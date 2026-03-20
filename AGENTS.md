@@ -39,7 +39,8 @@ Use this order:
 6. `docs/PROFILES.md`
 7. `docs/PATHS.md`
 8. `docs/STORAGE_LAYOUT.md`
-9. `docs/LIFECYCLE.md`
-10. `docs/RUNBOOK.md`
-11. `docs/SECURITY.md`
-12. `docs/MIGRATION_FROM_OLD.md`
+9. `docs/DEPLOYMENT.md`
+10. `docs/LIFECYCLE.md`
+11. `docs/RUNBOOK.md`
+12. `docs/SECURITY.md`
+13. `docs/MIGRATION_FROM_OLD.md`

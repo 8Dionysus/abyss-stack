@@ -29,6 +29,8 @@ jobs:
         run: |
           shellcheck \
             scripts/aoa-lib.sh \
+            scripts/aoa-install-layout \
+            scripts/aoa-sync-configs \
             scripts/aoa-up \
             scripts/aoa-down \
             scripts/aoa-status \

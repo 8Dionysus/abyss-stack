@@ -45,8 +45,9 @@ This repository should not absorb:
 5. Read [docs/PROFILES](docs/PROFILES.md).
 6. Read [docs/PATHS](docs/PATHS.md).
 7. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-8. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-9. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+8. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+9. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+10. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 ## Repository shape
 
@@ -83,6 +84,7 @@ The stack is organized around explicit compose modules rather than one swollen f
 
 The repository now includes:
 - profile files under `compose/profiles/`
+- deployment helpers under `scripts/`
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
 - a repository validation workflow under `.github/workflows/`
@@ -90,7 +92,7 @@ The repository now includes:
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass shifts the canonical runtime root to `/srv/abyss-stack`, makes the path model explicit, and adds validation for profile coherence and path drift.
+The current hardening pass shifts the canonical runtime root to `/srv/abyss-stack`, makes the path model explicit, adds deployment bridge scripts, and validates both profile coherence and path drift.
 
 ## License
 

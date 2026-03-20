@@ -24,6 +24,7 @@
 - reduce environment-specific assumptions where possible
 - enforce the new `/srv/abyss-stack` canonical runtime root
 - make the Fedora-first and Windows-usable path model explicit
+- make deployment from source checkout to runtime tree explicit and repeatable
 
 ## Phase 3: hybrid growth
 

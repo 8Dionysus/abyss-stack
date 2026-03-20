@@ -24,7 +24,7 @@ Expected live structure under `/srv/abyss-stack`:
 
 ## Meaning of the main directories
 
-- `Configs/` — compose modules, profiles, scripts, and service configs
+- `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, and service configs
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
 - `Services/` — persistent state for databases and runtime services
 - `Models/` — local model weights and related serving artifacts

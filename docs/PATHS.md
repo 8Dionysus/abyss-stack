@@ -57,6 +57,14 @@ may be mounted into the Linux runtime as:
 
 That preserves one stable in-runtime contract even when the host path differs.
 
+## Deployment bridge
+
+The repository includes helper scripts that bridge from a source checkout into the runtime tree:
+- `scripts/aoa-install-layout`
+- `scripts/aoa-sync-configs`
+
+Those scripts exist to keep the separation explicit instead of relying on path confusion.
+
 ## Why not make `C:\...` the canonical runtime root?
 
 Because the current compose surface still includes Linux-specific assumptions such as:

@@ -4,9 +4,17 @@
 
 The stack should be operated through explicit profiles and a systemd user entrypoint.
 
+## Deployment preparation
+
+The repository now includes deployment bridge scripts under `scripts/`:
+- `aoa-install-layout`
+- `aoa-sync-configs`
+
+They help bridge from a source checkout into the deployed runtime tree under `${AOA_STACK_ROOT}`.
+
 ## Human-facing wrappers
 
-The repository now includes these wrapper scripts under `scripts/`:
+The repository also includes these runtime wrappers under `scripts/`:
 - `aoa-up`
 - `aoa-down`
 - `aoa-status`

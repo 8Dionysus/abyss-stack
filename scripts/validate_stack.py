@@ -10,6 +10,16 @@ LEGACY_PATH = "/srv/abyss"
 LEGACY_ALLOWED = {
     ROOT / "docs" / "MIGRATION_FROM_OLD.md",
 }
+REQUIRED_SCRIPTS = {
+    "aoa-install-layout",
+    "aoa-sync-configs",
+    "aoa-up",
+    "aoa-down",
+    "aoa-status",
+    "aoa-logs",
+    "aoa-smoke",
+    "aoa-wait",
+}
 
 
 def iter_text_files() -> list[Path]:
@@ -53,16 +63,28 @@ def validate_paths(errors: list[str]) -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if "Fedora-first" not in readme:
         errors.append("README.md must state Fedora-first posture")
+    if "Windows-usable" not in readme:
+        errors.append("README.md must state Windows-usable posture")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
         errors.append("docs/PATHS.md must mention /srv/abyss-stack")
+    if "WSL2" not in paths_doc:
+        errors.append("docs/PATHS.md should mention WSL2 in the Windows-usable model")
+
+
+def validate_scripts(errors: list[str]) -> None:
+    script_names = {path.name for path in (ROOT / "scripts").iterdir() if path.is_file()}
+    missing = sorted(REQUIRED_SCRIPTS - script_names)
+    for name in missing:
+        errors.append(f"missing required script: scripts/{name}")
 
 
 def main() -> int:
     errors: list[str] = []
     validate_profiles(errors)
     validate_paths(errors)
+    validate_scripts(errors)
 
     if errors:
         print("validation failed:")
