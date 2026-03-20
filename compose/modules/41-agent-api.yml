@@ -1,3 +1,33 @@
-services: {}
-# Planned contents:
-# - langchain-api or successor agent-facing runtime API
+services:
+  langchain-api:
+    build: /srv/abyss/Services/langchain-api
+    container_name: langchain-api
+    env_file:
+      - /srv/abyss/Secrets/Configs/langchain-api.env
+    environment:
+      LC_BASE_URL: http://litellm:4000/v1
+      LC_API_KEY: EMPTY
+      LC_MODEL: aoa-tutor-deep
+      LC_TIMEOUT_S: 40
+      EMBEDDINGS_PROVIDER: ovms
+      OVMS_EMBEDDINGS_URL: http://ovms:8000/v3/embeddings
+      OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
+      OLLAMA_EMBEDDINGS_URL: http://ollama:11434/api/embed
+      OLLAMA_EMBEDDINGS_FALLBACK_URL: http://ollama:11434/api/embeddings
+      OLLAMA_EMBEDDINGS_MODEL: aoa-qwen3-embed-06b
+    depends_on:
+      litellm:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      ovms:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5401:5401"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5401/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped

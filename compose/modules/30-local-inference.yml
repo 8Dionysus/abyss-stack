@@ -1,3 +1,13 @@
-services: {}
-# Planned contents:
-# - ollama
+services:
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - /srv/abyss/Services/ollama:/root/.ollama:Z
+      - /srv/abyss/Models/gguf:/models:ro,Z
+      - /srv/abyss/Configs/ollama:/cfg:Z
+    ports:
+      - "127.0.0.1:11434:11434"

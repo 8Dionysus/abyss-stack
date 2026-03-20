@@ -13,7 +13,7 @@
 - reintroduce storage services cleanly
 - reintroduce orchestration and local inference
 - reintroduce gateway and agent API modules
-- reintroduce monitoring as a fully optional layer
+- reintroduce speech, browser, and monitoring modules
 
 ## Phase 2: operational hardening
 

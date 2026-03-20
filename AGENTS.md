@@ -33,6 +33,7 @@ Use this order:
 2. `CHARTER.md`
 3. `BOUNDARIES.md`
 4. `docs/ARCHITECTURE.md`
-5. `docs/LIFECYCLE.md`
-6. `docs/SECURITY.md`
-7. `docs/MIGRATION_FROM_OLD.md`
+5. `docs/SERVICE_CATALOG.md`
+6. `docs/LIFECYCLE.md`
+7. `docs/SECURITY.md`
+8. `docs/MIGRATION_FROM_OLD.md`

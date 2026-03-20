@@ -1,4 +1,31 @@
-services: {}
-# Planned contents:
-# - ovms
-# - Intel-specific inference helpers
+services:
+  ovms:
+    image: docker.io/openvino/model_server@sha256:e5ff7c50f3c36eae98c4e98d373e3fe91c9295630aea3cd8aaea0afd30be0e9c
+    container_name: ovms
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8200:8000"
+      - "127.0.0.1:9200:9000"
+    devices:
+      - /dev/dri:/dev/dri
+    env_file:
+      - /srv/abyss/Secrets/Configs/ovms-api.env
+    volumes:
+      - /srv/abyss/Models/ovms:/models:Z
+      - /srv/abyss/Secrets/Configs/ovms_api_key.txt:/run/secrets/ovms_api_key:ro,Z
+    command:
+      - --config_path
+      - /models/config.json
+      - --port
+      - "9000"
+      - --rest_port
+      - "8000"
+      - --log_level
+      - INFO
+      - --api_key_file
+      - /run/secrets/ovms_api_key
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/v2/health/live >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 20

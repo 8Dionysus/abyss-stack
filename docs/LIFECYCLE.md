@@ -37,7 +37,7 @@ podman compose \
 
 Optional modules should be layered explicitly rather than assumed.
 
-## Lifecycle rule
+## Profile rule
 
 A profile is a declared set of modules.
 A module is a declared concern.

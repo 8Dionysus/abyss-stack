@@ -19,6 +19,8 @@ The new stack uses small compose modules and named profiles.
 - `profiles/core.txt`
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
+- `profiles/tools.txt`
+- `profiles/observability.txt`
 
 A profile is only a list of module filenames in activation order.
 

@@ -14,6 +14,27 @@ The new repository keeps the useful body and removes monolith relapse.
 - operational docs as a core habit
 - storage, orchestration, inference, gateway, speech, browser, and monitoring service families
 
+## What has already been migrated
+
+### Service modules
+
+- `compose/modules/10-storage.yml`
+- `compose/modules/20-orchestration.yml`
+- `compose/modules/30-local-inference.yml`
+- `compose/modules/31-intel-inference.yml`
+- `compose/modules/40-llm-gateway.yml`
+- `compose/modules/41-agent-api.yml`
+- `compose/modules/50-speech.yml`
+- `compose/modules/51-browser-tools.yml`
+- `compose/modules/60-monitoring.yml`
+
+### Operational carryover
+
+- rootless and localhost-first posture
+- Intel-aware inference branch
+- `/srv/abyss` absolute runtime layout
+- optional heavy-data mount assumptions
+
 ## What changes
 
 ### Old
@@ -34,7 +55,7 @@ The new repository keeps the useful body and removes monolith relapse.
 - old `REQUIREMENTS.md` -> `docs/REFERENCE_PLATFORM.md`
 - old `BUILD.md` -> `docs/LIFECYCLE.md`
 - old `SECURITY.md` -> `docs/SECURITY.md`
-- old giant compose surfaces -> `compose/modules/*`
+- old compose surfaces -> `compose/modules/*`
 
 ## Migration rule
 

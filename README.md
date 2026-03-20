@@ -39,8 +39,9 @@ This repository should not absorb:
 1. Read [CHARTER](CHARTER.md).
 2. Read [BOUNDARIES](BOUNDARIES.md).
 3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
-4. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-5. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
+5. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+6. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 ## Repository shape
 
@@ -56,9 +57,9 @@ abyss-stack/
 └─ env/
 ```
 
-## Initial module layout
+## Module layout
 
-The new stack is organized around explicit compose modules rather than one swollen file:
+The stack is organized around explicit compose modules rather than one swollen file:
 
 - `10-storage.yml`
 - `20-orchestration.yml`
@@ -70,16 +71,10 @@ The new stack is organized around explicit compose modules rather than one swoll
 - `51-browser-tools.yml`
 - `60-monitoring.yml`
 
-## Initial profile layout
+## Current status
 
-- `core`
-- `agentic`
-- `intel`
-
-## Status
-
-This repository is now in structured bootstrap.
-The first goal is to establish a clean infra contract and modular skeleton before reintroducing concrete service details from `abyss-stack_old`.
+The bootstrap skeleton is in place and the first real services have now been migrated from `abyss-stack_old` into module files.
+The next work is profile-aware hardening, wrapper scripts, and service-by-service cleanup.
 
 ## License
 
