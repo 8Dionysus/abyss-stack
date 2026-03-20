@@ -1,0 +1,6 @@
+services: {}
+# Planned contents:
+# - prometheus
+# - grafana
+# - alertmanager
+# - cadvisor

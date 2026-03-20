@@ -1,0 +1,4 @@
+services: {}
+# Planned contents:
+# - ovms
+# - Intel-specific inference helpers

@@ -1,0 +1,6 @@
+services: {}
+# Planned contents:
+# - postgres
+# - redis
+# - qdrant
+# - neo4j
