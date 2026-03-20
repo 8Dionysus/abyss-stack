@@ -13,6 +13,7 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - secrets handling rules for infrastructure
 - backup, restore, smoke, and incident procedures
 - infra helper services and adapters
+- platform-aware path contracts for Fedora-first deployment and Windows-usable workflows
 
 ## Belongs elsewhere
 

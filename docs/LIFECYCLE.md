@@ -28,7 +28,7 @@ Expected pattern:
 Until wrappers are installed into the live runtime path, the intended manual shape is:
 
 ```bash
-cd /srv/abyss/Configs
+cd /srv/abyss-stack/Configs
 podman compose \
   -f compose/modules/10-storage.yml \
   -f compose/modules/20-orchestration.yml \
@@ -47,7 +47,12 @@ Its expected deployed location is:
 - `~/.config/systemd/user/podman-compose-abyss.service`
 
 It assumes the deployed runtime tree exists under:
-- `/srv/abyss/Configs`
+- `/srv/abyss-stack/Configs`
+
+## Path note
+
+The wrapper scripts treat the deployed Linux runtime path as distinct from any source checkout path.
+This is what makes the repository Fedora-first while still usable from Windows-oriented editing workflows.
 
 ## Profile rule
 

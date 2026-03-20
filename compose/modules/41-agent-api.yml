@@ -1,9 +1,9 @@
 services:
   langchain-api:
-    build: /srv/abyss/Services/langchain-api
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/langchain-api"
     container_name: langchain-api
     env_file:
-      - /srv/abyss/Secrets/Configs/langchain-api.env
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
       LC_BASE_URL: http://litellm:4000/v1
       LC_API_KEY: EMPTY

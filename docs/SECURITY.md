@@ -10,8 +10,8 @@
 ## Secret posture
 
 Expected live pattern:
-- runtime configs under `/srv/abyss/Configs`
-- secrets under `/srv/abyss/Secrets`
+- runtime configs under `/srv/abyss-stack/Configs`
+- secrets under `/srv/abyss-stack/Secrets`
 - example env files in `env/`
 - real env files never committed
 

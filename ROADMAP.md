@@ -22,6 +22,8 @@
 - add backup and restore helpers
 - add validation for compose coherence
 - reduce environment-specific assumptions where possible
+- enforce the new `/srv/abyss-stack` canonical runtime root
+- make the Fedora-first and Windows-usable path model explicit
 
 ## Phase 3: hybrid growth
 

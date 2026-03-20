@@ -2,15 +2,17 @@
 
 ## Canonical roots
 
-- `/srv/abyss` — active runtime root
+- `/srv/abyss-stack` — active deployed runtime root
 - `/abyss` — optional mounted vault for heavy data
+
+See also: [PATHS](PATHS.md) for the distinction between source checkout paths and deployed runtime paths.
 
 ## Active runtime tree
 
-Expected live structure under `/srv/abyss`:
+Expected live structure under `/srv/abyss-stack`:
 
 ```text
-/srv/abyss/
+/srv/abyss-stack/
   Configs/
   Secrets/
   Services/
@@ -47,6 +49,6 @@ If `/abyss` is not mounted, heavy writes may spill onto the system disk.
 ## Secret rule
 
 Never commit or publish real runtime material from:
-- `/srv/abyss/Secrets`
+- `/srv/abyss-stack/Secrets`
 - live `stack.env`
 - any secret-bearing mounted file used by services

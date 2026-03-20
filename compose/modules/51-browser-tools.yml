@@ -1,11 +1,11 @@
 services:
   docs-api:
-    build: /srv/abyss/Services/docs-api
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/docs-api"
     image: localhost/aoa-docs-api:0.2
     container_name: docs-api
     restart: unless-stopped
     volumes:
-      - /srv/abyss/Knowledge/n8n-docs:/docs/n8n-docs:ro,z
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Knowledge/n8n-docs:/docs/n8n-docs:ro,z"
     expose:
       - "5000"
     healthcheck:
@@ -25,7 +25,7 @@ services:
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       PYTHONUNBUFFERED: "1"
     volumes:
-      - /srv/abyss/Services/aoa-browser/ms-playwright:/ms-playwright:rw,Z,U
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/aoa-browser/ms-playwright:/ms-playwright:rw,Z,U"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
       interval: 10s

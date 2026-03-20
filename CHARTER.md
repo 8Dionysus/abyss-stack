@@ -27,6 +27,8 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 
 ## Design stance
 
+- Fedora-first deployment posture
+- Windows-usable source and path model
 - modular growth over infra monoliths
 - localhost-first exposure boundaries
 - rootless operation by default

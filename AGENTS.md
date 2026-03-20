@@ -4,7 +4,7 @@ Rules for coding agents and maintainers working in `abyss-stack`.
 
 ## Mission
 
-Move the stack forward without breaking locality, secrecy, or recoverability.
+Move the stack forward without breaking locality, secrecy, recoverability, or the Fedora-first deployment posture.
 
 ## Core protocol
 
@@ -19,6 +19,7 @@ Use this order:
 - do not widen host exposure from `127.0.0.1` to `0.0.0.0` without explicit operator intent
 - do not perform destructive data actions without an explicit rollback path
 - do not silently merge runtime and meaning layers back together
+- do not confuse a Windows source checkout path with the Linux runtime root
 
 ## Default stance
 
@@ -26,6 +27,7 @@ Use this order:
 - prefer profile-aware module changes over all-stack rewrites
 - prefer placeholder or skeletal files over pretending unfinished services are complete
 - prefer clarity and explicit boundaries over magical automation
+- preserve `/srv/abyss-stack` as the canonical deployed runtime root unless explicitly redesigned
 
 ## Repository reading order
 
@@ -35,8 +37,9 @@ Use this order:
 4. `docs/ARCHITECTURE.md`
 5. `docs/SERVICE_CATALOG.md`
 6. `docs/PROFILES.md`
-7. `docs/STORAGE_LAYOUT.md`
-8. `docs/LIFECYCLE.md`
-9. `docs/RUNBOOK.md`
-10. `docs/SECURITY.md`
-11. `docs/MIGRATION_FROM_OLD.md`
+7. `docs/PATHS.md`
+8. `docs/STORAGE_LAYOUT.md`
+9. `docs/LIFECYCLE.md`
+10. `docs/RUNBOOK.md`
+11. `docs/SECURITY.md`
+12. `docs/MIGRATION_FROM_OLD.md`

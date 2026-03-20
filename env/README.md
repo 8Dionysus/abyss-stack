@@ -11,6 +11,11 @@ This directory stores public-safe env examples only.
 
 ## Intended mapping
 
-- `env/stack.env.example` -> `/srv/abyss/Configs/stack.env`
-- `env/langchain-api.env.example` -> `/srv/abyss/Secrets/Configs/langchain-api.env`
-- `env/ovms-api.env.example` -> `/srv/abyss/Secrets/Configs/ovms-api.env`
+- `env/stack.env.example` -> `${AOA_STACK_ROOT}/Configs/stack.env`
+- `env/langchain-api.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env`
+- `env/ovms-api.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env`
+
+## Canonical deployed default
+
+Unless explicitly overridden, `AOA_STACK_ROOT` should resolve to:
+- `/srv/abyss-stack`

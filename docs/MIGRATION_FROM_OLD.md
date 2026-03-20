@@ -9,10 +9,15 @@ The new repository keeps the useful body and removes monolith relapse.
 ## What is retained from the old stack
 
 - rootless Podman and systemd user posture
-- `/srv/abyss` and `/abyss` storage assumptions
+- the `/abyss` heavy-data assumption as an optional mount
 - localhost-first security stance
 - operational docs as a core habit
 - storage, orchestration, inference, gateway, speech, browser, and monitoring service families
+
+## Canonical root shift
+
+The old stack revolved around `/srv/abyss`.
+The new stack now uses `/srv/abyss-stack` as the canonical deployed runtime root.
 
 ## What has already been migrated
 
@@ -32,7 +37,7 @@ The new repository keeps the useful body and removes monolith relapse.
 
 - rootless and localhost-first posture
 - Intel-aware inference branch
-- `/srv/abyss` absolute runtime layout
+- `/srv/abyss-stack` as the new absolute runtime layout root
 - optional heavy-data mount assumptions
 
 ## What changes
@@ -41,12 +46,14 @@ The new repository keeps the useful body and removes monolith relapse.
 - one broad `compose.stack.yml`
 - optional layers existed but the stack still felt center-heavy
 - infra repo still carried traces of broader cosmology
+- canonical runtime root was `/srv/abyss`
 
 ### New
 - explicit module files by concern
 - profile-driven activation
 - infra-only ownership boundaries
 - sibling AoA repositories stay authoritative for authored meaning
+- canonical runtime root is `/srv/abyss-stack`
 
 ## Mapping sketch
 

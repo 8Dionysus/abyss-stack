@@ -37,4 +37,4 @@ If they accidentally appear on host ports, treat that as drift.
 
 ## First rollback instinct
 
-If a change widened scope, broke locality, or tangled profiles, prefer a small rollback over improvising a giant repair.
+If a change widened scope, broke locality, tangled profiles, or mixed Windows host paths with Linux runtime paths, prefer a small rollback over improvising a giant repair.

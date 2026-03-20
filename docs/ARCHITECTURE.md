@@ -61,6 +61,14 @@ The intended rule is simple:
 - env examples may live in repo
 - real secrets do not live in repo
 
+## Platform stance
+
+The stack is Fedora-first as a deployed runtime.
+Windows usability is achieved by separating:
+- source checkout paths
+- deployed Linux runtime paths
+- optional host-side vault paths
+
 ## Ecosystem boundaries
 
 Sibling AoA repositories own authored meaning.

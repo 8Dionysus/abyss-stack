@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AOA_CONFIGS_ROOT="${AOA_CONFIGS_ROOT:-/srv/abyss/Configs}"
+AOA_STACK_ROOT="${AOA_STACK_ROOT:-/srv/abyss-stack}"
+AOA_CONFIGS_ROOT="${AOA_CONFIGS_ROOT:-${AOA_STACK_ROOT}/Configs}"
+AOA_VAULT_ROOT="${AOA_VAULT_ROOT:-/abyss}"
 AOA_STACK_PROFILE="${AOA_STACK_PROFILE:-core}"
 AOA_COMPOSE_PROJECT_NAME="${AOA_COMPOSE_PROJECT_NAME:-abyss}"
 AOA_LOG_TAIL="${AOA_LOG_TAIL:-200}"
 AOA_WAIT_TIMEOUT_S="${AOA_WAIT_TIMEOUT_S:-120}"
 AOA_WAIT_INTERVAL_S="${AOA_WAIT_INTERVAL_S:-5}"
+
+export AOA_STACK_ROOT
+export AOA_CONFIGS_ROOT
+export AOA_VAULT_ROOT
 
 AOA_MODULES_DIR="${AOA_CONFIGS_ROOT}/compose/modules"
 AOA_PROFILES_DIR="${AOA_CONFIGS_ROOT}/compose/profiles"
@@ -120,7 +126,9 @@ aoa_compose() {
 aoa_print_profile_summary() {
   local module_name
   aoa_note "profile: ${AOA_STACK_PROFILE}"
+  aoa_note "stack root: ${AOA_STACK_ROOT}"
   aoa_note "configs root: ${AOA_CONFIGS_ROOT}"
+  aoa_note "vault root: ${AOA_VAULT_ROOT}"
   aoa_note "compose project: ${AOA_COMPOSE_PROJECT_NAME}"
   aoa_note "modules:"
   for module_name in "${AOA_PROFILE_MODULE_NAMES[@]}"; do

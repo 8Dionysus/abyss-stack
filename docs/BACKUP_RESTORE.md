@@ -10,6 +10,7 @@ Configuration and documentation state:
 - scripts
 - systemd user files
 - public-safe docs
+- path and platform contracts
 
 ### S1
 

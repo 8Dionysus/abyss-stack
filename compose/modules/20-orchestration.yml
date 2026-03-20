@@ -2,12 +2,12 @@ services:
   n8n:
     image: docker.io/n8nio/n8n:latest
     env_file:
-      - /srv/abyss/Configs/stack.env
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/stack.env"
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
-      - /srv/abyss/Services/n8n:/home/node/.n8n:Z
-      - /srv/abyss/Knowledge/n8n-docs:/docs/n8n-docs:ro,z
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/n8n:/home/node/.n8n:Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Knowledge/n8n-docs:/docs/n8n-docs:ro,z"
     depends_on:
       - postgres
     restart: unless-stopped

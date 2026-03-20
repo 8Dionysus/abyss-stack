@@ -5,8 +5,27 @@
 - Fedora 43
 - rootless Podman
 - systemd user units
-- `/srv/abyss` as the canonical runtime root
+- `/srv/abyss-stack` as the canonical runtime root
 - `/abyss` as an optional mounted vault for heavy data
+
+## Fedora-first means
+
+The primary operational target is Fedora.
+That is where:
+- path defaults are anchored
+- SELinux-aware volume posture is assumed
+- rootless Podman is treated as canonical
+- systemd user units are part of the normal lifecycle model
+
+## Windows-usable means
+
+Windows is supported as a source and workflow environment, not as the canonical native runtime target for the current compose surface.
+
+Recommended Windows shape:
+- source checkout on Windows host wherever convenient
+- runtime deployment inside WSL2 or a Linux-oriented Podman machine
+- canonical runtime root inside that Linux layer remains `/srv/abyss-stack`
+- optional host vault path may be mapped into the Linux runtime as `/abyss`
 
 ## Why this matters
 
@@ -35,5 +54,5 @@ It is shaped around:
 
 This repository is intentionally aligned with:
 - rootless Podman rather than Docker
-- a local AI stack rooted under `/srv/abyss`
+- a local AI stack rooted under `/srv/abyss-stack`
 - an Intel-aware branch of the inference surface

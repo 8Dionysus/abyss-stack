@@ -6,8 +6,8 @@ services:
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
     volumes:
-      - /srv/abyss/Services/ollama:/root/.ollama:Z
-      - /srv/abyss/Models/gguf:/models:ro,Z
-      - /srv/abyss/Configs/ollama:/cfg:Z
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/ollama:/root/.ollama:Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/gguf:/models:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/ollama:/cfg:Z"
     ports:
       - "127.0.0.1:11434:11434"

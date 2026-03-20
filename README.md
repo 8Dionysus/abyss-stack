@@ -2,6 +2,8 @@
 
 `abyss-stack` is the infrastructure substrate of the AoA and ToS ecosystem.
 
+It is **Fedora-first** in deployment posture, while remaining **Windows-usable** for source work, path mapping, and hybrid workflows.
+
 It owns runtime, deployment, storage layout, lifecycle, security, and infra glue.
 It does **not** own the authored meaning of the specialized AoA layers.
 
@@ -41,9 +43,10 @@ This repository should not absorb:
 3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
 4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
 5. Read [docs/PROFILES](docs/PROFILES.md).
-6. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-7. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-8. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+6. Read [docs/PATHS](docs/PATHS.md).
+7. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+8. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+9. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 ## Repository shape
 
@@ -58,7 +61,8 @@ abyss-stack/
 ├─ compose/
 ├─ scripts/
 ├─ systemd/
-└─ env/
+├─ env/
+└─ .github/
 ```
 
 ## Module layout
@@ -81,11 +85,12 @@ The repository now includes:
 - profile files under `compose/profiles/`
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
+- a repository validation workflow under `.github/workflows/`
 
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The next work is hardening, cleanup, and gradual reduction of environment-specific assumptions.
+The current hardening pass shifts the canonical runtime root to `/srv/abyss-stack`, makes the path model explicit, and adds validation for profile coherence and path drift.
 
 ## License
 
