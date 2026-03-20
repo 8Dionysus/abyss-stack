@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_DIR = ROOT / "compose" / "profiles"
 MODULE_DIR = ROOT / "compose" / "modules"
 LEGACY_PATH = "/srv/abyss"
+LEGACY_PATTERN = re.compile(r"/srv/abyss(?!-)")
 LEGACY_ALLOWED = {
     ROOT / "docs" / "MIGRATION_FROM_OLD.md",
+    ROOT / "scripts" / "validate_stack.py",
 }
 REQUIRED_SCRIPTS = {
     "aoa-install-layout",
@@ -55,7 +58,7 @@ def validate_profiles(errors: list[str]) -> None:
 def validate_paths(errors: list[str]) -> None:
     for path in iter_text_files():
         text = path.read_text(encoding="utf-8")
-        if LEGACY_PATH in text and path not in LEGACY_ALLOWED:
+        if LEGACY_PATTERN.search(text) and path not in LEGACY_ALLOWED:
             errors.append(
                 f"legacy path '{LEGACY_PATH}' found in {path.relative_to(ROOT)}"
             )
