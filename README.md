@@ -40,8 +40,10 @@ This repository should not absorb:
 2. Read [BOUNDARIES](BOUNDARIES.md).
 3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
 4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
-5. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-6. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+5. Read [docs/PROFILES](docs/PROFILES.md).
+6. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+7. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+8. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 ## Repository shape
 
@@ -54,6 +56,8 @@ abyss-stack/
 ├─ AGENTS.md
 ├─ docs/
 ├─ compose/
+├─ scripts/
+├─ systemd/
 └─ env/
 ```
 
@@ -71,10 +75,17 @@ The stack is organized around explicit compose modules rather than one swollen f
 - `51-browser-tools.yml`
 - `60-monitoring.yml`
 
+## Lifecycle surfaces
+
+The repository now includes:
+- profile files under `compose/profiles/`
+- human-facing wrappers under `scripts/`
+- a systemd user unit skeleton under `systemd/user/`
+
 ## Current status
 
-The bootstrap skeleton is in place and the first real services have now been migrated from `abyss-stack_old` into module files.
-The next work is profile-aware hardening, wrapper scripts, and service-by-service cleanup.
+The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
+The next work is hardening, cleanup, and gradual reduction of environment-specific assumptions.
 
 ## License
 

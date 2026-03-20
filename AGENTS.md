@@ -34,6 +34,9 @@ Use this order:
 3. `BOUNDARIES.md`
 4. `docs/ARCHITECTURE.md`
 5. `docs/SERVICE_CATALOG.md`
-6. `docs/LIFECYCLE.md`
-7. `docs/SECURITY.md`
-8. `docs/MIGRATION_FROM_OLD.md`
+6. `docs/PROFILES.md`
+7. `docs/STORAGE_LAYOUT.md`
+8. `docs/LIFECYCLE.md`
+9. `docs/RUNBOOK.md`
+10. `docs/SECURITY.md`
+11. `docs/MIGRATION_FROM_OLD.md`

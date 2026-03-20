@@ -21,6 +21,7 @@
 - add profile-aware lifecycle wrappers
 - add backup and restore helpers
 - add validation for compose coherence
+- reduce environment-specific assumptions where possible
 
 ## Phase 3: hybrid growth
 

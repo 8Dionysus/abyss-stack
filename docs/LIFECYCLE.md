@@ -4,18 +4,19 @@
 
 The stack should be operated through explicit profiles and a systemd user entrypoint.
 
-## Intended lifecycle surfaces
+## Human-facing wrappers
 
-### Human-facing wrappers
-
-Planned wrapper family:
+The repository now includes these wrapper scripts under `scripts/`:
 - `aoa-up`
 - `aoa-down`
 - `aoa-status`
 - `aoa-logs`
 - `aoa-smoke`
+- `aoa-wait`
 
-### Low-level canonical path
+They resolve a profile into an ordered compose module list.
+
+## Low-level canonical path
 
 Expected pattern:
 - profile resolves to an ordered module list
@@ -24,7 +25,7 @@ Expected pattern:
 
 ## Bootstrap manual pattern
 
-Until wrappers are reintroduced, the intended manual shape is:
+Until wrappers are installed into the live runtime path, the intended manual shape is:
 
 ```bash
 cd /srv/abyss/Configs
@@ -36,6 +37,17 @@ podman compose \
 ```
 
 Optional modules should be layered explicitly rather than assumed.
+
+## Systemd user surface
+
+A first unit skeleton now lives at:
+- `systemd/user/podman-compose-abyss.service`
+
+Its expected deployed location is:
+- `~/.config/systemd/user/podman-compose-abyss.service`
+
+It assumes the deployed runtime tree exists under:
+- `/srv/abyss/Configs`
 
 ## Profile rule
 
