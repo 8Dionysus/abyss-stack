@@ -1,7 +1,0 @@
-services:
-  ollama:
-    environment:
-      OLLAMA_NUM_PARALLEL: "1"
-      OLLAMA_MAX_QUEUE: "32"
-      OLLAMA_MAX_LOADED_MODELS: "1"
-      OLLAMA_KEEP_ALIVE: "10m"

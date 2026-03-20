@@ -49,6 +49,24 @@ This repository should not absorb:
 9. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
 10. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
+For the shortest next route by intent:
+- if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
+- if you need the knowledge world and authored architecture, go to [`Tree-of-Sophia`](https://github.com/8Dionysus/Tree-of-Sophia)
+- if you need reusable practice, go to [`aoa-techniques`](https://github.com/8Dionysus/aoa-techniques)
+- if you need bounded execution workflows, go to [`aoa-skills`](https://github.com/8Dionysus/aoa-skills)
+- if you need portable proof surfaces, go to [`aoa-evals`](https://github.com/8Dionysus/aoa-evals)
+
+## Quick route table
+
+| repository | owns | go here when |
+|---|---|---|
+| `abyss-stack` | runtime, deployment, storage, lifecycle, and infra glue | you need the body the system runs on |
+| `Agents-of-Abyss` | ecosystem identity, layer map, federation rules, program-level direction | you need the center and the constitutional view of AoA |
+| `Tree-of-Sophia` | living knowledge architecture for philosophy and world thought | you need the knowledge world rather than the runtime body |
+| `aoa-techniques` | reusable engineering practice | you need durable techniques rather than infrastructure modules |
+| `aoa-skills` | bounded agent-facing execution workflows | you need executable workflows rather than deployment posture |
+| `aoa-evals` | portable proof surfaces for bounded claims | you need evaluation and quality checks rather than runtime services |
+
 ## Repository shape
 
 ```text
