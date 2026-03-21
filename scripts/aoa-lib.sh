@@ -72,6 +72,7 @@ aoa_join_csv() {
   printf '%s' "${items[*]}"
 }
 
+# shellcheck disable=SC2120
 aoa_parse_profile_args() {
   local explicit_preset=0
   local explicit_profile=0
@@ -204,6 +205,7 @@ aoa_resolve_profiles() {
   local -A seen_profiles=()
 
   if ((${#AOA_ACTIVE_PRESETS[@]} == 0)) && ((${#AOA_ACTIVE_PROFILES[@]} == 0)); then
+    # shellcheck disable=SC2119
     aoa_parse_profile_args
   fi
 

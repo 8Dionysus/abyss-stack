@@ -30,15 +30,15 @@ if ((${#AOA_PRESET_NAMES[@]} == 0)); then
 fi
 
 if ((paths_mode)); then
+  preset_file=""
+  profile_file=""
   aoa_note ""
   aoa_note "preset files:"
-  local preset_file
   for preset_file in "${AOA_PRESET_FILES[@]}"; do
     aoa_note "- ${preset_file}"
   done
   aoa_note ""
   aoa_note "resolved profile files:"
-  local profile_file
   for profile_file in "${AOA_PROFILE_FILES[@]}"; do
     aoa_note "- ${profile_file}"
   done

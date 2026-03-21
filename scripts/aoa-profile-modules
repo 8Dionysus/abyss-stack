@@ -24,9 +24,9 @@ aoa_resolve_modules
 aoa_print_profile_summary
 
 if ((paths_mode)); then
+  module_file=""
   aoa_note ""
   aoa_note "module files:"
-  local module_file
   for module_file in "${AOA_PROFILE_MODULE_FILES[@]}"; do
     aoa_note "- ${module_file}"
   done
