@@ -1,0 +1,39 @@
+name: validate-stack
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Validate stack structure
+        run: python scripts/validate_stack.py
+
+      - name: Shellcheck scripts
+        run: |
+          shellcheck \
+            scripts/aoa-lib.sh \
+            scripts/aoa-install-layout \
+            scripts/aoa-sync-configs \
+            scripts/aoa-up \
+            scripts/aoa-down \
+            scripts/aoa-status \
+            scripts/aoa-logs \
+            scripts/aoa-smoke \
+            scripts/aoa-wait

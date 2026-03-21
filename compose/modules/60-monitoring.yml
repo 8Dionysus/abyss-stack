@@ -1,0 +1,64 @@
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v3.5.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.listen-address=0.0.0.0:9090"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z"
+      - "prometheus_data:/prometheus:Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro,Z"
+    restart: unless-stopped
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.56.2
+    privileged: true
+    security_opt:
+      - label=disable
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - "/:/rootfs:ro"
+      - "/sys:/sys:ro"
+      - "/dev/disk:/dev/disk:ro"
+      - "/etc/machine-id:/etc/machine-id:ro"
+      - "/home/${AOA_RUNTIME_USER:-dionysus}/.local/share/containers:/var/lib/containers:ro"
+      - "/run/user/${AOA_RUNTIME_UID:-1000}/podman:/var/run/podman:ro"
+    restart: unless-stopped
+
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.28.1
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.listen-address=0.0.0.0:9093"
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z"
+      - "alertmanager_data:/alertmanager:Z"
+    restart: unless-stopped
+
+  grafana:
+    image: docker.io/grafana/grafana:latest
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: adminadmin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - "grafana_data:/var/lib/grafana:Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro,Z"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data: {}
+  alertmanager_data: {}
+  grafana_data: {}
