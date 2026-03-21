@@ -16,12 +16,22 @@ LEGACY_ALLOWED = {
 REQUIRED_SCRIPTS = {
     "aoa-install-layout",
     "aoa-sync-configs",
+    "aoa-bootstrap-configs",
+    "aoa-check-layout",
+    "aoa-install-systemd",
     "aoa-up",
     "aoa-down",
     "aoa-status",
     "aoa-logs",
     "aoa-smoke",
     "aoa-wait",
+}
+REQUIRED_FILES = {
+    ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
+    ROOT / "config-templates" / "README.md",
+    ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
+    ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
+    ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
 }
 
 
@@ -83,11 +93,18 @@ def validate_scripts(errors: list[str]) -> None:
         errors.append(f"missing required script: scripts/{name}")
 
 
+def validate_required_files(errors: list[str]) -> None:
+    for path in sorted(REQUIRED_FILES):
+        if not path.exists():
+            errors.append(f"missing required file: {path.relative_to(ROOT)}")
+
+
 def main() -> int:
     errors: list[str] = []
     validate_profiles(errors)
     validate_paths(errors)
     validate_scripts(errors)
+    validate_required_files(errors)
 
     if errors:
         print("validation failed:")

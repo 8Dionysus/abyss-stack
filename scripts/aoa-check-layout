@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+strict_mode=0
+while (($#)); do
+  case "$1" in
+    --strict)
+      strict_mode=1
+      ;;
+    *)
+      aoa_die "unknown argument: $1"
+      ;;
+  esac
+  shift || true
+done
+
+errors=0
+warnings=0
+
+check_dir() {
+  local path="$1"
+  if [[ -d "$path" ]]; then
+    aoa_note "ok   dir  $path"
+  else
+    aoa_note "fail dir  $path"
+    errors=$((errors + 1))
+  fi
+}
+
+check_warn_file() {
+  local label="$1"
+  local path="$2"
+  if [[ -e "$path" ]]; then
+    aoa_note "ok   file $label -> $path"
+  else
+    aoa_note "warn file $label -> $path"
+    warnings=$((warnings + 1))
+  fi
+}
+
+required_dirs=(
+  "${AOA_STACK_ROOT}/Configs"
+  "${AOA_STACK_ROOT}/Secrets/Configs"
+  "${AOA_STACK_ROOT}/Services"
+  "${AOA_STACK_ROOT}/Models"
+  "${AOA_STACK_ROOT}/Knowledge"
+  "${AOA_STACK_ROOT}/Logs"
+)
+
+for path in "${required_dirs[@]}"; do
+  check_dir "$path"
+done
+
+check_warn_file "stack env" "${AOA_STACK_ROOT}/Configs/stack.env"
+check_warn_file "langchain env" "${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
+check_warn_file "ovms env" "${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env"
+check_warn_file "ovms key file" "${AOA_STACK_ROOT}/Secrets/Configs/ovms_api_key.txt"
+check_warn_file "prometheus config" "${AOA_STACK_ROOT}/Configs/monitoring/prometheus.yml"
+check_warn_file "alert rules" "${AOA_STACK_ROOT}/Configs/monitoring/alerts.yml"
+check_warn_file "alertmanager config" "${AOA_STACK_ROOT}/Configs/monitoring/alertmanager/alertmanager.yml"
+check_warn_file "grafana datasource" "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources/prometheus.yml"
+check_warn_file "tts voices" "${AOA_STACK_ROOT}/Configs/tts/voices.yaml"
+check_warn_file "litellm config" "${AOA_STACK_ROOT}/Services/litellm/config.yaml"
+
+if ((errors > 0)); then
+  aoa_die "layout check failed with ${errors} hard errors"
+fi
+
+if ((strict_mode)) && ((warnings > 0)); then
+  aoa_die "layout check found ${warnings} warnings in strict mode"
+fi
+
+aoa_note "layout check passed"
+if ((warnings > 0)); then
+  aoa_note "warnings: ${warnings}"
+fi

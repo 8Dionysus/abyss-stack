@@ -24,9 +24,9 @@ Expected live structure under `/srv/abyss-stack`:
 
 ## Meaning of the main directories
 
-- `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, and service configs
+- `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, config templates, and runtime config files bootstrapped from those templates
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
-- `Services/` — persistent state for databases and runtime services
+- `Services/` — persistent state for databases and runtime services, plus a few runtime service-local inputs such as the LiteLLM config file
 - `Models/` — local model weights and related serving artifacts
 - `Knowledge/` — local knowledge corpora and helper inputs
 - `Logs/` — logs and generated runtime artifacts

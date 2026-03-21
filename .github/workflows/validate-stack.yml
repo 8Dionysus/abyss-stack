@@ -31,6 +31,9 @@ jobs:
             scripts/aoa-lib.sh \
             scripts/aoa-install-layout \
             scripts/aoa-sync-configs \
+            scripts/aoa-bootstrap-configs \
+            scripts/aoa-check-layout \
+            scripts/aoa-install-systemd \
             scripts/aoa-up \
             scripts/aoa-down \
             scripts/aoa-status \

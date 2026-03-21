@@ -9,6 +9,9 @@ The stack should be operated through explicit profiles and a systemd user entryp
 The repository now includes deployment bridge scripts under `scripts/`:
 - `aoa-install-layout`
 - `aoa-sync-configs`
+- `aoa-bootstrap-configs`
+- `aoa-check-layout`
+- `aoa-install-systemd`
 
 They help bridge from a source checkout into the deployed runtime tree under `${AOA_STACK_ROOT}`.
 

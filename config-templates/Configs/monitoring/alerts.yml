@@ -1,0 +1,11 @@
+groups:
+  - name: abyss-stack-example
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Prometheus target down
+          description: Target {{ $labels.instance }} for job {{ $labels.job }} is down.

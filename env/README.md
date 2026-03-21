@@ -19,3 +19,7 @@ This directory stores public-safe env examples only.
 
 Unless explicitly overridden, `AOA_STACK_ROOT` should resolve to:
 - `/srv/abyss-stack`
+
+## See also
+
+- `docs/SECRETS_BOOTSTRAP.md`

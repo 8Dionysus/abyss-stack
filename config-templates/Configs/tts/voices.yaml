@@ -1,0 +1,10 @@
+voices:
+  default:
+    backend: qwen-tts
+    reference: /voices/example.wav
+    style: neutral
+
+  narrator:
+    backend: qwen-tts
+    reference: /voices/example.wav
+    style: calm

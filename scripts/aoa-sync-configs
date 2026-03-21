@@ -38,6 +38,7 @@ fi
 
 items=(
   compose
+  config-templates
   docs
   scripts
   systemd

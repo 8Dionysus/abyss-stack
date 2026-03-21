@@ -5,14 +5,16 @@
 When something feels wrong, use this order:
 
 1. check profile and module intent
-2. check container state
-3. check health endpoints
-4. check logs
-5. decide whether to fix forward or roll back
+2. check runtime layout and required files
+3. check container state
+4. check health endpoints
+5. check logs
+6. decide whether to fix forward or roll back
 
 ## Useful commands
 
 ```bash
+aoa-check-layout
 aoa-status --profile core
 aoa-smoke --profile core
 aoa-logs --profile core

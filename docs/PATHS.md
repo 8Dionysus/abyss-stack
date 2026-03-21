@@ -62,6 +62,7 @@ That preserves one stable in-runtime contract even when the host path differs.
 The repository includes helper scripts that bridge from a source checkout into the runtime tree:
 - `scripts/aoa-install-layout`
 - `scripts/aoa-sync-configs`
+- `scripts/aoa-bootstrap-configs`
 
 Those scripts exist to keep the separation explicit instead of relying on path confusion.
 

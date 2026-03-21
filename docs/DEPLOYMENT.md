@@ -23,13 +23,11 @@ Suggested flow:
 cd ~/src/abyss-stack
 scripts/aoa-install-layout
 scripts/aoa-sync-configs
+scripts/aoa-bootstrap-configs
+scripts/aoa-check-layout
 ```
 
-Then create or place the real secret-bearing files under:
-
-```text
-/srv/abyss-stack/Secrets/Configs/
-```
+Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
 ## Scenario B: Windows checkout plus Linux runtime
 
@@ -41,7 +39,9 @@ Suggested logic:
 1. keep editing in the Windows checkout if that is convenient
 2. run the deployment bridge scripts inside the Linux layer against the repo view available there
 3. deploy into `/srv/abyss-stack`
-4. optionally map a Windows host vault path into `/abyss`
+4. bootstrap public-safe runtime config files from templates
+5. bootstrap secrets separately
+6. optionally map a Windows host vault path into `/abyss`
 
 The important thing is not where the source lives.
 The important thing is that the deployed runtime still becomes `/srv/abyss-stack` inside Linux.
@@ -59,6 +59,21 @@ Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_
 By default it is non-destructive.
 An explicit `--delete` mode exists for a tighter mirror when that is desired.
 
+### `scripts/aoa-bootstrap-configs`
+
+Copies public-safe config templates into the runtime tree if the destination files are missing.
+Use `--force` only when you explicitly want template content to overwrite existing runtime config files.
+
+### `scripts/aoa-check-layout`
+
+Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
+Use `--strict` if warnings should fail the command.
+
+### `scripts/aoa-install-systemd`
+
+Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.
+Use `--enable-now` if you want it enabled and started immediately.
+
 ## Recommended first deployment flow
 
 ```bash
@@ -67,7 +82,11 @@ export AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
 
 scripts/aoa-install-layout
 scripts/aoa-sync-configs
+scripts/aoa-bootstrap-configs
+scripts/aoa-check-layout
 ```
+
+Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
 Then inspect:
 
@@ -84,6 +103,12 @@ Or manually use the deployed scripts:
 ## systemd user install
 
 After the deployed config tree exists:
+
+```bash
+scripts/aoa-install-systemd --enable-now
+```
+
+Or manually:
 
 ```bash
 mkdir -p ~/.config/systemd/user
