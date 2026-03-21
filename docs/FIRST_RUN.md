@@ -82,22 +82,24 @@ scripts/aoa-profile-endpoints --profile intel
 scripts/aoa-up --profile intel
 ```
 
-## Optional helper layers
+## Compose optional layers
 
-### Tools
+### Agent runtime plus tools
 
 ```bash
-scripts/aoa-profile-endpoints --profile tools
-scripts/aoa-up --profile tools
-scripts/aoa-internal-probes --profile tools
+scripts/aoa-profile-modules --profile agentic --profile tools --paths
+scripts/aoa-profile-endpoints --profile agentic --profile tools
+scripts/aoa-up --profile agentic --profile tools
+scripts/aoa-smoke --with-internal --profile agentic --profile tools
 ```
 
-### Observability
+### Agent runtime plus tools plus observability
 
 ```bash
-scripts/aoa-profile-endpoints --profile observability
-scripts/aoa-up --profile observability
-scripts/aoa-internal-probes --profile observability
+scripts/aoa-profile-modules --profile agentic,tools,observability --paths
+scripts/aoa-profile-endpoints --profile agentic,tools,observability
+scripts/aoa-up --profile agentic,tools,observability
+scripts/aoa-smoke --with-internal --profile agentic,tools,observability
 ```
 
 ## If something feels wrong

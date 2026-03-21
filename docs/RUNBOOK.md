@@ -26,6 +26,14 @@ aoa-smoke --profile core
 aoa-logs --profile core
 ```
 
+For combined surfaces:
+
+```bash
+aoa-profile-modules --profile agentic --profile tools --profile observability --paths
+aoa-profile-endpoints --profile agentic --profile tools --profile observability
+aoa-smoke --with-internal --profile agentic --profile tools --profile observability
+```
+
 Low-level checks:
 
 ```bash

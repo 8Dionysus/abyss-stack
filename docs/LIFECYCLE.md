@@ -21,8 +21,9 @@ They help bridge from a source checkout into the deployed runtime tree under `${
 
 The repository also includes:
 - `aoa-profile-modules`
+- `aoa-profile-endpoints`
 
-This helper makes it easy to see what a profile will activate before you start it.
+These helpers make it easy to see what a profile, or profile-combination, will activate before you start it.
 
 ## Human-facing wrappers
 
@@ -36,10 +37,23 @@ The repository also includes these runtime wrappers under `scripts/`:
 
 They resolve a profile into an ordered compose module list.
 
+## Profile composition
+
+You can operate one profile or several composed profiles.
+Examples:
+
+```bash
+aoa-up --profile agentic --profile tools
+aoa-up --profile agentic,tools,observability
+```
+
+The order matters because module ordering is preserved.
+Optional layers such as `tools` and `observability` should usually come after the base profile.
+
 ## Low-level canonical path
 
 Expected pattern:
-- profile resolves to an ordered module list
+- one or more profiles resolve to an ordered module list
 - compose files are applied in that order
 - systemd user unit becomes the stable operator entrypoint
 

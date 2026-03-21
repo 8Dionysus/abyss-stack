@@ -101,11 +101,13 @@ Use `--enable-now` if you want it enabled and started immediately.
 
 Shows which compose modules a profile resolves to.
 Use `--paths` if you want the absolute module file paths.
+You can pass several profiles.
 
 ### `scripts/aoa-profile-endpoints`
 
 Shows the host-facing endpoints and internal-only notes for a profile.
 Use it before or after startup to understand what should become reachable.
+You can pass several profiles.
 
 ## Recommended first deployment flow
 
@@ -134,6 +136,16 @@ Or manually use the deployed scripts:
 
 ```bash
 /srv/abyss-stack/Configs/scripts/aoa-up --profile core
+```
+
+## Combined runtime example
+
+Bring up an agent runtime plus tools and observability:
+
+```bash
+aoa-profile-modules --profile agentic --profile tools --profile observability --paths
+aoa-profile-endpoints --profile agentic --profile tools --profile observability
+aoa-up --profile agentic --profile tools --profile observability
 ```
 
 ## systemd user install

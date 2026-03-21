@@ -75,3 +75,5 @@ jobs:
           scripts/aoa-profile-endpoints --profile intel
           scripts/aoa-profile-endpoints --profile tools
           scripts/aoa-profile-endpoints --profile observability
+          scripts/aoa-profile-modules --profile agentic --profile tools --profile observability --paths
+          scripts/aoa-profile-endpoints --profile agentic,tools,observability

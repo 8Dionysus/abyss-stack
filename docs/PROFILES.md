@@ -57,16 +57,40 @@ Only then should it be included in one or more profiles.
 Some modules rely on sibling modules being present in the same profile.
 The repository validator now checks these inter-module requirements so broken profiles fail fast in CI.
 
+## Composing profiles
+
+Profiles can now be combined.
+This is the intended way to layer optional surfaces like `tools` and `observability` onto a base runtime path.
+
+### Repeated `--profile`
+
+```bash
+aoa-up --profile agentic --profile tools --profile observability
+```
+
+### Comma-separated form
+
+```bash
+aoa-up --profile agentic,tools,observability
+```
+
+## Composition rule
+
+- profiles are resolved in the order you declare them
+- modules are appended in that order
+- duplicate modules are kept only once, at first appearance
+- optional layers should usually come after the base profile
+
 ## Practical note
 
-If you want to see the concrete host-facing endpoints and post-start checks for a profile, read:
+If you want to see the concrete host-facing endpoints and post-start checks for a profile or profile-combination, read:
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
 
 Or use:
 
 ```bash
-aoa-profile-endpoints --profile agentic
-aoa-profile-modules --profile agentic --paths
+aoa-profile-modules --profile agentic --profile tools --paths
+aoa-profile-endpoints --profile agentic --profile tools
 ```
 
 ## Examples
@@ -91,6 +115,14 @@ Bring up the Intel-aware agent runtime:
 aoa-profile-modules --profile intel --paths
 aoa-profile-endpoints --profile intel
 aoa-up --profile intel
+```
+
+Bring up an agent runtime plus tools and observability:
+
+```bash
+aoa-profile-modules --profile agentic --profile tools --profile observability --paths
+aoa-profile-endpoints --profile agentic --profile tools --profile observability
+aoa-up --profile agentic --profile tools --profile observability
 ```
 
 Bring up only observability:

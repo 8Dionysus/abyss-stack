@@ -149,3 +149,54 @@ scripts/aoa-wait --profile observability
 scripts/aoa-smoke --profile observability
 scripts/aoa-internal-probes --profile observability
 ```
+
+## Common combined recipes
+
+### `agentic + tools`
+
+What it gives you:
+- the generic local agent path
+- speech endpoints on the host
+- browser-tools surfaces kept internal-only
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile agentic --profile tools --paths
+scripts/aoa-profile-endpoints --profile agentic --profile tools
+scripts/aoa-up --profile agentic --profile tools
+scripts/aoa-smoke --with-internal --profile agentic --profile tools
+```
+
+### `agentic + observability`
+
+What it gives you:
+- the generic local agent path
+- dashboards and metrics visibility
+- internal-only `cadvisor`
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile agentic --profile observability --paths
+scripts/aoa-profile-endpoints --profile agentic --profile observability
+scripts/aoa-up --profile agentic --profile observability
+scripts/aoa-smoke --with-internal --profile agentic --profile observability
+```
+
+### `intel + tools + observability`
+
+What it gives you:
+- Intel-aware agent runtime with OVMS
+- speech helpers
+- observability surfaces
+- all internal-only surfaces checked in one pass
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile intel,tools,observability --paths
+scripts/aoa-profile-endpoints --profile intel,tools,observability
+scripts/aoa-up --profile intel,tools,observability
+scripts/aoa-smoke --with-internal --profile intel,tools,observability
+```
