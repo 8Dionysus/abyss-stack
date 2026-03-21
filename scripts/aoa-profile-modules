@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+paths_mode=0
+profile_args=()
+while (($#)); do
+  case "$1" in
+    --paths)
+      paths_mode=1
+      ;;
+    *)
+      profile_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${profile_args[@]}"
+aoa_resolve_modules "${AOA_STACK_PROFILE}"
+aoa_print_profile_summary
+
+if ((paths_mode)); then
+  aoa_note ""
+  aoa_note "module files:"
+  for module_file in "${AOA_PROFILE_MODULE_FILES[@]}"; do
+    aoa_note "- ${module_file}"
+  done
+fi

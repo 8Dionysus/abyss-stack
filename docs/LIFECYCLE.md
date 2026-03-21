@@ -12,8 +12,16 @@ The repository now includes deployment bridge scripts under `scripts/`:
 - `aoa-bootstrap-configs`
 - `aoa-check-layout`
 - `aoa-install-systemd`
+- `aoa-first-run`
 
 They help bridge from a source checkout into the deployed runtime tree under `${AOA_STACK_ROOT}`.
+
+## Profile introspection
+
+The repository also includes:
+- `aoa-profile-modules`
+
+This helper makes it easy to see what a profile will activate before you start it.
 
 ## Human-facing wrappers
 

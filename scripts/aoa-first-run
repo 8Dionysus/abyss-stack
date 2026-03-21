@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+strict_mode=0
+delete_sync=0
+force_templates=0
+
+while (($#)); do
+  case "$1" in
+    --strict)
+      strict_mode=1
+      ;;
+    --delete-sync)
+      delete_sync=1
+      ;;
+    --force-templates)
+      force_templates=1
+      ;;
+    *)
+      aoa_die "unknown argument: $1"
+      ;;
+  esac
+  shift || true
+done
+
+sync_args=()
+bootstrap_args=()
+check_args=()
+
+if ((delete_sync)); then
+  sync_args+=(--delete)
+fi
+if ((force_templates)); then
+  bootstrap_args+=(--force)
+fi
+if ((strict_mode)); then
+  check_args+=(--strict)
+fi
+
+"${SCRIPT_DIR}/aoa-install-layout"
+"${SCRIPT_DIR}/aoa-sync-configs" "${sync_args[@]}"
+"${SCRIPT_DIR}/aoa-bootstrap-configs" "${bootstrap_args[@]}"
+"${SCRIPT_DIR}/aoa-check-layout" "${check_args[@]}"
+
+aoa_note "first-run bootstrap phase complete"
+aoa_note "next: create real secrets as described in ${AOA_CONFIGS_ROOT}/docs/SECRETS_BOOTSTRAP.md"

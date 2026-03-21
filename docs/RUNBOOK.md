@@ -15,6 +15,7 @@ When something feels wrong, use this order:
 
 ```bash
 aoa-check-layout
+aoa-profile-modules --profile core
 aoa-status --profile core
 aoa-smoke --profile core
 aoa-logs --profile core

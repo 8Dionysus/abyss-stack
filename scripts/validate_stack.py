@@ -19,6 +19,8 @@ REQUIRED_SCRIPTS = {
     "aoa-bootstrap-configs",
     "aoa-check-layout",
     "aoa-install-systemd",
+    "aoa-first-run",
+    "aoa-profile-modules",
     "aoa-up",
     "aoa-down",
     "aoa-status",
@@ -27,6 +29,7 @@ REQUIRED_SCRIPTS = {
     "aoa-wait",
 }
 REQUIRED_FILES = {
+    ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",

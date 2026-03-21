@@ -11,6 +11,16 @@ Typical shape:
 - deployed runtime at `/srv/abyss-stack`
 - optional heavy-data vault at `/abyss`
 
+## Fastest guided route
+
+If you want the least-friction path, use:
+
+```bash
+scripts/aoa-first-run --strict
+```
+
+Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
+
 ## Scenario A: Fedora-native source checkout
 
 Example:
@@ -74,6 +84,11 @@ Use `--strict` if warnings should fail the command.
 Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.
 Use `--enable-now` if you want it enabled and started immediately.
 
+### `scripts/aoa-profile-modules`
+
+Shows which compose modules a profile resolves to.
+Use `--paths` if you want the absolute module file paths.
+
 ## Recommended first deployment flow
 
 ```bash
@@ -84,6 +99,7 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout
+scripts/aoa-profile-modules --profile core
 ```
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
