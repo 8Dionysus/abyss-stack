@@ -4,7 +4,7 @@
 
 It is meant to answer a simple question before you burn time on startup errors:
 
-**is the current environment shaped enough to run the Fedora-first stack?**
+**is the current environment shaped enough to run the Fedora-first stack selection I am about to use?**
 
 ## What it checks
 
@@ -14,22 +14,49 @@ The current doctor pass looks at things like:
 - availability of a compose backend
 - whether `podman info` works
 - whether `systemctl --user` appears usable
-- whether `/dev/dri` exists for Intel-oriented profiles
+- whether `/dev/dri` exists when the selected preset or profile includes Intel-aware inference
 - whether the optional vault path appears mounted
 - whether the stack root is the canonical `/srv/abyss-stack`
+- whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
+
+## Preset-aware and profile-aware behavior
+
+`aoa-doctor` can now resolve the same selectors as the runtime wrappers:
+- `--preset`
+- `--profile`
+- repeated flags
+- comma-separated forms
+
+That means the doctor output is now contextual.
+For example:
+- `aoa-doctor --preset agent-full` will not treat missing `/dev/dri` as relevant
+- `aoa-doctor --preset intel-full` will warn if `/dev/dri` is missing
+- `aoa-doctor --preset agent-full` will remind you that internal-only layers are selected and should be checked after startup
 
 ## Usage
 
-Basic check:
+Basic check using the default base profile:
 
 ```bash
 scripts/aoa-doctor
 ```
 
+Target a preset:
+
+```bash
+scripts/aoa-doctor --preset agent-full
+```
+
+Target a specific Intel-aware path:
+
+```bash
+scripts/aoa-doctor --preset intel-full
+```
+
 Strict check:
 
 ```bash
-scripts/aoa-doctor --strict
+scripts/aoa-doctor --strict --preset intel-full
 ```
 
 ## Interpreting results
@@ -43,18 +70,26 @@ scripts/aoa-doctor --strict
 A warning does not always mean the stack is unusable.
 For example:
 - `/abyss` not being mounted is a warning, not a hard failure
-- `/dev/dri` missing is mainly relevant for Intel-aware paths
+- `/dev/dri` matters only if the selected preset/profile includes the Intel-aware path
 - `systemctl --user` matters for unit-managed lifecycle, not for every manual invocation
+- internal-only services are not a doctor failure; they simply mean you should later use `aoa-smoke --with-internal`
 
 ## Typical use order
 
+For a generic full bundle:
+
 ```bash
-scripts/aoa-doctor
+scripts/aoa-doctor --preset agent-full
 scripts/aoa-first-run --strict
+scripts/aoa-check-layout --strict
+scripts/aoa-smoke --with-internal --preset agent-full
 ```
 
-Then create secrets and run:
+For an Intel-aware full bundle:
 
 ```bash
+scripts/aoa-doctor --preset intel-full
+scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
+scripts/aoa-smoke --with-internal --preset intel-full
 ```

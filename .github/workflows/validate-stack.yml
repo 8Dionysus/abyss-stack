@@ -70,6 +70,8 @@ jobs:
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
 
           scripts/aoa-check-layout --strict
+          scripts/aoa-doctor --preset agent-full
+          scripts/aoa-doctor --preset intel-full
           scripts/aoa-preset-profiles --preset agent-full --paths
           scripts/aoa-profile-modules --profile core --paths
           scripts/aoa-profile-endpoints --profile core

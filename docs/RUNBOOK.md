@@ -18,14 +18,15 @@ When something feels wrong, use this order:
 
 ```bash
 aoa-doctor
+aoa-doctor --preset agent-full
 aoa-check-layout
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
 aoa-render-services --profile core
-aoa-internal-probes --profile tools
+aoa-internal-probes --preset agent-full
 aoa-status --profile core
-aoa-smoke --profile core
+aoa-smoke --with-internal --preset agent-full
 aoa-logs --profile core
 ```
 

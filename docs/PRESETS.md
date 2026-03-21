@@ -74,6 +74,7 @@ aoa-up --preset agent-tools,intel-observability
 Before launching a preset:
 
 ```bash
+aoa-doctor --preset agent-full
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --preset agent-full --paths
 aoa-profile-endpoints --preset agent-full
@@ -82,3 +83,20 @@ aoa-render-config --preset agent-full --write /tmp/abyss-agent-full.rendered.yml
 ```
 
 Treat rendered output as potentially secret-bearing.
+
+## Preset-aware smoke patterns
+
+Generic full bundle:
+
+```bash
+aoa-up --preset agent-full
+aoa-smoke --with-internal --preset agent-full
+```
+
+Intel-aware full bundle:
+
+```bash
+aoa-doctor --preset intel-full
+aoa-up --preset intel-full
+aoa-smoke --with-internal --preset intel-full
+```
