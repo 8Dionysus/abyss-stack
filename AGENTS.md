@@ -21,6 +21,7 @@ Use this order:
 - do not silently merge runtime and meaning layers back together
 - do not confuse a Windows source checkout path with the Linux runtime root
 - do not convert public-safe config templates into committed secret-bearing runtime files
+- do not publish rendered config output that may contain secret-bearing values
 
 ## Default stance
 
@@ -39,14 +40,15 @@ Use this order:
 5. `docs/SERVICE_CATALOG.md`
 6. `docs/PROFILES.md`
 7. `docs/PROFILE_RECIPES.md`
-8. `docs/INTERNAL_PROBES.md`
-9. `docs/PATHS.md`
-10. `docs/STORAGE_LAYOUT.md`
-11. `docs/DEPLOYMENT.md`
-12. `docs/FIRST_RUN.md`
-13. `docs/DOCTOR.md`
-14. `docs/SECRETS_BOOTSTRAP.md`
-15. `docs/LIFECYCLE.md`
-16. `docs/RUNBOOK.md`
-17. `docs/SECURITY.md`
-18. `docs/MIGRATION_FROM_OLD.md`
+8. `docs/RENDER_TRUTH.md`
+9. `docs/INTERNAL_PROBES.md`
+10. `docs/PATHS.md`
+11. `docs/STORAGE_LAYOUT.md`
+12. `docs/DEPLOYMENT.md`
+13. `docs/FIRST_RUN.md`
+14. `docs/DOCTOR.md`
+15. `docs/SECRETS_BOOTSTRAP.md`
+16. `docs/LIFECYCLE.md`
+17. `docs/RUNBOOK.md`
+18. `docs/SECURITY.md`
+19. `docs/MIGRATION_FROM_OLD.md`

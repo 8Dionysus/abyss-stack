@@ -109,6 +109,17 @@ Shows the host-facing endpoints and internal-only notes for a profile.
 Use it before or after startup to understand what should become reachable.
 You can pass several profiles.
 
+### `scripts/aoa-render-services`
+
+Shows the final service list from the actual composed runtime view.
+This is deeper runtime truth than module or endpoint narration because it comes from Compose itself after profile composition.
+
+### `scripts/aoa-render-config`
+
+Renders the fully composed config that Compose sees.
+Use `--write <path>` if you want to keep the output locally instead of printing it.
+Treat the rendered output as potentially secret-bearing.
+
 ## Recommended first deployment flow
 
 ```bash
@@ -136,6 +147,15 @@ Or manually use the deployed scripts:
 
 ```bash
 /srv/abyss-stack/Configs/scripts/aoa-up --profile core
+```
+
+## Render-truth example
+
+After secrets exist, inspect the actual composed truth before startup:
+
+```bash
+aoa-render-services --profile agentic,tools,observability
+aoa-render-config --profile agentic,tools,observability --write /tmp/abyss-agentic-tools-observability.rendered.yml
 ```
 
 ## Combined runtime example

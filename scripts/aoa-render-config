@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+output_file=""
+profile_args=()
+
+while (($#)); do
+  case "$1" in
+    --write)
+      shift
+      (($#)) || aoa_die "missing value after --write"
+      output_file="$1"
+      ;;
+    --write=*)
+      output_file="${1#*=}"
+      ;;
+    *)
+      profile_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${profile_args[@]}"
+aoa_resolve_modules "${AOA_STACK_PROFILE}"
+
+if [[ -n "$output_file" ]]; then
+  mkdir -p "$(dirname -- "$output_file")"
+  umask 077
+  aoa_compose config > "$output_file"
+  printf 'rendered config written to %s\n' "$output_file" >&2
+else
+  aoa_compose config
+fi

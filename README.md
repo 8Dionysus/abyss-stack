@@ -44,15 +44,16 @@ This repository should not absorb:
 4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
 5. Read [docs/PROFILES](docs/PROFILES.md).
 6. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
-7. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
-8. Read [docs/PATHS](docs/PATHS.md).
-9. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-10. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-11. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-12. Read [docs/DOCTOR](docs/DOCTOR.md).
-13. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-14. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-15. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+7. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
+8. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
+9. Read [docs/PATHS](docs/PATHS.md).
+10. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+11. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+12. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+13. Read [docs/DOCTOR](docs/DOCTOR.md).
+14. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+15. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+16. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -115,6 +116,7 @@ The repository now includes:
 - host-doctor and bootstrap-rehearsal support
 - profile endpoint recipes and endpoint introspection helpers
 - internal-only probe helpers for hidden services
+- render-truth helpers for actual composed runtime output
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
 - a repository validation workflow under `.github/workflows/`
@@ -122,7 +124,7 @@ The repository now includes:
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass adds internal-only probes so hidden services are no longer treated as a blind spot after startup.
+The current hardening pass adds render-truth helpers so the effective composed runtime can be inspected directly, not just described narratively.
 
 ## License
 

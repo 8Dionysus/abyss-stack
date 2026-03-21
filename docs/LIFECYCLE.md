@@ -22,8 +22,11 @@ They help bridge from a source checkout into the deployed runtime tree under `${
 The repository also includes:
 - `aoa-profile-modules`
 - `aoa-profile-endpoints`
+- `aoa-render-services`
+- `aoa-render-config`
 
 These helpers make it easy to see what a profile, or profile-combination, will activate before you start it.
+`aoa-render-services` and `aoa-render-config` are the deeper runtime-truth layer because they come from the composed runtime view rather than just docs or module lists.
 
 ## Human-facing wrappers
 
@@ -55,6 +58,7 @@ Optional layers such as `tools` and `observability` should usually come after th
 Expected pattern:
 - one or more profiles resolve to an ordered module list
 - compose files are applied in that order
+- the rendered Compose view is inspectable before launch
 - systemd user unit becomes the stable operator entrypoint
 
 ## Bootstrap manual pattern

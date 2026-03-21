@@ -11,6 +11,7 @@ For any profile:
 ```bash
 scripts/aoa-profile-modules --profile <name> --paths
 scripts/aoa-profile-endpoints --profile <name>
+scripts/aoa-render-services --profile <name>
 scripts/aoa-up --profile <name>
 scripts/aoa-wait --profile <name>
 scripts/aoa-smoke --profile <name>
@@ -48,6 +49,7 @@ Good for validating storage, orchestration, and local model-serving basics.
 
 ```bash
 scripts/aoa-profile-endpoints --profile core
+scripts/aoa-render-services --profile core
 scripts/aoa-up --profile core
 scripts/aoa-wait --profile core
 scripts/aoa-smoke --profile core
@@ -70,6 +72,7 @@ All `core` endpoints, plus:
 
 ```bash
 scripts/aoa-profile-endpoints --profile agentic
+scripts/aoa-render-services --profile agentic
 scripts/aoa-up --profile agentic
 scripts/aoa-wait --profile agentic
 scripts/aoa-smoke --profile agentic
@@ -93,6 +96,7 @@ All `agentic` endpoints, plus:
 ```bash
 scripts/aoa-doctor
 scripts/aoa-profile-endpoints --profile intel
+scripts/aoa-render-services --profile intel
 scripts/aoa-up --profile intel
 scripts/aoa-wait --profile intel
 scripts/aoa-smoke --profile intel
@@ -118,6 +122,7 @@ Optional helper surfaces for speech and browser-like tooling.
 
 ```bash
 scripts/aoa-profile-endpoints --profile tools
+scripts/aoa-render-services --profile tools
 scripts/aoa-up --profile tools
 scripts/aoa-wait --profile tools
 scripts/aoa-smoke --profile tools
@@ -144,6 +149,7 @@ Optional visibility into the body rather than the body itself.
 
 ```bash
 scripts/aoa-profile-endpoints --profile observability
+scripts/aoa-render-services --profile observability
 scripts/aoa-up --profile observability
 scripts/aoa-wait --profile observability
 scripts/aoa-smoke --profile observability
@@ -164,6 +170,7 @@ Try:
 ```bash
 scripts/aoa-profile-modules --profile agentic --profile tools --paths
 scripts/aoa-profile-endpoints --profile agentic --profile tools
+scripts/aoa-render-services --profile agentic --profile tools
 scripts/aoa-up --profile agentic --profile tools
 scripts/aoa-smoke --with-internal --profile agentic --profile tools
 ```
@@ -180,6 +187,7 @@ Try:
 ```bash
 scripts/aoa-profile-modules --profile agentic --profile observability --paths
 scripts/aoa-profile-endpoints --profile agentic --profile observability
+scripts/aoa-render-services --profile agentic --profile observability
 scripts/aoa-up --profile agentic --profile observability
 scripts/aoa-smoke --with-internal --profile agentic --profile observability
 ```
@@ -197,6 +205,7 @@ Try:
 ```bash
 scripts/aoa-profile-modules --profile intel,tools,observability --paths
 scripts/aoa-profile-endpoints --profile intel,tools,observability
+scripts/aoa-render-services --profile intel,tools,observability
 scripts/aoa-up --profile intel,tools,observability
 scripts/aoa-smoke --with-internal --profile intel,tools,observability
 ```

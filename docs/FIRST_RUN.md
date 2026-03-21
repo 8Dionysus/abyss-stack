@@ -52,6 +52,17 @@ For absolute module paths:
 scripts/aoa-profile-modules --profile core --paths
 ```
 
+## Deeper runtime truth before launch
+
+After secrets exist, inspect what Compose actually sees:
+
+```bash
+scripts/aoa-render-services --profile core
+aoa-render-config --profile core --write /tmp/abyss-core.rendered.yml
+```
+
+Treat the rendered config as potentially secret-bearing.
+
 ## Bring up the first profile
 
 ```bash
@@ -69,6 +80,7 @@ This is the generic local agent path and defaults to Ollama-backed embeddings:
 ```bash
 scripts/aoa-profile-modules --profile agentic --paths
 scripts/aoa-profile-endpoints --profile agentic
+scripts/aoa-render-services --profile agentic
 scripts/aoa-up --profile agentic
 ```
 
@@ -79,6 +91,7 @@ This adds OVMS plus the Intel overlay module for the agent API:
 ```bash
 scripts/aoa-profile-modules --profile intel --paths
 scripts/aoa-profile-endpoints --profile intel
+scripts/aoa-render-services --profile intel
 scripts/aoa-up --profile intel
 ```
 
@@ -89,6 +102,7 @@ scripts/aoa-up --profile intel
 ```bash
 scripts/aoa-profile-modules --profile agentic --profile tools --paths
 scripts/aoa-profile-endpoints --profile agentic --profile tools
+scripts/aoa-render-services --profile agentic --profile tools
 scripts/aoa-up --profile agentic --profile tools
 scripts/aoa-smoke --with-internal --profile agentic --profile tools
 ```
@@ -98,6 +112,7 @@ scripts/aoa-smoke --with-internal --profile agentic --profile tools
 ```bash
 scripts/aoa-profile-modules --profile agentic,tools,observability --paths
 scripts/aoa-profile-endpoints --profile agentic,tools,observability
+scripts/aoa-render-services --profile agentic,tools,observability
 scripts/aoa-up --profile agentic,tools,observability
 scripts/aoa-smoke --with-internal --profile agentic,tools,observability
 ```
@@ -118,4 +133,5 @@ Then read:
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
+- [RENDER_TRUTH](RENDER_TRUTH.md)
 - [INTERNAL_PROBES](INTERNAL_PROBES.md)

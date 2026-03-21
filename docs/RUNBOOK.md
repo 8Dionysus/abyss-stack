@@ -8,10 +8,11 @@ When something feels wrong, use this order:
 2. check host-readiness and runtime layout
 3. check expected profile endpoints and profile composition
 4. check internal-only probes when relevant
-5. check container state
-6. check health endpoints
-7. check logs
-8. decide whether to fix forward or roll back
+5. check rendered runtime truth when composition may be the problem
+6. check container state
+7. check health endpoints
+8. check logs
+9. decide whether to fix forward or roll back
 
 ## Useful commands
 
@@ -20,11 +21,20 @@ aoa-doctor
 aoa-check-layout
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
+aoa-render-services --profile core
 aoa-internal-probes --profile tools
 aoa-status --profile core
 aoa-smoke --profile core
 aoa-logs --profile core
 ```
+
+For rendered config output:
+
+```bash
+aoa-render-config --profile agentic,tools,observability --write /tmp/abyss.rendered.yml
+```
+
+Treat rendered output as potentially secret-bearing.
 
 For combined surfaces:
 

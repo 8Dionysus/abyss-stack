@@ -1,0 +1,97 @@
+# RENDER TRUTH
+
+`abyss-stack` has several layers of understanding:
+
+- docs and profile descriptions tell you the intended shape
+- profile/module introspection tells you the declared shape
+- internal probes and smoke tell you what appears healthy after startup
+- rendered compose output tells you the **actual composed runtime truth** that Compose sees before launch
+
+This document is about that last layer.
+
+## Why this matters
+
+Once profiles can be composed, the deepest practical question is no longer just:
+
+**which modules did I declare?**
+
+It becomes:
+
+**what is the final config and final service set after Compose merges everything?**
+
+That is the runtime truth layer.
+
+## Tools
+
+### `aoa-render-services`
+
+Lists the effective service names from the composed runtime view.
+
+Examples:
+
+```bash
+scripts/aoa-render-services --profile core
+scripts/aoa-render-services --profile agentic
+scripts/aoa-render-services --profile agentic,tools,observability
+```
+
+### `aoa-render-config`
+
+Renders the composed config that Compose sees.
+
+Examples:
+
+```bash
+scripts/aoa-render-config --profile core
+scripts/aoa-render-config --profile intel > /tmp/abyss-intel.rendered.yml
+scripts/aoa-render-config --profile agentic,tools,observability --write /tmp/abyss-agentic-tools-observability.rendered.yml
+```
+
+## Important caution
+
+Rendered config can be **secret-bearing**.
+Depending on env files and resolved settings, it may expose values that should stay local.
+
+Treat rendered output like sensitive runtime material:
+- do not paste it publicly
+- do not commit it
+- prefer writing it to a local file you control
+- prefer inspecting it locally and deleting it when done
+
+## Recommended use order
+
+After secrets exist and layout is valid:
+
+```bash
+scripts/aoa-check-layout --strict
+scripts/aoa-profile-modules --profile agentic --profile tools --profile observability --paths
+scripts/aoa-profile-endpoints --profile agentic --profile tools --profile observability
+scripts/aoa-render-services --profile agentic --profile tools --profile observability
+scripts/aoa-render-config --profile agentic --profile tools --profile observability --write /tmp/abyss.rendered.yml
+```
+
+Only then move to:
+
+```bash
+scripts/aoa-up --profile agentic --profile tools --profile observability
+```
+
+## What render-truth is good for
+
+- verifying that multi-profile composition produced the service set you expected
+- seeing whether an overlay actually took effect
+- spotting duplicate or surprising service definitions before startup
+- understanding the final order of merged modules in practice
+- debugging profile-composition confusion without starting containers
+
+## What render-truth is not
+
+It is not a replacement for:
+- `aoa-doctor`
+- `aoa-check-layout`
+- `aoa-smoke`
+- `aoa-internal-probes`
+
+It complements them.
+Render-truth tells you what Compose sees.
+The other tools tell you what the environment and running containers are doing.

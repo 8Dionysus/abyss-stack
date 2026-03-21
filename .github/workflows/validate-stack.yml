@@ -17,10 +17,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install shellcheck and rsync
+      - name: Install shellcheck, rsync, podman and podman-compose
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck rsync
+          sudo apt-get install -y shellcheck rsync podman podman-compose
 
       - name: Validate stack structure
         run: python scripts/validate_stack.py
@@ -39,6 +39,8 @@ jobs:
             scripts/aoa-profile-modules \
             scripts/aoa-profile-endpoints \
             scripts/aoa-internal-probes \
+            scripts/aoa-render-services \
+            scripts/aoa-render-config \
             scripts/aoa-up \
             scripts/aoa-down \
             scripts/aoa-status \
@@ -77,3 +79,13 @@ jobs:
           scripts/aoa-profile-endpoints --profile observability
           scripts/aoa-profile-modules --profile agentic --profile tools --profile observability --paths
           scripts/aoa-profile-endpoints --profile agentic,tools,observability
+          scripts/aoa-render-services --profile core
+          scripts/aoa-render-services --profile agentic
+          scripts/aoa-render-services --profile intel
+          scripts/aoa-render-services --profile agentic,tools,observability
+          scripts/aoa-render-config --profile core >/dev/null
+          scripts/aoa-render-config --profile agentic >/dev/null
+          scripts/aoa-render-config --profile intel >/dev/null
+          scripts/aoa-render-config --profile agentic,tools,observability >/dev/null
+          scripts/aoa-render-config --profile agentic,tools,observability --write "$RUNNER_TEMP/abyss-combined.rendered.yml"
+          test -s "$RUNNER_TEMP/abyss-combined.rendered.yml"
