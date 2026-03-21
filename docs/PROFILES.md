@@ -59,7 +59,7 @@ The repository validator now checks these inter-module requirements so broken pr
 
 ## Composing profiles
 
-Profiles can now be combined.
+Profiles can be combined.
 This is the intended way to layer optional surfaces like `tools` and `observability` onto a base runtime path.
 
 ### Repeated `--profile`
@@ -85,6 +85,9 @@ aoa-up --profile agentic,tools,observability
 
 If you want to see the concrete host-facing endpoints and post-start checks for a profile or profile-combination, read:
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
+
+If you want named bundles on top of composition, read:
+- [PRESETS](PRESETS.md)
 
 Or use:
 

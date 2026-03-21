@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/aoa-lib.sh"
 
 aoa_parse_profile_args "$@"
-aoa_resolve_modules "${AOA_STACK_PROFILE}"
+aoa_resolve_modules
 aoa_print_profile_summary
 
 aoa_note ""

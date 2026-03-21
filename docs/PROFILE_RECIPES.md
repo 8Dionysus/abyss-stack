@@ -175,6 +175,14 @@ scripts/aoa-up --profile agentic --profile tools
 scripts/aoa-smoke --with-internal --profile agentic --profile tools
 ```
 
+Preset form:
+
+```bash
+aoa-preset-profiles --preset agent-tools --paths
+aoa-up --preset agent-tools
+aoa-smoke --with-internal --preset agent-tools
+```
+
 ### `agentic + observability`
 
 What it gives you:
@@ -190,6 +198,14 @@ scripts/aoa-profile-endpoints --profile agentic --profile observability
 scripts/aoa-render-services --profile agentic --profile observability
 scripts/aoa-up --profile agentic --profile observability
 scripts/aoa-smoke --with-internal --profile agentic --profile observability
+```
+
+Preset form:
+
+```bash
+aoa-preset-profiles --preset agent-observability --paths
+aoa-up --preset agent-observability
+aoa-smoke --with-internal --preset agent-observability
 ```
 
 ### `intel + tools + observability`
@@ -208,4 +224,12 @@ scripts/aoa-profile-endpoints --profile intel,tools,observability
 scripts/aoa-render-services --profile intel,tools,observability
 scripts/aoa-up --profile intel,tools,observability
 scripts/aoa-smoke --with-internal --profile intel,tools,observability
+```
+
+Preset form:
+
+```bash
+aoa-preset-profiles --preset intel-full --paths
+aoa-up --preset intel-full
+aoa-smoke --with-internal --preset intel-full
 ```

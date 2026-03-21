@@ -97,28 +97,35 @@ Use `--strict` if warnings should fail the command.
 Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.
 Use `--enable-now` if you want it enabled and started immediately.
 
+### `scripts/aoa-preset-profiles`
+
+Shows which profiles a preset resolves to.
+Use `--paths` if you want preset and profile file paths.
+
 ### `scripts/aoa-profile-modules`
 
 Shows which compose modules a profile resolves to.
 Use `--paths` if you want the absolute module file paths.
-You can pass several profiles.
+You can pass several profiles or presets.
 
 ### `scripts/aoa-profile-endpoints`
 
 Shows the host-facing endpoints and internal-only notes for a profile.
 Use it before or after startup to understand what should become reachable.
-You can pass several profiles.
+You can pass several profiles or presets.
 
 ### `scripts/aoa-render-services`
 
 Shows the final service list from the actual composed runtime view.
 This is deeper runtime truth than module or endpoint narration because it comes from Compose itself after profile composition.
+You can pass several profiles or presets.
 
 ### `scripts/aoa-render-config`
 
 Renders the fully composed config that Compose sees.
 Use `--write <path>` if you want to keep the output locally instead of printing it.
 Treat the rendered output as potentially secret-bearing.
+You can pass several profiles or presets.
 
 ## Recommended first deployment flow
 
@@ -149,18 +156,20 @@ Or manually use the deployed scripts:
 /srv/abyss-stack/Configs/scripts/aoa-up --profile core
 ```
 
-## Render-truth example
+## Preset example
 
-After secrets exist, inspect the actual composed truth before startup:
+Bring up a named combined runtime bundle:
 
 ```bash
-aoa-render-services --profile agentic,tools,observability
-aoa-render-config --profile agentic,tools,observability --write /tmp/abyss-agentic-tools-observability.rendered.yml
+aoa-preset-profiles --preset agent-full --paths
+aoa-profile-endpoints --preset agent-full
+aoa-render-services --preset agent-full
+aoa-up --preset agent-full
 ```
 
 ## Combined runtime example
 
-Bring up an agent runtime plus tools and observability:
+Bring up an agent runtime plus tools and observability without a preset:
 
 ```bash
 aoa-profile-modules --profile agentic --profile tools --profile observability --paths

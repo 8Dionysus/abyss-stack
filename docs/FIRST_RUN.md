@@ -95,7 +95,17 @@ scripts/aoa-render-services --profile intel
 scripts/aoa-up --profile intel
 ```
 
-## Compose optional layers
+## Use a preset instead of spelling the whole composition
+
+```bash
+scripts/aoa-preset-profiles --preset agent-full --paths
+scripts/aoa-profile-endpoints --preset agent-full
+scripts/aoa-render-services --preset agent-full
+scripts/aoa-up --preset agent-full
+scripts/aoa-smoke --with-internal --preset agent-full
+```
+
+## Compose optional layers manually
 
 ### Agent runtime plus tools
 
@@ -132,6 +142,7 @@ Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
+- [PRESETS](PRESETS.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
 - [RENDER_TRUTH](RENDER_TRUTH.md)
 - [INTERNAL_PROBES](INTERNAL_PROBES.md)

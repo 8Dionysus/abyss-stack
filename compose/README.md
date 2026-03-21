@@ -1,6 +1,6 @@
 # compose layout
 
-The new stack uses small compose modules and named profiles.
+The new stack uses small compose modules, named profiles, and named presets.
 
 ## Modules
 
@@ -25,11 +25,23 @@ The new stack uses small compose modules and named profiles.
 
 A profile is only a list of module filenames in activation order.
 
+## Presets
+
+- `presets/agent-tools.txt`
+- `presets/agent-observability.txt`
+- `presets/agent-full.txt`
+- `presets/intel-tools.txt`
+- `presets/intel-observability.txt`
+- `presets/intel-full.txt`
+
+A preset is a list of profile names in activation order.
+
 ## Rule
 
 New capability should arrive as:
 1. a module
 2. optionally a profile inclusion
-3. corresponding docs and lifecycle notes
+3. optionally a preset inclusion for a common operating bundle
+4. corresponding docs and lifecycle notes
 
 Not as a silent growth of one giant compose file.

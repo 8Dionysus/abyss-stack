@@ -43,17 +43,18 @@ This repository should not absorb:
 3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
 4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
 5. Read [docs/PROFILES](docs/PROFILES.md).
-6. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
-7. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
-8. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
-9. Read [docs/PATHS](docs/PATHS.md).
-10. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-11. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-12. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-13. Read [docs/DOCTOR](docs/DOCTOR.md).
-14. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-15. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-16. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+6. Read [docs/PRESETS](docs/PRESETS.md).
+7. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
+8. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
+9. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
+10. Read [docs/PATHS](docs/PATHS.md).
+11. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+12. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+13. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+14. Read [docs/DOCTOR](docs/DOCTOR.md).
+15. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+16. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+17. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -110,6 +111,7 @@ The stack is organized around explicit compose modules rather than one swollen f
 
 The repository now includes:
 - profile files under `compose/profiles/`
+- preset files under `compose/presets/`
 - deployment helpers under `scripts/`
 - config-template bootstrap helpers under `scripts/`
 - first-run and profile-introspection helpers under `scripts/`
@@ -117,6 +119,7 @@ The repository now includes:
 - profile endpoint recipes and endpoint introspection helpers
 - internal-only probe helpers for hidden services
 - render-truth helpers for actual composed runtime output
+- preset-aware composition helpers and preset introspection
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
 - a repository validation workflow under `.github/workflows/`
@@ -124,7 +127,7 @@ The repository now includes:
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass adds render-truth helpers so the effective composed runtime can be inspected directly, not just described narratively.
+The current hardening pass adds named presets on top of profile composition so common runtime bundles can be invoked and inspected as first-class operating modes.
 
 ## License
 

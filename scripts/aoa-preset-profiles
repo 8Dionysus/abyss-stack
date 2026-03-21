@@ -23,11 +23,23 @@ aoa_parse_profile_args "${selector_args[@]}"
 aoa_resolve_modules
 aoa_print_profile_summary
 
+if ((${#AOA_PRESET_NAMES[@]} == 0)); then
+  aoa_note ""
+  aoa_note "no presets resolved"
+  exit 0
+fi
+
 if ((paths_mode)); then
   aoa_note ""
-  aoa_note "module files:"
-  local module_file
-  for module_file in "${AOA_PROFILE_MODULE_FILES[@]}"; do
-    aoa_note "- ${module_file}"
+  aoa_note "preset files:"
+  local preset_file
+  for preset_file in "${AOA_PRESET_FILES[@]}"; do
+    aoa_note "- ${preset_file}"
+  done
+  aoa_note ""
+  aoa_note "resolved profile files:"
+  local profile_file
+  for profile_file in "${AOA_PROFILE_FILES[@]}"; do
+    aoa_note "- ${profile_file}"
   done
 fi

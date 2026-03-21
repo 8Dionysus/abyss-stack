@@ -2,7 +2,7 @@
 
 ## Canonical lifecycle model
 
-The stack should be operated through explicit profiles and a systemd user entrypoint.
+The stack should be operated through explicit profiles, optional presets, and a systemd user entrypoint.
 
 ## Deployment preparation
 
@@ -17,15 +17,16 @@ The repository now includes deployment bridge scripts under `scripts/`:
 
 They help bridge from a source checkout into the deployed runtime tree under `${AOA_STACK_ROOT}`.
 
-## Profile introspection
+## Profile and preset introspection
 
 The repository also includes:
+- `aoa-preset-profiles`
 - `aoa-profile-modules`
 - `aoa-profile-endpoints`
 - `aoa-render-services`
 - `aoa-render-config`
 
-These helpers make it easy to see what a profile, or profile-combination, will activate before you start it.
+These helpers make it easy to see what a preset, profile, or profile-combination will activate before you start it.
 `aoa-render-services` and `aoa-render-config` are the deeper runtime-truth layer because they come from the composed runtime view rather than just docs or module lists.
 
 ## Human-facing wrappers
@@ -38,25 +39,34 @@ The repository also includes these runtime wrappers under `scripts/`:
 - `aoa-smoke`
 - `aoa-wait`
 
-They resolve a profile into an ordered compose module list.
+They resolve presets and profiles into an ordered compose module list.
 
-## Profile composition
+## Composition layers
 
-You can operate one profile or several composed profiles.
+You can operate:
+- one profile
+- several composed profiles
+- one or more presets
+- presets plus extra profiles
+
 Examples:
 
 ```bash
 aoa-up --profile agentic --profile tools
 aoa-up --profile agentic,tools,observability
+aoa-up --preset agent-full
+aoa-up --preset agent-tools --profile observability
 ```
 
-The order matters because module ordering is preserved.
+The order matters because profile ordering is preserved.
 Optional layers such as `tools` and `observability` should usually come after the base profile.
+Presets expand before direct `--profile` additions.
 
 ## Low-level canonical path
 
 Expected pattern:
-- one or more profiles resolve to an ordered module list
+- one or more presets and profiles resolve to an ordered profile list
+- that profile list resolves to an ordered module list
 - compose files are applied in that order
 - the rendered Compose view is inspectable before launch
 - systemd user unit becomes the stable operator entrypoint

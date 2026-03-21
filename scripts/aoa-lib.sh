@@ -4,7 +4,9 @@ set -euo pipefail
 AOA_STACK_ROOT="${AOA_STACK_ROOT:-/srv/abyss-stack}"
 AOA_CONFIGS_ROOT="${AOA_CONFIGS_ROOT:-${AOA_STACK_ROOT}/Configs}"
 AOA_VAULT_ROOT="${AOA_VAULT_ROOT:-/abyss}"
-AOA_STACK_PROFILE="${AOA_STACK_PROFILE:-core}"
+AOA_STACK_PRESET="${AOA_STACK_PRESET:-}"
+AOA_STACK_PROFILE="${AOA_STACK_PROFILE:-}"
+AOA_STACK_DEFAULT_PROFILE="${AOA_STACK_DEFAULT_PROFILE:-core}"
 AOA_COMPOSE_PROJECT_NAME="${AOA_COMPOSE_PROJECT_NAME:-abyss}"
 AOA_LOG_TAIL="${AOA_LOG_TAIL:-200}"
 AOA_WAIT_TIMEOUT_S="${AOA_WAIT_TIMEOUT_S:-120}"
@@ -13,12 +15,19 @@ AOA_WAIT_INTERVAL_S="${AOA_WAIT_INTERVAL_S:-5}"
 export AOA_STACK_ROOT
 export AOA_CONFIGS_ROOT
 export AOA_VAULT_ROOT
+export AOA_STACK_PRESET
+export AOA_STACK_PROFILE
+export AOA_STACK_DEFAULT_PROFILE
 
 AOA_MODULES_DIR="${AOA_CONFIGS_ROOT}/compose/modules"
 AOA_PROFILES_DIR="${AOA_CONFIGS_ROOT}/compose/profiles"
+AOA_PRESETS_DIR="${AOA_CONFIGS_ROOT}/compose/presets"
 
+AOA_ACTIVE_PRESETS=()
 AOA_ACTIVE_PROFILES=()
 AOA_FORWARD_ARGS=()
+AOA_PRESET_NAMES=()
+AOA_PRESET_FILES=()
 AOA_PROFILE_NAMES=()
 AOA_PROFILE_FILES=()
 AOA_PROFILE_MODULE_NAMES=()
@@ -40,7 +49,7 @@ aoa_trim() {
   printf '%s' "$value"
 }
 
-aoa_expand_profile_specs() {
+aoa_expand_specs() {
   local spec raw_part trimmed
   local -a raw_parts
 
@@ -53,16 +62,52 @@ aoa_expand_profile_specs() {
   done
 }
 
+aoa_join_csv() {
+  local -a items=("$@")
+  if ((${#items[@]} == 0)); then
+    printf ''
+    return
+  fi
+  local IFS=,
+  printf '%s' "${items[*]}"
+}
+
 aoa_parse_profile_args() {
+  local explicit_preset=0
   local explicit_profile=0
-  local profile
-  local -a profile_specs=("${AOA_STACK_PROFILE}")
+  local item
+  local -a preset_specs=()
+  local -a profile_specs=()
+  local -A seen_presets=()
   local -A seen_profiles=()
+
+  if [[ -n "$AOA_STACK_PRESET" ]]; then
+    preset_specs+=("$AOA_STACK_PRESET")
+  fi
+  if [[ -n "$AOA_STACK_PROFILE" ]]; then
+    profile_specs+=("$AOA_STACK_PROFILE")
+  fi
 
   AOA_FORWARD_ARGS=()
 
   while (($#)); do
     case "$1" in
+      --preset)
+        shift
+        (($#)) || aoa_die "missing value after --preset"
+        if ((explicit_preset == 0)); then
+          preset_specs=()
+          explicit_preset=1
+        fi
+        preset_specs+=("$1")
+        ;;
+      --preset=*)
+        if ((explicit_preset == 0)); then
+          preset_specs=()
+          explicit_preset=1
+        fi
+        preset_specs+=("${1#*=}")
+        ;;
       --profile)
         shift
         (($#)) || aoa_die "missing value after --profile"
@@ -94,18 +139,31 @@ aoa_parse_profile_args() {
     shift || true
   done
 
-  AOA_ACTIVE_PROFILES=()
-  while IFS= read -r profile; do
-    [[ -n "$profile" ]] || continue
-    if [[ -z "${seen_profiles[$profile]+x}" ]]; then
-      seen_profiles["$profile"]=1
-      AOA_ACTIVE_PROFILES+=("$profile")
+  AOA_ACTIVE_PRESETS=()
+  while IFS= read -r item; do
+    [[ -n "$item" ]] || continue
+    if [[ -z "${seen_presets[$item]+x}" ]]; then
+      seen_presets["$item"]=1
+      AOA_ACTIVE_PRESETS+=("$item")
     fi
-  done < <(aoa_expand_profile_specs "${profile_specs[@]}")
+  done < <(aoa_expand_specs "${preset_specs[@]}")
 
-  ((${#AOA_ACTIVE_PROFILES[@]} > 0)) || AOA_ACTIVE_PROFILES=("core")
+  AOA_ACTIVE_PROFILES=()
+  while IFS= read -r item; do
+    [[ -n "$item" ]] || continue
+    if [[ -z "${seen_profiles[$item]+x}" ]]; then
+      seen_profiles["$item"]=1
+      AOA_ACTIVE_PROFILES+=("$item")
+    fi
+  done < <(aoa_expand_specs "${profile_specs[@]}")
 
-  AOA_STACK_PROFILE="$(IFS=,; printf '%s' "${AOA_ACTIVE_PROFILES[*]}")"
+  if ((${#AOA_ACTIVE_PRESETS[@]} == 0)) && ((${#AOA_ACTIVE_PROFILES[@]} == 0)); then
+    AOA_ACTIVE_PROFILES=("$AOA_STACK_DEFAULT_PROFILE")
+  fi
+
+  AOA_STACK_PRESET="$(aoa_join_csv "${AOA_ACTIVE_PRESETS[@]}")"
+  AOA_STACK_PROFILE="$(aoa_join_csv "${AOA_ACTIVE_PROFILES[@]}")"
+  export AOA_STACK_PRESET
   export AOA_STACK_PROFILE
 }
 
@@ -123,38 +181,74 @@ aoa_detect_compose() {
   aoa_die "neither 'podman compose' nor 'podman-compose' is available"
 }
 
-aoa_resolve_modules() {
-  local profile profile_file raw_line line trimmed module_file
-  local -a profile_specs=("$@")
-  local -A seen_profiles=()
-  local -A seen_modules=()
+aoa_add_profile_if_new() {
+  local profile="$1"
+  local -n seen_profiles_ref=$2
+  local profile_file
 
-  if ((${#profile_specs[@]} == 0)); then
-    if ((${#AOA_ACTIVE_PROFILES[@]} > 0)); then
-      profile_specs=("${AOA_ACTIVE_PROFILES[@]}")
-    else
-      profile_specs=("${AOA_STACK_PROFILE:-core}")
-    fi
+  if [[ -n "${seen_profiles_ref[$profile]+x}" ]]; then
+    return
+  fi
+  seen_profiles_ref["$profile"]=1
+
+  profile_file="${AOA_PROFILES_DIR}/${profile}.txt"
+  [[ -f "$profile_file" ]] || aoa_die "profile file not found: $profile_file"
+
+  AOA_PROFILE_NAMES+=("$profile")
+  AOA_PROFILE_FILES+=("$profile_file")
+}
+
+aoa_resolve_profiles() {
+  local preset preset_file profile raw_line line trimmed
+  local -A seen_presets=()
+  local -A seen_profiles=()
+
+  if ((${#AOA_ACTIVE_PRESETS[@]} == 0)) && ((${#AOA_ACTIVE_PROFILES[@]} == 0)); then
+    aoa_parse_profile_args
   fi
 
+  AOA_PRESET_NAMES=()
+  AOA_PRESET_FILES=()
   AOA_PROFILE_NAMES=()
   AOA_PROFILE_FILES=()
+
+  for preset in "${AOA_ACTIVE_PRESETS[@]}"; do
+    if [[ -n "${seen_presets[$preset]+x}" ]]; then
+      continue
+    fi
+    seen_presets["$preset"]=1
+
+    preset_file="${AOA_PRESETS_DIR}/${preset}.txt"
+    [[ -f "$preset_file" ]] || aoa_die "preset file not found: $preset_file"
+
+    AOA_PRESET_NAMES+=("$preset")
+    AOA_PRESET_FILES+=("$preset_file")
+
+    while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+      line="${raw_line%%#*}"
+      trimmed="$(aoa_trim "$line")"
+      [[ -z "$trimmed" ]] && continue
+      aoa_add_profile_if_new "$trimmed" seen_profiles
+    done < "$preset_file"
+  done
+
+  for profile in "${AOA_ACTIVE_PROFILES[@]}"; do
+    aoa_add_profile_if_new "$profile" seen_profiles
+  done
+
+  ((${#AOA_PROFILE_NAMES[@]} > 0)) || aoa_die "resolved presets/profiles produced zero profiles"
+}
+
+aoa_resolve_modules() {
+  local raw_line line trimmed module_file profile_file
+  local -A seen_modules=()
+
+  aoa_resolve_profiles
+
   AOA_PROFILE_MODULE_NAMES=()
   AOA_PROFILE_MODULE_FILES=()
 
-  while IFS= read -r profile; do
-    [[ -n "$profile" ]] || continue
-    if [[ -n "${seen_profiles[$profile]+x}" ]]; then
-      continue
-    fi
-    seen_profiles["$profile"]=1
-
-    profile_file="${AOA_PROFILES_DIR}/${profile}.txt"
-    [[ -f "$profile_file" ]] || aoa_die "profile file not found: $profile_file"
-
-    AOA_PROFILE_NAMES+=("$profile")
-    AOA_PROFILE_FILES+=("$profile_file")
-
+  for profile_file in "${AOA_PROFILE_FILES[@]}"; do
     while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
       line="${raw_line%%#*}"
       trimmed="$(aoa_trim "$line")"
@@ -169,9 +263,8 @@ aoa_resolve_modules() {
         AOA_PROFILE_MODULE_FILES+=("$module_file")
       fi
     done < "$profile_file"
-  done < <(aoa_expand_profile_specs "${profile_specs[@]}")
+  done
 
-  ((${#AOA_PROFILE_NAMES[@]} > 0)) || aoa_die "no profiles resolved from specification '${AOA_STACK_PROFILE}'"
   ((${#AOA_PROFILE_MODULE_FILES[@]} > 0)) || aoa_die "resolved profiles produced zero modules"
 }
 
@@ -180,7 +273,7 @@ aoa_compose() {
   local module_file
 
   aoa_detect_compose
-  aoa_resolve_modules "${AOA_STACK_PROFILE}"
+  aoa_resolve_modules
 
   for module_file in "${AOA_PROFILE_MODULE_FILES[@]}"; do
     args+=(-f "$module_file")
@@ -194,12 +287,19 @@ aoa_compose() {
 }
 
 aoa_print_profile_summary() {
-  local profile_name module_name
-  aoa_note "profiles: ${AOA_STACK_PROFILE}"
+  local preset_name profile_name module_name
+  aoa_note "presets: ${AOA_STACK_PRESET:-(none)}"
+  aoa_note "profiles: ${AOA_STACK_PROFILE:-(none)}"
   aoa_note "stack root: ${AOA_STACK_ROOT}"
   aoa_note "configs root: ${AOA_CONFIGS_ROOT}"
   aoa_note "vault root: ${AOA_VAULT_ROOT}"
   aoa_note "compose project: ${AOA_COMPOSE_PROJECT_NAME}"
+  if ((${#AOA_PRESET_NAMES[@]} > 0)); then
+    aoa_note "resolved presets:"
+    for preset_name in "${AOA_PRESET_NAMES[@]}"; do
+      aoa_note "- ${preset_name}"
+    done
+  fi
   aoa_note "resolved profiles:"
   for profile_name in "${AOA_PROFILE_NAMES[@]}"; do
     aoa_note "- ${profile_name}"

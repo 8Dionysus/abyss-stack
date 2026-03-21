@@ -7,7 +7,7 @@ source "${SCRIPT_DIR}/aoa-lib.sh"
 
 with_internal=0
 internal_strict=0
-profile_args=()
+selector_args=()
 while (($#)); do
   case "$1" in
     --with-internal)
@@ -18,14 +18,14 @@ while (($#)); do
       internal_strict=1
       ;;
     *)
-      profile_args+=("$1")
+      selector_args+=("$1")
       ;;
   esac
   shift || true
 done
 
-aoa_parse_profile_args "${profile_args[@]}"
-aoa_resolve_modules "${AOA_STACK_PROFILE}"
+aoa_parse_profile_args "${selector_args[@]}"
+aoa_resolve_modules
 aoa_print_profile_summary
 
 failures=0
@@ -90,11 +90,11 @@ if has_module "60-monitoring.yml"; then
 fi
 
 if ((with_internal)); then
-  internal_args=(--profile "$AOA_STACK_PROFILE")
+  internal_args=()
   if ((internal_strict)); then
     internal_args+=(--strict)
   fi
-  "${SCRIPT_DIR}/aoa-internal-probes" "${internal_args[@]}" || failures=$((failures + 1))
+  AOA_STACK_PRESET="$AOA_STACK_PRESET" AOA_STACK_PROFILE="$AOA_STACK_PROFILE" "${SCRIPT_DIR}/aoa-internal-probes" "${internal_args[@]}" || failures=$((failures + 1))
 fi
 
 if ((failures > 0)); then

@@ -6,6 +6,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_DIR = ROOT / "compose" / "profiles"
+PRESET_DIR = ROOT / "compose" / "presets"
 MODULE_DIR = ROOT / "compose" / "modules"
 LEGACY_PATH = "/srv/abyss"
 LEGACY_PATTERN = re.compile(r"/srv/abyss(?!-)")
@@ -21,6 +22,7 @@ REQUIRED_SCRIPTS = {
     "aoa-check-layout",
     "aoa-install-systemd",
     "aoa-first-run",
+    "aoa-preset-profiles",
     "aoa-profile-modules",
     "aoa-profile-endpoints",
     "aoa-internal-probes",
@@ -36,10 +38,18 @@ REQUIRED_SCRIPTS = {
 REQUIRED_FILES = {
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
+    ROOT / "docs" / "PRESETS.md",
     ROOT / "docs" / "PROFILE_RECIPES.md",
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
+    ROOT / "compose" / "presets" / "README.md",
+    ROOT / "compose" / "presets" / "agent-tools.txt",
+    ROOT / "compose" / "presets" / "agent-observability.txt",
+    ROOT / "compose" / "presets" / "agent-full.txt",
+    ROOT / "compose" / "presets" / "intel-tools.txt",
+    ROOT / "compose" / "presets" / "intel-observability.txt",
+    ROOT / "compose" / "presets" / "intel-full.txt",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
@@ -66,18 +76,18 @@ def iter_text_files() -> list[Path]:
     return paths
 
 
-def load_profile_modules(profile: Path) -> list[str]:
-    modules: list[str] = []
-    for raw in profile.read_text(encoding="utf-8").splitlines():
+def load_names(file_path: Path) -> list[str]:
+    names: list[str] = []
+    for raw in file_path.read_text(encoding="utf-8").splitlines():
         line = raw.split("#", 1)[0].strip()
         if line:
-            modules.append(line)
-    return modules
+            names.append(line)
+    return names
 
 
 def validate_profiles(errors: list[str]) -> None:
     for profile in sorted(PROFILE_DIR.glob("*.txt")):
-        modules = load_profile_modules(profile)
+        modules = load_names(profile)
         if not modules:
             errors.append(f"profile has no modules: {profile.relative_to(ROOT)}")
             continue
@@ -97,6 +107,20 @@ def validate_profiles(errors: list[str]) -> None:
             if missing:
                 errors.append(
                     f"profile {profile.name} includes {module_name} but is missing required modules: {', '.join(missing)}"
+                )
+
+
+def validate_presets(errors: list[str]) -> None:
+    for preset in sorted(PRESET_DIR.glob("*.txt")):
+        profiles = load_names(preset)
+        if not profiles:
+            errors.append(f"preset has no profiles: {preset.relative_to(ROOT)}")
+            continue
+        for profile_name in profiles:
+            profile_path = PROFILE_DIR / f"{profile_name}.txt"
+            if not profile_path.exists():
+                errors.append(
+                    f"preset {preset.name} references missing profile {profile_name}"
                 )
 
 
@@ -137,6 +161,7 @@ def validate_required_files(errors: list[str]) -> None:
 def main() -> int:
     errors: list[str] = []
     validate_profiles(errors)
+    validate_presets(errors)
     validate_paths(errors)
     validate_scripts(errors)
     validate_required_files(errors)

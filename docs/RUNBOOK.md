@@ -19,6 +19,7 @@ When something feels wrong, use this order:
 ```bash
 aoa-doctor
 aoa-check-layout
+aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
 aoa-render-services --profile core
@@ -31,7 +32,7 @@ aoa-logs --profile core
 For rendered config output:
 
 ```bash
-aoa-render-config --profile agentic,tools,observability --write /tmp/abyss.rendered.yml
+aoa-render-config --preset agent-full --write /tmp/abyss.rendered.yml
 ```
 
 Treat rendered output as potentially secret-bearing.
@@ -39,9 +40,9 @@ Treat rendered output as potentially secret-bearing.
 For combined surfaces:
 
 ```bash
-aoa-profile-modules --profile agentic --profile tools --profile observability --paths
-aoa-profile-endpoints --profile agentic --profile tools --profile observability
-aoa-smoke --with-internal --profile agentic --profile tools --profile observability
+aoa-preset-profiles --preset intel-full --paths
+aoa-profile-endpoints --preset intel-full
+aoa-smoke --with-internal --preset intel-full
 ```
 
 Low-level checks:
