@@ -16,8 +16,11 @@ Typical shape:
 If you want the least-friction path, use:
 
 ```bash
+scripts/aoa-doctor
 scripts/aoa-first-run --strict
 ```
+
+`aoa-first-run --strict` is strict about layout and bootstrapped config presence, but still ignores missing secrets on that first pass by design.
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
@@ -31,10 +34,11 @@ Suggested flow:
 
 ```bash
 cd ~/src/abyss-stack
+scripts/aoa-doctor
 scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
-scripts/aoa-check-layout
+scripts/aoa-check-layout --ignore-secrets --strict
 ```
 
 Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
@@ -58,6 +62,12 @@ The important thing is that the deployed runtime still becomes `/srv/abyss-stack
 
 ## What the helper scripts do
 
+### `scripts/aoa-doctor`
+
+Checks host-side and runtime-side readiness for the Fedora-first model.
+It reports missing commands, platform mismatches, vault mount state, and Intel-specific hints such as `/dev/dri` presence.
+Use `--strict` if warnings should fail the command.
+
 ### `scripts/aoa-install-layout`
 
 Creates the non-destructive runtime directory skeleton under `${AOA_STACK_ROOT}`.
@@ -77,6 +87,7 @@ Use `--force` only when you explicitly want template content to overwrite existi
 ### `scripts/aoa-check-layout`
 
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
+Use `--ignore-secrets` for the first bootstrap pass before secrets exist.
 Use `--strict` if warnings should fail the command.
 
 ### `scripts/aoa-install-systemd`
@@ -95,10 +106,11 @@ Use `--paths` if you want the absolute module file paths.
 export AOA_STACK_ROOT=/srv/abyss-stack
 export AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
 
+scripts/aoa-doctor
 scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
-scripts/aoa-check-layout
+scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-profile-modules --profile core
 ```
 

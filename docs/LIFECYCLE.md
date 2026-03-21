@@ -7,6 +7,7 @@ The stack should be operated through explicit profiles and a systemd user entryp
 ## Deployment preparation
 
 The repository now includes deployment bridge scripts under `scripts/`:
+- `aoa-doctor`
 - `aoa-install-layout`
 - `aoa-sync-configs`
 - `aoa-bootstrap-configs`

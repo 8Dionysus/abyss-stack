@@ -5,7 +5,7 @@
 When something feels wrong, use this order:
 
 1. check profile and module intent
-2. check runtime layout and required files
+2. check host-readiness and runtime layout
 3. check container state
 4. check health endpoints
 5. check logs
@@ -14,6 +14,7 @@ When something feels wrong, use this order:
 ## Useful commands
 
 ```bash
+aoa-doctor
 aoa-check-layout
 aoa-profile-modules --profile core
 aoa-status --profile core

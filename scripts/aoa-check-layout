@@ -6,10 +6,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/aoa-lib.sh"
 
 strict_mode=0
+ignore_secrets=0
 while (($#)); do
   case "$1" in
     --strict)
       strict_mode=1
+      ;;
+    --ignore-secrets)
+      ignore_secrets=1
       ;;
     *)
       aoa_die "unknown argument: $1"
@@ -55,10 +59,15 @@ for path in "${required_dirs[@]}"; do
   check_dir "$path"
 done
 
-check_warn_file "stack env" "${AOA_STACK_ROOT}/Configs/stack.env"
-check_warn_file "langchain env" "${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
-check_warn_file "ovms env" "${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env"
-check_warn_file "ovms key file" "${AOA_STACK_ROOT}/Secrets/Configs/ovms_api_key.txt"
+if ((ignore_secrets)); then
+  aoa_note "skip secret file checks on this pass"
+else
+  check_warn_file "stack env" "${AOA_STACK_ROOT}/Configs/stack.env"
+  check_warn_file "langchain env" "${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
+  check_warn_file "ovms env" "${AOA_STACK_ROOT}/Secrets/Configs/ovms-api.env"
+  check_warn_file "ovms key file" "${AOA_STACK_ROOT}/Secrets/Configs/ovms_api_key.txt"
+fi
+
 check_warn_file "prometheus config" "${AOA_STACK_ROOT}/Configs/monitoring/prometheus.yml"
 check_warn_file "alert rules" "${AOA_STACK_ROOT}/Configs/monitoring/alerts.yml"
 check_warn_file "alertmanager config" "${AOA_STACK_ROOT}/Configs/monitoring/alertmanager/alertmanager.yml"

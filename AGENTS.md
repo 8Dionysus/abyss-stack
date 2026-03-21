@@ -42,8 +42,9 @@ Use this order:
 8. `docs/STORAGE_LAYOUT.md`
 9. `docs/DEPLOYMENT.md`
 10. `docs/FIRST_RUN.md`
-11. `docs/SECRETS_BOOTSTRAP.md`
-12. `docs/LIFECYCLE.md`
-13. `docs/RUNBOOK.md`
-14. `docs/SECURITY.md`
-15. `docs/MIGRATION_FROM_OLD.md`
+11. `docs/DOCTOR.md`
+12. `docs/SECRETS_BOOTSTRAP.md`
+13. `docs/LIFECYCLE.md`
+14. `docs/RUNBOOK.md`
+15. `docs/SECURITY.md`
+16. `docs/MIGRATION_FROM_OLD.md`

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+strict_mode=0
+while (($#)); do
+  case "$1" in
+    --strict)
+      strict_mode=1
+      ;;
+    *)
+      aoa_die "unknown argument: $1"
+      ;;
+  esac
+  shift || true
+done
+
+errors=0
+warnings=0
+
+doctor_ok() {
+  aoa_note "ok   $1"
+}
+
+doctor_warn() {
+  aoa_note "warn $1"
+  warnings=$((warnings + 1))
+}
+
+doctor_fail() {
+  aoa_note "fail $1"
+  errors=$((errors + 1))
+}
+
+check_required_cmd() {
+  local name="$1"
+  if command -v "$name" >/dev/null 2>&1; then
+    doctor_ok "cmd  $name"
+  else
+    doctor_fail "cmd  $name not found"
+  fi
+}
+
+uname_s="$(uname -s)"
+aoa_note "stack root: ${AOA_STACK_ROOT}"
+aoa_note "configs root: ${AOA_CONFIGS_ROOT}"
+aoa_note "vault root: ${AOA_VAULT_ROOT}"
+
+if [[ "$uname_s" == "Linux" ]]; then
+  doctor_ok "platform Linux"
+else
+  doctor_warn "platform ${uname_s}; Fedora-first runtime expects Linux"
+fi
+
+if [[ "${AOA_STACK_ROOT}" == "/srv/abyss-stack" ]]; then
+  doctor_ok "canonical stack root ${AOA_STACK_ROOT}"
+else
+  doctor_warn "non-canonical stack root ${AOA_STACK_ROOT}"
+fi
+
+check_required_cmd podman
+check_required_cmd rsync
+check_required_cmd curl
+
+if podman compose version >/dev/null 2>&1; then
+  doctor_ok "compose backend podman compose"
+elif command -v podman-compose >/dev/null 2>&1; then
+  doctor_ok "compose backend podman-compose"
+else
+  doctor_fail "compose backend unavailable"
+fi
+
+if podman info >/dev/null 2>&1; then
+  doctor_ok "podman info"
+else
+  doctor_warn "podman installed but not currently usable"
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user show-environment >/dev/null 2>&1; then
+    doctor_ok "systemctl --user"
+  else
+    doctor_warn "systemctl exists but user instance unavailable"
+  fi
+else
+  doctor_warn "systemctl not found"
+fi
+
+if [[ -e /dev/dri ]]; then
+  doctor_ok "/dev/dri present"
+else
+  doctor_warn "/dev/dri missing; intel profile may be limited"
+fi
+
+if command -v findmnt >/dev/null 2>&1; then
+  if findmnt "${AOA_VAULT_ROOT}" >/dev/null 2>&1; then
+    doctor_ok "vault mount ${AOA_VAULT_ROOT}"
+  else
+    doctor_warn "vault mount ${AOA_VAULT_ROOT} not present"
+  fi
+else
+  doctor_warn "findmnt not found; cannot check vault mount"
+fi
+
+if ((errors > 0)); then
+  aoa_die "doctor found ${errors} hard errors"
+fi
+
+if ((strict_mode)) && ((warnings > 0)); then
+  aoa_die "doctor found ${warnings} warnings in strict mode"
+fi
+
+aoa_note "doctor check passed"
+if ((warnings > 0)); then
+  aoa_note "warnings: ${warnings}"
+fi

@@ -29,7 +29,7 @@ done
 
 sync_args=()
 bootstrap_args=()
-check_args=()
+check_args=(--ignore-secrets)
 
 if ((delete_sync)); then
   sync_args+=(--delete)
@@ -47,4 +47,5 @@ fi
 "${SCRIPT_DIR}/aoa-check-layout" "${check_args[@]}"
 
 aoa_note "first-run bootstrap phase complete"
-aoa_note "next: create real secrets as described in ${AOA_CONFIGS_ROOT}/docs/SECRETS_BOOTSTRAP.md"
+aoa_note "missing secrets were intentionally ignored on this pass"
+aoa_note "next: run ${AOA_CONFIGS_ROOT}/scripts/aoa-doctor and create real secrets as described in ${AOA_CONFIGS_ROOT}/docs/SECRETS_BOOTSTRAP.md"

@@ -17,19 +17,27 @@ From the source checkout:
 export AOA_STACK_ROOT=/srv/abyss-stack
 export AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
 
+scripts/aoa-doctor
 scripts/aoa-first-run --strict
 ```
 
 That will:
+- check host and runtime prerequisites
 - create the runtime layout
 - sync repo-managed configs and docs
 - bootstrap public-safe runtime config templates
-- check the layout in strict mode
+- check the layout in strict bootstrap mode while still allowing missing secrets on that first pass
 
 ## Then do the one thing it cannot do for you
 
 Create the real secret-bearing files described in:
 - [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md)
+
+Then validate the fully bootstrapped layout:
+
+```bash
+scripts/aoa-check-layout --strict
+```
 
 ## Inspect the profile before launch
 
@@ -86,6 +94,7 @@ scripts/aoa-up --profile observability
 Start with:
 
 ```bash
+scripts/aoa-doctor
 scripts/aoa-check-layout
 scripts/aoa-status --profile core
 scripts/aoa-logs --profile core
@@ -94,3 +103,4 @@ scripts/aoa-logs --profile core
 Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
+- [DOCTOR](DOCTOR.md)

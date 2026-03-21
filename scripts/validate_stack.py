@@ -14,6 +14,7 @@ LEGACY_ALLOWED = {
     ROOT / "scripts" / "validate_stack.py",
 }
 REQUIRED_SCRIPTS = {
+    "aoa-doctor",
     "aoa-install-layout",
     "aoa-sync-configs",
     "aoa-bootstrap-configs",
@@ -30,6 +31,7 @@ REQUIRED_SCRIPTS = {
 }
 REQUIRED_FILES = {
     ROOT / "docs" / "FIRST_RUN.md",
+    ROOT / "docs" / "DOCTOR.md",
     ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
