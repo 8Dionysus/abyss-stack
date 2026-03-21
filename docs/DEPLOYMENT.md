@@ -39,6 +39,8 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
+scripts/aoa-profile-modules --profile core
+scripts/aoa-profile-endpoints --profile core
 ```
 
 Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
@@ -100,6 +102,11 @@ Use `--enable-now` if you want it enabled and started immediately.
 Shows which compose modules a profile resolves to.
 Use `--paths` if you want the absolute module file paths.
 
+### `scripts/aoa-profile-endpoints`
+
+Shows the host-facing endpoints and internal-only notes for a profile.
+Use it before or after startup to understand what should become reachable.
+
 ## Recommended first deployment flow
 
 ```bash
@@ -112,6 +119,7 @@ scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-profile-modules --profile core
+scripts/aoa-profile-endpoints --profile core
 ```
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).

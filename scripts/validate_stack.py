@@ -22,6 +22,7 @@ REQUIRED_SCRIPTS = {
     "aoa-install-systemd",
     "aoa-first-run",
     "aoa-profile-modules",
+    "aoa-profile-endpoints",
     "aoa-up",
     "aoa-down",
     "aoa-status",
@@ -32,6 +33,7 @@ REQUIRED_SCRIPTS = {
 REQUIRED_FILES = {
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
+    ROOT / "docs" / "PROFILE_RECIPES.md",
     ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",

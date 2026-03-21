@@ -6,10 +6,11 @@ When something feels wrong, use this order:
 
 1. check profile and module intent
 2. check host-readiness and runtime layout
-3. check container state
-4. check health endpoints
-5. check logs
-6. decide whether to fix forward or roll back
+3. check expected profile endpoints and profile composition
+4. check container state
+5. check health endpoints
+6. check logs
+7. decide whether to fix forward or roll back
 
 ## Useful commands
 
@@ -17,6 +18,7 @@ When something feels wrong, use this order:
 aoa-doctor
 aoa-check-layout
 aoa-profile-modules --profile core
+aoa-profile-endpoints --profile core
 aoa-status --profile core
 aoa-smoke --profile core
 aoa-logs --profile core

@@ -35,6 +35,17 @@ The agentic surface plus Intel-oriented inference and an OVMS overlay for the ag
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
 
+### `tools`
+
+Optional helper surfaces:
+- `50-speech.yml`
+- `51-browser-tools.yml`
+
+### `observability`
+
+Optional monitoring stack:
+- `60-monitoring.yml`
+
 ## Design rule
 
 Profiles stay small and legible.
@@ -45,6 +56,18 @@ Only then should it be included in one or more profiles.
 
 Some modules rely on sibling modules being present in the same profile.
 The repository validator now checks these inter-module requirements so broken profiles fail fast in CI.
+
+## Practical note
+
+If you want to see the concrete host-facing endpoints and post-start checks for a profile, read:
+- [PROFILE_RECIPES](PROFILE_RECIPES.md)
+
+Or use:
+
+```bash
+aoa-profile-endpoints --profile agentic
+aoa-profile-modules --profile agentic --paths
+```
 
 ## Examples
 
@@ -58,6 +81,7 @@ Bring up the main agent runtime:
 
 ```bash
 aoa-profile-modules --profile agentic --paths
+aoa-profile-endpoints --profile agentic
 aoa-up --profile agentic
 ```
 
@@ -65,6 +89,7 @@ Bring up the Intel-aware agent runtime:
 
 ```bash
 aoa-profile-modules --profile intel --paths
+aoa-profile-endpoints --profile intel
 aoa-up --profile intel
 ```
 

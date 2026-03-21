@@ -43,6 +43,7 @@ scripts/aoa-check-layout --strict
 
 ```bash
 scripts/aoa-profile-modules --profile core
+scripts/aoa-profile-endpoints --profile core
 ```
 
 For absolute module paths:
@@ -67,6 +68,7 @@ This is the generic local agent path and defaults to Ollama-backed embeddings:
 
 ```bash
 scripts/aoa-profile-modules --profile agentic --paths
+scripts/aoa-profile-endpoints --profile agentic
 scripts/aoa-up --profile agentic
 ```
 
@@ -76,6 +78,7 @@ This adds OVMS plus the Intel overlay module for the agent API:
 
 ```bash
 scripts/aoa-profile-modules --profile intel --paths
+scripts/aoa-profile-endpoints --profile intel
 scripts/aoa-up --profile intel
 ```
 
@@ -84,12 +87,14 @@ scripts/aoa-up --profile intel
 ### Tools
 
 ```bash
+scripts/aoa-profile-endpoints --profile tools
 scripts/aoa-up --profile tools
 ```
 
 ### Observability
 
 ```bash
+scripts/aoa-profile-endpoints --profile observability
 scripts/aoa-up --profile observability
 ```
 
@@ -108,3 +113,4 @@ Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
+- [PROFILE_RECIPES](PROFILE_RECIPES.md)

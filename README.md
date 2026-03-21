@@ -43,14 +43,15 @@ This repository should not absorb:
 3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
 4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
 5. Read [docs/PROFILES](docs/PROFILES.md).
-6. Read [docs/PATHS](docs/PATHS.md).
-7. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-8. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-9. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-10. Read [docs/DOCTOR](docs/DOCTOR.md).
-11. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-12. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-13. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+6. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
+7. Read [docs/PATHS](docs/PATHS.md).
+8. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+9. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+10. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+11. Read [docs/DOCTOR](docs/DOCTOR.md).
+12. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+13. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+14. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -111,6 +112,7 @@ The repository now includes:
 - config-template bootstrap helpers under `scripts/`
 - first-run and profile-introspection helpers under `scripts/`
 - host-doctor and bootstrap-rehearsal support
+- profile endpoint recipes and endpoint introspection helpers
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
 - a repository validation workflow under `.github/workflows/`
@@ -118,7 +120,7 @@ The repository now includes:
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass clarifies the difference between the generic `agentic` path and the Intel-aware OVMS overlay path, and validates inter-module dependencies before launch.
+The current hardening pass adds richer runtime recipes and endpoint introspection so each profile is easier to understand and verify after startup.
 
 ## License
 
