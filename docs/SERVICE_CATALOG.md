@@ -27,7 +27,13 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `41-agent-api.yml`
 
-- `langchain-api` — agent-facing runtime API
+- `langchain-api` — base agent-facing runtime API
+- default embeddings path — Ollama-first
+
+## `42-agent-api-intel.yml`
+
+- `langchain-api` overlay — switches embeddings path to OVMS
+- adds explicit OVMS runtime dependency for Intel-aware profiles
 
 ## `50-speech.yml`
 

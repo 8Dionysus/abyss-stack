@@ -9,7 +9,7 @@ services:
       LC_API_KEY: EMPTY
       LC_MODEL: aoa-tutor-deep
       LC_TIMEOUT_S: 40
-      EMBEDDINGS_PROVIDER: ovms
+      EMBEDDINGS_PROVIDER: "${AOA_EMBEDDINGS_PROVIDER:-ollama}"
       OVMS_EMBEDDINGS_URL: http://ovms:8000/v3/embeddings
       OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
       OLLAMA_EMBEDDINGS_URL: http://ollama:11434/api/embed
@@ -20,8 +20,6 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
-      ovms:
-        condition: service_healthy
     ports:
       - "127.0.0.1:5401:5401"
     healthcheck:

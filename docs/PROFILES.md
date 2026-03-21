@@ -17,7 +17,7 @@ The smallest useful local substrate:
 
 ### `agentic`
 
-A local agent-facing runtime surface:
+A local agent-facing runtime surface with an Ollama-first embeddings path:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `30-local-inference.yml`
@@ -26,30 +26,25 @@ A local agent-facing runtime surface:
 
 ### `intel`
 
-The agentic surface with Intel-oriented inference:
+The agentic surface plus Intel-oriented inference and an OVMS overlay for the agent API:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `30-local-inference.yml`
 - `31-intel-inference.yml`
 - `40-llm-gateway.yml`
 - `41-agent-api.yml`
-
-### `tools`
-
-Optional helper surfaces:
-- `50-speech.yml`
-- `51-browser-tools.yml`
-
-### `observability`
-
-Optional monitoring stack:
-- `60-monitoring.yml`
+- `42-agent-api-intel.yml`
 
 ## Design rule
 
 Profiles stay small and legible.
 A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
+
+## Dependency note
+
+Some modules rely on sibling modules being present in the same profile.
+The repository validator now checks these inter-module requirements so broken profiles fail fast in CI.
 
 ## Examples
 
@@ -62,7 +57,15 @@ aoa-up --profile core
 Bring up the main agent runtime:
 
 ```bash
+aoa-profile-modules --profile agentic --paths
 aoa-up --profile agentic
+```
+
+Bring up the Intel-aware agent runtime:
+
+```bash
+aoa-profile-modules --profile intel --paths
+aoa-up --profile intel
 ```
 
 Bring up only observability:

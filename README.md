@@ -98,6 +98,7 @@ The stack is organized around explicit compose modules rather than one swollen f
 - `31-intel-inference.yml`
 - `40-llm-gateway.yml`
 - `41-agent-api.yml`
+- `42-agent-api-intel.yml`
 - `50-speech.yml`
 - `51-browser-tools.yml`
 - `60-monitoring.yml`
@@ -117,7 +118,7 @@ The repository now includes:
 ## Current status
 
 The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass adds doctor checks and CI bootstrap rehearsal so the path from source checkout to a live Fedora-first runtime is easier to verify before the first real launch.
+The current hardening pass clarifies the difference between the generic `agentic` path and the Intel-aware OVMS overlay path, and validates inter-module dependencies before launch.
 
 ## License
 

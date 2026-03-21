@@ -10,6 +10,7 @@ The new stack uses small compose modules and named profiles.
 - `modules/31-intel-inference.yml`
 - `modules/40-llm-gateway.yml`
 - `modules/41-agent-api.yml`
+- `modules/42-agent-api-intel.yml`
 - `modules/50-speech.yml`
 - `modules/51-browser-tools.yml`
 - `modules/60-monitoring.yml`

@@ -63,15 +63,19 @@ scripts/aoa-smoke --profile core
 
 ### Agent-facing runtime
 
+This is the generic local agent path and defaults to Ollama-backed embeddings:
+
 ```bash
-scripts/aoa-profile-modules --profile agentic
+scripts/aoa-profile-modules --profile agentic --paths
 scripts/aoa-up --profile agentic
 ```
 
 ### Intel-aware runtime
 
+This adds OVMS plus the Intel overlay module for the agent API:
+
 ```bash
-scripts/aoa-profile-modules --profile intel
+scripts/aoa-profile-modules --profile intel --paths
 scripts/aoa-up --profile intel
 ```
 

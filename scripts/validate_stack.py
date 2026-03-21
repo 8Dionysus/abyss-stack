@@ -38,6 +38,12 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
 }
+MODULE_REQUIREMENTS = {
+    "20-orchestration.yml": {"10-storage.yml"},
+    "40-llm-gateway.yml": {"30-local-inference.yml"},
+    "41-agent-api.yml": {"40-llm-gateway.yml", "30-local-inference.yml"},
+    "42-agent-api-intel.yml": {"41-agent-api.yml", "31-intel-inference.yml"},
+}
 
 
 def iter_text_files() -> list[Path]:
@@ -53,20 +59,37 @@ def iter_text_files() -> list[Path]:
     return paths
 
 
+def load_profile_modules(profile: Path) -> list[str]:
+    modules: list[str] = []
+    for raw in profile.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            modules.append(line)
+    return modules
+
+
 def validate_profiles(errors: list[str]) -> None:
     for profile in sorted(PROFILE_DIR.glob("*.txt")):
-        lines = []
-        for raw in profile.read_text(encoding="utf-8").splitlines():
-            line = raw.split("#", 1)[0].strip()
-            if line:
-                lines.append(line)
-        if not lines:
+        modules = load_profile_modules(profile)
+        if not modules:
             errors.append(f"profile has no modules: {profile.relative_to(ROOT)}")
-        for module_name in lines:
+            continue
+
+        seen = set(modules)
+        for module_name in modules:
             module_path = MODULE_DIR / module_name
             if not module_path.exists():
                 errors.append(
                     f"profile {profile.name} references missing module {module_name}"
+                )
+
+        for module_name, requirements in MODULE_REQUIREMENTS.items():
+            if module_name not in seen:
+                continue
+            missing = sorted(requirement for requirement in requirements if requirement not in seen)
+            if missing:
+                errors.append(
+                    f"profile {profile.name} includes {module_name} but is missing required modules: {', '.join(missing)}"
                 )
 
 

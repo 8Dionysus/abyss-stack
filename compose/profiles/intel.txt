@@ -4,3 +4,4 @@
 31-intel-inference.yml
 40-llm-gateway.yml
 41-agent-api.yml
+42-agent-api-intel.yml

@@ -66,3 +66,5 @@ jobs:
 
           scripts/aoa-check-layout --strict
           scripts/aoa-profile-modules --profile core --paths
+          scripts/aoa-profile-modules --profile agentic --paths
+          scripts/aoa-profile-modules --profile intel --paths
