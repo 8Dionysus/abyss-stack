@@ -89,6 +89,7 @@ scripts/aoa-up --profile intel
 ```bash
 scripts/aoa-profile-endpoints --profile tools
 scripts/aoa-up --profile tools
+scripts/aoa-internal-probes --profile tools
 ```
 
 ### Observability
@@ -96,6 +97,7 @@ scripts/aoa-up --profile tools
 ```bash
 scripts/aoa-profile-endpoints --profile observability
 scripts/aoa-up --profile observability
+scripts/aoa-internal-probes --profile observability
 ```
 
 ## If something feels wrong
@@ -114,3 +116,4 @@ Then read:
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
+- [INTERNAL_PROBES](INTERNAL_PROBES.md)

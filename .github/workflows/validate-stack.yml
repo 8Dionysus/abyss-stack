@@ -38,6 +38,7 @@ jobs:
             scripts/aoa-first-run \
             scripts/aoa-profile-modules \
             scripts/aoa-profile-endpoints \
+            scripts/aoa-internal-probes \
             scripts/aoa-up \
             scripts/aoa-down \
             scripts/aoa-status \
@@ -72,3 +73,5 @@ jobs:
           scripts/aoa-profile-endpoints --profile agentic
           scripts/aoa-profile-modules --profile intel --paths
           scripts/aoa-profile-endpoints --profile intel
+          scripts/aoa-profile-endpoints --profile tools
+          scripts/aoa-profile-endpoints --profile observability

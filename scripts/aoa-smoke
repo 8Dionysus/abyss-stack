@@ -5,7 +5,26 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/aoa-lib.sh
 source "${SCRIPT_DIR}/aoa-lib.sh"
 
-aoa_parse_profile_args "$@"
+with_internal=0
+internal_strict=0
+profile_args=()
+while (($#)); do
+  case "$1" in
+    --with-internal)
+      with_internal=1
+      ;;
+    --with-internal-strict)
+      with_internal=1
+      internal_strict=1
+      ;;
+    *)
+      profile_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${profile_args[@]}"
 aoa_resolve_modules "${AOA_STACK_PROFILE}"
 aoa_print_profile_summary
 
@@ -52,14 +71,30 @@ if has_module "50-speech.yml"; then
 fi
 
 if has_module "51-browser-tools.yml"; then
-  aoa_note "skip browser-tools host probes because docs-api and aoa-browser are internal-only"
+  if ((with_internal)); then
+    aoa_note "browser-tools internal probes requested"
+  else
+    aoa_note "skip browser-tools host probes because docs-api and aoa-browser are internal-only"
+  fi
 fi
 
 if has_module "60-monitoring.yml"; then
   aoa_probe_http "prometheus" "http://127.0.0.1:9090/-/ready" || failures=$((failures + 1))
   aoa_probe_http "alertmanager" "http://127.0.0.1:9093/-/ready" || failures=$((failures + 1))
   aoa_probe_http "grafana" "http://127.0.0.1:3000/api/health" || failures=$((failures + 1))
-  aoa_note "skip cadvisor host probe because it is internal-only"
+  if ((with_internal)); then
+    aoa_note "monitoring internal probes requested"
+  else
+    aoa_note "skip cadvisor host probe because it is internal-only"
+  fi
+fi
+
+if ((with_internal)); then
+  internal_args=(--profile "$AOA_STACK_PROFILE")
+  if ((internal_strict)); then
+    internal_args+=(--strict)
+  fi
+  "${SCRIPT_DIR}/aoa-internal-probes" "${internal_args[@]}" || failures=$((failures + 1))
 fi
 
 if ((failures > 0)); then

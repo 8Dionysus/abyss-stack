@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
 
   cadvisor:
+    container_name: cadvisor
     image: ghcr.io/google/cadvisor:0.56.2
     privileged: true
     security_opt:

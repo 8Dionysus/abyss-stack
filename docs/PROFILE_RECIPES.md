@@ -16,6 +16,18 @@ scripts/aoa-wait --profile <name>
 scripts/aoa-smoke --profile <name>
 ```
 
+If the profile includes internal-only services, follow with:
+
+```bash
+scripts/aoa-internal-probes --profile <name>
+```
+
+Or combine host-facing and internal-only checks in one pass:
+
+```bash
+scripts/aoa-smoke --with-internal --profile <name>
+```
+
 ## `core`
 
 ### What it is for
@@ -109,6 +121,7 @@ scripts/aoa-profile-endpoints --profile tools
 scripts/aoa-up --profile tools
 scripts/aoa-wait --profile tools
 scripts/aoa-smoke --profile tools
+scripts/aoa-internal-probes --profile tools
 ```
 
 ## `observability`
@@ -134,4 +147,5 @@ scripts/aoa-profile-endpoints --profile observability
 scripts/aoa-up --profile observability
 scripts/aoa-wait --profile observability
 scripts/aoa-smoke --profile observability
+scripts/aoa-internal-probes --profile observability
 ```
