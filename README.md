@@ -49,12 +49,14 @@ This repository should not absorb:
 9. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
 10. Read [docs/PATHS](docs/PATHS.md).
 11. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-12. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-13. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-14. Read [docs/DOCTOR](docs/DOCTOR.md).
-15. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-16. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-17. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+12. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+13. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+14. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+15. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+16. Read [docs/DOCTOR](docs/DOCTOR.md).
+17. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+18. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+19. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
