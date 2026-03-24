@@ -36,6 +36,11 @@ REQUIRED_SCRIPTS = {
     "aoa-wait",
 }
 REQUIRED_FILES = {
+    ROOT / "compose" / "AGENTS.md",
+    ROOT / "env" / "AGENTS.md",
+    ROOT / "config-templates" / "AGENTS.md",
+    ROOT / "systemd" / "user" / "AGENTS.md",
+    ROOT / "scripts" / "AGENTS.md",
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
     ROOT / "docs" / "PRESETS.md",
