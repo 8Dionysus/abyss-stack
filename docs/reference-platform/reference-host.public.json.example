@@ -1,0 +1,90 @@
+{
+  "artifact_kind": "aoa.host-facts",
+  "schema_version": "1",
+  "capture_mode": "public",
+  "captured_at": "2026-01-01T00:00:00Z",
+  "captured_by": "scripts/aoa-host-facts",
+  "platform": {
+    "os_id": "fedora",
+    "os_version_id": "43",
+    "os_pretty_name": "Fedora Linux 43",
+    "kernel_release": "6.0.0-example",
+    "arch": "x86_64"
+  },
+  "cpu": {
+    "vendor": "ExampleVendor",
+    "model_name": "Example CPU",
+    "sockets": 1,
+    "cores_per_socket": 8,
+    "threads_per_core": 2,
+    "physical_cores_estimate": 8,
+    "logical_cpus": 16,
+    "max_mhz": 5200.0
+  },
+  "memory": {
+    "total_bytes": 68719476736,
+    "swap_total_bytes": 34359738368
+  },
+  "acceleration": {
+    "dev_dri_present": true,
+    "render_nodes": [
+      "renderD128"
+    ],
+    "intel_drm_present": true
+  },
+  "storage": {
+    "observed_paths": [
+      {
+        "query_path": "/",
+        "resolved_path": "/",
+        "mount_target": "/",
+        "mounted": true,
+        "fstype": "btrfs",
+        "size_bytes": 1999844147200,
+        "available_bytes": 999922073600
+      },
+      {
+        "query_path": "/srv/abyss-stack",
+        "resolved_path": "/",
+        "mount_target": "/",
+        "mounted": true,
+        "fstype": "btrfs",
+        "size_bytes": 1999844147200,
+        "available_bytes": 999922073600
+      },
+      {
+        "query_path": "/abyss",
+        "resolved_path": "/abyss",
+        "mount_target": "/abyss",
+        "mounted": true,
+        "fstype": "ext4",
+        "size_bytes": 3999688294400,
+        "available_bytes": 2999416217600
+      }
+    ]
+  },
+  "runtime": {
+    "podman_present": true,
+    "podman_version": "5.0.0",
+    "podman_rootless": true,
+    "compose_backend": "podman compose",
+    "systemd_user_available": true,
+    "selinux_mode": "enforcing"
+  },
+  "paths": {
+    "stack_root": "/srv/abyss-stack",
+    "configs_root": "/srv/abyss-stack/Configs",
+    "vault_root": "/abyss",
+    "stack_root_is_canonical": true,
+    "stack_root_exists": true,
+    "configs_root_exists": true,
+    "vault_root_exists": true,
+    "vault_root_mounted": true
+  },
+  "redaction": {
+    "hostname_redacted": true,
+    "mount_sources_redacted": true,
+    "device_serials_redacted": true,
+    "network_redacted": true
+  }
+}

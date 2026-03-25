@@ -11,6 +11,11 @@ Typical shape:
 - deployed runtime at `/srv/abyss-stack`
 - optional heavy-data vault at `/abyss`
 
+If you are operating from a Windows host through WSL, also read:
+- [WINDOWS_BRIDGE](WINDOWS_BRIDGE.md)
+- [WINDOWS_SETUP](WINDOWS_SETUP.md)
+- [WINDOWS_PERFORMANCE](WINDOWS_PERFORMANCE.md)
+
 ## Fastest guided route
 
 If you want the least-friction path, use:
@@ -53,11 +58,12 @@ Example:
 
 Suggested logic:
 1. keep editing in the Windows checkout if that is convenient
-2. run the deployment bridge scripts inside the Linux layer against the repo view available there
-3. deploy into `/srv/abyss-stack`
-4. bootstrap public-safe runtime config files from templates
-5. bootstrap secrets separately
-6. optionally map a Windows host vault path into `/abyss`
+2. use `pwsh -File scripts/aoa.ps1 host-doctor` and `pwsh -File scripts/aoa.ps1 doctor --preset agent-full` from PowerShell to validate the host bridge
+3. run the deployment bridge scripts inside the Linux layer against the repo view available there, either directly or through `pwsh -File scripts/aoa.ps1 ...`
+4. deploy into `/srv/abyss-stack`
+5. bootstrap public-safe runtime config files from templates
+6. bootstrap secrets separately
+7. optionally map a Windows host vault path into `/abyss`
 
 The important thing is not where the source lives.
 The important thing is that the deployed runtime still becomes `/srv/abyss-stack` inside Linux.
@@ -69,6 +75,8 @@ The important thing is that the deployed runtime still becomes `/srv/abyss-stack
 Checks host-side and runtime-side readiness for the Fedora-first model.
 It reports missing commands, platform mismatches, vault mount state, and Intel-specific hints such as `/dev/dri` presence.
 Use `--strict` if warnings should fail the command.
+
+From a Windows host, use `pwsh -File scripts/aoa.ps1 host-doctor` for the Windows+WSL readiness pass before invoking the Linux doctor.
 
 ### `scripts/aoa-install-layout`
 
@@ -126,6 +134,8 @@ Renders the fully composed config that Compose sees.
 Use `--write <path>` if you want to keep the output locally instead of printing it.
 Treat the rendered output as potentially secret-bearing.
 You can pass several profiles or presets.
+
+If you need to layer a bounded overlay, use `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` with `scripts/aoa.ps1` on Windows.
 
 ## Recommended first deployment flow
 

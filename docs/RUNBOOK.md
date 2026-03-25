@@ -9,10 +9,11 @@ When something feels wrong, use this order:
 3. check expected profile endpoints and profile composition
 4. check internal-only probes when relevant
 5. check rendered runtime truth when composition may be the problem
-6. check container state
-7. check health endpoints
-8. check logs
-9. decide whether to fix forward or roll back
+6. capture or compare host facts when the machine itself may have drifted
+7. check container state
+8. check health endpoints
+9. check logs
+10. decide whether to fix forward or roll back
 
 ## Useful commands
 
@@ -20,6 +21,7 @@ When something feels wrong, use this order:
 aoa-doctor
 aoa-doctor --preset agent-full
 aoa-check-layout
+aoa-host-facts --mode public
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -37,6 +39,12 @@ aoa-render-config --preset agent-full --write /tmp/abyss.rendered.yml
 ```
 
 Treat rendered output as potentially secret-bearing.
+
+For private host-facts capture during local incident work:
+
+```bash
+aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/incident.private.json"
+```
 
 For combined surfaces:
 
@@ -65,4 +73,4 @@ If they accidentally appear on host ports, treat that as drift.
 
 ## First rollback instinct
 
-If a change widened scope, broke locality, tangled profiles, or mixed Windows host paths with Linux runtime paths, prefer a small rollback over improvising a giant repair.
+If a change widened scope, broke locality, tangled profiles, mixed Windows host paths with Linux runtime paths, or introduced unreviewed host-facts exposure, prefer a small rollback over improvising a giant repair.

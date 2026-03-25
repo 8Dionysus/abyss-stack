@@ -15,6 +15,11 @@ The repository now includes deployment bridge scripts under `scripts/`:
 - `aoa-install-systemd`
 - `aoa-first-run`
 
+For Windows-host orchestration through WSL, the repository also includes:
+- `aoa.ps1`
+- `aoa-doctor-win.ps1`
+- `aoa-bootstrap-wsl.ps1`
+
 They help bridge from a source checkout into the deployed runtime tree under `${AOA_STACK_ROOT}`.
 
 ## Profile and preset introspection
@@ -29,6 +34,8 @@ The repository also includes:
 These helpers make it easy to see what a preset, profile, or profile-combination will activate before you start it.
 `aoa-render-services` and `aoa-render-config` are the deeper runtime-truth layer because they come from the composed runtime view rather than just docs or module lists.
 
+You may optionally layer bounded overlays after the canonical module list through `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` on the Windows bridge.
+
 ## Human-facing wrappers
 
 The repository also includes these runtime wrappers under `scripts/`:
@@ -40,6 +47,8 @@ The repository also includes these runtime wrappers under `scripts/`:
 - `aoa-wait`
 
 They resolve presets and profiles into an ordered compose module list.
+
+On Windows, `pwsh -File scripts/aoa.ps1 <command>` is the host-facing wrapper that forwards into the same Linux command surface.
 
 ## Composition layers
 
@@ -67,7 +76,7 @@ Presets expand before direct `--profile` additions.
 Expected pattern:
 - one or more presets and profiles resolve to an ordered profile list
 - that profile list resolves to an ordered module list
-- compose files are applied in that order
+- compose files are applied in that order, with any bounded extra compose overlays appended after the canonical module files
 - the rendered Compose view is inspectable before launch
 - systemd user unit becomes the stable operator entrypoint
 

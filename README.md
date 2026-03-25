@@ -4,7 +4,7 @@
 
 It is **Fedora-first** in deployment posture, while remaining **Windows-usable** for source work, path mapping, and hybrid workflows.
 
-It owns runtime, deployment, storage layout, lifecycle, security, and infra glue.
+It owns runtime, deployment, storage layout, lifecycle, security, reference platform posture, and infra glue.
 It does **not** own the authored meaning of the specialized AoA layers.
 
 ## What this repository is for
@@ -15,6 +15,7 @@ This repository is the right home for:
 - storage and mount contracts
 - service modules and deployment profiles
 - security, runbook, backup, and restore posture
+- normative host posture and machine-readable host-facts contracts
 - infra helper services that support AoA and ToS
 
 ## What this repository is not for
@@ -46,17 +47,25 @@ This repository should not absorb:
 6. Read [docs/PRESETS](docs/PRESETS.md).
 7. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
 8. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
-9. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
-10. Read [docs/PATHS](docs/PATHS.md).
-11. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-12. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-13. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-14. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-15. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-16. Read [docs/DOCTOR](docs/DOCTOR.md).
-17. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-18. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-19. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+9. Read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md).
+10. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
+11. Read [docs/PATHS](docs/PATHS.md).
+12. Read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md).
+13. Read [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md).
+14. Read [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md).
+15. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+16. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
+17. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
+18. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+19. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+20. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+21. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+22. Read [docs/DOCTOR](docs/DOCTOR.md).
+23. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+24. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+25. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+26. Read [docs/SECURITY](docs/SECURITY.md).
+27. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -64,6 +73,9 @@ For the shortest next route by intent:
 - if you need reusable practice, go to [`aoa-techniques`](https://github.com/8Dionysus/aoa-techniques)
 - if you need bounded execution workflows, go to [`aoa-skills`](https://github.com/8Dionysus/aoa-skills)
 - if you need portable proof surfaces, go to [`aoa-evals`](https://github.com/8Dionysus/aoa-evals)
+- if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
+- if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
+- if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
 
 ## Quick route table
 
@@ -86,6 +98,8 @@ abyss-stack/
 ├─ ROADMAP.md
 ├─ AGENTS.md
 ├─ docs/
+├─ schemas/
+├─ examples/
 ├─ compose/
 ├─ config-templates/
 ├─ scripts/
@@ -121,7 +135,11 @@ The repository now includes:
 - profile endpoint recipes and endpoint introspection helpers
 - internal-only probe helpers for hidden services
 - render-truth helpers for actual composed runtime output
+- runtime benchmark policy, schema, and example artifacts
+- reference-platform schema and host-facts capture support
 - preset-aware composition helpers and preset introspection
+- Windows host bridge scripts and WSL guidance docs
+- optional compose tuning overlays
 - human-facing wrappers under `scripts/`
 - a systemd user unit skeleton under `systemd/user/`
 - a repository validation workflow under `.github/workflows/`

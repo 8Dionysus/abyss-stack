@@ -8,6 +8,24 @@
 - `/srv/abyss-stack` as the canonical runtime root
 - `/abyss` as an optional mounted vault for heavy data
 
+## This file versus host facts
+
+This file is normative. It names the intended operating posture.
+
+Observed machine facts belong to the machine-readable host-facts layer described in [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md).
+
+Recommended local review flow:
+
+```bash
+scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
+scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+```
+
+Until a canonical Linux reference host is chosen, keep the repository on the example artifact only.
+Generate `docs/reference-platform/reference-host.public.json` later, after review, when you intentionally refresh the canonical public snapshot.
+
+`aoa-doctor` stays focused on readiness. It is not the durable inventory surface.
+
 ## Fedora-first means
 
 The primary operational target is Fedora.

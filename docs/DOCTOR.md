@@ -33,6 +33,14 @@ For example:
 - `aoa-doctor --preset intel-full` will warn if `/dev/dri` is missing
 - `aoa-doctor --preset agent-full` will remind you that internal-only layers are selected and should be checked after startup
 
+## Relationship to host-facts capture
+
+Use `aoa-doctor` to decide whether a selected runtime is ready to start.
+
+Use `scripts/aoa-host-facts` to capture durable machine-readable host facts.
+
+The two surfaces complement each other and should not absorb each other's job.
+
 ## Usage
 
 Basic check using the default base profile:
@@ -58,6 +66,26 @@ Strict check:
 ```bash
 scripts/aoa-doctor --strict --preset intel-full
 ```
+
+Durable host-facts capture:
+
+```bash
+scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
+scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+```
+
+Keep `docs/reference-platform/reference-host.public.json` for later canonical-host refreshes, not routine local captures.
+
+## Windows host bridge
+
+If your source checkout lives on Windows and the runtime lives in WSL, start with:
+
+```powershell
+pwsh -File scripts/aoa.ps1 host-doctor
+pwsh -File scripts/aoa.ps1 doctor --preset agent-full
+```
+
+`host-doctor` checks the Windows-side and WSL-side readiness before the Linux doctor is invoked through the bridge.
 
 ## Interpreting results
 

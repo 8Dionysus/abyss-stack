@@ -9,6 +9,8 @@ This guide is the shortest careful path from a source checkout to a running loca
 - `rsync` is available
 - the runtime root should be `/srv/abyss-stack`
 
+If you are starting from Windows, read [WINDOWS_SETUP](WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
+
 ## Fast path
 
 From the source checkout:
@@ -28,6 +30,14 @@ That will:
 - bootstrap public-safe runtime config templates
 - check the layout in strict bootstrap mode while still allowing missing secrets on that first pass
 
+From a Windows host, the equivalent careful route is:
+
+```powershell
+pwsh -File scripts/aoa.ps1 host-doctor
+pwsh -File scripts/aoa.ps1 doctor --preset agent-full
+pwsh -File scripts/aoa.ps1 first-run --strict
+```
+
 ## Then do the one thing it cannot do for you
 
 Create the real secret-bearing files described in:
@@ -38,6 +48,19 @@ Then validate the fully bootstrapped layout:
 ```bash
 scripts/aoa-check-layout --strict
 ```
+
+## Optional but recommended: capture host facts
+
+Once the runtime roots exist, record both the public-safe and local-private host posture:
+
+```bash
+scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
+scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+```
+
+Review the public artifact before commit.
+Do not commit the private artifact.
+Keep `docs/reference-platform/reference-host.public.json` reserved for the reviewed canonical Linux reference host snapshot.
 
 ## Inspect the profile before launch
 
@@ -58,7 +81,7 @@ After secrets exist, inspect what Compose actually sees:
 
 ```bash
 scripts/aoa-render-services --profile core
-aoa-render-config --profile core --write /tmp/abyss-core.rendered.yml
+scripts/aoa-render-config --profile core --write /tmp/abyss-core.rendered.yml
 ```
 
 Treat the rendered config as potentially secret-bearing.
@@ -142,6 +165,7 @@ Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
+- [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md)
 - [PRESETS](PRESETS.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
 - [RENDER_TRUTH](RENDER_TRUTH.md)

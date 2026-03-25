@@ -11,6 +11,7 @@ AOA_COMPOSE_PROJECT_NAME="${AOA_COMPOSE_PROJECT_NAME:-abyss}"
 AOA_LOG_TAIL="${AOA_LOG_TAIL:-200}"
 AOA_WAIT_TIMEOUT_S="${AOA_WAIT_TIMEOUT_S:-120}"
 AOA_WAIT_INTERVAL_S="${AOA_WAIT_INTERVAL_S:-5}"
+AOA_EXTRA_COMPOSE_FILES="${AOA_EXTRA_COMPOSE_FILES:-}"
 
 export AOA_STACK_ROOT
 export AOA_CONFIGS_ROOT
@@ -18,6 +19,7 @@ export AOA_VAULT_ROOT
 export AOA_STACK_PRESET
 export AOA_STACK_PROFILE
 export AOA_STACK_DEFAULT_PROFILE
+export AOA_EXTRA_COMPOSE_FILES
 
 AOA_MODULES_DIR="${AOA_CONFIGS_ROOT}/compose/modules"
 AOA_PROFILES_DIR="${AOA_CONFIGS_ROOT}/compose/profiles"
@@ -32,6 +34,8 @@ AOA_PROFILE_NAMES=()
 AOA_PROFILE_FILES=()
 AOA_PROFILE_MODULE_NAMES=()
 AOA_PROFILE_MODULE_FILES=()
+AOA_EXTRA_COMPOSE_FILE_SPECS=()
+AOA_EXTRA_COMPOSE_FILE_PATHS=()
 
 aoa_die() {
   printf 'error: %s\n' "$*" >&2
@@ -270,15 +274,49 @@ aoa_resolve_modules() {
   ((${#AOA_PROFILE_MODULE_FILES[@]} > 0)) || aoa_die "resolved profiles produced zero modules"
 }
 
+aoa_resolve_extra_compose_files() {
+  local spec trimmed resolved
+  local -A seen_files=()
+
+  AOA_EXTRA_COMPOSE_FILE_SPECS=()
+  AOA_EXTRA_COMPOSE_FILE_PATHS=()
+
+  [[ -n "$AOA_EXTRA_COMPOSE_FILES" ]] || return 0
+
+  while IFS= read -r spec; do
+    trimmed="$(aoa_trim "$spec")"
+    [[ -n "$trimmed" ]] || continue
+
+    if [[ "$trimmed" == /* ]]; then
+      resolved="$trimmed"
+    else
+      resolved="${AOA_CONFIGS_ROOT}/${trimmed}"
+    fi
+
+    [[ -f "$resolved" ]] || aoa_die "extra compose file not found: $resolved"
+
+    if [[ -z "${seen_files[$resolved]+x}" ]]; then
+      seen_files["$resolved"]=1
+      AOA_EXTRA_COMPOSE_FILE_SPECS+=("$trimmed")
+      AOA_EXTRA_COMPOSE_FILE_PATHS+=("$resolved")
+    fi
+  done < <(aoa_expand_specs "$AOA_EXTRA_COMPOSE_FILES")
+}
+
 aoa_compose() {
   local args=()
-  local module_file
+  local module_file extra_file
 
   aoa_detect_compose
   aoa_resolve_modules
+  aoa_resolve_extra_compose_files
 
   for module_file in "${AOA_PROFILE_MODULE_FILES[@]}"; do
     args+=(-f "$module_file")
+  done
+
+  for extra_file in "${AOA_EXTRA_COMPOSE_FILE_PATHS[@]}"; do
+    args+=(-f "$extra_file")
   done
 
   (
@@ -289,7 +327,10 @@ aoa_compose() {
 }
 
 aoa_print_profile_summary() {
-  local preset_name profile_name module_name
+  local preset_name profile_name module_name overlay_spec
+
+  aoa_resolve_extra_compose_files
+
   aoa_note "presets: ${AOA_STACK_PRESET:-(none)}"
   aoa_note "profiles: ${AOA_STACK_PROFILE:-(none)}"
   aoa_note "stack root: ${AOA_STACK_ROOT}"
@@ -310,6 +351,13 @@ aoa_print_profile_summary() {
   for module_name in "${AOA_PROFILE_MODULE_NAMES[@]}"; do
     aoa_note "- ${module_name}"
   done
+
+  if ((${#AOA_EXTRA_COMPOSE_FILE_SPECS[@]} > 0)); then
+    aoa_note "extra compose files:"
+    for overlay_spec in "${AOA_EXTRA_COMPOSE_FILE_SPECS[@]}"; do
+      aoa_note "- ${overlay_spec}"
+    done
+  fi
 }
 
 aoa_probe_http() {

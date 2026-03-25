@@ -1,0 +1,104 @@
+{
+  "surface_type": "runtime_benchmark_manifest",
+  "schema_version": "v1",
+  "benchmark_id": "local-workhorse-q4-latency-baseline",
+  "benchmark_family": "latency-single-turn",
+  "benchmark_label": "Workhorse local q4 single-turn latency on agent-observability",
+  "started_at_utc": "2026-03-24T15:42:00Z",
+  "finished_at_utc": "2026-03-24T15:49:15Z",
+  "runner": {
+    "name": "local-runtime-bench-runner",
+    "version": "0.1.0-draft",
+    "measurement_contract": {
+      "warmup_runs": 3,
+      "measured_runs": 24,
+      "timeout_ms": 120000,
+      "retry_policy": "no-retry-on-measured-runs",
+      "streaming_enabled": true
+    },
+    "invocation_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/invocation.txt"
+  },
+  "system_under_test": {
+    "target_kind": "local-model",
+    "target_label": "workhorse-local-q4",
+    "serving_backend": "ollama",
+    "profile_class": "workhorse",
+    "context_budget_class": "bounded-short-long",
+    "quantization_or_runtime_variant": "q4_k_m"
+  },
+  "runtime_selection": {
+    "selection_type": "preset",
+    "selection_name": "agent-observability",
+    "rendered_services_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-services.txt",
+    "rendered_config_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-config.redacted.yml",
+    "smoke_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/smoke.json",
+    "internal_probe_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/internal.json"
+  },
+  "environment": {
+    "os": "Fedora Linux",
+    "kernel_or_runtime": "rootless podman + systemd user",
+    "cpu_model": "local x86 host",
+    "system_ram_gb": 64,
+    "accelerators": [
+      {
+        "type": "gpu",
+        "label": "local accelerator",
+        "memory_gb": 16
+      }
+    ],
+    "vault_mounted": true,
+    "network_posture": "localhost-first"
+  },
+  "fixtures": {
+    "fixture_family": "runtime-latency-smoke-v1",
+    "case_count": 24,
+    "input_shape": "single-turn short prompt with bounded completion",
+    "token_budget_notes": "prompt <= 512 tokens; completion <= 256 tokens"
+  },
+  "metrics": {
+    "unit_contract": {
+      "latency_unit": "ms",
+      "throughput_unit": "tokens_per_second",
+      "memory_unit": "gb"
+    },
+    "summary": {
+      "first_token_ms_p50": 612,
+      "first_token_ms_p95": 760,
+      "completion_ms_p50": 1840,
+      "completion_ms_p95": 2205,
+      "tokens_per_second_p50": 45.2,
+      "tokens_per_second_p95": 39.4,
+      "peak_ram_gb": 13.7,
+      "peak_vram_gb": 7.9,
+      "success_rate": 1.0,
+      "error_rate": 0.0
+    },
+    "metric_notes": "Warmup runs excluded from p50 and p95 summary. Measured runs used one stable prompt family and no retries."
+  },
+  "evidence": {
+    "summary_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/summary.json",
+    "notes_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/notes.md",
+    "raw_artifact_refs": [
+      "local:/abyss/runtime-benchmarks/raw/2026-03-24/workhorse-local-q4/latency-samples.csv",
+      "local:/abyss/runtime-benchmarks/raw/2026-03-24/workhorse-local-q4/device-samples.jsonl"
+    ],
+    "plot_refs": [
+      "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/plots/latency-distribution.png"
+    ]
+  },
+  "comparison_tags": [
+    "baseline",
+    "latency",
+    "ollama",
+    "workhorse"
+  ],
+  "verdict_boundary": {
+    "supports_runtime_claims_only": true,
+    "does_not_prove": [
+      "reasoning quality",
+      "general agent capability",
+      "artifact quality",
+      "cross-host ranking"
+    ]
+  }
+}

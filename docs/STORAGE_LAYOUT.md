@@ -19,6 +19,8 @@ Expected live structure under `/srv/abyss-stack`:
   Models/
   Knowledge/
   Logs/
+    host-facts/
+    runtime-benchmarks/
   .codex-home/
 ```
 
@@ -29,7 +31,7 @@ Expected live structure under `/srv/abyss-stack`:
 - `Services/` — persistent state for databases and runtime services, plus a few runtime service-local inputs such as the LiteLLM config file
 - `Models/` — local model weights and related serving artifacts
 - `Knowledge/` — local knowledge corpora and helper inputs
-- `Logs/` — logs and generated runtime artifacts
+- `Logs/` — logs and generated runtime artifacts, including local private host-facts captures under `Logs/host-facts/` and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
 - `.codex-home/` — isolated agent or codex-style runtime home
 
 ## Heavy-data caution
@@ -52,3 +54,4 @@ Never commit or publish real runtime material from:
 - `/srv/abyss-stack/Secrets`
 - live `stack.env`
 - any secret-bearing mounted file used by services
+- private host-facts captures under `/srv/abyss-stack/Logs/host-facts/`

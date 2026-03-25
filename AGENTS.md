@@ -22,6 +22,8 @@ Use this order:
 - do not confuse a Windows source checkout path with the Linux runtime root
 - do not convert public-safe config templates into committed secret-bearing runtime files
 - do not publish rendered config output that may contain secret-bearing values
+- do not commit private host-facts captures from live machines
+- do not turn `aoa-doctor` into a generic inventory or monitoring program
 
 ## Default stance
 
@@ -30,6 +32,16 @@ Use this order:
 - prefer placeholder or skeletal files over pretending unfinished services are complete
 - prefer clarity and explicit boundaries over magical automation
 - preserve `/srv/abyss-stack` as the canonical deployed runtime root unless explicitly redesigned
+- preserve the split between normative platform docs, public-safe host facts, and private host facts
+
+## Host-facts rule
+
+- `docs/REFERENCE_PLATFORM.md` owns the intended host posture.
+- `docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations.
+- `scripts/aoa-doctor` answers readiness, not durable inventory.
+- `scripts/aoa-host-facts` captures durable host facts.
+- public-safe artifacts may live under `docs/reference-platform/`
+- private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
 
 ## Repository reading order
 
@@ -42,14 +54,20 @@ Use this order:
 7. `docs/PRESETS.md`
 8. `docs/PROFILE_RECIPES.md`
 9. `docs/RENDER_TRUTH.md`
-10. `docs/INTERNAL_PROBES.md`
-11. `docs/PATHS.md`
-12. `docs/STORAGE_LAYOUT.md`
-13. `docs/DEPLOYMENT.md`
-14. `docs/FIRST_RUN.md`
-15. `docs/DOCTOR.md`
-16. `docs/SECRETS_BOOTSTRAP.md`
-17. `docs/LIFECYCLE.md`
-18. `docs/RUNBOOK.md`
-19. `docs/SECURITY.md`
-20. `docs/MIGRATION_FROM_OLD.md`
+10. `docs/RUNTIME_BENCH_POLICY.md`
+11. `docs/INTERNAL_PROBES.md`
+12. `docs/PATHS.md`
+13. `docs/WINDOWS_BRIDGE.md`
+14. `docs/WINDOWS_SETUP.md`
+15. `docs/WINDOWS_PERFORMANCE.md`
+16. `docs/STORAGE_LAYOUT.md`
+17. `docs/REFERENCE_PLATFORM.md`
+18. `docs/REFERENCE_PLATFORM_SPEC.md`
+19. `docs/DEPLOYMENT.md`
+20. `docs/FIRST_RUN.md`
+21. `docs/DOCTOR.md`
+22. `docs/SECRETS_BOOTSTRAP.md`
+23. `docs/LIFECYCLE.md`
+24. `docs/RUNBOOK.md`
+25. `docs/SECURITY.md`
+26. `docs/MIGRATION_FROM_OLD.md`

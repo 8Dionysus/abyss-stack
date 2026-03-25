@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  validate-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install shellcheck, rsync, podman and podman-compose
         run: |
@@ -24,6 +24,9 @@ jobs:
 
       - name: Validate stack structure
         run: python scripts/validate_stack.py
+
+      - name: Python syntax check
+        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts
 
       - name: Shellcheck scripts
         run: |
@@ -101,3 +104,95 @@ jobs:
           scripts/aoa-render-config --preset intel-full >/dev/null
           scripts/aoa-render-config --profile agentic,tools,observability --write "$RUNNER_TEMP/abyss-combined.rendered.yml"
           test -s "$RUNNER_TEMP/abyss-combined.rendered.yml"
+
+      - name: Rehearse extra compose overlay flow
+        run: |
+          export AOA_STACK_ROOT="$RUNNER_TEMP/abyss-stack-overlay"
+          export AOA_CONFIGS_ROOT="$AOA_STACK_ROOT/Configs"
+          export AOA_VAULT_ROOT="$RUNNER_TEMP/abyss-vault-overlay"
+          mkdir -p "$AOA_VAULT_ROOT"
+
+          scripts/aoa-first-run --strict
+          cp env/stack.env.example "$AOA_STACK_ROOT/Secrets/Configs/stack.env"
+          ln -sfn "$AOA_STACK_ROOT/Secrets/Configs/stack.env" "$AOA_STACK_ROOT/Configs/stack.env"
+          cp env/langchain-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env"
+          cp env/ovms-api.env.example "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env"
+          printf '%s\n' 'TEST_KEY' > "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+          chmod 600 \
+            "$AOA_STACK_ROOT/Secrets/Configs/stack.env" \
+            "$AOA_STACK_ROOT/Secrets/Configs/langchain-api.env" \
+            "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env" \
+            "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
+
+          export AOA_EXTRA_COMPOSE_FILES="compose/tuning/ollama.cpu.yml"
+          scripts/aoa-render-config --profile core >/dev/null
+
+      - name: Capture host-facts artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/host-facts"
+
+          scripts/aoa-host-facts --mode public --write "$RUNNER_TEMP/host-facts/reference-host.public.json"
+          scripts/aoa-host-facts --mode private --write "$RUNNER_TEMP/host-facts/latest.private.json"
+
+          python - \
+            "$RUNNER_TEMP/host-facts/reference-host.public.json" \
+            "$RUNNER_TEMP/host-facts/latest.private.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          public = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          private = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+
+          assert public["artifact_kind"] == "aoa.host-facts"
+          assert public["capture_mode"] == "public"
+          assert public["captured_by"] == "scripts/aoa-host-facts"
+          assert private["artifact_kind"] == "aoa.host-facts"
+          assert private["capture_mode"] == "private"
+          assert private["captured_by"] == "scripts/aoa-host-facts"
+          PY
+
+  validate-windows-host-bridge:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate stack structure
+        shell: pwsh
+        run: python scripts/validate_stack.py
+
+      - name: Parse PowerShell bridge scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            "scripts/aoa.ps1",
+            "scripts/aoa-doctor-win.ps1",
+            "scripts/aoa-bootstrap-wsl.ps1"
+          )
+
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            $resolvedPath = (Resolve-Path $file).Path
+
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $resolvedPath,
+              [ref]$tokens,
+              [ref]$parseErrors
+            )
+
+            $errorList = @($parseErrors)
+            if ($errorList.Count -gt 0) {
+              $errorList | ForEach-Object {
+                Write-Error ("{0}: {1}" -f $file, $_.Message)
+              }
+              exit 1
+            }
+          }

@@ -14,11 +14,14 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 8. `docs/RENDER_TRUTH.md`
 9. `docs/INTERNAL_PROBES.md`
 10. `docs/PATHS.md`
+11. `docs/REFERENCE_PLATFORM.md`
+12. `docs/REFERENCE_PLATFORM_SPEC.md`
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.
 - Shared env defaults, selector parsing, compose resolution, and probe helpers live in `scripts/aoa-lib.sh`.
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
+- `scripts/aoa-host-facts` owns durable machine-readable host-facts capture. Keep it stdlib-only and secret-safe.
 
 ## Shell script rules
 - Use `#!/usr/bin/env bash` and `set -euo pipefail`.
@@ -44,13 +47,16 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - `.github/workflows/validate-stack.yml`
   - the relevant docs in `docs/`
 - If you introduce or remove required runtime files, update both `aoa-check-layout` and `validate_stack.py`.
+- If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/reference-platform/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 
 ## Verify
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
+python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts
 shellcheck scripts/aoa-lib.sh scripts/<touched-script>
 bash -n scripts/<touched-script>
+scripts/aoa-host-facts --mode public
 ```
 
 For bootstrap or lifecycle changes, rehearse the flow encoded in `.github/workflows/validate-stack.yml` with a temporary runtime root.
