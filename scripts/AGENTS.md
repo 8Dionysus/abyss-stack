@@ -13,9 +13,10 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 7. `docs/PROFILE_RECIPES.md`
 8. `docs/RENDER_TRUTH.md`
 9. `docs/INTERNAL_PROBES.md`
-10. `docs/PATHS.md`
-11. `docs/REFERENCE_PLATFORM.md`
-12. `docs/REFERENCE_PLATFORM_SPEC.md`
+10. `docs/RECURRENCE_RUNTIME_POLICY.md`
+11. `docs/PATHS.md`
+12. `docs/REFERENCE_PLATFORM.md`
+13. `docs/REFERENCE_PLATFORM_SPEC.md`
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.
@@ -48,6 +49,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - the relevant docs in `docs/`
 - If you introduce or remove required runtime files, update both `aoa-check-layout` and `validate_stack.py`.
 - If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/reference-platform/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
 ## Verify
 For shell work, run the smallest useful set:

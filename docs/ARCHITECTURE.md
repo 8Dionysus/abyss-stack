@@ -31,6 +31,8 @@ Model routing and agent-facing runtime APIs:
 - LiteLLM
 - LangChain API or successor service modules
 
+This layer may also host the runtime return wrapper that rebuilds context from a last valid anchor rather than continuing under drift.
+
 ### 5. Speech and tool layer
 
 Optional runtime helpers:

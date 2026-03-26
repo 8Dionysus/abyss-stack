@@ -15,6 +15,8 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `modules/51-browser-tools.yml`
 - `modules/60-monitoring.yml`
 
+`41-agent-api.yml` may consume a public-safe return policy file from `Configs/agent-api/return-policy.yaml`.
+
 ## Profiles
 
 - `profiles/core.txt`

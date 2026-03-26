@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/aoa-lib.sh"
 
 strict_mode=0
 ignore_secrets=0
+selector_args=()
 while (($#)); do
   case "$1" in
     --strict)
@@ -14,6 +15,16 @@ while (($#)); do
       ;;
     --ignore-secrets)
       ignore_secrets=1
+      ;;
+    --preset|--profile)
+      option_name="$1"
+      selector_args+=("$1")
+      shift || true
+      (($#)) || aoa_die "missing value after ${option_name}"
+      selector_args+=("$1")
+      ;;
+    --preset=*|--profile=*)
+      selector_args+=("$1")
       ;;
     *)
       aoa_die "unknown argument: $1"
@@ -46,6 +57,25 @@ check_warn_file() {
   fi
 }
 
+has_module() {
+  local target="$1"
+  local module
+
+  for module in "${AOA_PROFILE_MODULE_NAMES[@]}"; do
+    [[ "$module" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+selection_metadata_ready=0
+if [[ -d "${AOA_PROFILES_DIR}" ]] && [[ -d "${AOA_MODULES_DIR}" ]]; then
+  selection_metadata_ready=1
+  aoa_parse_profile_args "${selector_args[@]}"
+  aoa_resolve_modules
+else
+  aoa_note "skip selection-sensitive checks until synced compose metadata exists under ${AOA_CONFIGS_ROOT}"
+fi
+
 required_dirs=(
   "${AOA_STACK_ROOT}/Configs"
   "${AOA_STACK_ROOT}/Secrets/Configs"
@@ -74,6 +104,12 @@ check_warn_file "alertmanager config" "${AOA_STACK_ROOT}/Configs/monitoring/aler
 check_warn_file "grafana datasource" "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources/prometheus.yml"
 check_warn_file "tts voices" "${AOA_STACK_ROOT}/Configs/tts/voices.yaml"
 check_warn_file "litellm config" "${AOA_STACK_ROOT}/Services/litellm/config.yaml"
+
+if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
+  aoa_note "selected runtime includes 41-agent-api.yml; checking return-policy contract"
+  check_dir "${AOA_STACK_ROOT}/Logs/returns"
+  check_warn_file "agent API return policy" "${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml"
+fi
 
 if ((errors > 0)); then
   aoa_die "layout check failed with ${errors} hard errors"

@@ -14,6 +14,7 @@ When something feels wrong, use this order:
 8. check health endpoints
 9. check logs
 10. decide whether to fix forward or roll back
+11. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 

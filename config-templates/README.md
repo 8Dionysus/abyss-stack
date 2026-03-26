@@ -18,6 +18,7 @@ scripts/aoa-bootstrap-configs
 
 ## Current template families
 
+- `Configs/agent-api/`
 - `Configs/monitoring/`
 - `Configs/tts/`
 - `Configs/ollama/`

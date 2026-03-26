@@ -14,6 +14,7 @@ This repository is the right home for:
 - rootless Podman and systemd user orchestration
 - storage and mount contracts
 - service modules and deployment profiles
+- runtime-facing return and bounded context-rebuild policy for agent-facing routes
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
 - infra helper services that support AoA and ToS
@@ -58,14 +59,15 @@ This repository should not absorb:
 17. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
 18. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
 19. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-20. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-21. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-22. Read [docs/DOCTOR](docs/DOCTOR.md).
-23. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-24. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-25. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-26. Read [docs/SECURITY](docs/SECURITY.md).
-27. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+20. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+21. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+22. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+23. Read [docs/DOCTOR](docs/DOCTOR.md).
+24. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+25. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+26. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+27. Read [docs/SECURITY](docs/SECURITY.md).
+28. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -76,6 +78,8 @@ For the shortest next route by intent:
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
+
+`abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
 
 ## Quick route table
 

@@ -84,6 +84,8 @@ scripts/aoa-up --profile agentic --profile tools --profile observability
 - understanding the final order of merged modules in practice
 - debugging profile-composition confusion without starting containers
 
+When the return wrapper is enabled, rendered output should show the mounted return-policy file and writable return-log path for the agent-facing runtime surface.
+
 ## What render-truth is not
 
 It is not a replacement for:

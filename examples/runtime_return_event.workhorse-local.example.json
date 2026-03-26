@@ -1,0 +1,52 @@
+{
+  "surface_type": "runtime_return_event",
+  "schema_version": "v1",
+  "event_id": "2026-03-26T201400Z__agentic__return-001",
+  "occurred_at_utc": "2026-03-26T20:14:00Z",
+  "runtime_selection": {
+    "selection_type": "profile",
+    "selection_name": "agentic",
+    "service_surface": "langchain-api",
+    "module_ref": "compose/modules/41-agent-api.yml"
+  },
+  "model_profile": {
+    "profile_class": "workhorse",
+    "context_budget_class": "bounded-short-long"
+  },
+  "return_reason": "verification_boundary_lost",
+  "anchor": {
+    "anchor_kind": "artifact",
+    "source_artifact": "bounded_plan",
+    "anchor_ref": "artifact:bounded_plan/route-2026-03-26-pass-02"
+  },
+  "context_rebuild": {
+    "core_refreshed": true,
+    "short_strategy": "anchor_plus_local_plan",
+    "long_strategy": "drop_then_reselect",
+    "memory_access_refs": [
+      "local:/srv/abyss-stack/Logs/checkpoints/route-2026-03-26-pass-02/checkpoint-pack.json"
+    ]
+  },
+  "reentry": {
+    "mode": "previous_phase",
+    "next_hop": "planner",
+    "return_count_for_route": 1,
+    "outcome": "reentered"
+  },
+  "evidence": {
+    "policy_ref": "local:/srv/abyss-stack/Configs/agent-api/return-policy.yaml",
+    "rendered_services_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-services.txt",
+    "rendered_config_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-config.redacted.yml",
+    "runtime_log_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/langchain-api.log",
+    "return_bundle_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/event.json"
+  },
+  "boundary": {
+    "supports_runtime_claims_only": true,
+    "does_not_prove": [
+      "route correctness",
+      "agent role truth",
+      "playbook scenario truth",
+      "memo canon"
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "surface_type": "runtime_return_policy",
+  "schema_version": "v1",
+  "policy_id": "agentic-default-return",
+  "description": "Default anchor-based runtime return policy for the agent-facing local stack.",
+  "enabled": true,
+  "anchor_precedence": [
+    "transition_decision.anchor_artifact",
+    "bounded_plan",
+    "route_decision",
+    "verification_result",
+    "inquiry_checkpoint"
+  ],
+  "trigger_reasons": [
+    "artifact_contract_lost",
+    "verification_boundary_lost",
+    "scope_expansion_without_plan",
+    "stall_cycle",
+    "checkpoint_posture_lost",
+    "context_overrun_without_selection"
+  ],
+  "context_rebuild": {
+    "core_strategy": "preserve_and_refresh",
+    "short_strategy": "anchor_plus_local_plan",
+    "long_strategy": "drop_then_reselect",
+    "memory_access_strategy": "checkpoint_then_selective_recall",
+    "allow_full_archive_by_default": false
+  },
+  "reentry": {
+    "allowed_modes": [
+      "previous_phase",
+      "router_reentry",
+      "checkpoint_relaunch",
+      "safe_stop"
+    ],
+    "default_mode": "previous_phase",
+    "max_return_loops_per_route": 2,
+    "escalation_after_limit": "safe_stop"
+  },
+  "profile_class_rules": [
+    {
+      "profile_class": "spark",
+      "max_return_loops": 1,
+      "default_memory_access_strategy": "checkpoint_first",
+      "max_long_reload_segments": 0,
+      "allow_profile_escalation": false,
+      "notes": "Keep return thin: core plus anchor, with no long reload by default."
+    },
+    {
+      "profile_class": "workhorse",
+      "max_return_loops": 2,
+      "default_memory_access_strategy": "checkpoint_then_selective_recall",
+      "max_long_reload_segments": 1,
+      "allow_profile_escalation": true,
+      "notes": "Default operational posture for bounded re-entry."
+    },
+    {
+      "profile_class": "deep",
+      "max_return_loops": 2,
+      "default_memory_access_strategy": "checkpoint_then_selective_recall",
+      "max_long_reload_segments": 2,
+      "allow_profile_escalation": false,
+      "notes": "Use richer recall only after anchor-preserving rebuild."
+    },
+    {
+      "profile_class": "archive",
+      "max_return_loops": 1,
+      "default_memory_access_strategy": "selective_recall",
+      "max_long_reload_segments": 0,
+      "allow_profile_escalation": false,
+      "notes": "Summary-first return posture. Do not resume open-ended generation from archive mode."
+    }
+  ],
+  "logging": {
+    "emit_return_events": true,
+    "log_root": "local:/srv/abyss-stack/Logs/returns",
+    "redact_runtime_values": true,
+    "render_truth_ref_required": true
+  },
+  "boundaries": {
+    "owns_runtime_only": true,
+    "does_not_define_routing_truth": true,
+    "does_not_define_memory_canon": true,
+    "does_not_define_agent_role_meaning": true,
+    "does_not_define_playbook_meaning": true
+  }
+}

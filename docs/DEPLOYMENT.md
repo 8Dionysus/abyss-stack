@@ -94,6 +94,8 @@ An explicit `--delete` mode exists for a tighter mirror when that is desired.
 Copies public-safe config templates into the runtime tree if the destination files are missing.
 Use `--force` only when you explicitly want template content to overwrite existing runtime config files.
 
+The agent-facing runtime may also consume a public-safe return policy file at `${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml`, bootstrapped from `config-templates/`.
+
 ### `scripts/aoa-check-layout`
 
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.

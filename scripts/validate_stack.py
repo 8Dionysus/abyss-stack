@@ -49,6 +49,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "AGENTS.md",
     ROOT / "systemd" / "user" / "AGENTS.md",
     ROOT / "scripts" / "AGENTS.md",
+    ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
     ROOT / "docs" / "PRESETS.md",
@@ -75,11 +76,16 @@ REQUIRED_FILES = {
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "ollama.cpu.yml",
     ROOT / "config-templates" / "README.md",
+    ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
+    ROOT / "schemas" / "runtime-return-policy.schema.json",
+    ROOT / "schemas" / "runtime-return-event.schema.json",
     ROOT / "examples" / "runtime_benchmark.workhorse-local.example.json",
+    ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
+    ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
 }
 
 MODULE_REQUIREMENTS = {
@@ -184,6 +190,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must state Fedora-first posture")
     if "Windows-usable" not in readme:
         errors.append("README.md must state Windows-usable posture")
+    if "docs/RECURRENCE_RUNTIME_POLICY.md" not in readme:
+        errors.append("README.md must route readers to docs/RECURRENCE_RUNTIME_POLICY.md")
     if "docs/REFERENCE_PLATFORM.md" not in readme:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM.md")
     if "docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
@@ -271,6 +279,42 @@ def validate_reference_platform(errors: list[str]) -> None:
         )
 
 
+def validate_return_runtime_contract(errors: list[str]) -> None:
+    templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
+    if "Configs/agent-api/" not in templates_readme:
+        errors.append("config-templates/README.md must mention Configs/agent-api/")
+
+    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    if "Configs/agent-api/return-policy.yaml" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention Configs/agent-api/return-policy.yaml")
+
+    first_run_doc = (ROOT / "docs" / "FIRST_RUN.md").read_text(encoding="utf-8")
+    if "Configs/agent-api/return-policy.yaml" not in first_run_doc:
+        errors.append("docs/FIRST_RUN.md must mention Configs/agent-api/return-policy.yaml")
+
+    render_truth_doc = (ROOT / "docs" / "RENDER_TRUTH.md").read_text(encoding="utf-8")
+    if "return-policy" not in render_truth_doc:
+        errors.append("docs/RENDER_TRUTH.md should mention return-policy mounts when the wrapper is enabled")
+
+    policy_schema = json.loads(
+        (ROOT / "schemas" / "runtime-return-policy.schema.json").read_text(encoding="utf-8")
+    )
+    if policy_schema.get("title") != "abyss-stack runtime return policy":
+        errors.append("runtime-return-policy.schema.json must describe abyss-stack runtime return policy")
+    policy_surface_type = policy_schema.get("properties", {}).get("surface_type", {})
+    if policy_surface_type.get("const") != "runtime_return_policy":
+        errors.append("runtime-return-policy.schema.json must pin surface_type.const to runtime_return_policy")
+
+    event_schema = json.loads(
+        (ROOT / "schemas" / "runtime-return-event.schema.json").read_text(encoding="utf-8")
+    )
+    if event_schema.get("title") != "abyss-stack runtime return event":
+        errors.append("runtime-return-event.schema.json must describe abyss-stack runtime return event")
+    event_surface_type = event_schema.get("properties", {}).get("surface_type", {})
+    if event_surface_type.get("const") != "runtime_return_event":
+        errors.append("runtime-return-event.schema.json must pin surface_type.const to runtime_return_event")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -280,6 +324,7 @@ def main() -> int:
     validate_scripts(errors)
     validate_required_files(errors)
     validate_reference_platform(errors)
+    validate_return_runtime_contract(errors)
 
     if errors:
         print("validation failed:")

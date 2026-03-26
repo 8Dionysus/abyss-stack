@@ -30,6 +30,8 @@ This directory stores public-safe runtime config templates that are bootstrapped
 - Update `config-templates/README.md` and the relevant docs when the operating contract changes.
 - If you introduce a new top-level tree beyond `Configs/` or `Services/`, update `scripts/aoa-bootstrap-configs`.
 
+`Configs/agent-api/return-policy.yaml` is public-safe runtime policy, not a secret-bearing env file.
+
 ## Verify
 Use a temporary runtime root you control:
 ```bash

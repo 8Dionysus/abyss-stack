@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/schemas/runtime-return-policy.schema.json",
+  "title": "abyss-stack runtime return policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_type",
+    "schema_version",
+    "policy_id",
+    "enabled",
+    "anchor_precedence",
+    "trigger_reasons",
+    "context_rebuild",
+    "reentry",
+    "profile_class_rules",
+    "logging",
+    "boundaries"
+  ],
+  "properties": {
+    "surface_type": {
+      "type": "string",
+      "const": "runtime_return_policy"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 3
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "anchor_precedence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 2
+      }
+    },
+    "trigger_reasons": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "artifact_contract_lost",
+          "anchor_missing",
+          "verification_boundary_lost",
+          "source_boundary_lost",
+          "scope_expansion_without_plan",
+          "stall_cycle",
+          "checkpoint_posture_lost",
+          "context_overrun_without_selection"
+        ]
+      }
+    },
+    "context_rebuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_strategy",
+        "short_strategy",
+        "long_strategy",
+        "memory_access_strategy",
+        "allow_full_archive_by_default"
+      ],
+      "properties": {
+        "core_strategy": {
+          "type": "string",
+          "enum": [
+            "preserve_and_refresh"
+          ]
+        },
+        "short_strategy": {
+          "type": "string",
+          "enum": [
+            "anchor_only",
+            "anchor_plus_local_plan"
+          ]
+        },
+        "long_strategy": {
+          "type": "string",
+          "enum": [
+            "drop_then_reselect",
+            "summary_first",
+            "bounded_carry"
+          ]
+        },
+        "memory_access_strategy": {
+          "type": "string",
+          "enum": [
+            "none",
+            "checkpoint_first",
+            "selective_recall",
+            "checkpoint_then_selective_recall"
+          ]
+        },
+        "allow_full_archive_by_default": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "reentry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_modes",
+        "default_mode",
+        "max_return_loops_per_route",
+        "escalation_after_limit"
+      ],
+      "properties": {
+        "allowed_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "same_phase",
+              "previous_phase",
+              "router_reentry",
+              "checkpoint_relaunch",
+              "safe_stop"
+            ]
+          }
+        },
+        "default_mode": {
+          "type": "string",
+          "enum": [
+            "same_phase",
+            "previous_phase",
+            "router_reentry",
+            "checkpoint_relaunch",
+            "safe_stop"
+          ]
+        },
+        "max_return_loops_per_route": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "escalation_after_limit": {
+          "type": "string",
+          "enum": [
+            "safe_stop",
+            "operator_review",
+            "profile_escalation"
+          ]
+        }
+      }
+    },
+    "profile_class_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_class",
+          "max_return_loops",
+          "default_memory_access_strategy",
+          "max_long_reload_segments",
+          "allow_profile_escalation"
+        ],
+        "properties": {
+          "profile_class": {
+            "type": "string",
+            "enum": [
+              "spark",
+              "workhorse",
+              "deep",
+              "archive",
+              "custom"
+            ]
+          },
+          "max_return_loops": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "default_memory_access_strategy": {
+            "type": "string",
+            "enum": [
+              "none",
+              "checkpoint_first",
+              "selective_recall",
+              "checkpoint_then_selective_recall"
+            ]
+          },
+          "max_long_reload_segments": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "allow_profile_escalation": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "emit_return_events",
+        "log_root",
+        "redact_runtime_values",
+        "render_truth_ref_required"
+      ],
+      "properties": {
+        "emit_return_events": {
+          "type": "boolean"
+        },
+        "log_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redact_runtime_values": {
+          "type": "boolean"
+        },
+        "render_truth_ref_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owns_runtime_only",
+        "does_not_define_routing_truth",
+        "does_not_define_memory_canon",
+        "does_not_define_agent_role_meaning",
+        "does_not_define_playbook_meaning"
+      ],
+      "properties": {
+        "owns_runtime_only": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_define_routing_truth": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_define_memory_canon": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_define_agent_role_meaning": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_define_playbook_meaning": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    }
+  }
+}

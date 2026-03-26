@@ -29,6 +29,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 - `langchain-api` — base agent-facing runtime API
 - default embeddings path — Ollama-first
+- may consume a public-safe return policy file and emit runtime return events
 
 ## `42-agent-api-intel.yml`
 
