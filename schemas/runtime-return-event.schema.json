@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/schemas/runtime-return-event.schema.json",
+  "title": "abyss-stack runtime return event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_type",
+    "schema_version",
+    "event_id",
+    "occurred_at_utc",
+    "runtime_selection",
+    "model_profile",
+    "return_reason",
+    "anchor",
+    "context_rebuild",
+    "reentry",
+    "evidence",
+    "boundary"
+  ],
+  "properties": {
+    "surface_type": {
+      "type": "string",
+      "const": "runtime_return_event"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "occurred_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_type",
+        "selection_name",
+        "service_surface",
+        "module_ref"
+      ],
+      "properties": {
+        "selection_type": {
+          "type": "string",
+          "enum": [
+            "profile",
+            "preset",
+            "profile-set",
+            "custom"
+          ]
+        },
+        "selection_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_surface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "model_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_class",
+        "context_budget_class"
+      ],
+      "properties": {
+        "profile_class": {
+          "type": "string",
+          "enum": [
+            "spark",
+            "workhorse",
+            "deep",
+            "archive",
+            "custom"
+          ]
+        },
+        "context_budget_class": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "return_reason": {
+      "type": "string",
+      "enum": [
+        "artifact_contract_lost",
+        "anchor_missing",
+        "verification_boundary_lost",
+        "source_boundary_lost",
+        "scope_expansion_without_plan",
+        "stall_cycle",
+        "checkpoint_posture_lost",
+        "context_overrun_without_selection"
+      ]
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_kind",
+        "source_artifact",
+        "anchor_ref"
+      ],
+      "properties": {
+        "anchor_kind": {
+          "type": "string",
+          "enum": [
+            "artifact",
+            "checkpoint",
+            "review"
+          ]
+        },
+        "source_artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "context_rebuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_refreshed",
+        "short_strategy",
+        "long_strategy",
+        "memory_access_refs"
+      ],
+      "properties": {
+        "core_refreshed": {
+          "type": "boolean"
+        },
+        "short_strategy": {
+          "type": "string",
+          "enum": [
+            "anchor_only",
+            "anchor_plus_local_plan"
+          ]
+        },
+        "long_strategy": {
+          "type": "string",
+          "enum": [
+            "drop_then_reselect",
+            "summary_first",
+            "bounded_carry"
+          ]
+        },
+        "memory_access_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reentry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "next_hop",
+        "return_count_for_route",
+        "outcome"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "same_phase",
+            "previous_phase",
+            "router_reentry",
+            "checkpoint_relaunch",
+            "safe_stop"
+          ]
+        },
+        "next_hop": {
+          "type": "string",
+          "minLength": 1
+        },
+        "return_count_for_route": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "reentered",
+            "safe_stop",
+            "escalated"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_ref",
+        "runtime_log_ref"
+      ],
+      "properties": {
+        "policy_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rendered_services_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rendered_config_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime_log_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "return_bundle_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supports_runtime_claims_only",
+        "does_not_prove"
+      ],
+      "properties": {
+        "supports_runtime_claims_only": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_prove": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

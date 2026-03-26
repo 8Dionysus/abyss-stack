@@ -9,6 +9,7 @@ aoa_note "creating runtime layout under ${AOA_STACK_ROOT}"
 
 mkdir -p \
   "${AOA_STACK_ROOT}/Configs" \
+  "${AOA_STACK_ROOT}/Configs/agent-api" \
   "${AOA_STACK_ROOT}/Configs/monitoring/alertmanager" \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources" \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/dashboards" \
@@ -22,6 +23,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Knowledge" \
   "${AOA_STACK_ROOT}/Knowledge/n8n-docs" \
   "${AOA_STACK_ROOT}/Logs" \
+  "${AOA_STACK_ROOT}/Logs/returns" \
   "${AOA_STACK_ROOT}/Logs/tts" \
   "${AOA_STACK_ROOT}/.codex-home"
 

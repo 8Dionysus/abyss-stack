@@ -105,3 +105,6 @@ Preferred rule:
 - do not encode human role meaning here
 - do not turn runtime profiles into routing truth
 - do not treat one quantization as permanent canon
+
+Return posture should also remain class-based.
+`spark` should use the thinnest anchor-only rebuild, `workhorse` should be the default checkpoint-first return class, `deep` may allow richer selective recall, and `archive` should stay summary-first rather than becoming generic continuation.

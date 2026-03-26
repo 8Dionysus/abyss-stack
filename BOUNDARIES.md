@@ -16,6 +16,7 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - platform-aware path contracts for Fedora-first deployment and Windows-usable workflows
 - normative host posture and public-safe/private host-facts contracts
 - runtime benchmark policies, schemas, normalized manifests, and raw runtime evidence
+- runtime-facing return policy, context rebuild posture, and return-event logging
 
 ## Belongs elsewhere
 
@@ -30,6 +31,7 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - role contracts in `aoa-agents`
 - scenario compositions in `aoa-playbooks`
 - derived knowledge substrate meaning in `aoa-kag`
+- authored reasons, scenario triggers, and semantic anchor meaning from sibling AoA repositories
 
 ## Anti-drift rule
 

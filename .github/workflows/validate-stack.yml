@@ -72,7 +72,9 @@ jobs:
             "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
 
-          scripts/aoa-check-layout --strict
+          scripts/aoa-check-layout --strict --profile core
+          scripts/aoa-check-layout --strict --profile agentic
+          scripts/aoa-check-layout --strict --profile intel
           scripts/aoa-doctor --preset agent-full
           scripts/aoa-doctor --preset intel-full
           scripts/aoa-preset-profiles --preset agent-full --paths
@@ -97,7 +99,9 @@ jobs:
           scripts/aoa-render-services --preset agent-full
           scripts/aoa-render-services --preset intel-full
           scripts/aoa-render-config --profile core >/dev/null
-          scripts/aoa-render-config --profile agentic >/dev/null
+          scripts/aoa-render-config --profile agentic --write "$RUNNER_TEMP/abyss-agentic.rendered.yml"
+          grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
+          grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           scripts/aoa-render-config --profile intel >/dev/null
           scripts/aoa-render-config --profile agentic,tools,observability >/dev/null
           scripts/aoa-render-config --preset agent-full >/dev/null

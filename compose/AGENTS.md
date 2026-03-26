@@ -44,6 +44,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
   - `docs/INTERNAL_PROBES.md`
 - If a module needs new runtime config files, update `config-templates/`, `scripts/aoa-check-layout`, and the relevant docs.
 - If a module needs new runtime directories or mounts, update `scripts/aoa-install-layout` and the relevant docs.
+- If `41-agent-api.yml` or a successor runtime service gains a return-policy mount or return-log path, update `config-templates/`, `scripts/aoa-check-layout`, `scripts/aoa-install-layout`, and the relevant docs together.
 
 ## When changing profiles or presets
 - Keep activation order meaningful and minimal.

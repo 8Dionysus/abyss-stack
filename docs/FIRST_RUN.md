@@ -43,6 +43,8 @@ pwsh -File scripts/aoa.ps1 first-run --strict
 Create the real secret-bearing files described in:
 - [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md)
 
+If the agent API layer is part of the selected profile or preset, verify that `Configs/agent-api/return-policy.yaml` was bootstrapped before launch.
+
 Then validate the fully bootstrapped layout:
 
 ```bash

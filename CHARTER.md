@@ -33,5 +33,6 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 - localhost-first exposure boundaries
 - rootless operation by default
 - explicit profiles over hidden coupling
+- anchor-based return over drifted continuity when runtime routes lose shape
 - operational clarity over cleverness
 - reversible changes over wide refactors

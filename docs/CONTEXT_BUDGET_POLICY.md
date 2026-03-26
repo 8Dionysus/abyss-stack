@@ -100,6 +100,11 @@ This bucket should remain retrieval-shaped and filtered.
 - do not grant full archive access by default to every route
 - keep checkpoint packs and memory candidates smaller than raw history whenever possible
 
+## Return rebuild rule
+
+When a route returns, keep `core` stable, reset `short` to the active anchor and re-entry note, prefer checkpoint-first `memory_access`, and rebuild `long` only if a bounded re-entry slice is explicitly justified.
+Do not respond to drift by loading full raw history.
+
 ## Boundaries to preserve
 
 - context budget is not proof of capability
