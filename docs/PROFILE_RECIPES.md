@@ -108,7 +108,7 @@ scripts/aoa-smoke --profile intel
 
 ### What it is for
 
-A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, mirrored `aoa-memo` recall surfaces, and mirrored `aoa-evals` eval-selection surfaces from the runtime tree.
+A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, mirrored `aoa-memo` recall surfaces, mirrored `aoa-evals` eval-selection surfaces, and mirrored `aoa-playbooks` activation/composition advisory surfaces from the runtime tree.
 This profile is metadata-only for reads and does not change `langchain-api`, but it also enables filesystem-first memo export candidates and filesystem-first eval export candidates.
 
 ### Host-facing endpoints
@@ -122,6 +122,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-profile-endpoints --profile federation
 scripts/aoa-render-services --profile federation
 scripts/aoa-up --profile federation
@@ -239,7 +240,7 @@ aoa-smoke --with-internal --preset agent-observability
 
 What it gives you:
 - the generic local agent path
-- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, `aoa-memo` recall surfaces, and `aoa-evals` eval-selection surfaces
+- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, `aoa-memo` recall surfaces, `aoa-evals` eval-selection surfaces, and `aoa-playbooks` activation/composition advisory surfaces
 - filesystem-first memo export candidates under `Logs/memo-exports/`
 - filesystem-first eval export candidates under `Logs/eval-exports/`
 - no change to the existing `/run` or `/embeddings` surfaces
@@ -251,6 +252,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-profile-modules --profile agentic --profile federation --paths
 scripts/aoa-profile-endpoints --profile agentic --profile federation
 scripts/aoa-render-services --profile agentic --profile federation

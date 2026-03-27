@@ -63,17 +63,18 @@ This repository should not absorb:
 19. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
 20. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
 21. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
-22. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-23. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-24. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-25. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-26. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-27. Read [docs/DOCTOR](docs/DOCTOR.md).
-28. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-29. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-30. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-31. Read [docs/SECURITY](docs/SECURITY.md).
-32. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+22. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
+23. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+24. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+25. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+26. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+27. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+28. Read [docs/DOCTOR](docs/DOCTOR.md).
+29. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+30. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+31. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+32. Read [docs/SECURITY](docs/SECURITY.md).
+33. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -82,6 +83,7 @@ For the shortest next route by intent:
 - if you need bounded execution workflows, go to [`aoa-skills`](https://github.com/8Dionysus/aoa-skills)
 - if you need portable proof surfaces, go to [`aoa-evals`](https://github.com/8Dionysus/aoa-evals)
 - if you need memory-layer meaning or recall contracts, go to [`aoa-memo`](https://github.com/8Dionysus/aoa-memo)
+- if you need playbook meaning, activation doctrine, or authored execution bundles, go to [`aoa-playbooks`](https://github.com/8Dionysus/aoa-playbooks)
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
@@ -89,6 +91,7 @@ For the shortest next route by intent:
 - if you need the repo merge and branch discipline, read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md)
 - if you need the runtime-side memo mirror, recall seam, or export candidates, read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md)
 - if you need the runtime-side eval mirror, `/evals/*` selection seam, or filesystem-first eval export candidates, read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md)
+- if you need the runtime-side playbook mirror, `/playbooks/*` activation seam, or composition advisory surfaces, read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md)
 
 `abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
 
@@ -103,6 +106,7 @@ For the shortest next route by intent:
 | `aoa-skills` | bounded agent-facing execution workflows | you need executable workflows rather than deployment posture |
 | `aoa-memo` | memory objects, recall contracts, and memo-side writeback meaning | you need memory-layer authority rather than runtime export plumbing |
 | `aoa-evals` | portable proof surfaces for bounded claims | you need evaluation and quality checks rather than runtime services |
+| `aoa-playbooks` | playbook doctrine, authored execution bundles, and playbook-owned meaning | you need playbook authority rather than runtime advisory mirrors |
 
 ## Repository shape
 

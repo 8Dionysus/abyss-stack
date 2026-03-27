@@ -16,8 +16,9 @@ When something feels wrong, use this order:
 10. check logs
 11. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
 12. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
-13. decide whether to fix forward or roll back
-14. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+13. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
+14. decide whether to fix forward or roll back
+15. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -30,6 +31,7 @@ aoa-platform-adaptation --mode private --title "Short seam title" --summary "One
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
+curl http://127.0.0.1:5402/playbooks/activation
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -84,6 +86,16 @@ aoa-export-runtime-evidence-selection \
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write
+```
+
+For playbook advisory inspection through the localhost federation seam:
+
+```bash
+curl http://127.0.0.1:5402/playbooks/activation
+curl http://127.0.0.1:5402/playbooks/federation
+curl -X POST http://127.0.0.1:5402/playbooks/select \
+  -H 'content-type: application/json' \
+  -d '{"scenario":"bounded_change_safe"}'
 ```
 
 For combined surfaces:

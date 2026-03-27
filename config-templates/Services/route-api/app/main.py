@@ -18,6 +18,7 @@ REQUIRED_CONFIGS = {
     "aoa-routing": "aoa-routing.yaml",
     "aoa-memo": "aoa-memo.yaml",
     "aoa-evals": "aoa-evals.yaml",
+    "aoa-playbooks": "aoa-playbooks.yaml",
 }
 
 
@@ -28,7 +29,7 @@ class LayerStore:
     mirror_root: Path
     required_files: list[str]
     flags: dict[str, bool]
-    payloads: dict[str, dict[str, Any]]
+    payloads: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class AppStore:
     routing: LayerStore
     memo: LayerStore
     evals: LayerStore
+    playbooks: LayerStore
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -56,6 +58,14 @@ def load_json(path: Path) -> dict[str, Any]:
         raise RuntimeError(f"required mirrored JSON missing: {path}") from exc
     if not isinstance(payload, dict):
         raise RuntimeError(f"mirrored JSON must be an object: {path}")
+    return payload
+
+
+def load_json_value(path: Path) -> Any:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"required mirrored JSON missing: {path}") from exc
     return payload
 
 
@@ -220,6 +230,39 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
     )
 
 
+def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+    required_files = validated_required_files(config, mirror_root)
+    payloads = {
+        "registry": load_json(mirror_root / "generated/playbook_registry.min.json"),
+        "activation": load_json_value(mirror_root / "generated/playbook_activation_surfaces.min.json"),
+        "federation": load_json_value(mirror_root / "generated/playbook_federation_surfaces.min.json"),
+        "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
+        "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
+        "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
+        "automation_seeds": load_json(mirror_root / "generated/playbook_automation_seeds.json"),
+        "composition_manifest": load_json(mirror_root / "generated/playbook_composition_manifest.json"),
+    }
+
+    if not isinstance(payloads["activation"], list):
+        raise RuntimeError("aoa-playbooks activation surface must be a list")
+    if not isinstance(payloads["federation"], list):
+        raise RuntimeError("aoa-playbooks federation surface must be a list")
+
+    return LayerStore(
+        layer="aoa-playbooks",
+        config_path=config_path,
+        mirror_root=mirror_root,
+        required_files=required_files,
+        flags={
+            "read_only": bool(config.get("read_only", False)),
+            "advisory_only": bool(config.get("advisory_only", False)),
+            "allow_runtime_execution": bool(config.get("allow_runtime_execution", False)),
+            "include_composition_surfaces": bool(config.get("include_composition_surfaces", False)),
+        },
+        payloads=payloads,
+    )
+
+
 def load_layer(config_path: Path) -> LayerStore:
     config = load_yaml(config_path)
     layer = config.get("layer")
@@ -239,6 +282,8 @@ def load_layer(config_path: Path) -> LayerStore:
         return load_memo_layer(config_path, config, mirror_root)
     if layer == "aoa-evals":
         return load_evals_layer(config_path, config, mirror_root)
+    if layer == "aoa-playbooks":
+        return load_playbooks_layer(config_path, config, mirror_root)
     raise RuntimeError(f"unsupported layer in route-api config: {layer!r}")
 
 
@@ -255,6 +300,7 @@ def load_store(config_dir: Path) -> AppStore:
         routing=loaded_layers["aoa-routing"],
         memo=loaded_layers["aoa-memo"],
         evals=loaded_layers["aoa-evals"],
+        playbooks=loaded_layers["aoa-playbooks"],
     )
 
 
@@ -315,7 +361,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                     layer.payloads["recall_contracts"]["object"]["working_return"].get("return_ready")
                 ),
             }
-        else:
+        elif layer.layer == "aoa-evals":
             metadata = {
                 "catalog": {"version": layer.payloads["catalog"].get("catalog_version")},
                 "capsules": {"version": layer.payloads["capsules"].get("capsule_version")},
@@ -323,6 +369,16 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "comparison_spine": {"version": layer.payloads["comparison_spine"].get("comparison_spine_version")},
                 "runtime_evidence_templates": sorted(layer.payloads["runtime_evidence_templates"].keys()),
                 "hook_templates": sorted(layer.payloads["hook_templates"].keys()),
+            }
+        else:
+            metadata = {
+                "registry_count": len(layer.payloads["registry"]["playbooks"]),
+                "activation_count": len(layer.payloads["activation"]),
+                "federation_count": len(layer.payloads["federation"]),
+                "handoff_playbook_count": len(layer.payloads["handoffs"]["playbooks"]),
+                "failure_count": len(layer.payloads["failures"]["failures"]),
+                "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
+                "automation_seed_count": len(layer.payloads["automation_seeds"]["seeds"]),
             }
 
     return {
@@ -447,6 +503,211 @@ def memo_payload(store: AppStore, key: str) -> dict[str, Any]:
 
 def evals_payload(store: AppStore, key: str) -> dict[str, Any]:
     return store.evals.payloads[key]
+
+
+def playbooks_payload(store: AppStore, key: str) -> Any:
+    return store.playbooks.payloads[key]
+
+
+def playbook_registry_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "registry")["playbooks"]
+
+
+def playbook_activation_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "activation")
+
+
+def playbook_federation_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "federation")
+
+
+def playbook_handoff_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "handoffs")["playbooks"]
+
+
+def playbook_failure_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "failures")["failures"]
+
+
+def playbook_subagent_recipe_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "subagent_recipes")["recipes"]
+
+
+def playbook_automation_seed_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "automation_seeds")["seeds"]
+
+
+def require_playbook_registry_entry(store: AppStore, playbook_id: str) -> dict[str, Any]:
+    for entry in playbook_registry_entries(store):
+        if entry["id"] == playbook_id:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-playbooks registry entry found for playbook_id={playbook_id}")
+
+
+def optional_playbook_activation_entry(store: AppStore, playbook_id: str) -> dict[str, Any] | None:
+    for entry in playbook_activation_entries(store):
+        if entry["playbook_id"] == playbook_id:
+            return entry
+    return None
+
+
+def optional_playbook_federation_entry(store: AppStore, playbook_id: str) -> dict[str, Any] | None:
+    for entry in playbook_federation_entries(store):
+        if entry["playbook_id"] == playbook_id:
+            return entry
+    return None
+
+
+def optional_playbook_handoff_entry(store: AppStore, playbook_id: str) -> dict[str, Any] | None:
+    for entry in playbook_handoff_entries(store):
+        if entry["playbook_id"] == playbook_id:
+            return entry
+    return None
+
+
+def playbook_subagent_recipes_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
+    return [entry for entry in playbook_subagent_recipe_entries(store) if entry.get("playbook") == playbook_name]
+
+
+def playbook_automation_seeds_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
+    return [entry for entry in playbook_automation_seed_entries(store) if entry.get("playbook") == playbook_name]
+
+
+def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
+    registry_entry = require_playbook_registry_entry(store, playbook_id)
+    playbook_name = registry_entry["name"]
+    activation_entry = optional_playbook_activation_entry(store, playbook_id)
+    federation_entry = optional_playbook_federation_entry(store, playbook_id)
+    handoff_contract = optional_playbook_handoff_entry(store, playbook_id)
+    subagent_recipes = playbook_subagent_recipes_for_name(store, playbook_name)
+    automation_seeds = playbook_automation_seeds_for_name(store, playbook_name)
+
+    source_files = ["aoa-playbooks/generated/playbook_registry.min.json"]
+    if activation_entry is not None:
+        source_files.append("aoa-playbooks/generated/playbook_activation_surfaces.min.json")
+    if federation_entry is not None:
+        source_files.append("aoa-playbooks/generated/playbook_federation_surfaces.min.json")
+    if handoff_contract is not None:
+        source_files.append("aoa-playbooks/generated/playbook_handoff_contracts.json")
+    if subagent_recipes:
+        source_files.append("aoa-playbooks/generated/playbook_subagent_recipes.json")
+    if automation_seeds:
+        source_files.append("aoa-playbooks/generated/playbook_automation_seeds.json")
+
+    return {
+        "playbook_id": playbook_id,
+        "name": playbook_name,
+        "registry_entry": registry_entry,
+        "activation_entry": activation_entry,
+        "federation_entry": federation_entry,
+        "handoff_contract": handoff_contract,
+        "subagent_recipes": subagent_recipes,
+        "automation_seeds": automation_seeds,
+        "source_files": source_files,
+    }
+
+
+def compact_playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
+    card = playbook_card(store, playbook_id)
+    return {
+        "playbook_id": card["playbook_id"],
+        "name": card["name"],
+        "registry_entry": card["registry_entry"],
+        "activation_entry": card["activation_entry"],
+        "federation_entry": card["federation_entry"],
+        "handoff_contract": card["handoff_contract"],
+        "subagent_recipe_names": [entry["name"] for entry in card["subagent_recipes"]],
+        "automation_seed_names": [entry["name"] for entry in card["automation_seeds"]],
+    }
+
+
+def require_playbook_failure(store: AppStore, code: str) -> dict[str, Any]:
+    for entry in playbook_failure_entries(store):
+        if entry["code"] == code:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-playbooks failure entry found for code={code}")
+
+
+def require_playbook_subagent_recipe(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in playbook_subagent_recipe_entries(store):
+        if entry["name"] == name:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-playbooks subagent recipe found for name={name}")
+
+
+def require_playbook_automation_seed(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in playbook_automation_seed_entries(store):
+        if entry["name"] == name:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-playbooks automation seed found for name={name}")
+
+
+def resolve_playbook_select(
+    store: AppStore,
+    *,
+    scenario: str | None,
+    trigger: str | None,
+    evaluation_posture: str | None,
+    memory_posture: str | None,
+    fallback_mode: str | None,
+    return_reentry_mode: str | None,
+    eval_anchor: str | None,
+    required_skill: str | None,
+) -> dict[str, Any]:
+    matches: list[dict[str, Any]] = []
+    for registry_entry in playbook_registry_entries(store):
+        card = playbook_card(store, registry_entry["id"])
+        activation_entry = card["activation_entry"] or {}
+        federation_entry = card["federation_entry"] or {}
+
+        if scenario is not None and (activation_entry.get("scenario") or registry_entry.get("scenario")) != scenario:
+            continue
+        if trigger is not None and (activation_entry.get("trigger") or registry_entry.get("trigger")) != trigger:
+            continue
+        if evaluation_posture is not None and (activation_entry.get("evaluation_posture") or registry_entry.get("evaluation_posture")) != evaluation_posture:
+            continue
+        if memory_posture is not None and (
+            activation_entry.get("memory_posture")
+            or federation_entry.get("memory_posture")
+            or registry_entry.get("memory_posture")
+        ) != memory_posture:
+            continue
+        if fallback_mode is not None and (activation_entry.get("fallback_mode") or registry_entry.get("fallback_mode")) != fallback_mode:
+            continue
+        if return_reentry_mode is not None and return_reentry_mode not in activation_entry.get("return_reentry_modes", []):
+            continue
+        if eval_anchor is not None and (
+            eval_anchor not in activation_entry.get("eval_anchors", [])
+            and eval_anchor not in federation_entry.get("eval_anchors", [])
+        ):
+            continue
+        if required_skill is not None and required_skill not in federation_entry.get("required_skills", []):
+            continue
+
+        matches.append(compact_playbook_card(store, registry_entry["id"]))
+
+    if not matches:
+        raise HTTPException(status_code=404, detail="no aoa-playbooks entries matched the requested filters")
+
+    return {
+        "ok": True,
+        "filters": {
+            "scenario": scenario,
+            "trigger": trigger,
+            "evaluation_posture": evaluation_posture,
+            "memory_posture": memory_posture,
+            "fallback_mode": fallback_mode,
+            "return_reentry_mode": return_reentry_mode,
+            "eval_anchor": eval_anchor,
+            "required_skill": required_skill,
+        },
+        "playbooks": matches,
+        "source_files": [
+            "aoa-playbooks/generated/playbook_registry.min.json",
+            "aoa-playbooks/generated/playbook_activation_surfaces.min.json",
+            "aoa-playbooks/generated/playbook_federation_surfaces.min.json",
+        ],
+    }
 
 
 def require_task_family_hint(store: AppStore, task_family: str) -> dict[str, Any]:
@@ -1007,18 +1268,52 @@ class HookTemplateRequest(BaseModel):
     ]
 
 
+class PlaybookInspectRequest(BaseModel):
+    playbook_id: str
+
+
+class PlaybookSelectRequest(BaseModel):
+    scenario: str | None = None
+    trigger: str | None = None
+    evaluation_posture: str | None = None
+    memory_posture: str | None = None
+    fallback_mode: str | None = None
+    return_reentry_mode: str | None = None
+    eval_anchor: str | None = None
+    required_skill: str | None = None
+
+
+class PlaybookFailureRequest(BaseModel):
+    code: str
+
+
+class PlaybookSubagentRecipeRequest(BaseModel):
+    name: str
+
+
+class PlaybookAutomationSeedRequest(BaseModel):
+    name: str
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer, store.memo.layer, store.evals.layer],
+        "layers": [
+            store.agents.layer,
+            store.routing.layer,
+            store.memo.layer,
+            store.evals.layer,
+            store.playbooks.layer,
+        ],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
             store.memo.layer: True,
             store.evals.layer: True,
+            store.playbooks.layer: True,
         },
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
@@ -1026,6 +1321,10 @@ def health() -> dict[str, Any]:
         "memo_export_only_writeback": store.memo.flags["export_only_writeback"],
         "evals_read_only": store.evals.flags["read_only"],
         "evals_export_only_evidence": store.evals.flags["export_only_evidence"],
+        "playbooks_read_only": store.playbooks.flags["read_only"],
+        "playbooks_advisory_only": store.playbooks.flags["advisory_only"],
+        "playbooks_allow_runtime_execution": store.playbooks.flags["allow_runtime_execution"],
+        "playbooks_include_composition_surfaces": store.playbooks.flags["include_composition_surfaces"],
     }
 
 
@@ -1034,19 +1333,27 @@ def surface_status() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer, store.memo.layer, store.evals.layer],
+        "layers": [
+            store.agents.layer,
+            store.routing.layer,
+            store.memo.layer,
+            store.evals.layer,
+            store.playbooks.layer,
+        ],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
             store.memo.layer: True,
             store.evals.layer: True,
+            store.playbooks.layer: True,
         },
         "layers_status": {
             store.agents.layer: layer_status(store.agents),
             store.routing.layer: layer_status(store.routing),
             store.memo.layer: layer_status(store.memo),
             store.evals.layer: layer_status(store.evals),
+            store.playbooks.layer: layer_status(store.playbooks),
         },
     }
 
@@ -1350,3 +1657,128 @@ def evals_runtime_evidence_template(request: RuntimeEvidenceTemplateRequest) -> 
 def evals_hook_template(request: HookTemplateRequest) -> dict[str, Any]:
     store = require_store()
     return resolve_hook_template(store, request.name)
+
+
+@app.get("/playbooks/registry")
+def playbooks_registry() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "registry")}
+
+
+@app.get("/playbooks/activation")
+def playbooks_activation() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "activation")}
+
+
+@app.get("/playbooks/federation")
+def playbooks_federation() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "federation")}
+
+
+@app.get("/playbooks/handoffs")
+def playbooks_handoffs() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "handoffs")}
+
+
+@app.get("/playbooks/failures")
+def playbooks_failures() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "failures")}
+
+
+@app.get("/playbooks/subagent-recipes")
+def playbooks_subagent_recipes() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "subagent_recipes")}
+
+
+@app.get("/playbooks/automation-seeds")
+def playbooks_automation_seeds() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "automation_seeds")}
+
+
+@app.get("/playbooks/composition-manifest")
+def playbooks_composition_manifest() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": playbooks_payload(store, "composition_manifest")}
+
+
+@app.post("/playbooks/inspect")
+def playbooks_inspect(request: PlaybookInspectRequest) -> dict[str, Any]:
+    store = require_store()
+    card = playbook_card(store, request.playbook_id)
+    return {
+        "ok": True,
+        "playbook": card,
+        "source_files": card["source_files"],
+    }
+
+
+@app.post("/playbooks/select")
+def playbooks_select(request: PlaybookSelectRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_playbook_select(
+        store,
+        scenario=request.scenario,
+        trigger=request.trigger,
+        evaluation_posture=request.evaluation_posture,
+        memory_posture=request.memory_posture,
+        fallback_mode=request.fallback_mode,
+        return_reentry_mode=request.return_reentry_mode,
+        eval_anchor=request.eval_anchor,
+        required_skill=request.required_skill,
+    )
+
+
+@app.post("/playbooks/failure")
+def playbooks_failure(request: PlaybookFailureRequest) -> dict[str, Any]:
+    store = require_store()
+    entry = require_playbook_failure(store, request.code)
+    related = [
+        compact_playbook_card(store, registry_entry["id"])
+        for registry_entry in playbook_registry_entries(store)
+        if registry_entry["name"] in entry.get("used_by_playbooks", [])
+    ]
+    return {
+        "ok": True,
+        "code": request.code,
+        "failure": entry,
+        "related_playbooks": related,
+        "source_files": [
+            "aoa-playbooks/generated/playbook_failure_catalog.json",
+            "aoa-playbooks/generated/playbook_registry.min.json",
+            "aoa-playbooks/generated/playbook_activation_surfaces.min.json",
+            "aoa-playbooks/generated/playbook_federation_surfaces.min.json",
+            "aoa-playbooks/generated/playbook_handoff_contracts.json",
+            "aoa-playbooks/generated/playbook_subagent_recipes.json",
+            "aoa-playbooks/generated/playbook_automation_seeds.json",
+        ],
+    }
+
+
+@app.post("/playbooks/subagent-recipe")
+def playbooks_subagent_recipe(request: PlaybookSubagentRecipeRequest) -> dict[str, Any]:
+    store = require_store()
+    recipe = require_playbook_subagent_recipe(store, request.name)
+    return {
+        "ok": True,
+        "name": request.name,
+        "recipe": recipe,
+        "source_files": ["aoa-playbooks/generated/playbook_subagent_recipes.json"],
+    }
+
+
+@app.post("/playbooks/automation-seed")
+def playbooks_automation_seed(request: PlaybookAutomationSeedRequest) -> dict[str, Any]:
+    store = require_store()
+    seed = require_playbook_automation_seed(store, request.name)
+    return {
+        "ok": True,
+        "name": request.name,
+        "seed": seed,
+        "source_files": ["aoa-playbooks/generated/playbook_automation_seeds.json"],
+    }

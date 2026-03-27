@@ -29,17 +29,19 @@ scripts/aoa-first-run --strict
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
-If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack, the `aoa-routing` advisory pack, the `aoa-memo` recall pack, and the `aoa-evals` eval-selection pack after bootstrap:
+If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack, the `aoa-routing` advisory pack, the `aoa-memo` recall pack, the `aoa-evals` eval-selection pack, and the `aoa-playbooks` advisory pack after bootstrap:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 ```
 
 See [MEMO_RUNTIME_SEAM](MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
 See [EVAL_RUNTIME_SEAM](EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
+See [PLAYBOOK_RUNTIME_SEAM](PLAYBOOK_RUNTIME_SEAM.md) for the runtime-facing playbook mirror and `/playbooks/*` activation and composition advisory surfaces.
 
 ## Scenario A: Fedora-native source checkout
 
@@ -60,6 +62,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation 
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional federation advisory mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional federation memo mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional federation eval mirror
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional federation playbook mirror
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -123,7 +126,7 @@ The agent-facing runtime may also consume a public-safe return policy file at `$
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
 Use `--ignore-secrets` for the first bootstrap pass before secrets exist.
 Use `--strict` if warnings should fail the command.
-When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`, the mirrored `aoa-routing` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`, the mirrored `aoa-memo` recall pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo`, and the mirrored `aoa-evals` eval-selection pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals`.
+When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`, the mirrored `aoa-routing` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`, the mirrored `aoa-memo` recall pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo`, the mirrored `aoa-evals` eval-selection pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals`, and the mirrored `aoa-playbooks` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks`.
 
 ### `scripts/aoa-sync-federation-surfaces`
 
@@ -134,6 +137,7 @@ The current landing slice supports:
 - `--layer aoa-routing`
 - `--layer aoa-memo`
 - `--layer aoa-evals`
+- `--layer aoa-playbooks`
 
 The mirror targets for these layers are:
 
@@ -141,6 +145,7 @@ The mirror targets for these layers are:
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo`
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals`
+- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks`
 
 ### `scripts/aoa-install-systemd`
 
@@ -194,6 +199,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -242,6 +248,7 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation

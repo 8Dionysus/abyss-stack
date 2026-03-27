@@ -112,11 +112,12 @@ if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
 fi
 
 if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
-  aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents, aoa-routing, aoa-memo, and aoa-evals federation mirrors"
+  aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents, aoa-routing, aoa-memo, aoa-evals, and aoa-playbooks federation mirrors"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
+  check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks"
   check_dir "${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection"
   check_dir "${AOA_STACK_ROOT}/Logs/eval-exports/latest/artifact-hook"
   check_dir "${AOA_STACK_ROOT}/Logs/eval-exports/records"
@@ -126,6 +127,7 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-routing federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-routing.yaml"
   check_warn_file "aoa-memo federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-memo.yaml"
   check_warn_file "aoa-evals federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-evals.yaml"
+  check_warn_file "aoa-playbooks federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-playbooks.yaml"
   check_warn_file "aoa-agents runtime seam doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/docs/AGENT_RUNTIME_SEAM.md"
   check_warn_file "aoa-agents agent registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/agent_registry.min.json"
   check_warn_file "aoa-agents tier registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/model_tier_registry.json"
@@ -193,6 +195,24 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-evals restartable hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
   check_warn_file "aoa-evals runtime evidence schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/schemas/runtime-evidence-selection.schema.json"
   check_warn_file "aoa-evals artifact hook schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/schemas/artifact-to-verdict-hook.schema.json"
+  check_warn_file "aoa-playbooks execution seam doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/docs/PLAYBOOK_EXECUTION_SEAM.md"
+  check_warn_file "aoa-playbooks model doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/docs/PLAYBOOK_MODEL.md"
+  check_warn_file "aoa-playbooks lifecycle doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/docs/PLAYBOOK_LIFECYCLE.md"
+  check_warn_file "aoa-playbooks recurrence discipline doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/docs/PLAYBOOK_RECURRENCE_DISCIPLINE.md"
+  check_warn_file "aoa-playbooks registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_registry.min.json"
+  check_warn_file "aoa-playbooks activation" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_activation_surfaces.min.json"
+  check_warn_file "aoa-playbooks federation" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_federation_surfaces.min.json"
+  check_warn_file "aoa-playbooks handoffs" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_handoff_contracts.json"
+  check_warn_file "aoa-playbooks failures" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_failure_catalog.json"
+  check_warn_file "aoa-playbooks subagent recipes" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_subagent_recipes.json"
+  check_warn_file "aoa-playbooks automation seeds" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_automation_seeds.json"
+  check_warn_file "aoa-playbooks composition manifest" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_composition_manifest.json"
+  check_warn_file "aoa-playbooks registry schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/schemas/playbook-registry.schema.json"
+  check_warn_file "aoa-playbooks activation schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/schemas/playbook-activation-surface.schema.json"
+  check_warn_file "aoa-playbooks federation schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/schemas/playbook-federation-surface.schema.json"
+  check_warn_file "aoa-playbooks long-horizon activation example" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/examples/playbook_activation.long-horizon-model-tier-orchestra.example.json"
+  check_warn_file "aoa-playbooks restartable activation example" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/examples/playbook_activation.restartable-inquiry-loop.example.json"
+  check_warn_file "aoa-playbooks cross-repo activation example" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/examples/playbook_activation.cross-repo-boundary-rollout.example.json"
 fi
 
 if ((errors > 0)); then

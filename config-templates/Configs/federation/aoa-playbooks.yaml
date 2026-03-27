@@ -1,0 +1,25 @@
+layer: aoa-playbooks
+mirror_root: /app/federation/aoa-playbooks
+read_only: true
+advisory_only: true
+allow_runtime_execution: false
+include_composition_surfaces: true
+required_files:
+  - docs/PLAYBOOK_EXECUTION_SEAM.md
+  - docs/PLAYBOOK_MODEL.md
+  - docs/PLAYBOOK_LIFECYCLE.md
+  - docs/PLAYBOOK_RECURRENCE_DISCIPLINE.md
+  - generated/playbook_registry.min.json
+  - generated/playbook_activation_surfaces.min.json
+  - generated/playbook_federation_surfaces.min.json
+  - generated/playbook_handoff_contracts.json
+  - generated/playbook_failure_catalog.json
+  - generated/playbook_subagent_recipes.json
+  - generated/playbook_automation_seeds.json
+  - generated/playbook_composition_manifest.json
+  - schemas/playbook-registry.schema.json
+  - schemas/playbook-activation-surface.schema.json
+  - schemas/playbook-federation-surface.schema.json
+  - examples/playbook_activation.long-horizon-model-tier-orchestra.example.json
+  - examples/playbook_activation.restartable-inquiry-loop.example.json
+  - examples/playbook_activation.cross-repo-boundary-rollout.example.json
