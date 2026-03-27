@@ -1,6 +1,6 @@
 services:
   ollama:
-    image: docker.io/ollama/ollama:0.18.3
+    image: docker.io/ollama/ollama@sha256:975fb6123dc4c330a180c22ff37c0bdffff29a4a44b495dc7998ca0196458e57
     container_name: ollama
     restart: unless-stopped
     environment:

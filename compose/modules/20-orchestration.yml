@@ -1,6 +1,6 @@
 services:
   n8n:
-    image: docker.io/n8nio/n8n:latest
+    image: docker.io/n8nio/n8n@sha256:5bf25e23d65895ddde4ce42cf6ad1bc1b09673f16fbe824bd48f1baffe84937a
     env_file:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/stack.env"
     ports:

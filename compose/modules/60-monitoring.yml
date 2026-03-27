@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: docker.io/prom/prometheus:v3.5.1
+    image: docker.io/prom/prometheus@sha256:38c3b05c3bc744ff1b0b7b4eb82196026442845e62a1e2073795565da506d7a2
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -16,7 +16,7 @@ services:
 
   cadvisor:
     container_name: cadvisor
-    image: ghcr.io/google/cadvisor:0.56.2
+    image: ghcr.io/google/cadvisor@sha256:5534ae91cbf3428998d60428d107cfdd97272d80658534ac6e54d8ce3b0c4d72
     privileged: true
     security_opt:
       - label=disable
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   alertmanager:
-    image: docker.io/prom/alertmanager:v0.28.1
+    image: docker.io/prom/alertmanager@sha256:220da6995a919b9ee6e0d3da7ca5f09802f3088007af56be22160314d2485b54
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: docker.io/grafana/grafana:latest
+    image: docker.io/grafana/grafana@sha256:5c1eb28c96c2a8a103384183fb2c32f9cb499904b310b9ba8cdd6bdae435509a
     ports:
       - "127.0.0.1:3000:3000"
     environment:
