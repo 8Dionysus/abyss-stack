@@ -1,0 +1,90 @@
+{
+  "artifact_kind": "aoa.host-facts",
+  "schema_version": "1",
+  "capture_mode": "public",
+  "captured_at": "2026-03-27T17:22:51Z",
+  "captured_by": "scripts/aoa-host-facts",
+  "platform": {
+    "os_id": "fedora",
+    "os_version_id": "43",
+    "os_pretty_name": "Fedora Linux 43 (Workstation Edition)",
+    "kernel_release": "6.19.9-200.fc43.x86_64",
+    "arch": "x86_64"
+  },
+  "cpu": {
+    "vendor": "GenuineIntel",
+    "model_name": "Intel(R) Core(TM) Ultra 9 285H",
+    "sockets": 1,
+    "cores_per_socket": 16,
+    "threads_per_core": 1,
+    "physical_cores_estimate": 16,
+    "logical_cpus": 16,
+    "max_mhz": 5400.0
+  },
+  "memory": {
+    "total_bytes": 33035354112,
+    "swap_total_bytes": 12884897792
+  },
+  "acceleration": {
+    "dev_dri_present": true,
+    "render_nodes": [
+      "renderD128"
+    ],
+    "intel_drm_present": true
+  },
+  "storage": {
+    "observed_paths": [
+      {
+        "query_path": "/",
+        "resolved_path": "/",
+        "mount_target": "/",
+        "mounted": true,
+        "fstype": "btrfs",
+        "size_bytes": 209715200000,
+        "available_bytes": 125048434688
+      },
+      {
+        "query_path": "/srv/abyss-stack",
+        "resolved_path": "/srv/abyss-stack",
+        "mount_target": "/srv",
+        "mounted": true,
+        "fstype": "ext4",
+        "size_bytes": 542004535296,
+        "available_bytes": 414887268352
+      },
+      {
+        "query_path": "/abyss",
+        "resolved_path": "/abyss",
+        "mount_target": "/",
+        "mounted": true,
+        "fstype": "btrfs",
+        "size_bytes": 209715200000,
+        "available_bytes": 125048434688
+      }
+    ]
+  },
+  "runtime": {
+    "podman_present": true,
+    "podman_version": "5.8.1",
+    "podman_rootless": true,
+    "compose_backend": "podman compose",
+    "systemd_user_available": true,
+    "selinux_mode": "Enforcing"
+  },
+  "paths": {
+    "stack_root": "/srv/abyss-stack",
+    "configs_root": "/srv/abyss-stack/Configs",
+    "vault_root": "/abyss",
+    "stack_root_is_canonical": true,
+    "stack_root_exists": true,
+    "configs_root_exists": true,
+    "vault_root_exists": true,
+    "vault_root_mounted": false
+  },
+  "redaction": {
+    "hostname_redacted": true,
+    "mount_sources_redacted": true,
+    "device_serials_redacted": true,
+    "network_redacted": true
+  }
+}

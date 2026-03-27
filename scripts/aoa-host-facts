@@ -285,17 +285,25 @@ def podman_info() -> tuple[str | None, bool | None]:
     version = None
     rootless = None
 
-    version_block = payload.get("Version")
+    version_block = payload.get("version")
+    if version_block is None:
+        version_block = payload.get("Version")
     if isinstance(version_block, dict):
         version = version_block.get("Version")
     elif isinstance(version_block, str):
         version = version_block
 
-    host_block = payload.get("Host")
+    host_block = payload.get("host")
+    if host_block is None:
+        host_block = payload.get("Host")
     if isinstance(host_block, dict):
-        security_block = host_block.get("Security")
+        security_block = host_block.get("security")
+        if security_block is None:
+            security_block = host_block.get("Security")
         if isinstance(security_block, dict):
-            rootless = security_block.get("Rootless")
+            rootless = security_block.get("rootless")
+            if rootless is None:
+                rootless = security_block.get("Rootless")
 
     return version, rootless
 

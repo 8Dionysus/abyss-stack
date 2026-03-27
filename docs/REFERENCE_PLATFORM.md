@@ -21,8 +21,8 @@ scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.j
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
 ```
 
-Until a canonical Linux reference host is chosen, keep the repository on the example artifact only.
-Generate `docs/reference-platform/reference-host.public.json` later, after review, when you intentionally refresh the canonical public snapshot.
+The repository may carry a reviewed canonical public snapshot at `docs/reference-platform/reference-host.public.json`.
+Refresh that file intentionally when you are updating the chosen canonical Linux reference host, not during routine local captures.
 
 `aoa-doctor` stays focused on readiness. It is not the durable inventory surface.
 

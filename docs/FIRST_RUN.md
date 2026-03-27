@@ -62,7 +62,7 @@ scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts
 
 Review the public artifact before commit.
 Do not commit the private artifact.
-Keep `docs/reference-platform/reference-host.public.json` reserved for the reviewed canonical Linux reference host snapshot.
+Only refresh `docs/reference-platform/reference-host.public.json` when you are intentionally updating the reviewed canonical Linux reference host snapshot.
 
 ## Inspect the profile before launch
 
