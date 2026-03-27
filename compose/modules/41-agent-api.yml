@@ -10,6 +10,10 @@ services:
       LC_MODEL: "qwen3.5:9b"
       LC_TIMEOUT_S: 300
       LC_OLLAMA_THINK: "false"
+      LC_OLLAMA_NATIVE_CHAT: "${LC_OLLAMA_NATIVE_CHAT:-true}"
+      LC_OLLAMA_NATIVE_CHAT_URL: http://ollama:11434/api/chat
+      LC_OLLAMA_NUM_THREAD: "${LC_OLLAMA_NUM_THREAD:-6}"
+      LC_OLLAMA_NUM_BATCH: "${LC_OLLAMA_NUM_BATCH:-32}"
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"

@@ -29,10 +29,11 @@ scripts/aoa-first-run --strict
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
-If you want the optional `federation` profile, sync the public-safe `aoa-agents` surface pack after bootstrap:
+If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack and the `aoa-routing` advisory pack after bootstrap:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 ```
 
 ## Scenario A: Fedora-native source checkout
@@ -50,7 +51,8 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
-scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation mirror
+scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation contract mirror
+scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional federation advisory mirror
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -90,6 +92,11 @@ From a Windows host, use `pwsh -File scripts/aoa.ps1 host-doctor` for the Window
 Creates the non-destructive runtime directory skeleton under `${AOA_STACK_ROOT}`.
 It does not delete existing data.
 
+### `scripts/aoa-warmup`
+
+Warms the local Ollama chat model after startup when the selected profile includes `30-local-inference.yml`.
+`aoa-up` calls it automatically, so you usually do not need to invoke it by hand.
+
 ### `scripts/aoa-sync-configs`
 
 Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_ROOT}`.
@@ -109,7 +116,7 @@ The agent-facing runtime may also consume a public-safe return policy file at `$
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
 Use `--ignore-secrets` for the first bootstrap pass before secrets exist.
 Use `--strict` if warnings should fail the command.
-When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`.
+When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents` and the mirrored `aoa-routing` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`.
 
 ### `scripts/aoa-sync-federation-surfaces`
 
@@ -117,10 +124,12 @@ Copies a small allowlisted subset of public-safe sibling-repo surfaces into the 
 The current landing slice supports:
 
 - `--layer aoa-agents`
+- `--layer aoa-routing`
 
-The mirror target for this layer is:
+The mirror targets for these layers are:
 
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`
+- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`
 
 ### `scripts/aoa-install-systemd`
 
@@ -171,11 +180,14 @@ scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
+scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
+
+For local-Ollama profiles, `aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model resident for `30m` unless the stack restarts or the model is explicitly evicted.
 
 Then inspect:
 
@@ -214,6 +226,7 @@ Bring up an agent runtime plus the optional federation seam:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation

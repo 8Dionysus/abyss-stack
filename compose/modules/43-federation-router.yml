@@ -3,10 +3,10 @@ services:
     build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/route-api"
     container_name: route-api
     environment:
-      ROUTE_API_CONFIG_PATH: /app/config/aoa-agents.yaml
+      ROUTE_API_CONFIG_DIR: /app/config
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Knowledge/federation/aoa-agents:/app/federation/aoa-agents:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/federation/aoa-agents.yaml:/app/config/aoa-agents.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Knowledge/federation:/app/federation:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/federation:/app/config:ro,Z"
     ports:
       - "127.0.0.1:5402:5402"
     healthcheck:

@@ -9,3 +9,4 @@ aoa_parse_profile_args "$@"
 aoa_resolve_modules "${AOA_STACK_PROFILE}"
 aoa_print_profile_summary
 aoa_compose up -d "${AOA_FORWARD_ARGS[@]}"
+AOA_STACK_PRESET="$AOA_STACK_PRESET" AOA_STACK_PROFILE="$AOA_STACK_PROFILE" "${SCRIPT_DIR}/aoa-warmup" || true

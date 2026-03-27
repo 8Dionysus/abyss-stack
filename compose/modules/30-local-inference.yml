@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 30m
     volumes:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/ollama:/root/.ollama:Z"
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/ollama:/cfg:Z"

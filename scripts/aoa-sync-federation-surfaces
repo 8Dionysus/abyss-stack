@@ -7,70 +7,119 @@ source "${SCRIPT_DIR}/aoa-lib.sh"
 
 command -v rsync >/dev/null 2>&1 || aoa_die "rsync is required"
 
-layer=""
+layers=()
 while (($#)); do
   case "$1" in
     --layer)
       shift || true
       (($#)) || aoa_die "missing value after --layer"
-      layer="$1"
+      layers+=("$1")
       ;;
     --layer=*)
-      layer="${1#*=}"
+      layers+=("${1#*=}")
       ;;
     *)
       aoa_die "unknown argument: $1"
       ;;
   esac
   shift || true
-done
+  done
 
-[[ -n "$layer" ]] || aoa_die "expected --layer"
-[[ "$layer" == "aoa-agents" ]] || aoa_die "unsupported layer: ${layer}"
+(( ${#layers[@]} > 0 )) || aoa_die "expected --layer"
 
-source_root="${AOA_AGENTS_ROOT}"
-[[ -d "$source_root" ]] || aoa_die "aoa-agents root not found: ${source_root}"
+sync_layer() {
+  local layer="$1"
+  local source_root target_root tmp_root src_path rel_path artifact_schema
+  local -a required_paths=()
 
-target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
-tmp_root="$(mktemp -d)"
-trap 'rm -rf "${tmp_root}"' EXIT
+  case "$layer" in
+    aoa-agents)
+      source_root="${AOA_AGENTS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
+      required_paths=(
+        "docs/AGENT_RUNTIME_SEAM.md"
+        "generated/agent_registry.min.json"
+        "generated/model_tier_registry.json"
+        "generated/runtime_seam_bindings.json"
+        "generated/cohort_composition_registry.json"
+        "schemas/agent-registry.schema.json"
+        "schemas/model-tier-registry.schema.json"
+        "schemas/runtime-seam-bindings.schema.json"
+        "schemas/cohort-composition-registry.schema.json"
+      )
 
-required_paths=(
-  "docs/AGENT_RUNTIME_SEAM.md"
-  "generated/agent_registry.min.json"
-  "generated/model_tier_registry.json"
-  "generated/runtime_seam_bindings.json"
-  "generated/cohort_composition_registry.json"
-  "schemas/agent-registry.schema.json"
-  "schemas/model-tier-registry.schema.json"
-  "schemas/runtime-seam-bindings.schema.json"
-  "schemas/cohort-composition-registry.schema.json"
-)
+      while IFS= read -r artifact_schema; do
+        required_paths+=("schemas/${artifact_schema}")
+      done < <(find "${source_root}/schemas" -maxdepth 1 -type f -name 'artifact.*.schema.json' -printf '%f\n' | sort)
+      ;;
+    aoa-routing)
+      source_root="${AOA_ROUTING_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
+      required_paths=(
+        "docs/FEDERATION_ENTRY_ABI.md"
+        "docs/RECURRENCE_NAVIGATION_BOUNDARY.md"
+        "generated/aoa_router.min.json"
+        "generated/cross_repo_registry.min.json"
+        "generated/task_to_surface_hints.json"
+        "generated/task_to_tier_hints.json"
+        "generated/recommended_paths.min.json"
+        "generated/pairing_hints.min.json"
+        "generated/kag_source_lift_relation_hints.min.json"
+        "generated/federation_entrypoints.min.json"
+        "generated/return_navigation_hints.min.json"
+        "generated/tiny_model_entrypoints.json"
+        "schemas/aoa-router.schema.json"
+        "schemas/cross-repo-registry.schema.json"
+        "schemas/task-to-surface-hints.schema.json"
+        "schemas/task-to-tier-hints.schema.json"
+        "schemas/recommended-paths.schema.json"
+        "schemas/pairing-hints.schema.json"
+        "schemas/kag-source-lift-relation-hints.schema.json"
+        "schemas/federation-entrypoints.schema.json"
+        "schemas/return-navigation-hints.schema.json"
+        "schemas/tiny-model-entrypoints.schema.json"
+        "schemas/router-entry.schema.json"
+      )
+      ;;
+    *)
+      aoa_die "unsupported layer: ${layer}"
+      ;;
+  esac
 
-while IFS= read -r artifact_schema; do
-  required_paths+=("schemas/${artifact_schema}")
-done < <(find "${source_root}/schemas" -maxdepth 1 -type f -name 'artifact.*.schema.json' -printf '%f\n' | sort)
+  [[ -d "$source_root" ]] || aoa_die "${layer} root not found: ${source_root}"
 
-artifact_schema_count=0
-for path in "${required_paths[@]}"; do
-  if [[ "$path" == schemas/artifact.*.schema.json ]]; then
-    artifact_schema_count=$((artifact_schema_count + 1))
+  if [[ "$layer" == "aoa-agents" ]]; then
+    local artifact_schema_count=0
+    for rel_path in "${required_paths[@]}"; do
+      if [[ "$rel_path" == schemas/artifact.*.schema.json ]]; then
+        artifact_schema_count=$((artifact_schema_count + 1))
+      fi
+    done
+    ((artifact_schema_count > 0)) || aoa_die "no artifact schemas found under ${source_root}/schemas"
   fi
+
+  aoa_note "layer: ${layer}"
+  aoa_note "source root: ${source_root}"
+  aoa_note "mirror target: ${target_root}"
+
+  tmp_root="$(mktemp -d)"
+  trap 'rm -rf "${tmp_root}"' RETURN
+
+  for rel_path in "${required_paths[@]}"; do
+    src_path="${source_root}/${rel_path}"
+    [[ -f "$src_path" ]] || aoa_die "required source file missing: ${src_path}"
+    mkdir -p "${tmp_root}/$(dirname -- "${rel_path}")"
+    cp -a "${src_path}" "${tmp_root}/${rel_path}"
+  done
+
+  mkdir -p "$(dirname -- "${target_root}")"
+  rsync -a --delete "${tmp_root}/" "${target_root}/"
+  rm -rf "${tmp_root}"
+  trap - RETURN
+
+  aoa_note "federation surface sync complete for ${layer}"
+}
+
+for layer in "${layers[@]}"; do
+  sync_layer "$layer"
 done
-((artifact_schema_count > 0)) || aoa_die "no artifact schemas found under ${source_root}/schemas"
-
-aoa_note "layer: ${layer}"
-aoa_note "source root: ${source_root}"
-aoa_note "mirror target: ${target_root}"
-
-for rel_path in "${required_paths[@]}"; do
-  src_path="${source_root}/${rel_path}"
-  [[ -f "$src_path" ]] || aoa_die "required source file missing: ${src_path}"
-  mkdir -p "${tmp_root}/$(dirname -- "${rel_path}")"
-  cp -a "${src_path}" "${tmp_root}/${rel_path}"
-done
-
-mkdir -p "$(dirname -- "${target_root}")"
-rsync -a --delete "${tmp_root}/" "${target_root}/"
-
-aoa_note "federation surface sync complete"

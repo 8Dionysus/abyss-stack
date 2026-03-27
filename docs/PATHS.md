@@ -14,6 +14,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_CONFIGS_ROOT` — config root, usually `${AOA_STACK_ROOT}/Configs`
 - `AOA_VAULT_ROOT` — optional heavy-data vault root
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
+- `AOA_ROUTING_ROOT` — optional source root used to mirror public-safe `aoa-routing` advisory surfaces into the runtime tree
 - `AOA_RUNTIME_USER` — runtime username for a few host-specific mounts
 - `AOA_RUNTIME_UID` — runtime UID for a few host-specific mounts
 
@@ -31,6 +32,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | codex home | `/srv/abyss-stack/.codex-home` |
 | optional vault | `/abyss` |
 | optional `aoa-agents` source root | `/srv/aoa-agents` |
+| optional `aoa-routing` source root | `/srv/aoa-routing` |
 
 ## Windows-usable path model
 

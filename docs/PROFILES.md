@@ -41,6 +41,7 @@ An opt-in metadata-only federation seam:
 - `43-federation-router.yml`
 
 This profile is intended to layer over `agentic` or `intel`, but it may also be run by itself for seam debugging.
+It reads a mirrored `aoa-agents` contract seam plus an `aoa-routing advisory seam` through the single localhost-only `route-api`.
 
 ### `tools`
 
@@ -130,6 +131,8 @@ aoa-up --profile intel
 Bring up an agent runtime plus the optional federation seam:
 
 ```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation

@@ -15,6 +15,11 @@ API_KEY  = os.getenv("LC_API_KEY", "EMPTY")
 MODEL    = os.getenv("LC_MODEL", "qwen3.5:9b")
 TIMEOUT  = float(os.getenv("LC_TIMEOUT_S", "60"))
 OLLAMA_THINK = os.getenv("LC_OLLAMA_THINK", "false").strip().lower() in {"1", "true", "yes", "on"}
+OLLAMA_NATIVE_CHAT = os.getenv("LC_OLLAMA_NATIVE_CHAT", "true").strip().lower() in {"1", "true", "yes", "on"}
+OLLAMA_NATIVE_CHAT_URL = os.getenv("LC_OLLAMA_NATIVE_CHAT_URL", "http://ollama:11434/api/chat").rstrip("/")
+OLLAMA_NUM_THREAD = os.getenv("LC_OLLAMA_NUM_THREAD", "").strip()
+OLLAMA_NUM_BATCH = os.getenv("LC_OLLAMA_NUM_BATCH", "").strip()
+OLLAMA_NUM_CTX = os.getenv("LC_OLLAMA_NUM_CTX", "").strip()
 EMBEDDINGS_PROVIDER = os.getenv("EMBEDDINGS_PROVIDER", "ovms").strip().lower()
 OVMS_EMBEDDINGS_URL = os.getenv("OVMS_EMBEDDINGS_URL", "http://ovms:8000/v3/embeddings").rstrip("/")
 OVMS_EMBEDDINGS_MODEL = os.getenv("OVMS_EMBEDDINGS_MODEL", "qwen3-embed-0.6b-int8-ov")
@@ -77,6 +82,14 @@ def _normalize_input(value: str | list[str]) -> list[str]:
         raise HTTPException(status_code=400, detail="input must be string or list of strings")
     return items
 
+def _optional_int(raw: str) -> int | None:
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise RuntimeError(f"invalid_integer_env: {raw}")
+
 def _openai_embeddings_response(
     provider: str, model: str, vectors: list[list[float]], usage: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -129,6 +142,36 @@ def _ollama_embeddings(req: EmbeddingsReq, items: list[str]) -> dict[str, Any]:
         fallback_vectors.append(vec)
     return _openai_embeddings_response("ollama", model, fallback_vectors)
 
+def _ollama_chat(req: RunReq) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": req.user_text}],
+        "stream": False,
+        "think": OLLAMA_THINK,
+        "options": {
+            "temperature": float(req.temperature),
+            "num_predict": int(req.max_tokens),
+        },
+    }
+    num_thread = _optional_int(OLLAMA_NUM_THREAD)
+    num_batch = _optional_int(OLLAMA_NUM_BATCH)
+    num_ctx = _optional_int(OLLAMA_NUM_CTX)
+    if num_thread is not None:
+        payload["options"]["num_thread"] = num_thread
+    if num_batch is not None:
+        payload["options"]["num_batch"] = num_batch
+    if num_ctx is not None:
+        payload["options"]["num_ctx"] = num_ctx
+
+    data = _http_post_json(OLLAMA_NATIVE_CHAT_URL, payload, TIMEOUT)
+    message = data.get("message") or {}
+    content = message.get("content")
+    if not isinstance(content, str):
+        content = data.get("response") or ""
+    if not isinstance(content, str):
+        raise RuntimeError("unexpected_ollama_chat_response: missing content")
+    return {"ok": True, "backend": "ollama-native", "model": MODEL, "answer": content}
+
 @app.get("/health")
 def health():
     return {
@@ -140,6 +183,15 @@ def health():
 
 @app.post("/run")
 def run(req: RunReq):
+    if OLLAMA_NATIVE_CHAT and ("litellm" in BASE_URL or "ollama" in BASE_URL):
+        try:
+            return _ollama_chat(req)
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"upstream_ollama_chat_error: {type(e).__name__}: {e}",
+            )
+
     llm_kwargs = {
         "model": MODEL,
         "base_url": BASE_URL,
@@ -150,7 +202,20 @@ def run(req: RunReq):
         "max_tokens": int(req.max_tokens),
     }
     if "litellm" in BASE_URL or "ollama" in BASE_URL:
-        llm_kwargs["extra_body"] = {"think": OLLAMA_THINK}
+        extra_body: dict[str, Any] = {"think": OLLAMA_THINK}
+        ollama_options: dict[str, Any] = {}
+        num_thread = _optional_int(OLLAMA_NUM_THREAD)
+        num_batch = _optional_int(OLLAMA_NUM_BATCH)
+        num_ctx = _optional_int(OLLAMA_NUM_CTX)
+        if num_thread is not None:
+            ollama_options["num_thread"] = num_thread
+        if num_batch is not None:
+            ollama_options["num_batch"] = num_batch
+        if num_ctx is not None:
+            ollama_options["num_ctx"] = num_ctx
+        if ollama_options:
+            extra_body["options"] = ollama_options
+        llm_kwargs["extra_body"] = extra_body
 
     llm = ChatOpenAI(
         **llm_kwargs,

@@ -1,0 +1,28 @@
+layer: aoa-routing
+mirror_root: /app/federation/aoa-routing
+advisory_only: true
+allow_free_text_task_routing: false
+required_files:
+  - docs/FEDERATION_ENTRY_ABI.md
+  - docs/RECURRENCE_NAVIGATION_BOUNDARY.md
+  - generated/aoa_router.min.json
+  - generated/cross_repo_registry.min.json
+  - generated/task_to_surface_hints.json
+  - generated/task_to_tier_hints.json
+  - generated/recommended_paths.min.json
+  - generated/pairing_hints.min.json
+  - generated/kag_source_lift_relation_hints.min.json
+  - generated/federation_entrypoints.min.json
+  - generated/return_navigation_hints.min.json
+  - generated/tiny_model_entrypoints.json
+  - schemas/aoa-router.schema.json
+  - schemas/cross-repo-registry.schema.json
+  - schemas/task-to-surface-hints.schema.json
+  - schemas/task-to-tier-hints.schema.json
+  - schemas/recommended-paths.schema.json
+  - schemas/pairing-hints.schema.json
+  - schemas/kag-source-lift-relation-hints.schema.json
+  - schemas/federation-entrypoints.schema.json
+  - schemas/return-navigation-hints.schema.json
+  - schemas/tiny-model-entrypoints.schema.json
+  - schemas/router-entry.schema.json

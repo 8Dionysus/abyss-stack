@@ -29,6 +29,8 @@ Or combine host-facing and internal-only checks in one pass:
 scripts/aoa-smoke --with-internal --profile <name>
 ```
 
+For profiles that include local Ollama inference, `aoa-up` now performs a post-start warmup of `qwen3.5:9b` and relies on Ollama keep-alive to avoid repeated cold loads during normal short idle periods.
+
 ## `core`
 
 ### What it is for
@@ -106,7 +108,7 @@ scripts/aoa-smoke --profile intel
 
 ### What it is for
 
-A localhost-only federation seam that reads mirrored `aoa-agents` contracts from the runtime tree.
+A localhost-only federation seam that reads mirrored `aoa-agents` contracts plus mirrored `aoa-routing` advisory surfaces from the runtime tree.
 This profile is metadata-only and does not change `langchain-api`.
 
 ### Host-facing endpoints
@@ -117,6 +119,7 @@ This profile is metadata-only and does not change `langchain-api`.
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-profile-endpoints --profile federation
 scripts/aoa-render-services --profile federation
 scripts/aoa-up --profile federation
@@ -234,13 +237,14 @@ aoa-smoke --with-internal --preset agent-observability
 
 What it gives you:
 - the generic local agent path
-- a localhost-only federation seam for mirrored `aoa-agents` contracts
+- a localhost-only federation seam for mirrored `aoa-agents` contracts and `aoa-routing` advisory surfaces
 - no change to the existing `/run` or `/embeddings` surfaces
 
 Try:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-profile-modules --profile agentic --profile federation --paths
 scripts/aoa-profile-endpoints --profile agentic --profile federation
 scripts/aoa-render-services --profile agentic --profile federation
@@ -252,13 +256,14 @@ scripts/aoa-smoke --profile agentic --profile federation
 
 What it gives you:
 - the Intel-aware agent runtime with OVMS
-- the same localhost-only federation seam
+- the same localhost-only federation seam and `aoa-routing` advisory layer
 - no change to the existing Intel overlay contract
 
 Try:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-profile-modules --profile intel --profile federation --paths
 scripts/aoa-profile-endpoints --profile intel --profile federation
 scripts/aoa-render-services --profile intel --profile federation

@@ -112,9 +112,11 @@ if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
 fi
 
 if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
-  aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents federation mirror"
+  aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents and aoa-routing federation mirrors"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
+  check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
   check_warn_file "aoa-agents federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-agents.yaml"
+  check_warn_file "aoa-routing federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-routing.yaml"
   check_warn_file "aoa-agents runtime seam doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/docs/AGENT_RUNTIME_SEAM.md"
   check_warn_file "aoa-agents agent registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/agent_registry.min.json"
   check_warn_file "aoa-agents tier registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/model_tier_registry.json"
@@ -124,6 +126,29 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-agents model tier schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/model-tier-registry.schema.json"
   check_warn_file "aoa-agents seam bindings schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/runtime-seam-bindings.schema.json"
   check_warn_file "aoa-agents cohort schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/cohort-composition-registry.schema.json"
+  check_warn_file "aoa-routing federation ABI doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/docs/FEDERATION_ENTRY_ABI.md"
+  check_warn_file "aoa-routing recurrence boundary doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/docs/RECURRENCE_NAVIGATION_BOUNDARY.md"
+  check_warn_file "aoa-routing router surface" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/aoa_router.min.json"
+  check_warn_file "aoa-routing cross repo registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/cross_repo_registry.min.json"
+  check_warn_file "aoa-routing surface hints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/task_to_surface_hints.json"
+  check_warn_file "aoa-routing tier hints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/task_to_tier_hints.json"
+  check_warn_file "aoa-routing recommended paths" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/recommended_paths.min.json"
+  check_warn_file "aoa-routing pairing hints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/pairing_hints.min.json"
+  check_warn_file "aoa-routing kag relation hints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/kag_source_lift_relation_hints.min.json"
+  check_warn_file "aoa-routing federation entrypoints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/federation_entrypoints.min.json"
+  check_warn_file "aoa-routing return hints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/return_navigation_hints.min.json"
+  check_warn_file "aoa-routing tiny-model entrypoints" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/generated/tiny_model_entrypoints.json"
+  check_warn_file "aoa-routing router schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/aoa-router.schema.json"
+  check_warn_file "aoa-routing cross repo schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/cross-repo-registry.schema.json"
+  check_warn_file "aoa-routing task-to-surface schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/task-to-surface-hints.schema.json"
+  check_warn_file "aoa-routing task-to-tier schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/task-to-tier-hints.schema.json"
+  check_warn_file "aoa-routing recommended paths schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/recommended-paths.schema.json"
+  check_warn_file "aoa-routing pairing schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/pairing-hints.schema.json"
+  check_warn_file "aoa-routing kag relation schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/kag-source-lift-relation-hints.schema.json"
+  check_warn_file "aoa-routing federation entrypoints schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/federation-entrypoints.schema.json"
+  check_warn_file "aoa-routing return hints schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/return-navigation-hints.schema.json"
+  check_warn_file "aoa-routing tiny-model entrypoints schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/tiny-model-entrypoints.schema.json"
+  check_warn_file "aoa-routing router entry schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing/schemas/router-entry.schema.json"
 fi
 
 if ((errors > 0)); then

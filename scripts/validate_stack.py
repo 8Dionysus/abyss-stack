@@ -26,6 +26,7 @@ REQUIRED_SCRIPTS = {
     "aoa-sync-federation-surfaces",
     "aoa-bootstrap-configs",
     "aoa-check-layout",
+    "aoa-warmup",
     "aoa-install-systemd",
     "aoa-first-run",
     "aoa-preset-profiles",
@@ -86,6 +87,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
@@ -218,6 +220,28 @@ def validate_paths(errors: list[str]) -> None:
         errors.append(
             "docs/PATHS.md should mention WSL2 in the Windows-usable model"
         )
+    if "AOA_ROUTING_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_ROUTING_ROOT")
+
+    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-routing federation sync")
+
+    profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
+    if "aoa-routing advisory seam" not in profiles_doc:
+        errors.append("docs/PROFILES.md must describe the aoa-routing advisory seam")
+
+    recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
+    if "aoa-routing" not in recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention aoa-routing")
+
+    catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    if "aoa-routing advisory routing surfaces" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention aoa-routing advisory routing surfaces")
+
+    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    if "Knowledge/federation/aoa-routing/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
 
 
 def validate_scripts(errors: list[str]) -> None:
