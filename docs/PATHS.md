@@ -15,6 +15,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_VAULT_ROOT` — optional heavy-data vault root
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
 - `AOA_ROUTING_ROOT` — optional source root used to mirror public-safe `aoa-routing` advisory surfaces into the runtime tree
+- `AOA_MEMO_ROOT` — optional source root used to mirror public-safe `aoa-memo` recall and writeback-seam surfaces into the runtime tree
 - `AOA_RUNTIME_USER` — runtime username for a few host-specific mounts
 - `AOA_RUNTIME_UID` — runtime UID for a few host-specific mounts
 
@@ -33,6 +34,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | optional vault | `/abyss` |
 | optional `aoa-agents` source root | `/srv/aoa-agents` |
 | optional `aoa-routing` source root | `/srv/aoa-routing` |
+| optional `aoa-memo` source root | `/srv/aoa-memo` |
 
 ## Windows-usable path model
 

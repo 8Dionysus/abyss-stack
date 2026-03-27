@@ -51,6 +51,7 @@ fi
 
 if has_module "43-federation-router.yml"; then
   aoa_note "- route-api        http://127.0.0.1:5402/health"
+  aoa_note "- route-api memo   http://127.0.0.1:5402/memo/registry"
 fi
 
 if has_module "50-speech.yml"; then

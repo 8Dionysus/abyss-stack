@@ -81,6 +81,31 @@ sync_layer() {
         "schemas/router-entry.schema.json"
       )
       ;;
+    aoa-memo)
+      source_root="${AOA_MEMO_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo"
+      required_paths=(
+        "docs/MEMORY_MODEL.md"
+        "docs/RUNTIME_WRITEBACK_SEAM.md"
+        "docs/RECURRENCE_MEMORY_SUPPORT_SURFACES.md"
+        "docs/AGENT_MEMORY_POSTURE_SEAM.md"
+        "docs/PLAYBOOK_MEMORY_SCOPES.md"
+        "generated/memo_registry.min.json"
+        "generated/memory_catalog.min.json"
+        "generated/memory_sections.full.json"
+        "generated/memory_object_catalog.min.json"
+        "generated/memory_object_sections.full.json"
+        "examples/checkpoint_to_memory_contract.example.json"
+        "examples/recall_contract.router.semantic.json"
+        "examples/recall_contract.router.lineage.json"
+        "examples/recall_contract.object.working.json"
+        "examples/recall_contract.object.semantic.json"
+        "examples/recall_contract.object.lineage.json"
+        "examples/recall_contract.object.working.return.json"
+        "schemas/checkpoint-to-memory-contract.schema.json"
+        "schemas/core-memory-contract.schema.json"
+      )
+      ;;
     *)
       aoa_die "unsupported layer: ${layer}"
       ;;

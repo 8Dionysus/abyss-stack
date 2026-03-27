@@ -1,0 +1,44 @@
+{
+  "artifact_kind": "aoa.runtime-memo-export-candidate",
+  "schema_version": "1",
+  "capture_mode": "private",
+  "exported_at": "2026-03-28T01:15:00Z",
+  "exported_by": "scripts/aoa-export-memo-candidate",
+  "record_id": "2026-03-28T011500Z__checkpoint_export__checkpoint-export-state-capsule",
+  "title": "checkpoint export -> state capsule",
+  "summary": "Bounded checkpoint export candidate prepared from a route artifact without promoting it into memo canon automatically.",
+  "runtime_surface": "checkpoint_export",
+  "target_kind": "state_capsule",
+  "writeback_class": "checkpoint_export",
+  "temperature_hint": "hot",
+  "requires_human_review": false,
+  "review_state_default": "captured",
+  "source_input_ref": "local:/tmp/checkpoint-export.json",
+  "source_input_sha256": "e8dd9c017df9fa1c1b2e3f0dbb7b451fd0fdea2af8ec229fdbeb7b6ff0f8f3e6",
+  "contract_type": "checkpoint_to_memory_contract",
+  "contract_id": "aoa-memo.runtime-writeback.v1",
+  "runtime_boundary": {
+    "scratchpad_posture": "runtime_local_only",
+    "checkpoint_export_kind": "state_capsule",
+    "distillation_review_posture": "review_required",
+    "review_boundary_refs": [
+      "docs/WRITEBACK_TEMPERATURE_POLICY.md#writeback-classes",
+      "docs/MEMORY_MODEL.md#checkpoint-route-writeback",
+      "repo:aoa-agents/docs/AGENT_MEMORY_POSTURE.md"
+    ]
+  },
+  "memo_contract_refs": [
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/examples/checkpoint_to_memory_contract.example.json",
+    "schemas/inquiry_checkpoint.schema.json",
+    "docs/WRITEBACK_TEMPERATURE_POLICY.md#inquiry-checkpoint-packs"
+  ],
+  "candidate_payload": {
+    "checkpoint_id": "chk.runtime.2026-03-28.demo",
+    "question": "How should the route resume safely after interruption?",
+    "anchor_artifacts": [
+      "route_decision",
+      "transition_decision"
+    ],
+    "relaunch_note": "Resume from the last valid checkpoint with bounded context rebuild."
+  }
+}

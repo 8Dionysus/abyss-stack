@@ -21,6 +21,7 @@ Expected live structure under `/srv/abyss-stack`:
     federation/
   Logs/
     host-facts/
+    memo-exports/
     platform-adaptations/
     runtime-benchmarks/
   .codex-home/
@@ -32,8 +33,8 @@ Expected live structure under `/srv/abyss-stack`:
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
 - `Services/` — persistent state for databases and runtime services, plus source-seeded build contexts and service-local inputs for lightweight helper services such as `langchain-api`, `litellm`, `docs-api`, `qwen3-tts-api`, and `tts_router`
 - `Models/` — local model weights and related serving artifacts
-- `Knowledge/` — local knowledge corpora, helper inputs, and runtime-local mirrors of public-safe federation surfaces such as `Knowledge/federation/aoa-agents/` and `Knowledge/federation/aoa-routing/`
-- `Logs/` — logs and generated runtime artifacts, including local private host-facts captures under `Logs/host-facts/`, platform-adaptation records under `Logs/platform-adaptations/`, and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
+- `Knowledge/` — local knowledge corpora, helper inputs, and runtime-local mirrors of public-safe federation surfaces such as `Knowledge/federation/aoa-agents/`, `Knowledge/federation/aoa-routing/`, and `Knowledge/federation/aoa-memo/`
+- `Logs/` — logs and generated runtime artifacts, including local private host-facts captures under `Logs/host-facts/`, memo export candidates under `Logs/memo-exports/`, platform-adaptation records under `Logs/platform-adaptations/`, and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
 - `.codex-home/` — isolated agent or codex-style runtime home
 
 ## Heavy-data caution
@@ -66,4 +67,5 @@ Never commit or publish real runtime material from:
 - live `stack.env`
 - any secret-bearing mounted file used by services
 - private host-facts captures under `/srv/abyss-stack/Logs/host-facts/`
+- private memo export candidates under `/srv/abyss-stack/Logs/memo-exports/`
 - private platform-adaptation captures under `/srv/abyss-stack/Logs/platform-adaptations/`

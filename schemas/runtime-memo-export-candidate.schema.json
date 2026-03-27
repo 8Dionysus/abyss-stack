@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.invalid/abyss-stack/schemas/runtime-memo-export-candidate.schema.json",
+  "title": "abyss-stack runtime memo export candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "capture_mode",
+    "exported_at",
+    "exported_by",
+    "record_id",
+    "title",
+    "summary",
+    "runtime_surface",
+    "target_kind",
+    "writeback_class",
+    "temperature_hint",
+    "requires_human_review",
+    "review_state_default",
+    "source_input_ref",
+    "source_input_sha256",
+    "contract_type",
+    "contract_id",
+    "runtime_boundary",
+    "memo_contract_refs",
+    "candidate_payload"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "aoa.runtime-memo-export-candidate"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "capture_mode": {
+      "const": "private"
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "exported_by": {
+      "const": "scripts/aoa-export-memo-candidate"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_surface": {
+      "enum": [
+        "checkpoint_export",
+        "approval_record",
+        "transition_record",
+        "execution_trace",
+        "review_trace",
+        "distillation_claim_candidate",
+        "distillation_pattern_candidate",
+        "distillation_bridge_candidate"
+      ]
+    },
+    "target_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "writeback_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "temperature_hint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requires_human_review": {
+      "type": "boolean"
+    },
+    "review_state_default": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_input_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_input_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "contract_type": {
+      "const": "checkpoint_to_memory_contract"
+    },
+    "contract_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_boundary": {
+      "type": "object"
+    },
+    "memo_contract_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "candidate_payload": {
+      "type": "object"
+    }
+  }
+}

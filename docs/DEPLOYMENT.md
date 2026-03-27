@@ -29,12 +29,15 @@ scripts/aoa-first-run --strict
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
-If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack and the `aoa-routing` advisory pack after bootstrap:
+If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack, the `aoa-routing` advisory pack, and the `aoa-memo` recall pack after bootstrap:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --layer aoa-memo
 ```
+
+See [MEMO_RUNTIME_SEAM](MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
 
 ## Scenario A: Fedora-native source checkout
 
@@ -53,6 +56,7 @@ scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation contract mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional federation advisory mirror
+scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional federation memo mirror
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -116,7 +120,7 @@ The agent-facing runtime may also consume a public-safe return policy file at `$
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
 Use `--ignore-secrets` for the first bootstrap pass before secrets exist.
 Use `--strict` if warnings should fail the command.
-When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents` and the mirrored `aoa-routing` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`.
+When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`, the mirrored `aoa-routing` advisory pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`, and the mirrored `aoa-memo` recall pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo`.
 
 ### `scripts/aoa-sync-federation-surfaces`
 
@@ -125,11 +129,13 @@ The current landing slice supports:
 
 - `--layer aoa-agents`
 - `--layer aoa-routing`
+- `--layer aoa-memo`
 
 The mirror targets for these layers are:
 
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing`
+- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo`
 
 ### `scripts/aoa-install-systemd`
 
@@ -181,6 +187,7 @@ scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
+scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -227,6 +234,7 @@ Bring up an agent runtime plus the optional federation seam:
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
+scripts/aoa-sync-federation-surfaces --layer aoa-memo
 aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation

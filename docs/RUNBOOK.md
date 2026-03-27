@@ -14,8 +14,9 @@ When something feels wrong, use this order:
 8. check container state
 9. check health endpoints
 10. check logs
-11. decide whether to fix forward or roll back
-12. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+11. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
+12. decide whether to fix forward or roll back
+13. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -25,6 +26,7 @@ aoa-doctor --preset agent-full
 aoa-check-layout
 aoa-host-facts --mode public
 aoa-platform-adaptation --mode private --title "Short seam title" --summary "One bounded summary" --issue-class performance
+aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -58,6 +60,15 @@ aoa-platform-adaptation \
   --summary "One bounded summary" \
   --issue-class performance \
   --write "${AOA_STACK_ROOT}/Logs/platform-adaptations/latest/latest.private.json"
+```
+
+For a bounded runtime memo export candidate:
+
+```bash
+aoa-export-memo-candidate \
+  --runtime-surface checkpoint_export \
+  --input-file /tmp/checkpoint-export.json \
+  --write
 ```
 
 For combined surfaces:

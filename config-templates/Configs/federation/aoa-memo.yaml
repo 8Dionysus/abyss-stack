@@ -1,0 +1,25 @@
+layer: aoa-memo
+mirror_root: /app/federation/aoa-memo
+read_only: true
+export_only_writeback: true
+allow_free_text_recall: false
+required_files:
+  - docs/MEMORY_MODEL.md
+  - docs/RUNTIME_WRITEBACK_SEAM.md
+  - docs/RECURRENCE_MEMORY_SUPPORT_SURFACES.md
+  - docs/AGENT_MEMORY_POSTURE_SEAM.md
+  - docs/PLAYBOOK_MEMORY_SCOPES.md
+  - generated/memo_registry.min.json
+  - generated/memory_catalog.min.json
+  - generated/memory_sections.full.json
+  - generated/memory_object_catalog.min.json
+  - generated/memory_object_sections.full.json
+  - examples/checkpoint_to_memory_contract.example.json
+  - examples/recall_contract.router.semantic.json
+  - examples/recall_contract.router.lineage.json
+  - examples/recall_contract.object.working.json
+  - examples/recall_contract.object.semantic.json
+  - examples/recall_contract.object.lineage.json
+  - examples/recall_contract.object.working.return.json
+  - schemas/checkpoint-to-memory-contract.schema.json
+  - schemas/core-memory-contract.schema.json

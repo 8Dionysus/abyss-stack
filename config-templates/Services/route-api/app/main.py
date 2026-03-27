@@ -16,6 +16,7 @@ CONFIG_DIR = Path(os.environ.get("ROUTE_API_CONFIG_DIR", "/app/config"))
 REQUIRED_CONFIGS = {
     "aoa-agents": "aoa-agents.yaml",
     "aoa-routing": "aoa-routing.yaml",
+    "aoa-memo": "aoa-memo.yaml",
 }
 
 
@@ -33,6 +34,7 @@ class LayerStore:
 class AppStore:
     agents: LayerStore
     routing: LayerStore
+    memo: LayerStore
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -139,6 +141,43 @@ def load_routing_layer(config_path: Path, config: dict[str, Any], mirror_root: P
     )
 
 
+def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+    required_files = validated_required_files(config, mirror_root)
+    payloads = {
+        "registry": load_json(mirror_root / "generated/memo_registry.min.json"),
+        "catalog": load_json(mirror_root / "generated/memory_catalog.min.json"),
+        "sections": load_json(mirror_root / "generated/memory_sections.full.json"),
+        "object_catalog": load_json(mirror_root / "generated/memory_object_catalog.min.json"),
+        "object_sections": load_json(mirror_root / "generated/memory_object_sections.full.json"),
+        "checkpoint_contract": load_json(mirror_root / "examples/checkpoint_to_memory_contract.example.json"),
+        "recall_contracts": {
+            "router": {
+                "semantic": load_json(mirror_root / "examples/recall_contract.router.semantic.json"),
+                "lineage": load_json(mirror_root / "examples/recall_contract.router.lineage.json"),
+            },
+            "object": {
+                "working": load_json(mirror_root / "examples/recall_contract.object.working.json"),
+                "semantic": load_json(mirror_root / "examples/recall_contract.object.semantic.json"),
+                "lineage": load_json(mirror_root / "examples/recall_contract.object.lineage.json"),
+                "working_return": load_json(mirror_root / "examples/recall_contract.object.working.return.json"),
+            },
+        },
+    }
+
+    return LayerStore(
+        layer="aoa-memo",
+        config_path=config_path,
+        mirror_root=mirror_root,
+        required_files=required_files,
+        flags={
+            "read_only": bool(config.get("read_only", False)),
+            "export_only_writeback": bool(config.get("export_only_writeback", False)),
+            "allow_free_text_recall": bool(config.get("allow_free_text_recall", False)),
+        },
+        payloads=payloads,
+    )
+
+
 def load_layer(config_path: Path) -> LayerStore:
     config = load_yaml(config_path)
     layer = config.get("layer")
@@ -154,6 +193,8 @@ def load_layer(config_path: Path) -> LayerStore:
         return load_agents_layer(config_path, config, mirror_root)
     if layer == "aoa-routing":
         return load_routing_layer(config_path, config, mirror_root)
+    if layer == "aoa-memo":
+        return load_memo_layer(config_path, config, mirror_root)
     raise RuntimeError(f"unsupported layer in route-api config: {layer!r}")
 
 
@@ -168,6 +209,7 @@ def load_store(config_dir: Path) -> AppStore:
     return AppStore(
         agents=loaded_layers["aoa-agents"],
         routing=loaded_layers["aoa-routing"],
+        memo=loaded_layers["aoa-memo"],
     )
 
 
@@ -201,18 +243,33 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
             "artifact_contracts": sorted(layer.payloads["artifact_contracts"].keys()),
         }
     else:
-        metadata = {
-            "router": {"version": layer.payloads["router"].get("router_version")},
-            "cross_repo_registry": {"version": layer.payloads["cross_repo_registry"].get("version")},
-            "surface_hints": {"version": layer.payloads["surface_hints"].get("version")},
-            "tier_hints": {"version": layer.payloads["tier_hints"].get("version")},
-            "recommended_paths": {"version": layer.payloads["recommended_paths"].get("version")},
-            "pairing_hints": {"version": layer.payloads["pairing_hints"].get("version")},
-            "kag_source_lift_relation_hints": {"version": layer.payloads["kag_source_lift_relation_hints"].get("version")},
-            "federation_entrypoints": {"version": layer.payloads["federation_entrypoints"].get("version")},
-            "return_hints": {"version": layer.payloads["return_hints"].get("version")},
-            "tiny_model_entrypoints": {"version": layer.payloads["tiny_model_entrypoints"].get("version")},
-        }
+        if layer.layer == "aoa-routing":
+            metadata = {
+                "router": {"version": layer.payloads["router"].get("router_version")},
+                "cross_repo_registry": {"version": layer.payloads["cross_repo_registry"].get("version")},
+                "surface_hints": {"version": layer.payloads["surface_hints"].get("version")},
+                "tier_hints": {"version": layer.payloads["tier_hints"].get("version")},
+                "recommended_paths": {"version": layer.payloads["recommended_paths"].get("version")},
+                "pairing_hints": {"version": layer.payloads["pairing_hints"].get("version")},
+                "kag_source_lift_relation_hints": {"version": layer.payloads["kag_source_lift_relation_hints"].get("version")},
+                "federation_entrypoints": {"version": layer.payloads["federation_entrypoints"].get("version")},
+                "return_hints": {"version": layer.payloads["return_hints"].get("version")},
+                "tiny_model_entrypoints": {"version": layer.payloads["tiny_model_entrypoints"].get("version")},
+            }
+        else:
+            metadata = {
+                "registry": {"version": layer.payloads["registry"].get("version")},
+                "catalog": {"version": layer.payloads["catalog"].get("catalog_version")},
+                "object_catalog": {"version": layer.payloads["object_catalog"].get("catalog_version")},
+                "checkpoint_contract": {"contract_id": layer.payloads["checkpoint_contract"].get("contract_id")},
+                "router_recall_modes": sorted(layer.payloads["recall_contracts"]["router"].keys()),
+                "object_recall_modes": sorted(
+                    key for key in layer.payloads["recall_contracts"]["object"].keys() if key != "working_return"
+                ),
+                "object_return_ready": bool(
+                    layer.payloads["recall_contracts"]["object"]["working_return"].get("return_ready")
+                ),
+            }
 
     return {
         "config_path": str(layer.config_path),
@@ -328,6 +385,10 @@ def resolve_route(
 
 def routing_payload(store: AppStore, key: str) -> dict[str, Any]:
     return store.routing.payloads[key]
+
+
+def memo_payload(store: AppStore, key: str) -> dict[str, Any]:
+    return store.memo.payloads[key]
 
 
 def require_task_family_hint(store: AppStore, task_family: str) -> dict[str, Any]:
@@ -543,6 +604,98 @@ def resolve_starter(store: AppStore, starter_name: str) -> dict[str, Any]:
     raise HTTPException(status_code=404, detail=f"no aoa-routing starter found for starter_name={starter_name}")
 
 
+def memo_collection_key(family: Literal["doctrine", "object"]) -> str:
+    return "memo_surfaces" if family == "doctrine" else "memory_objects"
+
+
+def memo_collection_payload(store: AppStore, family: Literal["doctrine", "object"], *, sections: bool) -> dict[str, Any]:
+    if family == "doctrine":
+        return memo_payload(store, "sections" if sections else "catalog")
+    return memo_payload(store, "object_sections" if sections else "object_catalog")
+
+
+def require_memo_entry(
+    store: AppStore,
+    family: Literal["doctrine", "object"],
+    entry_id: str,
+    *,
+    sections: bool,
+) -> dict[str, Any]:
+    payload = memo_collection_payload(store, family, sections=sections)
+    collection_key = memo_collection_key(family)
+    for entry in payload[collection_key]:
+        if entry["id"] == entry_id:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-memo {family} entry found for id={entry_id}")
+
+
+def require_memo_section(
+    entry: dict[str, Any],
+    entry_id: str,
+    section_id: str,
+) -> dict[str, Any]:
+    for section in entry.get("sections", []):
+        if section["section_id"] == section_id:
+            return section
+    raise HTTPException(status_code=404, detail=f"no aoa-memo section found for id={entry_id}, section_id={section_id}")
+
+
+def resolve_memo_recall_contract(
+    store: AppStore,
+    family: Literal["router", "object"],
+    mode: Literal["working", "semantic", "lineage"],
+    return_ready: bool,
+) -> dict[str, Any]:
+    payloads = memo_payload(store, "recall_contracts")[family]
+    if family == "router":
+        if return_ready:
+            raise HTTPException(status_code=400, detail="return_ready is only supported for family=object and mode=working")
+        if mode not in {"semantic", "lineage"}:
+            raise HTTPException(status_code=400, detail="router family supports only semantic or lineage modes")
+        rel_path = f"examples/recall_contract.router.{mode}.json"
+        contract = payloads[mode]
+    else:
+        if mode not in {"working", "semantic", "lineage"}:
+            raise HTTPException(status_code=400, detail="object family supports working, semantic, or lineage modes")
+        if return_ready:
+            if mode != "working":
+                raise HTTPException(status_code=400, detail="return_ready requires family=object and mode=working")
+            rel_path = "examples/recall_contract.object.working.return.json"
+            contract = payloads["working_return"]
+        else:
+            rel_path = f"examples/recall_contract.object.{mode}.json"
+            contract = payloads[mode]
+
+    return {
+        "ok": True,
+        "family": family,
+        "mode": mode,
+        "return_ready": return_ready,
+        "contract": contract,
+        "source_files": [f"aoa-memo/{rel_path}"],
+    }
+
+
+def resolve_writeback_map(store: AppStore, runtime_surface: str) -> dict[str, Any]:
+    checkpoint_contract = memo_payload(store, "checkpoint_contract")
+    for mapping in checkpoint_contract["mapping_rules"]:
+        if mapping["runtime_surface"] != runtime_surface:
+            continue
+        return {
+            "ok": True,
+            "runtime_surface": runtime_surface,
+            "contract_type": checkpoint_contract["contract_type"],
+            "contract_id": checkpoint_contract["contract_id"],
+            "runtime_boundary": checkpoint_contract["runtime_boundary"],
+            "mapping": mapping,
+            "source_files": [
+                "aoa-memo/examples/checkpoint_to_memory_contract.example.json",
+                "aoa-memo/docs/RUNTIME_WRITEBACK_SEAM.md",
+            ],
+        }
+    raise HTTPException(status_code=404, detail=f"no aoa-memo writeback mapping found for runtime_surface={runtime_surface}")
+
+
 app = FastAPI(title="AoA federation route API")
 STORE: AppStore | None = None
 
@@ -614,19 +767,60 @@ class StarterRequest(BaseModel):
     starter_name: str
 
 
+class MemoInspectRequest(BaseModel):
+    family: Literal["doctrine", "object"]
+    id: str
+
+
+class MemoExpandRequest(BaseModel):
+    family: Literal["doctrine", "object"]
+    id: str
+    section_id: str | None = None
+
+
+class MemoRecallContractRequest(BaseModel):
+    family: Literal["router", "object"]
+    mode: Literal["working", "semantic", "lineage"]
+    return_ready: bool = False
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "MemoRecallContractRequest":
+        if self.family == "router" and self.mode == "working":
+            raise ValueError("router family supports only semantic or lineage modes")
+        if self.return_ready and not (self.family == "object" and self.mode == "working"):
+            raise ValueError("return_ready requires family=object and mode=working")
+        return self
+
+
+class MemoWritebackMapRequest(BaseModel):
+    runtime_surface: Literal[
+        "checkpoint_export",
+        "approval_record",
+        "transition_record",
+        "execution_trace",
+        "review_trace",
+        "distillation_claim_candidate",
+        "distillation_pattern_candidate",
+        "distillation_bridge_candidate",
+    ]
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer],
+        "layers": [store.agents.layer, store.routing.layer, store.memo.layer],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
+            store.memo.layer: True,
         },
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
+        "memo_read_only": store.memo.flags["read_only"],
+        "memo_export_only_writeback": store.memo.flags["export_only_writeback"],
     }
 
 
@@ -635,15 +829,17 @@ def surface_status() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer],
+        "layers": [store.agents.layer, store.routing.layer, store.memo.layer],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
+            store.memo.layer: True,
         },
         "layers_status": {
             store.agents.layer: layer_status(store.agents),
             store.routing.layer: layer_status(store.routing),
+            store.memo.layer: layer_status(store.memo),
         },
     }
 
@@ -791,3 +987,79 @@ def routing_return(request: ReturnRequest) -> dict[str, Any]:
 def routing_starter(request: StarterRequest) -> dict[str, Any]:
     store = require_store()
     return resolve_starter(store, request.starter_name)
+
+
+@app.get("/memo/registry")
+def memo_registry() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": memo_payload(store, "registry")}
+
+
+@app.get("/memo/catalog")
+def memo_catalog() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": memo_payload(store, "catalog")}
+
+
+@app.get("/memo/object-catalog")
+def memo_object_catalog() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": memo_payload(store, "object_catalog")}
+
+
+@app.get("/memo/checkpoint-contract")
+def memo_checkpoint_contract() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": memo_payload(store, "checkpoint_contract")}
+
+
+@app.post("/memo/inspect")
+def memo_inspect(request: MemoInspectRequest) -> dict[str, Any]:
+    store = require_store()
+    entry = require_memo_entry(store, request.family, request.id, sections=False)
+    source_file = (
+        "aoa-memo/generated/memory_catalog.min.json"
+        if request.family == "doctrine"
+        else "aoa-memo/generated/memory_object_catalog.min.json"
+    )
+    return {
+        "ok": True,
+        "family": request.family,
+        "id": request.id,
+        "entry": entry,
+        "source_files": [source_file],
+    }
+
+
+@app.post("/memo/expand")
+def memo_expand(request: MemoExpandRequest) -> dict[str, Any]:
+    store = require_store()
+    entry = require_memo_entry(store, request.family, request.id, sections=True)
+    source_file = (
+        "aoa-memo/generated/memory_sections.full.json"
+        if request.family == "doctrine"
+        else "aoa-memo/generated/memory_object_sections.full.json"
+    )
+    response: dict[str, Any] = {
+        "ok": True,
+        "family": request.family,
+        "id": request.id,
+        "entry": entry,
+        "source_files": [source_file],
+    }
+    if request.section_id is not None:
+        response["section_id"] = request.section_id
+        response["section"] = require_memo_section(entry, request.id, request.section_id)
+    return response
+
+
+@app.post("/memo/recall-contract")
+def memo_recall_contract(request: MemoRecallContractRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_memo_recall_contract(store, request.family, request.mode, request.return_ready)
+
+
+@app.post("/memo/writeback-map")
+def memo_writeback_map(request: MemoWritebackMapRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_writeback_map(store, request.runtime_surface)

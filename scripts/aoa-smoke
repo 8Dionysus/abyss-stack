@@ -67,6 +67,7 @@ fi
 
 if has_module "43-federation-router.yml"; then
   aoa_probe_http "route-api" "http://127.0.0.1:5402/health" || failures=$((failures + 1))
+  aoa_probe_http "route-api memo" "http://127.0.0.1:5402/memo/registry" || failures=$((failures + 1))
 fi
 
 if has_module "50-speech.yml"; then

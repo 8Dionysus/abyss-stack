@@ -38,9 +38,9 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `43-federation-router.yml`
 
-- `route-api` — localhost-only federation seam reader for mirrored `aoa-agents` contracts and `aoa-routing advisory routing surfaces`
+- `route-api` — localhost-only federation seam reader for mirrored `aoa-agents` contracts, `aoa-routing advisory routing surfaces`, and `aoa-memo` recall surfaces
 - consumes only runtime-local public-safe mirror data
-- exposes thin routing metadata and structured advisory routing without changing `langchain-api`
+- exposes thin routing metadata, structured advisory routing, bounded memo inspection, and filesystem-first memo export discovery without changing `langchain-api`
 
 ## `50-speech.yml`
 
