@@ -1,0 +1,21 @@
+layer: aoa-agents
+mirror_root: /app/federation/aoa-agents
+thin_routing_only: true
+allow_free_text_task_routing: false
+required_files:
+  - docs/AGENT_RUNTIME_SEAM.md
+  - generated/agent_registry.min.json
+  - generated/model_tier_registry.json
+  - generated/runtime_seam_bindings.json
+  - generated/cohort_composition_registry.json
+  - schemas/agent-registry.schema.json
+  - schemas/model-tier-registry.schema.json
+  - schemas/runtime-seam-bindings.schema.json
+  - schemas/cohort-composition-registry.schema.json
+  - schemas/artifact.bounded_plan.schema.json
+  - schemas/artifact.deep_synthesis_note.schema.json
+  - schemas/artifact.distillation_pack.schema.json
+  - schemas/artifact.route_decision.schema.json
+  - schemas/artifact.transition_decision.schema.json
+  - schemas/artifact.verification_result.schema.json
+  - schemas/artifact.work_result.schema.json

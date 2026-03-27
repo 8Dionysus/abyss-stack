@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPT_DIR}/aoa-lib.sh"
+
+command -v rsync >/dev/null 2>&1 || aoa_die "rsync is required"
+
+layer=""
+while (($#)); do
+  case "$1" in
+    --layer)
+      shift || true
+      (($#)) || aoa_die "missing value after --layer"
+      layer="$1"
+      ;;
+    --layer=*)
+      layer="${1#*=}"
+      ;;
+    *)
+      aoa_die "unknown argument: $1"
+      ;;
+  esac
+  shift || true
+done
+
+[[ -n "$layer" ]] || aoa_die "expected --layer"
+[[ "$layer" == "aoa-agents" ]] || aoa_die "unsupported layer: ${layer}"
+
+source_root="${AOA_AGENTS_ROOT}"
+[[ -d "$source_root" ]] || aoa_die "aoa-agents root not found: ${source_root}"
+
+target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
+tmp_root="$(mktemp -d)"
+trap 'rm -rf "${tmp_root}"' EXIT
+
+required_paths=(
+  "docs/AGENT_RUNTIME_SEAM.md"
+  "generated/agent_registry.min.json"
+  "generated/model_tier_registry.json"
+  "generated/runtime_seam_bindings.json"
+  "generated/cohort_composition_registry.json"
+  "schemas/agent-registry.schema.json"
+  "schemas/model-tier-registry.schema.json"
+  "schemas/runtime-seam-bindings.schema.json"
+  "schemas/cohort-composition-registry.schema.json"
+)
+
+while IFS= read -r artifact_schema; do
+  required_paths+=("schemas/${artifact_schema}")
+done < <(find "${source_root}/schemas" -maxdepth 1 -type f -name 'artifact.*.schema.json' -printf '%f\n' | sort)
+
+artifact_schema_count=0
+for path in "${required_paths[@]}"; do
+  if [[ "$path" == schemas/artifact.*.schema.json ]]; then
+    artifact_schema_count=$((artifact_schema_count + 1))
+  fi
+done
+((artifact_schema_count > 0)) || aoa_die "no artifact schemas found under ${source_root}/schemas"
+
+aoa_note "layer: ${layer}"
+aoa_note "source root: ${source_root}"
+aoa_note "mirror target: ${target_root}"
+
+for rel_path in "${required_paths[@]}"; do
+  src_path="${source_root}/${rel_path}"
+  [[ -f "$src_path" ]] || aoa_die "required source file missing: ${src_path}"
+  mkdir -p "${tmp_root}/$(dirname -- "${rel_path}")"
+  cp -a "${src_path}" "${tmp_root}/${rel_path}"
+done
+
+mkdir -p "$(dirname -- "${target_root}")"
+rsync -a --delete "${tmp_root}/" "${target_root}/"
+
+aoa_note "federation surface sync complete"

@@ -102,6 +102,28 @@ scripts/aoa-wait --profile intel
 scripts/aoa-smoke --profile intel
 ```
 
+## `federation`
+
+### What it is for
+
+A localhost-only federation seam that reads mirrored `aoa-agents` contracts from the runtime tree.
+This profile is metadata-only and does not change `langchain-api`.
+
+### Host-facing endpoints
+
+- `route-api` -> `http://127.0.0.1:5402/health`
+
+### First checks
+
+```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-profile-endpoints --profile federation
+scripts/aoa-render-services --profile federation
+scripts/aoa-up --profile federation
+scripts/aoa-wait --profile federation
+scripts/aoa-smoke --profile federation
+```
+
 ## `tools`
 
 ### What it is for
@@ -206,6 +228,42 @@ Preset form:
 aoa-preset-profiles --preset agent-observability --paths
 aoa-up --preset agent-observability
 aoa-smoke --with-internal --preset agent-observability
+```
+
+### `agentic + federation`
+
+What it gives you:
+- the generic local agent path
+- a localhost-only federation seam for mirrored `aoa-agents` contracts
+- no change to the existing `/run` or `/embeddings` surfaces
+
+Try:
+
+```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-profile-modules --profile agentic --profile federation --paths
+scripts/aoa-profile-endpoints --profile agentic --profile federation
+scripts/aoa-render-services --profile agentic --profile federation
+scripts/aoa-up --profile agentic --profile federation
+scripts/aoa-smoke --profile agentic --profile federation
+```
+
+### `intel + federation`
+
+What it gives you:
+- the Intel-aware agent runtime with OVMS
+- the same localhost-only federation seam
+- no change to the existing Intel overlay contract
+
+Try:
+
+```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+scripts/aoa-profile-modules --profile intel --profile federation --paths
+scripts/aoa-profile-endpoints --profile intel --profile federation
+scripts/aoa-render-services --profile intel --profile federation
+scripts/aoa-up --profile intel --profile federation
+scripts/aoa-smoke --profile intel --profile federation
 ```
 
 ### `intel + tools + observability`

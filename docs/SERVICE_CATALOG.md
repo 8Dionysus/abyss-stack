@@ -36,6 +36,12 @@ This file maps the first migrated runtime modules to their intended services.
 - `langchain-api` overlay — switches embeddings path to OVMS
 - adds explicit OVMS runtime dependency for Intel-aware profiles
 
+## `43-federation-router.yml`
+
+- `route-api` — localhost-only federation seam reader for mirrored `aoa-agents` surfaces
+- consumes only runtime-local public-safe mirror data
+- exposes thin routing metadata without changing `langchain-api`
+
 ## `50-speech.yml`
 
 - `qwen-tts` — local speech generation
@@ -67,6 +73,7 @@ Expected localhost-only services include:
 - ovms
 - litellm
 - langchain-api
+- route-api
 - qwen-tts
 - tts-router
 - prometheus

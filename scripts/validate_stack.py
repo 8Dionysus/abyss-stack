@@ -22,6 +22,7 @@ REQUIRED_SCRIPTS = {
     "aoa-host-facts",
     "aoa-install-layout",
     "aoa-sync-configs",
+    "aoa-sync-federation-surfaces",
     "aoa-bootstrap-configs",
     "aoa-check-layout",
     "aoa-install-systemd",
@@ -73,13 +74,19 @@ REQUIRED_FILES = {
     ROOT / "compose" / "presets" / "intel-tools.txt",
     ROOT / "compose" / "presets" / "intel-observability.txt",
     ROOT / "compose" / "presets" / "intel-full.txt",
+    ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "ollama.cpu.yml",
+    ROOT / "compose" / "modules" / "43-federation-router.yml",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
+    ROOT / "config-templates" / "Services" / "route-api" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "route-api" / "requirements.txt",
+    ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
@@ -315,6 +322,44 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
         errors.append("runtime-return-event.schema.json must pin surface_type.const to runtime_return_event")
 
 
+def validate_federation_landing(errors: list[str]) -> None:
+    templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
+    if "Configs/federation/" not in templates_readme:
+        errors.append("config-templates/README.md must mention Configs/federation/")
+    if "Services/route-api/" not in templates_readme:
+        errors.append("config-templates/README.md must mention Services/route-api/")
+
+    services_readme = (ROOT / "config-templates" / "Services" / "README.md").read_text(encoding="utf-8")
+    if "route-api/" not in services_readme:
+        errors.append("config-templates/Services/README.md must mention route-api/")
+
+    storage_layout_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    if "Knowledge/federation" not in storage_layout_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation")
+
+    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    if "aoa-sync-federation-surfaces --layer aoa-agents" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-agents")
+
+    paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
+    if "AOA_AGENTS_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_AGENTS_ROOT")
+
+    service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    if "43-federation-router.yml" not in service_catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention 43-federation-router.yml")
+    if "route-api" not in service_catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention route-api")
+
+    profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
+    if "`federation`" not in profiles_doc:
+        errors.append("docs/PROFILES.md must mention the federation profile")
+
+    profile_recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
+    if "route-api" not in profile_recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention route-api")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -325,6 +370,7 @@ def main() -> int:
     validate_required_files(errors)
     validate_reference_platform(errors)
     validate_return_runtime_contract(errors)
+    validate_federation_landing(errors)
 
     if errors:
         print("validation failed:")

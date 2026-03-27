@@ -1,0 +1,18 @@
+services:
+  route-api:
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/route-api"
+    container_name: route-api
+    environment:
+      ROUTE_API_CONFIG_PATH: /app/config/aoa-agents.yaml
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Knowledge/federation/aoa-agents:/app/federation/aoa-agents:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/federation/aoa-agents.yaml:/app/config/aoa-agents.yaml:ro,Z"
+    ports:
+      - "127.0.0.1:5402:5402"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5402/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped

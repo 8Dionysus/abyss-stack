@@ -111,6 +111,21 @@ if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   check_warn_file "agent API return policy" "${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml"
 fi
 
+if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
+  aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents federation mirror"
+  check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
+  check_warn_file "aoa-agents federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-agents.yaml"
+  check_warn_file "aoa-agents runtime seam doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/docs/AGENT_RUNTIME_SEAM.md"
+  check_warn_file "aoa-agents agent registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/agent_registry.min.json"
+  check_warn_file "aoa-agents tier registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/model_tier_registry.json"
+  check_warn_file "aoa-agents seam bindings" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/runtime_seam_bindings.json"
+  check_warn_file "aoa-agents cohort registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/cohort_composition_registry.json"
+  check_warn_file "aoa-agents agent registry schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/agent-registry.schema.json"
+  check_warn_file "aoa-agents model tier schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/model-tier-registry.schema.json"
+  check_warn_file "aoa-agents seam bindings schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/runtime-seam-bindings.schema.json"
+  check_warn_file "aoa-agents cohort schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/schemas/cohort-composition-registry.schema.json"
+fi
+
 if ((errors > 0)); then
   aoa_die "layout check failed with ${errors} hard errors"
 fi

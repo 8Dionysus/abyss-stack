@@ -19,6 +19,7 @@ scripts/aoa-bootstrap-configs
 ## Current template families
 
 - `Configs/agent-api/`
+- `Configs/federation/`
 - `Configs/monitoring/`
 - `Configs/tts/`
 - `Configs/ollama/`
@@ -26,6 +27,7 @@ scripts/aoa-bootstrap-configs
 - `Services/langchain-api/`
 - `Services/litellm/`
 - `Services/qwen3-tts-api/`
+- `Services/route-api/`
 - `Services/tts_router/`
 
 These `Services/*` entries are source-managed build contexts for lightweight

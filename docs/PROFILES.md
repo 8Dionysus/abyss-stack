@@ -35,6 +35,13 @@ The agentic surface plus Intel-oriented inference and an OVMS overlay for the ag
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
 
+### `federation`
+
+An opt-in metadata-only federation seam:
+- `43-federation-router.yml`
+
+This profile is intended to layer over `agentic` or `intel`, but it may also be run by itself for seam debugging.
+
 ### `tools`
 
 Optional helper surfaces:
@@ -118,6 +125,14 @@ Bring up the Intel-aware agent runtime:
 aoa-profile-modules --profile intel --paths
 aoa-profile-endpoints --profile intel
 aoa-up --profile intel
+```
+
+Bring up an agent runtime plus the optional federation seam:
+
+```bash
+aoa-profile-modules --profile agentic --profile federation --paths
+aoa-profile-endpoints --profile agentic --profile federation
+aoa-up --profile agentic --profile federation
 ```
 
 Bring up an agent runtime plus tools and observability:

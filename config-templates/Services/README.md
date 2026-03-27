@@ -17,6 +17,7 @@ Current source-managed service trees:
 - `langchain-api/`
 - `litellm/`
 - `qwen3-tts-api/`
+- `route-api/`
 - `tts_router/`
 
 Intentionally still runtime-only:

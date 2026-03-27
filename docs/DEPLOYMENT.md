@@ -29,6 +29,12 @@ scripts/aoa-first-run --strict
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 
+If you want the optional `federation` profile, sync the public-safe `aoa-agents` surface pack after bootstrap:
+
+```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+```
+
 ## Scenario A: Fedora-native source checkout
 
 Example:
@@ -44,6 +50,7 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
+scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional federation mirror
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -102,6 +109,18 @@ The agent-facing runtime may also consume a public-safe return policy file at `$
 Checks the runtime tree and reports missing directories, missing template-derived config files, and missing secret-bearing files.
 Use `--ignore-secrets` for the first bootstrap pass before secrets exist.
 Use `--strict` if warnings should fail the command.
+When the `federation` profile is selected, it also checks the mirrored `aoa-agents` contract pack under `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`.
+
+### `scripts/aoa-sync-federation-surfaces`
+
+Copies a small allowlisted subset of public-safe sibling-repo surfaces into the deployed runtime tree.
+The current landing slice supports:
+
+- `--layer aoa-agents`
+
+The mirror target for this layer is:
+
+- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents`
 
 ### `scripts/aoa-install-systemd`
 
@@ -151,6 +170,7 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
+scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
@@ -188,6 +208,15 @@ Bring up an agent runtime plus tools and observability without a preset:
 aoa-profile-modules --profile agentic --profile tools --profile observability --paths
 aoa-profile-endpoints --profile agentic --profile tools --profile observability
 aoa-up --profile agentic --profile tools --profile observability
+```
+
+Bring up an agent runtime plus the optional federation seam:
+
+```bash
+scripts/aoa-sync-federation-surfaces --layer aoa-agents
+aoa-profile-modules --profile agentic --profile federation --paths
+aoa-profile-endpoints --profile agentic --profile federation
+aoa-up --profile agentic --profile federation
 ```
 
 ## systemd user install
