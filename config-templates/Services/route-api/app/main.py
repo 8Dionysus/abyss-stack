@@ -17,6 +17,7 @@ REQUIRED_CONFIGS = {
     "aoa-agents": "aoa-agents.yaml",
     "aoa-routing": "aoa-routing.yaml",
     "aoa-memo": "aoa-memo.yaml",
+    "aoa-evals": "aoa-evals.yaml",
 }
 
 
@@ -35,6 +36,7 @@ class AppStore:
     agents: LayerStore
     routing: LayerStore
     memo: LayerStore
+    evals: LayerStore
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -178,6 +180,46 @@ def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path
     )
 
 
+def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+    required_files = validated_required_files(config, mirror_root)
+    payloads = {
+        "catalog": load_json(mirror_root / "generated/eval_catalog.min.json"),
+        "capsules": load_json(mirror_root / "generated/eval_capsules.json"),
+        "sections": load_json(mirror_root / "generated/eval_sections.full.json"),
+        "comparison_spine": load_json(mirror_root / "generated/comparison_spine.json"),
+        "runtime_evidence_templates": {
+            "workhorse-local": load_json(mirror_root / "examples/runtime_evidence_selection.workhorse-local.example.json"),
+            "return-anchor-integrity": load_json(
+                mirror_root / "examples/runtime_evidence_selection.return-anchor-integrity.example.json"
+            ),
+        },
+        "hook_templates": {
+            "self-agent-checkpoint-rollout": load_json(
+                mirror_root / "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
+            ),
+            "long-horizon-model-tier-orchestra": load_json(
+                mirror_root / "examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
+            ),
+            "restartable-inquiry-loop": load_json(
+                mirror_root / "examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
+            ),
+        },
+    }
+
+    return LayerStore(
+        layer="aoa-evals",
+        config_path=config_path,
+        mirror_root=mirror_root,
+        required_files=required_files,
+        flags={
+            "read_only": bool(config.get("read_only", False)),
+            "export_only_evidence": bool(config.get("export_only_evidence", False)),
+            "allow_free_text_eval_selection": bool(config.get("allow_free_text_eval_selection", False)),
+        },
+        payloads=payloads,
+    )
+
+
 def load_layer(config_path: Path) -> LayerStore:
     config = load_yaml(config_path)
     layer = config.get("layer")
@@ -195,6 +237,8 @@ def load_layer(config_path: Path) -> LayerStore:
         return load_routing_layer(config_path, config, mirror_root)
     if layer == "aoa-memo":
         return load_memo_layer(config_path, config, mirror_root)
+    if layer == "aoa-evals":
+        return load_evals_layer(config_path, config, mirror_root)
     raise RuntimeError(f"unsupported layer in route-api config: {layer!r}")
 
 
@@ -210,6 +254,7 @@ def load_store(config_dir: Path) -> AppStore:
         agents=loaded_layers["aoa-agents"],
         routing=loaded_layers["aoa-routing"],
         memo=loaded_layers["aoa-memo"],
+        evals=loaded_layers["aoa-evals"],
     )
 
 
@@ -256,7 +301,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "return_hints": {"version": layer.payloads["return_hints"].get("version")},
                 "tiny_model_entrypoints": {"version": layer.payloads["tiny_model_entrypoints"].get("version")},
             }
-        else:
+        elif layer.layer == "aoa-memo":
             metadata = {
                 "registry": {"version": layer.payloads["registry"].get("version")},
                 "catalog": {"version": layer.payloads["catalog"].get("catalog_version")},
@@ -269,6 +314,15 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "object_return_ready": bool(
                     layer.payloads["recall_contracts"]["object"]["working_return"].get("return_ready")
                 ),
+            }
+        else:
+            metadata = {
+                "catalog": {"version": layer.payloads["catalog"].get("catalog_version")},
+                "capsules": {"version": layer.payloads["capsules"].get("capsule_version")},
+                "sections": {"version": layer.payloads["sections"].get("section_version")},
+                "comparison_spine": {"version": layer.payloads["comparison_spine"].get("comparison_spine_version")},
+                "runtime_evidence_templates": sorted(layer.payloads["runtime_evidence_templates"].keys()),
+                "hook_templates": sorted(layer.payloads["hook_templates"].keys()),
             }
 
     return {
@@ -389,6 +443,10 @@ def routing_payload(store: AppStore, key: str) -> dict[str, Any]:
 
 def memo_payload(store: AppStore, key: str) -> dict[str, Any]:
     return store.memo.payloads[key]
+
+
+def evals_payload(store: AppStore, key: str) -> dict[str, Any]:
+    return store.evals.payloads[key]
 
 
 def require_task_family_hint(store: AppStore, task_family: str) -> dict[str, Any]:
@@ -696,6 +754,117 @@ def resolve_writeback_map(store: AppStore, runtime_surface: str) -> dict[str, An
     raise HTTPException(status_code=404, detail=f"no aoa-memo writeback mapping found for runtime_surface={runtime_surface}")
 
 
+def require_eval_catalog_entry(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in evals_payload(store, "catalog")["evals"]:
+        if entry["name"] == name:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-evals catalog entry found for name={name}")
+
+
+def require_eval_capsule_entry(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in evals_payload(store, "capsules")["evals"]:
+        if entry["name"] == name:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-evals capsule entry found for name={name}")
+
+
+def require_eval_sections_entry(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in evals_payload(store, "sections")["evals"]:
+        if entry["name"] == name:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-evals section entry found for name={name}")
+
+
+def require_eval_section(entry: dict[str, Any], name: str, section_key: str) -> dict[str, Any]:
+    for section in entry.get("sections", []):
+        if section["key"] == section_key:
+            return section
+    raise HTTPException(status_code=404, detail=f"no aoa-evals section found for name={name}, section_key={section_key}")
+
+
+def resolve_eval_selection(
+    store: AppStore,
+    *,
+    category: str | None,
+    status: str | None,
+    claim_type: str | None,
+    baseline_mode: str | None,
+    export_ready: bool | None,
+) -> dict[str, Any]:
+    matches: list[dict[str, Any]] = []
+    for entry in evals_payload(store, "catalog")["evals"]:
+        if category is not None and entry.get("category") != category:
+            continue
+        if status is not None and entry.get("status") != status:
+            continue
+        if claim_type is not None and entry.get("claim_type") != claim_type:
+            continue
+        if baseline_mode is not None and entry.get("baseline_mode") != baseline_mode:
+            continue
+        if export_ready is not None and bool(entry.get("export_ready")) != export_ready:
+            continue
+        matches.append(entry)
+
+    if not matches:
+        raise HTTPException(status_code=404, detail="no aoa-evals entries matched the requested filters")
+
+    return {
+        "ok": True,
+        "filters": {
+            "category": category,
+            "status": status,
+            "claim_type": claim_type,
+            "baseline_mode": baseline_mode,
+            "export_ready": export_ready,
+        },
+        "evals": matches,
+        "source_files": ["aoa-evals/generated/eval_catalog.min.json"],
+    }
+
+
+def resolve_eval_comparison(store: AppStore, baseline_mode: str | None) -> dict[str, Any]:
+    entries = evals_payload(store, "comparison_spine")["evals"]
+    if baseline_mode is not None:
+        entries = [entry for entry in entries if entry.get("baseline_mode") == baseline_mode]
+    if not entries:
+        raise HTTPException(status_code=404, detail="no aoa-evals comparison entries matched the requested filters")
+    return {
+        "ok": True,
+        "baseline_mode": baseline_mode,
+        "entries": entries,
+        "source_files": ["aoa-evals/generated/comparison_spine.json"],
+    }
+
+
+def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> dict[str, Any]:
+    template = evals_payload(store, "runtime_evidence_templates")[template_name]
+    rel_path = {
+        "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
+        "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+    }[template_name]
+    return {
+        "ok": True,
+        "name": template_name,
+        "template": template,
+        "source_files": [f"aoa-evals/{rel_path}"],
+    }
+
+
+def resolve_hook_template(store: AppStore, template_name: str) -> dict[str, Any]:
+    template = evals_payload(store, "hook_templates")[template_name]
+    rel_path = {
+        "self-agent-checkpoint-rollout": "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
+        "long-horizon-model-tier-orchestra": "examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json",
+        "restartable-inquiry-loop": "examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json",
+    }[template_name]
+    return {
+        "ok": True,
+        "name": template_name,
+        "template": template,
+        "source_files": [f"aoa-evals/{rel_path}"],
+    }
+
+
 app = FastAPI(title="AoA federation route API")
 STORE: AppStore | None = None
 
@@ -805,22 +974,58 @@ class MemoWritebackMapRequest(BaseModel):
     ]
 
 
+class EvalInspectRequest(BaseModel):
+    name: str
+
+
+class EvalExpandRequest(BaseModel):
+    name: str
+    section_key: str | None = None
+
+
+class EvalSelectRequest(BaseModel):
+    category: str | None = None
+    status: str | None = None
+    claim_type: str | None = None
+    baseline_mode: str | None = None
+    export_ready: bool | None = None
+
+
+class EvalComparisonRequest(BaseModel):
+    baseline_mode: str | None = None
+
+
+class RuntimeEvidenceTemplateRequest(BaseModel):
+    name: Literal["workhorse-local", "return-anchor-integrity"]
+
+
+class HookTemplateRequest(BaseModel):
+    name: Literal[
+        "self-agent-checkpoint-rollout",
+        "long-horizon-model-tier-orchestra",
+        "restartable-inquiry-loop",
+    ]
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer, store.memo.layer],
+        "layers": [store.agents.layer, store.routing.layer, store.memo.layer, store.evals.layer],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
             store.memo.layer: True,
+            store.evals.layer: True,
         },
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
         "memo_read_only": store.memo.flags["read_only"],
         "memo_export_only_writeback": store.memo.flags["export_only_writeback"],
+        "evals_read_only": store.evals.flags["read_only"],
+        "evals_export_only_evidence": store.evals.flags["export_only_evidence"],
     }
 
 
@@ -829,17 +1034,19 @@ def surface_status() -> dict[str, Any]:
     store = require_store()
     return {
         "ok": True,
-        "layers": [store.agents.layer, store.routing.layer, store.memo.layer],
+        "layers": [store.agents.layer, store.routing.layer, store.memo.layer, store.evals.layer],
         "mirror_ready": True,
         "layer_readiness": {
             store.agents.layer: True,
             store.routing.layer: True,
             store.memo.layer: True,
+            store.evals.layer: True,
         },
         "layers_status": {
             store.agents.layer: layer_status(store.agents),
             store.routing.layer: layer_status(store.routing),
             store.memo.layer: layer_status(store.memo),
+            store.evals.layer: layer_status(store.evals),
         },
     }
 
@@ -1063,3 +1270,83 @@ def memo_recall_contract(request: MemoRecallContractRequest) -> dict[str, Any]:
 def memo_writeback_map(request: MemoWritebackMapRequest) -> dict[str, Any]:
     store = require_store()
     return resolve_writeback_map(store, request.runtime_surface)
+
+
+@app.get("/evals/catalog")
+def evals_catalog() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": evals_payload(store, "catalog")}
+
+
+@app.get("/evals/capsules")
+def evals_capsules() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": evals_payload(store, "capsules")}
+
+
+@app.get("/evals/comparison-spine")
+def evals_comparison_spine() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": evals_payload(store, "comparison_spine")}
+
+
+@app.post("/evals/inspect")
+def evals_inspect(request: EvalInspectRequest) -> dict[str, Any]:
+    store = require_store()
+    return {
+        "ok": True,
+        "name": request.name,
+        "catalog_entry": require_eval_catalog_entry(store, request.name),
+        "capsule": require_eval_capsule_entry(store, request.name),
+        "source_files": [
+            "aoa-evals/generated/eval_catalog.min.json",
+            "aoa-evals/generated/eval_capsules.json",
+        ],
+    }
+
+
+@app.post("/evals/expand")
+def evals_expand(request: EvalExpandRequest) -> dict[str, Any]:
+    store = require_store()
+    entry = require_eval_sections_entry(store, request.name)
+    response: dict[str, Any] = {
+        "ok": True,
+        "name": request.name,
+        "entry": entry,
+        "source_files": ["aoa-evals/generated/eval_sections.full.json"],
+    }
+    if request.section_key is not None:
+        response["section_key"] = request.section_key
+        response["section"] = require_eval_section(entry, request.name, request.section_key)
+    return response
+
+
+@app.post("/evals/select")
+def evals_select(request: EvalSelectRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_eval_selection(
+        store,
+        category=request.category,
+        status=request.status,
+        claim_type=request.claim_type,
+        baseline_mode=request.baseline_mode,
+        export_ready=request.export_ready,
+    )
+
+
+@app.post("/evals/comparison")
+def evals_comparison(request: EvalComparisonRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_eval_comparison(store, request.baseline_mode)
+
+
+@app.post("/evals/runtime-evidence-template")
+def evals_runtime_evidence_template(request: RuntimeEvidenceTemplateRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_runtime_evidence_template(store, request.name)
+
+
+@app.post("/evals/hook-template")
+def evals_hook_template(request: HookTemplateRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_hook_template(store, request.name)

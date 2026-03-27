@@ -1,0 +1,22 @@
+layer: aoa-evals
+mirror_root: /app/federation/aoa-evals
+read_only: true
+export_only_evidence: true
+allow_free_text_eval_selection: false
+required_files:
+  - docs/README.md
+  - docs/TRACE_EVAL_BRIDGE.md
+  - docs/RUNTIME_BENCH_PROMOTION_GUIDE.md
+  - docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md
+  - docs/RECURRENCE_PROOF_PROGRAM.md
+  - generated/eval_catalog.min.json
+  - generated/eval_capsules.json
+  - generated/eval_sections.full.json
+  - generated/comparison_spine.json
+  - examples/runtime_evidence_selection.workhorse-local.example.json
+  - examples/runtime_evidence_selection.return-anchor-integrity.example.json
+  - examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json
+  - examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json
+  - examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json
+  - schemas/runtime-evidence-selection.schema.json
+  - schemas/artifact-to-verdict-hook.schema.json

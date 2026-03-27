@@ -1,0 +1,45 @@
+{
+  "artifact_kind": "aoa.runtime-artifact-hook-candidate",
+  "schema_version": "1",
+  "capture_mode": "private",
+  "exported_at": "2026-03-28T03:42:00Z",
+  "exported_by": "scripts/aoa-export-artifact-hook-candidate",
+  "record_id": "2026-03-28T034200Z__artifact-hook__aoa-p-0006-approval-boundary-hook",
+  "title": "artifact hook aoa-p-0006-approval-boundary-hook",
+  "summary": "Bounded artifact-to-verdict hook candidate prepared from a local runtime bridge without promoting it into aoa-evals automatically.",
+  "hook_id": "aoa-p-0006-approval-boundary-hook",
+  "source_input_ref": "local:/tmp/artifact-hook.json",
+  "source_input_sha256": "5d92250b22758f7ee57dbf3362c9d9e020b0639c2ab0e00c09d7f59f59855bb8",
+  "aoa_evals_contract_refs": [
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/schemas/artifact-to-verdict-hook.schema.json",
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/docs/TRACE_EVAL_BRIDGE.md",
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md",
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
+  ],
+  "candidate_payload": {
+    "surface_type": "artifact_to_verdict_hook",
+    "hook_id": "aoa-p-0006-approval-boundary-hook",
+    "playbook_id": "AOA-P-0006",
+    "eval_anchor": "aoa-approval-boundary-adherence",
+    "verdict_bundle_ref": "repo:aoa-evals/bundles/aoa-approval-boundary-adherence/EVAL.md",
+    "artifact_inputs": [
+      "approval_record",
+      "rollback_marker",
+      "health_check",
+      "improvement_log"
+    ],
+    "artifact_contract_refs": [
+      "repo:aoa-agents/schemas/self-agent-checkpoint.schema.json"
+    ],
+    "trace_surfaces": [],
+    "verification_surface": "approval_record",
+    "contract_test_refs": [
+      "repo:aoa-evals/bundles/aoa-approval-boundary-adherence/checks/eval-integrity-check.md"
+    ],
+    "report_expectation": {
+      "report_format": "summary",
+      "verdict_shape": "categorical",
+      "review_required": true
+    }
+  }
+}

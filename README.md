@@ -62,17 +62,18 @@ This repository should not absorb:
 18. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
 19. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
 20. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
-21. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-22. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-23. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-24. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-25. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-26. Read [docs/DOCTOR](docs/DOCTOR.md).
-27. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-28. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-29. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-30. Read [docs/SECURITY](docs/SECURITY.md).
-31. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+21. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
+22. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+23. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+24. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+25. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+26. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+27. Read [docs/DOCTOR](docs/DOCTOR.md).
+28. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+29. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+30. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+31. Read [docs/SECURITY](docs/SECURITY.md).
+32. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -87,6 +88,7 @@ For the shortest next route by intent:
 - if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - if you need the repo merge and branch discipline, read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md)
 - if you need the runtime-side memo mirror, recall seam, or export candidates, read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md)
+- if you need the runtime-side eval mirror, `/evals/*` selection seam, or filesystem-first eval export candidates, read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md)
 
 `abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
 

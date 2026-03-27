@@ -15,8 +15,9 @@ When something feels wrong, use this order:
 9. check health endpoints
 10. check logs
 11. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
-12. decide whether to fix forward or roll back
-13. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+12. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
+13. decide whether to fix forward or roll back
+14. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -27,6 +28,8 @@ aoa-check-layout
 aoa-host-facts --mode public
 aoa-platform-adaptation --mode private --title "Short seam title" --summary "One bounded summary" --issue-class performance
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
+aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
+aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -68,6 +71,18 @@ For a bounded runtime memo export candidate:
 aoa-export-memo-candidate \
   --runtime-surface checkpoint_export \
   --input-file /tmp/checkpoint-export.json \
+  --write
+```
+
+For bounded runtime eval export candidates:
+
+```bash
+aoa-export-runtime-evidence-selection \
+  --input-file /tmp/runtime-evidence-selection.json \
+  --write
+
+aoa-export-artifact-hook-candidate \
+  --input-file /tmp/artifact-hook.json \
   --write
 ```
 

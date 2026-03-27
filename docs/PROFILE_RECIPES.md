@@ -108,8 +108,8 @@ scripts/aoa-smoke --profile intel
 
 ### What it is for
 
-A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, and mirrored `aoa-memo` recall surfaces from the runtime tree.
-This profile is metadata-only for reads and does not change `langchain-api`, but it also enables filesystem-first memo export candidates.
+A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, mirrored `aoa-memo` recall surfaces, and mirrored `aoa-evals` eval-selection surfaces from the runtime tree.
+This profile is metadata-only for reads and does not change `langchain-api`, but it also enables filesystem-first memo export candidates and filesystem-first eval export candidates.
 
 ### Host-facing endpoints
 
@@ -121,6 +121,7 @@ This profile is metadata-only for reads and does not change `langchain-api`, but
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
+scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-profile-endpoints --profile federation
 scripts/aoa-render-services --profile federation
 scripts/aoa-up --profile federation
@@ -238,8 +239,9 @@ aoa-smoke --with-internal --preset agent-observability
 
 What it gives you:
 - the generic local agent path
-- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, and `aoa-memo` recall surfaces
+- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, `aoa-memo` recall surfaces, and `aoa-evals` eval-selection surfaces
 - filesystem-first memo export candidates under `Logs/memo-exports/`
+- filesystem-first eval export candidates under `Logs/eval-exports/`
 - no change to the existing `/run` or `/embeddings` surfaces
 
 Try:
@@ -248,6 +250,7 @@ Try:
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
+scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-profile-modules --profile agentic --profile federation --paths
 scripts/aoa-profile-endpoints --profile agentic --profile federation
 scripts/aoa-render-services --profile agentic --profile federation
@@ -259,8 +262,9 @@ scripts/aoa-smoke --profile agentic --profile federation
 
 What it gives you:
 - the Intel-aware agent runtime with OVMS
-- the same localhost-only federation seam, `aoa-routing` advisory layer, and `aoa-memo` recall layer
+- the same localhost-only federation seam, `aoa-routing` advisory layer, `aoa-memo` recall layer, and `aoa-evals` eval-selection layer
 - the same filesystem-first memo export candidates
+- filesystem-first eval export candidates under `Logs/eval-exports/`
 - no change to the existing Intel overlay contract
 
 Try:
@@ -269,6 +273,7 @@ Try:
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
+scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-profile-modules --profile intel --profile federation --paths
 scripts/aoa-profile-endpoints --profile intel --profile federation
 scripts/aoa-render-services --profile intel --profile federation

@@ -106,6 +106,28 @@ sync_layer() {
         "schemas/core-memory-contract.schema.json"
       )
       ;;
+    aoa-evals)
+      source_root="${AOA_EVALS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
+      required_paths=(
+        "docs/README.md"
+        "docs/TRACE_EVAL_BRIDGE.md"
+        "docs/RUNTIME_BENCH_PROMOTION_GUIDE.md"
+        "docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md"
+        "docs/RECURRENCE_PROOF_PROGRAM.md"
+        "generated/eval_catalog.min.json"
+        "generated/eval_capsules.json"
+        "generated/eval_sections.full.json"
+        "generated/comparison_spine.json"
+        "examples/runtime_evidence_selection.workhorse-local.example.json"
+        "examples/runtime_evidence_selection.return-anchor-integrity.example.json"
+        "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
+        "examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
+        "examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
+        "schemas/runtime-evidence-selection.schema.json"
+        "schemas/artifact-to-verdict-hook.schema.json"
+      )
+      ;;
     *)
       aoa_die "unsupported layer: ${layer}"
       ;;

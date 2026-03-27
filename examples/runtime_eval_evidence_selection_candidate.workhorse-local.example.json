@@ -1,0 +1,52 @@
+{
+  "artifact_kind": "aoa.runtime-eval-evidence-selection-candidate",
+  "schema_version": "1",
+  "capture_mode": "private",
+  "exported_at": "2026-03-28T03:40:00Z",
+  "exported_by": "scripts/aoa-export-runtime-evidence-selection",
+  "record_id": "2026-03-28T034000Z__runtime-evidence-selection__workhorse-q4-vs-q6-latency-tradeoff",
+  "title": "runtime evidence selection workhorse-q4-vs-q6-latency-tradeoff",
+  "summary": "Bounded runtime evidence selection candidate prepared from local benchmark manifests without promoting it into aoa-evals automatically.",
+  "selection_id": "workhorse-q4-vs-q6-latency-tradeoff",
+  "source_input_ref": "local:/tmp/runtime-evidence-selection.json",
+  "source_input_sha256": "4f23f6a4ecde414743d96ce8d9ac8f5e7c7fe03d7a4d7d1d5b6a3fd6298024a1",
+  "aoa_evals_contract_refs": [
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/schemas/runtime-evidence-selection.schema.json",
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/docs/RUNTIME_BENCH_PROMOTION_GUIDE.md",
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.workhorse-local.example.json"
+  ],
+  "candidate_payload": {
+    "surface_type": "runtime_evidence_selection",
+    "selection_id": "workhorse-q4-vs-q6-latency-tradeoff",
+    "source_repo": "abyss-stack",
+    "source_schema_ref": "repo:abyss-stack/schemas/runtime-benchmark.schema.json",
+    "source_manifests": [
+      "repo:abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/benchmark.manifest.json",
+      "repo:abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T161000Z__latency-single-turn__workhorse-local-q6/benchmark.manifest.json"
+    ],
+    "bounded_claim": "Under matched host, preset, and fixture conditions, the q6 runtime variant keeps lower p95 first-token latency than the q4 variant while using more VRAM. This is a runtime tradeoff claim only.",
+    "promotion_target": "bundle-candidate",
+    "comparison_mode": "fixed-baseline",
+    "candidate_eval_refs": [
+      "candidate:fixed-baseline-runtime-latency-tradeoff"
+    ],
+    "selected_evidence": [
+      {
+        "artifact_ref": "repo:abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/summary.json",
+        "evidence_role": "summary",
+        "summary_only": true
+      }
+    ],
+    "environment_invariants": [
+      "same host hardware class"
+    ],
+    "do_not_overread": [
+      "does not rank reasoning quality"
+    ],
+    "review_posture": {
+      "portable_enough": false,
+      "comparison_hygiene_named": true,
+      "human_review_required": true
+    }
+  }
+}

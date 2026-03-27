@@ -41,8 +41,8 @@ An opt-in metadata-only federation seam:
 - `43-federation-router.yml`
 
 This profile is intended to layer over `agentic` or `intel`, but it may also be run by itself for seam debugging.
-It reads a mirrored `aoa-agents` contract seam, an `aoa-routing advisory seam`, and an `aoa-memo` recall seam through the single localhost-only `route-api`.
-It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/`.
+It reads a mirrored `aoa-agents` contract seam, an `aoa-routing advisory seam`, an `aoa-memo` recall seam, and an `aoa-evals` eval selection seam through the single localhost-only `route-api`.
+It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` and filesystem-first eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/`.
 
 ### `tools`
 
@@ -135,6 +135,7 @@ Bring up an agent runtime plus the optional federation seam:
 scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
+scripts/aoa-sync-federation-surfaces --layer aoa-evals
 aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation

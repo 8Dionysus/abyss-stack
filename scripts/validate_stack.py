@@ -22,6 +22,8 @@ REQUIRED_SCRIPTS = {
     "aoa-host-facts",
     "aoa-platform-adaptation",
     "aoa-export-memo-candidate",
+    "aoa-export-runtime-evidence-selection",
+    "aoa-export-artifact-hook-candidate",
     "aoa-install-layout",
     "aoa-sync-configs",
     "aoa-sync-federation-surfaces",
@@ -63,6 +65,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
+    ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -92,6 +95,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-memo.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "aoa-evals.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
@@ -100,10 +104,14 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
     ROOT / "schemas" / "runtime-memo-export-candidate.schema.json",
+    ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
+    ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
     ROOT / "examples" / "runtime_benchmark.workhorse-local.example.json",
     ROOT / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json",
+    ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
+    ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
 }
@@ -222,6 +230,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/BRANCH_POLICY.md")
     if "docs/MEMO_RUNTIME_SEAM.md" not in readme:
         errors.append("README.md must route readers to docs/MEMO_RUNTIME_SEAM.md")
+    if "docs/EVAL_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to docs/EVAL_RUNTIME_SEAM.md")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
@@ -234,38 +244,52 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/PATHS.md must mention AOA_ROUTING_ROOT")
     if "AOA_MEMO_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_MEMO_ROOT")
+    if "AOA_EVALS_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-routing federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-memo" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-memo federation sync")
+    if "scripts/aoa-sync-federation-surfaces --layer aoa-evals" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-evals federation sync")
 
     profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
     if "aoa-routing advisory seam" not in profiles_doc:
         errors.append("docs/PROFILES.md must describe the aoa-routing advisory seam")
     if "aoa-memo" not in profiles_doc:
         errors.append("docs/PROFILES.md must describe the aoa-memo recall seam")
+    if "aoa-evals" not in profiles_doc:
+        errors.append("docs/PROFILES.md must describe the aoa-evals eval selection seam")
 
     recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "aoa-routing" not in recipes_doc:
         errors.append("docs/PROFILE_RECIPES.md must mention aoa-routing")
     if "aoa-memo" not in recipes_doc:
         errors.append("docs/PROFILE_RECIPES.md must mention aoa-memo")
+    if "aoa-evals" not in recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention aoa-evals")
 
     catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "aoa-routing advisory routing surfaces" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-routing advisory routing surfaces")
     if "aoa-memo" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-memo")
+    if "aoa-evals" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention aoa-evals")
 
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
     if "Knowledge/federation/aoa-memo/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-memo/")
+    if "Knowledge/federation/aoa-evals/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-evals/")
     if "Logs/memo-exports/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
+    if "Logs/eval-exports/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
 
 
 def validate_scripts(errors: list[str]) -> None:
@@ -459,12 +483,16 @@ def validate_federation_landing(errors: list[str]) -> None:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-agents")
     if "aoa-sync-federation-surfaces --layer aoa-memo" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-memo")
+    if "aoa-sync-federation-surfaces --layer aoa-evals" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-evals")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "AOA_AGENTS_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_AGENTS_ROOT")
     if "AOA_MEMO_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_MEMO_ROOT")
+    if "AOA_EVALS_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
 
     service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "43-federation-router.yml" not in service_catalog_doc:
@@ -513,6 +541,63 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
         errors.append("runtime memo export example must use exported_by scripts/aoa-export-memo-candidate")
 
 
+def validate_eval_runtime_seam(errors: list[str]) -> None:
+    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    if "aoa-export-runtime-evidence-selection" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-export-runtime-evidence-selection")
+    if "aoa-export-artifact-hook-candidate" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-export-artifact-hook-candidate")
+
+    seam_doc = (ROOT / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    for snippet in (
+        "aoa-evals",
+        "/evals/",
+        "aoa-export-runtime-evidence-selection",
+        "aoa-export-artifact-hook-candidate",
+        "Logs/eval-exports/",
+    ):
+        if snippet not in seam_doc:
+            errors.append(f"docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
+
+    evidence_schema = json.loads(
+        (ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json").read_text(encoding="utf-8")
+    )
+    if evidence_schema.get("title") != "abyss-stack runtime eval evidence selection candidate":
+        errors.append(
+            "runtime-eval-evidence-selection-candidate.schema.json must describe abyss-stack runtime eval evidence selection candidate"
+        )
+
+    evidence_example = json.loads(
+        (ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if evidence_example.get("artifact_kind") != "aoa.runtime-eval-evidence-selection-candidate":
+        errors.append(
+            "runtime eval evidence selection example must use artifact_kind aoa.runtime-eval-evidence-selection-candidate"
+        )
+    if evidence_example.get("exported_by") != "scripts/aoa-export-runtime-evidence-selection":
+        errors.append(
+            "runtime eval evidence selection example must use exported_by scripts/aoa-export-runtime-evidence-selection"
+        )
+
+    hook_schema = json.loads(
+        (ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json").read_text(encoding="utf-8")
+    )
+    if hook_schema.get("title") != "abyss-stack runtime artifact hook candidate":
+        errors.append("runtime-artifact-hook-candidate.schema.json must describe abyss-stack runtime artifact hook candidate")
+
+    hook_example = json.loads(
+        (ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if hook_example.get("artifact_kind") != "aoa.runtime-artifact-hook-candidate":
+        errors.append("runtime artifact hook example must use artifact_kind aoa.runtime-artifact-hook-candidate")
+    if hook_example.get("exported_by") != "scripts/aoa-export-artifact-hook-candidate":
+        errors.append("runtime artifact hook example must use exported_by scripts/aoa-export-artifact-hook-candidate")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -525,6 +610,7 @@ def main() -> int:
     validate_platform_adaptations(errors)
     validate_branch_policy(errors)
     validate_memo_runtime_seam(errors)
+    validate_eval_runtime_seam(errors)
     validate_return_runtime_contract(errors)
     validate_federation_landing(errors)
 
