@@ -2,9 +2,12 @@
 
 The current stack mounts `${AOA_STACK_ROOT}/Configs/ollama` into the Ollama container as `/cfg`.
 
-This directory is reserved for optional local runtime material such as:
-- helper notes
-- future model alias material
-- future Modelfile or bootstrap helpers
+This directory carries optional local runtime helper material for Ollama-backed paths.
 
-At the current stage the stack does not require a concrete file here to boot.
+Current posture:
+- chat runs should use `qwen3.5:9b` directly on the Ollama side
+- Intel/OVMS owns the Qwen3 embedding line
+- Ollama fallback embeddings should use `nomic-embed-text` directly
+
+Keep these files local-runtime focused.
+Do not put secrets here.

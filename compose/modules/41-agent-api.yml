@@ -7,8 +7,8 @@ services:
     environment:
       LC_BASE_URL: http://litellm:4000/v1
       LC_API_KEY: EMPTY
-      LC_MODEL: aoa-tutor-deep
-      LC_TIMEOUT_S: 40
+      LC_MODEL: "qwen3.5:9b"
+      LC_TIMEOUT_S: 120
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"
@@ -17,7 +17,7 @@ services:
       OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
       OLLAMA_EMBEDDINGS_URL: http://ollama:11434/api/embed
       OLLAMA_EMBEDDINGS_FALLBACK_URL: http://ollama:11434/api/embeddings
-      OLLAMA_EMBEDDINGS_MODEL: aoa-qwen3-embed-06b
+      OLLAMA_EMBEDDINGS_MODEL: nomic-embed-text
     volumes:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns:/app/logs/returns:Z"

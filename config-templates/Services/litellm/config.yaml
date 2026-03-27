@@ -1,13 +1,15 @@
 model_list:
-  - model_name: aoa-tutor-deep
+  - model_name: "qwen3.5:9b"
     litellm_params:
-      model: ollama/qwen2.5:7b
+      model: "ollama_chat/qwen3.5:9b"
       api_base: http://ollama:11434
 
-  - model_name: aoa-embed-local
+  - model_name: "nomic-embed-text"
     litellm_params:
-      model: ollama/nomic-embed-text
+      model: "ollama/nomic-embed-text"
       api_base: http://ollama:11434
 
 litellm_settings:
   set_verbose: true
+  request_timeout: 120
+  stream_timeout: 120
