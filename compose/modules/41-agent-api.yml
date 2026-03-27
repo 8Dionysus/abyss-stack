@@ -8,7 +8,8 @@ services:
       LC_BASE_URL: http://litellm:4000/v1
       LC_API_KEY: EMPTY
       LC_MODEL: "qwen3.5:9b"
-      LC_TIMEOUT_S: 120
+      LC_TIMEOUT_S: 300
+      LC_OLLAMA_THINK: "false"
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"

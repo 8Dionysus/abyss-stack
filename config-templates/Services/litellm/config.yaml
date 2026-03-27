@@ -11,5 +11,5 @@ model_list:
 
 litellm_settings:
   set_verbose: true
-  request_timeout: 120
-  stream_timeout: 120
+  request_timeout: 300
+  stream_timeout: 300
