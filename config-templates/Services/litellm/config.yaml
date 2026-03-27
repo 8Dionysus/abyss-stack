@@ -10,6 +10,6 @@ model_list:
       api_base: http://ollama:11434
 
 litellm_settings:
-  set_verbose: true
+  drop_params: true
   request_timeout: 300
   stream_timeout: 300

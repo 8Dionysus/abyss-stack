@@ -91,8 +91,9 @@ An explicit `--delete` mode exists for a tighter mirror when that is desired.
 
 ### `scripts/aoa-bootstrap-configs`
 
-Copies public-safe config templates into the runtime tree if the destination files are missing.
+Copies public-safe config templates and source-managed helper-service build contexts into the runtime tree if the destination files are missing.
 Use `--force` only when you explicitly want template content to overwrite existing runtime config files.
+`--force` also refreshes existing runtime helper-service trees from `config-templates/Services/`.
 
 The agent-facing runtime may also consume a public-safe return policy file at `${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml`, bootstrapped from `config-templates/`.
 

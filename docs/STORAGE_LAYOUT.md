@@ -28,7 +28,7 @@ Expected live structure under `/srv/abyss-stack`:
 
 - `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, config templates, and runtime config files bootstrapped from those templates
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
-- `Services/` — persistent state for databases and runtime services, plus a few runtime service-local inputs such as the LiteLLM config file
+- `Services/` — persistent state for databases and runtime services, plus source-seeded build contexts and service-local inputs for lightweight helper services such as `langchain-api`, `litellm`, `docs-api`, `qwen3-tts-api`, and `tts_router`
 - `Models/` — local model weights and related serving artifacts
 - `Knowledge/` — local knowledge corpora and helper inputs
 - `Logs/` — logs and generated runtime artifacts, including local private host-facts captures under `Logs/host-facts/` and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
@@ -47,6 +47,15 @@ ls -la /abyss | head
 ```
 
 If `/abyss` is not mounted, heavy writes may spill onto the system disk.
+
+## Runtime-only seam
+
+Not every runtime subtree is source-managed yet.
+
+Current intentional seam:
+
+- `Services/aoa-browser/ms-playwright/` remains runtime-only browser payload
+- the `aoa-browser` service currently depends on a prebuilt local image rather than a source-managed build context in this repository
 
 ## Secret rule
 

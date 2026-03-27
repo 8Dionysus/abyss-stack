@@ -22,4 +22,16 @@ scripts/aoa-bootstrap-configs
 - `Configs/monitoring/`
 - `Configs/tts/`
 - `Configs/ollama/`
+- `Services/docs-api/`
+- `Services/langchain-api/`
 - `Services/litellm/`
+- `Services/qwen3-tts-api/`
+- `Services/tts_router/`
+
+These `Services/*` entries are source-managed build contexts for lightweight
+runtime helper services. They are bootstrapped into the deployed runtime tree by
+`scripts/aoa-bootstrap-configs`.
+
+`aoa-browser` is intentionally not templated here yet. In the current runtime
+it remains a runtime-only local image plus browser payload under
+`/srv/abyss-stack/Services/aoa-browser/`.

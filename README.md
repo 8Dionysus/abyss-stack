@@ -14,6 +14,7 @@ This repository is the right home for:
 - rootless Podman and systemd user orchestration
 - storage and mount contracts
 - service modules and deployment profiles
+- versioned build contexts for lightweight runtime helper services
 - runtime-facing return and bounded context-rebuild policy for agent-facing routes
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
@@ -134,6 +135,7 @@ The repository now includes:
 - preset files under `compose/presets/`
 - deployment helpers under `scripts/`
 - config-template bootstrap helpers under `scripts/`
+- source-managed helper-service build contexts under `config-templates/Services/`
 - first-run and profile-introspection helpers under `scripts/`
 - host-doctor and bootstrap-rehearsal support
 - profile endpoint recipes and endpoint introspection helpers
