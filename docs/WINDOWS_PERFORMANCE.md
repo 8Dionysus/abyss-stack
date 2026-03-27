@@ -72,6 +72,19 @@ Record at least:
 - overlays used
 - rough startup and first-response timings
 
+If a platform-specific quirk or tuning decision shows up, capture one bounded platform-adaptation record instead of leaving the result in chat memory only:
+
+```bash
+scripts/aoa-platform-adaptation \
+  --mode private \
+  --title "Windows or WSL seam title" \
+  --summary "One bounded summary" \
+  --issue-class performance \
+  --write "${AOA_STACK_ROOT}/Logs/platform-adaptations/latest/latest.private.json"
+```
+
+That artifact is intentionally small enough to export to another runtime root or to carry from Linux to Windows plus WSL on the same machine.
+
 The goal is not mythology.
 
 The goal is one clear map of where the bridge is smooth and where it still drags.

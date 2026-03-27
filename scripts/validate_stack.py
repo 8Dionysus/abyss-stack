@@ -20,6 +20,7 @@ LEGACY_ALLOWED = {
 REQUIRED_SCRIPTS = {
     "aoa-doctor",
     "aoa-host-facts",
+    "aoa-platform-adaptation",
     "aoa-install-layout",
     "aoa-sync-configs",
     "aoa-sync-federation-surfaces",
@@ -57,6 +58,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "PROFILE_RECIPES.md",
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
+    ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -67,6 +69,9 @@ REQUIRED_FILES = {
     ROOT / "docs" / "reference-platform" / "README.md",
     ROOT / "docs" / "reference-platform" / "schema.v1.json",
     ROOT / "docs" / "reference-platform" / "reference-host.public.json.example",
+    ROOT / "docs" / "platform-adaptations" / "README.md",
+    ROOT / "docs" / "platform-adaptations" / "schema.v1.json",
+    ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example",
     ROOT / "compose" / "presets" / "README.md",
     ROOT / "compose" / "presets" / "agent-tools.txt",
     ROOT / "compose" / "presets" / "agent-observability.txt",
@@ -203,6 +208,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM.md")
     if "docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM_SPEC.md")
+    if "docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
+        errors.append("README.md must route readers to docs/PLATFORM_ADAPTATION_POLICY.md")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
@@ -284,6 +291,50 @@ def validate_reference_platform(errors: list[str]) -> None:
         errors.append(
             "reference-host.public.json.example must use captured_by scripts/aoa-host-facts"
         )
+
+
+def validate_platform_adaptations(errors: list[str]) -> None:
+    boundaries_doc = (ROOT / "BOUNDARIES.md").read_text(encoding="utf-8")
+    if "platform-adaptation" not in boundaries_doc:
+        errors.append("BOUNDARIES.md must mention platform-adaptation records")
+
+    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    if "aoa-platform-adaptation" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-platform-adaptation")
+
+    windows_perf_doc = (ROOT / "docs" / "WINDOWS_PERFORMANCE.md").read_text(encoding="utf-8")
+    if "aoa-platform-adaptation" not in windows_perf_doc:
+        errors.append("docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
+
+    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    if "Logs/platform-adaptations/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/platform-adaptations/")
+
+    policy_doc = (ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md").read_text(encoding="utf-8")
+    if "aoa-host-facts" not in policy_doc:
+        errors.append("docs/PLATFORM_ADAPTATION_POLICY.md must mention aoa-host-facts")
+    if "runtime benchmarks" not in policy_doc and "runtime benchmark" not in policy_doc:
+        errors.append("docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
+
+    schema = json.loads(
+        (ROOT / "docs" / "platform-adaptations" / "schema.v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if schema.get("title") != "AoA Platform Adaptation Record":
+        errors.append("platform-adaptations/schema.v1.json must describe AoA Platform Adaptation Record")
+
+    example = json.loads(
+        (ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example").read_text(
+            encoding="utf-8"
+        )
+    )
+    if example.get("artifact_kind") != "aoa.platform-adaptation":
+        errors.append("platform-adaptation.public.json.example must use artifact_kind aoa.platform-adaptation")
+    if example.get("capture_mode") != "public":
+        errors.append("platform-adaptation.public.json.example must use capture_mode public")
+    if example.get("captured_by") != "scripts/aoa-platform-adaptation":
+        errors.append("platform-adaptation.public.json.example must use captured_by scripts/aoa-platform-adaptation")
 
 
 def validate_return_runtime_contract(errors: list[str]) -> None:
@@ -369,6 +420,7 @@ def main() -> int:
     validate_scripts(errors)
     validate_required_files(errors)
     validate_reference_platform(errors)
+    validate_platform_adaptations(errors)
     validate_return_runtime_contract(errors)
     validate_federation_landing(errors)
 

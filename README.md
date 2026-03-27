@@ -18,6 +18,7 @@ This repository is the right home for:
 - runtime-facing return and bounded context-rebuild policy for agent-facing routes
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
+- platform-adaptation policy and public-safe/private tuning record contracts
 - infra helper services that support AoA and ToS
 
 ## What this repository is not for
@@ -58,17 +59,18 @@ This repository should not absorb:
 15. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
 16. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
 17. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
-18. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-19. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-20. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-21. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-22. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-23. Read [docs/DOCTOR](docs/DOCTOR.md).
-24. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-25. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-26. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-27. Read [docs/SECURITY](docs/SECURITY.md).
-28. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+18. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
+19. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+20. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+21. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+22. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+23. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+24. Read [docs/DOCTOR](docs/DOCTOR.md).
+25. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+26. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+27. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+28. Read [docs/SECURITY](docs/SECURITY.md).
+29. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -79,6 +81,7 @@ For the shortest next route by intent:
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
+- if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 
 `abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
 
@@ -143,6 +146,7 @@ The repository now includes:
 - render-truth helpers for actual composed runtime output
 - runtime benchmark policy, schema, and example artifacts
 - reference-platform schema and host-facts capture support
+- platform-adaptation schema, example artifacts, and capture support
 - preset-aware composition helpers and preset introspection
 - Windows host bridge scripts and WSL guidance docs
 - optional compose tuning overlays

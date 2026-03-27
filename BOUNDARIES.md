@@ -16,6 +16,7 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - platform-aware path contracts for Fedora-first deployment and Windows-usable workflows
 - normative host posture and public-safe/private host-facts contracts
 - runtime benchmark policies, schemas, normalized manifests, and raw runtime evidence
+- platform-adaptation policies and bounded public-safe/private tuning records
 - runtime-facing return policy, context rebuild posture, and return-event logging
 
 ## Belongs elsewhere
@@ -45,3 +46,4 @@ If the answer points to authored meaning or duplicated authority, it does not be
 
 Runtime benchmark evidence may live here; proof wording about what that evidence means does not.
 Public-safe host-facts contracts may live here; private captures belong in runtime logs, not git history.
+Platform-adaptation records may live here; they should stay bounded to runtime seams, adaptations, and portability notes.

@@ -10,11 +10,12 @@ When something feels wrong, use this order:
 4. check internal-only probes when relevant
 5. check rendered runtime truth when composition may be the problem
 6. capture or compare host facts when the machine itself may have drifted
-7. check container state
-8. check health endpoints
-9. check logs
-10. decide whether to fix forward or roll back
-11. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+7. capture a bounded platform-adaptation record when the seam looks machine-specific or likely to recur on another platform
+8. check container state
+9. check health endpoints
+10. check logs
+11. decide whether to fix forward or roll back
+12. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -23,6 +24,7 @@ aoa-doctor
 aoa-doctor --preset agent-full
 aoa-check-layout
 aoa-host-facts --mode public
+aoa-platform-adaptation --mode private --title "Short seam title" --summary "One bounded summary" --issue-class performance
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -45,6 +47,17 @@ For private host-facts capture during local incident work:
 
 ```bash
 aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/incident.private.json"
+```
+
+For a bounded platform-adaptation record when the issue is likely to recur:
+
+```bash
+aoa-platform-adaptation \
+  --mode private \
+  --title "Short seam title" \
+  --summary "One bounded summary" \
+  --issue-class performance \
+  --write "${AOA_STACK_ROOT}/Logs/platform-adaptations/latest/latest.private.json"
 ```
 
 For combined surfaces:

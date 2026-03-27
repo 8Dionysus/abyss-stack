@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import re
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+SCRIPT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def slugify(text: str) -> str:
+    lowered = text.strip().lower()
+    lowered = re.sub(r"[^a-z0-9]+", "-", lowered)
+    lowered = lowered.strip("-")
+    return lowered or "record"
+
+
+def parse_key_value(raw: str) -> tuple[str, str]:
+    if "=" not in raw:
+        raise argparse.ArgumentTypeError(f"expected KEY=VALUE, got: {raw}")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        raise argparse.ArgumentTypeError(f"missing key in: {raw}")
+    return key, value
+
+
+def detect_runtime_class() -> str | None:
+    if platform.system() == "Linux":
+        if Path("/proc/version").exists():
+            try:
+                version_text = Path("/proc/version").read_text(encoding="utf-8").lower()
+            except OSError:
+                version_text = ""
+            if "microsoft" in version_text or "wsl" in version_text:
+                return "linux-under-wsl"
+        if shutil.which("podman"):
+            return "rootless-podman"
+        return "linux"
+    if platform.system() == "Windows":
+        return "windows"
+    return platform.system().lower() or None
+
+
+def default_host_facts_ref(mode: str) -> str | None:
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+    private_ref = stack_root / "Logs" / "host-facts" / "latest.private.json"
+    public_ref = SCRIPT_ROOT / "docs" / "reference-platform" / "reference-host.public.json"
+    if mode == "private" and private_ref.exists():
+        return f"local:{private_ref}"
+    if mode == "public" and public_ref.exists():
+        return "repo:docs/reference-platform/reference-host.public.json"
+    return None
+
+
+def metric_dict(items: list[tuple[str, str]]) -> dict[str, float | str]:
+    out: dict[str, float | str] = {}
+    for key, value in items:
+        try:
+            out[key] = float(value)
+        except ValueError:
+            out[key] = value
+    return out
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Capture a bounded platform-adaptation record for abyss-stack."
+    )
+    parser.add_argument("--mode", choices=["public", "private"], default="private")
+    parser.add_argument("--write", help="Optional output path. Defaults to stdout.")
+    parser.add_argument("--record-id", help="Optional explicit record id.")
+    parser.add_argument("--title", required=True)
+    parser.add_argument("--summary", required=True)
+    parser.add_argument(
+        "--issue-class",
+        choices=[
+            "performance",
+            "compatibility",
+            "pathing",
+            "storage",
+            "orchestration",
+            "networking",
+            "acceleration",
+            "other",
+        ],
+        required=True,
+    )
+    parser.add_argument("--surface", action="append", default=[], help="Repeatable affected surface label.")
+    parser.add_argument("--os-family", default=platform.system().lower() or None)
+    parser.add_argument("--runtime-class", default=detect_runtime_class())
+    parser.add_argument("--hardware-class", default=None)
+    parser.add_argument("--portability-tag", action="append", default=[])
+    parser.add_argument("--signal", default="")
+    parser.add_argument("--risk", default=None)
+    parser.add_argument("--hypothesis", default="")
+    parser.add_argument("--confirmed-by", action="append", default=[])
+    parser.add_argument("--action", action="append", default=[])
+    parser.add_argument("--setting", action="append", default=[], type=parse_key_value)
+    parser.add_argument("--route-change", default=None)
+    parser.add_argument("--before", action="append", default=[], type=parse_key_value)
+    parser.add_argument("--after", action="append", default=[], type=parse_key_value)
+    parser.add_argument("--improvement-summary", default=None)
+    parser.add_argument("--host-facts-ref", default=None)
+    parser.add_argument("--evidence-ref", action="append", default=[])
+    parser.add_argument("--applies-when", action="append", default=[])
+    parser.add_argument("--retest-on", action="append", default=[])
+    parser.add_argument("--windows-bridge-note", default=None)
+    parser.add_argument("--tag", action="append", default=[])
+    parser.add_argument("--non-claim", action="append", default=[])
+    parser.add_argument("--redacted-field", action="append", default=[])
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    record_id = args.record_id or f"{timestamp}__{args.issue_class}__{slugify(args.title)}"
+    host_facts_ref = args.host_facts_ref or default_host_facts_ref(args.mode)
+
+    record = {
+        "artifact_kind": "aoa.platform-adaptation",
+        "schema_version": "1",
+        "capture_mode": args.mode,
+        "captured_at": captured_at,
+        "captured_by": "scripts/aoa-platform-adaptation",
+        "record_id": record_id,
+        "title": args.title,
+        "summary": args.summary,
+        "issue_class": args.issue_class,
+        "target_surfaces": args.surface,
+        "platform_scope": {
+            "os_family": args.os_family,
+            "runtime_class": args.runtime_class,
+            "hardware_class": args.hardware_class,
+            "portability_tags": args.portability_tag,
+        },
+        "symptom": {
+            "signal": args.signal,
+            "risk": args.risk,
+        },
+        "diagnosis": {
+            "hypothesis": args.hypothesis,
+            "confirmed_by": args.confirmed_by,
+        },
+        "adaptation": {
+            "actions": args.action,
+            "settings": {key: value for key, value in args.setting},
+            "route_change": args.route_change,
+        },
+        "impact": {
+            "before": metric_dict(args.before),
+            "after": metric_dict(args.after),
+            "improvement_summary": args.improvement_summary,
+        },
+        "host_facts_ref": host_facts_ref,
+        "evidence_refs": args.evidence_ref,
+        "portability": {
+            "applies_when": args.applies_when,
+            "retest_on": args.retest_on,
+            "windows_bridge_notes": args.windows_bridge_note,
+        },
+        "tags": args.tag,
+        "non_claims": args.non_claim,
+        "redaction": {
+            "redacted_fields": args.redacted_field,
+        },
+    }
+
+    rendered = json.dumps(record, indent=2, ensure_ascii=True) + "\n"
+    if args.write:
+        output_path = Path(args.write)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

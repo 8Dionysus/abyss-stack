@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.invalid/abyss-stack/platform-adaptations/schema.v1.json",
+  "title": "AoA Platform Adaptation Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "capture_mode",
+    "captured_at",
+    "captured_by",
+    "record_id",
+    "title",
+    "summary",
+    "issue_class",
+    "target_surfaces",
+    "platform_scope",
+    "symptom",
+    "diagnosis",
+    "adaptation",
+    "impact",
+    "evidence_refs",
+    "tags",
+    "non_claims"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "aoa.platform-adaptation"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "capture_mode": {
+      "enum": [
+        "public",
+        "private"
+      ]
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "captured_by": {
+      "const": "scripts/aoa-platform-adaptation"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issue_class": {
+      "enum": [
+        "performance",
+        "compatibility",
+        "pathing",
+        "storage",
+        "orchestration",
+        "networking",
+        "acceleration",
+        "other"
+      ]
+    },
+    "target_surfaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "platform_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_family",
+        "runtime_class",
+        "hardware_class",
+        "portability_tags"
+      ],
+      "properties": {
+        "os_family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runtime_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hardware_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "portability_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "symptom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal",
+        "risk"
+      ],
+      "properties": {
+        "signal": {
+          "type": "string"
+        },
+        "risk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis",
+        "confirmed_by"
+      ],
+      "properties": {
+        "hypothesis": {
+          "type": "string"
+        },
+        "confirmed_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "adaptation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actions",
+        "settings",
+        "route_change"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "route_change": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "before",
+        "after",
+        "improvement_summary"
+      ],
+      "properties": {
+        "before": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        },
+        "after": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        },
+        "improvement_summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "host_facts_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "portability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applies_when",
+        "retest_on",
+        "windows_bridge_notes"
+      ],
+      "properties": {
+        "applies_when": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retest_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "windows_bridge_notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "redacted_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
