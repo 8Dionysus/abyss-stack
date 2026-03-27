@@ -60,6 +60,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
+    ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -212,6 +213,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM_SPEC.md")
     if "docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
         errors.append("README.md must route readers to docs/PLATFORM_ADAPTATION_POLICY.md")
+    if "docs/BRANCH_POLICY.md" not in readme:
+        errors.append("README.md must route readers to docs/BRANCH_POLICY.md")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
@@ -361,6 +364,24 @@ def validate_platform_adaptations(errors: list[str]) -> None:
         errors.append("platform-adaptation.public.json.example must use captured_by scripts/aoa-platform-adaptation")
 
 
+def validate_branch_policy(errors: list[str]) -> None:
+    contributing_doc = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    if "docs/BRANCH_POLICY.md" not in contributing_doc:
+        errors.append("CONTRIBUTING.md must point to docs/BRANCH_POLICY.md")
+
+    policy_doc = (ROOT / "docs" / "BRANCH_POLICY.md").read_text(encoding="utf-8")
+    required_snippets = [
+        "`main` is the only long-lived branch",
+        "Delete the topic branch locally and on `origin`.",
+        "If a branch was effectively landed by squash, cherry-pick, or a rewritten equivalent, do not merge it again.",
+        "/srv/abyss-stack",
+        "/home/dionysus/src/abyss-stack",
+    ]
+    for snippet in required_snippets:
+        if snippet not in policy_doc:
+            errors.append(f"docs/BRANCH_POLICY.md must mention: {snippet}")
+
+
 def validate_return_runtime_contract(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/agent-api/" not in templates_readme:
@@ -445,6 +466,7 @@ def main() -> int:
     validate_required_files(errors)
     validate_reference_platform(errors)
     validate_platform_adaptations(errors)
+    validate_branch_policy(errors)
     validate_return_runtime_contract(errors)
     validate_federation_landing(errors)
 

@@ -32,6 +32,7 @@ python scripts/validate_stack.py
 ```
 
 If you touch bootstrap, layout, or lifecycle scripts, also align your validation with the current GitHub workflow in `.github/workflows/validate-stack.yml`.
+If you are opening, merging, or retiring topic branches, follow [docs/BRANCH_POLICY.md](docs/BRANCH_POLICY.md).
 
 ## Preferred PR scope
 
@@ -39,6 +40,7 @@ Prefer:
 - 1 focused infrastructure change per PR
 - or 1 focused validation or hardening improvement
 - or 1 focused documentation update that clarifies runtime posture
+- and 1 short-lived branch per bounded wave
 
 ## Review criteria
 
@@ -48,6 +50,7 @@ PRs are reviewed for:
 - clarity of runtime ownership boundaries
 - profile and preset coherence
 - validation quality
+- branch and merge hygiene
 
 ## Security
 
