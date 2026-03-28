@@ -17,8 +17,9 @@ When something feels wrong, use this order:
 11. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
 12. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
 13. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
-14. decide whether to fix forward or roll back
-15. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+14. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
+15. decide whether to fix forward or roll back
+16. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -32,6 +33,7 @@ aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 curl http://127.0.0.1:5402/playbooks/activation
+curl http://127.0.0.1:5402/kag/registry
 aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile core
 aoa-profile-endpoints --profile core
@@ -96,6 +98,16 @@ curl http://127.0.0.1:5402/playbooks/federation
 curl -X POST http://127.0.0.1:5402/playbooks/select \
   -H 'content-type: application/json' \
   -d '{"scenario":"bounded_change_safe"}'
+```
+
+For KAG and `Tree-of-Sophia` handoff inspection through the localhost federation seam:
+
+```bash
+curl http://127.0.0.1:5402/kag/registry
+curl http://127.0.0.1:5402/kag/tos-export
+curl -X POST http://127.0.0.1:5402/kag/query-mode \
+  -H 'content-type: application/json' \
+  -d '{"mode":"global_search"}'
 ```
 
 For combined surfaces:

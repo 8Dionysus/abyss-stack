@@ -108,7 +108,7 @@ scripts/aoa-smoke --profile intel
 
 ### What it is for
 
-A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, mirrored `aoa-memo` recall surfaces, mirrored `aoa-evals` eval-selection surfaces, and mirrored `aoa-playbooks` activation/composition advisory surfaces from the runtime tree.
+A localhost-only federation seam that reads mirrored `aoa-agents` contracts, mirrored `aoa-routing` advisory surfaces, mirrored `aoa-memo` recall surfaces, mirrored `aoa-evals` eval-selection surfaces, mirrored `aoa-playbooks` activation/composition advisory surfaces, mirrored `aoa-kag` retrieval/regrounding surfaces, and a source-owned `tos-source` handoff companion from the runtime tree.
 This profile is metadata-only for reads and does not change `langchain-api`, but it also enables filesystem-first memo export candidates and filesystem-first eval export candidates.
 
 ### Host-facing endpoints
@@ -123,6 +123,8 @@ scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
+scripts/aoa-sync-federation-surfaces --layer aoa-kag
+scripts/aoa-sync-federation-surfaces --layer tos-source
 scripts/aoa-profile-endpoints --profile federation
 scripts/aoa-render-services --profile federation
 scripts/aoa-up --profile federation
@@ -240,7 +242,7 @@ aoa-smoke --with-internal --preset agent-observability
 
 What it gives you:
 - the generic local agent path
-- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, `aoa-memo` recall surfaces, `aoa-evals` eval-selection surfaces, and `aoa-playbooks` activation/composition advisory surfaces
+- a localhost-only federation seam for mirrored `aoa-agents` contracts, `aoa-routing` advisory surfaces, `aoa-memo` recall surfaces, `aoa-evals` eval-selection surfaces, `aoa-playbooks` activation/composition advisory surfaces, `aoa-kag` retrieval/regrounding surfaces, and the `tos-source` handoff companion
 - filesystem-first memo export candidates under `Logs/memo-exports/`
 - filesystem-first eval export candidates under `Logs/eval-exports/`
 - no change to the existing `/run` or `/embeddings` surfaces
@@ -253,6 +255,8 @@ scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
+scripts/aoa-sync-federation-surfaces --layer aoa-kag
+scripts/aoa-sync-federation-surfaces --layer tos-source
 scripts/aoa-profile-modules --profile agentic --profile federation --paths
 scripts/aoa-profile-endpoints --profile agentic --profile federation
 scripts/aoa-render-services --profile agentic --profile federation
@@ -264,7 +268,7 @@ scripts/aoa-smoke --profile agentic --profile federation
 
 What it gives you:
 - the Intel-aware agent runtime with OVMS
-- the same localhost-only federation seam, `aoa-routing` advisory layer, `aoa-memo` recall layer, and `aoa-evals` eval-selection layer
+- the same localhost-only federation seam, `aoa-routing` advisory layer, `aoa-memo` recall layer, `aoa-evals` eval-selection layer, `aoa-playbooks` advisory layer, and `aoa-kag`/`tos-source` handoff layer
 - the same filesystem-first memo export candidates
 - filesystem-first eval export candidates under `Logs/eval-exports/`
 - no change to the existing Intel overlay contract
@@ -276,6 +280,9 @@ scripts/aoa-sync-federation-surfaces --layer aoa-agents
 scripts/aoa-sync-federation-surfaces --layer aoa-routing
 scripts/aoa-sync-federation-surfaces --layer aoa-memo
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
+scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
+scripts/aoa-sync-federation-surfaces --layer aoa-kag
+scripts/aoa-sync-federation-surfaces --layer tos-source
 scripts/aoa-profile-modules --profile intel --profile federation --paths
 scripts/aoa-profile-endpoints --profile intel --profile federation
 scripts/aoa-render-services --profile intel --profile federation

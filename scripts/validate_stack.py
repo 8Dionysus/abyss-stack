@@ -67,6 +67,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
     ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
     ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
+    ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -98,6 +99,8 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-memo.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-evals.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "aoa-kag.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "tos-source.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
@@ -236,6 +239,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/EVAL_RUNTIME_SEAM.md")
     if "docs/PLAYBOOK_RUNTIME_SEAM.md" not in readme:
         errors.append("README.md must route readers to docs/PLAYBOOK_RUNTIME_SEAM.md")
+    if "docs/KAG_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to docs/KAG_RUNTIME_SEAM.md")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
@@ -252,6 +257,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
     if "AOA_PLAYBOOKS_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
+    if "AOA_KAG_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_KAG_ROOT")
+    if "AOA_TOS_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_TOS_ROOT")
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" not in deployment_doc:
@@ -262,6 +271,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/DEPLOYMENT.md must mention aoa-evals federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-playbooks" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-playbooks federation sync")
+    if "scripts/aoa-sync-federation-surfaces --layer aoa-kag" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-kag federation sync")
+    if "scripts/aoa-sync-federation-surfaces --layer tos-source" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention tos-source federation sync")
 
     profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
     if "aoa-routing advisory seam" not in profiles_doc:
@@ -272,6 +285,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/PROFILES.md must describe the aoa-evals eval selection seam")
     if "aoa-playbooks" not in profiles_doc:
         errors.append("docs/PROFILES.md must describe the aoa-playbooks advisory seam")
+    if "aoa-kag" not in profiles_doc:
+        errors.append("docs/PROFILES.md must describe the aoa-kag advisory seam")
+    if "tos-source" not in profiles_doc:
+        errors.append("docs/PROFILES.md must describe the tos-source handoff seam")
 
     recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "aoa-routing" not in recipes_doc:
@@ -282,6 +299,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/PROFILE_RECIPES.md must mention aoa-evals")
     if "aoa-playbooks" not in recipes_doc:
         errors.append("docs/PROFILE_RECIPES.md must mention aoa-playbooks")
+    if "aoa-kag" not in recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention aoa-kag")
+    if "tos-source" not in recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention tos-source")
 
     catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "aoa-routing advisory routing surfaces" not in catalog_doc:
@@ -292,6 +313,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-evals")
     if "aoa-playbooks" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-playbooks")
+    if "aoa-kag" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention aoa-kag")
+    if "tos-source" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention tos-source")
 
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
@@ -302,6 +327,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-evals/")
     if "Knowledge/federation/aoa-playbooks/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-playbooks/")
+    if "Knowledge/federation/aoa-kag/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-kag/")
+    if "Knowledge/federation/tos-source/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/tos-source/")
     if "Logs/memo-exports/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
     if "Logs/eval-exports/" not in storage_doc:
@@ -503,6 +532,10 @@ def validate_federation_landing(errors: list[str]) -> None:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-evals")
     if "aoa-sync-federation-surfaces --layer aoa-playbooks" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-playbooks")
+    if "aoa-sync-federation-surfaces --layer aoa-kag" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-kag")
+    if "aoa-sync-federation-surfaces --layer tos-source" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer tos-source")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "AOA_AGENTS_ROOT" not in paths_doc:
@@ -513,6 +546,10 @@ def validate_federation_landing(errors: list[str]) -> None:
         errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
     if "AOA_PLAYBOOKS_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
+    if "AOA_KAG_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_KAG_ROOT")
+    if "AOA_TOS_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_TOS_ROOT")
 
     service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "43-federation-router.yml" not in service_catalog_doc:
@@ -635,6 +672,25 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
             errors.append(f"docs/PLAYBOOK_RUNTIME_SEAM.md must mention {snippet}")
 
 
+def validate_kag_runtime_seam(errors: list[str]) -> None:
+    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    if "/kag/" not in runbook_doc and "kag/registry" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention KAG advisory seam inspection")
+
+    seam_doc = (ROOT / "docs" / "KAG_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    for snippet in (
+        "aoa-kag",
+        "tos-source",
+        "/kag/",
+        "Tree-of-Sophia",
+        "advisory-only",
+        "aoa-sync-federation-surfaces --layer aoa-kag",
+        "aoa-sync-federation-surfaces --layer tos-source",
+    ):
+        if snippet not in seam_doc:
+            errors.append(f"docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -649,6 +705,7 @@ def main() -> int:
     validate_memo_runtime_seam(errors)
     validate_eval_runtime_seam(errors)
     validate_playbook_runtime_seam(errors)
+    validate_kag_runtime_seam(errors)
     validate_return_runtime_contract(errors)
     validate_federation_landing(errors)
 

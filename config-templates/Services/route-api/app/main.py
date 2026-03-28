@@ -19,6 +19,8 @@ REQUIRED_CONFIGS = {
     "aoa-memo": "aoa-memo.yaml",
     "aoa-evals": "aoa-evals.yaml",
     "aoa-playbooks": "aoa-playbooks.yaml",
+    "aoa-kag": "aoa-kag.yaml",
+    "tos-source": "tos-source.yaml",
 }
 
 
@@ -39,6 +41,8 @@ class AppStore:
     memo: LayerStore
     evals: LayerStore
     playbooks: LayerStore
+    kag: LayerStore
+    tos_source: LayerStore
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -263,6 +267,59 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
     )
 
 
+def load_kag_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+    required_files = validated_required_files(config, mirror_root)
+    payloads = {
+        "registry": load_json(mirror_root / "generated/kag_registry.min.json"),
+        "federation_spine": load_json(mirror_root / "generated/federation_spine.min.json"),
+        "tiny_consumer_bundle": load_json(mirror_root / "generated/tiny_consumer_bundle.min.json"),
+        "reasoning_handoff_pack": load_json(mirror_root / "generated/reasoning_handoff_pack.min.json"),
+        "return_regrounding_pack": load_json(mirror_root / "generated/return_regrounding_pack.min.json"),
+        "technique_lift_pack": load_json(mirror_root / "generated/technique_lift_pack.min.json"),
+        "tos_retrieval_axis_pack": load_json(mirror_root / "generated/tos_retrieval_axis_pack.min.json"),
+        "tos_text_chunk_map": load_json(mirror_root / "generated/tos_text_chunk_map.min.json"),
+        "cross_source_node_projection": load_json(mirror_root / "generated/cross_source_node_projection.min.json"),
+        "counterpart_exposure_review": load_json(
+            mirror_root / "generated/counterpart_federation_exposure_review.min.json"
+        ),
+    }
+
+    return LayerStore(
+        layer="aoa-kag",
+        config_path=config_path,
+        mirror_root=mirror_root,
+        required_files=required_files,
+        flags={
+            "advisory_only": bool(config.get("advisory_only", False)),
+            "allow_free_text_querying": bool(config.get("allow_free_text_querying", False)),
+            "allow_runtime_reasoning_handoff": bool(config.get("allow_runtime_reasoning_handoff", False)),
+        },
+        payloads=payloads,
+    )
+
+
+def load_tos_source_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+    required_files = validated_required_files(config, mirror_root)
+    payloads = {
+        "export": load_json(mirror_root / "generated/kag_export.min.json"),
+        "entry_surface": load_json(mirror_root / "examples/source_node.example.json"),
+        "tiny_entry_surface": load_json(mirror_root / "examples/tos_tiny_entry_route.example.json"),
+    }
+
+    return LayerStore(
+        layer="tos-source",
+        config_path=config_path,
+        mirror_root=mirror_root,
+        required_files=required_files,
+        flags={
+            "read_only": bool(config.get("read_only", False)),
+            "source_owned": bool(config.get("source_owned", False)),
+            "allow_runtime_mutation": bool(config.get("allow_runtime_mutation", False)),
+        },
+        payloads=payloads,
+    )
+
+
 def load_layer(config_path: Path) -> LayerStore:
     config = load_yaml(config_path)
     layer = config.get("layer")
@@ -284,6 +341,10 @@ def load_layer(config_path: Path) -> LayerStore:
         return load_evals_layer(config_path, config, mirror_root)
     if layer == "aoa-playbooks":
         return load_playbooks_layer(config_path, config, mirror_root)
+    if layer == "aoa-kag":
+        return load_kag_layer(config_path, config, mirror_root)
+    if layer == "tos-source":
+        return load_tos_source_layer(config_path, config, mirror_root)
     raise RuntimeError(f"unsupported layer in route-api config: {layer!r}")
 
 
@@ -301,6 +362,8 @@ def load_store(config_dir: Path) -> AppStore:
         memo=loaded_layers["aoa-memo"],
         evals=loaded_layers["aoa-evals"],
         playbooks=loaded_layers["aoa-playbooks"],
+        kag=loaded_layers["aoa-kag"],
+        tos_source=loaded_layers["tos-source"],
     )
 
 
@@ -370,7 +433,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "runtime_evidence_templates": sorted(layer.payloads["runtime_evidence_templates"].keys()),
                 "hook_templates": sorted(layer.payloads["hook_templates"].keys()),
             }
-        else:
+        elif layer.layer == "aoa-playbooks":
             metadata = {
                 "registry_count": len(layer.payloads["registry"]["playbooks"]),
                 "activation_count": len(layer.payloads["activation"]),
@@ -379,6 +442,28 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "failure_count": len(layer.payloads["failures"]["failures"]),
                 "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
                 "automation_seed_count": len(layer.payloads["automation_seeds"]["seeds"]),
+            }
+        elif layer.layer == "aoa-kag":
+            metadata = {
+                "registry_count": len(layer.payloads["registry"]["surfaces"]),
+                "spine_repo_count": layer.payloads["federation_spine"].get(
+                    "repo_count", len(layer.payloads["federation_spine"].get("repos", []))
+                ),
+                "reasoning_scenario_count": layer.payloads["reasoning_handoff_pack"].get(
+                    "scenario_count", len(layer.payloads["reasoning_handoff_pack"].get("scenarios", []))
+                ),
+                "regrounding_mode_count": layer.payloads["return_regrounding_pack"].get(
+                    "mode_count", len(layer.payloads["return_regrounding_pack"].get("modes", []))
+                ),
+                "chunk_count": len(layer.payloads["tos_text_chunk_map"].get("chunks", [])),
+                "axis_count": len(layer.payloads["tos_retrieval_axis_pack"].get("axes", [])),
+                "projection_count": len(layer.payloads["cross_source_node_projection"].get("projections", [])),
+            }
+        else:
+            metadata = {
+                "exported_object_id": layer.payloads["export"].get("object_id"),
+                "entry_surface_path": layer.payloads["export"].get("entry_surface", {}).get("path"),
+                "section_handle_count": len(layer.payloads["export"].get("section_handles", [])),
             }
 
     return {
@@ -507,6 +592,14 @@ def evals_payload(store: AppStore, key: str) -> dict[str, Any]:
 
 def playbooks_payload(store: AppStore, key: str) -> Any:
     return store.playbooks.payloads[key]
+
+
+def kag_payload(store: AppStore, key: str) -> dict[str, Any]:
+    return store.kag.payloads[key]
+
+
+def tos_source_payload(store: AppStore, key: str) -> dict[str, Any]:
+    return store.tos_source.payloads[key]
 
 
 def playbook_registry_entries(store: AppStore) -> list[dict[str, Any]]:
@@ -1126,6 +1219,149 @@ def resolve_hook_template(store: AppStore, template_name: str) -> dict[str, Any]
     }
 
 
+def kag_registry_entries(store: AppStore) -> list[dict[str, Any]]:
+    return kag_payload(store, "registry")["surfaces"]
+
+
+def require_kag_registry_entry(store: AppStore, surface_id: str) -> dict[str, Any]:
+    for entry in kag_registry_entries(store):
+        if entry.get("surface_id") == surface_id or entry.get("id") == surface_id:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-kag registry entry found for surface_id={surface_id}")
+
+
+def require_kag_repo_entry(store: AppStore, repo: Literal["Tree-of-Sophia", "aoa-techniques"]) -> dict[str, Any]:
+    for entry in kag_payload(store, "federation_spine")["repos"]:
+        if entry["repo"] == repo:
+            return entry
+    raise HTTPException(status_code=404, detail=f"no aoa-kag federation spine repo entry found for repo={repo}")
+
+
+def require_kag_regrounding_mode(store: AppStore, mode_id: str) -> dict[str, Any]:
+    for mode in kag_payload(store, "return_regrounding_pack")["modes"]:
+        if mode["mode_id"] == mode_id:
+            return mode
+    raise HTTPException(status_code=404, detail=f"no aoa-kag regrounding mode found for mode_id={mode_id}")
+
+
+def require_kag_chunk(store: AppStore, chunk_id: str) -> dict[str, Any]:
+    for chunk in kag_payload(store, "tos_text_chunk_map")["chunks"]:
+        if chunk["chunk_id"] == chunk_id:
+            return chunk
+    raise HTTPException(status_code=404, detail=f"no aoa-kag chunk found for chunk_id={chunk_id}")
+
+
+def require_kag_axis(store: AppStore, axis_id: str) -> dict[str, Any]:
+    for axis in kag_payload(store, "tos_retrieval_axis_pack")["axes"]:
+        if axis["axis_id"] == axis_id:
+            return axis
+    raise HTTPException(status_code=404, detail=f"no aoa-kag axis found for axis_id={axis_id}")
+
+
+def require_kag_projection(store: AppStore, projection_id: str) -> dict[str, Any]:
+    for projection in kag_payload(store, "cross_source_node_projection")["projections"]:
+        if projection["projection_id"] == projection_id:
+            return projection
+    raise HTTPException(status_code=404, detail=f"no aoa-kag projection found for projection_id={projection_id}")
+
+
+def resolve_kag_inspect(store: AppStore, surface_id: str) -> dict[str, Any]:
+    pack_by_surface_id = {
+        "AOA-K-0005": ("tos_text_chunk_map", "aoa-kag/generated/tos_text_chunk_map.min.json"),
+        "AOA-K-0006": ("cross_source_node_projection", "aoa-kag/generated/cross_source_node_projection.min.json"),
+        "AOA-K-0007": ("tos_retrieval_axis_pack", "aoa-kag/generated/tos_retrieval_axis_pack.min.json"),
+        "AOA-K-0008": ("counterpart_exposure_review", "aoa-kag/generated/counterpart_federation_exposure_review.min.json"),
+        "AOA-K-0009": ("federation_spine", "aoa-kag/generated/federation_spine.min.json"),
+    }
+    if surface_id not in pack_by_surface_id:
+        raise HTTPException(status_code=404, detail=f"unsupported aoa-kag inspect surface_id={surface_id}")
+
+    payload_key, source_file = pack_by_surface_id[surface_id]
+    response: dict[str, Any] = {
+        "ok": True,
+        "surface_id": surface_id,
+        "registry_entry": require_kag_registry_entry(store, surface_id),
+        "pack": kag_payload(store, payload_key),
+        "source_files": [
+            "aoa-kag/generated/kag_registry.min.json",
+            source_file,
+        ],
+    }
+
+    if surface_id in {"AOA-K-0005", "AOA-K-0006", "AOA-K-0007"}:
+        response["tos_support"] = {
+            "export": tos_source_payload(store, "export"),
+            "entry_surface": tos_source_payload(store, "entry_surface"),
+            "tiny_entry_surface": tos_source_payload(store, "tiny_entry_surface"),
+        }
+        response["source_files"].extend(
+            [
+                "tos-source/generated/kag_export.min.json",
+                "tos-source/examples/source_node.example.json",
+                "tos-source/examples/tos_tiny_entry_route.example.json",
+            ]
+        )
+
+    return response
+
+
+def resolve_kag_query_mode(store: AppStore, mode: Literal["local_search", "global_search", "drift_search"]) -> dict[str, Any]:
+    scenarios = [
+        scenario
+        for scenario in kag_payload(store, "reasoning_handoff_pack")["scenarios"]
+        if mode in scenario.get("compatible_query_modes", [])
+    ]
+    regrounding_modes = [
+        entry
+        for entry in kag_payload(store, "return_regrounding_pack")["modes"]
+        if entry.get("query_mode_hint") == mode
+    ]
+    if not scenarios and not regrounding_modes:
+        raise HTTPException(status_code=404, detail=f"no aoa-kag entries matched mode={mode}")
+
+    return {
+        "ok": True,
+        "mode": mode,
+        "reasoning_scenarios": scenarios,
+        "regrounding_modes": regrounding_modes,
+        "source_files": [
+            "aoa-kag/generated/reasoning_handoff_pack.min.json",
+            "aoa-kag/generated/return_regrounding_pack.min.json",
+        ],
+    }
+
+
+def resolve_kag_regrounding(store: AppStore, mode_id: str) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "mode_id": mode_id,
+        "regrounding_mode": require_kag_regrounding_mode(store, mode_id),
+        "source_files": ["aoa-kag/generated/return_regrounding_pack.min.json"],
+    }
+
+
+def resolve_kag_repo_entry(store: AppStore, repo: Literal["Tree-of-Sophia", "aoa-techniques"]) -> dict[str, Any]:
+    repo_entry = require_kag_repo_entry(store, repo)
+    response: dict[str, Any] = {
+        "ok": True,
+        "repo": repo,
+        "repo_entry": repo_entry,
+        "source_files": ["aoa-kag/generated/federation_spine.min.json"],
+    }
+    if repo == "Tree-of-Sophia":
+        response["tos_export"] = tos_source_payload(store, "export")
+        response["tos_entry_surface"] = tos_source_payload(store, "entry_surface")
+        response["tos_tiny_entry_surface"] = tos_source_payload(store, "tiny_entry_surface")
+        response["source_files"].extend(
+            [
+                "tos-source/generated/kag_export.min.json",
+                "tos-source/examples/source_node.example.json",
+                "tos-source/examples/tos_tiny_entry_route.example.json",
+            ]
+        )
+    return response
+
+
 app = FastAPI(title="AoA federation route API")
 STORE: AppStore | None = None
 
@@ -1295,6 +1531,34 @@ class PlaybookAutomationSeedRequest(BaseModel):
     name: str
 
 
+class KagInspectRequest(BaseModel):
+    surface_id: str
+
+
+class KagQueryModeRequest(BaseModel):
+    mode: Literal["local_search", "global_search", "drift_search"]
+
+
+class KagRegroundingRequest(BaseModel):
+    mode_id: str
+
+
+class KagRepoEntryRequest(BaseModel):
+    repo: Literal["Tree-of-Sophia", "aoa-techniques"]
+
+
+class KagChunkRequest(BaseModel):
+    chunk_id: str
+
+
+class KagAxisRequest(BaseModel):
+    axis_id: str
+
+
+class KagProjectionRequest(BaseModel):
+    projection_id: str
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     store = require_store()
@@ -1306,6 +1570,8 @@ def health() -> dict[str, Any]:
             store.memo.layer,
             store.evals.layer,
             store.playbooks.layer,
+            store.kag.layer,
+            store.tos_source.layer,
         ],
         "mirror_ready": True,
         "layer_readiness": {
@@ -1314,6 +1580,8 @@ def health() -> dict[str, Any]:
             store.memo.layer: True,
             store.evals.layer: True,
             store.playbooks.layer: True,
+            store.kag.layer: True,
+            store.tos_source.layer: True,
         },
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
@@ -1325,6 +1593,12 @@ def health() -> dict[str, Any]:
         "playbooks_advisory_only": store.playbooks.flags["advisory_only"],
         "playbooks_allow_runtime_execution": store.playbooks.flags["allow_runtime_execution"],
         "playbooks_include_composition_surfaces": store.playbooks.flags["include_composition_surfaces"],
+        "kag_advisory_only": store.kag.flags["advisory_only"],
+        "kag_allow_free_text_querying": store.kag.flags["allow_free_text_querying"],
+        "kag_allow_runtime_reasoning_handoff": store.kag.flags["allow_runtime_reasoning_handoff"],
+        "tos_source_read_only": store.tos_source.flags["read_only"],
+        "tos_source_owned": store.tos_source.flags["source_owned"],
+        "tos_source_allow_runtime_mutation": store.tos_source.flags["allow_runtime_mutation"],
     }
 
 
@@ -1339,6 +1613,8 @@ def surface_status() -> dict[str, Any]:
             store.memo.layer,
             store.evals.layer,
             store.playbooks.layer,
+            store.kag.layer,
+            store.tos_source.layer,
         ],
         "mirror_ready": True,
         "layer_readiness": {
@@ -1347,6 +1623,8 @@ def surface_status() -> dict[str, Any]:
             store.memo.layer: True,
             store.evals.layer: True,
             store.playbooks.layer: True,
+            store.kag.layer: True,
+            store.tos_source.layer: True,
         },
         "layers_status": {
             store.agents.layer: layer_status(store.agents),
@@ -1354,6 +1632,8 @@ def surface_status() -> dict[str, Any]:
             store.memo.layer: layer_status(store.memo),
             store.evals.layer: layer_status(store.evals),
             store.playbooks.layer: layer_status(store.playbooks),
+            store.kag.layer: layer_status(store.kag),
+            store.tos_source.layer: layer_status(store.tos_source),
         },
     }
 
@@ -1781,4 +2061,133 @@ def playbooks_automation_seed(request: PlaybookAutomationSeedRequest) -> dict[st
         "name": request.name,
         "seed": seed,
         "source_files": ["aoa-playbooks/generated/playbook_automation_seeds.json"],
+    }
+
+
+@app.get("/kag/registry")
+def kag_registry() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "registry")}
+
+
+@app.get("/kag/federation-spine")
+def kag_federation_spine() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "federation_spine")}
+
+
+@app.get("/kag/tiny-consumer-bundle")
+def kag_tiny_consumer_bundle() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "tiny_consumer_bundle")}
+
+
+@app.get("/kag/reasoning-handoff-pack")
+def kag_reasoning_handoff_pack() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "reasoning_handoff_pack")}
+
+
+@app.get("/kag/return-regrounding-pack")
+def kag_return_regrounding_pack() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "return_regrounding_pack")}
+
+
+@app.get("/kag/technique-lift-pack")
+def kag_technique_lift_pack() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "technique_lift_pack")}
+
+
+@app.get("/kag/tos-retrieval-axis-pack")
+def kag_tos_retrieval_axis_pack() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "tos_retrieval_axis_pack")}
+
+
+@app.get("/kag/tos-text-chunk-map")
+def kag_tos_text_chunk_map() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "tos_text_chunk_map")}
+
+
+@app.get("/kag/cross-source-node-projection")
+def kag_cross_source_node_projection() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "cross_source_node_projection")}
+
+
+@app.get("/kag/counterpart-exposure-review")
+def kag_counterpart_exposure_review() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": kag_payload(store, "counterpart_exposure_review")}
+
+
+@app.get("/kag/tos-export")
+def kag_tos_export() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": tos_source_payload(store, "export")}
+
+
+@app.get("/kag/tos-entry-surface")
+def kag_tos_entry_surface() -> dict[str, Any]:
+    store = require_store()
+    return {"ok": True, "data": tos_source_payload(store, "entry_surface")}
+
+
+@app.post("/kag/inspect")
+def kag_inspect(request: KagInspectRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_kag_inspect(store, request.surface_id)
+
+
+@app.post("/kag/query-mode")
+def kag_query_mode(request: KagQueryModeRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_kag_query_mode(store, request.mode)
+
+
+@app.post("/kag/regrounding")
+def kag_regrounding(request: KagRegroundingRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_kag_regrounding(store, request.mode_id)
+
+
+@app.post("/kag/repo-entry")
+def kag_repo_entry(request: KagRepoEntryRequest) -> dict[str, Any]:
+    store = require_store()
+    return resolve_kag_repo_entry(store, request.repo)
+
+
+@app.post("/kag/chunk")
+def kag_chunk(request: KagChunkRequest) -> dict[str, Any]:
+    store = require_store()
+    return {
+        "ok": True,
+        "chunk_id": request.chunk_id,
+        "chunk": require_kag_chunk(store, request.chunk_id),
+        "source_files": ["aoa-kag/generated/tos_text_chunk_map.min.json"],
+    }
+
+
+@app.post("/kag/axis")
+def kag_axis(request: KagAxisRequest) -> dict[str, Any]:
+    store = require_store()
+    return {
+        "ok": True,
+        "axis_id": request.axis_id,
+        "axis": require_kag_axis(store, request.axis_id),
+        "source_files": ["aoa-kag/generated/tos_retrieval_axis_pack.min.json"],
+    }
+
+
+@app.post("/kag/projection")
+def kag_projection(request: KagProjectionRequest) -> dict[str, Any]:
+    store = require_store()
+    return {
+        "ok": True,
+        "projection_id": request.projection_id,
+        "projection": require_kag_projection(store, request.projection_id),
+        "source_files": ["aoa-kag/generated/cross_source_node_projection.min.json"],
     }

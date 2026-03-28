@@ -80,6 +80,7 @@ For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
 - if you need the knowledge world and authored architecture, go to [`Tree-of-Sophia`](https://github.com/8Dionysus/Tree-of-Sophia)
 - if you need reusable practice, go to [`aoa-techniques`](https://github.com/8Dionysus/aoa-techniques)
+- if you need derived retrieval, reasoning-handoff, or regrounding packs, go to [`aoa-kag`](https://github.com/8Dionysus/aoa-kag)
 - if you need bounded execution workflows, go to [`aoa-skills`](https://github.com/8Dionysus/aoa-skills)
 - if you need portable proof surfaces, go to [`aoa-evals`](https://github.com/8Dionysus/aoa-evals)
 - if you need memory-layer meaning or recall contracts, go to [`aoa-memo`](https://github.com/8Dionysus/aoa-memo)
@@ -92,6 +93,7 @@ For the shortest next route by intent:
 - if you need the runtime-side memo mirror, recall seam, or export candidates, read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md)
 - if you need the runtime-side eval mirror, `/evals/*` selection seam, or filesystem-first eval export candidates, read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md)
 - if you need the runtime-side playbook mirror, `/playbooks/*` activation seam, or composition advisory surfaces, read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md)
+- if you need the runtime-side KAG mirror, `/kag/*` advisory seam, or the `Tree-of-Sophia` handoff companion, read [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md)
 
 `abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
 
@@ -103,6 +105,7 @@ For the shortest next route by intent:
 | `Agents-of-Abyss` | ecosystem identity, layer map, federation rules, program-level direction | you need the center and the constitutional view of AoA |
 | `Tree-of-Sophia` | living knowledge architecture for philosophy and world thought | you need the knowledge world rather than the runtime body |
 | `aoa-techniques` | reusable engineering practice | you need durable techniques rather than infrastructure modules |
+| `aoa-kag` | derived retrieval, reasoning-handoff, and regrounding packs | you need KAG-side advisory retrieval surfaces rather than live runtime services |
 | `aoa-skills` | bounded agent-facing execution workflows | you need executable workflows rather than deployment posture |
 | `aoa-memo` | memory objects, recall contracts, and memo-side writeback meaning | you need memory-layer authority rather than runtime export plumbing |
 | `aoa-evals` | portable proof surfaces for bounded claims | you need evaluation and quality checks rather than runtime services |

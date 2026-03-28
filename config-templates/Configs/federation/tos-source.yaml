@@ -1,0 +1,16 @@
+layer: tos-source
+mirror_root: /app/federation/tos-source
+read_only: true
+source_owned: true
+allow_runtime_mutation: false
+required_files:
+  - docs/KAG_EXPORT.md
+  - docs/TINY_ENTRY_ROUTE.md
+  - docs/NODE_CONTRACT.md
+  - docs/PRACTICE_BRANCH.md
+  - docs/ZARATHUSTRA_TRILINGUAL_ENTRY.md
+  - generated/kag_export.min.json
+  - examples/source_node.example.json
+  - examples/tos_tiny_entry_route.example.json
+  - schemas/tos-node-contract.schema.json
+  - schemas/tos-tiny-entry-route.schema.json

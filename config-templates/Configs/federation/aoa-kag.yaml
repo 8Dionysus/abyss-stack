@@ -1,0 +1,36 @@
+layer: aoa-kag
+mirror_root: /app/federation/aoa-kag
+advisory_only: true
+allow_free_text_querying: false
+allow_runtime_reasoning_handoff: false
+required_files:
+  - docs/CONSUMER_GUIDE.md
+  - docs/REASONING_HANDOFF.md
+  - docs/REASONING_HANDOFF_PACK.md
+  - docs/RECURRENCE_REGROUNDING.md
+  - docs/BRIDGE_CONTRACTS.md
+  - docs/FEDERATION_KAG_READINESS.md
+  - docs/COUNTERPART_CONSUMER_CONTRACT.md
+  - docs/TOS_RETRIEVAL_AXIS_PACK.md
+  - generated/kag_registry.min.json
+  - generated/federation_spine.min.json
+  - generated/tiny_consumer_bundle.min.json
+  - generated/reasoning_handoff_pack.min.json
+  - generated/return_regrounding_pack.min.json
+  - generated/technique_lift_pack.min.json
+  - generated/tos_retrieval_axis_pack.min.json
+  - generated/tos_text_chunk_map.min.json
+  - generated/cross_source_node_projection.min.json
+  - generated/counterpart_federation_exposure_review.min.json
+  - schemas/kag-registry.schema.json
+  - schemas/federation-spine.schema.json
+  - schemas/tiny-consumer-bundle.schema.json
+  - schemas/reasoning-handoff-pack.schema.json
+  - schemas/return-regrounding-pack.schema.json
+  - schemas/technique-lift-pack.schema.json
+  - schemas/tos-retrieval-axis-pack.schema.json
+  - schemas/tos-text-chunk-map.schema.json
+  - schemas/cross-source-node-projection.schema.json
+  - schemas/counterpart-federation-exposure-review.schema.json
+  - schemas/counterpart-consumer-contract.schema.json
+  - schemas/bridge-envelope.schema.json

@@ -70,6 +70,8 @@ if has_module "43-federation-router.yml"; then
   aoa_probe_http "route-api memo" "http://127.0.0.1:5402/memo/registry" || failures=$((failures + 1))
   aoa_probe_http "route-api evals" "http://127.0.0.1:5402/evals/catalog" || failures=$((failures + 1))
   aoa_probe_http "route-api playbooks" "http://127.0.0.1:5402/playbooks/activation" || failures=$((failures + 1))
+  aoa_probe_http "route-api kag" "http://127.0.0.1:5402/kag/registry" || failures=$((failures + 1))
+  aoa_probe_http "route-api tos" "http://127.0.0.1:5402/kag/tos-export" || failures=$((failures + 1))
 fi
 
 if has_module "50-speech.yml"; then
