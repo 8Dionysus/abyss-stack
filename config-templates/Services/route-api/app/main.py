@@ -162,8 +162,10 @@ def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path
     payloads = {
         "registry": load_json(mirror_root / "generated/memo_registry.min.json"),
         "catalog": load_json(mirror_root / "generated/memory_catalog.min.json"),
+        "capsules": load_json(mirror_root / "generated/memory_capsules.json"),
         "sections": load_json(mirror_root / "generated/memory_sections.full.json"),
         "object_catalog": load_json(mirror_root / "generated/memory_object_catalog.min.json"),
+        "object_capsules": load_json(mirror_root / "generated/memory_object_capsules.json"),
         "object_sections": load_json(mirror_root / "generated/memory_object_sections.full.json"),
         "checkpoint_contract": load_json(mirror_root / "examples/checkpoint_to_memory_contract.example.json"),
         "recall_contracts": {
@@ -1020,10 +1022,44 @@ def memo_collection_key(family: Literal["doctrine", "object"]) -> str:
     return "memo_surfaces" if family == "doctrine" else "memory_objects"
 
 
-def memo_collection_payload(store: AppStore, family: Literal["doctrine", "object"], *, sections: bool) -> dict[str, Any]:
+def memo_payload_key(
+    family: Literal["doctrine", "object"],
+    surface: Literal["catalog", "capsules", "sections"],
+) -> str:
     if family == "doctrine":
-        return memo_payload(store, "sections" if sections else "catalog")
-    return memo_payload(store, "object_sections" if sections else "object_catalog")
+        return {
+            "catalog": "catalog",
+            "capsules": "capsules",
+            "sections": "sections",
+        }[surface]
+    return {
+        "catalog": "object_catalog",
+        "capsules": "object_capsules",
+        "sections": "object_sections",
+    }[surface]
+
+
+def memo_source_file(
+    family: Literal["doctrine", "object"],
+    surface: Literal["catalog", "capsules", "sections"],
+) -> str:
+    return {
+        ("doctrine", "catalog"): "aoa-memo/generated/memory_catalog.min.json",
+        ("doctrine", "capsules"): "aoa-memo/generated/memory_capsules.json",
+        ("doctrine", "sections"): "aoa-memo/generated/memory_sections.full.json",
+        ("object", "catalog"): "aoa-memo/generated/memory_object_catalog.min.json",
+        ("object", "capsules"): "aoa-memo/generated/memory_object_capsules.json",
+        ("object", "sections"): "aoa-memo/generated/memory_object_sections.full.json",
+    }[(family, surface)]
+
+
+def memo_collection_payload(
+    store: AppStore,
+    family: Literal["doctrine", "object"],
+    *,
+    surface: Literal["catalog", "capsules", "sections"],
+) -> dict[str, Any]:
+    return memo_payload(store, memo_payload_key(family, surface))
 
 
 def require_memo_entry(
@@ -1031,9 +1067,9 @@ def require_memo_entry(
     family: Literal["doctrine", "object"],
     entry_id: str,
     *,
-    sections: bool,
+    surface: Literal["catalog", "capsules", "sections"],
 ) -> dict[str, Any]:
-    payload = memo_collection_payload(store, family, sections=sections)
+    payload = memo_collection_payload(store, family, surface=surface)
     collection_key = memo_collection_key(family)
     for entry in payload[collection_key]:
         if entry["id"] == entry_id:
@@ -1810,36 +1846,39 @@ def memo_checkpoint_contract() -> dict[str, Any]:
 @app.post("/memo/inspect")
 def memo_inspect(request: MemoInspectRequest) -> dict[str, Any]:
     store = require_store()
-    entry = require_memo_entry(store, request.family, request.id, sections=False)
-    source_file = (
-        "aoa-memo/generated/memory_catalog.min.json"
-        if request.family == "doctrine"
-        else "aoa-memo/generated/memory_object_catalog.min.json"
-    )
+    entry = require_memo_entry(store, request.family, request.id, surface="catalog")
     return {
         "ok": True,
         "family": request.family,
         "id": request.id,
         "entry": entry,
-        "source_files": [source_file],
+        "source_files": [memo_source_file(request.family, "catalog")],
+    }
+
+
+@app.post("/memo/capsule")
+def memo_capsule(request: MemoInspectRequest) -> dict[str, Any]:
+    store = require_store()
+    entry = require_memo_entry(store, request.family, request.id, surface="capsules")
+    return {
+        "ok": True,
+        "family": request.family,
+        "id": request.id,
+        "entry": entry,
+        "source_files": [memo_source_file(request.family, "capsules")],
     }
 
 
 @app.post("/memo/expand")
 def memo_expand(request: MemoExpandRequest) -> dict[str, Any]:
     store = require_store()
-    entry = require_memo_entry(store, request.family, request.id, sections=True)
-    source_file = (
-        "aoa-memo/generated/memory_sections.full.json"
-        if request.family == "doctrine"
-        else "aoa-memo/generated/memory_object_sections.full.json"
-    )
+    entry = require_memo_entry(store, request.family, request.id, surface="sections")
     response: dict[str, Any] = {
         "ok": True,
         "family": request.family,
         "id": request.id,
         "entry": entry,
-        "source_files": [source_file],
+        "source_files": [memo_source_file(request.family, "sections")],
     }
     if request.section_id is not None:
         response["section_id"] = request.section_id
