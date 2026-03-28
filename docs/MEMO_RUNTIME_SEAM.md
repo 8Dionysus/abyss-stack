@@ -15,6 +15,7 @@ That mirror currently includes:
 
 - memo doctrine docs needed for runtime orientation and recurrence support
 - compact doctrine and object catalogs
+- compact doctrine and object capsule packs
 - full section packs for doctrine and object inspection
 - router-ready and object-facing recall contracts
 - the checkpoint-to-memory contract example
@@ -34,6 +35,7 @@ Phase 3 adds a `/memo/*` namespace for bounded read-only inspection:
 - `GET /memo/object-catalog`
 - `GET /memo/checkpoint-contract`
 - `POST /memo/inspect`
+- `POST /memo/capsule`
 - `POST /memo/expand`
 - `POST /memo/recall-contract`
 - `POST /memo/writeback-map`
@@ -89,6 +91,7 @@ To inspect the memo seam after the `federation` profile is up:
 curl http://127.0.0.1:5402/memo/registry
 curl http://127.0.0.1:5402/memo/catalog
 curl http://127.0.0.1:5402/memo/object-catalog
+curl -X POST http://127.0.0.1:5402/memo/capsule -H 'content-type: application/json' -d '{"family":"doctrine","id":"AOA-M-0002"}'
 ```
 
 To emit a bounded memo export candidate:
