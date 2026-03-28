@@ -24,6 +24,9 @@ A local agent-facing runtime surface with an Ollama-first embeddings path:
 - `40-llm-gateway.yml`
 - `41-agent-api.yml`
 
+This profile keeps the default `POST /run` path unchanged.
+Its new `POST /run/federated` path stays opt-in and only becomes useful when the `federation` profile is also present and `AOA_FEDERATED_RUN_ENABLED=true`.
+
 ### `intel`
 
 The agentic surface plus Intel-oriented inference and an OVMS overlay for the agent API:
@@ -43,6 +46,7 @@ An opt-in metadata-only federation seam:
 This profile is intended to layer over `agentic` or `intel`, but it may also be run by itself for seam debugging.
 It reads a mirrored `aoa-agents` contract seam, an `aoa-routing advisory seam`, an `aoa-memo` recall seam, an `aoa-evals` eval selection seam, an `aoa-playbooks` activation/composition advisory seam, an `aoa-kag` retrieval/regrounding seam, and a source-owned `tos-source` handoff seam through the single localhost-only `route-api`.
 It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` and filesystem-first eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/`.
+`route-api` remains advisory-only in this shape, but when this profile is layered onto `agentic`, `langchain-api` may consume it through `POST /run/federated`.
 
 ### `tools`
 
@@ -143,6 +147,8 @@ aoa-profile-modules --profile agentic --profile federation --paths
 aoa-profile-endpoints --profile agentic --profile federation
 aoa-up --profile agentic --profile federation
 ```
+
+If you want the live advisory consumer as well, enable `AOA_FEDERATED_RUN_ENABLED=true` for `langchain-api` before starting the combined profile.
 
 Bring up an agent runtime plus tools and observability:
 
