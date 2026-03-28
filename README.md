@@ -111,7 +111,7 @@ For the shortest next route by intent:
 | `aoa-evals` | portable proof surfaces for bounded claims | you need evaluation and quality checks rather than runtime services |
 | `aoa-playbooks` | playbook doctrine, authored execution bundles, and playbook-owned meaning | you need playbook authority rather than runtime advisory mirrors |
 
-## Repository shape
+## Source checkout shape
 
 ```text
 abyss-stack/
@@ -130,6 +130,9 @@ abyss-stack/
 ├─ env/
 └─ .github/
 ```
+
+The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally narrower than the source checkout.
+It does not try to duplicate every source-only top-level surface such as `.github/`, `schemas/`, `examples/`, or contributor workflow files.
 
 ## Module layout
 
@@ -171,8 +174,8 @@ The repository now includes:
 
 ## Current status
 
-The bootstrap skeleton is in place, the first real services have been migrated from `abyss-stack_old`, and the first profile-aware scripts and unit scaffolding now exist.
-The current hardening pass adds named presets on top of profile composition so common runtime bundles can be invoked and inspected as first-class operating modes.
+`abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
+The next large step is no longer bootstrap or mirror landing; it is deciding what the live runtime loop should actually consume from those already-landed seams.
 
 ## License
 

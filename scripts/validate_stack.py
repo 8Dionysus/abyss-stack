@@ -9,6 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE_DIR = ROOT / "compose" / "profiles"
 PRESET_DIR = ROOT / "compose" / "presets"
 MODULE_DIR = ROOT / "compose" / "modules"
+RUNTIME_CONFIGS_MIRROR_MODE = (
+    ROOT.name == "Configs"
+    and (ROOT / "compose").exists()
+    and (ROOT / "config-templates").exists()
+    and not (ROOT / "CONTRIBUTING.md").exists()
+)
 
 LEGACY_PATH = "/srv/abyss"
 LEGACY_PATTERN = re.compile(r"/srv/abyss(?!-)")
@@ -691,8 +697,43 @@ def validate_kag_runtime_seam(errors: list[str]) -> None:
             errors.append(f"docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
 
 
+def validate_runtime_configs_mirror(errors: list[str]) -> None:
+    required_runtime_paths = [
+        ROOT / "README.md",
+        ROOT / "compose" / "modules",
+        ROOT / "compose" / "profiles",
+        ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
+        ROOT / "scripts" / "aoa-check-layout",
+        ROOT / "docs" / "DEPLOYMENT.md",
+    ]
+    for path in required_runtime_paths:
+        if not path.exists():
+            errors.append(f"runtime Configs mirror is missing required path: {path.relative_to(ROOT)}")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    if "Source checkout shape" not in readme:
+        errors.append("runtime Configs mirror README must clarify that the repository tree is the source checkout shape")
+    if "/srv/abyss-stack/Configs" not in readme:
+        errors.append("runtime Configs mirror README must mention /srv/abyss-stack/Configs")
+
+    agents_doc = (ROOT / "scripts" / "AGENTS.md").read_text(encoding="utf-8")
+    if "source checkout only" not in agents_doc:
+        errors.append("runtime Configs mirror scripts/AGENTS.md must note that .github workflow refs are source-checkout-only")
+
+
 def main() -> int:
     errors: list[str] = []
+
+    if RUNTIME_CONFIGS_MIRROR_MODE:
+        validate_runtime_configs_mirror(errors)
+        if errors:
+            print("validation failed:")
+            for error in errors:
+                print(f"- {error}")
+            return 1
+
+        print("validation passed (runtime Configs mirror mode)")
+        return 0
 
     validate_profiles(errors)
     validate_presets(errors)

@@ -5,7 +5,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 
 ## Read before editing
 1. `scripts/aoa-lib.sh`
-2. `.github/workflows/validate-stack.yml`
+2. `.github/workflows/validate-stack.yml` in the source checkout only; the runtime `Configs/` mirror does not include `.github/`
 3. `docs/FIRST_RUN.md`
 4. `docs/DOCTOR.md`
 5. `docs/DEPLOYMENT.md`

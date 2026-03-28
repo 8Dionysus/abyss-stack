@@ -39,5 +39,6 @@ Do not restore blindly over a live stack without deciding whether the stack must
 
 ## Current status
 
-This document is a contract skeleton for the new stack.
-Exact restore procedures should be hardened as the wrapper and operational model mature.
+This is no longer just a contract skeleton.
+The stack is already a live stateful runtime, but restore remains intentionally explicit and operator-driven.
+The next hardening step is to keep the restore path crisp as runtime state, federation mirrors, and platform-specific adaptations continue to grow.
