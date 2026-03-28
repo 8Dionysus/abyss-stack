@@ -30,6 +30,8 @@ This file maps the first migrated runtime modules to their intended services.
 - `langchain-api` — base agent-facing runtime API
 - default embeddings path — Ollama-first
 - may consume a public-safe return policy file and emit runtime return events
+- now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
+- returns the normal model answer plus a redacted `advisory_trace` when the federated path is enabled
 
 ## `42-agent-api-intel.yml`
 
@@ -40,7 +42,8 @@ This file maps the first migrated runtime modules to their intended services.
 
 - `route-api` — localhost-only federation seam reader for mirrored `aoa-agents` contracts, `aoa-routing advisory routing surfaces`, `aoa-memo` recall surfaces, `aoa-evals` eval selection surfaces, `aoa-playbooks` activation/composition advisory surfaces, `aoa-kag` retrieval/regrounding surfaces, and the source-owned `tos-source` handoff companion
 - consumes only runtime-local public-safe mirror data
-- exposes thin routing metadata, structured advisory routing, bounded memo inspection, structured eval selection, playbook activation/composition inspection, `/kag/*` retrieval/regrounding inspection, and filesystem-first memo/eval export discovery without changing `langchain-api`
+- exposes thin routing metadata, structured advisory routing, bounded memo inspection, structured eval selection, playbook activation/composition inspection, `/kag/*` retrieval/regrounding inspection, and filesystem-first memo/eval export discovery
+- remains an advisory facade; it does not execute the route itself, while `langchain-api` is now the first live consumer of those mirrored seams
 
 ## `50-speech.yml`
 

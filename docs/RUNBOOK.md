@@ -18,8 +18,9 @@ When something feels wrong, use this order:
 12. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
 13. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
 14. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
-15. decide whether to fix forward or roll back
-16. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+15. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
+16. decide whether to fix forward or roll back
+17. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -99,6 +100,21 @@ curl -X POST http://127.0.0.1:5402/playbooks/select \
   -H 'content-type: application/json' \
   -d '{"scenario":"bounded_change_safe"}'
 ```
+
+For the live federated run path through `langchain-api`:
+
+```bash
+curl -X POST http://127.0.0.1:5401/run/federated \
+  -H 'content-type: application/json' \
+  -d '{"user_text":"Summarize the current route","playbook_id":"AOA-P-0008"}'
+
+curl -X POST http://127.0.0.1:5401/run/federated \
+  -H 'content-type: application/json' \
+  -d '{"user_text":"Use this memo card if it helps","memo":{"family":"router","mode":"semantic","id":"claim-1"}}'
+```
+
+Expect `503` when `AOA_FEDERATED_RUN_ENABLED` is off or `route-api` is not currently reachable.
+Expect `409` when a playbook filter matches more than one playbook and the runtime refuses to guess.
 
 For KAG and `Tree-of-Sophia` handoff inspection through the localhost federation seam:
 

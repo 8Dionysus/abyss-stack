@@ -17,6 +17,8 @@ services:
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"
+      AOA_FEDERATED_RUN_ENABLED: "${AOA_FEDERATED_RUN_ENABLED:-false}"
+      AOA_ROUTE_API_BASE_URL: "${AOA_ROUTE_API_BASE_URL:-http://route-api:5402}"
       EMBEDDINGS_PROVIDER: "${AOA_EMBEDDINGS_PROVIDER:-ollama}"
       OVMS_EMBEDDINGS_URL: http://ovms:8000/v3/embeddings
       OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov

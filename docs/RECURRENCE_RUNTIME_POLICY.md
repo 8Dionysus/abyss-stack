@@ -51,6 +51,8 @@ The runtime wrapper may consume public surfaces from neighboring AoA repositorie
 - an `anchor_artifact` name from the agent layer
 - a checkpoint or bounded recall handle selected upstream
 - a scenario hint that narrows re-entry posture
+- a playbook advisory card that narrows recall defaults and fallback posture
+- a memo recall contract that names inspect, capsule, and expand surfaces without moving memo ownership here
 
 But `abyss-stack` must consume those surfaces without re-owning their authored meaning.
 
@@ -122,6 +124,14 @@ Prefer:
 1. checkpoint pack
 2. selected prior decision or verification surfaces
 3. selected archive recall only if profile posture allows it
+
+When the live runtime does consume memo recall, the first bounded posture should remain:
+
+```text
+inspect -> capsule -> expand
+```
+
+Use the capsule step only when the upstream contract publishes it, and keep full expansion as an explicit choice rather than a hidden default.
 
 The wrapper should grow `memory_access` before growing raw `long`.
 
@@ -217,6 +227,7 @@ The narrowest implementation path is to let the agent-facing runtime service con
 
 For the current stack shape, that most naturally lands in the `41-agent-api.yml` surface.
 If the service name changes later, the file contract may stay stable while the consumer changes.
+`route-api` remains the advisory facade in this arrangement; it names playbook and memo surfaces, while `langchain-api` is the first live runtime consumer of those surfaces through `POST /run/federated`.
 
 ## Render-truth and runbook stance
 

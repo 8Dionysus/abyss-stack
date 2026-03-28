@@ -175,7 +175,8 @@ The repository now includes:
 ## Current status
 
 `abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
-The next large step is no longer bootstrap or mirror landing; it is deciding what the live runtime loop should actually consume from those already-landed seams.
+The first live consumer step has now landed in `langchain-api` through opt-in `POST /run/federated`, which can consume advisory playbook and memo seams without changing the default `POST /run` path.
+The next large step is no longer whether the live runtime should consume those seams at all, but how broadly and how deeply the runtime loop should rely on them.
 
 ## License
 
