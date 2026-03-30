@@ -31,7 +31,7 @@ Control baseline:
 Promoted bounded-worker path:
 - runtime path: `http://127.0.0.1:5403/run`
 - backend: `llama.cpp`
-- orchestration: `LangGraph` for `W5` and `W6`
+- orchestration: `LangGraph` for `W5`, `W6`, and the current bounded local-worker posture
 
 Durable program roots now in use:
 - `qwen-local-pilot-v1`
@@ -126,11 +126,9 @@ What it does not do:
 - it does not upgrade runtime success into portable proof wording
 - it does not collapse `W4` into a silent monolithic mutator
 
-## LangGraph sidecar pilot
+## LangGraph sidecar origin and promoted role
 
-The current trial runner remains the execution baseline.
-
-An optional comparison layer now also exists:
+The original comparison layer still exists:
 
 ```bash
 scripts/aoa-langgraph-pilot materialize
@@ -145,6 +143,12 @@ scripts/aoa-langgraph-pilot --url http://127.0.0.1:5403/run --program-id langgra
 ```
 
 Use [LANGGRAPH_PILOT](LANGGRAPH_PILOT.md) for the sidecar contract.
+
+That sidecar surface established the now-adopted execution posture:
+
+- `aoa-local-ai-trials` remains the historical baseline for `W0` through `W4`
+- `LangGraph` is now the primary orchestration layer for `W5`, `W6`, and the current bounded local-worker path
+- `aoa-langgraph-pilot` remains the W4-shaped comparison and fixture surface rather than the full execution baseline
 
 ## W5 long-horizon pilot
 

@@ -2,10 +2,10 @@
 
 ## Purpose
 
-This document defines the bounded LangGraph sidecar pilot for `abyss-stack`.
+This document defines the bounded LangGraph sidecar pilot for `abyss-stack` and records the execution-layer decision that came out of it.
 
 It is not a new service and not a migration of `aoa-local-ai-trials`.
-It is a comparison layer for one W4-shaped supervised edit flow.
+It began as a comparison layer for one W4-shaped supervised edit flow and now serves as the origin surface for the adopted bounded execution layer used by `W5` and `W6`.
 
 ## Current pilot
 
@@ -13,7 +13,7 @@ Program id:
 - `langgraph-sidecar-pilot-v1`
 - `langgraph-sidecar-llamacpp-v1` for the disposable backend-promotion fixture gate
 
-Current runtime path:
+Current origin runtime path:
 - `intel-full -> langchain-api /run -> ollama-native`
 
 Current cases:
@@ -63,6 +63,11 @@ The sidecar pilot does not:
 - replace `langchain-api /run`
 - widen W4 into autonomous long-horizon execution
 
+Current adopted role:
+- `LangGraph` is the preferred bounded execution layer for `W5`, `W6`, and follow-on local-worker flows
+- `aoa-local-ai-trials` remains the historical baseline for `W0` through `W4`
+- `aoa-langgraph-pilot` remains the W4-shaped comparison and fixture surface
+
 ## Artifacts
 
 Runtime truth:
@@ -93,4 +98,5 @@ The sidecar should answer a narrow question:
 - does LangGraph improve pause/resume and recovery clarity for a bounded supervised edit flow
 - without reducing W4 safety, scope discipline, or reportability
 
-Until that answer is positive, the existing runner remains the execution baseline.
+That answer is now positive for bounded local-worker flows.
+Keep the sidecar pilot as the comparison and origin surface, and use the `W5` and `W6` contracts for the adopted execution posture.

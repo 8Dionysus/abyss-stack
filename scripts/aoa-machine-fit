@@ -419,11 +419,11 @@ def main() -> int:
     current_overlays = parse_overlays(os.environ.get("AOA_EXTRA_COMPOSE_FILES", ""))
     if drm_nodes["dev_dri_present"] and ai_devices:
         validated_acceleration_posture = (
-            "OVMS embeddings on Intel GPU; Qwen chat via Ollama; Intel NPU is visible but not yet part of the validated canonical path."
+            "OVMS embeddings on Intel GPU; Qwen chat on the promoted llama.cpp path; Ollama remains the validated control path; Intel NPU is visible but not yet part of the validated canonical path."
         )
     elif drm_nodes["dev_dri_present"]:
         validated_acceleration_posture = (
-            "Intel GPU is available for OVMS-side acceleration; Qwen chat remains on Ollama."
+            "Intel GPU is available for OVMS-side acceleration; Qwen chat prefers llama.cpp while Ollama remains the control path."
         )
     else:
         validated_acceleration_posture = (
@@ -433,6 +433,19 @@ def main() -> int:
     latest_adaptation = DEFAULT_STACK_ROOT / "Logs" / "platform-adaptations" / "latest" / "latest.private.json"
     adaptation_record = read_json(latest_adaptation)
     validated_settings: dict[str, str] = {}
+    if preferred_preset == "intel-full":
+        validated_settings = {
+            "AOA_LLAMACPP_DEVICE": "none",
+            "AOA_LLAMACPP_NO_OP_OFFLOAD": "1",
+            "AOA_LLAMACPP_THREADS": "4",
+            "AOA_LLAMACPP_THREADS_BATCH": "4",
+            "AOA_LLAMACPP_THREADS_HTTP": "2",
+            "AOA_LLAMACPP_CTX_SIZE": "4096",
+            "AOA_LLAMACPP_BATCH_SIZE": "512",
+            "AOA_LLAMACPP_UBATCH_SIZE": "128",
+            "AOA_LLAMACPP_REASONING": "off",
+            "AOA_LLAMACPP_THINK": "none",
+        }
     if adaptation_record:
         adaptation_hardware_class = (
             adaptation_record.get("platform_scope", {}).get("hardware_class")
@@ -447,11 +460,19 @@ def main() -> int:
         if isinstance(raw_settings, dict) and (
             adaptation_hardware_class is None or adaptation_hardware_class == hardware_class
         ):
-            validated_settings = {
-                str(key): str(value)
-                for key, value in raw_settings.items()
-                if value is not None
-            }
+            if preferred_preset == "intel-full":
+                for key, value in raw_settings.items():
+                    if value is None:
+                        continue
+                    key_text = str(key)
+                    if key_text.startswith("AOA_LLAMACPP_"):
+                        validated_settings[key_text] = str(value)
+            else:
+                validated_settings = {
+                    str(key): str(value)
+                    for key, value in raw_settings.items()
+                    if value is not None
+                }
 
     host_facts_ref = args.host_facts_ref
     if host_facts_ref is None:
@@ -505,7 +526,7 @@ def main() -> int:
 
     summary_parts = [
         f"Preferred preset is {preferred_preset}.",
-        "Qwen chat should stay on langchain-api /run through the validated local path.",
+        "Qwen chat should stay on the promoted llama.cpp path, with Ollama retained as the control path.",
     ]
     if freshness_state == "up-to-date":
         summary_parts.append("Relevant host packages are current in the configured Fedora repositories.")
@@ -563,7 +584,7 @@ def main() -> int:
         "runtime_recommendation": {
             "preferred_preset": preferred_preset,
             "preferred_profile_set": preferred_profiles,
-            "preferred_runtime_path": "intel-full -> langchain-api /run -> litellm/ollama + route-api"
+            "preferred_runtime_path": "intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api"
             if preferred_preset == "intel-full"
             else "agent-full -> langchain-api /run -> litellm/ollama + route-api",
             "validated_acceleration_posture": validated_acceleration_posture,
@@ -593,7 +614,7 @@ def main() -> int:
                 "kernel update",
                 "linux-firmware update",
                 "mesa or Intel runtime update",
-                "Ollama or langchain-api runtime change",
+                "llama.cpp, Ollama control-path, or langchain-api runtime change",
                 "host load envelope change before latency-sensitive trials",
             ],
         },
