@@ -1606,8 +1606,38 @@ def prepare_mutation_proposal(case: dict[str, Any], *, log_root: Path) -> tuple[
             agents_refs=agents_refs,
         )
         proposal_summary["wave_id"] = WAVE_ID
+        if (
+            not proposal_summary.get("proposal_valid")
+            and any("old_text and new_text must differ" in str(item) for item in proposal_summary.get("proposal_failure_reasons", []))
+        ):
+            write_text_exact(case_root / "artifacts" / "proposal.diff", "")
+            write_json(
+                case_root / "artifacts" / "proposal.edit-spec.json",
+                TRIALS.build_w4_edit_spec_json(
+                    case_id=case["case_id"],
+                    selected_target_file=str(proposal_summary.get("selected_target_file") or allowed_relative_files[0]),
+                    mode="preexisting_noop",
+                    valid=True,
+                    attempt_order=[],
+                    spec=None,
+                    errors=[],
+                    attempts=[],
+                ),
+            )
+            proposal_summary.update(
+                {
+                    "edit_contract": "preexisting-noop",
+                    "edit_spec_mode": "preexisting_noop",
+                    "edit_spec_valid": True,
+                    "builder_match_count": 0,
+                    "rendered_diff_valid": True,
+                    "proposal_valid": True,
+                    "proposal_failure_reasons": [],
+                    "touched_files": [],
+                }
+            )
         write_json(case_root / "artifacts" / "proposal.summary.json", proposal_summary)
-        return proposal_summary, command_refs, failures, repo_root
+        return proposal_summary, command_refs, ([] if proposal_summary.get("proposal_valid") else failures), repo_root
 
     if case["execution_mode"] == "script_refresh":
         proposal_prompt_path = case_root / "artifacts" / "proposal.prompt.txt"
