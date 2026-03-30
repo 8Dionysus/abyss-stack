@@ -9,10 +9,14 @@ command -v python3 >/dev/null 2>&1 || aoa_die "python3 is required"
 
 layers=()
 check_mode=0
+json_mode=0
 while (($#)); do
   case "$1" in
     --check)
       check_mode=1
+      ;;
+    --json)
+      json_mode=1
       ;;
     --layer)
       shift || true
@@ -30,6 +34,43 @@ while (($#)); do
   done
 
 (( ${#layers[@]} > 0 )) || aoa_die "expected --layer"
+
+if (( json_mode )) && ! (( check_mode )); then
+  aoa_die "--json requires --check"
+fi
+
+emit_check_json() {
+  local layer="$1"
+  local status="$2"
+  local source_root="$3"
+  local mirror_target="$4"
+  shift 4
+  python3 - "$layer" "$status" "$source_root" "$mirror_target" "$@" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+layer = sys.argv[1]
+status = sys.argv[2]
+source_root = str(Path(sys.argv[3]))
+mirror_target = str(Path(sys.argv[4]))
+missing_files = [str(Path(item)) for item in sys.argv[5:]]
+
+print(
+    json.dumps(
+        {
+            "layer": layer,
+            "status": status,
+            "source_root": source_root,
+            "mirror_target": mirror_target,
+            "missing_files": missing_files,
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+)
+PY
+}
 
 resolve_federation_config_dir() {
   local source_templates_dir runtime_configs_dir
@@ -200,9 +241,11 @@ check_layer() {
   done < <(load_required_paths "${config_path}")
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
-  aoa_note "check layer: ${layer}"
-  aoa_note "source root: ${source_root}"
-  aoa_note "mirror target: ${target_root}"
+  if (( ! json_mode )); then
+    aoa_note "check layer: ${layer}"
+    aoa_note "source root: ${source_root}"
+    aoa_note "mirror target: ${target_root}"
+  fi
 
   for rel_path in "${required_paths[@]}"; do
     [[ -f "${source_root}/${rel_path}" ]] || aoa_die "required source file missing: ${source_root}/${rel_path}"
@@ -212,14 +255,22 @@ check_layer() {
   done
 
   if (( ${#missing_paths[@]} > 0 )); then
-    aoa_warn "missing mirrored files for ${layer}:"
-    for rel_path in "${missing_paths[@]}"; do
-      printf '  %s\n' "${rel_path}"
-    done
+    if (( json_mode )); then
+      emit_check_json "${layer}" "missing" "${source_root}" "${target_root}" "${missing_paths[@]}"
+    else
+      aoa_warn "missing mirrored files for ${layer}:"
+      for rel_path in "${missing_paths[@]}"; do
+        printf '  %s\n' "${rel_path}"
+      done
+    fi
     return 1
   fi
 
-  aoa_note "federation surface check complete for ${layer}"
+  if (( json_mode )); then
+    emit_check_json "${layer}" "ok" "${source_root}" "${target_root}"
+  else
+    aoa_note "federation surface check complete for ${layer}"
+  fi
   return 0
 }
 
