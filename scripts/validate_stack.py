@@ -29,6 +29,9 @@ REQUIRED_SCRIPTS = {
     "aoa-machine-fit",
     "aoa-platform-adaptation",
     "aoa-local-ai-trials",
+    "aoa-langgraph-pilot",
+    "aoa-w5-pilot",
+    "aoa-llamacpp-pilot",
     "aoa-qwen-check",
     "aoa-qwen-run",
     "aoa-qwen-bench",
@@ -74,6 +77,9 @@ REQUIRED_FILES = {
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "docs" / "LOCAL_AI_TRIALS.md",
+    ROOT / "docs" / "LANGGRAPH_PILOT.md",
+    ROOT / "docs" / "LLAMACPP_PILOT.md",
+    ROOT / "docs" / "W5_PILOT.md",
     ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
@@ -94,6 +100,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "machine-fit" / "README.md",
     ROOT / "docs" / "machine-fit" / "schema.v1.json",
     ROOT / "docs" / "machine-fit" / "machine-fit.public.json.example",
+    ROOT / "scripts" / "requirements-langgraph-pilot.txt",
     ROOT / "docs" / "platform-adaptations" / "README.md",
     ROOT / "docs" / "platform-adaptations" / "schema.v1.json",
     ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example",
@@ -107,7 +114,9 @@ REQUIRED_FILES = {
     ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "ollama.cpu.yml",
+    ROOT / "compose" / "modules" / "32-llamacpp-inference.yml",
     ROOT / "compose" / "modules" / "43-federation-router.yml",
+    ROOT / "compose" / "modules" / "44-llamacpp-agent-sidecar.yml",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
@@ -264,6 +273,10 @@ def validate_paths(errors: list[str]) -> None:
     for required_snippet in (
         "prepare-wave W4 --lane docs",
         "apply-case W4 <case-id>",
+        "scripts/aoa-w5-pilot materialize",
+        "run-scenario <scenario-id> --until milestone",
+        "resume-scenario <scenario-id>",
+        "implementation_patch",
         "proposal.edit-spec.json",
         "exact_replace",
         "anchored_replace",
@@ -276,6 +289,22 @@ def validate_paths(errors: list[str]) -> None:
             errors.append(
                 f"docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
             )
+
+    w5_doc = (ROOT / "docs" / "W5_PILOT.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "http://127.0.0.1:5403/run",
+        "scripts/aoa-w5-pilot materialize",
+        "run-scenario <scenario-id> --until milestone|done",
+        "resume-scenario <scenario-id>",
+        "status --all",
+        "plan_freeze",
+        "first_mutation",
+        "landing",
+        "stack-sync-federation-check-mode",
+        "implementation_patch",
+    ):
+        if required_snippet not in w5_doc:
+            errors.append(f"docs/W5_PILOT.md must mention `{required_snippet}`")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:

@@ -21,6 +21,11 @@ This file maps the first migrated runtime modules to their intended services.
 
 - `ovms` — Intel and OpenVINO oriented model serving
 
+## `32-llamacpp-inference.yml`
+
+- `llama-cpp` — optional OpenAI-compatible GGUF serving sidecar for bounded backend-parity work
+- reuses a resolved local GGUF model file rather than changing the canonical validated Ollama path
+
 ## `40-llm-gateway.yml`
 
 - `litellm` — model gateway and routing facade
@@ -37,6 +42,12 @@ This file maps the first migrated runtime modules to their intended services.
 
 - `langchain-api` overlay — switches embeddings path to OVMS
 - adds explicit OVMS runtime dependency for Intel-aware profiles
+
+## `44-llamacpp-agent-sidecar.yml`
+
+- `langchain-api-llamacpp` — optional sidecar agent API bound to a `llama.cpp` backend on a separate host port
+- preserves the canonical `langchain-api` service and `5401` path for honest A/B comparison
+- keeps embeddings on OVMS for Intel-aware pilot runs
 
 ## `43-federation-router.yml`
 
@@ -74,8 +85,10 @@ Expected localhost-only services include:
 - n8n
 - ollama
 - ovms
+- llama-cpp
 - litellm
 - langchain-api
+- langchain-api-llamacpp
 - route-api
 - qwen-tts
 - tts-router

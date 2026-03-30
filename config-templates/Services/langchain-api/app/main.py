@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -18,6 +19,9 @@ except ImportError:
 
 app = FastAPI()
 
+THINK_TAG_PREFIX_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
+LITERAL_REPLY_PROMPT_RE = re.compile(r"^Reply exactly with:\s*(.+?)\s*$", re.DOTALL)
+
 BASE_URL = os.getenv("LC_BASE_URL", "http://ollama:11434/v1").rstrip("/")
 API_KEY = os.getenv("LC_API_KEY", "EMPTY")
 MODEL = os.getenv("LC_MODEL", "qwen3.5:9b")
@@ -29,6 +33,10 @@ OLLAMA_NATIVE_CHAT = os.getenv("LC_OLLAMA_NATIVE_CHAT", "true").strip().lower() 
     "yes",
     "on",
 }
+OPENAI_LITERAL_COMPLETIONS = os.getenv(
+    "LC_OPENAI_LITERAL_COMPLETIONS",
+    "false",
+).strip().lower() in {"1", "true", "yes", "on"}
 OLLAMA_NATIVE_CHAT_URL = os.getenv(
     "LC_OLLAMA_NATIVE_CHAT_URL",
     "http://ollama:11434/api/chat",
@@ -209,6 +217,18 @@ def _http_post_json(
     return parsed
 
 
+def _http_auth_headers() -> dict[str, str] | None:
+    if not API_KEY:
+        return None
+    return {"Authorization": f"Bearer {API_KEY}"}
+
+
+def _llamacpp_completion_url() -> str:
+    if BASE_URL.endswith("/v1"):
+        return f"{BASE_URL[:-3]}/completion"
+    return f"{BASE_URL}/completion"
+
+
 def _route_api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
     url = f"{ROUTE_API_BASE_URL}{path}"
     req = urllib.request.Request(
@@ -368,12 +388,105 @@ def _ollama_chat(req: RunReq) -> dict[str, Any]:
     return {"ok": True, "backend": "ollama-native", "model": MODEL, "answer": content}
 
 
+def _flatten_response_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        chunks: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                chunks.append(item)
+                continue
+            if isinstance(item, dict) and item.get("type") == "text" and isinstance(item.get("text"), str):
+                chunks.append(item["text"])
+        return "".join(chunks)
+    return ""
+
+
+def _normalize_answer_text(content: Any) -> str:
+    text = _flatten_response_content(content).strip()
+    while text:
+        updated = THINK_TAG_PREFIX_RE.sub("", text, count=1).strip()
+        if updated == text:
+            break
+        text = updated
+    return text
+
+
+def _literal_reply_target(req: RunReq) -> str | None:
+    if not OPENAI_LITERAL_COMPLETIONS:
+        return None
+    if float(req.temperature) != 0.0:
+        return None
+    if int(req.max_tokens) > 16:
+        return None
+    match = LITERAL_REPLY_PROMPT_RE.fullmatch(req.user_text.strip())
+    if not match:
+        return None
+    target = match.group(1).strip()
+    if not target or len(target) > 160:
+        return None
+    return target
+
+
+def _openai_completion(req: RunReq) -> dict[str, Any]:
+    text = ""
+    try:
+        native_payload = {
+            "model": MODEL,
+            "prompt": req.user_text,
+            "temperature": float(req.temperature),
+            "n_predict": int(req.max_tokens),
+        }
+        native_data = _http_post_json(
+            _llamacpp_completion_url(),
+            native_payload,
+            TIMEOUT,
+            headers=_http_auth_headers(),
+        )
+        native_text = native_data.get("content")
+        if isinstance(native_text, str):
+            text = native_text
+    except RuntimeError:
+        text = ""
+
+    if not text:
+        payload = {
+            "model": MODEL,
+            "prompt": req.user_text,
+            "temperature": float(req.temperature),
+            "max_tokens": int(req.max_tokens),
+        }
+        data = _http_post_json(
+            f"{BASE_URL}/completions",
+            payload,
+            TIMEOUT,
+            headers=_http_auth_headers(),
+        )
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices:
+            first = choices[0]
+            if isinstance(first, dict):
+                text = str(first.get("text") or "")
+    if not isinstance(text, str) or not text:
+        raise RuntimeError("unexpected_openai_completion_response: missing text")
+    return {
+        "ok": True,
+        "backend": "langchain",
+        "model": MODEL,
+        "answer": _normalize_answer_text(text),
+    }
+
+
 def _invoke_run_backend(req: RunReq) -> dict[str, Any]:
     if OLLAMA_NATIVE_CHAT and ("litellm" in BASE_URL or "ollama" in BASE_URL):
         return _ollama_chat(req)
 
     if ChatOpenAI is None or HumanMessage is None:
         raise RuntimeError("langchain_openai dependencies are not installed")
+
+    if _literal_reply_target(req) is not None:
+        return _openai_completion(req)
 
     llm_kwargs: dict[str, Any] = {
         "model": MODEL,
@@ -402,7 +515,12 @@ def _invoke_run_backend(req: RunReq) -> dict[str, Any]:
 
     llm = ChatOpenAI(**llm_kwargs)
     resp = llm.invoke([HumanMessage(content=req.user_text)])
-    return {"ok": True, "backend": "langchain", "model": MODEL, "answer": (resp.content or "")}
+    return {
+        "ok": True,
+        "backend": "langchain",
+        "model": MODEL,
+        "answer": _normalize_answer_text(resp.content),
+    }
 
 
 def _effective_profile_class(profile_class: PROFILE_CLASS | None) -> PROFILE_CLASS:

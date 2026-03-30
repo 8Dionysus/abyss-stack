@@ -1,0 +1,1220 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+SCRIPT_PATH = Path(__file__).resolve()
+SCRIPT_DIR = SCRIPT_PATH.parent
+SOURCE_ROOT = SCRIPT_DIR.parent
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
+PILOT_ID = "llamacpp-sidecar-pilot-v1"
+PILOT_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "comparisons" / PILOT_ID
+PROMOTION_ID = "llamacpp-promotion-gate-v1"
+PROMOTION_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "promotions" / PROMOTION_ID
+SIDECAR_PROJECT = os.environ.get("AOA_LLAMACPP_COMPOSE_PROJECT", "abyss-llamacpp-pilot")
+MODEL_STORE_ROOT = STACK_ROOT / "Logs" / "llamacpp" / "models" / "bartowski"
+OLLAMA_MANIFEST = (
+    STACK_ROOT
+    / "Services"
+    / "ollama"
+    / "models"
+    / "manifests"
+    / "registry.ollama.ai"
+    / "library"
+    / "qwen3.5"
+    / "9b"
+)
+SIDECAR_FILE_SPECS = (
+    "compose/modules/32-llamacpp-inference.yml",
+    "compose/modules/44-llamacpp-agent-sidecar.yml",
+)
+FEDERATION_LAYERS = (
+    "aoa-agents",
+    "aoa-routing",
+    "aoa-memo",
+    "aoa-evals",
+    "aoa-playbooks",
+    "aoa-kag",
+    "tos-source",
+)
+BASE_HEALTH_URL = "http://127.0.0.1:5401/health"
+BASE_RUN_URL = "http://127.0.0.1:5401/run"
+LLAMACPP_HEALTH_URL = "http://127.0.0.1:11435/health"
+LLAMACPP_HEALTH_FALLBACK_URL = "http://127.0.0.1:11435/v1/health"
+CANDIDATE_HEALTH_URL = "http://127.0.0.1:5403/health"
+CANDIDATE_RUN_URL = "http://127.0.0.1:5403/run"
+LLAMACPP_W0_PROGRAM_ID = "qwen-llamacpp-pilot-v1"
+LLAMACPP_W4_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
+LLAMACPP_W4_GATE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / "langgraph-sidecar-llamacpp-promotion-gate"
+LLAMACPP_W4_GATE_MIRROR_ROOT = Path("/srv/Dionysus/reports/local-ai-trials/langgraph-sidecar-llamacpp-promotion-gate")
+
+CANDIDATE_MODEL_SPECS = (
+    {
+        "quant": "Q4_K_M",
+        "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "runtime_variant": "Q4_K_M via llama.cpp sidecar",
+        "target_label": "workhorse-local-qwen3.5-9b-llamacpp-q4km",
+        "backend_label": "langchain-api-llamacpp -> llama.cpp-openai",
+    },
+    {
+        "quant": "Q6_K",
+        "filename": "Qwen_Qwen3.5-9B-Q6_K.gguf",
+        "runtime_variant": "Q6_K via llama.cpp sidecar",
+        "target_label": "workhorse-local-qwen3.5-9b-llamacpp-q6k",
+        "backend_label": "langchain-api-llamacpp -> llama.cpp-openai",
+    },
+)
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def timestamp_dir() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    ensure_parent(path)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
+def write_text(path: Path, content: str) -> None:
+    ensure_parent(path)
+    path.write_text(content, encoding="utf-8")
+
+
+def run_cmd(
+    argv: list[str],
+    *,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+    capture_output: bool = False,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        argv,
+        cwd=str(cwd or SOURCE_ROOT),
+        env=env,
+        text=True,
+        capture_output=capture_output,
+        check=check,
+    )
+
+
+def base_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["AOA_STACK_ROOT"] = str(STACK_ROOT)
+    env["AOA_CONFIGS_ROOT"] = str(CONFIGS_ROOT)
+    env.setdefault("PODMAN_DEFAULT_PLATFORM", "linux/amd64")
+    return env
+
+
+def sidecar_env(model_host_path: Path) -> dict[str, str]:
+    env = base_env()
+    env["AOA_LLAMACPP_MODEL_HOST_PATH"] = str(model_host_path)
+    return env
+
+
+def sidecar_compose_cmd(*args: str) -> list[str]:
+    cmd = ["podman", "compose", "-p", SIDECAR_PROJECT]
+    for spec in SIDECAR_FILE_SPECS:
+        cmd.extend(["-f", str(CONFIGS_ROOT / spec)])
+    cmd.extend(args)
+    return cmd
+
+
+def http_get_json(url: str, timeout_s: float = 5.0) -> tuple[int, dict[str, Any] | None]:
+    req = urllib.request.Request(url=url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            body = resp.read().decode("utf-8", errors="ignore")
+            payload = json.loads(body) if body else None
+            if payload is not None and not isinstance(payload, dict):
+                payload = None
+            return resp.status, payload
+    except urllib.error.URLError:
+        return None, None
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        try:
+            payload = json.loads(body) if body else None
+            if payload is not None and not isinstance(payload, dict):
+                payload = None
+        except Exception:
+            payload = None
+        return exc.code, payload
+
+
+def wait_for_url(name: str, url: str, timeout_s: float, accept_503: bool = False) -> dict[str, Any]:
+    deadline = time.time() + timeout_s
+    last_status: int | None = None
+    last_payload: dict[str, Any] | None = None
+
+    while time.time() < deadline:
+        try:
+            status, payload = http_get_json(url, timeout_s=4.0)
+        except Exception:
+            status, payload = None, None
+
+        last_status = status
+        last_payload = payload
+
+        if status == 200:
+            return {
+                "ready": True,
+                "status": status,
+                "payload": payload,
+                "url": url,
+                "name": name,
+            }
+        if status == 503 and accept_503:
+            time.sleep(2.0)
+            continue
+        time.sleep(2.0)
+
+    return {
+        "ready": False,
+        "status": last_status,
+        "payload": last_payload,
+        "url": url,
+        "name": name,
+    }
+
+
+def container_logs(name: str, tail: int = 80) -> str:
+    proc = run_cmd(
+        ["podman", "logs", "--tail", str(tail), name],
+        capture_output=True,
+        check=False,
+    )
+    return (proc.stdout or "") + (proc.stderr or "")
+
+
+def wait_for_llama(timeout_s: float) -> dict[str, Any]:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        status, payload = http_get_json(LLAMACPP_HEALTH_URL, timeout_s=4.0)
+        if status == 200:
+            return {
+                "ready": True,
+                "status": status,
+                "payload": payload,
+                "url": LLAMACPP_HEALTH_URL,
+                "name": "llama-cpp",
+            }
+
+        logs = container_logs("llama-cpp")
+        if any(
+            marker in logs
+            for marker in (
+                "failed to load model",
+                "error loading model",
+                "Exec format error",
+                "main: exiting due to model loading error",
+            )
+        ):
+            return {
+                "ready": False,
+                "status": status,
+                "payload": payload,
+                "url": LLAMACPP_HEALTH_URL,
+                "name": "llama-cpp",
+                "error": "llama.cpp reported a model-load failure",
+                "log_excerpt": logs[-4000:],
+            }
+
+        status, payload = http_get_json(LLAMACPP_HEALTH_FALLBACK_URL, timeout_s=4.0)
+        if status == 200:
+            return {
+                "ready": True,
+                "status": status,
+                "payload": payload,
+                "url": LLAMACPP_HEALTH_FALLBACK_URL,
+                "name": "llama-cpp",
+            }
+        time.sleep(2.0)
+
+    return {
+        "ready": False,
+        "status": None,
+        "payload": None,
+        "url": LLAMACPP_HEALTH_URL,
+        "name": "llama-cpp",
+        "error": "timeout waiting for llama.cpp health",
+    }
+
+
+def resolve_model_info(model_host_path: str | None = None) -> dict[str, Any]:
+    if model_host_path:
+        blob_path = Path(model_host_path).expanduser().resolve()
+        if not blob_path.exists():
+            raise SystemExit(f"error: model host path does not exist: {blob_path}")
+        manifest_path = None
+        blob_digest = None
+    else:
+        if not OLLAMA_MANIFEST.exists():
+            raise SystemExit(f"error: missing Ollama manifest: {OLLAMA_MANIFEST}")
+        manifest = json.loads(OLLAMA_MANIFEST.read_text(encoding="utf-8"))
+        model_layer = next(
+            (
+                layer
+                for layer in manifest.get("layers", [])
+                if layer.get("mediaType") == "application/vnd.ollama.image.model"
+            ),
+            None,
+        )
+        if not model_layer:
+            raise SystemExit(f"error: no model layer found in {OLLAMA_MANIFEST}")
+        blob_digest = str(model_layer["digest"]).split(":", 1)[1]
+        blob_path = STACK_ROOT / "Services" / "ollama" / "models" / "blobs" / f"sha256-{blob_digest}"
+        if not blob_path.exists():
+            raise SystemExit(f"error: resolved GGUF blob does not exist: {blob_path}")
+        manifest_path = OLLAMA_MANIFEST
+
+    with blob_path.open("rb") as handle:
+        header = handle.read(4)
+    if header != b"GGUF":
+        raise SystemExit(f"error: resolved model is not a GGUF file: {blob_path}")
+
+    ollama_runtime = None
+    try:
+        status, payload = http_get_json("http://127.0.0.1:11434/api/tags", timeout_s=2.0)
+        if status == 200 and payload:
+            for item in payload.get("models", []):
+                if item.get("name") == "qwen3.5:9b":
+                    ollama_runtime = item
+                    break
+    except Exception:
+        ollama_runtime = None
+
+    return {
+        "resolved_at": utc_now(),
+        "manifest_path": str(manifest_path) if manifest_path else None,
+        "model_host_path": str(blob_path),
+        "blob_digest": blob_digest,
+        "blob_size_bytes": blob_path.stat().st_size,
+        "model_alias": "qwen3.5:9b",
+        "runtime_details": ollama_runtime,
+        "reuse_strategy": "resident_ollama_gguf_blob",
+    }
+
+
+def candidate_model_info() -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for spec in CANDIDATE_MODEL_SPECS:
+        model_path = MODEL_STORE_ROOT / spec["filename"]
+        items.append(
+            {
+                **spec,
+                "model_host_path": str(model_path),
+                "exists": model_path.exists(),
+                "size_bytes": model_path.stat().st_size if model_path.exists() else None,
+            }
+        )
+    return items
+
+
+def run_qwen_check(*, case_name: str, url: str, timeout_s: float) -> dict[str, Any]:
+    proc = run_cmd(
+        [
+            str(SCRIPT_DIR / "aoa-qwen-check"),
+            "--case",
+            case_name,
+            "--url",
+            url,
+            "--timeout",
+            str(timeout_s),
+            "--json",
+        ],
+        env=base_env(),
+        capture_output=True,
+        check=False,
+    )
+    payload = None
+    for line in proc.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("{"):
+            continue
+        try:
+            payload = json.loads(stripped)
+        except Exception:
+            continue
+    return {
+        "ok": proc.returncode == 0 and isinstance(payload, dict) and bool(payload.get("ok")),
+        "returncode": proc.returncode,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "payload": payload,
+    }
+
+
+def ensure_baseline_healthy(timeout_s: float = 20.0) -> dict[str, Any]:
+    health = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=timeout_s)
+    if not health["ready"]:
+        raise RuntimeError("baseline langchain-api health degraded")
+    return health
+
+
+def case_mean(summary: dict[str, Any], case_name: str) -> float | None:
+    bucket = summary.get("case_breakdown", {}).get(case_name, {})
+    value = bucket.get("mean_s")
+    return float(value) if isinstance(value, (int, float)) else None
+
+
+def screening_winner(
+    *,
+    baseline: dict[str, Any],
+    screenings: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    stable = [item for item in screenings if item.get("stable")]
+    if not stable:
+        return None
+    baseline_exact = case_mean(baseline["summary"], "exact-reply")
+    eligible: list[dict[str, Any]] = []
+    for item in stable:
+        candidate_exact = case_mean(item["bench"]["summary"], "exact-reply")
+        exact_ratio = None
+        if baseline_exact and candidate_exact is not None:
+            exact_ratio = (candidate_exact - baseline_exact) / baseline_exact
+        item["exact_reply_regression_ratio"] = round(exact_ratio, 4) if exact_ratio is not None else None
+        if exact_ratio is not None and exact_ratio > 0.15:
+            continue
+        eligible.append(item)
+    if not eligible:
+        return None
+    eligible.sort(
+        key=lambda item: (
+            case_mean(item["bench"]["summary"], "repo-routing") if case_mean(item["bench"]["summary"], "repo-routing") is not None else 999999.0,
+            0 if item["quant"] == "Q4_K_M" else 1,
+        )
+    )
+    return eligible[0]
+
+
+def sync_configs() -> None:
+    run_cmd([str(SCRIPT_DIR / "aoa-sync-configs")], env=base_env())
+    run_cmd([str(SCRIPT_DIR / "aoa-bootstrap-configs"), "--force"], env=base_env())
+    sync_argv = [str(SCRIPT_DIR / "aoa-sync-federation-surfaces")]
+    for layer in FEDERATION_LAYERS:
+        sync_argv.extend(["--layer", layer])
+    run_cmd(sync_argv, env=base_env())
+
+
+def run_doctor(preset: str) -> None:
+    run_cmd([str(SCRIPT_DIR / "aoa-doctor"), "--preset", preset], env=base_env())
+
+
+def up_base_stack(preset: str) -> None:
+    run_cmd([str(SCRIPT_DIR / "aoa-up"), "--preset", preset], env=base_env())
+
+
+def up_llama_sidecar(model_host_path: Path) -> None:
+    run_cmd(sidecar_compose_cmd("up", "-d", "llama-cpp"), env=sidecar_env(model_host_path), cwd=CONFIGS_ROOT)
+
+
+def up_langchain_sidecar(model_host_path: Path) -> None:
+    run_cmd(
+        sidecar_compose_cmd("up", "--build", "-d", "langchain-api-llamacpp"),
+        env=sidecar_env(model_host_path),
+        cwd=CONFIGS_ROOT,
+    )
+
+
+def stop_sidecars() -> None:
+    run_cmd(sidecar_compose_cmd("down"), env=base_env(), cwd=CONFIGS_ROOT, check=False)
+
+
+def parse_bench_output(stdout: str) -> tuple[Path, dict[str, Any]]:
+    run_dir: Path | None = None
+    summary_payload: dict[str, Any] | None = None
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("run dir: "):
+            run_dir = Path(stripped[len("run dir: ") :])
+            continue
+        if stripped.startswith("{") and stripped.endswith("}"):
+            try:
+                payload = json.loads(stripped)
+            except Exception:
+                continue
+            if isinstance(payload, dict) and "benchmark_id" in payload:
+                summary_payload = payload
+    if run_dir is None or summary_payload is None:
+        raise RuntimeError("bench output did not contain a run dir and summary JSON")
+    return run_dir, summary_payload
+
+
+def run_bench(
+    *,
+    preset: str,
+    url: str,
+    repeat: int,
+    timeout_s: float,
+    backend_label: str,
+    runtime_variant: str,
+    target_label: str,
+) -> dict[str, Any]:
+    proc = run_cmd(
+        [
+            str(SCRIPT_DIR / "aoa-qwen-bench"),
+            "--preset",
+            preset,
+            "--repeat",
+            str(repeat),
+            "--timeout",
+            str(timeout_s),
+            "--url",
+            url,
+            "--backend-label",
+            backend_label,
+            "--model-label",
+            "qwen3.5:9b",
+            "--runtime-variant",
+            runtime_variant,
+            "--target-label",
+            target_label,
+        ],
+        env=base_env(),
+        capture_output=True,
+        check=False,
+    )
+    run_dir, summary_payload = parse_bench_output(proc.stdout)
+    manifest_path = run_dir / "benchmark.manifest.json"
+    summary_path = run_dir / "summary.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    return {
+        "ok": proc.returncode == 0,
+        "returncode": proc.returncode,
+        "command": proc.args,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "run_dir": str(run_dir),
+        "manifest": manifest,
+        "summary": summary,
+        "summary_stdout": summary_payload,
+    }
+
+
+def maybe_delta(candidate: float | None, baseline: float | None) -> float | None:
+    if candidate is None or baseline is None:
+        return None
+    return round(candidate - baseline, 3)
+
+
+def build_report(
+    *,
+    preset: str,
+    model_info: dict[str, Any],
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    comparison: dict[str, Any],
+) -> str:
+    base_summary = baseline["summary"]
+    cand_summary = candidate["summary"]
+    lines = [
+        f"# {PILOT_ID}",
+        "",
+        "## Summary",
+        f"- preset: `{preset}`",
+        f"- model reuse: `{model_info['reuse_strategy']}`",
+        f"- baseline run: `{baseline['run_dir']}`",
+        f"- candidate run: `{candidate['run_dir']}`",
+        f"- recommendation: `{comparison['recommendation']}`",
+        "",
+        "## Overall",
+        f"- baseline overall mean: `{base_summary.get('overall_mean_s')}` s",
+        f"- candidate overall mean: `{cand_summary.get('overall_mean_s')}` s",
+        f"- delta: `{comparison['overall_delta_s']}` s",
+        "",
+        "## Case deltas",
+    ]
+    for case_name, payload in comparison["case_deltas"].items():
+        lines.append(
+            f"- `{case_name}`: baseline `{payload['baseline_mean_s']}` s, candidate `{payload['candidate_mean_s']}` s, delta `{payload['delta_s']}` s"
+        )
+    lines.extend(
+        [
+            "",
+            "## Boundary",
+            "- This pilot compares serving/runtime posture, not reasoning quality canon.",
+            "- The validated canonical path remains Ollama-backed until a measured promotion decision is made.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def screening_report(
+    *,
+    baseline: dict[str, Any],
+    screenings: list[dict[str, Any]],
+    winner: dict[str, Any] | None,
+    promotion: dict[str, Any] | None,
+) -> str:
+    lines = [
+        f"# {PROMOTION_ID}",
+        "",
+        "## Summary",
+        f"- baseline run: `{baseline['run_dir']}`",
+        f"- winner: `{winner['quant']}`" if winner else "- winner: `none`",
+        "",
+        "## Candidate Screening",
+    ]
+    for item in screenings:
+        routing_mean = case_mean(item["bench"]["summary"], "repo-routing") if item.get("bench") else None
+        exact_mean = case_mean(item["bench"]["summary"], "exact-reply") if item.get("bench") else None
+        lines.append(
+            f"- `{item['quant']}`: stable=`{item.get('stable')}` exact=`{exact_mean}` repo-routing=`{routing_mean}` baseline-recheck=`{item.get('baseline_recheck', {}).get('ready')}`"
+        )
+    if promotion is not None:
+        lines.extend(
+            [
+                "",
+                "## Promotion Gate",
+                f"- W0 gate: `{promotion['w0_gate_result']}`",
+                f"- W4 fixture gate: `{promotion['w4_gate_result']}`",
+                f"- baseline healthy after teardown: `{promotion['baseline_after_teardown']}`",
+                f"- recommendation: `{promotion['recommendation']}`",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
+def write_comparison_run(
+    *,
+    preset: str,
+    model_info: dict[str, Any],
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+) -> Path:
+    run_root = PILOT_ROOT / "runs" / timestamp_dir()
+    run_root.mkdir(parents=True, exist_ok=True)
+    write_json(run_root / "model-resolution.json", model_info)
+    write_text(run_root / "baseline.bench.stdout.txt", baseline["stdout"])
+    write_text(run_root / "baseline.bench.stderr.txt", baseline["stderr"])
+    write_text(run_root / "candidate.bench.stdout.txt", candidate["stdout"])
+    write_text(run_root / "candidate.bench.stderr.txt", candidate["stderr"])
+
+    case_deltas: dict[str, Any] = {}
+    baseline_cases = baseline["summary"].get("case_breakdown", {})
+    candidate_cases = candidate["summary"].get("case_breakdown", {})
+    for case_name in sorted(set(baseline_cases) | set(candidate_cases)):
+        base_case = baseline_cases.get(case_name, {})
+        cand_case = candidate_cases.get(case_name, {})
+        case_deltas[case_name] = {
+            "baseline_mean_s": base_case.get("mean_s"),
+            "candidate_mean_s": cand_case.get("mean_s"),
+            "delta_s": maybe_delta(cand_case.get("mean_s"), base_case.get("mean_s")),
+        }
+
+    overall_delta_s = maybe_delta(
+        candidate["summary"].get("overall_mean_s"),
+        baseline["summary"].get("overall_mean_s"),
+    )
+    if candidate["ok"] and baseline["ok"] and overall_delta_s is not None and overall_delta_s < 0:
+        recommendation = "promising: llama.cpp sidecar is faster than the fresh Ollama baseline on this bounded bench"
+    elif candidate["ok"] and baseline["ok"]:
+        recommendation = "not better yet: llama.cpp sidecar did not beat the fresh Ollama baseline on this bounded bench"
+    else:
+        recommendation = "inconclusive: one or both benchmark runs failed"
+
+    comparison = {
+        "pilot_id": PILOT_ID,
+        "captured_at": utc_now(),
+        "preset": preset,
+        "baseline_run_ref": baseline["run_dir"],
+        "candidate_run_ref": candidate["run_dir"],
+        "baseline_backend": baseline["manifest"]["system_under_test"]["backend"],
+        "candidate_backend": candidate["manifest"]["system_under_test"]["backend"],
+        "overall_delta_s": overall_delta_s,
+        "case_deltas": case_deltas,
+        "recommendation": recommendation,
+    }
+    write_json(
+        run_root / "comparison.json",
+        {
+            **comparison,
+            "baseline_summary": baseline["summary"],
+            "candidate_summary": candidate["summary"],
+        },
+    )
+    write_json(
+        run_root / "pilot.manifest.json",
+        {
+            "pilot_id": PILOT_ID,
+            "captured_at": utc_now(),
+            "preset": preset,
+            "model_info_ref": "model-resolution.json",
+            "baseline_run_ref": baseline["run_dir"],
+            "candidate_run_ref": candidate["run_dir"],
+            "comparison_ref": "comparison.json",
+        },
+    )
+    write_text(
+        run_root / "report.md",
+        build_report(
+            preset=preset,
+            model_info=model_info,
+            baseline=baseline,
+            candidate=candidate,
+            comparison=comparison,
+        ),
+    )
+    write_json(
+        PILOT_ROOT / "latest.json",
+        {
+            "pilot_id": PILOT_ID,
+            "captured_at": utc_now(),
+            "latest_run_root": str(run_root),
+            "comparison_ref": str(run_root / "comparison.json"),
+            "report_ref": str(run_root / "report.md"),
+        },
+    )
+    return run_root
+
+
+def screening_artifact_root() -> Path:
+    path = PROMOTION_ROOT / "runs" / timestamp_dir()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def write_screening_artifacts(
+    *,
+    run_root: Path,
+    baseline: dict[str, Any],
+    screenings: list[dict[str, Any]],
+    winner: dict[str, Any] | None,
+    promotion: dict[str, Any] | None,
+) -> None:
+    write_json(
+        run_root / "baseline.summary.json",
+        {
+            "summary": baseline["summary"],
+            "smokes": baseline.get("smokes"),
+        },
+    )
+    for item in screenings:
+        quant = item["quant"].lower()
+        write_json(run_root / f"{quant}.screening.json", item)
+    payload = {
+        "promotion_id": PROMOTION_ID,
+        "captured_at": utc_now(),
+        "baseline_run_ref": baseline["run_dir"],
+        "baseline_smokes": baseline.get("smokes"),
+        "winner_quant": winner["quant"] if winner else None,
+        "winner_model_host_path": winner["model_host_path"] if winner else None,
+        "screenings": [
+            {
+                "quant": item["quant"],
+                "stable": item.get("stable"),
+                "exact_reply_regression_ratio": item.get("exact_reply_regression_ratio"),
+                "repo_routing_mean_s": case_mean(item["bench"]["summary"], "repo-routing") if item.get("bench") else None,
+                "baseline_recheck_ready": item.get("baseline_recheck", {}).get("ready"),
+            }
+            for item in screenings
+        ],
+        "promotion": promotion,
+    }
+    write_json(run_root / "promotion.json", payload)
+    write_text(
+        run_root / "report.md",
+        screening_report(
+            baseline=baseline,
+            screenings=screenings,
+            winner=winner,
+            promotion=promotion,
+        ),
+    )
+    write_json(
+        PROMOTION_ROOT / "latest.json",
+        {
+            "promotion_id": PROMOTION_ID,
+            "captured_at": utc_now(),
+            "latest_run_root": str(run_root),
+            "promotion_ref": str(run_root / "promotion.json"),
+            "report_ref": str(run_root / "report.md"),
+        },
+    )
+
+
+def candidate_screening(
+    *,
+    spec: dict[str, Any],
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    model_path = Path(spec["model_host_path"])
+    if not model_path.exists():
+        return {
+            **spec,
+            "stable": False,
+            "error": f"missing model file: {model_path}",
+        }
+    result: dict[str, Any] = {
+        **spec,
+        "started_at": utc_now(),
+    }
+    try:
+        up_llama_sidecar(model_path)
+        llama_ready = wait_for_llama(args.wait_timeout)
+        result["llama_cpp"] = llama_ready
+        if not llama_ready["ready"]:
+            result["stable"] = False
+            return result
+
+        up_langchain_sidecar(model_path)
+        candidate_ready = wait_for_url("langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=args.wait_timeout)
+        result["candidate_health"] = candidate_ready
+        if not candidate_ready["ready"]:
+            result["stable"] = False
+            return result
+
+        exact = run_qwen_check(case_name="exact-reply", url=CANDIDATE_RUN_URL, timeout_s=args.timeout)
+        routing = run_qwen_check(case_name="repo-routing", url=CANDIDATE_RUN_URL, timeout_s=args.timeout)
+        bench = run_bench(
+            preset=args.preset,
+            url=CANDIDATE_RUN_URL,
+            repeat=args.repeat,
+            timeout_s=args.timeout,
+            backend_label=spec["backend_label"],
+            runtime_variant=spec["runtime_variant"],
+            target_label=spec["target_label"],
+        )
+        result["exact_smoke"] = exact
+        result["repo_routing_smoke"] = routing
+        result["bench"] = bench
+        result["stable"] = bool(exact["ok"] and routing["ok"] and bench["ok"])
+        return result
+    finally:
+        stop_sidecars()
+        result["baseline_recheck"] = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0)
+        if result.get("stable") and not result["baseline_recheck"]["ready"]:
+            result["stable"] = False
+
+
+def auto_approve_fixture(log_root: Path, *, case_id: str) -> Path:
+    approval_path = log_root / "waves" / "W4" / case_id / "artifacts" / "approval.status.json"
+    payload = json.loads(approval_path.read_text(encoding="utf-8"))
+    payload["status"] = "approved"
+    payload["approved"] = True
+    payload["approved_at"] = utc_now()
+    payload["notes"] = "Approved automatically by aoa-llamacpp-pilot for the disposable fixture gate."
+    write_json(approval_path, payload)
+    return approval_path
+
+
+def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict[str, Any]:
+    model_path = Path(winner["model_host_path"])
+    up_llama_sidecar(model_path)
+    llama_ready = wait_for_llama(args.wait_timeout)
+    if not llama_ready["ready"]:
+        stop_sidecars()
+        raise RuntimeError("winner llama.cpp sidecar did not become healthy during promotion gate")
+    up_langchain_sidecar(model_path)
+    candidate_ready = wait_for_url("langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=args.wait_timeout)
+    if not candidate_ready["ready"]:
+        stop_sidecars()
+        raise RuntimeError("winner langchain-api-llamacpp did not become healthy during promotion gate")
+    try:
+        run_cmd(
+            [
+                str(SCRIPT_DIR / "aoa-local-ai-trials"),
+                "--url",
+                CANDIDATE_RUN_URL,
+                "--program-id",
+                LLAMACPP_W0_PROGRAM_ID,
+                "run-wave",
+                "W0",
+            ],
+            env=base_env(),
+            check=True,
+        )
+        w0_index = json.loads(
+            (STACK_ROOT / "Logs" / "local-ai-trials" / LLAMACPP_W0_PROGRAM_ID / "W0-runtime-index.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        shutil.rmtree(LLAMACPP_W4_GATE_LOG_ROOT, ignore_errors=True)
+        shutil.rmtree(LLAMACPP_W4_GATE_MIRROR_ROOT, ignore_errors=True)
+        run_cmd(
+            [
+                str(SCRIPT_DIR / "aoa-langgraph-pilot"),
+                "--url",
+                CANDIDATE_RUN_URL,
+                "--program-id",
+                LLAMACPP_W4_PROGRAM_ID,
+                "--log-root",
+                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                "--mirror-root",
+                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                "materialize",
+            ],
+            env=base_env(),
+            check=True,
+        )
+
+        run_cmd(
+            [
+                str(SCRIPT_DIR / "aoa-langgraph-pilot"),
+                "--url",
+                CANDIDATE_RUN_URL,
+                "--program-id",
+                LLAMACPP_W4_PROGRAM_ID,
+                "--log-root",
+                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                "--mirror-root",
+                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                "run-case",
+                "fixture-docs-wording-alignment",
+                "--until",
+                "approval",
+            ],
+            env=base_env(),
+            check=True,
+        )
+        fixture_log_root = LLAMACPP_W4_GATE_LOG_ROOT
+        auto_approve_fixture(fixture_log_root, case_id="fixture-docs-wording-alignment")
+        run_cmd(
+            [
+                str(SCRIPT_DIR / "aoa-langgraph-pilot"),
+                "--url",
+                CANDIDATE_RUN_URL,
+                "--program-id",
+                LLAMACPP_W4_PROGRAM_ID,
+                "--log-root",
+                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                "--mirror-root",
+                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                "resume-case",
+                "fixture-docs-wording-alignment",
+            ],
+            env=base_env(),
+            check=True,
+        )
+        w4_index = json.loads(
+            (fixture_log_root / "W4-langgraph-sidecar-index.json").read_text(encoding="utf-8")
+        )
+    finally:
+        stop_sidecars()
+
+    baseline_after_teardown = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0)
+    recommendation = (
+        "promote llama.cpp"
+        if w0_index.get("gate_result") == "pass"
+        and w4_index.get("gate_result") == "pass"
+        and baseline_after_teardown.get("ready")
+        else "stay on Ollama"
+    )
+    return {
+        "winner_quant": winner["quant"],
+        "winner_model_host_path": winner["model_host_path"],
+        "w0_gate_result": w0_index.get("gate_result"),
+        "w0_index_ref": str(STACK_ROOT / "Logs" / "local-ai-trials" / LLAMACPP_W0_PROGRAM_ID / "W0-runtime-index.json"),
+        "w4_gate_result": w4_index.get("gate_result"),
+        "w4_index_ref": str(LLAMACPP_W4_GATE_LOG_ROOT / "W4-langgraph-sidecar-index.json"),
+        "baseline_after_teardown": bool(baseline_after_teardown.get("ready")),
+        "baseline_recheck_payload": baseline_after_teardown,
+        "recommendation": recommendation,
+    }
+
+
+def doctor_command(args: argparse.Namespace) -> int:
+    if not args.skip_sync:
+        sync_configs()
+    model_info = resolve_model_info(args.model_host_path)
+    run_doctor(args.preset)
+    payload = {
+        "pilot_id": PILOT_ID,
+        "preset": args.preset,
+        "model_info": model_info,
+        "candidate_models": candidate_model_info(),
+        "base_health": wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=2.0),
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
+    return 0
+
+
+def ensure_base_ready(preset: str, wait_timeout: float) -> None:
+    baseline_ready = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=2.0)
+    if baseline_ready["ready"]:
+        return
+    up_base_stack(preset)
+    baseline_ready = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=wait_timeout)
+    if not baseline_ready["ready"]:
+        raise SystemExit("error: baseline langchain-api health is not ready")
+
+
+def up_command(args: argparse.Namespace) -> int:
+    if not args.skip_sync:
+        sync_configs()
+    model_info = resolve_model_info(args.model_host_path)
+    run_doctor(args.preset)
+    ensure_base_ready(args.preset, args.wait_timeout)
+    model_path = Path(model_info["model_host_path"])
+    up_llama_sidecar(model_path)
+    llama_ready = wait_for_llama(args.wait_timeout)
+    if not llama_ready["ready"]:
+        stop_sidecars()
+        payload = {
+            "pilot_id": PILOT_ID,
+            "preset": args.preset,
+            "model_info": model_info,
+            "llama_cpp": llama_ready,
+            "langchain_api_llamacpp": {
+                "ready": False,
+                "status": None,
+                "payload": None,
+                "url": CANDIDATE_HEALTH_URL,
+                "name": "langchain-api-llamacpp",
+            },
+        }
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 1
+
+    up_langchain_sidecar(model_path)
+    candidate_ready = wait_for_url(
+        "langchain-api-llamacpp",
+        CANDIDATE_HEALTH_URL,
+        timeout_s=args.wait_timeout,
+    )
+    if not candidate_ready["ready"]:
+        stop_sidecars()
+    payload = {
+        "pilot_id": PILOT_ID,
+        "preset": args.preset,
+        "model_info": model_info,
+        "llama_cpp": llama_ready,
+        "langchain_api_llamacpp": candidate_ready,
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
+    return 0 if llama_ready["ready"] and candidate_ready["ready"] else 1
+
+
+def bench_command(args: argparse.Namespace) -> int:
+    candidate = run_bench(
+        preset=args.preset,
+        url=CANDIDATE_RUN_URL,
+        repeat=args.repeat,
+        timeout_s=args.timeout,
+        backend_label="langchain-api-llamacpp -> llama.cpp-openai",
+        runtime_variant="Q4_K_M via llama.cpp sidecar",
+        target_label="workhorse-local-qwen3.5-9b-llamacpp",
+    )
+    print(json.dumps(candidate["summary"], indent=2, ensure_ascii=True))
+    return 0 if candidate["ok"] else 1
+
+
+def run_command(args: argparse.Namespace) -> int:
+    if not args.skip_sync:
+        sync_configs()
+    model_info = resolve_model_info(args.model_host_path)
+    run_doctor(args.preset)
+    ensure_base_ready(args.preset, args.wait_timeout)
+
+    baseline = run_bench(
+        preset=args.preset,
+        url=BASE_RUN_URL,
+        repeat=args.repeat,
+        timeout_s=args.timeout,
+        backend_label="langchain-api -> ollama-native",
+        runtime_variant="Q4_K_M via Ollama",
+        target_label="workhorse-local-qwen3.5-9b-ollama-baseline",
+    )
+    model_path = Path(model_info["model_host_path"])
+    up_llama_sidecar(model_path)
+    llama_ready = wait_for_llama(args.wait_timeout)
+    if not llama_ready["ready"]:
+        stop_sidecars()
+        detail = llama_ready.get("error") or "llama.cpp sidecar did not become healthy in time"
+        raise SystemExit(f"error: {detail}")
+
+    up_langchain_sidecar(model_path)
+    candidate_ready = wait_for_url("langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=args.wait_timeout)
+    if not candidate_ready["ready"]:
+        stop_sidecars()
+        raise SystemExit("error: langchain-api-llamacpp did not become healthy in time")
+
+    candidate = run_bench(
+        preset=args.preset,
+        url=CANDIDATE_RUN_URL,
+        repeat=args.repeat,
+        timeout_s=args.timeout,
+        backend_label="langchain-api-llamacpp -> llama.cpp-openai",
+        runtime_variant="Q4_K_M via llama.cpp sidecar",
+        target_label="workhorse-local-qwen3.5-9b-llamacpp",
+    )
+    run_root = write_comparison_run(
+        preset=args.preset,
+        model_info=model_info,
+        baseline=baseline,
+        candidate=candidate,
+    )
+    print(f"comparison root: {run_root}")
+    print(json.dumps(json.loads((run_root / 'comparison.json').read_text(encoding='utf-8')), indent=2, ensure_ascii=True))
+    return 0 if baseline["ok"] and candidate["ok"] else 1
+
+
+def promote_command(args: argparse.Namespace) -> int:
+    if not args.skip_sync:
+        sync_configs()
+    run_doctor(args.preset)
+    ensure_base_ready(args.preset, args.wait_timeout)
+    baseline_smokes = {
+        "exact_smoke": run_qwen_check(case_name="exact-reply", url=BASE_RUN_URL, timeout_s=args.timeout),
+        "repo_routing_smoke": run_qwen_check(case_name="repo-routing", url=BASE_RUN_URL, timeout_s=args.timeout),
+    }
+    baseline = run_bench(
+        preset=args.preset,
+        url=BASE_RUN_URL,
+        repeat=args.repeat,
+        timeout_s=args.timeout,
+        backend_label="langchain-api -> ollama-native",
+        runtime_variant="Q4_K_M via Ollama",
+        target_label="workhorse-local-qwen3.5-9b-ollama-baseline",
+    )
+    baseline["smokes"] = baseline_smokes
+    screenings = [
+        candidate_screening(spec=spec, args=args)
+        for spec in candidate_model_info()
+    ]
+    winner = screening_winner(baseline=baseline, screenings=screenings)
+    if winner is not None:
+        promotion = run_promotion_gate(args, winner)
+    else:
+        promotion = {
+            "winner_quant": None,
+            "winner_model_host_path": None,
+            "w0_gate_result": "not-run",
+            "w0_index_ref": None,
+            "w4_gate_result": "not-run",
+            "w4_index_ref": None,
+            "baseline_after_teardown": bool(wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0).get("ready")),
+            "baseline_recheck_payload": wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0),
+            "recommendation": "stay on Ollama",
+            "reason": "no candidate satisfied the stability and exact-reply regression rule",
+        }
+    run_root = screening_artifact_root()
+    write_screening_artifacts(
+        run_root=run_root,
+        baseline=baseline,
+        screenings=screenings,
+        winner=winner,
+        promotion=promotion,
+    )
+    payload = json.loads((run_root / "promotion.json").read_text(encoding="utf-8"))
+    print(f"promotion root: {run_root}")
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
+    if winner is None or promotion is None:
+        return 1
+    return 0 if promotion["recommendation"] == "promote llama.cpp" else 1
+
+
+def status_command(_: argparse.Namespace) -> int:
+    latest = None
+    latest_path = PILOT_ROOT / "latest.json"
+    if latest_path.exists():
+        latest = json.loads(latest_path.read_text(encoding="utf-8"))
+    promotion_latest = None
+    promotion_latest_path = PROMOTION_ROOT / "latest.json"
+    if promotion_latest_path.exists():
+        promotion_latest = json.loads(promotion_latest_path.read_text(encoding="utf-8"))
+    payload = {
+        "pilot_id": PILOT_ID,
+        "latest": latest,
+        "promotion_latest": promotion_latest,
+        "base_health": wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=2.0),
+        "llama_cpp_health": wait_for_url("llama-cpp", LLAMACPP_HEALTH_URL, timeout_s=2.0, accept_503=True),
+        "langchain_api_llamacpp_health": wait_for_url(
+            "langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=2.0
+        ),
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
+    return 0
+
+
+def down_command(_: argparse.Namespace) -> int:
+    stop_sidecars()
+    print(json.dumps({"pilot_id": PILOT_ID, "stopped_services": ["langchain-api-llamacpp", "llama-cpp"]}, indent=2, ensure_ascii=True))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run a bounded llama.cpp sidecar pilot next to the canonical Ollama path."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    def add_common_flags(sub: argparse.ArgumentParser) -> None:
+        sub.add_argument("--preset", default="intel-full")
+        sub.add_argument("--repeat", type=int, default=2)
+        sub.add_argument("--timeout", type=float, default=90.0)
+        sub.add_argument("--wait-timeout", type=float, default=180.0)
+        sub.add_argument("--model-host-path", default=None)
+        sub.add_argument("--skip-sync", action="store_true")
+
+    doctor = subparsers.add_parser("doctor", help="Resolve the reusable GGUF model and confirm the base preset posture.")
+    add_common_flags(doctor)
+    doctor.set_defaults(func=doctor_command)
+
+    up = subparsers.add_parser("up", help="Sync configs, resolve the GGUF model, and start the llama.cpp sidecar services.")
+    add_common_flags(up)
+    up.set_defaults(func=up_command)
+
+    bench = subparsers.add_parser("bench", help="Benchmark the llama.cpp sidecar langchain-api path on port 5403.")
+    add_common_flags(bench)
+    bench.set_defaults(func=bench_command)
+
+    run = subparsers.add_parser("run", help="Run a fresh Ollama baseline bench and a fresh llama.cpp sidecar bench, then compare them.")
+    add_common_flags(run)
+    run.set_defaults(func=run_command)
+
+    promote = subparsers.add_parser(
+        "promote",
+        help="Screen fixed llama.cpp quants and run the bounded W0 + W4 promotion gate on the winner.",
+    )
+    add_common_flags(promote)
+    promote.set_defaults(func=promote_command)
+
+    status = subparsers.add_parser("status", help="Show current sidecar health and the latest saved comparison ref.")
+    status.set_defaults(func=status_command)
+
+    down = subparsers.add_parser("down", help="Stop and remove only the llama.cpp sidecar services.")
+    down.set_defaults(func=down_command)
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        return int(args.func(args))
+    except subprocess.CalledProcessError as exc:
+        if exc.stdout:
+            sys.stdout.write(exc.stdout)
+        if exc.stderr:
+            sys.stderr.write(exc.stderr)
+        print(f"error: command failed: {' '.join(str(part) for part in exc.cmd)}", file=sys.stderr)
+        return exc.returncode or 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

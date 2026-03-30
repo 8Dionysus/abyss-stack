@@ -17,12 +17,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-PROGRAM_ID = "qwen-local-pilot-v1"
+DEFAULT_PROGRAM_ID = "qwen-local-pilot-v1"
+PROGRAM_ID = DEFAULT_PROGRAM_ID
 MODEL = "qwen3.5:9b"
 
 STACK_ROOT = Path("/srv/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
+DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5401/run"
+LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
+LANGCHAIN_BASE_URL = DEFAULT_LANGCHAIN_RUN_URL.rsplit("/", 1)[0]
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 
@@ -335,7 +339,24 @@ def route_endpoint(path: str) -> str:
 
 
 def langchain_endpoint(path: str) -> str:
-    return f"http://127.0.0.1:5401{path}"
+    return f"{LANGCHAIN_BASE_URL}{path}"
+
+
+def default_log_root_for(program_id: str) -> Path:
+    return STACK_ROOT / "Logs" / "local-ai-trials" / program_id
+
+
+def default_mirror_root_for(program_id: str) -> Path:
+    return Path("/srv/Dionysus/reports/local-ai-trials") / program_id
+
+
+def configure_program_runtime(*, program_id: str, run_url: str) -> None:
+    global PROGRAM_ID, LOG_ROOT_DEFAULT, MIRROR_ROOT_DEFAULT, LANGCHAIN_RUN_URL, LANGCHAIN_BASE_URL
+    PROGRAM_ID = program_id
+    LOG_ROOT_DEFAULT = default_log_root_for(program_id)
+    MIRROR_ROOT_DEFAULT = default_mirror_root_for(program_id)
+    LANGCHAIN_RUN_URL = run_url
+    LANGCHAIN_BASE_URL = run_url.rsplit("/", 1)[0]
 
 
 def case_dir(log_root: Path, wave_id: str, case_id: str) -> Path:
@@ -2121,6 +2142,8 @@ def run_qwen_prompt(
         absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
         "--prompt-file",
         str(prompt_path),
+        "--url",
+        LANGCHAIN_RUN_URL,
         "--timeout",
         str(timeout_s),
         "--temperature",
@@ -2334,6 +2357,8 @@ def run_w1_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> N
         absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
         "--prompt-file",
         str(prompt_path),
+        "--url",
+        LANGCHAIN_RUN_URL,
         "--timeout",
         "120",
         "--temperature",
@@ -3357,6 +3382,8 @@ def run_w2_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> N
                         absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                         "--prompt-file",
                         str(prompt_path),
+                        "--url",
+                        LANGCHAIN_RUN_URL,
                         "--timeout",
                         "150",
                         "--temperature",
@@ -3381,6 +3408,8 @@ def run_w2_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> N
                         absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                         "--prompt-file",
                         str(judge_prompt_path),
+                        "--url",
+                        LANGCHAIN_RUN_URL,
                         "--timeout",
                         "150",
                         "--temperature",
@@ -3496,6 +3525,8 @@ def run_w2_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> N
                     absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                     "--prompt-file",
                     str(judge_prompt_path),
+                    "--url",
+                    LANGCHAIN_RUN_URL,
                     "--timeout",
                     "240",
                     "--temperature",
@@ -4319,6 +4350,8 @@ def run_w3_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> N
                     absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                     "--prompt-file",
                     str(prompt_path),
+                    "--url",
+                    LANGCHAIN_RUN_URL,
                     "--timeout",
                     "180",
                     "--temperature",
@@ -5417,6 +5450,11 @@ def prepare_w4_docs_case(
     proposal_target_path = case_root / "artifacts" / "proposal.target.json"
     proposal_plan_path = case_root / "artifacts" / "proposal.plan.json"
     proposal_summary_path = case_root / "artifacts" / "proposal.summary.json"
+    docs_timeout_scale = 2 if "5403" in LANGCHAIN_RUN_URL else 1
+    target_timeout_s = 45 * docs_timeout_scale
+    plan_timeout_s = 60 * docs_timeout_scale
+    exact_timeout_s = 90 * docs_timeout_scale
+    anchor_timeout_s = 90 * docs_timeout_scale
 
     file_entries: list[dict[str, Any]] = []
     file_errors: list[str] = []
@@ -5439,7 +5477,7 @@ def prepare_w4_docs_case(
             label="proposal-target-selection",
             prompt_text=target_prompt,
             max_tokens=40,
-            timeout_s=45,
+            timeout_s=target_timeout_s,
         )
         command_refs.append(target_command_ref)
         raw_target_answer = str(target_qwen.get("answer") or "")
@@ -5487,8 +5525,10 @@ def prepare_w4_docs_case(
                     absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                     "--prompt-file",
                     str(target_prompt_path),
+                    "--url",
+                    LANGCHAIN_RUN_URL,
                     "--timeout",
-                    "45",
+                    str(target_timeout_s),
                     "--temperature",
                     "0",
                     "--max-tokens",
@@ -5528,8 +5568,10 @@ def prepare_w4_docs_case(
                     absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                     "--prompt-file",
                     str(plan_prompt_path),
+                    "--url",
+                    LANGCHAIN_RUN_URL,
                     "--timeout",
-                    "60",
+                    str(plan_timeout_s),
                     "--temperature",
                     "0",
                     "--max-tokens",
@@ -5626,7 +5668,7 @@ def prepare_w4_docs_case(
         label="proposal-alignment-plan",
         prompt_text=plan_prompt,
         max_tokens=180,
-        timeout_s=60,
+        timeout_s=plan_timeout_s,
     )
     command_refs.append(plan_command_ref)
     raw_plan_answer = str(plan_qwen.get("answer") or "")
@@ -5683,8 +5725,10 @@ def prepare_w4_docs_case(
                     absolute(SCRIPTS_ROOT / "aoa-qwen-run"),
                     "--prompt-file",
                     str(proposal_prompt_path),
+                    "--url",
+                    LANGCHAIN_RUN_URL,
                     "--timeout",
-                    "90",
+                    str(exact_timeout_s),
                     "--temperature",
                     "0",
                     "--max-tokens",
@@ -5735,7 +5779,7 @@ def prepare_w4_docs_case(
             label="proposal-edit-spec-exact",
             prompt_text=exact_prompt,
             max_tokens=220,
-            timeout_s=90,
+            timeout_s=exact_timeout_s,
         )
         command_refs.append(exact_command_ref)
         attempt_order.append("exact_replace")
@@ -5818,7 +5862,7 @@ def prepare_w4_docs_case(
                 label="proposal-edit-spec-anchor",
                 prompt_text=anchor_prompt,
                 max_tokens=260,
-                timeout_s=90,
+                timeout_s=anchor_timeout_s,
             )
             command_refs.append(anchor_command_ref)
             attempt_order.append("anchored_replace")
@@ -6703,7 +6747,13 @@ def w4_failure_summary(
     )
 
 
-def apply_w4_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) -> None:
+def apply_w4_case(
+    case: dict[str, Any],
+    *,
+    log_root: Path,
+    mirror_root: Path,
+    land_back: bool = True,
+) -> None:
     catalog = build_catalog()
     case_root = case_dir(log_root, "W4", case["case_id"])
     repo_root = repo_root_for_w4_case(case)
@@ -6951,65 +7001,66 @@ def apply_w4_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) ->
             failures.append("one or more acceptance checks failed in isolated worktree")
             raise RuntimeError("worktree acceptance failed")
 
-        ensure_repo_ready_for_w4_case(
-            repo_root,
-            case=case,
-            log_root=log_root,
-            catalog=catalog,
-        )
-        if git_head(repo_root) != base_head:
-            failure_class = "landing_reapply_failure"
-            failures.append("repo HEAD drifted before landing validated diff back to main repo")
-            raise RuntimeError("main repo head drifted")
-
-        landing_diff_text = landing_diff_path.read_text(encoding="utf-8")
-        if landing_diff_text.strip():
-            main_check_raw = git_command(
+        if land_back:
+            ensure_repo_ready_for_w4_case(
                 repo_root,
-                ["apply", "--check", str(landing_diff_path)],
-                timeout_s=60,
+                case=case,
+                log_root=log_root,
+                catalog=catalog,
             )
-            main_check_ref = persist_command_result(case_root, "landing-apply-check", main_check_raw)
-            command_refs.append(main_check_ref)
-            artifact_refs.extend(
-                [main_check_ref["stdout_path"], main_check_ref["stderr_path"], main_check_ref["command_meta"]]
-            )
-            if main_check_raw["exit_code"] != 0 or main_check_raw["timed_out"]:
+            if git_head(repo_root) != base_head:
                 failure_class = "landing_reapply_failure"
-                failures.append("validated diff could not be applied cleanly back to the main repo")
-                raise RuntimeError("main repo apply check failed")
+                failures.append("repo HEAD drifted before landing validated diff back to main repo")
+                raise RuntimeError("main repo head drifted")
 
-            main_apply_raw = git_command(
-                repo_root,
-                ["apply", str(landing_diff_path)],
-                timeout_s=60,
-            )
-            main_apply_ref = persist_command_result(case_root, "landing-apply", main_apply_raw)
-            command_refs.append(main_apply_ref)
-            artifact_refs.extend(
-                [main_apply_ref["stdout_path"], main_apply_ref["stderr_path"], main_apply_ref["command_meta"]]
-            )
-            if main_apply_raw["exit_code"] != 0 or main_apply_raw["timed_out"]:
-                failure_class = "landing_reapply_failure"
-                failures.append("validated diff failed during landing apply in the main repo")
-                raise RuntimeError("main repo apply failed")
+            landing_diff_text = landing_diff_path.read_text(encoding="utf-8")
+            if landing_diff_text.strip():
+                main_check_raw = git_command(
+                    repo_root,
+                    ["apply", "--check", str(landing_diff_path)],
+                    timeout_s=60,
+                )
+                main_check_ref = persist_command_result(case_root, "landing-apply-check", main_check_raw)
+                command_refs.append(main_check_ref)
+                artifact_refs.extend(
+                    [main_check_ref["stdout_path"], main_check_ref["stderr_path"], main_check_ref["command_meta"]]
+                )
+                if main_check_raw["exit_code"] != 0 or main_check_raw["timed_out"]:
+                    failure_class = "landing_reapply_failure"
+                    failures.append("validated diff could not be applied cleanly back to the main repo")
+                    raise RuntimeError("main repo apply check failed")
 
-        main_acceptance_refs, main_acceptance_ok = run_acceptance_checks(
-            case_root,
-            repo_root=repo_root,
-            checks=case.get("acceptance_checks", []),
-            label_prefix="landing-acceptance",
-        )
-        command_refs.extend(main_acceptance_refs)
-        for ref in main_acceptance_refs:
-            artifact_refs.extend([ref["stdout_path"], ref["stderr_path"], ref["command_meta"]])
-        if not main_acceptance_ok:
-            reverse_diff_text = landing_diff_path.read_text(encoding="utf-8")
-            if reverse_diff_text.strip():
-                git_command(repo_root, ["apply", "-R", str(landing_diff_path)], timeout_s=60)
-            failure_class = "post_change_validation_failure"
-            failures.append("one or more acceptance checks failed after landing diff back to the main repo")
-            raise RuntimeError("main repo acceptance failed")
+                main_apply_raw = git_command(
+                    repo_root,
+                    ["apply", str(landing_diff_path)],
+                    timeout_s=60,
+                )
+                main_apply_ref = persist_command_result(case_root, "landing-apply", main_apply_raw)
+                command_refs.append(main_apply_ref)
+                artifact_refs.extend(
+                    [main_apply_ref["stdout_path"], main_apply_ref["stderr_path"], main_apply_ref["command_meta"]]
+                )
+                if main_apply_raw["exit_code"] != 0 or main_apply_raw["timed_out"]:
+                    failure_class = "landing_reapply_failure"
+                    failures.append("validated diff failed during landing apply in the main repo")
+                    raise RuntimeError("main repo apply failed")
+
+            main_acceptance_refs, main_acceptance_ok = run_acceptance_checks(
+                case_root,
+                repo_root=repo_root,
+                checks=case.get("acceptance_checks", []),
+                label_prefix="landing-acceptance",
+            )
+            command_refs.extend(main_acceptance_refs)
+            for ref in main_acceptance_refs:
+                artifact_refs.extend([ref["stdout_path"], ref["stderr_path"], ref["command_meta"]])
+            if not main_acceptance_ok:
+                reverse_diff_text = landing_diff_path.read_text(encoding="utf-8")
+                if reverse_diff_text.strip():
+                    git_command(repo_root, ["apply", "-R", str(landing_diff_path)], timeout_s=60)
+                failure_class = "post_change_validation_failure"
+                failures.append("one or more acceptance checks failed after landing diff back to the main repo")
+                raise RuntimeError("main repo acceptance failed")
 
         run_manifest = {
             "artifact_kind": "aoa.local-ai-trial.run-manifest",
@@ -7023,7 +7074,11 @@ def apply_w4_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) ->
             "commands": command_refs,
             "artifact_refs": artifact_refs,
             "notes": [
-                "W4 landed only after isolated worktree mutation, scoped diff validation, and repeated acceptance checks in the main repo.",
+                (
+                    "W4 landed only after isolated worktree mutation, scoped diff validation, and repeated acceptance checks in the main repo."
+                    if land_back
+                    else "W4 dry-run passed in an isolated worktree without reapplying any diff back to the repo root."
+                ),
             ],
         }
         result_summary = build_result_summary(
@@ -7039,15 +7094,27 @@ def apply_w4_case(case: dict[str, Any], *, log_root: Path, mirror_root: Path) ->
                 "highlights": [
                     *highlights,
                     f"Changed files: `{json.dumps(changed_files, ensure_ascii=True)}`.",
-                    "All worktree and main-repo acceptance checks passed.",
+                    (
+                        "All worktree and main-repo acceptance checks passed."
+                        if land_back
+                        else "All worktree-only acceptance checks passed. No landing back to the repo root was attempted."
+                    ),
                 ],
                 "failures": ["None."],
                 "changed_files": changed_files,
             },
             failure_class=None,
-            reviewer_notes="The W4 case stayed inside approved scope, passed isolated validation, and landed cleanly back to the main repo.",
+            reviewer_notes=(
+                "The W4 case stayed inside approved scope, passed isolated validation, and landed cleanly back to the main repo."
+                if land_back
+                else "The W4 fixture case stayed inside approved scope and passed the full isolated worktree dry-run without touching the repo root."
+            ),
             boundary_notes=w4_boundary_note(),
-            next_action="Review the landed diff and decide whether to approve the next W4 case.",
+            next_action=(
+                "Review the landed diff and decide whether to approve the next W4 case."
+                if land_back
+                else "Use the dry-run packet as the bounded backend-comparison verdict for this fixture case."
+            ),
         )
         finalize_case(
             case=case,
@@ -7532,8 +7599,10 @@ def run_w0(log_root: Path, mirror_root: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Materialize and run the supervised local Qwen pilot.")
-    parser.add_argument("--log-root", default=str(LOG_ROOT_DEFAULT))
-    parser.add_argument("--mirror-root", default=str(MIRROR_ROOT_DEFAULT))
+    parser.add_argument("--url", default=DEFAULT_LANGCHAIN_RUN_URL)
+    parser.add_argument("--program-id", default=DEFAULT_PROGRAM_ID)
+    parser.add_argument("--log-root", default=None)
+    parser.add_argument("--mirror-root", default=None)
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("materialize", help="Materialize contracts, case specs, and planned wave indexes.")
@@ -7564,8 +7633,9 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    log_root = Path(args.log_root)
-    mirror_root = Path(args.mirror_root)
+    configure_program_runtime(program_id=args.program_id, run_url=args.url)
+    log_root = Path(args.log_root) if args.log_root else default_log_root_for(PROGRAM_ID)
+    mirror_root = Path(args.mirror_root) if args.mirror_root else default_mirror_root_for(PROGRAM_ID)
     catalog = build_catalog()
 
     if args.command == "materialize":

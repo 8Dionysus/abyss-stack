@@ -8,9 +8,11 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `modules/20-orchestration.yml`
 - `modules/30-local-inference.yml`
 - `modules/31-intel-inference.yml`
+- `modules/32-llamacpp-inference.yml`
 - `modules/40-llm-gateway.yml`
 - `modules/41-agent-api.yml`
 - `modules/42-agent-api-intel.yml`
+- `modules/44-llamacpp-agent-sidecar.yml`
 - `modules/50-speech.yml`
 - `modules/51-browser-tools.yml`
 - `modules/60-monitoring.yml`
@@ -37,6 +39,15 @@ A profile is only a list of module filenames in activation order.
 - `presets/intel-full.txt`
 
 A preset is a list of profile names in activation order.
+
+## Optional pilot modules
+
+`32-llamacpp-inference.yml` and `44-llamacpp-agent-sidecar.yml` are not part of the default profiles or presets.
+
+They exist for the bounded `llama.cpp` sidecar pilot and are typically activated through:
+
+- `scripts/aoa-llamacpp-pilot`
+- or `AOA_EXTRA_COMPOSE_FILES` when you intentionally want the sidecar path
 
 ## Rule
 

@@ -79,6 +79,12 @@ scripts/aoa-local-ai-trials prepare-wave W4 --lane docs
 scripts/aoa-local-ai-trials apply-case W4 <case-id>
 ```
 
+Optional backend/program overrides:
+
+```bash
+scripts/aoa-local-ai-trials --url http://127.0.0.1:5403/run --program-id qwen-llamacpp-pilot-v1 run-wave W0
+```
+
 What the helper does now:
 
 - materializes contracts and frozen case specs for `W0` through `W4`
@@ -96,6 +102,50 @@ What it does not do:
 - it does not introduce a new serving API
 - it does not upgrade runtime success into portable proof wording
 - it does not collapse `W4` into a silent monolithic mutator
+
+## LangGraph sidecar pilot
+
+The current trial runner remains the execution baseline.
+
+An optional comparison layer now also exists:
+
+```bash
+scripts/aoa-langgraph-pilot materialize
+scripts/aoa-langgraph-pilot run-case 8dionysus-profile-routing-clarity --until approval
+scripts/aoa-langgraph-pilot resume-case 8dionysus-profile-routing-clarity
+```
+
+The same runner can also be pointed at an alternate backend/program root:
+
+```bash
+scripts/aoa-langgraph-pilot --url http://127.0.0.1:5403/run --program-id langgraph-sidecar-llamacpp-v1 run-case fixture-docs-wording-alignment --until approval
+```
+
+Use [LANGGRAPH_PILOT](LANGGRAPH_PILOT.md) for the sidecar contract.
+
+## W5 long-horizon pilot
+
+The next bounded scenario layer lives beside the earlier waves:
+
+```bash
+scripts/aoa-w5-pilot materialize
+scripts/aoa-w5-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-w5-pilot resume-scenario <scenario-id>
+scripts/aoa-w5-pilot status --all
+```
+
+Use [W5_PILOT](W5_PILOT.md) for the full W5 contract.
+
+The W5 runner:
+
+- defaults to `http://127.0.0.1:5403/run`
+- treats the promoted `llama.cpp` path as the primary substrate while keeping baseline `5401` as a control path
+- keeps `LangGraph` as the primary orchestration layer
+- uses milestone gates instead of a monolithic `run-wave W5`
+- supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`
+- reuses `approval.status.json` at `plan_freeze`, `first_mutation`, and `landing`
+- keeps mutation scenarios worktree-first and explicitly approved before landing
+- records one local checkpoint commit per successful mutation scenario when a tracked diff is present
 
 ## W1 grounded execution
 
