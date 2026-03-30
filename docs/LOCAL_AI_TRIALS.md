@@ -147,6 +147,29 @@ The W5 runner:
 - keeps mutation scenarios worktree-first and explicitly approved before landing
 - records one local checkpoint commit per successful mutation scenario when a tracked diff is present
 
+## W6 bounded autonomy pilot
+
+The autonomy-focused layer lives beside W5 and keeps the same promoted substrate:
+
+```bash
+scripts/aoa-w6-pilot materialize
+scripts/aoa-w6-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-w6-pilot resume-scenario <scenario-id>
+scripts/aoa-w6-pilot status --all
+```
+
+Use [W6_PILOT](W6_PILOT.md) for the full W6 contract.
+
+The W6 runner:
+
+- defaults to `http://127.0.0.1:5403/run`
+- keeps `LangGraph` as the primary orchestration layer
+- reduces approvals to `plan_freeze` and `landing`
+- removes `first_mutation` from the normal mutation path
+- keeps mutation scenarios worktree-first and explicitly approved before landing
+- supports one bounded `autonomous_repair_loop` after `post_change_validation_failure`
+- tracks `novel_implementation_passes`, `preexisting_noop_count`, `repair_attempted_count`, and `repair_success_count`
+
 ## W1 grounded execution
 
 Use:
