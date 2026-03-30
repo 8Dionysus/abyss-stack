@@ -73,6 +73,33 @@ def build_run_entry(summary_path: Path) -> dict[str, Any]:
     }
 
 
+def referenced_run_refs_from_comparison(path: Path) -> set[str]:
+    payload = load_json(path)
+    refs: set[str] = set()
+    for key in ("baseline_run_ref", "candidate_run_ref"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            refs.add(value)
+    return refs
+
+
+def referenced_run_refs_from_promotion(path: Path) -> set[str]:
+    payload = load_json(path)
+    refs: set[str] = set()
+    value = payload.get("baseline_run_ref")
+    if isinstance(value, str) and value:
+        refs.add(value)
+
+    for screening_path in sorted(path.parent.glob("*.screening.json")):
+        screening = load_json(screening_path)
+        bench = screening.get("bench")
+        if isinstance(bench, dict):
+            run_dir = bench.get("run_dir")
+            if isinstance(run_dir, str) and run_dir:
+                refs.add(run_dir)
+    return refs
+
+
 def latest_entries_by_key(entries: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     for entry in entries:
@@ -142,6 +169,107 @@ def collect_latest_group(root: Path, kind: str) -> dict[str, dict[str, Any]]:
     return results
 
 
+def collect_packet_references(write_root: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    latest_refs = {"comparison": set(), "promotion": set()}
+    all_refs = {"comparison": set(), "promotion": set()}
+
+    comparisons_root = write_root / "comparisons"
+    promotions_root = write_root / "promotions"
+
+    for comparison_path in sorted(comparisons_root.glob("*/runs/*/comparison.json")):
+        refs = referenced_run_refs_from_comparison(comparison_path)
+        all_refs["comparison"].update(refs)
+    for promotion_path in sorted(promotions_root.glob("*/runs/*/promotion.json")):
+        refs = referenced_run_refs_from_promotion(promotion_path)
+        all_refs["promotion"].update(refs)
+
+    for child in sorted(path for path in comparisons_root.iterdir() if path.is_dir()):
+        pointer = child / "latest.json"
+        if not pointer.exists():
+            continue
+        payload = load_json(pointer)
+        comparison_ref = payload.get("comparison_ref")
+        if isinstance(comparison_ref, str) and Path(comparison_ref).exists():
+            latest_refs["comparison"].update(referenced_run_refs_from_comparison(Path(comparison_ref)))
+
+    for child in sorted(path for path in promotions_root.iterdir() if path.is_dir()):
+        pointer = child / "latest.json"
+        if not pointer.exists():
+            continue
+        payload = load_json(pointer)
+        promotion_ref = payload.get("promotion_ref")
+        if isinstance(promotion_ref, str) and Path(promotion_ref).exists():
+            latest_refs["promotion"].update(referenced_run_refs_from_promotion(Path(promotion_ref)))
+
+    return latest_refs, all_refs
+
+
+def classify_retention(
+    run_entries: list[dict[str, Any]],
+    latest_by_target_label: dict[str, dict[str, Any]],
+    latest_packet_refs: dict[str, set[str]],
+    all_packet_refs: dict[str, set[str]],
+) -> dict[str, Any]:
+    latest_target_refs = {
+        str(entry["run_ref"])
+        for entry in latest_by_target_label.values()
+        if isinstance(entry.get("run_ref"), str)
+    }
+    latest_pointer_refs = set().union(*latest_packet_refs.values())
+    all_pointer_refs = set().union(*all_packet_refs.values())
+    active_target_labels = set(latest_by_target_label.keys())
+
+    by_class: dict[str, list[dict[str, Any]]] = {
+        "canonical": [],
+        "historical": [],
+        "exploratory": [],
+    }
+    run_class_map: dict[str, dict[str, str]] = {}
+
+    for entry in run_entries:
+        run_ref = str(entry["run_ref"])
+        target_label = str(entry.get("target_label") or "")
+        if run_ref in latest_pointer_refs:
+            retention_class = "canonical"
+            reason = "referenced by the current latest comparison or promotion packet"
+        elif run_ref in latest_target_refs:
+            retention_class = "canonical"
+            reason = "latest run for its target label"
+        elif run_ref in all_pointer_refs:
+            retention_class = "historical"
+            reason = "referenced by an older comparison or promotion packet"
+        elif target_label in active_target_labels:
+            retention_class = "historical"
+            reason = "older run in an active target lineage"
+        else:
+            retention_class = "exploratory"
+            reason = "not referenced by current or historical durable comparison surfaces"
+
+        retained = {
+            "run_ref": run_ref,
+            "captured_at": entry.get("captured_at"),
+            "target_label": entry.get("target_label"),
+            "benchmark_id": entry.get("benchmark_id"),
+            "overall_mean_s": entry.get("overall_mean_s"),
+            "retention_reason": reason,
+        }
+        by_class[retention_class].append(retained)
+        run_class_map[run_ref] = {
+            "retention_class": retention_class,
+            "retention_reason": reason,
+        }
+
+    return {
+        "classes": by_class,
+        "run_class_map": run_class_map,
+        "counts": {
+            "canonical": len(by_class["canonical"]),
+            "historical": len(by_class["historical"]),
+            "exploratory": len(by_class["exploratory"]),
+        },
+    }
+
+
 def build_catalog(write_root: Path) -> dict[str, Any]:
     runs_root = write_root / "runs"
     comparisons_root = write_root / "comparisons"
@@ -155,6 +283,8 @@ def build_catalog(write_root: Path) -> dict[str, Any]:
     latest_by_target_label = latest_entries_by_key(run_entries, "target_label")
     latest_by_benchmark_id = latest_entries_by_key(run_entries, "benchmark_id")
     latest_by_family = latest_entries_by_key(run_entries, "benchmark_family")
+    latest_packet_refs, all_packet_refs = collect_packet_references(write_root)
+    retention = classify_retention(run_entries, latest_by_target_label, latest_packet_refs, all_packet_refs)
 
     comparisons = collect_latest_group(comparisons_root, "comparison")
     promotions = collect_latest_group(promotions_root, "promotion")
@@ -164,6 +294,14 @@ def build_catalog(write_root: Path) -> dict[str, Any]:
         "generated_at": utc_now(),
         "write_root": str(write_root),
         "retention_posture": "keep raw runs as evidence, use latest pointers and this catalog for durable navigation",
+        "retention": {
+            "counts": retention["counts"],
+            "policy": {
+                "canonical": "current latest pointers and latest runs for active target labels",
+                "historical": "older runs in active lineages or runs referenced by older comparison/promotion packets",
+                "exploratory": "runs not referenced by durable comparison surfaces",
+            },
+        },
         "runs": {
             "count": len(run_entries),
             "index_ref": str(write_root / "runs" / "index.json"),
@@ -195,6 +333,7 @@ def build_catalog(write_root: Path) -> dict[str, Any]:
         },
         "comparisons": comparisons,
         "promotions": promotions,
+        "retention_ref": str(write_root / "retention.json"),
     }
 
 
@@ -215,10 +354,20 @@ def main() -> int:
         build_run_entry(path)
         for path in sorted(runs_root.glob("*/summary.json"))
     ]
+    latest_by_target_label = latest_entries_by_key(run_entries, "target_label")
+    latest_packet_refs, all_packet_refs = collect_packet_references(write_root)
+    retention = classify_retention(run_entries, latest_by_target_label, latest_packet_refs, all_packet_refs)
+    run_entries_with_retention = []
+    for entry in run_entries:
+        enriched = dict(entry)
+        enriched.update(retention["run_class_map"][str(entry["run_ref"])])
+        run_entries_with_retention.append(enriched)
+
     latest_root = write_root / "latest"
     latest_index = {
         "generated_at": catalog["generated_at"],
         "catalog_ref": str(write_root / "catalog.json"),
+        "retention_ref": str(write_root / "retention.json"),
         "comparison_refs": {
             key: value.get("pointer_ref")
             for key, value in catalog["comparisons"].items()
@@ -228,25 +377,44 @@ def main() -> int:
             for key, value in catalog["promotions"].items()
         },
         "latest_runs_by_target_label": catalog["runs"]["latest_by_target_label"],
+        "canonical_run_refs": [
+            item["run_ref"]
+            for item in retention["classes"]["canonical"]
+        ],
     }
     run_index = {
         "generated_at": catalog["generated_at"],
-        "count": len(run_entries),
-        "entries": run_entries,
+        "count": len(run_entries_with_retention),
+        "entries": run_entries_with_retention,
+    }
+    retention_index = {
+        "generated_at": catalog["generated_at"],
+        "counts": retention["counts"],
+        "classes": retention["classes"],
+        "notes": {
+            "canonical": "use these first for repeatable control-path and promotion-path comparison",
+            "historical": "keep these for lineage and reviewable decision history",
+            "exploratory": "keep these as local evidence, but do not treat them as the default comparison set",
+        },
     }
 
     write_json(write_root / "catalog.json", catalog)
     write_json(latest_root / "index.json", latest_index)
     write_json(runs_root / "index.json", run_index)
+    write_json(write_root / "retention.json", retention_index)
 
     print(json.dumps({
         "ok": True,
         "catalog_ref": str(write_root / "catalog.json"),
         "latest_ref": str(latest_root / "index.json"),
         "run_index_ref": str(runs_root / "index.json"),
+        "retention_ref": str(write_root / "retention.json"),
         "run_count": len(run_entries),
         "comparison_count": len(catalog["comparisons"]),
         "promotion_count": len(catalog["promotions"]),
+        "canonical_count": retention["counts"]["canonical"],
+        "historical_count": retention["counts"]["historical"],
+        "exploratory_count": retention["counts"]["exploratory"],
     }, ensure_ascii=True))
     return 0
 
