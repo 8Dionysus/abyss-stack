@@ -72,7 +72,11 @@ Optional heavy-data root:
 Recommended active tree:
 ```text
 ${AOA_STACK_ROOT}/Logs/runtime-benchmarks/
+  catalog.json
+  latest/
+    index.json
   runs/
+    index.json
     2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/
       benchmark.manifest.json
       summary.json
@@ -90,6 +94,7 @@ Rules:
 - move bulky raw captures to the optional vault when mounted
 - never assume `${AOA_VAULT_ROOT}` exists just because the architecture names it
 - never commit secret-bearing rendered config or live env material
+- keep one generated catalog and one `latest/` pointer layer so repeated runs stay comparable without hand-scanning timestamp directories
 
 ## Minimum run outputs
 A strong runtime benchmark run should produce:
@@ -118,6 +123,17 @@ scripts/aoa-qwen-bench --preset intel-full
 This runner stays on the intended `langchain-api /run` path and writes machine-local evidence under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/`.
 It performs one uncounted warmup call per case before measured repeats so warm-latency reads stay warm by definition instead of by accident.
 
+Refresh the durable catalog after new runs:
+
+```bash
+scripts/aoa-runtime-bench-index
+```
+
+That helper writes:
+- `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/catalog.json`
+- `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/latest/index.json`
+- `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/index.json`
+
 ## Relationship to local trial programs
 
 If you need a supervised per-case trial program rather than a standalone benchmark run, use:
@@ -143,6 +159,11 @@ scripts/aoa-llamacpp-pilot run --preset intel-full
 
 That pilot runs a fresh Ollama baseline on `5401`, a fresh `llama.cpp` sidecar bench on `5403`, and writes a comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
 It is a runtime-parity aid, not a promotion decision by itself.
+
+Use the catalog layer to answer:
+- what the latest baseline run was for a target label
+- which comparison packet currently represents a pilot family
+- which promotion packet currently represents the active substrate verdict
 
 ## Comparison hygiene
 Before treating two runs as comparable, keep stable:
