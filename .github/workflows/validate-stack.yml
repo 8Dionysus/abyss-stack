@@ -26,7 +26,7 @@ jobs:
         run: python scripts/validate_stack.py
 
       - name: Python syntax check
-        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot
+        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index
 
       - name: Shellcheck scripts
         run: |

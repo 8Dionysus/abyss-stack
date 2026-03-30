@@ -33,6 +33,7 @@ REQUIRED_SCRIPTS = {
     "aoa-w5-pilot",
     "aoa-w6-pilot",
     "aoa-llamacpp-pilot",
+    "aoa-runtime-bench-index",
     "aoa-qwen-check",
     "aoa-qwen-run",
     "aoa-qwen-bench",

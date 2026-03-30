@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+DEFAULT_WRITE_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks"
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    ensure_parent(path)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected object at {path}")
+    return payload
+
+
+def parse_run_dir_name(name: str) -> tuple[str | None, str | None, str | None]:
+    parts = name.split("__", 2)
+    if len(parts) != 3:
+        return None, None, None
+    return parts[0], parts[1], parts[2]
+
+
+def summarize_case_means(case_breakdown: dict[str, Any] | None) -> dict[str, float | None]:
+    result: dict[str, float | None] = {}
+    if not isinstance(case_breakdown, dict):
+        return result
+    for case_id, payload in sorted(case_breakdown.items()):
+        if isinstance(payload, dict):
+            value = payload.get("mean_s")
+            result[str(case_id)] = value if isinstance(value, (int, float)) else None
+    return result
+
+
+def build_run_entry(summary_path: Path) -> dict[str, Any]:
+    summary = load_json(summary_path)
+    run_root = summary_path.parent
+    timestamp_token, benchmark_family, target_label = parse_run_dir_name(run_root.name)
+    return {
+        "run_ref": str(run_root),
+        "summary_ref": str(summary_path),
+        "run_dir": run_root.name,
+        "timestamp_token": timestamp_token,
+        "captured_at": summary.get("captured_at"),
+        "benchmark_id": summary.get("benchmark_id"),
+        "benchmark_family": benchmark_family,
+        "target_label": target_label,
+        "all_passed": bool(summary.get("all_passed")),
+        "runtime_selection": summary.get("runtime_selection"),
+        "overall_mean_s": summary.get("overall_mean_s"),
+        "overall_best_s": summary.get("overall_best_s"),
+        "overall_worst_s": summary.get("overall_worst_s"),
+        "case_means_s": summarize_case_means(summary.get("case_breakdown")),
+    }
+
+
+def latest_entries_by_key(entries: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        value = entry.get(key)
+        if not isinstance(value, str) or not value:
+            continue
+        existing = latest.get(value)
+        if existing is None or str(entry.get("captured_at") or entry.get("timestamp_token") or "") >= str(
+            existing.get("captured_at") or existing.get("timestamp_token") or ""
+        ):
+            latest[value] = entry
+    return dict(sorted(latest.items()))
+
+
+def load_latest_pointer(pointer_path: Path, kind: str) -> dict[str, Any] | None:
+    if not pointer_path.exists():
+        return None
+    payload = load_json(pointer_path)
+    latest_run_root = payload.get("latest_run_root")
+    if not isinstance(latest_run_root, str):
+        return None
+    result: dict[str, Any] = {
+        "kind": kind,
+        "pointer_ref": str(pointer_path),
+        "captured_at": payload.get("captured_at"),
+        "latest_run_root": latest_run_root,
+    }
+    if kind == "comparison":
+        result["comparison_ref"] = payload.get("comparison_ref")
+        result["report_ref"] = payload.get("report_ref")
+        comparison_ref = payload.get("comparison_ref")
+        if isinstance(comparison_ref, str) and Path(comparison_ref).exists():
+            comparison = load_json(Path(comparison_ref))
+            result["pilot_id"] = comparison.get("pilot_id")
+            result["preset"] = comparison.get("preset")
+            result["baseline_backend"] = comparison.get("baseline_backend")
+            result["candidate_backend"] = comparison.get("candidate_backend")
+            result["overall_delta_s"] = comparison.get("overall_delta_s")
+            result["recommendation"] = comparison.get("recommendation")
+    if kind == "promotion":
+        result["promotion_ref"] = payload.get("promotion_ref")
+        result["report_ref"] = payload.get("report_ref")
+        promotion_ref = payload.get("promotion_ref")
+        if isinstance(promotion_ref, str) and Path(promotion_ref).exists():
+            promotion = load_json(Path(promotion_ref))
+            result["promotion_id"] = promotion.get("promotion_id")
+            result["winner_quant"] = promotion.get("winner_quant")
+            result["winner_model_host_path"] = promotion.get("winner_model_host_path")
+            promotion_block = promotion.get("promotion")
+            if isinstance(promotion_block, dict):
+                result["w0_gate_result"] = promotion_block.get("w0_gate_result")
+                result["w4_gate_result"] = promotion_block.get("w4_gate_result")
+                result["recommendation"] = promotion_block.get("recommendation")
+    return result
+
+
+def collect_latest_group(root: Path, kind: str) -> dict[str, dict[str, Any]]:
+    results: dict[str, dict[str, Any]] = {}
+    if not root.exists():
+        return results
+    for child in sorted(path for path in root.iterdir() if path.is_dir()):
+        pointer = child / "latest.json"
+        loaded = load_latest_pointer(pointer, kind)
+        if loaded is None:
+            continue
+        results[child.name] = loaded
+    return results
+
+
+def build_catalog(write_root: Path) -> dict[str, Any]:
+    runs_root = write_root / "runs"
+    comparisons_root = write_root / "comparisons"
+    promotions_root = write_root / "promotions"
+
+    run_entries = [
+        build_run_entry(path)
+        for path in sorted(runs_root.glob("*/summary.json"))
+    ]
+
+    latest_by_target_label = latest_entries_by_key(run_entries, "target_label")
+    latest_by_benchmark_id = latest_entries_by_key(run_entries, "benchmark_id")
+    latest_by_family = latest_entries_by_key(run_entries, "benchmark_family")
+
+    comparisons = collect_latest_group(comparisons_root, "comparison")
+    promotions = collect_latest_group(promotions_root, "promotion")
+
+    return {
+        "catalog_id": "runtime-benchmarks-catalog-v1",
+        "generated_at": utc_now(),
+        "write_root": str(write_root),
+        "retention_posture": "keep raw runs as evidence, use latest pointers and this catalog for durable navigation",
+        "runs": {
+            "count": len(run_entries),
+            "index_ref": str(write_root / "runs" / "index.json"),
+            "latest_by_target_label": {
+                key: {
+                    "run_ref": value["run_ref"],
+                    "captured_at": value["captured_at"],
+                    "overall_mean_s": value["overall_mean_s"],
+                    "case_means_s": value["case_means_s"],
+                }
+                for key, value in latest_by_target_label.items()
+            },
+            "latest_by_benchmark_id": {
+                key: {
+                    "run_ref": value["run_ref"],
+                    "captured_at": value["captured_at"],
+                    "overall_mean_s": value["overall_mean_s"],
+                }
+                for key, value in latest_by_benchmark_id.items()
+            },
+            "latest_by_family": {
+                key: {
+                    "run_ref": value["run_ref"],
+                    "target_label": value["target_label"],
+                    "captured_at": value["captured_at"],
+                }
+                for key, value in latest_by_family.items()
+            },
+        },
+        "comparisons": comparisons,
+        "promotions": promotions,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build a durable runtime benchmark catalog")
+    parser.add_argument(
+        "--write-root",
+        default=str(DEFAULT_WRITE_ROOT),
+        help="runtime benchmark root (default: %(default)s)",
+    )
+    args = parser.parse_args()
+
+    write_root = Path(args.write_root).expanduser().resolve()
+    catalog = build_catalog(write_root)
+
+    runs_root = write_root / "runs"
+    run_entries = [
+        build_run_entry(path)
+        for path in sorted(runs_root.glob("*/summary.json"))
+    ]
+    latest_root = write_root / "latest"
+    latest_index = {
+        "generated_at": catalog["generated_at"],
+        "catalog_ref": str(write_root / "catalog.json"),
+        "comparison_refs": {
+            key: value.get("pointer_ref")
+            for key, value in catalog["comparisons"].items()
+        },
+        "promotion_refs": {
+            key: value.get("pointer_ref")
+            for key, value in catalog["promotions"].items()
+        },
+        "latest_runs_by_target_label": catalog["runs"]["latest_by_target_label"],
+    }
+    run_index = {
+        "generated_at": catalog["generated_at"],
+        "count": len(run_entries),
+        "entries": run_entries,
+    }
+
+    write_json(write_root / "catalog.json", catalog)
+    write_json(latest_root / "index.json", latest_index)
+    write_json(runs_root / "index.json", run_index)
+
+    print(json.dumps({
+        "ok": True,
+        "catalog_ref": str(write_root / "catalog.json"),
+        "latest_ref": str(latest_root / "index.json"),
+        "run_index_ref": str(runs_root / "index.json"),
+        "run_count": len(run_entries),
+        "comparison_count": len(catalog["comparisons"]),
+        "promotion_count": len(catalog["promotions"]),
+    }, ensure_ascii=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
