@@ -74,6 +74,7 @@ Recommended active tree:
 ${AOA_STACK_ROOT}/Logs/runtime-benchmarks/
   catalog.json
   retention.json
+  cohorts.json
   latest/
     index.json
   runs/
@@ -133,6 +134,7 @@ scripts/aoa-runtime-bench-index
 That helper writes:
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/catalog.json`
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/retention.json`
+- `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/cohorts.json`
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/latest/index.json`
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/index.json`
 
@@ -143,6 +145,18 @@ Retention classes:
   Older runs that remain part of an active lineage or older comparison/promotion history.
 - `exploratory`
   Local evidence that is not part of the current default comparison surface.
+
+Cohort layer:
+- `current-control`
+  The default local control-path runs to compare against first.
+- `promotion-basis`
+  The runs directly used by the current comparison/promotion verdict path.
+- `current-promoted`
+  The latest promoted winner runs for the active backend substrate.
+- `comparison-challenger`
+  The latest challenger runs retained beside the promoted winner.
+- `legacy-baseline`
+  Older control-path runs kept for drift review.
 
 ## Relationship to local trial programs
 
