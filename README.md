@@ -18,6 +18,7 @@ This repository is the right home for:
 - runtime-facing return and bounded context-rebuild policy for agent-facing routes
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
+- current-machine fit policy, driver freshness posture, and bounded machine-local tuning guidance
 - platform-adaptation policy and public-safe/private tuning record contracts
 - infra helper services that support AoA and ToS
 
@@ -59,22 +60,23 @@ This repository should not absorb:
 15. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
 16. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
 17. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
-18. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
-19. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
-20. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
-21. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
-22. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
-23. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-24. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-25. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-26. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-27. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-28. Read [docs/DOCTOR](docs/DOCTOR.md).
-29. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-30. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-31. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-32. Read [docs/SECURITY](docs/SECURITY.md).
-33. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+18. Read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md).
+19. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
+20. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
+21. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
+22. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
+23. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
+24. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+25. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+26. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+27. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+28. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+29. Read [docs/DOCTOR](docs/DOCTOR.md).
+30. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+31. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+32. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+33. Read [docs/SECURITY](docs/SECURITY.md).
+34. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -88,6 +90,7 @@ For the shortest next route by intent:
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
+- if you need to tune the runtime to the current machine, confirm driver freshness, or decide which preset the host should prefer, read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md)
 - if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - if you need the repo merge and branch discipline, read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md)
 - if you need the runtime-side memo mirror, recall seam, or export candidates, read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md)
@@ -164,6 +167,7 @@ The repository now includes:
 - render-truth helpers for actual composed runtime output
 - runtime benchmark policy, schema, and example artifacts
 - reference-platform schema and host-facts capture support
+- machine-fit schema and current-host adaptation capture support
 - platform-adaptation schema, example artifacts, and capture support
 - preset-aware composition helpers and preset introspection
 - Windows host bridge scripts and WSL guidance docs
@@ -174,9 +178,9 @@ The repository now includes:
 
 ## Current status
 
-`abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
+`abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 The first live consumer step has now landed in `langchain-api` through opt-in `POST /run/federated`, which can consume advisory playbook and memo seams without changing the default `POST /run` path.
-The next large step is no longer whether the live runtime should consume those seams at all, but how broadly and how deeply the runtime loop should rely on them.
+The next large step is no longer bootstrap or mirror landing, or whether the live runtime should consume those seams at all; it is deciding how broadly and how deeply the runtime loop should rely on those already-landed seams.
 
 ## License
 

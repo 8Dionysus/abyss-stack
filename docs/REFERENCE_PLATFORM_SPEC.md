@@ -6,6 +6,7 @@ This document defines the machine-readable host-facts layer for `abyss-stack`.
 
 `REFERENCE_PLATFORM.md` tells you the intended host shape.
 The host-facts layer records what a concrete machine actually looks like.
+The machine-fit layer then decides what that host should currently prefer.
 
 ## Artifact surfaces
 
@@ -76,7 +77,8 @@ If a proposed field makes attacker reconnaissance easier but does not materially
 2. Capture a public snapshot and review it before commit.
 3. Capture a private snapshot locally when you need fuller deployment evidence.
 4. Keep the schema version stable until the contract changes.
-5. When the shape changes, update this doc, the schema, the capture script, validation, and workflow coverage together.
+5. Use [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md) when you need the bounded current-host runtime posture.
+6. When the shape changes, update this doc, the schema, the capture script, validation, and workflow coverage together.
 
 ## Suggested commands
 

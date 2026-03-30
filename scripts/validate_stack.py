@@ -26,7 +26,12 @@ LEGACY_ALLOWED = {
 REQUIRED_SCRIPTS = {
     "aoa-doctor",
     "aoa-host-facts",
+    "aoa-machine-fit",
     "aoa-platform-adaptation",
+    "aoa-local-ai-trials",
+    "aoa-qwen-check",
+    "aoa-qwen-run",
+    "aoa-qwen-bench",
     "aoa-export-memo-candidate",
     "aoa-export-runtime-evidence-selection",
     "aoa-export-artifact-hook-candidate",
@@ -68,6 +73,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "PROFILE_RECIPES.md",
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
+    ROOT / "docs" / "LOCAL_AI_TRIALS.md",
     ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
@@ -77,6 +83,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
+    ROOT / "docs" / "MACHINE_FIT_POLICY.md",
     ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
     ROOT / "docs" / "WINDOWS_BRIDGE.md",
     ROOT / "docs" / "WINDOWS_SETUP.md",
@@ -84,6 +91,9 @@ REQUIRED_FILES = {
     ROOT / "docs" / "reference-platform" / "README.md",
     ROOT / "docs" / "reference-platform" / "schema.v1.json",
     ROOT / "docs" / "reference-platform" / "reference-host.public.json.example",
+    ROOT / "docs" / "machine-fit" / "README.md",
+    ROOT / "docs" / "machine-fit" / "schema.v1.json",
+    ROOT / "docs" / "machine-fit" / "machine-fit.public.json.example",
     ROOT / "docs" / "platform-adaptations" / "README.md",
     ROOT / "docs" / "platform-adaptations" / "schema.v1.json",
     ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example",
@@ -235,6 +245,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM.md")
     if "docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
         errors.append("README.md must route readers to docs/REFERENCE_PLATFORM_SPEC.md")
+    if "docs/MACHINE_FIT_POLICY.md" not in readme:
+        errors.append("README.md must route readers to docs/MACHINE_FIT_POLICY.md")
     if "docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
         errors.append("README.md must route readers to docs/PLATFORM_ADAPTATION_POLICY.md")
     if "docs/BRANCH_POLICY.md" not in readme:
@@ -247,6 +259,23 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to docs/PLAYBOOK_RUNTIME_SEAM.md")
     if "docs/KAG_RUNTIME_SEAM.md" not in readme:
         errors.append("README.md must route readers to docs/KAG_RUNTIME_SEAM.md")
+
+    local_ai_trials = (ROOT / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "prepare-wave W4 --lane docs",
+        "apply-case W4 <case-id>",
+        "proposal.edit-spec.json",
+        "exact_replace",
+        "anchored_replace",
+        "deterministically inside the runner",
+        "script_refresh",
+        "approval.status.json",
+        "isolated git worktree",
+    ):
+        if required_snippet not in local_ai_trials:
+            errors.append(
+                f"docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
+            )
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:

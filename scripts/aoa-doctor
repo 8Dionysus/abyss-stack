@@ -117,6 +117,31 @@ if has_module "51-browser-tools.yml" || has_module "60-monitoring.yml"; then
   doctor_ok "internal-only services selected; use aoa-smoke --with-internal after startup"
 fi
 
+machine_fit_path="${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
+if [[ -f "${machine_fit_path}" ]]; then
+  doctor_ok "machine-fit record ${machine_fit_path}"
+else
+  doctor_warn "machine-fit record missing; run ${AOA_CONFIGS_ROOT}/scripts/aoa-machine-fit after bootstrap"
+fi
+
+if [[ -r /proc/loadavg ]]; then
+  load_1m="$(awk '{print $1}' /proc/loadavg 2>/dev/null || true)"
+  cpu_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  if [[ -n "${load_1m}" && -n "${cpu_count}" ]]; then
+    if python3 - "$load_1m" "$cpu_count" <<'PY'
+import sys
+load = float(sys.argv[1])
+cpus = int(sys.argv[2])
+sys.exit(0 if load > (cpus * 0.50) else 1)
+PY
+    then
+      doctor_warn "host loadavg ${load_1m} is noisy for latency-sensitive trials on ${cpu_count} logical CPUs"
+    else
+      doctor_ok "host load envelope looks reasonable for latency-sensitive work"
+    fi
+  fi
+fi
+
 if command -v findmnt >/dev/null 2>&1; then
   if findmnt "${AOA_VAULT_ROOT}" >/dev/null 2>&1; then
     doctor_ok "vault mount ${AOA_VAULT_ROOT}"

@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+def run_prompt(
+    *,
+    prompt_file: Path,
+    url: str,
+    timeout_s: float,
+    temperature: float,
+    max_tokens: int | None,
+) -> dict[str, object]:
+    prompt = prompt_file.read_text(encoding="utf-8")
+    payload = {
+        "user_text": prompt,
+        "temperature": float(temperature),
+    }
+    if max_tokens is not None:
+        payload["max_tokens"] = int(max_tokens)
+
+    req = urllib.request.Request(
+        url=url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    start = time.perf_counter()
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        raw = resp.read().decode("utf-8", errors="ignore")
+        status = resp.status
+    elapsed_s = round(time.perf_counter() - start, 3)
+
+    body = json.loads(raw)
+    return {
+        "ok": True,
+        "url": url,
+        "http_status": status,
+        "elapsed_s": elapsed_s,
+        "backend": body.get("backend"),
+        "model": body.get("model"),
+        "answer": str(body.get("answer") or "").strip(),
+        "prompt_file": str(prompt_file),
+    }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run a bounded prompt file through langchain-api /run."
+    )
+    parser.add_argument("--prompt-file", required=True)
+    parser.add_argument("--url", default="http://127.0.0.1:5401/run")
+    parser.add_argument("--timeout", type=float, default=70.0)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--max-tokens", type=int, default=None)
+    parser.add_argument("--json", action="store_true")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    prompt_file = Path(args.prompt_file)
+
+    try:
+        result = run_prompt(
+            prompt_file=prompt_file,
+            url=args.url,
+            timeout_s=args.timeout,
+            temperature=args.temperature,
+            max_tokens=args.max_tokens,
+        )
+    except urllib.error.HTTPError as exc:
+        payload = exc.read().decode("utf-8", errors="ignore")
+        result = {
+            "ok": False,
+            "url": args.url,
+            "http_status": exc.code,
+            "elapsed_s": None,
+            "backend": None,
+            "model": None,
+            "answer": "",
+            "prompt_file": str(prompt_file),
+            "error": f"http_error {exc.code}: {payload[:300]}",
+        }
+    except Exception as exc:
+        result = {
+            "ok": False,
+            "url": args.url,
+            "http_status": None,
+            "elapsed_s": None,
+            "backend": None,
+            "model": None,
+            "answer": "",
+            "prompt_file": str(prompt_file),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    if args.json:
+        sys.stdout.write(json.dumps(result, ensure_ascii=True) + "\n")
+    else:
+        if result.get("ok"):
+            print(
+                f"ok   qwen run {result['url']} {result['elapsed_s']}s {result['prompt_file']}"
+            )
+        else:
+            print(f"fail qwen run {result['url']} {result.get('error')}")
+
+    return 0 if result.get("ok") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -63,6 +63,7 @@ fi
 
 if has_module "41-agent-api.yml"; then
   aoa_probe_http "langchain-api" "http://127.0.0.1:5401/health" || failures=$((failures + 1))
+  "${SCRIPT_DIR}/aoa-qwen-check" --case exact-reply || failures=$((failures + 1))
 fi
 
 if has_module "43-federation-router.yml"; then

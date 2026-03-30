@@ -33,15 +33,19 @@ Use this order:
 - prefer clarity and explicit boundaries over magical automation
 - preserve `/srv/abyss-stack` as the canonical deployed runtime root unless explicitly redesigned
 - preserve the split between normative platform docs, public-safe host facts, and private host facts
+- treat current-machine fit as a first-class runtime concern before latency-sensitive or accelerator-sensitive work
 
 ## Host-facts rule
 
 - `docs/REFERENCE_PLATFORM.md` owns the intended host posture.
 - `docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations.
+- `docs/MACHINE_FIT_POLICY.md` owns the current-machine adaptation policy and capture destinations.
 - `scripts/aoa-doctor` answers readiness, not durable inventory.
 - `scripts/aoa-host-facts` captures durable host facts.
+- `scripts/aoa-machine-fit` captures the bounded current-machine runtime posture.
 - public-safe artifacts may live under `docs/reference-platform/`
 - private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
+- private machine-fit captures belong under `${AOA_STACK_ROOT}/Logs/machine-fit/`
 
 ## Repository reading order
 

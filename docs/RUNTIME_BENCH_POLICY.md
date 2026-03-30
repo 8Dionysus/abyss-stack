@@ -106,6 +106,33 @@ A strong runtime benchmark run should produce:
 
 `notes.md` carries human review notes, caveats, and non-claims.
 
+## First bounded runner
+
+For the current local Qwen path, use the runtime-local bench wrapper:
+
+```bash
+scripts/aoa-qwen-bench --profile agentic
+scripts/aoa-qwen-bench --preset intel-full
+```
+
+This runner stays on the intended `langchain-api /run` path and writes machine-local evidence under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/`.
+It performs one uncounted warmup call per case before measured repeats so warm-latency reads stay warm by definition instead of by accident.
+
+## Relationship to local trial programs
+
+If you need a supervised per-case trial program rather than a standalone benchmark run, use:
+
+```bash
+scripts/aoa-local-ai-trials materialize
+scripts/aoa-local-ai-trials run-wave W0
+```
+
+That helper may reuse runtime benchmark artifacts as evidence inside case packets, but it does not change the benchmark boundary:
+
+- benchmark artifacts remain runtime-local truth in `abyss-stack`
+- wave verdicts remain bounded trial judgments, not portable eval canon
+- portable proof wording still belongs in `aoa-evals`
+
 ## Comparison hygiene
 Before treating two runs as comparable, keep stable:
 - host hardware class or disclose the delta

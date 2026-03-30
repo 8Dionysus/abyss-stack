@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.invalid/abyss-stack/machine-fit/schema.v1.json",
+  "title": "AoA Machine Fit Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "capture_mode",
+    "captured_at",
+    "captured_by",
+    "assessment_id",
+    "machine",
+    "driver_posture",
+    "package_freshness",
+    "runtime_recommendation",
+    "host_envelope",
+    "fit_verdict",
+    "evidence_refs",
+    "non_claims"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "aoa.machine-fit"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "capture_mode": {
+      "enum": [
+        "public",
+        "private"
+      ]
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "captured_by": {
+      "const": "scripts/aoa-machine-fit"
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_id",
+        "os_version_id",
+        "kernel_release",
+        "arch",
+        "cpu_model",
+        "logical_cpus",
+        "memory_total_bytes",
+        "hardware_class"
+      ],
+      "properties": {
+        "os_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "os_version_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kernel_release": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "arch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cpu_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "logical_cpus": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "memory_total_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hardware_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "driver_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_modules_loaded",
+        "dri",
+        "accel",
+        "display_devices",
+        "ai_devices"
+      ],
+      "properties": {
+        "kernel_modules_loaded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dri": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dev_dri_present",
+            "render_nodes",
+            "current_user_in_render_group",
+            "current_user_in_video_group"
+          ],
+          "properties": {
+            "dev_dri_present": {
+              "type": "boolean"
+            },
+            "render_nodes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "current_user_in_render_group": {
+              "type": "boolean"
+            },
+            "current_user_in_video_group": {
+              "type": "boolean"
+            }
+          }
+        },
+        "accel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dev_accel_present",
+            "accel_nodes"
+          ],
+          "properties": {
+            "dev_accel_present": {
+              "type": "boolean"
+            },
+            "accel_nodes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "display_devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pciDevice"
+          }
+        },
+        "ai_devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pciDevice"
+          }
+        }
+      }
+    },
+    "package_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_manager",
+        "state",
+        "packages",
+        "updates_available",
+        "missing_packages",
+        "checked_command"
+      ],
+      "properties": {
+        "package_manager": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "up-to-date",
+            "updates-available",
+            "unknown"
+          ]
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/packageRecord"
+          }
+        },
+        "updates_available": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checked_command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "runtime_recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preferred_preset",
+        "preferred_profile_set",
+        "preferred_runtime_path",
+        "validated_acceleration_posture",
+        "validated_settings",
+        "recommended_overlays",
+        "current_overlays",
+        "host_facts_ref",
+        "platform_adaptation_ref"
+      ],
+      "properties": {
+        "preferred_preset": {
+          "type": "string"
+        },
+        "preferred_profile_set": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preferred_runtime_path": {
+          "type": "string"
+        },
+        "validated_acceleration_posture": {
+          "type": "string"
+        },
+        "validated_settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "recommended_overlays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current_overlays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "host_facts_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platform_adaptation_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "host_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loadavg_1m",
+        "loadavg_5m",
+        "loadavg_15m",
+        "available_memory_bytes",
+        "latency_trial_ready",
+        "notes"
+      ],
+      "properties": {
+        "loadavg_1m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "loadavg_5m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "loadavg_15m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "available_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "latency_trial_ready": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fit_verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "summary",
+        "next_actions",
+        "retest_on"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "qualified",
+            "qualified-noisy-host",
+            "needs-attention"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retest_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redacted_fields"
+      ],
+      "properties": {
+        "redacted_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pciDevice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "header",
+        "driver_in_use",
+        "kernel_modules"
+      ],
+      "properties": {
+        "header": {
+          "type": "string"
+        },
+        "driver_in_use": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kernel_modules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "packageRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "installed",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
