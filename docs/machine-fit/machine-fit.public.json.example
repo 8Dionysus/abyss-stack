@@ -126,12 +126,19 @@
       "tools",
       "observability"
     ],
-    "preferred_runtime_path": "intel-full -> langchain-api /run -> litellm/ollama + route-api",
-    "validated_acceleration_posture": "OVMS embeddings on Intel GPU; Qwen chat via Ollama; Intel NPU is visible but not yet part of the validated canonical path.",
+    "preferred_runtime_path": "intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api",
+    "validated_acceleration_posture": "OVMS embeddings on Intel GPU; Qwen chat on the promoted llama.cpp path; Ollama remains the validated control path; Intel NPU is visible but not yet part of the validated canonical path.",
     "validated_settings": {
-      "LC_OLLAMA_NUM_THREAD": "6",
-      "LC_OLLAMA_NUM_BATCH": "32",
-      "LC_OLLAMA_THINK": "false"
+      "AOA_LLAMACPP_DEVICE": "none",
+      "AOA_LLAMACPP_NO_OP_OFFLOAD": "1",
+      "AOA_LLAMACPP_THREADS": "4",
+      "AOA_LLAMACPP_THREADS_BATCH": "4",
+      "AOA_LLAMACPP_THREADS_HTTP": "2",
+      "AOA_LLAMACPP_CTX_SIZE": "4096",
+      "AOA_LLAMACPP_BATCH_SIZE": "512",
+      "AOA_LLAMACPP_UBATCH_SIZE": "128",
+      "AOA_LLAMACPP_REASONING": "off",
+      "AOA_LLAMACPP_THINK": "none"
     },
     "recommended_overlays": [],
     "current_overlays": [],
@@ -148,7 +155,7 @@
   },
   "fit_verdict": {
     "status": "qualified",
-    "summary": "Preferred preset is intel-full. Qwen chat should stay on langchain-api /run through the validated local path. Relevant host packages are current in the configured Fedora repositories.",
+    "summary": "Preferred preset is intel-full. Qwen chat should stay on the promoted llama.cpp path, with Ollama retained as the control path. Relevant host packages are current in the configured Fedora repositories.",
     "next_actions": [
       "Run scripts/aoa-doctor --preset intel-full before launch.",
       "Refresh host facts when the host or kernel changes.",
@@ -158,7 +165,7 @@
       "kernel update",
       "linux-firmware update",
       "mesa or Intel runtime update",
-      "Ollama or langchain-api runtime change",
+      "llama.cpp, Ollama control-path, or langchain-api runtime change",
       "host load envelope change before latency-sensitive trials"
     ]
   },

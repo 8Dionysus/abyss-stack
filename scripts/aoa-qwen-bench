@@ -8,11 +8,11 @@ source "${SCRIPT_DIR}/aoa-lib.sh"
 repeat=2
 timeout_s=90
 write_root="${AOA_STACK_ROOT}/Logs/runtime-benchmarks"
-run_url="http://127.0.0.1:5401/run"
-backend_label="langchain-api -> ollama-native"
+run_url="http://127.0.0.1:5403/run"
+backend_label="langchain-api-llamacpp -> llama.cpp-openai"
 model_label="qwen3.5:9b"
-runtime_variant="Q4_K_M via Ollama"
-target_label="workhorse-local-qwen3.5-9b"
+runtime_variant="Q4_K_M via llama.cpp sidecar"
+target_label="workhorse-local-qwen3.5-9b-llamacpp"
 selector_args=()
 
 while (($#)); do
@@ -138,10 +138,10 @@ preset = os.environ.get("AOA_QWEN_BENCH_PRESET", "")
 profile = os.environ.get("AOA_QWEN_BENCH_PROFILE", "")
 run_dir = Path(os.environ["AOA_QWEN_BENCH_RUN_DIR"])
 check_path = os.environ["AOA_QWEN_CHECK_PATH"]
-backend_label = os.environ.get("AOA_QWEN_BENCH_BACKEND_LABEL", "langchain-api -> ollama-native")
+backend_label = os.environ.get("AOA_QWEN_BENCH_BACKEND_LABEL", "langchain-api-llamacpp -> llama.cpp-openai")
 model_label = os.environ.get("AOA_QWEN_BENCH_MODEL_LABEL", "qwen3.5:9b")
-runtime_variant = os.environ.get("AOA_QWEN_BENCH_RUNTIME_VARIANT", "Q4_K_M via Ollama")
-target_label = os.environ.get("AOA_QWEN_BENCH_TARGET_LABEL", "workhorse-local-qwen3.5-9b")
+runtime_variant = os.environ.get("AOA_QWEN_BENCH_RUNTIME_VARIANT", "Q4_K_M via llama.cpp sidecar")
+target_label = os.environ.get("AOA_QWEN_BENCH_TARGET_LABEL", "workhorse-local-qwen3.5-9b-llamacpp")
 cases = ["exact-reply", "repo-routing"]
 warmup_runs_per_case = 1
 

@@ -109,7 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["exact-reply", "repo-routing"],
         required=True,
     )
-    parser.add_argument("--url", default="http://127.0.0.1:5401/run")
+    parser.add_argument("--url", default="http://127.0.0.1:5403/run")
     parser.add_argument("--timeout", type=float, default=70.0)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=None)

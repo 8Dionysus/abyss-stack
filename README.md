@@ -91,8 +91,8 @@ For the shortest next route by intent:
 - if you need playbook meaning, activation doctrine, or authored execution bundles, go to [`aoa-playbooks`](https://github.com/8Dionysus/aoa-playbooks)
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
-- if you need the bounded llama.cpp A/B runtime pilot next to the validated Ollama path, read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md)
-- if you need bounded local-model trial contracts, W4 supervised edits, or the promoted W5/W6 local-worker path, read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md)
+- if you need the promoted local Qwen runtime path on `5403`, the retained Ollama control path on `5401`, or the bounded `llama.cpp` comparison and promotion lineage, read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md)
+- if you need bounded local-model trial contracts, the adopted LangGraph execution posture, or the promoted W5/W6 local-worker path, read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
 - if you need to tune the runtime to the current machine, confirm driver freshness, or decide which preset the host should prefer, read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md)
 - if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
@@ -185,6 +185,9 @@ The repository now includes:
 ## Current status
 
 `abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
+The current bounded local-worker posture is `llama.cpp`-first on `5403`, with Ollama retained on `5401` as the control and rollback path.
+`LangGraph` is now the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows, while the earlier W0-W4 runner lineage remains available as the historical baseline.
+The current Intel embeddings posture still uses OVMS; any move from OpenVINO serving to OpenVINO GenAI should be treated as a separate reviewed stack change.
 The first live consumer step has now landed in `langchain-api` through opt-in `POST /run/federated`, which can consume advisory playbook and memo seams without changing the default `POST /run` path.
 The next large step is no longer bootstrap or mirror landing, or whether the live runtime should consume those seams at all; it is deciding how broadly and how deeply the runtime loop should rely on those already-landed seams.
 

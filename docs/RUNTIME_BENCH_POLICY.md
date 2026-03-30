@@ -125,6 +125,9 @@ scripts/aoa-qwen-bench --preset intel-full
 This runner stays on the intended `langchain-api /run` path and writes machine-local evidence under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/`.
 It performs one uncounted warmup call per case before measured repeats so warm-latency reads stay warm by definition instead of by accident.
 
+The default helper posture now targets the promoted local-worker path on `5403`.
+Use an explicit `--url`, `--backend-label`, `--runtime-variant`, and `--target-label` when you want to refresh the retained Ollama control path on `5401`.
+
 Refresh the durable catalog after new runs:
 
 ```bash
@@ -175,14 +178,14 @@ That helper may reuse runtime benchmark artifacts as evidence inside case packet
 
 ## Optional backend-parity pilot
 
-For a bounded `llama.cpp` versus Ollama comparison on the same host and the same `langchain-api /run` contract, use:
+For a bounded refresh of the promoted `llama.cpp` path against the retained Ollama control path on the same host and the same `langchain-api /run` contract, use:
 
 ```bash
 scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
-That pilot runs a fresh Ollama baseline on `5401`, a fresh `llama.cpp` sidecar bench on `5403`, and writes a comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
-It is a runtime-parity aid, not a promotion decision by itself.
+That pilot runs a fresh Ollama control bench on `5401`, a fresh `llama.cpp` sidecar bench on `5403`, and writes a comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
+It remains a runtime-parity and challenger-evaluation aid even after the current `llama.cpp` promotion.
 
 Use the catalog layer to answer:
 - what the latest baseline run was for a target label

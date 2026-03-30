@@ -2,11 +2,13 @@
 
 ## Purpose
 
-This document defines the bounded `llama.cpp` sidecar pilot for `abyss-stack`.
+This document defines the bounded `llama.cpp` sidecar pilot for `abyss-stack` and records the promoted runtime posture that came out of it.
 
-It exists to answer a narrow question:
+The pilot originally existed to answer a narrow question:
 
 **does a `llama.cpp` sidecar improve the local Qwen runtime posture on this machine without replacing the validated canonical Ollama path yet?**
+
+That question is now answered positively for the current bounded local-worker path.
 
 ## Boundary
 
@@ -19,15 +21,22 @@ The pilot is:
 The pilot is not:
 - a silent replacement for the canonical local runtime
 - a proof-layer quality verdict
-- a claim that `llama.cpp` is already promoted into machine-fit canon
+- a claim that every service in the stack should immediately move off the retained control path
 
-## Current default posture
+## Current promoted posture
 
-The validated canonical path remains:
+The current preferred bounded local-worker path is:
 
-`intel-full -> langchain-api /run -> litellm/ollama + route-api`
+`intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api`
 
-The `llama.cpp` pilot is intentionally separate from that path until a reviewed promotion decision says otherwise.
+The retained control and rollback path remains:
+
+`intel-full -> langchain-api /run -> ollama-native + route-api`
+
+The pilot script remains intentionally useful after promotion:
+- to refresh bounded backend comparisons
+- to verify the promoted sidecar posture
+- to keep the control path honest without making it the default worker substrate
 
 ## What the pilot reuses
 
@@ -44,19 +53,19 @@ This keeps the pilot honest:
 - same quantized resident artifact
 - different serving runtime
 
-## Pilot services
+## Promoted and control services
 
-When the pilot is active, it adds two localhost-only services:
+When the promoted path is active, it uses two localhost-only services:
 
 - `llama-cpp` -> `http://127.0.0.1:11435`
 - `langchain-api-llamacpp` -> `http://127.0.0.1:5403/health`
 
-The canonical services stay in place:
+The control-path services stay in place:
 
 - `ollama` -> `http://127.0.0.1:11434`
 - `langchain-api` -> `http://127.0.0.1:5401/health`
 
-That separation preserves honest A/B comparison.
+That separation preserves honest A/B comparison, rollback, and future challenger evaluation.
 
 ## Operator commands
 
@@ -189,11 +198,12 @@ Promotion packets stay runtime-local too and capture:
 
 A green or promising pilot does not automatically change the machine-fit record.
 
-Promotion requires:
+Promotion required:
 - reviewed comparison output
 - a clear recommendation that the sidecar is better for the intended bounded path
 - an explicit update to machine-fit and the validated runtime docs
 
-Until then:
-- Ollama remains the validated preferred path
-- `llama.cpp` remains an optional pilot substrate
+Current result:
+- `llama.cpp` is the preferred bounded local-worker path
+- Ollama remains the validated control and rollback path
+- any OpenVINO-side shift to OpenVINO GenAI should be reviewed separately from the `llama.cpp` promotion decision

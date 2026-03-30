@@ -18,18 +18,21 @@ Persistent state and retrieval substrate:
 
 Workflow coordination and pipeline surfaces:
 - n8n
+- LangGraph for bounded local-worker execution, pause/resume, and milestone-gated recovery flows
 
 ### 3. Inference layer
 
 Local and accelerator-aware model serving:
-- Ollama
-- OVMS and Intel-oriented model serving
+- llama.cpp as the promoted local GGUF-serving path for bounded local-worker flows
+- Ollama as the retained control and rollback path
+- OVMS as the current Intel/OpenVINO-oriented serving path for embeddings
+- a future OpenVINO GenAI migration as a separate stack change, not part of the current promoted path
 
 ### 4. Gateway and agent API layer
 
 Model routing and agent-facing runtime APIs:
 - LiteLLM
-- LangChain API or successor service modules
+- LangChain API service modules, including the control-path `langchain-api` surface and the promoted local-worker `langchain-api-llamacpp` surface
 
 This layer may also host the runtime return wrapper that rebuilds context from a last valid anchor rather than continuing under drift.
 

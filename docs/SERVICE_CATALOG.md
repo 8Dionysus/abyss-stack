@@ -15,16 +15,18 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `30-local-inference.yml`
 
-- `ollama` — local LLM and embedding serving
+- `ollama` — retained local control and rollback serving surface for Qwen chat and fallback embeddings
 
 ## `31-intel-inference.yml`
 
-- `ovms` — Intel and OpenVINO oriented model serving
+- `ovms` — current Intel and OpenVINO oriented model serving surface for embeddings
+- any migration from OVMS/OpenVINO serving to OpenVINO GenAI is a separate reviewed stack change
 
 ## `32-llamacpp-inference.yml`
 
-- `llama-cpp` — optional OpenAI-compatible GGUF serving sidecar for bounded backend-parity work
-- reuses a resolved local GGUF model file rather than changing the canonical validated Ollama path
+- `llama-cpp` — promoted OpenAI-compatible GGUF serving surface for bounded local-worker flows
+- reuses a resolved local GGUF model file and now backs the preferred local Qwen worker path on `5403`
+- keeps Ollama in place as the control and rollback path
 
 ## `40-llm-gateway.yml`
 
@@ -32,7 +34,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `41-agent-api.yml`
 
-- `langchain-api` — base agent-facing runtime API
+- `langchain-api` — base control-path agent-facing runtime API on `5401`
 - default embeddings path — Ollama-first
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
@@ -45,9 +47,16 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `44-llamacpp-agent-sidecar.yml`
 
-- `langchain-api-llamacpp` — optional sidecar agent API bound to a `llama.cpp` backend on a separate host port
-- preserves the canonical `langchain-api` service and `5401` path for honest A/B comparison
-- keeps embeddings on OVMS for Intel-aware pilot runs
+- `langchain-api-llamacpp` — promoted bounded local-worker API bound to a `llama.cpp` backend on `5403`
+- is the preferred local Qwen worker path for the current promoted `W5/W6` substrate
+- preserves the base `langchain-api` service and `5401` path as the control and rollback surface
+- keeps embeddings on OVMS for the current Intel-aware posture
+
+## Execution layer
+
+- `LangGraph` is now the adopted bounded execution layer for the `W5` and `W6` local-worker flows
+- it remains a CLI-side execution surface rather than a long-running network service
+- the original `aoa-langgraph-pilot` remains useful as the W4-shaped comparison and fixture surface
 
 ## `43-federation-router.yml`
 
