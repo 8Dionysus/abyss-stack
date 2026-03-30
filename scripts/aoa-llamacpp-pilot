@@ -1127,6 +1127,31 @@ def promote_command(args: argparse.Namespace) -> int:
     return 0 if promotion["recommendation"] == "promote llama.cpp" else 1
 
 
+def verify_command(args: argparse.Namespace) -> int:
+    llama_ready = wait_for_llama(args.timeout)
+    candidate_ready = wait_for_url("langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=args.timeout)
+    exact = run_qwen_check(case_name="exact-reply", url=CANDIDATE_RUN_URL, timeout_s=args.timeout)
+    routing = run_qwen_check(case_name="repo-routing", url=CANDIDATE_RUN_URL, timeout_s=args.timeout)
+    payload = {
+        "pilot_id": PILOT_ID,
+        "ok": bool(llama_ready.get("ready")) and bool(candidate_ready.get("ready")) and exact["ok"] and routing["ok"],
+        "llama_cpp_health": {
+            "ok": bool(llama_ready.get("ready")),
+            "status": llama_ready.get("status"),
+            "url": llama_ready.get("url"),
+        },
+        "langchain_api_llamacpp_health": {
+            "ok": bool(candidate_ready.get("ready")),
+            "status": candidate_ready.get("status"),
+            "url": candidate_ready.get("url"),
+        },
+        "exact_reply": exact,
+        "repo_routing": routing,
+    }
+    print(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))
+    return 0 if payload["ok"] else 1
+
+
 def status_command(_: argparse.Namespace) -> int:
     latest = None
     latest_path = PILOT_ROOT / "latest.json"
@@ -1192,6 +1217,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common_flags(promote)
     promote.set_defaults(func=promote_command)
+
+    verify = subparsers.add_parser("verify", help="Verify the currently running llama.cpp sidecar without calling up or down.")
+    verify.add_argument("--timeout", type=float, default=60.0)
+    verify.set_defaults(func=verify_command)
 
     status = subparsers.add_parser("status", help="Show current sidecar health and the latest saved comparison ref.")
     status.set_defaults(func=status_command)
