@@ -10,17 +10,18 @@ When something feels wrong, use this order:
 4. check internal-only probes when relevant
 5. check rendered runtime truth when composition may be the problem
 6. capture or compare host facts when the machine itself may have drifted
-7. capture a bounded platform-adaptation record when the seam looks machine-specific or likely to recur on another platform
-8. check container state
-9. check health endpoints
-10. check logs
-11. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
-12. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
-13. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
-14. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
-15. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
-16. decide whether to fix forward or roll back
-17. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+7. refresh or compare machine-fit when the question is what this host should currently prefer
+8. capture a bounded platform-adaptation record when the seam looks machine-specific or likely to recur on another platform
+9. check container state
+10. check health endpoints
+11. check logs
+12. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
+13. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
+14. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
+15. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
+16. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
+17. decide whether to fix forward or roll back
+18. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 
 ## Useful commands
 
@@ -29,6 +30,7 @@ aoa-doctor
 aoa-doctor --preset agent-full
 aoa-check-layout
 aoa-host-facts --mode public
+aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 aoa-platform-adaptation --mode private --title "Short seam title" --summary "One bounded summary" --issue-class performance
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write

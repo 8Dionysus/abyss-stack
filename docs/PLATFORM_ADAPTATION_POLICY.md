@@ -27,6 +27,7 @@ Do not use this surface for:
 
 ## Relationship to other artifacts
 - `aoa-host-facts` records what a concrete machine looks like
+- `aoa-machine-fit` records what runtime posture that machine should currently prefer
 - runtime benchmarks record measured runtime behavior
 - platform-adaptation records connect the two with bounded diagnosis and adaptation notes
 

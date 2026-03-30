@@ -18,6 +18,8 @@ The current doctor pass looks at things like:
 - whether the optional vault path appears mounted
 - whether the stack root is the canonical `/srv/abyss-stack`
 - whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
+- whether a current machine-fit record is missing for the deployed runtime root
+- whether the current host envelope looks noisy for latency-sensitive work
 
 ## Preset-aware and profile-aware behavior
 
@@ -38,6 +40,8 @@ For example:
 Use `aoa-doctor` to decide whether a selected runtime is ready to start.
 
 Use `scripts/aoa-host-facts` to capture durable machine-readable host facts.
+
+Use `scripts/aoa-machine-fit` to capture the bounded current-machine runtime posture after host facts exist.
 
 The two surfaces complement each other and should not absorb each other's job.
 
@@ -72,6 +76,7 @@ Durable host-facts capture:
 ```bash
 scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
 Keep `docs/reference-platform/reference-host.public.json` for later canonical-host refreshes, not routine local captures.
@@ -110,6 +115,7 @@ For a generic full bundle:
 scripts/aoa-doctor --preset agent-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset agent-full
 ```
 
@@ -119,5 +125,6 @@ For an Intel-aware full bundle:
 scripts/aoa-doctor --preset intel-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset intel-full
 ```

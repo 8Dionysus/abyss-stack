@@ -23,6 +23,7 @@ If you want the least-friction path, use:
 ```bash
 scripts/aoa-doctor
 scripts/aoa-first-run --strict
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
 `aoa-first-run --strict` is strict about layout and bootstrapped config presence, but still ignores missing secrets on that first pass by design.
@@ -101,6 +102,15 @@ It reports missing commands, platform mismatches, vault mount state, and Intel-s
 Use `--strict` if warnings should fail the command.
 
 From a Windows host, use `pwsh -File scripts/aoa.ps1 host-doctor` for the Windows+WSL readiness pass before invoking the Linux doctor.
+
+### `scripts/aoa-machine-fit`
+
+Captures the bounded current-machine runtime posture after the layout exists.
+Use it to record:
+- which preset this host should currently prefer
+- whether the relevant host packages are current in configured repos
+- what validated local tuning should be reused
+- whether the current host envelope is too noisy for latency-sensitive work
 
 ### `scripts/aoa-install-layout`
 
@@ -204,6 +214,7 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-memo     # optional

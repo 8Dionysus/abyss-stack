@@ -13,18 +13,21 @@
 This file is normative. It names the intended operating posture.
 
 Observed machine facts belong to the machine-readable host-facts layer described in [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md).
+The current-host runtime choice belongs to [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md).
 
 Recommended local review flow:
 
 ```bash
 scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
 The repository may carry a reviewed canonical public snapshot at `docs/reference-platform/reference-host.public.json`.
 Refresh that file intentionally when you are updating the chosen canonical Linux reference host, not during routine local captures.
 
 `aoa-doctor` stays focused on readiness. It is not the durable inventory surface.
+`aoa-machine-fit` is the bounded surface that says what this concrete machine should currently prefer.
 
 ## Fedora-first means
 
@@ -67,6 +70,14 @@ It is shaped around:
 - 32 GB RAM preferred
 - fast SSD or NVMe for active state
 - enough free headroom for models, service state, and logs
+
+## Operational principle
+
+The stack should not pretend that every machine deserves the same runtime posture.
+Once the normative posture is satisfied, the next step is to fit the runtime to the actual host:
+- prefer the strongest validated preset the host can support
+- preserve the driver and package freshness state that shaped that decision
+- refresh the machine-fit record when the host drifts
 
 ## Known user-specific fit
 

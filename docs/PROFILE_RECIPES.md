@@ -78,6 +78,8 @@ scripts/aoa-render-services --profile agentic
 scripts/aoa-up --profile agentic
 scripts/aoa-wait --profile agentic
 scripts/aoa-smoke --profile agentic
+scripts/aoa-qwen-check --case exact-reply
+scripts/aoa-qwen-bench --profile agentic
 ```
 
 ## `intel`
@@ -102,6 +104,8 @@ scripts/aoa-render-services --profile intel
 scripts/aoa-up --profile intel
 scripts/aoa-wait --profile intel
 scripts/aoa-smoke --profile intel
+scripts/aoa-qwen-check --case exact-reply
+scripts/aoa-qwen-bench --profile intel
 ```
 
 ## `federation`
@@ -211,6 +215,7 @@ Preset form:
 aoa-preset-profiles --preset agent-tools --paths
 aoa-up --preset agent-tools
 aoa-smoke --with-internal --preset agent-tools
+aoa-qwen-bench --preset agent-tools
 ```
 
 ### `agentic + observability`
@@ -236,6 +241,7 @@ Preset form:
 aoa-preset-profiles --preset agent-observability --paths
 aoa-up --preset agent-observability
 aoa-smoke --with-internal --preset agent-observability
+aoa-qwen-bench --preset agent-observability
 ```
 
 ### `agentic + federation`
@@ -314,4 +320,5 @@ Preset form:
 aoa-preset-profiles --preset intel-full --paths
 aoa-up --preset intel-full
 aoa-smoke --with-internal --preset intel-full
+aoa-qwen-bench --preset intel-full
 ```

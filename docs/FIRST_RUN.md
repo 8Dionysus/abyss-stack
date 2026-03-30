@@ -51,18 +51,20 @@ Then validate the fully bootstrapped layout:
 scripts/aoa-check-layout --strict
 ```
 
-## Optional but recommended: capture host facts
+## Optional but recommended: capture host facts and machine fit
 
-Once the runtime roots exist, record both the public-safe and local-private host posture:
+Once the runtime roots exist, record both the public-safe and local-private host posture, then capture the bounded current-machine fit:
 
 ```bash
 scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
 Review the public artifact before commit.
 Do not commit the private artifact.
 Only refresh `docs/reference-platform/reference-host.public.json` when you are intentionally updating the reviewed canonical Linux reference host snapshot.
+Refresh the private machine-fit record when kernel, firmware, container runtime, or validated local tuning changes.
 
 ## Inspect the profile before launch
 
@@ -107,6 +109,8 @@ scripts/aoa-profile-modules --profile agentic --paths
 scripts/aoa-profile-endpoints --profile agentic
 scripts/aoa-render-services --profile agentic
 scripts/aoa-up --profile agentic
+scripts/aoa-smoke --profile agentic
+scripts/aoa-qwen-check --case exact-reply
 ```
 
 ### Intel-aware runtime
@@ -118,6 +122,8 @@ scripts/aoa-profile-modules --profile intel --paths
 scripts/aoa-profile-endpoints --profile intel
 scripts/aoa-render-services --profile intel
 scripts/aoa-up --profile intel
+scripts/aoa-smoke --profile intel
+scripts/aoa-qwen-check --case exact-reply
 ```
 
 ## Use a preset instead of spelling the whole composition
@@ -128,7 +134,20 @@ scripts/aoa-profile-endpoints --preset agent-full
 scripts/aoa-render-services --preset agent-full
 scripts/aoa-up --preset agent-full
 scripts/aoa-smoke --with-internal --preset agent-full
+scripts/aoa-qwen-bench --preset agent-full
 ```
+
+## Optional supervised local AI qualification
+
+Once the intended Qwen path is healthy, materialize the bounded local pilot and run the runtime wave:
+
+```bash
+scripts/aoa-local-ai-trials materialize
+scripts/aoa-local-ai-trials run-wave W0
+```
+
+That flow keeps machine-readable trial truth under `Logs/local-ai-trials/` and writes Markdown mirrors to `Dionysus/reports/local-ai-trials/`.
+Use [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md) for the full contract.
 
 ## Compose optional layers manually
 
@@ -168,6 +187,7 @@ Then read:
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](DOCTOR.md)
 - [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md)
+- [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md)
 - [PRESETS](PRESETS.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
 - [RENDER_TRUTH](RENDER_TRUTH.md)
