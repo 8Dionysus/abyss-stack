@@ -11,26 +11,49 @@ It is narrower than a proof layer and narrower than a benchmark-only surface:
 - durable human+AI-readable summaries may be mirrored elsewhere
 - no new HTTP APIs are introduced for the trial surface
 
-## Canonical pilot in this runtime
+## Pilot lineage in this runtime
 
-Current program:
+Baseline control program:
 - `qwen-local-pilot-v1`
 
-Canonical baseline:
+Promoted local-worker path:
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
+
+Control baseline:
 - preset: `intel-full`
-- runtime path: `langchain-api /run`
+- runtime path: `http://127.0.0.1:5401/run`
 - local Qwen posture:
   - `LC_OLLAMA_NUM_THREAD=6`
   - `LC_OLLAMA_NUM_BATCH=32`
   - `LC_OLLAMA_THINK=false`
 
+Promoted bounded-worker path:
+- runtime path: `http://127.0.0.1:5403/run`
+- backend: `llama.cpp`
+- orchestration: `LangGraph` for `W5` and `W6`
+
+Durable program roots now in use:
+- `qwen-local-pilot-v1`
+- `langgraph-sidecar-pilot-v1`
+- `qwen-llamacpp-pilot-v1`
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
+
 ## Dual-surface reporting
 
-Runtime truth root:
-- `${AOA_STACK_ROOT}/Logs/local-ai-trials/qwen-local-pilot-v1/`
+Runtime truth root family:
+- `${AOA_STACK_ROOT}/Logs/local-ai-trials/<program-id>/`
 
-Durable human+AI-readable mirror:
-- `/srv/Dionysus/reports/local-ai-trials/qwen-local-pilot-v1/`
+Durable human+AI-readable mirror family:
+- `/srv/Dionysus/reports/local-ai-trials/<program-id>/`
+
+Current durable program roots:
+- `qwen-local-pilot-v1`
+- `langgraph-sidecar-pilot-v1`
+- `qwen-llamacpp-pilot-v1`
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
 
 Keep the split explicit:
 
