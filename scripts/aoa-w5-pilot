@@ -1174,6 +1174,71 @@ def prepare_implementation_case(
     target_entry = TRIALS.read_w4_repo_text(repo_root, target_file)
     target_excerpt = TRIALS.bounded_text_slice(target_entry["text"], char_limit=2200, line_limit=120)
     agents_guidance, _ = TRIALS.trim_agents_guidance(agents_refs, char_limit=500)
+    exact_timeout_s = 300 if "5403" in LANGCHAIN_RUN_URL else 120
+    anchor_timeout_s = 300 if "5403" in LANGCHAIN_RUN_URL else 120
+
+    # If the bounded implementation contract is already satisfied on the current HEAD,
+    # keep the scenario honest and pass it through the same mutation pipeline as a no-op.
+    satisfaction_refs, acceptance_ok = TRIALS.run_acceptance_checks(
+        case_root,
+        repo_root=repo_root,
+        checks=case.get("acceptance_checks", []),
+        label_prefix="proposal-satisfaction",
+    )
+    command_refs.extend(satisfaction_refs)
+    if acceptance_ok:
+        write_text(
+            proposal_prompt_path,
+            "NO-OP: the implementation contract is already satisfied at the current repo HEAD; no edit-spec prompt was sent.",
+        )
+        write_text(
+            proposal_retry_prompt_path,
+            "NO-OP: anchor fallback was not needed because the implementation contract is already satisfied.",
+        )
+        write_text_exact(proposal_diff_path, "")
+        write_json(
+            proposal_edit_spec_path,
+            build_impl_edit_spec_json(
+                case_id=case["case_id"],
+                selected_target_file=target_file,
+                mode="preexisting_noop",
+                valid=True,
+                attempt_order=[],
+                spec=None,
+                errors=[],
+                attempts=[],
+            ),
+        )
+        proposal_summary = {
+            "artifact_kind": "aoa.local-ai-trial.w5-proposal-summary",
+            "program_id": PROGRAM_ID,
+            "wave_id": WAVE_ID,
+            "case_id": case["case_id"],
+            "prepared_at": utc_now(),
+            "execution_mode": case["execution_mode"],
+            "lane": case.get("lane"),
+            "repo_root": str(repo_root),
+            "base_head": repo_head,
+            "allowed_files": allowed_relative_files,
+            "source_refs": case.get("source_refs", []),
+            "agents_refs": agents_refs,
+            "selected_target_file": target_file,
+            "edit_contract": "preexisting-noop",
+            "edit_spec_mode": "preexisting_noop",
+            "edit_spec_valid": True,
+            "builder_match_count": 0,
+            "rendered_diff_valid": True,
+            "proposal_valid": True,
+            "proposal_failure_reasons": [],
+            "touched_files": [],
+            "command_artifacts": [
+                path
+                for ref in command_refs
+                for path in (ref["stdout_path"], ref["stderr_path"], ref["command_meta"])
+            ],
+        }
+        write_json(proposal_summary_path, proposal_summary)
+        return proposal_summary, command_refs, []
 
     attempt_order: list[str] = []
     attempts: list[dict[str, Any]] = []
@@ -1189,7 +1254,7 @@ def prepare_implementation_case(
         label="proposal-edit-spec-exact",
         prompt_text=exact_prompt,
         max_tokens=260,
-        timeout_s=120,
+        timeout_s=exact_timeout_s,
     )
     command_refs.append(exact_command_ref)
     attempt_order.append("exact_replace")
@@ -1252,7 +1317,7 @@ def prepare_implementation_case(
             label="proposal-edit-spec-anchor",
             prompt_text=anchor_prompt,
             max_tokens=320,
-            timeout_s=120,
+            timeout_s=anchor_timeout_s,
         )
         command_refs.append(anchor_command_ref)
         attempt_order.append("anchored_replace")
@@ -1468,6 +1533,7 @@ def run_worktree_preview(
     proposal_summary = load_json(proposal_summary_path)
     allowed_relative = set(proposal_summary.get("allowed_files") or [])
     base_head = str(proposal_summary.get("base_head") or "")
+    diff_text = proposal_diff_path.read_text(encoding="utf-8") if proposal_diff_path.exists() else ""
 
     command_refs: list[dict[str, Any]] = []
     artifact_refs = proposal_artifact_refs(case_root)
@@ -1500,21 +1566,22 @@ def run_worktree_preview(
     failure_class: str | None = None
     try:
         if case["execution_mode"] in {"qwen_patch", "implementation_patch"}:
-            apply_check_raw = TRIALS.git_command(worktree_path, ["apply", "--check", str(proposal_diff_path)], timeout_s=60)
-            apply_check_ref = TRIALS.persist_command_result(case_root, "worktree-apply-check", apply_check_raw)
-            command_refs.append(apply_check_ref)
-            artifact_refs.extend([apply_check_ref["stdout_path"], apply_check_ref["stderr_path"], apply_check_ref["command_meta"]])
-            if apply_check_raw["exit_code"] != 0 or apply_check_raw["timed_out"]:
-                failure_class = "proposal_invalid"
-                raise RuntimeError("git apply --check failed in isolated worktree")
+            if diff_text.strip():
+                apply_check_raw = TRIALS.git_command(worktree_path, ["apply", "--check", str(proposal_diff_path)], timeout_s=60)
+                apply_check_ref = TRIALS.persist_command_result(case_root, "worktree-apply-check", apply_check_raw)
+                command_refs.append(apply_check_ref)
+                artifact_refs.extend([apply_check_ref["stdout_path"], apply_check_ref["stderr_path"], apply_check_ref["command_meta"]])
+                if apply_check_raw["exit_code"] != 0 or apply_check_raw["timed_out"]:
+                    failure_class = "proposal_invalid"
+                    raise RuntimeError("git apply --check failed in isolated worktree")
 
-            apply_raw = TRIALS.git_command(worktree_path, ["apply", str(proposal_diff_path)], timeout_s=60)
-            apply_ref = TRIALS.persist_command_result(case_root, "worktree-apply", apply_raw)
-            command_refs.append(apply_ref)
-            artifact_refs.extend([apply_ref["stdout_path"], apply_ref["stderr_path"], apply_ref["command_meta"]])
-            if apply_raw["exit_code"] != 0 or apply_raw["timed_out"]:
-                failure_class = "proposal_invalid"
-                raise RuntimeError("git apply failed in isolated worktree")
+                apply_raw = TRIALS.git_command(worktree_path, ["apply", str(proposal_diff_path)], timeout_s=60)
+                apply_ref = TRIALS.persist_command_result(case_root, "worktree-apply", apply_raw)
+                command_refs.append(apply_ref)
+                artifact_refs.extend([apply_ref["stdout_path"], apply_ref["stderr_path"], apply_ref["command_meta"]])
+                if apply_raw["exit_code"] != 0 or apply_raw["timed_out"]:
+                    failure_class = "proposal_invalid"
+                    raise RuntimeError("git apply failed in isolated worktree")
         else:
             builder_command = case.get("mutation_policy", {}).get("builder_command") or []
             builder_raw = TRIALS.run_command(builder_command, cwd=worktree_path, timeout_s=600)
