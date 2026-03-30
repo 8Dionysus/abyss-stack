@@ -73,6 +73,7 @@ Recommended active tree:
 ```text
 ${AOA_STACK_ROOT}/Logs/runtime-benchmarks/
   catalog.json
+  retention.json
   latest/
     index.json
   runs/
@@ -131,8 +132,17 @@ scripts/aoa-runtime-bench-index
 
 That helper writes:
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/catalog.json`
+- `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/retention.json`
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/latest/index.json`
 - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/runs/index.json`
+
+Retention classes:
+- `canonical`
+  Current latest pointers and the latest run for each active target label.
+- `historical`
+  Older runs that remain part of an active lineage or older comparison/promotion history.
+- `exploratory`
+  Local evidence that is not part of the current default comparison surface.
 
 ## Relationship to local trial programs
 
