@@ -52,31 +52,33 @@ This repository should not absorb:
 7. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
 8. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
 9. Read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md).
-10. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
-11. Read [docs/PATHS](docs/PATHS.md).
-12. Read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md).
-13. Read [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md).
-14. Read [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md).
-15. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-16. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
-17. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
-18. Read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md).
-19. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
-20. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
-21. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
-22. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
-23. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
-24. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-25. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-26. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-27. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-28. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-29. Read [docs/DOCTOR](docs/DOCTOR.md).
-30. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-31. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-32. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-33. Read [docs/SECURITY](docs/SECURITY.md).
-34. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
+10. Read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md).
+11. Read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md).
+12. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
+13. Read [docs/PATHS](docs/PATHS.md).
+14. Read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md).
+15. Read [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md).
+16. Read [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md).
+17. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
+18. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
+19. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
+20. Read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md).
+21. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
+22. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
+23. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
+24. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
+25. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
+26. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
+27. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
+28. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
+29. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
+30. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
+31. Read [docs/DOCTOR](docs/DOCTOR.md).
+32. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
+33. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
+34. Read [docs/RUNBOOK](docs/RUNBOOK.md).
+35. Read [docs/SECURITY](docs/SECURITY.md).
+36. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
 
 For the shortest next route by intent:
 - if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
@@ -89,6 +91,8 @@ For the shortest next route by intent:
 - if you need playbook meaning, activation doctrine, or authored execution bundles, go to [`aoa-playbooks`](https://github.com/8Dionysus/aoa-playbooks)
 - if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
+- if you need the bounded llama.cpp A/B runtime pilot next to the validated Ollama path, read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md)
+- if you need bounded local-model trial contracts, W4 supervised edits, or the promoted W5/W6 local-worker path, read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md)
 - if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
 - if you need to tune the runtime to the current machine, confirm driver freshness, or decide which preset the host should prefer, read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md)
 - if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
@@ -145,9 +149,11 @@ The stack is organized around explicit compose modules rather than one swollen f
 - `20-orchestration.yml`
 - `30-local-inference.yml`
 - `31-intel-inference.yml`
+- `32-llamacpp-inference.yml`
 - `40-llm-gateway.yml`
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
+- `44-llamacpp-agent-sidecar.yml`
 - `50-speech.yml`
 - `51-browser-tools.yml`
 - `60-monitoring.yml`

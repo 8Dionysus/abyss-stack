@@ -5,11 +5,19 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/aoa-lib.sh
 source "${SCRIPT_DIR}/aoa-lib.sh"
 
-command -v rsync >/dev/null 2>&1 || aoa_die "rsync is required"
+command -v python3 >/dev/null 2>&1 || aoa_die "python3 is required"
 
 layers=()
+check_mode=0
+json_mode=0
 while (($#)); do
   case "$1" in
+    --check)
+      check_mode=1
+      ;;
+    --json)
+      json_mode=1
+      ;;
     --layer)
       shift || true
       (($#)) || aoa_die "missing value after --layer"
@@ -27,184 +35,114 @@ while (($#)); do
 
 (( ${#layers[@]} > 0 )) || aoa_die "expected --layer"
 
+if (( json_mode )) && ! (( check_mode )); then
+  aoa_die "--json requires --check"
+fi
+
+emit_check_json() {
+  local layer="$1"
+  local status="$2"
+  local source_root="$3"
+  local mirror_target="$4"
+  shift 4
+  python3 - "$layer" "$status" "$source_root" "$mirror_target" "$@" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+layer = sys.argv[1]
+status = sys.argv[2]
+source_root = str(Path(sys.argv[3]))
+mirror_target = str(Path(sys.argv[4]))
+missing_files = [str(Path(item)) for item in sys.argv[5:]]
+
+print(
+    json.dumps(
+        {
+            "layer": layer,
+            "status": status,
+            "source_root": source_root,
+            "mirror_target": mirror_target,
+            "missing_files": missing_files,
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+)
+PY
+}
+
+resolve_federation_config_dir() {
+  local source_templates_dir runtime_configs_dir
+  source_templates_dir="${SCRIPT_DIR}/../config-templates/Configs/federation"
+  runtime_configs_dir="${AOA_CONFIGS_ROOT}/federation"
+
+  if [[ -d "${source_templates_dir}" ]]; then
+    printf '%s\n' "${source_templates_dir}"
+    return 0
+  fi
+  if [[ -d "${runtime_configs_dir}" ]]; then
+    printf '%s\n' "${runtime_configs_dir}"
+    return 0
+  fi
+  aoa_die "federation config directory not found"
+}
+
+load_required_paths() {
+  local config_path="$1"
+  python3 - "$config_path" <<'PY'
+from pathlib import Path
+import sys
+
+import yaml
+
+config_path = Path(sys.argv[1])
+payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+required_files = payload.get("required_files")
+if not isinstance(required_files, list) or not required_files:
+    raise SystemExit(f"required_files missing or empty in {config_path}")
+for rel_path in required_files:
+    if not isinstance(rel_path, str) or not rel_path:
+        raise SystemExit(f"invalid required_files entry in {config_path}: {rel_path!r}")
+    print(rel_path)
+PY
+}
+
 sync_layer() {
   local layer="$1"
-  local source_root target_root tmp_root src_path rel_path artifact_schema
+  local source_root target_root tmp_root src_path rel_path config_dir config_path
   local -a required_paths=()
+
+  command -v rsync >/dev/null 2>&1 || aoa_die "rsync is required"
 
   case "$layer" in
     aoa-agents)
       source_root="${AOA_AGENTS_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
-      required_paths=(
-        "docs/AGENT_RUNTIME_SEAM.md"
-        "generated/agent_registry.min.json"
-        "generated/model_tier_registry.json"
-        "generated/runtime_seam_bindings.json"
-        "generated/cohort_composition_registry.json"
-        "schemas/agent-registry.schema.json"
-        "schemas/model-tier-registry.schema.json"
-        "schemas/runtime-seam-bindings.schema.json"
-        "schemas/cohort-composition-registry.schema.json"
-      )
-
-      while IFS= read -r artifact_schema; do
-        required_paths+=("schemas/${artifact_schema}")
-      done < <(find "${source_root}/schemas" -maxdepth 1 -type f -name 'artifact.*.schema.json' -printf '%f\n' | sort)
       ;;
     aoa-routing)
       source_root="${AOA_ROUTING_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
-      required_paths=(
-        "docs/FEDERATION_ENTRY_ABI.md"
-        "docs/RECURRENCE_NAVIGATION_BOUNDARY.md"
-        "generated/aoa_router.min.json"
-        "generated/cross_repo_registry.min.json"
-        "generated/task_to_surface_hints.json"
-        "generated/task_to_tier_hints.json"
-        "generated/recommended_paths.min.json"
-        "generated/pairing_hints.min.json"
-        "generated/kag_source_lift_relation_hints.min.json"
-        "generated/federation_entrypoints.min.json"
-        "generated/return_navigation_hints.min.json"
-        "generated/tiny_model_entrypoints.json"
-        "schemas/aoa-router.schema.json"
-        "schemas/cross-repo-registry.schema.json"
-        "schemas/task-to-surface-hints.schema.json"
-        "schemas/task-to-tier-hints.schema.json"
-        "schemas/recommended-paths.schema.json"
-        "schemas/pairing-hints.schema.json"
-        "schemas/kag-source-lift-relation-hints.schema.json"
-        "schemas/federation-entrypoints.schema.json"
-        "schemas/return-navigation-hints.schema.json"
-        "schemas/tiny-model-entrypoints.schema.json"
-        "schemas/router-entry.schema.json"
-      )
       ;;
     aoa-memo)
       source_root="${AOA_MEMO_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo"
-      required_paths=(
-        "docs/MEMORY_MODEL.md"
-        "docs/RUNTIME_WRITEBACK_SEAM.md"
-        "docs/RECURRENCE_MEMORY_SUPPORT_SURFACES.md"
-        "docs/AGENT_MEMORY_POSTURE_SEAM.md"
-        "docs/PLAYBOOK_MEMORY_SCOPES.md"
-        "generated/memo_registry.min.json"
-        "generated/memory_catalog.min.json"
-        "generated/memory_capsules.json"
-        "generated/memory_sections.full.json"
-        "generated/memory_object_catalog.min.json"
-        "generated/memory_object_capsules.json"
-        "generated/memory_object_sections.full.json"
-        "examples/checkpoint_to_memory_contract.example.json"
-        "examples/recall_contract.router.semantic.json"
-        "examples/recall_contract.router.lineage.json"
-        "examples/recall_contract.object.working.json"
-        "examples/recall_contract.object.semantic.json"
-        "examples/recall_contract.object.lineage.json"
-        "examples/recall_contract.object.working.return.json"
-        "schemas/checkpoint-to-memory-contract.schema.json"
-        "schemas/core-memory-contract.schema.json"
-      )
       ;;
     aoa-evals)
       source_root="${AOA_EVALS_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
-      required_paths=(
-        "docs/README.md"
-        "docs/TRACE_EVAL_BRIDGE.md"
-        "docs/RUNTIME_BENCH_PROMOTION_GUIDE.md"
-        "docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md"
-        "docs/RECURRENCE_PROOF_PROGRAM.md"
-        "generated/eval_catalog.min.json"
-        "generated/eval_capsules.json"
-        "generated/eval_sections.full.json"
-        "generated/comparison_spine.json"
-        "examples/runtime_evidence_selection.workhorse-local.example.json"
-        "examples/runtime_evidence_selection.return-anchor-integrity.example.json"
-        "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
-        "examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
-        "examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
-        "schemas/runtime-evidence-selection.schema.json"
-        "schemas/artifact-to-verdict-hook.schema.json"
-      )
       ;;
     aoa-playbooks)
       source_root="${AOA_PLAYBOOKS_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks"
-      required_paths=(
-        "docs/PLAYBOOK_EXECUTION_SEAM.md"
-        "docs/PLAYBOOK_MODEL.md"
-        "docs/PLAYBOOK_LIFECYCLE.md"
-        "docs/PLAYBOOK_RECURRENCE_DISCIPLINE.md"
-        "generated/playbook_registry.min.json"
-        "generated/playbook_activation_surfaces.min.json"
-        "generated/playbook_federation_surfaces.min.json"
-        "generated/playbook_handoff_contracts.json"
-        "generated/playbook_failure_catalog.json"
-        "generated/playbook_subagent_recipes.json"
-        "generated/playbook_automation_seeds.json"
-        "generated/playbook_composition_manifest.json"
-        "schemas/playbook-registry.schema.json"
-        "schemas/playbook-activation-surface.schema.json"
-        "schemas/playbook-federation-surface.schema.json"
-        "examples/playbook_activation.long-horizon-model-tier-orchestra.example.json"
-        "examples/playbook_activation.restartable-inquiry-loop.example.json"
-        "examples/playbook_activation.cross-repo-boundary-rollout.example.json"
-      )
       ;;
     aoa-kag)
       source_root="${AOA_KAG_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-kag"
-      required_paths=(
-        "docs/CONSUMER_GUIDE.md"
-        "docs/REASONING_HANDOFF.md"
-        "docs/REASONING_HANDOFF_PACK.md"
-        "docs/RECURRENCE_REGROUNDING.md"
-        "docs/BRIDGE_CONTRACTS.md"
-        "docs/FEDERATION_KAG_READINESS.md"
-        "docs/COUNTERPART_CONSUMER_CONTRACT.md"
-        "docs/TOS_RETRIEVAL_AXIS_PACK.md"
-        "generated/kag_registry.min.json"
-        "generated/federation_spine.min.json"
-        "generated/tiny_consumer_bundle.min.json"
-        "generated/reasoning_handoff_pack.min.json"
-        "generated/return_regrounding_pack.min.json"
-        "generated/technique_lift_pack.min.json"
-        "generated/tos_retrieval_axis_pack.min.json"
-        "generated/tos_text_chunk_map.min.json"
-        "generated/cross_source_node_projection.min.json"
-        "generated/counterpart_federation_exposure_review.min.json"
-        "schemas/kag-registry.schema.json"
-        "schemas/federation-spine.schema.json"
-        "schemas/tiny-consumer-bundle.schema.json"
-        "schemas/reasoning-handoff-pack.schema.json"
-        "schemas/return-regrounding-pack.schema.json"
-        "schemas/technique-lift-pack.schema.json"
-        "schemas/tos-retrieval-axis-pack.schema.json"
-        "schemas/tos-text-chunk-map.schema.json"
-        "schemas/cross-source-node-projection.schema.json"
-        "schemas/counterpart-federation-exposure-review.schema.json"
-        "schemas/counterpart-consumer-contract.schema.json"
-        "schemas/bridge-envelope.schema.json"
-      )
       ;;
     tos-source)
       source_root="${AOA_TOS_ROOT}"
       target_root="${AOA_STACK_ROOT}/Knowledge/federation/tos-source"
-      required_paths=(
-        "docs/KAG_EXPORT.md"
-        "docs/TINY_ENTRY_ROUTE.md"
-        "docs/NODE_CONTRACT.md"
-        "docs/PRACTICE_BRANCH.md"
-        "docs/ZARATHUSTRA_TRILINGUAL_ENTRY.md"
-        "generated/kag_export.min.json"
-        "examples/source_node.example.json"
-        "examples/tos_tiny_entry_route.example.json"
-        "schemas/tos-node-contract.schema.json"
-        "schemas/tos-tiny-entry-route.schema.json"
-      )
       ;;
     *)
       aoa_die "unsupported layer: ${layer}"
@@ -212,6 +150,14 @@ sync_layer() {
   esac
 
   [[ -d "$source_root" ]] || aoa_die "${layer} root not found: ${source_root}"
+
+  config_dir="$(resolve_federation_config_dir)"
+  config_path="${config_dir}/${layer}.yaml"
+  [[ -f "$config_path" ]] || aoa_die "federation config not found for ${layer}: ${config_path}"
+  while IFS= read -r rel_path; do
+    required_paths+=("${rel_path}")
+  done < <(load_required_paths "${config_path}")
+  (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
   if [[ "$layer" == "aoa-agents" ]]; then
     local artifact_schema_count=0
@@ -245,6 +191,98 @@ sync_layer() {
   aoa_note "federation surface sync complete for ${layer}"
 }
 
+check_layer() {
+  local layer="$1"
+  local source_root target_root rel_path config_dir config_path
+  local -a required_paths=()
+  local -a missing_paths=()
+
+  case "$layer" in
+    aoa-agents)
+      source_root="${AOA_AGENTS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"
+      ;;
+    aoa-routing)
+      source_root="${AOA_ROUTING_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-routing"
+      ;;
+    aoa-memo)
+      source_root="${AOA_MEMO_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo"
+      ;;
+    aoa-evals)
+      source_root="${AOA_EVALS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
+      ;;
+    aoa-playbooks)
+      source_root="${AOA_PLAYBOOKS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks"
+      ;;
+    aoa-kag)
+      source_root="${AOA_KAG_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/aoa-kag"
+      ;;
+    tos-source)
+      source_root="${AOA_TOS_ROOT}"
+      target_root="${AOA_STACK_ROOT}/Knowledge/federation/tos-source"
+      ;;
+    *)
+      aoa_die "unsupported layer: ${layer}"
+      ;;
+  esac
+
+  [[ -d "$source_root" ]] || aoa_die "${layer} root not found: ${source_root}"
+
+  config_dir="$(resolve_federation_config_dir)"
+  config_path="${config_dir}/${layer}.yaml"
+  [[ -f "$config_path" ]] || aoa_die "federation config not found for ${layer}: ${config_path}"
+  while IFS= read -r rel_path; do
+    required_paths+=("${rel_path}")
+  done < <(load_required_paths "${config_path}")
+  (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
+
+  if (( ! json_mode )); then
+    aoa_note "check layer: ${layer}"
+    aoa_note "source root: ${source_root}"
+    aoa_note "mirror target: ${target_root}"
+  fi
+
+  for rel_path in "${required_paths[@]}"; do
+    [[ -f "${source_root}/${rel_path}" ]] || aoa_die "required source file missing: ${source_root}/${rel_path}"
+    if [[ ! -f "${target_root}/${rel_path}" ]]; then
+      missing_paths+=("${target_root}/${rel_path}")
+    fi
+  done
+
+  if (( ${#missing_paths[@]} > 0 )); then
+    if (( json_mode )); then
+      emit_check_json "${layer}" "missing" "${source_root}" "${target_root}" "${missing_paths[@]}"
+    else
+      aoa_warn "missing mirrored files for ${layer}:"
+      for rel_path in "${missing_paths[@]}"; do
+        printf '  %s\n' "${rel_path}"
+      done
+    fi
+    return 1
+  fi
+
+  if (( json_mode )); then
+    emit_check_json "${layer}" "ok" "${source_root}" "${target_root}"
+  else
+    aoa_note "federation surface check complete for ${layer}"
+  fi
+  return 0
+}
+
+overall_status=0
 for layer in "${layers[@]}"; do
-  sync_layer "$layer"
+  if (( check_mode )); then
+    if ! check_layer "$layer"; then
+      overall_status=1
+    fi
+  else
+    sync_layer "$layer"
+  fi
 done
+
+exit "${overall_status}"

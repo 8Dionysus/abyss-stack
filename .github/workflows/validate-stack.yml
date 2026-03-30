@@ -26,7 +26,7 @@ jobs:
         run: python scripts/validate_stack.py
 
       - name: Python syntax check
-        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts
+        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot
 
       - name: Shellcheck scripts
         run: |
@@ -34,6 +34,7 @@ jobs:
             scripts/aoa-lib.sh \
             scripts/aoa-doctor \
             scripts/aoa-install-layout \
+            scripts/aoa-sync-federation-surfaces \
             scripts/aoa-sync-configs \
             scripts/aoa-bootstrap-configs \
             scripts/aoa-check-layout \
@@ -130,6 +131,11 @@ jobs:
 
           export AOA_EXTRA_COMPOSE_FILES="compose/tuning/ollama.cpu.yml"
           scripts/aoa-render-config --profile core >/dev/null
+
+          printf 'GGUFTEST' > "$RUNNER_TEMP/qwen3.5-9b.gguf"
+          export AOA_LLAMACPP_MODEL_HOST_PATH="$RUNNER_TEMP/qwen3.5-9b.gguf"
+          export AOA_EXTRA_COMPOSE_FILES="compose/modules/32-llamacpp-inference.yml,compose/modules/44-llamacpp-agent-sidecar.yml"
+          scripts/aoa-render-config --preset intel-full >/dev/null
 
       - name: Capture host-facts artifacts
         run: |

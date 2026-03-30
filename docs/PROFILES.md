@@ -65,6 +65,9 @@ Profiles stay small and legible.
 A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
 
+The optional `llama.cpp` sidecar pilot deliberately stays outside the default profiles and presets.
+Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) when you want a bounded backend-parity comparison without redefining the validated canonical runtime path.
+
 ## Dependency note
 
 Some modules rely on sibling modules being present in the same profile.

@@ -1,0 +1,32 @@
+services:
+  langchain-api-llamacpp:
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/langchain-api"
+    container_name: langchain-api-llamacpp
+    env_file:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
+    environment:
+      LC_BASE_URL: http://llama-cpp:8080/v1
+      LC_API_KEY: EMPTY
+      LC_MODEL: "${AOA_LLAMACPP_MODEL_ALIAS:-qwen3.5:9b}"
+      LC_TIMEOUT_S: 300
+      LC_OLLAMA_NATIVE_CHAT: "false"
+      LC_OPENAI_LITERAL_COMPLETIONS: "true"
+      AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
+      AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
+      AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns-llamacpp}"
+      AOA_FEDERATED_RUN_ENABLED: "false"
+      EMBEDDINGS_PROVIDER: ovms
+      OVMS_EMBEDDINGS_URL: http://host.containers.internal:8200/v3/embeddings
+      OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns-llamacpp:/app/logs/returns-llamacpp:Z"
+    ports:
+      - "127.0.0.1:${AOA_LLAMACPP_LANGCHAIN_HOST_PORT:-5403}:5401"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5401/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped

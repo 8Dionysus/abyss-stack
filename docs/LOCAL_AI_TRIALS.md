@@ -11,26 +11,49 @@ It is narrower than a proof layer and narrower than a benchmark-only surface:
 - durable human+AI-readable summaries may be mirrored elsewhere
 - no new HTTP APIs are introduced for the trial surface
 
-## Canonical pilot in this runtime
+## Pilot lineage in this runtime
 
-Current program:
+Baseline control program:
 - `qwen-local-pilot-v1`
 
-Canonical baseline:
+Promoted local-worker path:
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
+
+Control baseline:
 - preset: `intel-full`
-- runtime path: `langchain-api /run`
+- runtime path: `http://127.0.0.1:5401/run`
 - local Qwen posture:
   - `LC_OLLAMA_NUM_THREAD=6`
   - `LC_OLLAMA_NUM_BATCH=32`
   - `LC_OLLAMA_THINK=false`
 
+Promoted bounded-worker path:
+- runtime path: `http://127.0.0.1:5403/run`
+- backend: `llama.cpp`
+- orchestration: `LangGraph` for `W5` and `W6`
+
+Durable program roots now in use:
+- `qwen-local-pilot-v1`
+- `langgraph-sidecar-pilot-v1`
+- `qwen-llamacpp-pilot-v1`
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
+
 ## Dual-surface reporting
 
-Runtime truth root:
-- `${AOA_STACK_ROOT}/Logs/local-ai-trials/qwen-local-pilot-v1/`
+Runtime truth root family:
+- `${AOA_STACK_ROOT}/Logs/local-ai-trials/<program-id>/`
 
-Durable human+AI-readable mirror:
-- `/srv/Dionysus/reports/local-ai-trials/qwen-local-pilot-v1/`
+Durable human+AI-readable mirror family:
+- `/srv/Dionysus/reports/local-ai-trials/<program-id>/`
+
+Current durable program roots:
+- `qwen-local-pilot-v1`
+- `langgraph-sidecar-pilot-v1`
+- `qwen-llamacpp-pilot-v1`
+- `w5-langgraph-llamacpp-v1`
+- `w6-bounded-autonomy-llamacpp-v1`
 
 Keep the split explicit:
 
@@ -79,6 +102,12 @@ scripts/aoa-local-ai-trials prepare-wave W4 --lane docs
 scripts/aoa-local-ai-trials apply-case W4 <case-id>
 ```
 
+Optional backend/program overrides:
+
+```bash
+scripts/aoa-local-ai-trials --url http://127.0.0.1:5403/run --program-id qwen-llamacpp-pilot-v1 run-wave W0
+```
+
 What the helper does now:
 
 - materializes contracts and frozen case specs for `W0` through `W4`
@@ -96,6 +125,73 @@ What it does not do:
 - it does not introduce a new serving API
 - it does not upgrade runtime success into portable proof wording
 - it does not collapse `W4` into a silent monolithic mutator
+
+## LangGraph sidecar pilot
+
+The current trial runner remains the execution baseline.
+
+An optional comparison layer now also exists:
+
+```bash
+scripts/aoa-langgraph-pilot materialize
+scripts/aoa-langgraph-pilot run-case 8dionysus-profile-routing-clarity --until approval
+scripts/aoa-langgraph-pilot resume-case 8dionysus-profile-routing-clarity
+```
+
+The same runner can also be pointed at an alternate backend/program root:
+
+```bash
+scripts/aoa-langgraph-pilot --url http://127.0.0.1:5403/run --program-id langgraph-sidecar-llamacpp-v1 run-case fixture-docs-wording-alignment --until approval
+```
+
+Use [LANGGRAPH_PILOT](LANGGRAPH_PILOT.md) for the sidecar contract.
+
+## W5 long-horizon pilot
+
+The next bounded scenario layer lives beside the earlier waves:
+
+```bash
+scripts/aoa-w5-pilot materialize
+scripts/aoa-w5-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-w5-pilot resume-scenario <scenario-id>
+scripts/aoa-w5-pilot status --all
+```
+
+Use [W5_PILOT](W5_PILOT.md) for the full W5 contract.
+
+The W5 runner:
+
+- defaults to `http://127.0.0.1:5403/run`
+- treats the promoted `llama.cpp` path as the primary substrate while keeping baseline `5401` as a control path
+- keeps `LangGraph` as the primary orchestration layer
+- uses milestone gates instead of a monolithic `run-wave W5`
+- supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`
+- reuses `approval.status.json` at `plan_freeze`, `first_mutation`, and `landing`
+- keeps mutation scenarios worktree-first and explicitly approved before landing
+- records one local checkpoint commit per successful mutation scenario when a tracked diff is present
+
+## W6 bounded autonomy pilot
+
+The autonomy-focused layer lives beside W5 and keeps the same promoted substrate:
+
+```bash
+scripts/aoa-w6-pilot materialize
+scripts/aoa-w6-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-w6-pilot resume-scenario <scenario-id>
+scripts/aoa-w6-pilot status --all
+```
+
+Use [W6_PILOT](W6_PILOT.md) for the full W6 contract.
+
+The W6 runner:
+
+- defaults to `http://127.0.0.1:5403/run`
+- keeps `LangGraph` as the primary orchestration layer
+- reduces approvals to `plan_freeze` and `landing`
+- removes `first_mutation` from the normal mutation path
+- keeps mutation scenarios worktree-first and explicitly approved before landing
+- supports one bounded `autonomous_repair_loop` after `post_change_validation_failure`
+- tracks `novel_implementation_passes`, `preexisting_noop_count`, `repair_attempted_count`, and `repair_success_count`
 
 ## W1 grounded execution
 

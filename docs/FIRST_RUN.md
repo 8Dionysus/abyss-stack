@@ -149,6 +149,17 @@ scripts/aoa-local-ai-trials run-wave W0
 That flow keeps machine-readable trial truth under `Logs/local-ai-trials/` and writes Markdown mirrors to `Dionysus/reports/local-ai-trials/`.
 Use [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md) for the full contract.
 
+## Optional llama.cpp backend-parity pilot
+
+If you want to compare a bounded `llama.cpp` sidecar against the current validated Ollama path without replacing the canonical runtime:
+
+```bash
+scripts/aoa-llamacpp-pilot run --preset intel-full
+```
+
+That pilot resolves the resident Ollama GGUF blob, starts `llama-cpp` on a separate host port, exposes a sidecar `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
+Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full contract.
+
 ## Compose optional layers manually
 
 ### Agent runtime plus tools

@@ -1,0 +1,33 @@
+services:
+  llama-cpp:
+    image: "${AOA_LLAMACPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-openvino}"
+    platform: linux/amd64
+    container_name: llama-cpp
+    restart: unless-stopped
+    cpus: "${AOA_LLAMACPP_CPUS:-4.0}"
+    mem_limit: "${AOA_LLAMACPP_MEM_LIMIT:-12g}"
+    mem_reservation: "${AOA_LLAMACPP_MEM_RESERVATION:-8g}"
+    environment:
+      LLAMA_ARG_MODEL: /models/qwen3.5-9b.gguf
+      LLAMA_ARG_ALIAS: "${AOA_LLAMACPP_MODEL_ALIAS:-qwen3.5:9b}"
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: "8080"
+      LLAMA_ARG_CTX_SIZE: "${AOA_LLAMACPP_CTX_SIZE:-4096}"
+      LLAMA_ARG_THREADS: "${AOA_LLAMACPP_THREADS:-4}"
+      LLAMA_ARG_THREADS_BATCH: "${AOA_LLAMACPP_THREADS_BATCH:-4}"
+      LLAMA_ARG_THREADS_HTTP: "${AOA_LLAMACPP_THREADS_HTTP:-2}"
+      LLAMA_ARG_PARALLEL: "${AOA_LLAMACPP_PARALLEL:-1}"
+      LLAMA_ARG_BATCH_SIZE: "${AOA_LLAMACPP_BATCH_SIZE:-512}"
+      LLAMA_ARG_UBATCH_SIZE: "${AOA_LLAMACPP_UBATCH_SIZE:-128}"
+      LLAMA_ARG_N_GPU_LAYERS: "${AOA_LLAMACPP_N_GPU_LAYERS:-0}"
+      LLAMA_ARG_DEVICE: "${AOA_LLAMACPP_DEVICE:-none}"
+      LLAMA_ARG_ENDPOINT_METRICS: "${AOA_LLAMACPP_ENDPOINT_METRICS:-1}"
+      LLAMA_ARG_JINJA: "${AOA_LLAMACPP_JINJA:-1}"
+      LLAMA_ARG_REASONING: "${AOA_LLAMACPP_REASONING:-off}"
+      LLAMA_ARG_THINK: "${AOA_LLAMACPP_THINK:-none}"
+      LLAMA_ARG_NO_OP_OFFLOAD: "${AOA_LLAMACPP_NO_OP_OFFLOAD:-1}"
+      LLAMA_ARG_NO_WARMUP: "${AOA_LLAMACPP_NO_WARMUP:-1}"
+    volumes:
+      - "${AOA_LLAMACPP_MODEL_HOST_PATH:-/srv/abyss-stack/Logs/llamacpp/missing-model.gguf}:/models/qwen3.5-9b.gguf:ro,Z"
+    ports:
+      - "127.0.0.1:${AOA_LLAMACPP_HOST_PORT:-11435}:8080"

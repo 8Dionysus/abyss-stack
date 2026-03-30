@@ -31,6 +31,21 @@ scripts/aoa-smoke --with-internal --profile <name>
 
 For profiles that include local Ollama inference, `aoa-up` now performs a post-start warmup of `qwen3.5:9b` and relies on Ollama keep-alive to avoid repeated cold loads during normal short idle periods.
 
+## Optional sidecar runtime pilot
+
+If you want a bounded `llama.cpp` backend-parity check without replacing the validated Ollama path, use:
+
+```bash
+scripts/aoa-llamacpp-pilot run --preset intel-full
+```
+
+That pilot keeps:
+- the canonical `langchain-api` on `127.0.0.1:5401`
+- the `llama.cpp` sidecar on `127.0.0.1:11435`
+- the sidecar `langchain-api-llamacpp` on `127.0.0.1:5403`
+
+Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full operator contract.
+
 ## `core`
 
 ### What it is for

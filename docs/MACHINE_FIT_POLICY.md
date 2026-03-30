@@ -139,3 +139,6 @@ scripts/aoa-machine-fit \
 `abyss-stack` may own the runtime-local record of what this machine should run and re-check.
 
 It does not own the global meaning of sibling AoA layers, and it does not replace runtime benchmarks or proof artifacts.
+
+An optional runtime sidecar pilot, such as a bounded `llama.cpp` comparison, does not change the preferred machine-fit posture by itself.
+Only a reviewed promotion decision should move a pilot path into the validated preferred runtime path.

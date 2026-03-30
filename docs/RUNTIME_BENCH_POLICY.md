@@ -133,6 +133,17 @@ That helper may reuse runtime benchmark artifacts as evidence inside case packet
 - wave verdicts remain bounded trial judgments, not portable eval canon
 - portable proof wording still belongs in `aoa-evals`
 
+## Optional backend-parity pilot
+
+For a bounded `llama.cpp` versus Ollama comparison on the same host and the same `langchain-api /run` contract, use:
+
+```bash
+scripts/aoa-llamacpp-pilot run --preset intel-full
+```
+
+That pilot runs a fresh Ollama baseline on `5401`, a fresh `llama.cpp` sidecar bench on `5403`, and writes a comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
+It is a runtime-parity aid, not a promotion decision by itself.
+
 ## Comparison hygiene
 Before treating two runs as comparable, keep stable:
 - host hardware class or disclose the delta
