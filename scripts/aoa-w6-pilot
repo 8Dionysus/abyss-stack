@@ -1290,6 +1290,17 @@ def deterministic_implementation_candidate(case_id: str, text: str) -> str | Non
             1,
         )
         updated = updated.replace(
+            '  aoa_note "check layer: ${layer}"\n'
+            '  aoa_note "source root: ${source_root}"\n'
+            '  aoa_note "mirror target: ${target_root}"\n',
+            '  if (( ! json_mode )); then\n'
+            '    aoa_note "check layer: ${layer}"\n'
+            '    aoa_note "source root: ${source_root}"\n'
+            '    aoa_note "mirror target: ${target_root}"\n'
+            '  fi\n',
+            1,
+        )
+        updated = updated.replace(
             '  if (( ${#missing_paths[@]} > 0 )); then\n'
             '    aoa_warn "missing mirrored files for ${layer}:"\n'
             '    for rel_path in "${missing_paths[@]}"; do\n'
@@ -1312,8 +1323,9 @@ def deterministic_implementation_candidate(case_id: str, text: str) -> str | Non
             '  fi\n\n'
             '  if (( json_mode )); then\n'
             '    emit_check_json "${layer}" "ok" "${source_root}" "${target_root}"\n'
+            '  else\n'
+            '    aoa_note "federation surface check complete for ${layer}"\n'
             '  fi\n'
-            '  aoa_note "federation surface check complete for ${layer}"\n'
             '  return 0\n',
             1,
         )
