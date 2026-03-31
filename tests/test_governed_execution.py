@@ -273,7 +273,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 5100)
+        self.assertLess(len(prompt), 5400)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -388,6 +388,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn('derive `blocked_runs` from `freshest_runs_by_request_lineage(runs)` before `latest_blocked`', prompt)
         self.assertIn('do not submit a no-op replacement of the existing `"recommended_action": (` block', prompt)
         self.assertIn('do not call `freshest_runs_by_request_lineage()` on `blocked_runs` or `latest_blocked` again', prompt)
+        self.assertIn('prefer one compact `exact_replace` that swaps the current two-line `blocked_runs` / `latest_blocked` block', prompt)
         self.assertIn("Relevant helper excerpt", prompt)
         self.assertIn("def request_lineage_key", prompt)
         self.assertIn("def freshest_runs_by_request_lineage", prompt)

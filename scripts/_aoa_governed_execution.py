@@ -897,6 +897,9 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 '- do not call `freshest_runs_by_request_lineage()` on `blocked_runs` or `latest_blocked` again; introduce a fresh lineage list from full `runs` first, then filter that fresher list for operator-action runs'
             )
+            extra_code_requirements.append(
+                '- prefer one compact `exact_replace` that swaps the current two-line `blocked_runs` / `latest_blocked` block for exactly three short lines: freshest lineage list, filtered blocked runs, then `latest_blocked = blocked_runs[:1]`'
+            )
             lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
             if lineage_helper_block is not None:
                 related_excerpts.append(
@@ -1258,7 +1261,13 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             target_text=target_text,
             failure_context=attempt_failure_context,
         )
+        request_goal_lower = str(context["request"].get("goal") or "").lower()
+        request_lineage_goal = any(
+            marker in request_goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
+        )
         edit_max_tokens = 180 if selected_target_file.endswith(".py") else 220
+        if selected_target_file.endswith(".py") and request_lineage_goal:
+            edit_max_tokens = 260
         edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=edit_max_tokens)
         edit_answer = str(edit_response.get("answer") or "")
         persist_proposal_attempt_artifacts(
