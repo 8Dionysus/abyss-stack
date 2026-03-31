@@ -50,7 +50,7 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
-The first governed wave is mutation-only and `abyss-stack`-only.
+The green repo-scope expansion gate serves as evidence for later review only; it does not widen the governed repo scope during the current wave. The first governed wave remains mutation-only and `abyss-stack`-only.
 
 For seeded canary preparation, use:
 
