@@ -727,8 +727,10 @@ def build_edit_spec_prompt(
     failure_context: list[str],
 ) -> str:
     failure_block = "\n".join(f"- {item}" for item in failure_context) if failure_context else "- none"
+    excerpt_char_limit = 1200 if target_file.endswith((".py", ".sh", ".json", ".yaml", ".yml")) else 1800
     excerpt = compact_excerpt(
         target_text,
+        char_limit=excerpt_char_limit,
         focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
     )
     return textwrap.dedent(
@@ -964,7 +966,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             target_text=target_text,
             failure_context=attempt_failure_context,
         )
-        edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=280)
+        edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=220)
         edit_answer = str(edit_response.get("answer") or "")
         try:
             parsed_spec = parse_json_answer_block(edit_answer)

@@ -270,6 +270,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
+        self.assertLess(len(prompt), 3600)
 
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
