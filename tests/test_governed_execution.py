@@ -292,6 +292,44 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("blocked_runs", excerpt)
         self.assertNotIn("def make_pass_summary", excerpt)
 
+    def test_extract_python_symbol_excerpt_preserves_function_header_when_compacted(self) -> None:
+        target_text = (
+            "def list_runs(*, log_root=None):\n"
+            + "".join(f"    filler_{index} = {index}\n" for index in range(120))
+            + "    blocked_runs = []\n"
+            + "    return {\"runs\": blocked_runs}\n"
+        )
+        excerpt = self.module.extract_python_symbol_excerpt(
+            target_text,
+            goal="Update scripts/_aoa_governed_execution.py so list_runs computes operator triage from request lineage.",
+            char_limit=220,
+        )
+        assert excerpt is not None
+        self.assertTrue(excerpt.startswith("def list_runs"))
+        self.assertIn("blocked_runs", excerpt)
+
+    def test_compact_python_block_prefers_return_shape_when_requested(self) -> None:
+        block = (
+            "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
+            "    state = load_state(run_dir)\n"
+            "    approval = load_approval(run_dir)\n"
+            "    summary = load_summary_or_synthesize(run_dir, state, approval)\n"
+            "    triage = summary.get(\"triage\") or compute_triage(state, summary, approval)\n"
+            "    return {\n"
+            "        \"run_id\": state.get(\"run_id\") or run_dir.name,\n"
+            "        \"updated_at\": state.get(\"updated_at\"),\n"
+            "        \"request_path\": str(run_dir / \"request.json\"),\n"
+            "    }\n"
+        )
+        excerpt = self.module.compact_python_block(
+            block,
+            char_limit=180,
+            focus_terms=['"request_path"', 'return {', '"run_id"', '"updated_at"'],
+        )
+        self.assertTrue(excerpt.startswith("def build_run_record"))
+        self.assertIn("\"request_path\"", excerpt)
+        self.assertNotIn("summary = load_summary_or_synthesize", excerpt)
+
     def test_python_symbol_hints_from_goal_prefers_identifier_tokens(self) -> None:
         hints = self.module.python_symbol_hints_from_goal(
             "Update scripts/_aoa_governed_execution.py so list_runs computes latest_operator_action from request lineage."
@@ -305,7 +343,10 @@ class GovernedExecutionTests(unittest.TestCase):
             ("padding\n" * 200)
             + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
             + "    state = load_state(run_dir)\n"
-            + "    return {\"run_id\": state.get(\"run_id\"), \"updated_at\": state.get(\"updated_at\")}\n"
+            + "    approval = load_approval(run_dir)\n"
+            + "    summary = load_summary_or_synthesize(run_dir, state, approval)\n"
+            + "    triage = summary.get(\"triage\") or compute_triage(state, summary, approval)\n"
+            + "    return {\"run_id\": state.get(\"run_id\"), \"updated_at\": state.get(\"updated_at\"), \"request_path\": str(run_dir / \"request.json\")}\n"
             + ("middle\n" * 120)
             + "def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:\n"
             + "    blocked_runs = [run for run in runs if (run.get(\"triage\") or {}).get(\"operator_action_required\")]\n"
@@ -328,6 +369,9 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("Relevant helper excerpt", prompt)
         self.assertIn("def build_run_record", prompt)
+        self.assertIn("\"request_path\"", prompt)
+        self.assertIn("prefer changing `list_runs` aggregation first", prompt)
+        self.assertNotIn("summary = load_summary_or_synthesize", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
 
     def test_persist_proposal_attempt_artifacts_writes_error_artifact(self) -> None:

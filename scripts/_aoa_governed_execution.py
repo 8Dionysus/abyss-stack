@@ -705,7 +705,7 @@ def extract_python_symbol_excerpt(
             continue
         if len(stripped) <= char_limit:
             return stripped
-        return compact_excerpt(
+        return compact_python_block(
             stripped,
             char_limit=char_limit,
             focus_terms=(focus_terms or []) + [symbol],
@@ -758,6 +758,47 @@ def compact_excerpt(text: str, *, char_limit: int = 1800, focus_terms: list[str]
     return head.rstrip() + "\n...\n" + tail.lstrip()
 
 
+def compact_python_block(text: str, *, char_limit: int, focus_terms: list[str] | None = None) -> str:
+    stripped = text.strip()
+    if len(stripped) <= char_limit:
+        return stripped
+    lines = stripped.splitlines()
+    if not lines:
+        return stripped
+    header = lines[0].rstrip()
+    body = "\n".join(lines[1:]).strip()
+    if not body:
+        return header
+    body_lines = body.splitlines()
+    lowered_lines = [line.lower() for line in body_lines]
+    for term in focus_terms or []:
+        target = term.lower()
+        focus_index = next((index for index, line in enumerate(lowered_lines) if target in line), None)
+        if focus_index is None:
+            continue
+        start = max(focus_index - 1, 0)
+        end = min(focus_index + 8, len(body_lines))
+        if "return {" in lowered_lines[focus_index]:
+            start = focus_index
+            brace_balance = body_lines[focus_index].count("{") - body_lines[focus_index].count("}")
+            end = focus_index + 1
+            while end < len(body_lines) and brace_balance > 0 and end < focus_index + 20:
+                brace_balance += body_lines[end].count("{") - body_lines[end].count("}")
+                end += 1
+        snippet = "\n".join(body_lines[start:end]).strip()
+        if snippet:
+            if start > 0:
+                snippet = "...\n" + snippet
+            if end < len(body_lines):
+                snippet = snippet + "\n..."
+            compacted = header + "\n" + snippet
+            if len(compacted) <= char_limit:
+                return compacted
+    body_limit = max(char_limit - len(header) - 1, 80)
+    compacted_body = compact_excerpt(body, char_limit=body_limit, focus_terms=focus_terms)
+    return header + "\n" + compacted_body
+
+
 def build_target_selection_prompt(
     *,
     request: dict[str, Any],
@@ -805,8 +846,9 @@ def build_edit_spec_prompt(
     excerpt_char_limit = 1200 if target_file.endswith((".py", ".sh", ".json", ".yaml", ".yml")) else 1800
     excerpt = None
     related_excerpt = None
+    goal_lower = request["goal"].lower()
+    extra_code_requirements: list[str] = []
     if target_file.endswith(".py"):
-        goal_lower = request["goal"].lower()
         logic_focus_terms = focus_terms_from_goal(request["goal"], target_file=target_file)
         if any(
             marker in goal_lower
@@ -820,6 +862,9 @@ def build_edit_spec_prompt(
                 "blocked_run_count",
                 "request_path",
             ] + logic_focus_terms
+            extra_code_requirements.append(
+                "- for request-lineage or latest-operator-action goals, prefer changing `list_runs` aggregation first; only extend `build_run_record` when the same patch immediately consumes that new field inside `list_runs`"
+            )
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
@@ -829,10 +874,10 @@ def build_edit_spec_prompt(
         if any(marker in goal_lower for marker in ("request lineage", "request_path")):
             build_run_record_block = extract_python_named_block(target_text, symbol="build_run_record")
             if build_run_record_block is not None:
-                related_excerpt = compact_excerpt(
+                related_excerpt = compact_python_block(
                     build_run_record_block,
-                    char_limit=360,
-                    focus_terms=["request_path", "run_id", "updated_at"],
+                    char_limit=420,
+                    focus_terms=['"request_path"', 'return {', '"run_id"', '"updated_at"'],
                 )
     if excerpt is None:
         excerpt = compact_excerpt(
@@ -848,6 +893,9 @@ def build_edit_spec_prompt(
             f"{related_excerpt}\n"
             "```"
         )
+    extra_requirements_block = ""
+    if extra_code_requirements:
+        extra_requirements_block = "\n" + "\n".join(extra_code_requirements)
     return textwrap.dedent(
         f"""\
         Governed execution bounded edit proposal.
@@ -876,6 +924,7 @@ def build_edit_spec_prompt(
         - the edit must be self-contained; do not add placeholder setup or scaffolding for a later edit
         - do not introduce a new local variable unless the same change also uses it to satisfy the goal
         - when the goal names a function or status field, change the logic that computes that behavior rather than adding unused state
+        {extra_requirements_block}
 
         Goal:
         {request["goal"]}
