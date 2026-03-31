@@ -317,6 +317,20 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(normalized["old_text"], "beta")
         self.assertEqual(normalized["new_text"], "gamma")
 
+    def test_normalize_edit_spec_rejects_old_text_that_duplicates_anchor(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "duplicate anchored context"):
+            self.module.normalize_edit_spec(
+                {
+                    "mode": "anchored_replace",
+                    "target_file": "docs/target.md",
+                    "anchor_before": "alpha",
+                    "old_text": "beta",
+                    "new_text": "gamma",
+                    "anchor_after": "beta",
+                },
+                selected_target_file="docs/target.md",
+            )
+
     def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
         parsed = self.module.parse_json_answer_block(
             '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'

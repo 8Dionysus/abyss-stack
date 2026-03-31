@@ -890,6 +890,9 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
         if not isinstance(anchor_before, str) or not anchor_before or not isinstance(anchor_after, str) or not anchor_after:
             payload["mode"] = "exact_replace"
             return payload
+        old_text_stripped = old_text.strip()
+        if old_text_stripped == anchor_before.strip() or old_text_stripped == anchor_after.strip():
+            raise RuntimeError("proposal old_text must not duplicate anchored context")
         payload["anchor_before"] = anchor_before
         payload["anchor_after"] = anchor_after
     return payload
