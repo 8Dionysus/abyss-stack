@@ -67,6 +67,7 @@ Only then should it be included in one or more profiles.
 
 The optional `llama.cpp` sidecar pilot deliberately stays outside the default profiles and presets.
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) when you want a bounded backend-parity comparison without redefining the validated canonical runtime path.
+When the promoted `langchain-api-llamacpp` worker is used as the governed-execution advisory path, keep `AOA_FEDERATED_RUN_ENABLED=true` for that sidecar so `POST /run/federated` remains available without changing mutation permissions.
 
 ## Dependency note
 

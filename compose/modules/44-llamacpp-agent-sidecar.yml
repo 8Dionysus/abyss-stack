@@ -14,7 +14,7 @@ services:
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns-llamacpp}"
-      AOA_FEDERATED_RUN_ENABLED: "false"
+      AOA_FEDERATED_RUN_ENABLED: "true"
       EMBEDDINGS_PROVIDER: ovms
       OVMS_EMBEDDINGS_URL: http://host.containers.internal:8200/v3/embeddings
       OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov

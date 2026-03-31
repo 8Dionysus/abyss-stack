@@ -286,6 +286,12 @@ def validate_profiles(errors: list[str]) -> None:
                     f"profile {profile.name} includes {module_name} but is missing required modules: {', '.join(missing)}"
                 )
 
+    sidecar_module = (MODULE_DIR / "44-llamacpp-agent-sidecar.yml").read_text(encoding="utf-8")
+    if 'AOA_FEDERATED_RUN_ENABLED: "true"' not in sidecar_module:
+        errors.append(
+            'compose/modules/44-llamacpp-agent-sidecar.yml must enable AOA_FEDERATED_RUN_ENABLED for governed advisory runs'
+        )
+
 
 def validate_presets(errors: list[str]) -> None:
     for preset in sorted(PRESET_DIR.glob("*.txt")):
@@ -642,6 +648,12 @@ def validate_scripts(errors: list[str]) -> None:
     for name in missing:
         errors.append(f"missing required script: scripts/{name}")
 
+    llamacpp_pilot = (ROOT / "scripts" / "aoa-llamacpp-pilot").read_text(encoding="utf-8")
+    if "podman\", \"network\", \"connect\"" not in llamacpp_pilot:
+        errors.append("scripts/aoa-llamacpp-pilot must connect the sidecar to the primary runtime network")
+    if "abyss_default" not in llamacpp_pilot:
+        errors.append("scripts/aoa-llamacpp-pilot must mention abyss_default as the primary runtime network")
+
 
 def validate_required_files(errors: list[str]) -> None:
     for path in sorted(REQUIRED_FILES):
@@ -860,10 +872,16 @@ def validate_federation_landing(errors: list[str]) -> None:
         errors.append("docs/SERVICE_CATALOG.md must mention 43-federation-router.yml")
     if "route-api" not in service_catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention route-api")
+    if "POST /run/federated" not in service_catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention POST /run/federated")
+    if "`abyss_default`" not in service_catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must explain the sidecar route-api network attachment")
 
     profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
     if "`federation`" not in profiles_doc:
         errors.append("docs/PROFILES.md must mention the federation profile")
+    if "AOA_FEDERATED_RUN_ENABLED=true" not in profiles_doc:
+        errors.append("docs/PROFILES.md must explain when AOA_FEDERATED_RUN_ENABLED=true is required")
 
     profile_recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "route-api" not in profile_recipes_doc:

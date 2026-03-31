@@ -51,6 +51,8 @@ This file maps the first migrated runtime modules to their intended services.
 - is the preferred local Qwen worker path for the current promoted `W5/W6` substrate
 - preserves the base `langchain-api` service and `5401` path as the control and rollback surface
 - keeps embeddings on OVMS for the current Intel-aware posture
+- keeps `POST /run/federated` enabled on the sidecar path so governed execution can consume advisory playbook and memo seams while remaining fail-closed
+- joins the shared `abyss_default` runtime network so the advisory `route-api` remains reachable by service name even though the sidecar runs in its own compose project
 
 ## Execution layer
 

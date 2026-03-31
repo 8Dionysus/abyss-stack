@@ -24,6 +24,7 @@ PILOT_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "comparisons" / PILOT_
 PROMOTION_ID = "llamacpp-promotion-gate-v1"
 PROMOTION_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "promotions" / PROMOTION_ID
 SIDECAR_PROJECT = os.environ.get("AOA_LLAMACPP_COMPOSE_PROJECT", "abyss-llamacpp-pilot")
+PRIMARY_RUNTIME_NETWORK = os.environ.get("AOA_PRIMARY_RUNTIME_NETWORK", "abyss_default")
 MODEL_STORE_ROOT = STACK_ROOT / "Logs" / "llamacpp" / "models" / "bartowski"
 OLLAMA_MANIFEST = (
     STACK_ROOT
@@ -429,12 +430,28 @@ def up_llama_sidecar(model_host_path: Path) -> None:
     run_cmd(sidecar_compose_cmd("up", "-d", "llama-cpp"), env=sidecar_env(model_host_path), cwd=CONFIGS_ROOT)
 
 
+def ensure_network_attachment(container_name: str, network_name: str) -> None:
+    inspect = run_cmd(
+        ["podman", "inspect", container_name, "--format", "{{json .NetworkSettings.Networks}}"],
+        env=base_env(),
+        capture_output=True,
+    )
+    attached = json.loads(inspect.stdout or "{}")
+    if network_name in attached:
+        return
+    run_cmd(
+        ["podman", "network", "connect", network_name, container_name],
+        env=base_env(),
+    )
+
+
 def up_langchain_sidecar(model_host_path: Path) -> None:
     run_cmd(
         sidecar_compose_cmd("up", "--build", "-d", "langchain-api-llamacpp"),
         env=sidecar_env(model_host_path),
         cwd=CONFIGS_ROOT,
     )
+    ensure_network_attachment("langchain-api-llamacpp", PRIMARY_RUNTIME_NETWORK)
 
 
 def stop_sidecars() -> None:
