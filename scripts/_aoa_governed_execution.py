@@ -889,10 +889,10 @@ def build_edit_spec_prompt(
                 '- keep the freshest run by `updated_at` within each request lineage first, then choose `latest_blocked` from those lineage representatives'
             )
             extra_code_requirements.append(
-                '- rewrite the existing `"recommended_action": (` expression inline; do not insert a new `latest_operator_action = ...` line between `latest_blocked` and `triage_summary`'
+                '- when a fresher run in the same lineage is running or completed, derive `blocked_runs` from `freshest_runs_by_request_lineage(runs)` before `latest_blocked`; do not keep older blocked retries in the active blocked set'
             )
             extra_code_requirements.append(
-                '- prefer an `exact_replace` of the current `"recommended_action": (` block or a very short anchored replace around that block instead of adding a preparatory assignment'
+                '- do not submit a no-op replacement of the existing `"recommended_action": (` block; change which runs flow into `blocked_runs` or `latest_blocked`, then let the current consumer read that fresher lineage'
             )
             lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
             if lineage_helper_block is not None:
