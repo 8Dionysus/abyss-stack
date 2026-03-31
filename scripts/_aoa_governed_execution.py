@@ -663,6 +663,9 @@ def build_edit_spec_prompt(
         - do not rename files
         - do not widen scope outside `{target_file}`
         - prefer the smallest safe edit
+        - prefer `exact_replace` when `old_text` is uniquely applicable by itself
+        - for `anchored_replace`, `old_text` must describe only the text between `anchor_before` and `anchor_after`
+        - do not repeat `anchor_before` or `anchor_after` inside `old_text`
 
         Goal:
         {request["goal"]}
@@ -1225,6 +1228,16 @@ def apply_edit_spec_in_place(repo_root: Path, *, selected_target_file: str, spec
             new_text=spec["new_text"],
             anchor_after=spec["anchor_after"],
         )
+        if match_count != 1 or candidate_text is None:
+            exact_match_count, exact_candidate_text = TRIALS.apply_exact_replace_to_text(
+                original_text,
+                old_text=spec["old_text"],
+                new_text=spec["new_text"],
+            )
+            if exact_match_count == 1 and exact_candidate_text is not None:
+                match_count = exact_match_count
+                candidate_text = exact_candidate_text
+                mode = "exact_replace"
     if match_count != 1 or candidate_text is None:
         raise RuntimeError(f"{mode} was not uniquely applicable to {selected_target_file}")
     target_path.write_text(candidate_text, encoding="utf-8")

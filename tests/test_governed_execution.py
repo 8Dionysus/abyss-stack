@@ -238,6 +238,24 @@ class GovernedExecutionTests(unittest.TestCase):
         )
         self.assertIn("repo-scope expansion gate remains evidence only", prompt)
         self.assertLess(len(prompt), 4000)
+        self.assertIn("prefer `exact_replace`", prompt)
+
+    def test_apply_edit_spec_in_place_falls_back_to_exact_replace_when_anchor_shape_is_bad(self) -> None:
+        target = self.repo_root / "docs" / "target.md"
+        target.write_text("alpha\nbeta\nomega\n", encoding="utf-8")
+        self.module.apply_edit_spec_in_place(
+            self.repo_root,
+            selected_target_file="docs/target.md",
+            spec={
+                "mode": "anchored_replace",
+                "target_file": "docs/target.md",
+                "anchor_before": "alpha",
+                "old_text": "beta",
+                "new_text": "gamma",
+                "anchor_after": "beta",
+            },
+        )
+        self.assertEqual(target.read_text(encoding="utf-8"), "alpha\ngamma\nomega\n")
 
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
