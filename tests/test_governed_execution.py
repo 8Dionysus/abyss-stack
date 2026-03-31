@@ -215,6 +215,30 @@ class GovernedExecutionTests(unittest.TestCase):
             "notes": [],
         }
 
+    def test_compact_excerpt_prefers_goal_focus_terms(self) -> None:
+        text = "alpha\n" + ("padding\n" * 400) + "repo-scope expansion gate remains evidence only\n" + ("tail\n" * 200)
+        excerpt = self.module.compact_excerpt(
+            text,
+            char_limit=240,
+            focus_terms=self.module.focus_terms_from_goal(
+                "Clarify repo-scope expansion gate wording in docs/GOVERNED_EXECUTION.md",
+                target_file="docs/GOVERNED_EXECUTION.md",
+            ),
+        )
+        self.assertIn("repo-scope expansion gate", excerpt)
+        self.assertLessEqual(len(excerpt), 260)
+
+    def test_build_edit_spec_prompt_uses_bounded_excerpt(self) -> None:
+        prompt = self.module.build_edit_spec_prompt(
+            request={"goal": "Clarify repo-scope expansion gate wording in docs/GOVERNED_EXECUTION.md"},
+            playbook_id="AOA-P-0011",
+            target_file="docs/GOVERNED_EXECUTION.md",
+            target_text=("padding\n" * 500) + "repo-scope expansion gate remains evidence only\n" + ("tail\n" * 500),
+            failure_context=[],
+        )
+        self.assertIn("repo-scope expansion gate remains evidence only", prompt)
+        self.assertLess(len(prompt), 4000)
+
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
         entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")

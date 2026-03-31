@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import textwrap
 import urllib.error
 import urllib.request
@@ -564,10 +565,36 @@ def enumerate_allowed_candidates(repo_root: Path, patterns: list[str]) -> list[s
     return sorted(set(candidates))
 
 
-def compact_excerpt(text: str, *, char_limit: int = 5000) -> str:
+def focus_terms_from_goal(goal: str, *, target_file: str) -> list[str]:
+    terms: list[str] = []
+    for raw in re.findall(r"`([^`]+)`|([A-Za-z0-9_.:/-]{4,})", goal):
+        token = (raw[0] or raw[1]).strip().lower()
+        if token and token not in terms:
+            terms.append(token)
+    for token in re.split(r"[^A-Za-z0-9]+", PurePosixPath(target_file).name.lower()):
+        if len(token) >= 4 and token not in terms:
+            terms.append(token)
+    return terms
+
+
+def compact_excerpt(text: str, *, char_limit: int = 1800, focus_terms: list[str] | None = None) -> str:
     stripped = text.strip()
     if len(stripped) <= char_limit:
         return stripped
+    lowered = stripped.lower()
+    for term in focus_terms or []:
+        index = lowered.find(term.lower())
+        if index < 0:
+            continue
+        radius = max(char_limit // 2, 40)
+        start = max(index - radius, 0)
+        end = min(index + radius, len(stripped))
+        snippet = stripped[start:end].strip()
+        if start > 0:
+            snippet = "...\n" + snippet
+        if end < len(stripped):
+            snippet = snippet + "\n..."
+        return snippet
     head = stripped[: char_limit // 2]
     tail = stripped[-(char_limit // 2) :]
     return head.rstrip() + "\n...\n" + tail.lstrip()
@@ -617,6 +644,10 @@ def build_edit_spec_prompt(
     failure_context: list[str],
 ) -> str:
     failure_block = "\n".join(f"- {item}" for item in failure_context) if failure_context else "- none"
+    excerpt = compact_excerpt(
+        target_text,
+        focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
+    )
     return textwrap.dedent(
         f"""\
         Governed execution bounded edit proposal.
@@ -644,17 +675,17 @@ def build_edit_spec_prompt(
 
         Current file content:
         ```text
-        {compact_excerpt(target_text)}
+        {excerpt}
         ```
         """
     ).rstrip() + "\n"
 
 
-def run_federated_prompt(prompt: str, request: dict[str, Any]) -> dict[str, Any]:
+def run_federated_prompt(prompt: str, request: dict[str, Any], *, max_tokens: int = 700) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "user_text": prompt,
         "temperature": 0.0,
-        "max_tokens": 700,
+        "max_tokens": max_tokens,
         "profile_class": request["profile_class"],
     }
     if request.get("playbook_id"):
@@ -735,7 +766,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         advisory_context=context["advisory_context"],
         failure_context=context.get("failure_context") or [],
     )
-    target_response = run_federated_prompt(target_prompt, context["request"])
+    target_response = run_federated_prompt(target_prompt, context["request"], max_tokens=160)
     target_answer = str(target_response.get("answer") or "")
     selected_payload = json.loads(TRIALS.extract_json_block(target_answer))
     if not isinstance(selected_payload, dict):
@@ -752,7 +783,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         target_text=target_text,
         failure_context=context.get("failure_context") or [],
     )
-    edit_response = run_federated_prompt(edit_prompt, context["request"])
+    edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=280)
     edit_answer = str(edit_response.get("answer") or "")
     parsed_spec = json.loads(TRIALS.extract_json_block(edit_answer))
     spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
