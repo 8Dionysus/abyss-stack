@@ -43,7 +43,7 @@ This repository should not absorb:
 
 ## Quick path rule
 
-- source checkout: `/home/dionysus/src/abyss-stack`
+- source checkout: `~/src/abyss-stack` by default, or `${AOA_SOURCE_ROOT}` if intentionally relocated
 - deployed runtime root: `/srv/abyss-stack`
 - deployed config tree: `/srv/abyss-stack/Configs`
 - do not edit `/srv/abyss-stack` as if it were the source repository

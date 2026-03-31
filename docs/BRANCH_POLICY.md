@@ -61,7 +61,7 @@
 ## Runtime-aware hygiene
 
 - `/srv/abyss-stack` is runtime state, not branch truth.
-- `/home/dionysus/src/abyss-stack` is source truth.
+- `~/src/abyss-stack` or `${AOA_SOURCE_ROOT}` is source truth.
 - If a fix is proven first in the live runtime, vendor it back into the source checkout before merge.
 - Do not treat runtime drift as implicitly merged work.
 

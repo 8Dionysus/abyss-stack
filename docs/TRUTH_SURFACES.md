@@ -16,7 +16,7 @@ Use it whenever a report, summary, or operator note could blur the line between:
 Every promoted runtime claim should be read through these four fields:
 
 - `source_authored`
-  The surface exists in the canonical source checkout at `/home/dionysus/src/abyss-stack`.
+  The surface exists in the canonical source checkout, usually `~/src/abyss-stack` or the configured `${AOA_SOURCE_ROOT}`.
 - `deployed`
   The same operator-facing surface exists in the deployed runtime tree at `/srv/abyss-stack`, usually under `/srv/abyss-stack/Configs/`.
 - `trial_proven`

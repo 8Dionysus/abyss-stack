@@ -385,7 +385,8 @@ def validate_paths(errors: list[str]) -> None:
         "deployed",
         "trial_proven",
         "live_available",
-        "/home/dionysus/src/abyss-stack",
+        "~/src/abyss-stack",
+        "AOA_SOURCE_ROOT",
         "/srv/abyss-stack",
         "trial_proven is not a synonym for production readiness",
         "aoa-llamacpp-pilot verify",
@@ -829,7 +830,8 @@ def validate_branch_policy(errors: list[str]) -> None:
         "Delete the topic branch locally and on `origin`.",
         "If a branch was effectively landed by squash, cherry-pick, or a rewritten equivalent, do not merge it again.",
         "/srv/abyss-stack",
-        "/home/dionysus/src/abyss-stack",
+        "~/src/abyss-stack",
+        "AOA_SOURCE_ROOT",
     ]
     for snippet in required_snippets:
         if snippet not in policy_doc:

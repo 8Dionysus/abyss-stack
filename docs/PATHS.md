@@ -24,11 +24,11 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_RUNTIME_USER` — runtime username for a few host-specific mounts
 - `AOA_RUNTIME_UID` — runtime UID for a few host-specific mounts
 
-## Fedora-first canonical paths
+## Fedora-first default paths
 
-| layer | canonical path |
+| layer | default path |
 |---|---|
-| canonical `abyss-stack` source checkout | `/home/dionysus/src/abyss-stack` |
+| default `abyss-stack` source checkout | `~/src/abyss-stack` |
 | deployed runtime root | `/srv/abyss-stack` |
 | configs | `/srv/abyss-stack/Configs` |
 | secrets | `/srv/abyss-stack/Secrets` |
@@ -45,6 +45,9 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | optional `aoa-playbooks` source root | `/srv/aoa-playbooks` |
 | optional `aoa-kag` source root | `/srv/aoa-kag` |
 | optional `Tree-of-Sophia` source root | `/srv/Tree-of-Sophia` |
+
+The source checkout path is a Fedora-first default, not a universal host constant.
+If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path.
 
 ## Windows-usable path model
 
