@@ -242,6 +242,35 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("under 240 characters", prompt)
         self.assertIn("never copy an entire section", prompt)
 
+    def test_build_edit_spec_prompt_prefers_relevant_code_identifier_excerpt(self) -> None:
+        target_text = (
+            ("padding\n" * 300)
+            + "def make_pass_summary(\n    pass\n)\n"
+            + ("middle\n" * 250)
+            + "def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:\n"
+            + "    blocked_runs = [run for run in runs if (run.get(\"triage\") or {}).get(\"operator_action_required\")]\n"
+            + "    latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)\n"
+            + "    triage_summary = {\n"
+            + "        \"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\",\n"
+            + "    }\n"
+            + ("tail\n" * 200)
+        )
+        prompt = self.module.build_edit_spec_prompt(
+            request={
+                "goal": (
+                    "Update scripts/_aoa_governed_execution.py so list_runs computes "
+                    "operator_triage.latest_operator_action from the freshest run in each request lineage."
+                )
+            },
+            playbook_id="AOA-P-0018",
+            target_file="scripts/_aoa_governed_execution.py",
+            target_text=target_text,
+            failure_context=[],
+        )
+        self.assertIn("def list_runs", prompt)
+        self.assertIn("latest_blocked", prompt)
+        self.assertNotIn("def make_pass_summary", prompt)
+
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
             [

@@ -53,6 +53,39 @@ FAILURE_CLASSES = {
     "post_change_validation_failure",
     "rollback_failed",
 }
+FOCUS_TERM_STOPWORDS = {
+    "about",
+    "after",
+    "before",
+    "change",
+    "clarify",
+    "completed",
+    "compute",
+    "computes",
+    "current",
+    "default",
+    "existing",
+    "fresher",
+    "freshest",
+    "goal",
+    "improve",
+    "keep",
+    "latest",
+    "older",
+    "operator",
+    "path",
+    "request",
+    "retry",
+    "running",
+    "stale",
+    "status",
+    "stops",
+    "summary",
+    "surface",
+    "surfacing",
+    "update",
+    "wording",
+}
 
 
 def load_trials_module() -> Any:
@@ -566,15 +599,40 @@ def enumerate_allowed_candidates(repo_root: Path, patterns: list[str]) -> list[s
 
 
 def focus_terms_from_goal(goal: str, *, target_file: str) -> list[str]:
-    terms: list[str] = []
+    strong_terms: list[str] = []
+    weak_terms: list[str] = []
+    target_file_key = target_file.lower()
+    target_name_key = PurePosixPath(target_file).name.lower()
+    target_name_terms = {
+        token
+        for token in re.split(r"[^A-Za-z0-9]+", PurePosixPath(target_file).name.lower())
+        if len(token) >= 4
+    }
+
+    def add_term(token: str, *, strong: bool) -> None:
+        normalized = token.strip().lower()
+        if not normalized or len(normalized) < 4:
+            return
+        if normalized in FOCUS_TERM_STOPWORDS:
+            return
+        if normalized == target_file_key or normalized == target_name_key:
+            return
+        if normalized in target_name_terms and strong_terms:
+            return
+        if normalized in strong_terms or normalized in weak_terms:
+            return
+        if strong:
+            strong_terms.append(normalized)
+        else:
+            weak_terms.append(normalized)
+
     for raw in re.findall(r"`([^`]+)`|([A-Za-z0-9_.:/-]{4,})", goal):
-        token = (raw[0] or raw[1]).strip().lower()
-        if token and token not in terms:
-            terms.append(token)
+        token = (raw[0] or raw[1]).strip()
+        normalized = token.lower()
+        add_term(token, strong=any(char in normalized for char in "_./-"))
     for token in re.split(r"[^A-Za-z0-9]+", PurePosixPath(target_file).name.lower()):
-        if len(token) >= 4 and token not in terms:
-            terms.append(token)
-    return terms
+        add_term(token, strong=False)
+    return strong_terms + weak_terms
 
 
 def candidate_path_hints_from_goal(goal: str) -> list[str]:
