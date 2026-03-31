@@ -61,6 +61,8 @@ At minimum, reports should let an operator see:
 - whether a bounded trial passed
 - whether the capability is currently live-available
 
+Note: Governed canary trust evidence is not a fifth truth status and does not widen execution permissions by itself.
+
 ## Historical backfill rule
 
 Older W5 and W6 mirrors may predate explicit `truth_status` fields.
