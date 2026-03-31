@@ -468,6 +468,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "section_handle_count": len(layer.payloads["export"].get("section_handles", [])),
             }
 
+    closure_status = layer_closure_status(layer=layer, files=files)
     return {
         "config_path": str(layer.config_path),
         "mirror_root": str(layer.mirror_root),
@@ -475,6 +476,151 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
         "flags": layer.flags,
         "required_files": files,
         "surface_metadata": metadata,
+        "closure_status": closure_status,
+    }
+
+
+def layer_closure_reasons(layer: LayerStore) -> list[str]:
+    reasons: list[str] = []
+
+    if layer.layer == "aoa-agents":
+        if not isinstance(layer.payloads["agents"].get("agents"), list) or not layer.payloads["agents"]["agents"]:
+            reasons.append("agent registry missing entries")
+        if not isinstance(layer.payloads["tiers"].get("model_tiers"), list) or not layer.payloads["tiers"]["model_tiers"]:
+            reasons.append("model tier registry missing entries")
+        if not isinstance(layer.payloads["bindings"].get("bindings"), list) or not layer.payloads["bindings"]["bindings"]:
+            reasons.append("runtime seam bindings missing entries")
+        if not isinstance(layer.payloads["cohorts"].get("cohort_patterns"), list) or not layer.payloads["cohorts"]["cohort_patterns"]:
+            reasons.append("cohort composition registry missing entries")
+        if not layer.payloads["artifact_contracts"]:
+            reasons.append("artifact contracts are missing")
+        return reasons
+
+    if layer.layer == "aoa-routing":
+        if layer.payloads["router"].get("router_version") is None:
+            reasons.append("router version is missing")
+        if layer.payloads["surface_hints"].get("version") is None:
+            reasons.append("surface hints version is missing")
+        if layer.payloads["federation_entrypoints"].get("version") is None:
+            reasons.append("federation entrypoints version is missing")
+        if layer.payloads["return_hints"].get("version") is None:
+            reasons.append("return hints version is missing")
+        if layer.payloads["tiny_model_entrypoints"].get("version") is None:
+            reasons.append("tiny-model entrypoints version is missing")
+        return reasons
+
+    if layer.layer == "aoa-memo":
+        if layer.payloads["registry"].get("version") is None:
+            reasons.append("memo registry version is missing")
+        if layer.payloads["catalog"].get("catalog_version") is None:
+            reasons.append("memo catalog version is missing")
+        if layer.payloads["object_catalog"].get("catalog_version") is None:
+            reasons.append("memo object catalog version is missing")
+        if not layer.payloads["checkpoint_contract"].get("contract_id"):
+            reasons.append("checkpoint contract id is missing")
+        router_contracts = layer.payloads["recall_contracts"]["router"]
+        if not all(mode in router_contracts for mode in ("semantic", "lineage")):
+            reasons.append("router recall contracts are incomplete")
+        object_contracts = layer.payloads["recall_contracts"]["object"]
+        if not all(mode in object_contracts for mode in ("working", "semantic", "lineage")):
+            reasons.append("object recall contracts are incomplete")
+        return reasons
+
+    if layer.layer == "aoa-evals":
+        if layer.payloads["catalog"].get("catalog_version") is None:
+            reasons.append("eval catalog version is missing")
+        if layer.payloads["sections"].get("section_version") is None:
+            reasons.append("eval sections version is missing")
+        if layer.payloads["comparison_spine"].get("comparison_spine_version") is None:
+            reasons.append("comparison spine version is missing")
+        if not layer.payloads["runtime_evidence_templates"]:
+            reasons.append("runtime evidence templates are missing")
+        if not layer.payloads["hook_templates"]:
+            reasons.append("hook templates are missing")
+        return reasons
+
+    if layer.layer == "aoa-playbooks":
+        if not isinstance(layer.payloads["registry"].get("playbooks"), list) or not layer.payloads["registry"]["playbooks"]:
+            reasons.append("playbook registry missing entries")
+        if not isinstance(layer.payloads["activation"], list) or not layer.payloads["activation"]:
+            reasons.append("playbook activation surfaces missing entries")
+        if not isinstance(layer.payloads["federation"], list) or not layer.payloads["federation"]:
+            reasons.append("playbook federation surfaces missing entries")
+        if not isinstance(layer.payloads["handoffs"].get("playbooks"), list) or not layer.payloads["handoffs"]["playbooks"]:
+            reasons.append("playbook handoff contracts missing entries")
+        if not isinstance(layer.payloads["failures"].get("failures"), list) or not layer.payloads["failures"]["failures"]:
+            reasons.append("playbook failure catalog missing entries")
+        if not isinstance(layer.payloads["composition_manifest"], dict) or not layer.payloads["composition_manifest"]:
+            reasons.append("playbook composition manifest is missing")
+        return reasons
+
+    if layer.layer == "aoa-kag":
+        if not isinstance(layer.payloads["registry"].get("surfaces"), list) or not layer.payloads["registry"]["surfaces"]:
+            reasons.append("kag registry missing entries")
+        spine_repos = layer.payloads["federation_spine"].get("repos", [])
+        if not isinstance(spine_repos, list) or not spine_repos:
+            reasons.append("federation spine missing repos")
+        scenarios = layer.payloads["reasoning_handoff_pack"].get("scenarios", [])
+        if not isinstance(scenarios, list) or not scenarios:
+            reasons.append("reasoning handoff pack missing scenarios")
+        modes = layer.payloads["return_regrounding_pack"].get("modes", [])
+        if not isinstance(modes, list) or not modes:
+            reasons.append("return regrounding pack missing modes")
+        axes = layer.payloads["tos_retrieval_axis_pack"].get("axes", [])
+        if not isinstance(axes, list) or not axes:
+            reasons.append("ToS retrieval axis pack missing axes")
+        chunks = layer.payloads["tos_text_chunk_map"].get("chunks", [])
+        if not isinstance(chunks, list) or not chunks:
+            reasons.append("ToS text chunk map missing chunks")
+        return reasons
+
+    if not layer.payloads["export"].get("object_id"):
+        reasons.append("tos-source export object id is missing")
+    if not layer.payloads["entry_surface"].get("node_id"):
+        reasons.append("tos-source entry surface node id is missing")
+    if not layer.payloads["tiny_entry_surface"].get("route_id"):
+        reasons.append("tos-source tiny-entry route id is missing")
+    return reasons
+
+
+def layer_closure_status(
+    *,
+    layer: LayerStore,
+    files: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    mirror_ready = all(item["present"] for item in files.values())
+    reasons = layer_closure_reasons(layer)
+    consumer_ready = len(reasons) == 0
+    return {
+        "mirror_ready": mirror_ready,
+        "consumer_ready": consumer_ready,
+        "closure_ready": mirror_ready and consumer_ready,
+        "reasons": reasons,
+    }
+
+
+def closure_summary(layers_status: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    ready_layers: list[str] = []
+    degraded_layers: list[str] = []
+    failing_layers: list[str] = []
+
+    for layer_name, payload in layers_status.items():
+        closure = payload["closure_status"]
+        if closure["closure_ready"]:
+            ready_layers.append(layer_name)
+            continue
+        if not closure["mirror_ready"]:
+            failing_layers.append(layer_name)
+        else:
+            degraded_layers.append(layer_name)
+
+    return {
+        "closure_ready": not degraded_layers and not failing_layers,
+        "ready_layer_count": len(ready_layers),
+        "layer_count": len(layers_status),
+        "ready_layers": sorted(ready_layers),
+        "degraded_layers": sorted(degraded_layers),
+        "failing_layers": sorted(failing_layers),
     }
 
 
@@ -1598,6 +1744,16 @@ class KagProjectionRequest(BaseModel):
 @app.get("/health")
 def health() -> dict[str, Any]:
     store = require_store()
+    layers_status = {
+        store.agents.layer: layer_status(store.agents),
+        store.routing.layer: layer_status(store.routing),
+        store.memo.layer: layer_status(store.memo),
+        store.evals.layer: layer_status(store.evals),
+        store.playbooks.layer: layer_status(store.playbooks),
+        store.kag.layer: layer_status(store.kag),
+        store.tos_source.layer: layer_status(store.tos_source),
+    }
+    control_loop_summary = closure_summary(layers_status)
     return {
         "ok": True,
         "layers": [
@@ -1635,12 +1791,23 @@ def health() -> dict[str, Any]:
         "tos_source_read_only": store.tos_source.flags["read_only"],
         "tos_source_owned": store.tos_source.flags["source_owned"],
         "tos_source_allow_runtime_mutation": store.tos_source.flags["allow_runtime_mutation"],
+        "closure_summary": control_loop_summary,
+        "operator_verdict_command": "aoa-status --autonomy --json",
     }
 
 
 @app.get("/surface-status")
 def surface_status() -> dict[str, Any]:
     store = require_store()
+    layers_status = {
+        store.agents.layer: layer_status(store.agents),
+        store.routing.layer: layer_status(store.routing),
+        store.memo.layer: layer_status(store.memo),
+        store.evals.layer: layer_status(store.evals),
+        store.playbooks.layer: layer_status(store.playbooks),
+        store.kag.layer: layer_status(store.kag),
+        store.tos_source.layer: layer_status(store.tos_source),
+    }
     return {
         "ok": True,
         "layers": [
@@ -1662,15 +1829,8 @@ def surface_status() -> dict[str, Any]:
             store.kag.layer: True,
             store.tos_source.layer: True,
         },
-        "layers_status": {
-            store.agents.layer: layer_status(store.agents),
-            store.routing.layer: layer_status(store.routing),
-            store.memo.layer: layer_status(store.memo),
-            store.evals.layer: layer_status(store.evals),
-            store.playbooks.layer: layer_status(store.playbooks),
-            store.kag.layer: layer_status(store.kag),
-            store.tos_source.layer: layer_status(store.tos_source),
-        },
+        "closure_summary": closure_summary(layers_status),
+        "layers_status": layers_status,
     }
 
 
