@@ -590,6 +590,28 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("request_path", candidate)
         self.assertIn("latest_blocked[0]", candidate)
 
+    def test_validate_edit_spec_candidate_rejects_unused_assignment_despite_string_mentions(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "unused Python assignment"):
+            self.module.validate_edit_spec_candidate(
+                (
+                    "PROMPT_HINT = 'latest_operator_action'\n"
+                    "blocked_runs = []\n"
+                    "latest_blocked = freshest_runs_by_request_lineage(blocked_runs)\n"
+                    "triage_summary = {\n"
+                    "    \"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\",\n"
+                    "}\n"
+                ),
+                selected_target_file="scripts/_aoa_governed_execution.py",
+                spec={
+                    "mode": "exact_replace",
+                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "old_text": "latest_blocked = freshest_runs_by_request_lineage(blocked_runs)",
+                    "new_text": (
+                        "latest_blocked = freshest_runs_by_request_lineage(blocked_runs)\n"
+                        "latest_operator_action = latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else None"
+                    ),
+                },
+            )
     def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
         parsed = self.module.parse_json_answer_block(
             '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'

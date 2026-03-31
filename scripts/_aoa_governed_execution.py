@@ -1144,15 +1144,19 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
     )
     if selected_target_file.endswith(".py"):
         try:
-            ast.parse(candidate_text)
+            parsed_candidate = ast.parse(candidate_text)
         except SyntaxError as exc:
             raise RuntimeError("proposal would produce invalid Python syntax") from exc
+        load_counts: dict[str, int] = {}
+        for node in ast.walk(parsed_candidate):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                load_counts[node.id] = load_counts.get(node.id, 0) + 1
         introduced_assignments = re.findall(
             r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^\n=]+)?\s*=",
             spec.get("new_text") or "",
         )
         for name in introduced_assignments:
-            if len(re.findall(rf"\b{re.escape(name)}\b", candidate_text)) <= 1:
+            if load_counts.get(name, 0) == 0:
                 raise RuntimeError("proposal introduces unused Python assignment")
     return candidate_text
 
