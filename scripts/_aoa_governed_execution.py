@@ -674,28 +674,65 @@ def python_symbol_hints_from_goal(goal: str) -> list[str]:
     return hints
 
 
-def extract_python_symbol_excerpt(text: str, *, goal: str, char_limit: int) -> str | None:
+def extract_python_named_block(text: str, *, symbol: str) -> str | None:
+    match = re.search(rf"(?m)^def {re.escape(symbol)}\(", text)
+    if match is None:
+        match = re.search(rf"(?m)^class {re.escape(symbol)}\b", text)
+    if match is None:
+        return None
+    start = match.start()
+    remainder = text[start:]
+    next_match = re.search(r"(?m)^(def|class) ", remainder[len(match.group(0)) :])
+    if next_match is None:
+        block = remainder
+    else:
+        block_end = len(match.group(0)) + next_match.start()
+        block = remainder[:block_end]
+    stripped = block.strip()
+    return stripped or None
+
+
+def extract_python_symbol_excerpt(
+    text: str,
+    *,
+    goal: str,
+    char_limit: int,
+    focus_terms: list[str] | None = None,
+) -> str | None:
     for symbol in python_symbol_hints_from_goal(goal):
-        match = re.search(rf"(?m)^def {re.escape(symbol)}\(", text)
-        if match is None:
-            match = re.search(rf"(?m)^class {re.escape(symbol)}\\b", text)
-        if match is None:
-            continue
-        start = match.start()
-        remainder = text[start:]
-        next_match = re.search(r"(?m)^(def|class) ", remainder[len(match.group(0)) :])
-        if next_match is None:
-            block = remainder
-        else:
-            block_end = len(match.group(0)) + next_match.start()
-            block = remainder[:block_end]
-        stripped = block.strip()
-        if not stripped:
+        stripped = extract_python_named_block(text, symbol=symbol)
+        if stripped is None:
             continue
         if len(stripped) <= char_limit:
             return stripped
-        return compact_excerpt(stripped, char_limit=char_limit, focus_terms=[symbol])
+        return compact_excerpt(
+            stripped,
+            char_limit=char_limit,
+            focus_terms=(focus_terms or []) + [symbol],
+        )
     return None
+
+
+def persist_proposal_attempt_artifacts(
+    run_dir: Path | None,
+    *,
+    kind: str,
+    attempt: int,
+    prompt: str,
+    response: str,
+    error: str | None = None,
+) -> None:
+    if run_dir is None:
+        return
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    attempt_label = f"a{attempt:02d}"
+    if prompt:
+        write_text(artifacts_dir / f"proposal.{kind}.{attempt_label}.prompt.txt", prompt)
+    if response:
+        write_text_exact(artifacts_dir / f"proposal.{kind}.{attempt_label}.response.txt", response)
+    if error:
+        write_text_exact(artifacts_dir / f"proposal.{kind}.{attempt_label}.error.txt", error + "\n")
 
 
 def compact_excerpt(text: str, *, char_limit: int = 1800, focus_terms: list[str] | None = None) -> str:
@@ -767,17 +804,49 @@ def build_edit_spec_prompt(
     failure_block = "\n".join(f"- {item}" for item in failure_context) if failure_context else "- none"
     excerpt_char_limit = 1200 if target_file.endswith((".py", ".sh", ".json", ".yaml", ".yml")) else 1800
     excerpt = None
+    related_excerpt = None
     if target_file.endswith(".py"):
+        goal_lower = request["goal"].lower()
+        logic_focus_terms = focus_terms_from_goal(request["goal"], target_file=target_file)
+        if any(
+            marker in goal_lower
+            for marker in ("latest_operator_action", "request lineage", "request_path", "recommended_action")
+        ):
+            logic_focus_terms = [
+                "blocked_runs",
+                "latest_blocked",
+                "recommended_action",
+                "triage_summary",
+                "blocked_run_count",
+                "request_path",
+            ] + logic_focus_terms
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
-            char_limit=min(excerpt_char_limit, 900),
+            char_limit=min(excerpt_char_limit, 650),
+            focus_terms=logic_focus_terms,
         )
+        if any(marker in goal_lower for marker in ("request lineage", "request_path")):
+            build_run_record_block = extract_python_named_block(target_text, symbol="build_run_record")
+            if build_run_record_block is not None:
+                related_excerpt = compact_excerpt(
+                    build_run_record_block,
+                    char_limit=360,
+                    focus_terms=["request_path", "run_id", "updated_at"],
+                )
     if excerpt is None:
         excerpt = compact_excerpt(
             target_text,
             char_limit=excerpt_char_limit,
             focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
+        )
+    related_excerpt_block = ""
+    if related_excerpt:
+        related_excerpt_block = (
+            "\n\nRelevant helper excerpt:\n"
+            "```text\n"
+            f"{related_excerpt}\n"
+            "```"
         )
     return textwrap.dedent(
         f"""\
@@ -821,6 +890,7 @@ def build_edit_spec_prompt(
         ```text
         {excerpt}
         ```
+        {related_excerpt_block}
         """
     ).rstrip() + "\n"
 
@@ -1004,6 +1074,7 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
 
 
 def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
+    run_dir = context.get("run_dir")
     fixture_path = os.environ.get("AOA_GOVERNED_EXECUTION_PROPOSAL_PATH")
     if fixture_path:
         payload = json.loads(Path(fixture_path).read_text(encoding="utf-8"))
@@ -1045,6 +1116,13 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         )
         target_response = run_federated_prompt(target_prompt, context["request"], max_tokens=160)
         target_answer = str(target_response.get("answer") or "")
+        persist_proposal_attempt_artifacts(
+            run_dir,
+            kind="target",
+            attempt=0,
+            prompt=target_prompt,
+            response=target_answer,
+        )
         selected_payload = parse_json_answer_block(target_answer)
         if not isinstance(selected_payload, dict):
             raise RuntimeError("target selection response did not contain a JSON object")
@@ -1077,6 +1155,13 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         edit_max_tokens = 180 if selected_target_file.endswith(".py") else 220
         edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=edit_max_tokens)
         edit_answer = str(edit_response.get("answer") or "")
+        persist_proposal_attempt_artifacts(
+            run_dir,
+            kind="edit",
+            attempt=edit_attempt,
+            prompt=edit_prompt,
+            response=edit_answer,
+        )
         try:
             parsed_spec = parse_json_answer_block(edit_answer)
             spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
@@ -1087,6 +1172,14 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             )
             break
         except Exception as exc:
+            persist_proposal_attempt_artifacts(
+                run_dir,
+                kind="edit",
+                attempt=edit_attempt,
+                prompt=edit_prompt,
+                response=edit_answer,
+                error=f"{type(exc).__name__}: {exc}",
+            )
             last_error = exc
     else:
         assert last_error is not None
@@ -1925,6 +2018,7 @@ def prepare_run(
             {
                 "request": request,
                 "repo_root": repo_root,
+                "run_dir": run_dir,
                 "playbook_id": advisory["playbook_id"],
                 "advisory_context": advisory,
                 "allowed_files": list(playbook_policy.get("allowed_files") or []),
@@ -2010,6 +2104,7 @@ def run_preview_after_plan_approval(
                     {
                         "request": request,
                         "repo_root": repo_root,
+                        "run_dir": run_dir,
                         "playbook_id": state["playbook_id"],
                         "advisory_context": advisory_context,
                         "allowed_files": list(playbook_policy.get("allowed_files") or []),

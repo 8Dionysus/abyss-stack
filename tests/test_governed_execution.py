@@ -300,6 +300,50 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("list_runs", hints)
         self.assertIn("latest_operator_action", hints)
 
+    def test_build_edit_spec_prompt_includes_helper_excerpt_for_request_lineage_goal(self) -> None:
+        target_text = (
+            ("padding\n" * 200)
+            + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
+            + "    state = load_state(run_dir)\n"
+            + "    return {\"run_id\": state.get(\"run_id\"), \"updated_at\": state.get(\"updated_at\")}\n"
+            + ("middle\n" * 120)
+            + "def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:\n"
+            + "    blocked_runs = [run for run in runs if (run.get(\"triage\") or {}).get(\"operator_action_required\")]\n"
+            + "    latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)\n"
+            + "    triage_summary = {\"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\"}\n"
+            + ("tail\n" * 120)
+        )
+        prompt = self.module.build_edit_spec_prompt(
+            request={
+                "goal": (
+                    "Update scripts/_aoa_governed_execution.py so list_runs computes "
+                    "latest_operator_action from the freshest request lineage."
+                )
+            },
+            playbook_id="AOA-P-0018",
+            target_file="scripts/_aoa_governed_execution.py",
+            target_text=target_text,
+            failure_context=[],
+        )
+        self.assertIn("def list_runs", prompt)
+        self.assertIn("Relevant helper excerpt", prompt)
+        self.assertIn("def build_run_record", prompt)
+        self.assertNotIn("def make_pass_summary", prompt)
+
+    def test_persist_proposal_attempt_artifacts_writes_error_artifact(self) -> None:
+        run_dir = self.root / "run"
+        self.module.persist_proposal_attempt_artifacts(
+            run_dir,
+            kind="edit",
+            attempt=1,
+            prompt="prompt",
+            response='{"ok": false}',
+            error="RuntimeError: rejected",
+        )
+        self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.prompt.txt").exists())
+        self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.response.txt").exists())
+        self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.error.txt").exists())
+
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
             [
