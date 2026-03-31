@@ -2629,8 +2629,9 @@ def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | N
             if not state_path.exists():
                 continue
             runs.append(build_run_record(child))
-    blocked_runs = [run for run in runs if (run.get("triage") or {}).get("operator_action_required")]
-    latest_blocked = freshest_runs_by_request_lineage(blocked_runs)
+    freshest_runs = freshest_runs_by_request_lineage(runs)
+    blocked_runs = [run for run in freshest_runs if (run.get("triage") or {}).get("operator_action_required")]
+    latest_blocked = blocked_runs[:1]
     triage_summary = {
         "blocked_run_count": len(blocked_runs),
         "blocked_run_ids": [run["run_id"] for run in blocked_runs],
