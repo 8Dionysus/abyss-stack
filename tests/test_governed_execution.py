@@ -270,7 +270,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 3900)
+        self.assertLess(len(prompt), 4300)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -373,6 +373,9 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn('do not add a sibling `"latest_operator_action"` key here', prompt)
         self.assertIn('prefer changing the upstream `blocked_runs` / `latest_blocked` lineage selection', prompt)
         self.assertIn('do not change only the fallback string or return a no-op edit', prompt)
+        self.assertIn('do not sort by the raw `request_path` string', prompt)
+        self.assertIn('strip any `-retry<number>` suffix', prompt)
+        self.assertIn('keep the freshest run by `updated_at` within each request lineage first', prompt)
         self.assertNotIn("Relevant helper excerpt", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
 

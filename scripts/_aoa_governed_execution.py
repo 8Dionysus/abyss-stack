@@ -881,6 +881,12 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 '- do not change only the fallback string or return a no-op edit; materially change which run becomes `latest_blocked`'
             )
+            extra_code_requirements.append(
+                '- do not sort by the raw `request_path` string; derive a lineage key from the request filename and strip any `-retry<number>` suffix before comparing runs'
+            )
+            extra_code_requirements.append(
+                '- keep the freshest run by `updated_at` within each request lineage first, then choose `latest_blocked` from those lineage representatives'
+            )
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
