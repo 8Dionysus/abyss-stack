@@ -239,6 +239,8 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("repo-scope expansion gate remains evidence only", prompt)
         self.assertLess(len(prompt), 4000)
         self.assertIn("prefer `exact_replace`", prompt)
+        self.assertIn("under 240 characters", prompt)
+        self.assertIn("never copy an entire section", prompt)
 
     def test_apply_edit_spec_in_place_falls_back_to_exact_replace_when_anchor_shape_is_bad(self) -> None:
         target = self.repo_root / "docs" / "target.md"
@@ -309,6 +311,29 @@ class GovernedExecutionTests(unittest.TestCase):
         )
         self.assertEqual(normalized["old_text"], "beta")
         self.assertEqual(normalized["new_text"], "gamma")
+
+    def test_default_proposal_provider_retries_invalid_edit_spec_once(self) -> None:
+        context = {
+            "request": {
+                "goal": "Clarify one bounded docs wording change.",
+                "playbook_id": "AOA-P-0011",
+                "profile_class": "workhorse",
+            },
+            "playbook_id": "AOA-P-0011",
+            "allowed_files": ["docs/target.md"],
+            "advisory_context": {"playbook": {"title": "bounded-change-safe", "summary": "test"}},
+            "repo_root": self.repo_root,
+            "failure_context": [],
+        }
+        responses = [
+            {"answer": '{"target_file":"docs/target.md"}'},
+            {"answer": '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta"}'},
+            {"answer": '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma"}'},
+        ]
+        with patch.object(self.module, "run_federated_prompt", side_effect=responses):
+            proposal = self.module.default_proposal_provider(context)
+        self.assertEqual(proposal["spec"]["new_text"], "gamma")
+        self.assertIn("Edit proposal attempts: 2.", proposal["notes"])
 
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
@@ -722,3 +747,44 @@ class GovernedExecutionTests(unittest.TestCase):
         status_payload = self.module.status_run("r1", log_root=self.logs_root)
         self.assertIn("triage", status_payload)
         self.assertFalse(status_payload["triage"]["operator_action_required"])
+
+    def test_status_and_list_runs_handle_inflight_run_without_summary(self) -> None:
+        run_dir = self.logs_root / "running-1"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            run_dir / "run.state.json",
+            {
+                "run_id": "running-1",
+                "repo_root": str(self.repo_root),
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "trust_state_snapshot": "experimental",
+                "phase": "prepare_proposal",
+                "status": "running",
+                "base_head": "abc123",
+                "updated_at": "2026-03-30T00:00:00Z",
+                "break_glass_used": False,
+            },
+        )
+        write_json(
+            run_dir / "approval.status.json",
+            {
+                "run_id": "running-1",
+                "base_head": "abc123",
+                "current_milestone": "plan_freeze",
+                "status": "pending",
+                "milestones": {
+                    "plan_freeze": {"status": "pending", "approved": False},
+                    "landing": {"status": "pending", "approved": False},
+                },
+            },
+        )
+
+        status_payload = self.module.status_run("running-1", log_root=self.logs_root)
+        self.assertEqual(status_payload["summary"]["status"], "running")
+        self.assertFalse(status_payload["triage"]["operator_action_required"])
+        self.assertIsNone(status_payload["triage"]["blocked_reason"])
+
+        index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
+        self.assertEqual(index_payload["run_count"], 1)
+        self.assertEqual(index_payload["operator_triage"]["blocked_run_count"], 0)

@@ -664,6 +664,10 @@ def build_edit_spec_prompt(
         - do not widen scope outside `{target_file}`
         - prefer the smallest safe edit
         - `old_text` and `new_text` must be plain JSON strings, not arrays or objects
+        - prefer editing a single sentence, list item, or short paragraph rather than a whole section
+        - keep `old_text` and `new_text` under 240 characters each whenever possible
+        - keep `anchor_before` and `anchor_after` under 160 characters each whenever possible
+        - never copy an entire section into `anchor_before` or `anchor_after`
         - prefer `exact_replace` when `old_text` is uniquely applicable by itself
         - for `anchored_replace`, `old_text` must describe only the text between `anchor_before` and `anchor_after`
         - do not repeat `anchor_before` or `anchor_after` inside `old_text`
@@ -850,17 +854,38 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("target selection chose a file outside the governed allowlist")
 
     target_text = (context["repo_root"] / selected_target_file).read_text(encoding="utf-8")
-    edit_prompt = build_edit_spec_prompt(
-        request=context["request"],
-        playbook_id=context["playbook_id"],
-        target_file=selected_target_file,
-        target_text=target_text,
-        failure_context=context.get("failure_context") or [],
-    )
-    edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=280)
-    edit_answer = str(edit_response.get("answer") or "")
-    parsed_spec = parse_json_answer_block(edit_answer)
-    spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
+    edit_failure_context = list(context.get("failure_context") or [])
+    edit_prompt = ""
+    edit_answer = ""
+    last_error: Exception | None = None
+    edit_attempts = 0
+    for edit_attempt in range(2):
+        edit_attempts = edit_attempt + 1
+        attempt_failure_context = list(edit_failure_context)
+        if last_error is not None:
+            attempt_failure_context.append(
+                "Previous edit proposal failed: "
+                + str(last_error)
+                + ". Retry with the smallest safe exact_replace or very short anchors; do not omit new_text."
+            )
+        edit_prompt = build_edit_spec_prompt(
+            request=context["request"],
+            playbook_id=context["playbook_id"],
+            target_file=selected_target_file,
+            target_text=target_text,
+            failure_context=attempt_failure_context,
+        )
+        edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=280)
+        edit_answer = str(edit_response.get("answer") or "")
+        try:
+            parsed_spec = parse_json_answer_block(edit_answer)
+            spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
+            break
+        except Exception as exc:
+            last_error = exc
+    else:
+        assert last_error is not None
+        raise last_error
     return {
         "provider": "langchain-api",
         "selected_target_file": selected_target_file,
@@ -870,7 +895,10 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         "edit_prompt": edit_prompt,
         "target_answer": target_answer,
         "edit_answer": edit_answer,
-        "notes": ["Proposal generated through langchain-api /run/federated."],
+        "notes": [
+            "Proposal generated through langchain-api /run/federated.",
+            f"Edit proposal attempts: {edit_attempts}.",
+        ],
     }
 
 
@@ -991,6 +1019,15 @@ def compute_triage(
 ) -> dict[str, Any]:
     status = str(summary.get("status") or state.get("status") or "unknown")
     milestone = str(summary.get("current_milestone") or (approval or {}).get("current_milestone") or "")
+    if status == "running":
+        return {
+            "terminal": False,
+            "resumable": False,
+            "operator_action_required": False,
+            "blocked_reason": None,
+            "recommended_action": str(summary.get("next_action") or "Governed execution is still running."),
+            "safe_resume_command": None,
+        }
     if status == "paused":
         blocked_reason = "plan_approval_required" if milestone == "plan_freeze" else "landing_approval_required"
         return {
@@ -1095,6 +1132,27 @@ def load_state(run_dir: Path) -> dict[str, Any]:
 
 def load_approval(run_dir: Path) -> dict[str, Any]:
     return json.loads(approval_artifact(run_dir).read_text(encoding="utf-8"))
+
+
+def load_summary_or_synthesize(run_dir: Path, state: dict[str, Any], approval: dict[str, Any] | None) -> dict[str, Any]:
+    summary_path = result_artifact(run_dir)
+    if summary_path.exists():
+        return json.loads(summary_path.read_text(encoding="utf-8"))
+    return {
+        "artifact_kind": "aoa.governed-run.result-summary",
+        "schema_version": "v1",
+        "run_id": state.get("run_id") or run_dir.name,
+        "updated_at": state.get("updated_at"),
+        "status": state.get("status") or "running",
+        "phase": state.get("phase"),
+        "current_milestone": (approval or {}).get("current_milestone"),
+        "break_glass_used": bool(state.get("break_glass_used")),
+        "next_action": "Governed execution is still running.",
+        "canary_id": state.get("canary_id"),
+        "task_class": state.get("task_class"),
+        "trust_state_snapshot": state.get("trust_state_snapshot"),
+        "triage": compute_triage(state, {"status": state.get("status") or "running"}, approval),
+    }
 
 
 def save_state(run_dir: Path, state: dict[str, Any]) -> None:
@@ -2051,8 +2109,8 @@ def promotion_summary(records: list[dict[str, Any]], policy: dict[str, Any] | No
 
 def build_run_record(run_dir: Path) -> dict[str, Any]:
     state = load_state(run_dir)
-    summary = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
     approval = load_approval(run_dir) if approval_artifact(run_dir).exists() else None
+    summary = load_summary_or_synthesize(run_dir, state, approval)
     triage = summary.get("triage") or compute_triage(state, summary, approval)
     return {
         "run_id": state.get("run_id") or run_dir.name,
@@ -2170,8 +2228,8 @@ def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | N
 def status_run(run_id: str, *, log_root: str | Path | None = None) -> dict[str, Any]:
     run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
     state = load_state(run_dir)
-    summary = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
     approval = load_approval(run_dir)
+    summary = load_summary_or_synthesize(run_dir, state, approval)
     triage = summary.get("triage") or compute_triage(state, summary, approval)
     return {
         "artifact_kind": "aoa.governed-run.status",
