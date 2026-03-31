@@ -2,7 +2,7 @@
   "surface_type": "runtime_governed_execution_policy",
   "schema_version": "v1",
   "policy_id": "agentic-governed-execution-v1",
-  "description": "Fail-closed governed mutation policy for the first abyss-stack-only execution lane.",
+  "description": "Fail-closed governed mutation policy for the first abyss-stack-only execution lane; repo-scope expansion gate serves as evidence for later review only and does not widen scope by itself.",
   "enabled": true,
   "global_rules": {
     "gate_mode": "fail_closed",
