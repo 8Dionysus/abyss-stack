@@ -331,6 +331,18 @@ class GovernedExecutionTests(unittest.TestCase):
                 selected_target_file="docs/target.md",
             )
 
+    def test_normalize_edit_spec_rejects_partial_python_statement(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "partial Python statement"):
+            self.module.normalize_edit_spec(
+                {
+                    "mode": "exact_replace",
+                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "old_text": "    latest_blocked =",
+                    "new_text": "    latest_blocked = max(runs)",
+                },
+                selected_target_file="scripts/_aoa_governed_execution.py",
+            )
+
     def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
         parsed = self.module.parse_json_answer_block(
             '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'

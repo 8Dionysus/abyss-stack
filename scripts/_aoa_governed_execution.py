@@ -756,6 +756,8 @@ def build_edit_spec_prompt(
         - prefer `exact_replace` when `old_text` is uniquely applicable by itself
         - for `anchored_replace`, `old_text` must describe only the text between `anchor_before` and `anchor_after`
         - do not repeat `anchor_before` or `anchor_after` inside `old_text`
+        - for code files, prefer replacing a complete statement or compact block, not a bare assignment prefix
+        - do not invent new dict keys or field names that are absent from the excerpt unless the goal explicitly requires them
 
         Goal:
         {request["goal"]}
@@ -878,6 +880,8 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
         raise RuntimeError("proposal old_text must be a non-empty string")
     if old_text == new_text:
         raise RuntimeError("proposal old_text and new_text must differ")
+    if selected_target_file.endswith(".py") and "\n" not in old_text and old_text.rstrip().endswith(("=", ":", ",")):
+        raise RuntimeError("proposal old_text must not be a partial Python statement")
     payload = {
         "mode": mode,
         "target_file": selected_target_file,
