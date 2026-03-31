@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
 import importlib.machinery
@@ -947,6 +948,51 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
     return payload
 
 
+def build_candidate_text(original_text: str, *, selected_target_file: str, spec: dict[str, Any]) -> str:
+    mode = spec["mode"]
+    if mode == "exact_replace":
+        match_count, candidate_text = TRIALS.apply_exact_replace_to_text(
+            original_text,
+            old_text=spec["old_text"],
+            new_text=spec["new_text"],
+        )
+    else:
+        match_count, candidate_text = TRIALS.apply_anchored_replace_to_text(
+            original_text,
+            anchor_before=spec["anchor_before"],
+            old_text=spec["old_text"],
+            new_text=spec["new_text"],
+            anchor_after=spec["anchor_after"],
+        )
+        if match_count != 1 or candidate_text is None:
+            exact_match_count, exact_candidate_text = TRIALS.apply_exact_replace_to_text(
+                original_text,
+                old_text=spec["old_text"],
+                new_text=spec["new_text"],
+            )
+            if exact_match_count == 1 and exact_candidate_text is not None:
+                match_count = exact_match_count
+                candidate_text = exact_candidate_text
+                mode = "exact_replace"
+    if match_count != 1 or candidate_text is None:
+        raise RuntimeError(f"{mode} was not uniquely applicable to {selected_target_file}")
+    return candidate_text
+
+
+def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str, spec: dict[str, Any]) -> str:
+    candidate_text = build_candidate_text(
+        target_text,
+        selected_target_file=selected_target_file,
+        spec=spec,
+    )
+    if selected_target_file.endswith(".py"):
+        try:
+            ast.parse(candidate_text)
+        except SyntaxError as exc:
+            raise RuntimeError("proposal would produce invalid Python syntax") from exc
+    return candidate_text
+
+
 def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     fixture_path = os.environ.get("AOA_GOVERNED_EXECUTION_PROPOSAL_PATH")
     if fixture_path:
@@ -1024,6 +1070,11 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         try:
             parsed_spec = parse_json_answer_block(edit_answer)
             spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
+            validate_edit_spec_candidate(
+                target_text,
+                selected_target_file=selected_target_file,
+                spec=spec,
+            )
             break
         except Exception as exc:
             last_error = exc
@@ -1487,33 +1538,11 @@ def pass_result(
 def apply_edit_spec_in_place(repo_root: Path, *, selected_target_file: str, spec: dict[str, Any]) -> None:
     target_path = repo_root / selected_target_file
     original_text = target_path.read_text(encoding="utf-8")
-    mode = spec["mode"]
-    if mode == "exact_replace":
-        match_count, candidate_text = TRIALS.apply_exact_replace_to_text(
-            original_text,
-            old_text=spec["old_text"],
-            new_text=spec["new_text"],
-        )
-    else:
-        match_count, candidate_text = TRIALS.apply_anchored_replace_to_text(
-            original_text,
-            anchor_before=spec["anchor_before"],
-            old_text=spec["old_text"],
-            new_text=spec["new_text"],
-            anchor_after=spec["anchor_after"],
-        )
-        if match_count != 1 or candidate_text is None:
-            exact_match_count, exact_candidate_text = TRIALS.apply_exact_replace_to_text(
-                original_text,
-                old_text=spec["old_text"],
-                new_text=spec["new_text"],
-            )
-            if exact_match_count == 1 and exact_candidate_text is not None:
-                match_count = exact_match_count
-                candidate_text = exact_candidate_text
-                mode = "exact_replace"
-    if match_count != 1 or candidate_text is None:
-        raise RuntimeError(f"{mode} was not uniquely applicable to {selected_target_file}")
+    candidate_text = build_candidate_text(
+        original_text,
+        selected_target_file=selected_target_file,
+        spec=spec,
+    )
     target_path.write_text(candidate_text, encoding="utf-8")
 
 

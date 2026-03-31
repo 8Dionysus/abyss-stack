@@ -371,6 +371,32 @@ class GovernedExecutionTests(unittest.TestCase):
                 selected_target_file="scripts/_aoa_governed_execution.py",
             )
 
+    def test_validate_edit_spec_candidate_rejects_non_applicable_change(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "uniquely applicable"):
+            self.module.validate_edit_spec_candidate(
+                "alpha\nbeta\n",
+                selected_target_file="docs/target.md",
+                spec={
+                    "mode": "exact_replace",
+                    "target_file": "docs/target.md",
+                    "old_text": "gamma",
+                    "new_text": "delta",
+                },
+            )
+
+    def test_validate_edit_spec_candidate_rejects_invalid_python_syntax(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "invalid Python syntax"):
+            self.module.validate_edit_spec_candidate(
+                "value = 1\n",
+                selected_target_file="scripts/_aoa_governed_execution.py",
+                spec={
+                    "mode": "exact_replace",
+                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "old_text": "value = 1",
+                    "new_text": "value =",
+                },
+            )
+
     def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
         parsed = self.module.parse_json_answer_block(
             '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'
