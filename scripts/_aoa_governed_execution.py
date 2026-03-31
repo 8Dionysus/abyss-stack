@@ -869,6 +869,9 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 "- each governed run state already records `request_path`; prefer a single localized change inside `list_runs` that reads the existing state field instead of adding a helper-only field elsewhere"
             )
+            extra_code_requirements.append(
+                "- `operator_triage.latest_operator_action` is rendered through the existing `triage_summary[\"recommended_action\"]` path here; replace that in-place computation instead of introducing a standalone `latest_operator_action` local"
+            )
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
