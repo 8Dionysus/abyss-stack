@@ -237,7 +237,7 @@ class GovernedExecutionTests(unittest.TestCase):
             failure_context=[],
         )
         self.assertIn("repo-scope expansion gate remains evidence only", prompt)
-        self.assertLess(len(prompt), 4000)
+        self.assertLess(len(prompt), 4300)
         self.assertIn("prefer `exact_replace`", prompt)
         self.assertIn("under 240 characters", prompt)
         self.assertIn("never copy an entire section", prompt)
@@ -394,6 +394,19 @@ class GovernedExecutionTests(unittest.TestCase):
                     "target_file": "scripts/_aoa_governed_execution.py",
                     "old_text": "value = 1",
                     "new_text": "value =",
+                },
+            )
+
+    def test_validate_edit_spec_candidate_rejects_unused_python_assignment(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "unused Python assignment"):
+            self.module.validate_edit_spec_candidate(
+                "blocked_runs = []\nreturn blocked_runs\n",
+                selected_target_file="scripts/_aoa_governed_execution.py",
+                spec={
+                    "mode": "exact_replace",
+                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "old_text": "blocked_runs = []",
+                    "new_text": "blocked_runs = []\nlineage_map: dict[str, str] = {}",
                 },
             )
 

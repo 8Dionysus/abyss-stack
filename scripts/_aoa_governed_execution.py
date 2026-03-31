@@ -804,6 +804,9 @@ def build_edit_spec_prompt(
         - do not repeat `anchor_before` or `anchor_after` inside `old_text`
         - for code files, prefer replacing a complete statement or compact block, not a bare assignment prefix
         - do not invent new dict keys or field names that are absent from the excerpt unless the goal explicitly requires them
+        - the edit must be self-contained; do not add placeholder setup or scaffolding for a later edit
+        - do not introduce a new local variable unless the same change also uses it to satisfy the goal
+        - when the goal names a function or status field, change the logic that computes that behavior rather than adding unused state
 
         Goal:
         {request["goal"]}
@@ -990,6 +993,13 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
             ast.parse(candidate_text)
         except SyntaxError as exc:
             raise RuntimeError("proposal would produce invalid Python syntax") from exc
+        introduced_assignments = re.findall(
+            r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^\n=]+)?\s*=",
+            spec.get("new_text") or "",
+        )
+        for name in introduced_assignments:
+            if len(re.findall(rf"\\b{re.escape(name)}\\b", candidate_text)) <= 1:
+                raise RuntimeError("proposal introduces unused Python assignment")
     return candidate_text
 
 
