@@ -247,6 +247,9 @@ class GovernedExecutionTests(unittest.TestCase):
             ("padding\n" * 300)
             + "def make_pass_summary(\n    pass\n)\n"
             + ("middle\n" * 250)
+            + "def request_lineage_key(request_path):\n"
+            + "    return request_path\n"
+            + ("helper\n" * 20)
             + "def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:\n"
             + "    blocked_runs = [run for run in runs if (run.get(\"triage\") or {}).get(\"operator_action_required\")]\n"
             + "    latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)\n"
@@ -270,7 +273,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 4300)
+        self.assertLess(len(prompt), 4450)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -341,6 +344,9 @@ class GovernedExecutionTests(unittest.TestCase):
     def test_build_edit_spec_prompt_keeps_request_lineage_goal_inside_list_runs(self) -> None:
         target_text = (
             ("padding\n" * 200)
+            + "def request_lineage_key(request_path: str) -> str:\n"
+            + "    return request_path\n"
+            + ("helper\n" * 20)
             + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
             + "    state = load_state(run_dir)\n"
             + "    approval = load_approval(run_dir)\n"
@@ -376,7 +382,8 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn('do not sort by the raw `request_path` string', prompt)
         self.assertIn('strip any `-retry<number>` suffix', prompt)
         self.assertIn('keep the freshest run by `updated_at` within each request lineage first', prompt)
-        self.assertNotIn("Relevant helper excerpt", prompt)
+        self.assertIn("Relevant helper excerpt", prompt)
+        self.assertIn("def request_lineage_key", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
 
     def test_build_edit_spec_prompt_includes_helper_excerpt_for_build_run_record_goal(self) -> None:
@@ -420,6 +427,38 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.prompt.txt").exists())
         self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.response.txt").exists())
         self.assertTrue((run_dir / "artifacts" / "proposal.edit.a01.error.txt").exists())
+
+    def test_request_lineage_key_strips_retry_suffix(self) -> None:
+        self.assertEqual(
+            self.module.request_lineage_key("/tmp/slot-4-retry7.request.json"),
+            "slot-4.request.json",
+        )
+        self.assertEqual(
+            self.module.request_lineage_key("/tmp/slot-4.request.json"),
+            "slot-4.request.json",
+        )
+        self.assertEqual(self.module.request_lineage_key(None), "")
+
+    def test_freshest_runs_by_request_lineage_prefers_latest_retry(self) -> None:
+        runs = [
+            {
+                "run_id": "slot-4-base",
+                "request_path": "/tmp/slot-4.request.json",
+                "updated_at": "2026-03-31T14:00:00Z",
+            },
+            {
+                "run_id": "slot-4-retry1",
+                "request_path": "/tmp/slot-4-retry1.request.json",
+                "updated_at": "2026-03-31T14:05:00Z",
+            },
+            {
+                "run_id": "slot-3-base",
+                "request_path": "/tmp/slot-3.request.json",
+                "updated_at": "2026-03-31T14:04:00Z",
+            },
+        ]
+        ordered = self.module.freshest_runs_by_request_lineage(runs)
+        self.assertEqual([item["run_id"] for item in ordered], ["slot-4-retry1", "slot-3-base"])
 
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
@@ -1091,3 +1130,73 @@ class GovernedExecutionTests(unittest.TestCase):
         index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
         self.assertEqual(index_payload["run_count"], 1)
         self.assertEqual(index_payload["operator_triage"]["blocked_run_count"], 0)
+
+    def test_list_runs_uses_freshest_request_lineage_for_recommended_action(self) -> None:
+        def write_blocked_run(run_id: str, *, request_path: str, updated_at: str, next_action: str) -> None:
+            run_dir = self.logs_root / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            write_json(
+                run_dir / "run.state.json",
+                {
+                    "run_id": run_id,
+                    "request_path": request_path,
+                    "repo_root": str(self.repo_root),
+                    "playbook_id": "AOA-P-0018",
+                    "task_class": "governed_lane",
+                    "trust_state_snapshot": "experimental",
+                    "phase": "await_plan_approval",
+                    "status": "paused",
+                    "base_head": "abc123",
+                    "updated_at": updated_at,
+                    "break_glass_used": False,
+                },
+            )
+            write_json(
+                run_dir / "approval.status.json",
+                {
+                    "run_id": run_id,
+                    "base_head": "abc123",
+                    "current_milestone": "plan_freeze",
+                    "status": "pending",
+                    "milestones": {
+                        "plan_freeze": {"status": "pending", "approved": False},
+                        "landing": {"status": "pending", "approved": False},
+                    },
+                },
+            )
+            write_json(
+                run_dir / "result.summary.json",
+                {
+                    "artifact_kind": "aoa.governed-run.result-summary",
+                    "schema_version": "v1",
+                    "run_id": run_id,
+                    "updated_at": updated_at,
+                    "status": "paused",
+                    "phase": "await_plan_approval",
+                    "current_milestone": "plan_freeze",
+                    "break_glass_used": False,
+                    "next_action": next_action,
+                },
+            )
+
+        write_blocked_run(
+            "slot-4-base",
+            request_path="/tmp/slot-4.request.json",
+            updated_at="2026-03-31T14:00:00Z",
+            next_action="review stale base request",
+        )
+        write_blocked_run(
+            "slot-4-retry1",
+            request_path="/tmp/slot-4-retry1.request.json",
+            updated_at="2026-03-31T14:05:00Z",
+            next_action="review freshest retry request",
+        )
+        write_blocked_run(
+            "slot-3-base",
+            request_path="/tmp/slot-3.request.json",
+            updated_at="2026-03-31T14:04:00Z",
+            next_action="review other lineage request",
+        )
+
+        index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
+        self.assertEqual(index_payload["operator_triage"]["recommended_action"], "review freshest retry request")

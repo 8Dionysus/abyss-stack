@@ -87,6 +87,7 @@ FOCUS_TERM_STOPWORDS = {
     "update",
     "wording",
 }
+REQUEST_RETRY_SUFFIX_RE = re.compile(r"-retry\d+(?=(?:\.[^.]+)+$|$)")
 
 
 def load_trials_module() -> Any:
@@ -845,7 +846,7 @@ def build_edit_spec_prompt(
     failure_block = "\n".join(f"- {item}" for item in failure_context) if failure_context else "- none"
     excerpt_char_limit = 1200 if target_file.endswith((".py", ".sh", ".json", ".yaml", ".yml")) else 1800
     excerpt = None
-    related_excerpt = None
+    related_excerpts: list[str] = []
     goal_lower = request["goal"].lower()
     request_lineage_goal = any(
         marker in goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
@@ -887,6 +888,15 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 '- keep the freshest run by `updated_at` within each request lineage first, then choose `latest_blocked` from those lineage representatives'
             )
+            lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
+            if lineage_helper_block is not None:
+                related_excerpts.append(
+                    compact_python_block(
+                        lineage_helper_block,
+                        char_limit=260,
+                        focus_terms=["request_path", "retry", "return"],
+                    )
+                )
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
@@ -896,10 +906,12 @@ def build_edit_spec_prompt(
         if any(marker in goal_lower for marker in ("request lineage", "request_path")) and "list_runs" not in goal_lower:
             build_run_record_block = extract_python_named_block(target_text, symbol="build_run_record")
             if build_run_record_block is not None:
-                related_excerpt = compact_python_block(
-                    build_run_record_block,
-                    char_limit=420,
-                    focus_terms=['"request_path"', 'return {', '"run_id"', '"updated_at"'],
+                related_excerpts.append(
+                    compact_python_block(
+                        build_run_record_block,
+                        char_limit=420,
+                        focus_terms=['"request_path"', 'return {', '"run_id"', '"updated_at"'],
+                    )
                 )
     if excerpt is None:
         excerpt = compact_excerpt(
@@ -908,11 +920,12 @@ def build_edit_spec_prompt(
             focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
         )
     related_excerpt_block = ""
-    if related_excerpt:
+    if related_excerpts:
+        related_excerpt_text = "\n\n---\n\n".join(related_excerpts)
         related_excerpt_block = (
             "\n\nRelevant helper excerpt:\n"
             "```text\n"
-            f"{related_excerpt}\n"
+            f"{related_excerpt_text}\n"
             "```"
         )
     extra_requirements_block = ""
@@ -2471,6 +2484,7 @@ def build_run_record(run_dir: Path) -> dict[str, Any]:
         "trust_state_snapshot": state.get("trust_state_snapshot"),
         "canary_id": state.get("canary_id"),
         "repo_root": state.get("repo_root"),
+        "request_path": state.get("request_path"),
         "updated_at": state.get("updated_at") or summary.get("updated_at"),
         "break_glass_used": bool(summary.get("break_glass_used") or state.get("break_glass_used")),
         "failure_class": summary.get("failure_class"),
@@ -2542,6 +2556,31 @@ def render_status_explain(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def request_lineage_key(request_path: Any) -> str:
+    path_text = str(request_path or "").strip()
+    if not path_text:
+        return ""
+    return REQUEST_RETRY_SUFFIX_RE.sub("", Path(path_text).name)
+
+
+def freshest_runs_by_request_lineage(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    representatives: dict[str, dict[str, Any]] = {}
+    ungrouped: list[dict[str, Any]] = []
+    for run in runs:
+        lineage = request_lineage_key(run.get("request_path"))
+        if not lineage:
+            ungrouped.append(run)
+            continue
+        existing = representatives.get(lineage)
+        if existing is None or str(run.get("updated_at") or "") > str(existing.get("updated_at") or ""):
+            representatives[lineage] = run
+    return sorted(
+        [*representatives.values(), *ungrouped],
+        key=lambda item: str(item.get("updated_at") or ""),
+        reverse=True,
+    )
+
+
 def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:
     root = Path(log_root or LOG_ROOT_DEFAULT)
     runs: list[dict[str, Any]] = []
@@ -2554,7 +2593,7 @@ def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | N
                 continue
             runs.append(build_run_record(child))
     blocked_runs = [run for run in runs if (run.get("triage") or {}).get("operator_action_required")]
-    latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+    latest_blocked = freshest_runs_by_request_lineage(blocked_runs)
     triage_summary = {
         "blocked_run_count": len(blocked_runs),
         "blocked_run_ids": [run["run_id"] for run in blocked_runs],
