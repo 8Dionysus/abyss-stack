@@ -273,7 +273,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 4450)
+        self.assertLess(len(prompt), 4800)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -382,6 +382,8 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn('do not sort by the raw `request_path` string', prompt)
         self.assertIn('strip any `-retry<number>` suffix', prompt)
         self.assertIn('keep the freshest run by `updated_at` within each request lineage first', prompt)
+        self.assertIn('rewrite the existing `"recommended_action": (` expression inline', prompt)
+        self.assertIn('do not insert a new `latest_operator_action = ...` line', prompt)
         self.assertIn("Relevant helper excerpt", prompt)
         self.assertIn("def request_lineage_key", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
