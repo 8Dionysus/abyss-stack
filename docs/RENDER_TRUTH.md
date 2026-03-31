@@ -9,6 +9,10 @@
 
 This document is about that last layer.
 
+It is not the same thing as autonomy readiness.
+Compose truth tells you what should run.
+`scripts/aoa-status --autonomy` tells you whether the promoted `llama.cpp + LangGraph + route-api` control loop is coherent on the deployed path.
+
 ## Why this matters
 
 Once profiles can be composed, the deepest practical question is no longer just:
@@ -93,7 +97,9 @@ It is not a replacement for:
 - `aoa-check-layout`
 - `aoa-smoke`
 - `aoa-internal-probes`
+- `aoa-status --autonomy`
 
 It complements them.
 Render-truth tells you what Compose sees.
 The other tools tell you what the environment and running containers are doing.
+Use route-api `/surface-status` and `aoa-status --autonomy --json` when you need closure and autonomy posture rather than compose composition.

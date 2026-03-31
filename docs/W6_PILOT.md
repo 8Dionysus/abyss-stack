@@ -16,6 +16,7 @@ W6 is not:
 - a new public HTTP API
 - a replacement for `aoa-local-ai-trials`, `aoa-langgraph-pilot`, or `aoa-w5-pilot`
 - an unbounded autonomy claim
+- a license to collapse `trial_proven` into `live_available`
 
 ## Operator Surface
 
@@ -27,6 +28,7 @@ scripts/aoa-w6-pilot run-scenario <scenario-id> --until milestone|done
 scripts/aoa-w6-pilot resume-scenario <scenario-id>
 scripts/aoa-w6-pilot status --all
 scripts/aoa-w6-pilot status <scenario-id>
+scripts/aoa-status --autonomy
 ```
 
 Defaults:
@@ -109,6 +111,15 @@ Wave-level outputs:
 - `W6-autonomy-index.md`
 - `W6_SUMMARY.md`
 
+Each summary should also carry truth-status language from [TRUTH_SURFACES](TRUTH_SURFACES.md):
+
+- `source_authored`
+- `deployed`
+- `trial_proven`
+- `live_available`
+
+For the current deployed control-loop verdict, use `scripts/aoa-status --autonomy` rather than treating the W6 summary as an operator health command.
+
 ## Boundaries
 
 W6 keeps these constraints:
@@ -159,3 +170,8 @@ But they are not hard-gate fields for W6.
 If the gate passes, the next action is:
 
 `W6 passed on the promoted llama.cpp + LangGraph autonomy track. Use this substrate and approval posture as the baseline for the next implementation-heavy autonomy wave.`
+
+That sentence still needs truth-status interpretation:
+
+- W6 can be `trial_proven` before the same control surfaces are deployed into `/srv/abyss-stack/Configs`
+- W6 is not `live_available` for a given control feature until the deployed operator path exposes it

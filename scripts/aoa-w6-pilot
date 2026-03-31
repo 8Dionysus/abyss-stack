@@ -229,6 +229,136 @@ def load_result_summary(log_root: Path, case_id: str) -> dict[str, Any] | None:
     return load_json(path)
 
 
+def script_contains(path: Path, *snippets: str) -> bool:
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    return all(snippet in text for snippet in snippets)
+
+
+def case_truth_status(case: dict[str, Any], *, status: str | None) -> dict[str, Any]:
+    case_id = case["case_id"]
+    if case_id == "stack-sync-federation-json-check-report":
+        source_authored = script_contains(
+            SOURCE_ROOT / "scripts" / "aoa-sync-federation-surfaces",
+            "--check",
+            "--json",
+        )
+        deployed = script_contains(
+            SCRIPTS_ROOT / "aoa-sync-federation-surfaces",
+            "--check",
+            "--json",
+        )
+        notes = [
+            "This truth status tracks the W6 JSON check surface for aoa-sync-federation-surfaces --check --json.",
+            "source_authored inspects the canonical source checkout copy.",
+            "deployed inspects the operator-visible Configs/scripts copy.",
+        ]
+    elif case_id == "llamacpp-pilot-verify-command":
+        source_authored = script_contains(
+            SOURCE_ROOT / "scripts" / "aoa-llamacpp-pilot",
+            'subparsers.add_parser("verify"',
+            "def verify_command(",
+        )
+        deployed = script_contains(
+            SCRIPTS_ROOT / "aoa-llamacpp-pilot",
+            'subparsers.add_parser("verify"',
+            "def verify_command(",
+        )
+        notes = [
+            "This truth status tracks the W6 verify surface for aoa-llamacpp-pilot verify.",
+            "source_authored inspects the canonical source checkout copy.",
+            "deployed inspects the operator-visible Configs/scripts copy.",
+        ]
+    else:
+        return TRIALS.infer_case_truth_status(case, status=status)
+
+    trial_proven = status == "pass"
+    live_available = trial_proven and deployed
+    if trial_proven:
+        notes.append("trial_proven is backed by the passing W6 implementation scenario packet.")
+    else:
+        notes.append("No passing W6 implementation packet exists yet, so trial_proven stays false.")
+    if live_available:
+        notes.append("live_available is true only because the W6 scenario passed and the deployed script exposes the same surface.")
+    elif deployed:
+        notes.append("The deployed script exposes the surface, but live availability is not yet backed by a passing W6 packet.")
+    else:
+        notes.append("The source copy exposes the surface, but the deployed Configs copy is not yet aligned.")
+    return TRIALS.make_truth_status(
+        source_authored=source_authored,
+        deployed=deployed,
+        trial_proven=trial_proven,
+        live_available=live_available,
+        notes=notes,
+    )
+
+
+def resolve_case_truth_status(
+    case: dict[str, Any],
+    result_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    status = None
+    if result_summary is not None:
+        status = str(result_summary.get("status") or "planned")
+    fallback = case_truth_status(case, status=status)
+    if result_summary is None:
+        return fallback
+    return TRIALS.normalize_truth_status(result_summary.get("truth_status"), fallback=fallback)
+
+
+def wave_truth_status(log_root: Path) -> dict[str, Any]:
+    json_result = load_result_summary(log_root, "stack-sync-federation-json-check-report")
+    verify_result = load_result_summary(log_root, "llamacpp-pilot-verify-command")
+    source_authored = script_contains(
+        SOURCE_ROOT / "scripts" / "aoa-sync-federation-surfaces",
+        "--check",
+        "--json",
+    ) and script_contains(
+        SOURCE_ROOT / "scripts" / "aoa-llamacpp-pilot",
+        'subparsers.add_parser("verify"',
+        "def verify_command(",
+    )
+    deployed = script_contains(
+        SCRIPTS_ROOT / "aoa-sync-federation-surfaces",
+        "--check",
+        "--json",
+    ) and script_contains(
+        SCRIPTS_ROOT / "aoa-llamacpp-pilot",
+        'subparsers.add_parser("verify"',
+        "def verify_command(",
+    )
+    trial_proven = bool(
+        json_result
+        and json_result.get("status") == "pass"
+        and verify_result
+        and verify_result.get("status") == "pass"
+    )
+    live_available = trial_proven and deployed
+    notes = [
+        "This wave-level truth status tracks the two W6 promoted runtime-control surfaces together.",
+        "source_authored requires both aoa-sync-federation-surfaces --check --json and aoa-llamacpp-pilot verify in the canonical source checkout.",
+        "deployed requires both surfaces in the operator-visible Configs/scripts mirror.",
+    ]
+    if trial_proven:
+        notes.append("trial_proven is backed by passing W6 packets for both implementation scenarios.")
+    else:
+        notes.append("Both implementation scenarios must pass before trial_proven becomes true.")
+    if live_available:
+        notes.append("live_available is true only because both surfaces are deployed and both W6 implementation packets passed.")
+    elif deployed:
+        notes.append("Both surfaces are deployed, but live availability is not yet backed by passing W6 packets for both scenarios.")
+    else:
+        notes.append("At least one promoted surface is still source-only and has not reached the deployed Configs mirror.")
+    return TRIALS.make_truth_status(
+        source_authored=source_authored,
+        deployed=deployed,
+        trial_proven=trial_proven,
+        live_available=live_available,
+        notes=notes,
+    )
+
+
 def load_graph_state(log_root: Path, case_id: str) -> W5State | None:
     path = state_path(log_root, case_id)
     if not path.exists():
@@ -728,6 +858,7 @@ def finalize_case_with_summary(
         reviewer_notes=reviewer_notes,
         boundary_notes=boundary_notes,
         next_action=next_action,
+        truth_status=case_truth_status(case, status=status),
     )
     TRIALS.finalize_case(
         case=case,
@@ -2149,6 +2280,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
             "repair_attempts": (graph_state or {}).get("repair_attempts", 0),
             "repair_succeeded": bool((graph_state or {}).get("repair_succeeded")),
             "preexisting_noop": bool((graph_state or {}).get("preexisting_noop")),
+            "truth_status": resolve_case_truth_status(case, result),
         }
         report_path = scenario_root(log_root, case["case_id"]) / "report.md"
         if report_path.exists():
@@ -2196,6 +2328,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
         },
         "gate_result": gate_result,
         "next_action": next_action,
+        "truth_status": wave_truth_status(log_root),
         "cases": case_entries,
         "gate_detail": {
             "pass_count": pass_count,
@@ -2219,6 +2352,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
 def summary_memo(log_root: Path, mirror_root: Path) -> str:
     index_payload = make_index_payload(log_root, mirror_root)
     gate = index_payload["gate_detail"]
+    truth_status = index_payload["truth_status"]
     return "\n".join(
         [
             "# W6 Summary",
@@ -2238,6 +2372,16 @@ def summary_memo(log_root: Path, mirror_root: Path) -> str:
             "## Substrate",
             "- Runtime path: `llama.cpp -> langchain-api /run` on `http://127.0.0.1:5403/run`",
             "- Orchestration layer: `LangGraph`",
+            "",
+            "## Truth Status",
+            *TRIALS.truth_status_lines(truth_status),
+            "",
+            "## Autonomy Posture",
+            "- Operator verdict path: `aoa-status --autonomy`",
+            "- Machine-readable verdict path: `aoa-status --autonomy --json`",
+            f"- trial_proven: `{TRIALS.bool_word(bool(truth_status.get('trial_proven')))}`",
+            f"- live_available: `{TRIALS.bool_word(bool(truth_status.get('live_available')))}`",
+            "- This summary remains a wave-local mirror and does not replace the deployed control-loop verdict.",
             "",
             "## Next Action",
             index_payload["next_action"],

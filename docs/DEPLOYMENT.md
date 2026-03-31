@@ -127,6 +127,18 @@ Warms the local Ollama chat model after startup when the selected profile includ
 Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_ROOT}`.
 By default it is non-destructive.
 An explicit `--delete` mode exists for a tighter mirror when that is desired.
+This is the boundary where a source-authored change becomes deployed.
+A source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/abyss-stack/Configs`.
+
+After syncing repo-managed surfaces, run:
+
+```bash
+python scripts/validate_stack.py --parity-check
+scripts/aoa-status --autonomy --json
+```
+
+to confirm the canonical source checkout still matches the deployed `Configs` mirror for repo-managed paths.
+Use `aoa-status --autonomy --json` for the operator-readable control-loop verdict after parity, runtime verify, route-api health, and federated closure are all expected to agree.
 
 ### `scripts/aoa-bootstrap-configs`
 
@@ -165,6 +177,16 @@ The mirror targets for these layers are:
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks`
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-kag`
 - `${AOA_STACK_ROOT}/Knowledge/federation/tos-source`
+
+For closure-aware operator checks, prefer:
+
+```bash
+scripts/aoa-sync-federation-surfaces --check --json --layer aoa-routing
+scripts/aoa-status --autonomy
+```
+
+Rendered compose truth and deployed autonomy readiness are different layers.
+`aoa-render-config` tells you what Compose sees; `aoa-status --autonomy` tells you whether the promoted `llama.cpp + LangGraph + route-api` control loop is currently coherent on the deployed path.
 
 ### `scripts/aoa-install-systemd`
 
@@ -214,6 +236,7 @@ scripts/aoa-install-layout
 scripts/aoa-sync-configs
 scripts/aoa-bootstrap-configs
 scripts/aoa-check-layout --ignore-secrets --strict
+python scripts/validate_stack.py --parity-check
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-sync-federation-surfaces --layer aoa-agents   # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-routing  # optional
@@ -227,6 +250,8 @@ scripts/aoa-profile-endpoints --profile core
 ```
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
+
+For claim wording after bootstrap, use [TRUTH_SURFACES](TRUTH_SURFACES.md).
 
 For local-Ollama profiles, `aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model resident for `30m` unless the stack restarts or the model is explicitly evicted.
 

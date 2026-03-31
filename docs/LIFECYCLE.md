@@ -111,6 +111,17 @@ It assumes the deployed runtime tree exists under:
 The wrapper scripts treat the deployed Linux runtime path as distinct from any source checkout path.
 This is what makes the repository Fedora-first while still usable from Windows-oriented editing workflows.
 
+Truth progression must stay explicit:
+
+- `source_authored`
+- `deployed`
+- `trial_proven`
+- `live_available`
+
+Do not collapse those states into one word such as "landed".
+A source-authored change becomes deployed only after `aoa-sync-configs` updates `/srv/abyss-stack/Configs`.
+Use `python scripts/validate_stack.py --parity-check` when repo-managed surfaces should match the deployed Configs mirror.
+
 ## Profile rule
 
 A profile is a declared set of modules.

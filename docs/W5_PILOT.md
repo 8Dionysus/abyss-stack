@@ -16,6 +16,7 @@ W5 is not:
 - a new public HTTP API
 - a replacement for `aoa-local-ai-trials`
 - an unbounded autonomy claim
+- a license to collapse `trial_proven` into `live_available`
 
 ## Operator Surface
 
@@ -27,6 +28,7 @@ scripts/aoa-w5-pilot run-scenario <scenario-id> --until milestone|done
 scripts/aoa-w5-pilot resume-scenario <scenario-id>
 scripts/aoa-w5-pilot status --all
 scripts/aoa-w5-pilot status <scenario-id>
+scripts/aoa-status --autonomy
 ```
 
 Defaults:
@@ -105,6 +107,15 @@ Wave-level outputs:
 - `W5-long-horizon-index.md`
 - `W5_SUMMARY.md`
 
+Each summary should also carry truth-status language from [TRUTH_SURFACES](TRUTH_SURFACES.md):
+
+- `source_authored`
+- `deployed`
+- `trial_proven`
+- `live_available`
+
+For the current deployed control-loop verdict, use `scripts/aoa-status --autonomy` rather than treating the W5 summary as an operator health command.
+
 ## Boundaries
 
 W5 keeps these constraints:
@@ -137,3 +148,8 @@ The hard W5 gate is:
 If the gate passes, the next action is:
 
 `W5 passed on promoted llama.cpp + LangGraph. Use this substrate as the bounded baseline for the next autonomy-focused wave.`
+
+That sentence still needs truth-status interpretation:
+
+- W5 may be `trial_proven` before every related control surface is `live_available`
+- a passing W5 packet does not override source-vs-deployed drift elsewhere in the stack

@@ -77,7 +77,9 @@ scripts/aoa-llamacpp-pilot up --preset intel-full
 scripts/aoa-llamacpp-pilot bench --preset intel-full
 scripts/aoa-llamacpp-pilot run --preset intel-full
 scripts/aoa-llamacpp-pilot promote --preset intel-full
+scripts/aoa-llamacpp-pilot verify --timeout 60
 scripts/aoa-llamacpp-pilot status
+scripts/aoa-status --autonomy
 scripts/aoa-llamacpp-pilot down
 ```
 
@@ -119,6 +121,12 @@ scripts/aoa-llamacpp-pilot down
 
 - reports the latest saved comparison ref
 - reports current sidecar and baseline health
+
+### `verify`
+
+- checks the promoted `llama.cpp` sidecar path on the deployed runtime surface
+- returns machine-readable JSON for bounded operator validation
+- should be paired with `aoa-status --autonomy` when you need the full control-loop verdict instead of a sidecar-only check
 
 ### `down`
 
@@ -207,3 +215,7 @@ Current result:
 - `llama.cpp` is the preferred bounded local-worker path
 - Ollama remains the validated control and rollback path
 - any OpenVINO-side shift to OpenVINO GenAI should be reviewed separately from the `llama.cpp` promotion decision
+
+Promotion posture still has two layers:
+- `aoa-llamacpp-pilot verify` checks the promoted sidecar lane itself
+- `aoa-status --autonomy --json` checks whether parity, route-api closure, federated mirrors, and W5/W6 truth status align on the deployed path

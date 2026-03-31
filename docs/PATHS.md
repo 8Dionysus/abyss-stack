@@ -13,6 +13,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_STACK_ROOT` — deployed Linux runtime root
 - `AOA_CONFIGS_ROOT` — config root, usually `${AOA_STACK_ROOT}/Configs`
 - `AOA_VAULT_ROOT` — optional heavy-data vault root
+- `AOA_SOURCE_ROOT` — optional canonical source checkout root used for parity-aware helpers such as `aoa-status --autonomy`
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
 - `AOA_ROUTING_ROOT` — optional source root used to mirror public-safe `aoa-routing` advisory surfaces into the runtime tree
 - `AOA_MEMO_ROOT` — optional source root used to mirror public-safe `aoa-memo` recall and writeback-seam surfaces into the runtime tree
@@ -27,6 +28,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 
 | layer | canonical path |
 |---|---|
+| canonical `abyss-stack` source checkout | `/home/dionysus/src/abyss-stack` |
 | deployed runtime root | `/srv/abyss-stack` |
 | configs | `/srv/abyss-stack/Configs` |
 | secrets | `/srv/abyss-stack/Secrets` |
@@ -77,6 +79,8 @@ The repository includes helper scripts that bridge from a source checkout into t
 - `scripts/aoa-install-layout`
 - `scripts/aoa-sync-configs`
 - `scripts/aoa-bootstrap-configs`
+
+Parity-aware helpers such as `scripts/aoa-status --autonomy` may also use `AOA_SOURCE_ROOT` when the canonical source checkout is not under `~/src/abyss-stack`.
 
 Those scripts exist to keep the separation explicit instead of relying on path confusion.
 

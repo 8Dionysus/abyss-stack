@@ -172,7 +172,9 @@ The W5 runner:
 - supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`
 - reuses `approval.status.json` at `plan_freeze`, `first_mutation`, and `landing`
 - keeps mutation scenarios worktree-first and explicitly approved before landing
+- records `landing.diff` for landed mutation scenarios
 - records one local checkpoint commit per successful mutation scenario when a tracked diff is present
+- feeds a wave-local summary, not the canonical deployed autonomy verdict
 
 ## W6 bounded autonomy pilot
 
@@ -194,8 +196,35 @@ The W6 runner:
 - reduces approvals to `plan_freeze` and `landing`
 - removes `first_mutation` from the normal mutation path
 - keeps mutation scenarios worktree-first and explicitly approved before landing
+- records `landing.diff` for landed mutation scenarios
 - supports one bounded `autonomous_repair_loop` after `post_change_validation_failure`
 - tracks `novel_implementation_passes`, `preexisting_noop_count`, `repair_attempted_count`, and `repair_success_count`
+- still relies on `scripts/aoa-status --autonomy` for the deployed control-loop verdict
+
+## Truth status
+
+Use [TRUTH_SURFACES](TRUTH_SURFACES.md) when reading or publishing trial outcomes.
+
+Trial summaries should keep these fields separate:
+
+- `source_authored`
+- `deployed`
+- `trial_proven`
+- `live_available`
+
+In particular:
+
+- `trial_proven` is not the same thing as `live_available`
+- a source-authored helper is not a live runtime surface until the deployed `Configs` copy is updated
+- mirror Markdown in `Dionysus` may carry additive truth-status corrections without becoming the owner of runtime truth
+- the deployed operator verdict for the promoted lane lives at `scripts/aoa-status --autonomy`
+
+When you need the current control-loop status instead of a wave-local summary, use:
+
+```bash
+scripts/aoa-status --autonomy
+scripts/aoa-status --autonomy --json
+```
 
 ## W1 grounded execution
 

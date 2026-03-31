@@ -258,6 +258,23 @@ RESULT_SUMMARY_SCHEMA = {
         "status": {"enum": ["pass", "fail", "planned"]},
         "score_breakdown": {"type": "object"},
         "failure_class": {"type": ["string", "null"]},
+        "truth_status": {
+            "type": "object",
+            "required": [
+                "source_authored",
+                "deployed",
+                "trial_proven",
+                "live_available",
+                "notes",
+            ],
+            "properties": {
+                "source_authored": {"type": "boolean"},
+                "deployed": {"type": "boolean"},
+                "trial_proven": {"type": "boolean"},
+                "live_available": {"type": "boolean"},
+                "notes": {"type": "array", "items": {"type": "string"}},
+            },
+        },
         "reviewer_decision": {"type": "object"},
         "boundary_check": {"type": "object"},
         "observed": {"type": "object"},
@@ -288,6 +305,23 @@ WAVE_INDEX_SCHEMA = {
         "status_counts": {"type": "object"},
         "gate_result": {"type": "string"},
         "next_action": {"type": "string"},
+        "truth_status": {
+            "type": "object",
+            "required": [
+                "source_authored",
+                "deployed",
+                "trial_proven",
+                "live_available",
+                "notes",
+            ],
+            "properties": {
+                "source_authored": {"type": "boolean"},
+                "deployed": {"type": "boolean"},
+                "trial_proven": {"type": "boolean"},
+                "live_available": {"type": "boolean"},
+                "notes": {"type": "array", "items": {"type": "string"}},
+            },
+        },
         "cases": {"type": "array", "items": {"type": "object"}},
         "gate_detail": {"type": "object"},
     },
@@ -357,6 +391,149 @@ def configure_program_runtime(*, program_id: str, run_url: str) -> None:
     MIRROR_ROOT_DEFAULT = default_mirror_root_for(program_id)
     LANGCHAIN_RUN_URL = run_url
     LANGCHAIN_BASE_URL = run_url.rsplit("/", 1)[0]
+
+
+def bool_word(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def make_truth_status(
+    *,
+    source_authored: bool,
+    deployed: bool,
+    trial_proven: bool,
+    live_available: bool,
+    notes: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "source_authored": bool(source_authored),
+        "deployed": bool(deployed),
+        "trial_proven": bool(trial_proven),
+        "live_available": bool(live_available),
+        "notes": notes or [],
+    }
+
+
+def normalize_truth_status(
+    payload: Any,
+    *,
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return fallback
+
+    return make_truth_status(
+        source_authored=bool(payload.get("source_authored")),
+        deployed=bool(payload.get("deployed")),
+        trial_proven=bool(payload.get("trial_proven")),
+        live_available=bool(payload.get("live_available")),
+        notes=[str(item) for item in payload.get("notes") or []],
+    )
+
+
+def infer_case_truth_status(
+    case: dict[str, Any],
+    *,
+    status: str | None,
+) -> dict[str, Any]:
+    runtime = case.get("runtime_selection") or {}
+    runtime_path = str(runtime.get("path") or "")
+    source_refs = [str(item) for item in case.get("source_refs") or []]
+    targets_deployed_runtime = (
+        runtime_path.startswith("langchain-api")
+        or runtime_path.startswith("route-api")
+        or "langchain-api" in runtime_path
+        or "route-api" in runtime_path
+        or any(ref.startswith("/srv/abyss-stack/") for ref in source_refs)
+    )
+    trial_proven = status == "pass"
+    live_available = trial_proven and targets_deployed_runtime
+
+    notes = [
+        "source_authored tracks the canonical trial contract in the source-owned runner.",
+        "deployed tracks whether this case targets an operator-visible surface under /srv/abyss-stack.",
+    ]
+    if trial_proven:
+        notes.append("trial_proven is backed by a passing case packet.")
+    else:
+        notes.append("No passing packet exists for this case yet, so trial_proven stays false.")
+    if live_available:
+        notes.append("live_available is true only because this case passed against a deployed runtime path.")
+    elif targets_deployed_runtime:
+        notes.append("This case targets the deployed runtime, but live availability is not yet proven by a passing packet.")
+    else:
+        notes.append("This case stays source-authored or worktree-local and should not be read as a live runtime claim.")
+
+    return make_truth_status(
+        source_authored=True,
+        deployed=targets_deployed_runtime,
+        trial_proven=trial_proven,
+        live_available=live_available,
+        notes=notes,
+    )
+
+
+def resolve_case_truth_status(
+    case: dict[str, Any],
+    result_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    status = None
+    if result_summary is not None:
+        status = str(result_summary.get("status") or "planned")
+    fallback = infer_case_truth_status(case, status=status)
+    if result_summary is None:
+        return fallback
+    return normalize_truth_status(result_summary.get("truth_status"), fallback=fallback)
+
+
+def program_wave_truth_status(*, gate_result: str) -> dict[str, Any]:
+    deployed_runner = (SCRIPTS_ROOT / "aoa-local-ai-trials").exists()
+    trial_proven = gate_result == "pass"
+    live_available = trial_proven and deployed_runner
+    notes = [
+        "Wave-level source_authored refers to the canonical aoa-local-ai-trials contract.",
+        "Wave-level deployed refers to the operator-visible runner under /srv/abyss-stack/Configs/scripts/aoa-local-ai-trials.",
+    ]
+    if trial_proven:
+        notes.append("trial_proven is backed by a passing wave gate.")
+    else:
+        notes.append("No passing wave gate exists yet, so trial_proven stays false.")
+    if live_available:
+        notes.append("live_available is true only when the passing wave also maps to the deployed runner surface.")
+    elif deployed_runner:
+        notes.append("The deployed runner exists, but live availability is not yet backed by a passing wave gate.")
+    else:
+        notes.append("The source runner exists, but the deployed Configs mirror does not yet expose the same runner surface.")
+    return make_truth_status(
+        source_authored=True,
+        deployed=deployed_runner,
+        trial_proven=trial_proven,
+        live_available=live_available,
+        notes=notes,
+    )
+
+
+def truth_status_lines(truth_status: dict[str, Any]) -> list[str]:
+    lines = [
+        f"- source_authored: `{bool_word(bool(truth_status.get('source_authored')))}`",
+        f"- deployed: `{bool_word(bool(truth_status.get('deployed')))}`",
+        f"- trial_proven: `{bool_word(bool(truth_status.get('trial_proven')))}`",
+        f"- live_available: `{bool_word(bool(truth_status.get('live_available')))}`",
+    ]
+    for note in truth_status.get("notes") or []:
+        lines.append(f"- note: {note}")
+    return lines
+
+
+def truth_status_compact(truth_status: dict[str, Any]) -> str:
+    return ", ".join(
+        [
+            f"source_authored={bool_word(bool(truth_status.get('source_authored')))}",
+            f"deployed={bool_word(bool(truth_status.get('deployed')))}",
+            f"trial_proven={bool_word(bool(truth_status.get('trial_proven')))}",
+            f"live_available={bool_word(bool(truth_status.get('live_available')))}",
+        ]
+    )
 
 
 def case_dir(log_root: Path, wave_id: str, case_id: str) -> Path:
@@ -582,7 +759,7 @@ def compact_prompt_slice(text: str, *, char_limit: int = 1400) -> str:
     return rendered
 
 
-def report_frontmatter(case: dict[str, Any], verdict: str) -> str:
+def report_frontmatter(case: dict[str, Any], verdict: str, truth_status: dict[str, Any]) -> str:
     runtime = case.get("runtime_selection") or RUNTIME_SELECTION_DEFAULT
     lines = [
         "---",
@@ -602,6 +779,11 @@ def report_frontmatter(case: dict[str, Any], verdict: str) -> str:
             f"  path: {runtime.get('path') if runtime.get('path') is not None else 'null'}",
             f"model: {MODEL}",
             f"verdict: {verdict}",
+            "truth_status:",
+            f"  source_authored: {bool_word(bool(truth_status.get('source_authored')))}",
+            f"  deployed: {bool_word(bool(truth_status.get('deployed')))}",
+            f"  trial_proven: {bool_word(bool(truth_status.get('trial_proven')))}",
+            f"  live_available: {bool_word(bool(truth_status.get('live_available')))}",
             "---",
         ]
     )
@@ -616,6 +798,7 @@ def render_report(
     log_root: Path,
 ) -> str:
     verdict = result_summary["status"]
+    truth_status = resolve_case_truth_status(case, result_summary)
     case_root = case_dir(log_root, case["wave_id"], case["case_id"])
     evidence_links = [
         f"- [case.spec.json]({case_root / 'case.spec.json'})",
@@ -643,7 +826,7 @@ def render_report(
 
     return "\n\n".join(
         [
-            report_frontmatter(case, verdict),
+            report_frontmatter(case, verdict, truth_status),
             f"# {case['title']}",
             "## Goal\n"
             + case.get("goal", "Run the frozen case under the local pilot reporting contract."),
@@ -653,6 +836,7 @@ def render_report(
             + "\n".join(f"- {item}" for item in case.get("expected_report_lines", [])),
             "## Actual Result\n"
             + "\n".join(f"- {item}" for item in result_summary.get("observed", {}).get("highlights", [])),
+            "## Truth Status\n" + "\n".join(truth_status_lines(truth_status)),
             "## Evidence\n"
             + "\n".join(evidence_links + ["", "Commands:"] + command_lines),
             "## Boundary Check\n"
@@ -666,6 +850,12 @@ def render_report(
 
 
 def render_wave_index_md(index_payload: dict[str, Any]) -> str:
+    truth_status = normalize_truth_status(
+        index_payload.get("truth_status"),
+        fallback=program_wave_truth_status(
+            gate_result=str(index_payload.get("gate_result") or "not-run")
+        ),
+    )
     lines = [
         f"# {index_payload['wave_id']} {index_payload['wave_title']}",
         "",
@@ -675,6 +865,9 @@ def render_wave_index_md(index_payload: dict[str, Any]) -> str:
         f"- Cases: `{index_payload['case_count']}`",
         f"- Status counts: `{json.dumps(index_payload['status_counts'], ensure_ascii=True)}`",
         f"- Next action: {index_payload['next_action']}",
+        "",
+        "## Truth Status",
+        *truth_status_lines(truth_status),
         "",
         "## Cases",
     ]
@@ -688,6 +881,8 @@ def render_wave_index_md(index_payload: dict[str, Any]) -> str:
             lines.append(f"- `{case['case_id']}`: `{status}`")
         if summary:
             lines.append(f"  {summary}")
+        if case.get("truth_status"):
+            lines.append(f"  truth_status: {truth_status_compact(case['truth_status'])}")
     if index_payload.get("gate_detail"):
         lines.extend(["", "## Gate Detail", "```json", json.dumps(index_payload["gate_detail"], indent=2, ensure_ascii=True), "```"])
     return "\n".join(lines)
@@ -1700,6 +1895,7 @@ def program_readme() -> str:
         - program-local contracts for case specs, run manifests, result summaries, and wave indexes
         - one packet per case under `waves/<wave-id>/<case-id>/`
         - machine-readable truth that stays local to `abyss-stack`
+        - truth-status fields that keep `source_authored`, `deployed`, `trial_proven`, and `live_available` separate
 
         Human+AI-readable mirror reports live in:
         - `{MIRROR_ROOT_DEFAULT}`
@@ -1722,6 +1918,7 @@ def mirror_program_readme() -> str:
         Keep here:
         - per-case Markdown reports
         - per-wave Markdown indexes
+        - truth-status addenda that clarify source vs deployed vs trial vs live state
 
         Do not move runtime truth into this mirror.
         Machine-readable truth stays in:
@@ -1751,6 +1948,7 @@ def materialize_program(log_root: Path, mirror_root: Path, catalog: dict[str, li
             "status_counts": {"planned": len(cases), "pass": 0, "fail": 0},
             "gate_result": "not-run",
             "next_action": "Execute this wave under human+AI curation after the prior gate passes.",
+            "truth_status": program_wave_truth_status(gate_result="not-run"),
             "cases": [
                 {
                     "case_id": case["case_id"],
@@ -1759,6 +1957,7 @@ def materialize_program(log_root: Path, mirror_root: Path, catalog: dict[str, li
                     "task_family": case["task_family"],
                     "case_spec": str(case_dir(log_root, wave_id, case["case_id"]) / "case.spec.json"),
                     "summary": case["title"],
+                    "truth_status": infer_case_truth_status(case, status=None),
                 }
                 for case in cases
             ],
@@ -1777,15 +1976,19 @@ def refresh_wave(log_root: Path, mirror_root: Path, wave_id: str) -> None:
     cases = catalog[wave_id]
     index_base = wave_index_name(wave_id)
     index_json_path = log_root / f"{index_base}.json"
+    result_by_case: dict[str, dict[str, Any] | None] = {}
 
     for case in cases:
         case_root = case_dir(log_root, wave_id, case["case_id"])
         run_path = case_root / "run.manifest.json"
         result_path = case_root / "result.summary.json"
+        result_summary = None
         if not (run_path.exists() and result_path.exists()):
+            result_by_case[case["case_id"]] = None
             continue
         run_manifest = json.loads(run_path.read_text(encoding="utf-8"))
         result_summary = json.loads(result_path.read_text(encoding="utf-8"))
+        result_by_case[case["case_id"]] = result_summary
         report = render_report(case, run_manifest, result_summary, log_root=log_root)
         write_text(case_root / "report.md", report)
         write_text(mirror_root / case_report_name(wave_id, case["case_id"]), report)
@@ -1803,6 +2006,7 @@ def refresh_wave(log_root: Path, mirror_root: Path, wave_id: str) -> None:
             "status_counts": {"planned": len(cases), "pass": 0, "fail": 0},
             "gate_result": "not-run",
             "next_action": "Execute this wave under human+AI curation after the prior gate passes.",
+            "truth_status": program_wave_truth_status(gate_result="not-run"),
             "cases": [
                 {
                     "case_id": case["case_id"],
@@ -1811,10 +2015,24 @@ def refresh_wave(log_root: Path, mirror_root: Path, wave_id: str) -> None:
                     "task_family": case["task_family"],
                     "case_spec": str(case_dir(log_root, wave_id, case["case_id"]) / "case.spec.json"),
                     "summary": case["title"],
+                    "truth_status": infer_case_truth_status(case, status=None),
                 }
                 for case in cases
             ],
         }
+
+    case_map = {case["case_id"]: case for case in cases}
+    for entry in index_payload.get("cases", []):
+        case = case_map.get(entry.get("case_id"))
+        if case is None:
+            continue
+        entry["truth_status"] = resolve_case_truth_status(
+            case,
+            result_by_case.get(case["case_id"]),
+        )
+    index_payload["truth_status"] = program_wave_truth_status(
+        gate_result=str(index_payload.get("gate_result") or "not-run")
+    )
 
     index_md = render_wave_index_md(index_payload)
     write_text(log_root / f"{index_base}.md", index_md)
@@ -2179,7 +2397,12 @@ def build_result_summary(
     reviewer_notes: str,
     boundary_notes: str,
     next_action: str,
+    truth_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    resolved_truth_status = normalize_truth_status(
+        truth_status,
+        fallback=infer_case_truth_status(case, status=status),
+    )
     return {
         "artifact_kind": "aoa.local-ai-trial.result-summary",
         "program_id": PROGRAM_ID,
@@ -2188,6 +2411,7 @@ def build_result_summary(
         "status": status,
         "score_breakdown": score_breakdown,
         "failure_class": failure_class,
+        "truth_status": resolved_truth_status,
         "reviewer_decision": {
             "status": "accepted" if status == "pass" else "needs-remediation",
             "reviewed_at": utc_now(),

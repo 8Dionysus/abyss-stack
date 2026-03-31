@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 import re
@@ -22,6 +23,23 @@ LEGACY_ALLOWED = {
     ROOT / "docs" / "MIGRATION_FROM_OLD.md",
     ROOT / "scripts" / "validate_stack.py",
 }
+
+SYNC_MANAGED_ITEMS = (
+    "compose",
+    "config-templates",
+    "docs",
+    "scripts",
+    "systemd",
+    "env",
+    "README.md",
+    "CHARTER.md",
+    "BOUNDARIES.md",
+    "ROADMAP.md",
+    "AGENTS.md",
+)
+
+PARITY_IGNORED_PARTS = {".git", "__pycache__"}
+PARITY_IGNORED_SUFFIXES = {".pyc"}
 
 REQUIRED_SCRIPTS = {
     "aoa-doctor",
@@ -79,6 +97,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "RENDER_TRUTH.md",
     ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "docs" / "LOCAL_AI_TRIALS.md",
+    ROOT / "docs" / "TRUTH_SURFACES.md",
     ROOT / "docs" / "LANGGRAPH_PILOT.md",
     ROOT / "docs" / "LLAMACPP_PILOT.md",
     ROOT / "docs" / "W5_PILOT.md",
@@ -193,6 +212,43 @@ def load_names(file_path: Path) -> list[str]:
     return names
 
 
+def load_structured_object(path: Path) -> dict[str, object]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        import yaml  # type: ignore
+
+        payload = yaml.safe_load(text)
+    except ImportError:
+        payload = json.loads(text)
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{path.relative_to(ROOT)} must parse as an object")
+    return payload
+
+
+def iter_sync_managed_files() -> list[Path]:
+    files: list[Path] = []
+
+    for item in SYNC_MANAGED_ITEMS:
+        source_path = ROOT / item
+        if source_path.is_file():
+            files.append(Path(item))
+            continue
+        if not source_path.is_dir():
+            continue
+
+        for child in source_path.rglob("*"):
+            if not child.is_file():
+                continue
+            rel = child.relative_to(ROOT)
+            if any(part in PARITY_IGNORED_PARTS for part in rel.parts):
+                continue
+            if child.suffix.lower() in PARITY_IGNORED_SUFFIXES:
+                continue
+            files.append(rel)
+
+    return sorted(files)
+
+
 def validate_profiles(errors: list[str]) -> None:
     for profile in sorted(PROFILE_DIR.glob("*.txt")):
         modules = load_names(profile)
@@ -274,6 +330,7 @@ def validate_paths(errors: list[str]) -> None:
 
     local_ai_trials = (ROOT / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
     for required_snippet in (
+        "TRUTH_SURFACES.md",
         "prepare-wave W4 --lane docs",
         "apply-case W4 <case-id>",
         "scripts/aoa-w5-pilot materialize",
@@ -287,14 +344,37 @@ def validate_paths(errors: list[str]) -> None:
         "script_refresh",
         "approval.status.json",
         "isolated git worktree",
+        "landing.diff",
+        "source_authored",
+        "live_available",
+        "aoa-status --autonomy",
     ):
         if required_snippet not in local_ai_trials:
             errors.append(
                 f"docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
             )
 
+    truth_doc = (ROOT / "docs" / "TRUTH_SURFACES.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "source_authored",
+        "deployed",
+        "trial_proven",
+        "live_available",
+        "/home/dionysus/src/abyss-stack",
+        "/srv/abyss-stack",
+        "trial_proven is not a synonym for production readiness",
+        "aoa-llamacpp-pilot verify",
+        "aoa-sync-federation-surfaces --check --json",
+        "aoa-status --autonomy --json",
+    ):
+        if required_snippet not in truth_doc:
+            errors.append(
+                f"docs/TRUTH_SURFACES.md must mention `{required_snippet}`"
+            )
+
     w5_doc = (ROOT / "docs" / "W5_PILOT.md").read_text(encoding="utf-8")
     for required_snippet in (
+        "TRUTH_SURFACES.md",
         "http://127.0.0.1:5403/run",
         "scripts/aoa-w5-pilot materialize",
         "run-scenario <scenario-id> --until milestone|done",
@@ -305,9 +385,25 @@ def validate_paths(errors: list[str]) -> None:
         "landing",
         "stack-sync-federation-check-mode",
         "implementation_patch",
+        "trial_proven",
+        "live_available",
+        "aoa-status --autonomy",
     ):
         if required_snippet not in w5_doc:
             errors.append(f"docs/W5_PILOT.md must mention `{required_snippet}`")
+
+    w6_doc = (ROOT / "docs" / "W6_PILOT.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "TRUTH_SURFACES.md",
+        "http://127.0.0.1:5403/run",
+        "stack-sync-federation-json-check-report",
+        "llamacpp-pilot-verify-command",
+        "trial_proven",
+        "live_available",
+        "aoa-status --autonomy",
+    ):
+        if required_snippet not in w6_doc:
+            errors.append(f"docs/W6_PILOT.md must mention `{required_snippet}`")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/abyss-stack" not in paths_doc:
@@ -318,6 +414,8 @@ def validate_paths(errors: list[str]) -> None:
         )
     if "AOA_ROUTING_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_ROUTING_ROOT")
+    if "AOA_SOURCE_ROOT" not in paths_doc:
+        errors.append("docs/PATHS.md must mention AOA_SOURCE_ROOT")
     if "AOA_MEMO_ROOT" not in paths_doc:
         errors.append("docs/PATHS.md must mention AOA_MEMO_ROOT")
     if "AOA_EVALS_ROOT" not in paths_doc:
@@ -330,6 +428,15 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/PATHS.md must mention AOA_TOS_ROOT")
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/abyss-stack/Configs`",
+        "python scripts/validate_stack.py --parity-check",
+        "aoa-status --autonomy",
+    ):
+        if required_snippet not in deployment_doc:
+            errors.append(
+                f"docs/DEPLOYMENT.md must mention `{required_snippet}`"
+            )
     if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-routing federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-memo" not in deployment_doc:
@@ -384,7 +491,6 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-kag")
     if "tos-source" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention tos-source")
-
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
@@ -402,6 +508,18 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
     if "Logs/eval-exports/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
+
+    lifecycle_doc = (ROOT / "docs" / "LIFECYCLE.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "source_authored",
+        "deployed",
+        "trial_proven",
+        "live_available",
+        "python scripts/validate_stack.py --parity-check",
+    ):
+        if required_snippet not in lifecycle_doc:
+            errors.append(f"docs/LIFECYCLE.md must mention `{required_snippet}`")
+
 
 
 def validate_scripts(errors: list[str]) -> None:
@@ -555,6 +673,10 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
     render_truth_doc = (ROOT / "docs" / "RENDER_TRUTH.md").read_text(encoding="utf-8")
     if "return-policy" not in render_truth_doc:
         errors.append("docs/RENDER_TRUTH.md should mention return-policy mounts when the wrapper is enabled")
+    if "aoa-status --autonomy" not in render_truth_doc:
+        errors.append("docs/RENDER_TRUTH.md must mention aoa-status --autonomy")
+    if "/surface-status" not in render_truth_doc:
+        errors.append("docs/RENDER_TRUTH.md must mention /surface-status")
 
     policy_schema = json.loads(
         (ROOT / "schemas" / "runtime-return-policy.schema.json").read_text(encoding="utf-8")
@@ -782,10 +904,52 @@ def validate_runtime_configs_mirror(errors: list[str]) -> None:
         errors.append("runtime Configs mirror scripts/AGENTS.md must note that .github workflow refs are source-checkout-only")
 
 
+def validate_deployed_parity(errors: list[str], deployed_root: Path) -> None:
+    if not deployed_root.exists():
+        errors.append(f"deployed Configs root does not exist: {deployed_root}")
+        return
+
+    for rel_path in iter_sync_managed_files():
+        source_path = ROOT / rel_path
+        deployed_path = deployed_root / rel_path
+        if not deployed_path.exists():
+            errors.append(
+                f"deployed Configs mirror is missing synced path: {rel_path}"
+            )
+            continue
+
+        if source_path.read_bytes() != deployed_path.read_bytes():
+            errors.append(
+                f"source/deployed drift for synced path: {rel_path}"
+            )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate the abyss-stack source repo or runtime Configs mirror."
+    )
+    parser.add_argument(
+        "--parity-check",
+        action="store_true",
+        help="Compare source-managed repo surfaces against the deployed Configs mirror.",
+    )
+    parser.add_argument(
+        "--deployed-configs-root",
+        default="/srv/abyss-stack/Configs",
+        help="Path to the deployed Configs mirror used by --parity-check.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
     errors: list[str] = []
 
     if RUNTIME_CONFIGS_MIRROR_MODE:
+        if args.parity_check:
+            print("validation failed:")
+            print("- --parity-check must be run from the canonical source checkout, not the deployed Configs mirror")
+            return 1
         validate_runtime_configs_mirror(errors)
         if errors:
             print("validation failed:")
@@ -810,6 +974,8 @@ def main() -> int:
     validate_kag_runtime_seam(errors)
     validate_return_runtime_contract(errors)
     validate_federation_landing(errors)
+    if args.parity_check:
+        validate_deployed_parity(errors, Path(args.deployed_configs_root))
 
     if errors:
         print("validation failed:")
@@ -817,7 +983,10 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print("validation passed")
+    if args.parity_check:
+        print("validation passed (source + deployed parity)")
+    else:
+        print("validation passed")
     return 0
 
 
