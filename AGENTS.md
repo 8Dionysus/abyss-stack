@@ -20,6 +20,7 @@ Use this order:
 - do not perform destructive data actions without an explicit rollback path
 - do not silently merge runtime and meaning layers back together
 - do not confuse a Windows source checkout path with the Linux runtime root
+- do not confuse `/home/dionysus/src/abyss-stack` with `/srv/abyss-stack`
 - do not convert public-safe config templates into committed secret-bearing runtime files
 - do not publish rendered config output that may contain secret-bearing values
 - do not commit private host-facts captures from live machines

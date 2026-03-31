@@ -41,6 +41,14 @@ This repository should not absorb:
 - `aoa-*` repositories own their specialized meaning.
 - `abyss-stack` owns the body those layers can run on.
 
+## Quick path rule
+
+- source checkout: `/home/dionysus/src/abyss-stack`
+- deployed runtime root: `/srv/abyss-stack`
+- deployed config tree: `/srv/abyss-stack/Configs`
+- do not edit `/srv/abyss-stack` as if it were the source repository
+- if you need the full path model, read [docs/PATHS](docs/PATHS.md)
+
 ## Start here
 
 1. Read [CHARTER](CHARTER.md).
