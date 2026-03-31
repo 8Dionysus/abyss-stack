@@ -628,6 +628,10 @@ def validate_paths(errors: list[str]) -> None:
             routing_playbooks = routing_target.get("playbooks") or {}
             abyss_stack_playbook = abyss_stack_playbooks.get("AOA-P-0011") or {}
             routing_playbook = routing_playbooks.get("AOA-P-0011") or {}
+            if abyss_stack_target.get("default_repo_root") != "~/src/abyss-stack":
+                errors.append(
+                    "abyss-stack governed policy default_repo_root must use the portable ~/src/abyss-stack default"
+                )
             if abyss_stack_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
                 errors.append("abyss-stack AOA-P-0011 governed policy entry must declare a valid trust_state")
             if routing_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:

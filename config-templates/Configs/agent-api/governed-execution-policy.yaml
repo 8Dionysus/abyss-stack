@@ -49,7 +49,7 @@
     "abyss-stack": {
       "repo_scope": "abyss-stack",
       "description": "Internal governed target for runtime-owned stack control, policy, and operator surfaces.",
-      "default_repo_root": "/home/dionysus/src/abyss-stack",
+      "default_repo_root": "~/src/abyss-stack",
       "playbooks": {
         "AOA-P-0011": {
           "enabled": true,

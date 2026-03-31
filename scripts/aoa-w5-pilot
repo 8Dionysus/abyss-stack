@@ -6,6 +6,7 @@ import copy
 import importlib.machinery
 import importlib.util
 import json
+import os
 import subprocess
 import textwrap
 from contextlib import contextmanager
@@ -36,12 +37,12 @@ CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
+HOME_SOURCE_ROOT = Path.home() / "src" / "abyss-stack"
 
 BASELINE_W4_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / "qwen-local-pilot-v1"
 LLAMACPP_PROMOTION_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "promotions" / "llamacpp-promotion-gate-v1"
 INDEX_NAME = "W5-long-horizon-index"
 SUMMARY_MEMO_NAME = "W5_SUMMARY.md"
-SOURCE_CHECKOUT_ROOT = Path("/home/dionysus/src/abyss-stack")
 
 READ_ONLY_SCENARIO_IDS = {
     "runtime-inspect-langchain-health",
@@ -112,6 +113,41 @@ class W5State(TypedDict, total=False):
     local_commit_message: str | None
     base_head: str | None
     forced_pause_seen: list[str]
+
+
+def is_source_checkout(path: Path) -> bool:
+    return (
+        (path / "CONTRIBUTING.md").exists()
+        and (path / "scripts" / "validate_stack.py").exists()
+        and (path / "docs" / "DEPLOYMENT.md").exists()
+    )
+
+
+def resolve_source_checkout_root() -> Path:
+    candidates: list[Path] = []
+    env_root = os.environ.get("AOA_SOURCE_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser())
+    if is_source_checkout(SOURCE_ROOT):
+        candidates.append(SOURCE_ROOT)
+    candidates.append(HOME_SOURCE_ROOT)
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser().resolve(strict=False)
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        if is_source_checkout(resolved):
+            return resolved
+
+    if env_root:
+        return Path(env_root).expanduser().resolve(strict=False)
+    return HOME_SOURCE_ROOT.resolve(strict=False)
+
+
+SOURCE_CHECKOUT_ROOT = resolve_source_checkout_root()
 
 
 def utc_now() -> str:
