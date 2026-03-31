@@ -34,6 +34,12 @@ These `Services/*` entries are source-managed build contexts for lightweight
 runtime helper services. They are bootstrapped into the deployed runtime tree by
 `scripts/aoa-bootstrap-configs`.
 
+The `Configs/agent-api/` family currently carries the public-safe runtime
+templates for:
+
+- `return-policy.yaml`
+- `governed-execution-policy.yaml`
+
 `aoa-browser` is intentionally not templated here yet. In the current runtime
 it remains a runtime-only local image plus browser payload under
 `/srv/abyss-stack/Services/aoa-browser/`.

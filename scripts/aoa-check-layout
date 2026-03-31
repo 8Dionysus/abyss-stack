@@ -108,7 +108,9 @@ check_warn_file "litellm config" "${AOA_STACK_ROOT}/Services/litellm/config.yaml
 if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   aoa_note "selected runtime includes 41-agent-api.yml; checking return-policy contract"
   check_dir "${AOA_STACK_ROOT}/Logs/returns"
+  check_dir "${AOA_STACK_ROOT}/Logs/governed-runs"
   check_warn_file "agent API return policy" "${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml"
+  check_warn_file "agent API governed execution policy" "${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml"
 fi
 
 if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then

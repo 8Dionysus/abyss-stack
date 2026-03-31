@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/schemas/runtime-governed-execution-policy.schema.json",
+  "title": "abyss-stack governed execution policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_type",
+    "schema_version",
+    "policy_id",
+    "enabled",
+    "global_rules",
+    "playbooks",
+    "boundaries"
+  ],
+  "properties": {
+    "surface_type": {
+      "type": "string",
+      "const": "runtime_governed_execution_policy"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 3
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "global_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_mode",
+        "canonical_gate_command",
+        "require_clean_repo",
+        "require_stable_base_head",
+        "approval_milestones",
+        "max_worktree_repairs",
+        "auto_rollback_on_post_apply_failure",
+        "break_glass_requires_reason",
+        "repo_scope",
+        "log_root"
+      ],
+      "properties": {
+        "gate_mode": {
+          "type": "string",
+          "enum": [
+            "fail_closed"
+          ]
+        },
+        "canonical_gate_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "require_clean_repo": {
+          "type": "boolean",
+          "const": true
+        },
+        "require_stable_base_head": {
+          "type": "boolean",
+          "const": true
+        },
+        "approval_milestones": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string",
+            "enum": [
+              "plan_freeze",
+              "landing"
+            ]
+          }
+        },
+        "max_worktree_repairs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "auto_rollback_on_post_apply_failure": {
+          "type": "boolean",
+          "const": true
+        },
+        "break_glass_requires_reason": {
+          "type": "boolean",
+          "const": true
+        },
+        "repo_scope": {
+          "type": "string",
+          "const": "abyss-stack"
+        },
+        "log_root": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "playbooks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "execution_kind",
+          "repo_scope",
+          "allowed_files",
+          "acceptance_commands",
+          "break_glass_allowed",
+          "repair_allowed"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "execution_kind": {
+            "type": "string",
+            "enum": [
+              "mutation"
+            ]
+          },
+          "repo_scope": {
+            "type": "string",
+            "const": "abyss-stack"
+          },
+          "allowed_files": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "acceptance_commands": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "break_glass_allowed": {
+            "type": "boolean"
+          },
+          "repair_allowed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owns_runtime_permissions_only",
+        "does_not_define_playbook_meaning",
+        "does_not_replace_route_api_advisory_surfaces",
+        "does_not_replace_langchain_api_federated_advisory_run",
+        "first_mutation_scope_is_abyss_stack_only"
+      ],
+      "properties": {
+        "owns_runtime_permissions_only": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_define_playbook_meaning": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_replace_route_api_advisory_surfaces": {
+          "type": "boolean",
+          "const": true
+        },
+        "does_not_replace_langchain_api_federated_advisory_run": {
+          "type": "boolean",
+          "const": true
+        },
+        "first_mutation_scope_is_abyss_stack_only": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    }
+  }
+}

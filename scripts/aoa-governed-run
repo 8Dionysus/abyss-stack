@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import _aoa_governed_execution as governed  # noqa: E402
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Governed abyss-stack execution lane")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    prepare = subparsers.add_parser("prepare-request", help="Write a governed execution request template")
+    prepare.add_argument("--write", required=True, help="Path to write the request JSON template")
+
+    run = subparsers.add_parser("run", help="Prepare a new governed run from a request file")
+    run.add_argument("--request-file", required=True, help="Path to the governed request JSON")
+    run.add_argument("--until", choices=("milestone", "done"), default="done")
+
+    resume = subparsers.add_parser("resume", help="Resume an existing governed run")
+    resume.add_argument("run_id", help="Run identifier")
+    resume.add_argument("--until", choices=("milestone", "done"), default="done")
+
+    status = subparsers.add_parser("status", help="Inspect governed run state")
+    status.add_argument("--all", action="store_true", help="List all governed runs")
+    status.add_argument("run_id", nargs="?", help="Run identifier")
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+
+    if args.command == "prepare-request":
+        target = Path(args.write).expanduser()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(governed.default_request_template(), indent=2, ensure_ascii=True) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps({"ok": True, "request_file": str(target)}, indent=2, ensure_ascii=True))
+        return 0
+
+    if args.command == "run":
+        payload = governed.prepare_run(args.request_file, until=args.until)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 0 if payload.get("status") != "fail" else 1
+
+    if args.command == "resume":
+        payload = governed.resume_run(args.run_id, until=args.until)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 0 if payload.get("status") != "fail" else 1
+
+    if args.command == "status":
+        if args.all and args.run_id:
+            raise SystemExit("status accepts either --all or a run_id, not both")
+        if args.all:
+            payload = governed.list_runs()
+        else:
+            if not args.run_id:
+                raise SystemExit("status requires --all or a run_id")
+            payload = governed.status_run(args.run_id)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 0
+
+    raise SystemExit(f"unsupported command: {args.command}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

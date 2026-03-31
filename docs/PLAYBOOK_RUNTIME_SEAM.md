@@ -60,6 +60,17 @@ These endpoints:
 - do not change `langchain-api`
 - remain advisory-only
 
+## Governed execution overlay
+
+The first governed mutation lane does not change this seam into a playbook engine.
+
+- `scripts/aoa-governed-run` resolves playbook cards through `POST /playbooks/inspect` or `POST /playbooks/select`
+- runtime permission semantics still live in `abyss-stack`
+- file scope, repo scope, break-glass allowance, and acceptance commands come from `${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml`
+- `aoa-playbooks` still owns playbook meaning; `abyss-stack` only owns the runtime permission overlay
+
+This keeps `/playbooks/*` advisory even when the governed lane uses those surfaces as input.
+
 ## What this phase does not do
 
 This landing does not:

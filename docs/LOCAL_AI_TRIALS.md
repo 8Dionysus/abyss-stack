@@ -172,7 +172,6 @@ The W5 runner:
 - supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`
 - reuses `approval.status.json` at `plan_freeze`, `first_mutation`, and `landing`
 - keeps mutation scenarios worktree-first and explicitly approved before landing
-- records `landing.diff` for landed mutation scenarios
 - records one local checkpoint commit per successful mutation scenario when a tracked diff is present
 - feeds a wave-local summary, not the canonical deployed autonomy verdict
 
@@ -196,7 +195,6 @@ The W6 runner:
 - reduces approvals to `plan_freeze` and `landing`
 - removes `first_mutation` from the normal mutation path
 - keeps mutation scenarios worktree-first and explicitly approved before landing
-- records `landing.diff` for landed mutation scenarios
 - supports one bounded `autonomous_repair_loop` after `post_change_validation_failure`
 - tracks `novel_implementation_passes`, `preexisting_noop_count`, `repair_attempted_count`, and `repair_success_count`
 - still relies on `scripts/aoa-status --autonomy` for the deployed control-loop verdict
@@ -225,6 +223,30 @@ When you need the current control-loop status instead of a wave-local summary, u
 scripts/aoa-status --autonomy
 scripts/aoa-status --autonomy --json
 ```
+
+## Governed execution after W6
+
+`W5` and `W6` remain pilot evidence.
+The first governed mutation lane now lives at `scripts/aoa-governed-run`.
+The canonical runtime contract for that lane is documented in [GOVERNED_EXECUTION](GOVERNED_EXECUTION.md).
+
+Use:
+
+```bash
+scripts/aoa-governed-run prepare-request --write /tmp/governed-request.json
+scripts/aoa-governed-run run --request-file /tmp/governed-request.json --until done
+scripts/aoa-governed-run resume <run-id>
+```
+
+This lane:
+
+- still fails closed on `aoa-status --autonomy --json`
+- resolves playbook and memo context through the existing advisory seams
+- writes `approval.status.json` at `plan_freeze` and `landing`
+- validates mutations inside an isolated git worktree before landing
+- records `landing.diff` and `worktree.manifest.json` before main-checkout apply
+- writes `rollback.status.json` if post-apply validation fails
+- keeps runtime execution permissions in `config-templates/Configs/agent-api/governed-execution-policy.yaml`
 
 ## W1 grounded execution
 

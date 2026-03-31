@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/schemas/runtime-governed-execution-request.schema.json",
+  "title": "abyss-stack governed execution request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "goal",
+    "profile_class",
+    "repo_root"
+  ],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "playbook_id": {
+      "type": "string",
+      "pattern": "^AOA-P-[0-9]{4}$"
+    },
+    "playbook_select": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scenario": { "type": "string" },
+        "trigger": { "type": "string" },
+        "evaluation_posture": { "type": "string" },
+        "memory_posture": { "type": "string" },
+        "fallback_mode": { "type": "string" },
+        "return_reentry_mode": { "type": "string" },
+        "eval_anchor": { "type": "string" },
+        "required_skill": { "type": "string" }
+      }
+    },
+    "memo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "mode"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "enum": [
+            "router",
+            "object"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "working",
+            "semantic",
+            "lineage"
+          ]
+        },
+        "id": { "type": "string" },
+        "section_id": { "type": "string" },
+        "return_ready": { "type": "boolean" }
+      }
+    },
+    "profile_class": {
+      "type": "string",
+      "enum": [
+        "spark",
+        "workhorse",
+        "deep",
+        "archive"
+      ]
+    },
+    "repo_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "break_glass_reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "playbook_id"
+      ]
+    },
+    {
+      "required": [
+        "playbook_select"
+      ]
+    }
+  ]
+}

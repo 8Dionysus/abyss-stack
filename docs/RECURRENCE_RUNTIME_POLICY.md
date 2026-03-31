@@ -221,6 +221,15 @@ ${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml
 That path is a runtime config contract, not secret material.
 A bootstrapped template should therefore live under `config-templates/Configs/agent-api/return-policy.yaml`.
 
+The same runtime family may also carry the governed execution policy beside it:
+
+```text
+${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml
+```
+
+That sibling file owns runtime execution permissions only.
+It does not replace `route-api` advisory surfaces or promote `langchain-api /run/federated` into the permission engine.
+
 ## Compose and service stance
 
 The narrowest implementation path is to let the agent-facing runtime service consume the return policy file and write return events to the runtime logs.

@@ -26,7 +26,10 @@ jobs:
         run: python scripts/validate_stack.py
 
       - name: Python syntax check
-        run: python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index
+        run: python -m py_compile scripts/validate_stack.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index
+
+      - name: Run autonomy control-loop unit tests
+        run: python -m unittest tests.test_aoa_status_autonomy tests.test_route_api_closure_status tests.test_governed_execution
 
       - name: Shellcheck scripts
         run: |
@@ -103,6 +106,9 @@ jobs:
           scripts/aoa-render-config --profile agentic --write "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
+          test -f "$AOA_STACK_ROOT/Configs/agent-api/governed-execution-policy.yaml"
+          python scripts/aoa-governed-run prepare-request --write "$RUNNER_TEMP/governed-request.json"
+          test -s "$RUNNER_TEMP/governed-request.json"
           scripts/aoa-render-config --profile intel >/dev/null
           scripts/aoa-render-config --profile agentic,tools,observability >/dev/null
           scripts/aoa-render-config --preset agent-full >/dev/null

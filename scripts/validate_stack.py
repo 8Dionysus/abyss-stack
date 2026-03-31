@@ -42,6 +42,9 @@ PARITY_IGNORED_PARTS = {".git", "__pycache__"}
 PARITY_IGNORED_SUFFIXES = {".pyc"}
 
 REQUIRED_SCRIPTS = {
+    "_aoa_governed_execution.py",
+    "_aoa_status_autonomy.py",
+    "aoa-governed-run",
     "aoa-doctor",
     "aoa-host-facts",
     "aoa-machine-fit",
@@ -90,6 +93,7 @@ REQUIRED_FILES = {
     ROOT / "systemd" / "user" / "AGENTS.md",
     ROOT / "scripts" / "AGENTS.md",
     ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
+    ROOT / "docs" / "GOVERNED_EXECUTION.md",
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
     ROOT / "docs" / "PRESETS.md",
@@ -141,6 +145,7 @@ REQUIRED_FILES = {
     ROOT / "compose" / "modules" / "44-llamacpp-agent-sidecar.yml",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
+    ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-memo.yaml",
@@ -155,6 +160,8 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "route-api" / "requirements.txt",
     ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
+    ROOT / "schemas" / "runtime-governed-execution-policy.schema.json",
+    ROOT / "schemas" / "runtime-governed-execution-request.schema.json",
     ROOT / "schemas" / "runtime-memo-export-candidate.schema.json",
     ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
@@ -166,6 +173,7 @@ REQUIRED_FILES = {
     ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
+    ROOT / "tests" / "test_governed_execution.py",
 }
 
 MODULE_REQUIREMENTS = {
@@ -331,8 +339,12 @@ def validate_paths(errors: list[str]) -> None:
     local_ai_trials = (ROOT / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
+        "GOVERNED_EXECUTION.md",
         "prepare-wave W4 --lane docs",
         "apply-case W4 <case-id>",
+        "scripts/aoa-governed-run prepare-request",
+        "scripts/aoa-governed-run run --request-file",
+        "scripts/aoa-governed-run resume",
         "scripts/aoa-w5-pilot materialize",
         "run-scenario <scenario-id> --until milestone",
         "resume-scenario <scenario-id>",
@@ -345,6 +357,7 @@ def validate_paths(errors: list[str]) -> None:
         "approval.status.json",
         "isolated git worktree",
         "landing.diff",
+        "rollback.status.json",
         "source_authored",
         "live_available",
         "aoa-status --autonomy",
@@ -371,6 +384,22 @@ def validate_paths(errors: list[str]) -> None:
             errors.append(
                 f"docs/TRUTH_SURFACES.md must mention `{required_snippet}`"
             )
+
+    governed_doc = (ROOT / "docs" / "GOVERNED_EXECUTION.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "aoa-governed-run prepare-request",
+        "aoa-governed-run run --request-file",
+        "approval.status.json",
+        "landing.diff",
+        "rollback.status.json",
+        "autonomy_gate_failed",
+        "policy_denied",
+        "scope_violation",
+        "aoa-status --autonomy --json",
+        "Configs/agent-api/governed-execution-policy.yaml",
+    ):
+        if required_snippet not in governed_doc:
+            errors.append(f"docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
 
     w5_doc = (ROOT / "docs" / "W5_PILOT.md").read_text(encoding="utf-8")
     for required_snippet in (
@@ -432,6 +461,10 @@ def validate_paths(errors: list[str]) -> None:
         "source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/abyss-stack/Configs`",
         "python scripts/validate_stack.py --parity-check",
         "aoa-status --autonomy",
+        "governed-execution-policy.yaml",
+        "scripts/aoa-governed-run",
+        "scripts/aoa-bootstrap-configs --force",
+        "Logs/governed-runs",
     ):
         if required_snippet not in deployment_doc:
             errors.append(
@@ -491,6 +524,9 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-kag")
     if "tos-source" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention tos-source")
+    if "aoa-governed-run" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention aoa-governed-run")
+
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
@@ -520,6 +556,39 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in lifecycle_doc:
             errors.append(f"docs/LIFECYCLE.md must mention `{required_snippet}`")
 
+    playbook_runtime_doc = (ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "aoa-governed-run",
+        "governed-execution-policy.yaml",
+        "runtime permission semantics still live in `abyss-stack`",
+    ):
+        if required_snippet not in playbook_runtime_doc:
+            errors.append(f"docs/PLAYBOOK_RUNTIME_SEAM.md must mention `{required_snippet}`")
+
+    recurrence_doc = (ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md").read_text(encoding="utf-8")
+    for required_snippet in (
+        "governed-execution-policy.yaml",
+        "runtime execution permissions only",
+        "langchain-api /run/federated",
+    ):
+        if required_snippet not in recurrence_doc:
+            errors.append(f"docs/RECURRENCE_RUNTIME_POLICY.md must mention `{required_snippet}`")
+
+    try:
+        governed_policy = load_structured_object(
+            ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml"
+        )
+    except Exception as exc:
+        errors.append(f"governed execution policy must parse cleanly: {exc}")
+    else:
+        if governed_policy.get("surface_type") != "runtime_governed_execution_policy":
+            errors.append("governed execution policy must declare surface_type=runtime_governed_execution_policy")
+        global_rules = governed_policy.get("global_rules")
+        if not isinstance(global_rules, dict) or global_rules.get("gate_mode") != "fail_closed":
+            errors.append("governed execution policy must set global_rules.gate_mode=fail_closed")
+        playbooks = governed_policy.get("playbooks")
+        if not isinstance(playbooks, dict) or "AOA-P-0011" not in playbooks:
+            errors.append("governed execution policy must include an AOA-P-0011 playbook entry")
 
 
 def validate_scripts(errors: list[str]) -> None:
