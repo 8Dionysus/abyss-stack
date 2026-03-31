@@ -273,6 +273,18 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(normalized["old_text"], "beta")
         self.assertEqual(normalized["new_text"], "gamma")
 
+    def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
+        parsed = self.module.parse_json_answer_block(
+            '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'
+        )
+        self.assertEqual(parsed["mode"], "exact_replace")
+        self.assertEqual(parsed["target_file"], "docs/target.md")
+        self.assertEqual(parsed["new_text"], "gamma")
+
+    def test_parse_json_answer_block_raises_when_block_cannot_be_salvaged(self) -> None:
+        with self.assertRaises(json.JSONDecodeError):
+            self.module.parse_json_answer_block('{"mode": ')
+
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
         entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")

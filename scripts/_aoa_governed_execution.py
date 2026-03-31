@@ -700,6 +700,63 @@ def run_federated_prompt(prompt: str, request: dict[str, Any], *, max_tokens: in
     return http_post_json(f"{LANGCHAIN_API_BASE_URL}/run/federated", payload, timeout_s=180.0)
 
 
+def try_salvage_json_block(block: str) -> str | None:
+    candidate = block.strip()
+    if not candidate:
+        return None
+    first_object = candidate.find("{")
+    first_array = candidate.find("[")
+    starts = [index for index in (first_object, first_array) if index >= 0]
+    if starts:
+        candidate = candidate[min(starts) :]
+    if not candidate or candidate[0] not in "{[":
+        return None
+    opener_to_closer = {"{": "}", "[": "]"}
+    stack: list[str] = [opener_to_closer[candidate[0]]]
+    in_string = False
+    escape = False
+    for char in candidate[1:]:
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == "\"":
+                in_string = False
+            continue
+        if char == "\"":
+            in_string = True
+        elif char in opener_to_closer:
+            stack.append(opener_to_closer[char])
+        elif char in "}]" and stack and char == stack[-1]:
+            stack.pop()
+    salvaged = candidate.rstrip()
+    if in_string:
+        if salvaged.endswith("\\"):
+            salvaged = salvaged[:-1]
+        salvaged += "\""
+    if stack:
+        salvaged += "".join(reversed(stack))
+    if salvaged == candidate:
+        return None
+    try:
+        json.loads(salvaged)
+    except json.JSONDecodeError:
+        return None
+    return salvaged
+
+
+def parse_json_answer_block(answer_text: str) -> Any:
+    block = TRIALS.extract_json_block(answer_text)
+    try:
+        return json.loads(block)
+    except json.JSONDecodeError:
+        salvaged = try_salvage_json_block(block)
+        if salvaged is None:
+            raise
+        return json.loads(salvaged)
+
+
 def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> dict[str, Any]:
     if not isinstance(spec, dict):
         raise RuntimeError("proposal spec must be an object")
@@ -770,7 +827,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     )
     target_response = run_federated_prompt(target_prompt, context["request"], max_tokens=160)
     target_answer = str(target_response.get("answer") or "")
-    selected_payload = json.loads(TRIALS.extract_json_block(target_answer))
+    selected_payload = parse_json_answer_block(target_answer)
     if not isinstance(selected_payload, dict):
         raise RuntimeError("target selection response did not contain a JSON object")
     selected_target_file = str(selected_payload.get("target_file") or "")
@@ -787,7 +844,7 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     )
     edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=280)
     edit_answer = str(edit_response.get("answer") or "")
-    parsed_spec = json.loads(TRIALS.extract_json_block(edit_answer))
+    parsed_spec = parse_json_answer_block(edit_answer)
     spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
     return {
         "provider": "langchain-api",
