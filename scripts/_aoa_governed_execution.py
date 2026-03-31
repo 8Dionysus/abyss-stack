@@ -87,7 +87,7 @@ FOCUS_TERM_STOPWORDS = {
     "update",
     "wording",
 }
-REQUEST_RETRY_SUFFIX_RE = re.compile(r"-retry\d+(?=(?:\.[^.]+)+$|$)")
+REQUEST_RETRY_SUFFIX_RE = re.compile(r"-retry(?:\d+)?(?=(?:\.[^.]+)+$|$)")
 
 
 def load_trials_module() -> Any:
@@ -2545,7 +2545,7 @@ def render_run_index_explain(payload: dict[str, Any]) -> str:
     ]
     triage = payload.get("operator_triage") or {}
     if triage:
-        lines.append(f"- blocked_runs: `{triage.get('blocked_run_count')}`")
+        lines.append(f"- active_blocked_lineages: `{triage.get('blocked_run_count')}`")
         lines.append(f"- latest_operator_action: `{triage.get('recommended_action')}`")
     gate = (payload.get("promotion_summary") or {}).get("repo_scope_expansion_gate") or {}
     if gate:

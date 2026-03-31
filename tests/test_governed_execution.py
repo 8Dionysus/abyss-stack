@@ -440,6 +440,10 @@ class GovernedExecutionTests(unittest.TestCase):
 
     def test_request_lineage_key_strips_retry_suffix(self) -> None:
         self.assertEqual(
+            self.module.request_lineage_key("/tmp/slot-4-retry.request.json"),
+            "slot-4.request.json",
+        )
+        self.assertEqual(
             self.module.request_lineage_key("/tmp/slot-4-retry7.request.json"),
             "slot-4.request.json",
         )
@@ -1232,3 +1236,71 @@ class GovernedExecutionTests(unittest.TestCase):
 
         index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
         self.assertEqual(index_payload["operator_triage"]["recommended_action"], "review freshest retry request")
+
+    def test_list_runs_collapse_unnumbered_retry_lineage(self) -> None:
+        stale_dir = self.logs_root / "slot-1-stale"
+        stale_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            stale_dir / "run.state.json",
+            {
+                "run_id": "slot-1-stale",
+                "request_path": "/tmp/slot-1-retry.request.json",
+                "repo_root": str(self.repo_root),
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "trust_state_snapshot": "experimental",
+                "phase": "failed",
+                "status": "fail",
+                "base_head": "abc123",
+                "updated_at": "2026-03-31T14:00:00Z",
+                "break_glass_used": False,
+            },
+        )
+        write_json(
+            stale_dir / "result.summary.json",
+            {
+                "artifact_kind": "aoa.governed-run.result-summary",
+                "schema_version": "v1",
+                "run_id": "slot-1-stale",
+                "updated_at": "2026-03-31T14:00:00Z",
+                "status": "fail",
+                "phase": "failed",
+                "failure_class": "proposal_invalid",
+                "next_action": "repair stale retry",
+            },
+        )
+
+        passed_dir = self.logs_root / "slot-1-passed"
+        passed_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            passed_dir / "run.state.json",
+            {
+                "run_id": "slot-1-passed",
+                "request_path": "/tmp/slot-1-retry4.request.json",
+                "repo_root": str(self.repo_root),
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "trust_state_snapshot": "experimental",
+                "phase": "completed",
+                "status": "pass",
+                "base_head": "abc123",
+                "updated_at": "2026-03-31T14:05:00Z",
+                "break_glass_used": False,
+            },
+        )
+        write_json(
+            passed_dir / "result.summary.json",
+            {
+                "artifact_kind": "aoa.governed-run.result-summary",
+                "schema_version": "v1",
+                "run_id": "slot-1-passed",
+                "updated_at": "2026-03-31T14:05:00Z",
+                "status": "pass",
+                "phase": "completed",
+                "next_action": "landed successfully",
+            },
+        )
+
+        index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
+        self.assertEqual(index_payload["operator_triage"]["blocked_run_count"], 0)
+        self.assertEqual(index_payload["operator_triage"]["blocked_run_ids"], [])

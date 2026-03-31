@@ -50,7 +50,7 @@
       "enabled": true,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
-      "trust_state": "experimental",
+      "trust_state": "canary_proven",
       "task_class": "docs_only",
       "allowed_files": [
         "docs/*.md",
@@ -73,7 +73,7 @@
       "enabled": true,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
-      "trust_state": "experimental",
+      "trust_state": "canary_proven",
       "task_class": "governed_lane",
       "allowed_files": [
         "docs/*.md",
