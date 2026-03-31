@@ -663,6 +663,7 @@ def build_edit_spec_prompt(
         - do not rename files
         - do not widen scope outside `{target_file}`
         - prefer the smallest safe edit
+        - `old_text` and `new_text` must be plain JSON strings, not arrays or objects
         - prefer `exact_replace` when `old_text` is uniquely applicable by itself
         - for `anchored_replace`, `old_text` must describe only the text between `anchor_before` and `anchor_after`
         - do not repeat `anchor_before` or `anchor_after` inside `old_text`
@@ -757,6 +758,22 @@ def parse_json_answer_block(answer_text: str) -> Any:
         return json.loads(salvaged)
 
 
+def coerce_text_like_field(value: Any, *, field_name: str) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
+        return "".join(value)
+    if isinstance(value, dict):
+        for key in ("text", "value", "content", "replacement"):
+            candidate = value.get(key)
+            if isinstance(candidate, str):
+                return candidate
+        lines = value.get("lines")
+        if isinstance(lines, list) and lines and all(isinstance(item, str) for item in lines):
+            return "\n".join(lines)
+    raise RuntimeError(f"proposal {field_name} must be a string")
+
+
 def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> dict[str, Any]:
     if not isinstance(spec, dict):
         raise RuntimeError("proposal spec must be an object")
@@ -766,12 +783,10 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
     target_file = spec.get("target_file")
     if not isinstance(target_file, str) or target_file != selected_target_file:
         raise RuntimeError("proposal target_file must match the selected target file")
-    old_text = spec.get("old_text")
-    new_text = spec.get("new_text")
-    if not isinstance(old_text, str) or not old_text:
+    old_text = coerce_text_like_field(spec.get("old_text"), field_name="old_text")
+    new_text = coerce_text_like_field(spec.get("new_text"), field_name="new_text")
+    if not old_text:
         raise RuntimeError("proposal old_text must be a non-empty string")
-    if not isinstance(new_text, str):
-        raise RuntimeError("proposal new_text must be a string")
     if old_text == new_text:
         raise RuntimeError("proposal old_text and new_text must differ")
     payload = {

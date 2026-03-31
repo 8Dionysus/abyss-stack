@@ -285,6 +285,31 @@ class GovernedExecutionTests(unittest.TestCase):
         with self.assertRaises(json.JSONDecodeError):
             self.module.parse_json_answer_block('{"mode": ')
 
+    def test_normalize_edit_spec_coerces_string_list_new_text(self) -> None:
+        normalized = self.module.normalize_edit_spec(
+            {
+                "mode": "exact_replace",
+                "target_file": "docs/target.md",
+                "old_text": "beta",
+                "new_text": ["gam", "ma"],
+            },
+            selected_target_file="docs/target.md",
+        )
+        self.assertEqual(normalized["new_text"], "gamma")
+
+    def test_normalize_edit_spec_coerces_dict_string_wrapper(self) -> None:
+        normalized = self.module.normalize_edit_spec(
+            {
+                "mode": "exact_replace",
+                "target_file": "docs/target.md",
+                "old_text": {"text": "beta"},
+                "new_text": {"content": "gamma"},
+            },
+            selected_target_file="docs/target.md",
+        )
+        self.assertEqual(normalized["old_text"], "beta")
+        self.assertEqual(normalized["new_text"], "gamma")
+
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
         entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")
