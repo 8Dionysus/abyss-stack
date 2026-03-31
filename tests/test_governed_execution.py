@@ -257,6 +257,22 @@ class GovernedExecutionTests(unittest.TestCase):
         )
         self.assertEqual(target.read_text(encoding="utf-8"), "alpha\ngamma\nomega\n")
 
+    def test_normalize_edit_spec_downgrades_missing_anchor_to_exact_replace(self) -> None:
+        normalized = self.module.normalize_edit_spec(
+            {
+                "mode": "anchored_replace",
+                "target_file": "docs/target.md",
+                "anchor_before": "alpha",
+                "old_text": "beta",
+                "new_text": "gamma",
+                "anchor_after": "",
+            },
+            selected_target_file="docs/target.md",
+        )
+        self.assertEqual(normalized["mode"], "exact_replace")
+        self.assertEqual(normalized["old_text"], "beta")
+        self.assertEqual(normalized["new_text"], "gamma")
+
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
         entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")

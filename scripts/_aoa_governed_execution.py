@@ -726,10 +726,9 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
     if mode == "anchored_replace":
         anchor_before = spec.get("anchor_before")
         anchor_after = spec.get("anchor_after")
-        if not isinstance(anchor_before, str) or not anchor_before:
-            raise RuntimeError("proposal anchor_before must be a non-empty string")
-        if not isinstance(anchor_after, str) or not anchor_after:
-            raise RuntimeError("proposal anchor_after must be a non-empty string")
+        if not isinstance(anchor_before, str) or not anchor_before or not isinstance(anchor_after, str) or not anchor_after:
+            payload["mode"] = "exact_replace"
+            return payload
         payload["anchor_before"] = anchor_before
         payload["anchor_after"] = anchor_after
     return payload
