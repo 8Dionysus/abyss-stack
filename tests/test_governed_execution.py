@@ -270,7 +270,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 3200)
+        self.assertLess(len(prompt), 3300)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -338,7 +338,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("list_runs", hints)
         self.assertIn("latest_operator_action", hints)
 
-    def test_build_edit_spec_prompt_includes_helper_excerpt_for_request_lineage_goal(self) -> None:
+    def test_build_edit_spec_prompt_keeps_request_lineage_goal_inside_list_runs(self) -> None:
         target_text = (
             ("padding\n" * 200)
             + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
@@ -367,12 +367,38 @@ class GovernedExecutionTests(unittest.TestCase):
             failure_context=[],
         )
         self.assertIn("def list_runs", prompt)
+        self.assertIn("prefer changing `list_runs` aggregation first", prompt)
+        self.assertIn("each governed run state already records `request_path`", prompt)
+        self.assertNotIn("Relevant helper excerpt", prompt)
+        self.assertNotIn("def make_pass_summary", prompt)
+
+    def test_build_edit_spec_prompt_includes_helper_excerpt_for_build_run_record_goal(self) -> None:
+        target_text = (
+            ("padding\n" * 200)
+            + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
+            + "    state = load_state(run_dir)\n"
+            + "    approval = load_approval(run_dir)\n"
+            + "    summary = load_summary_or_synthesize(run_dir, state, approval)\n"
+            + "    triage = summary.get(\"triage\") or compute_triage(state, summary, approval)\n"
+            + "    return {\"run_id\": state.get(\"run_id\"), \"updated_at\": state.get(\"updated_at\"), \"request_path\": str(run_dir / \"request.json\")}\n"
+            + ("tail\n" * 120)
+        )
+        prompt = self.module.build_edit_spec_prompt(
+            request={
+                "goal": (
+                    "Update scripts/_aoa_governed_execution.py so build_run_record "
+                    "includes request_path in the returned record."
+                )
+            },
+            playbook_id="AOA-P-0018",
+            target_file="scripts/_aoa_governed_execution.py",
+            target_text=target_text,
+            failure_context=[],
+        )
         self.assertIn("Relevant helper excerpt", prompt)
         self.assertIn("def build_run_record", prompt)
         self.assertIn("\"request_path\"", prompt)
-        self.assertIn("prefer changing `list_runs` aggregation first", prompt)
         self.assertNotIn("summary = load_summary_or_synthesize", prompt)
-        self.assertNotIn("def make_pass_summary", prompt)
 
     def test_persist_proposal_attempt_artifacts_writes_error_artifact(self) -> None:
         run_dir = self.root / "run"

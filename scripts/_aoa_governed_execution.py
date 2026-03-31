@@ -847,13 +847,13 @@ def build_edit_spec_prompt(
     excerpt = None
     related_excerpt = None
     goal_lower = request["goal"].lower()
+    request_lineage_goal = any(
+        marker in goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
+    )
     extra_code_requirements: list[str] = []
     if target_file.endswith(".py"):
         logic_focus_terms = focus_terms_from_goal(request["goal"], target_file=target_file)
-        if any(
-            marker in goal_lower
-            for marker in ("latest_operator_action", "request lineage", "request_path", "recommended_action")
-        ):
+        if request_lineage_goal or "recommended_action" in goal_lower:
             logic_focus_terms = [
                 "blocked_runs",
                 "latest_blocked",
@@ -862,8 +862,12 @@ def build_edit_spec_prompt(
                 "blocked_run_count",
                 "request_path",
             ] + logic_focus_terms
+        if request_lineage_goal:
             extra_code_requirements.append(
                 "- for request-lineage or latest-operator-action goals, prefer changing `list_runs` aggregation first; only extend `build_run_record` when the same patch immediately consumes that new field inside `list_runs`"
+            )
+            extra_code_requirements.append(
+                "- each governed run state already records `request_path`; prefer a single localized change inside `list_runs` that reads the existing state field instead of adding a helper-only field elsewhere"
             )
         excerpt = extract_python_symbol_excerpt(
             target_text,
@@ -871,7 +875,7 @@ def build_edit_spec_prompt(
             char_limit=min(excerpt_char_limit, 650),
             focus_terms=logic_focus_terms,
         )
-        if any(marker in goal_lower for marker in ("request lineage", "request_path")):
+        if any(marker in goal_lower for marker in ("request lineage", "request_path")) and "list_runs" not in goal_lower:
             build_run_record_block = extract_python_named_block(target_text, symbol="build_run_record")
             if build_run_record_block is not None:
                 related_excerpt = compact_python_block(
