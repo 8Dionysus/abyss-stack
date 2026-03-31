@@ -270,7 +270,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 3500)
+        self.assertLess(len(prompt), 3900)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -370,6 +370,9 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("prefer changing `list_runs` aggregation first", prompt)
         self.assertIn("each governed run state already records `request_path`", prompt)
         self.assertIn("replace that in-place computation instead of introducing a standalone `latest_operator_action` local", prompt)
+        self.assertIn('do not add a sibling `"latest_operator_action"` key here', prompt)
+        self.assertIn('prefer `anchored_replace` scoped to the existing `"recommended_action": (` block', prompt)
+        self.assertIn("do not return a no-op edit", prompt)
         self.assertNotIn("Relevant helper excerpt", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
 

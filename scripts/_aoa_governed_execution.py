@@ -872,6 +872,15 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 "- `operator_triage.latest_operator_action` is rendered through the existing `triage_summary[\"recommended_action\"]` path here; replace that in-place computation instead of introducing a standalone `latest_operator_action` local"
             )
+            extra_code_requirements.append(
+                '- preserve the current `triage_summary` dict shape; do not add a sibling `"latest_operator_action"` key here'
+            )
+            extra_code_requirements.append(
+                '- prefer `anchored_replace` scoped to the existing `"recommended_action": (` block instead of replacing a larger `triage_summary` fragment'
+            )
+            extra_code_requirements.append(
+                "- do not return a no-op edit; `new_text` must materially change the current `recommended_action` computation"
+            )
         excerpt = extract_python_symbol_excerpt(
             target_text,
             goal=request["goal"],
