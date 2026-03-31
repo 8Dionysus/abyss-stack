@@ -660,6 +660,43 @@ def narrow_candidate_files(candidate_files: list[str], *, goal: str) -> list[str
     return narrowed or candidate_files
 
 
+def python_symbol_hints_from_goal(goal: str) -> list[str]:
+    hints: list[str] = []
+    for raw in re.findall(r"`([^`]+)`|([A-Za-z_][A-Za-z0-9_]{2,})", goal):
+        token = (raw[0] or raw[1]).strip()
+        if "_" not in token:
+            continue
+        if token.lower() in FOCUS_TERM_STOPWORDS:
+            continue
+        if token not in hints:
+            hints.append(token)
+    return hints
+
+
+def extract_python_symbol_excerpt(text: str, *, goal: str, char_limit: int) -> str | None:
+    for symbol in python_symbol_hints_from_goal(goal):
+        match = re.search(rf"(?m)^def {re.escape(symbol)}\(", text)
+        if match is None:
+            match = re.search(rf"(?m)^class {re.escape(symbol)}\\b", text)
+        if match is None:
+            continue
+        start = match.start()
+        remainder = text[start:]
+        next_match = re.search(r"(?m)^(def|class) ", remainder[len(match.group(0)) :])
+        if next_match is None:
+            block = remainder
+        else:
+            block_end = len(match.group(0)) + next_match.start()
+            block = remainder[:block_end]
+        stripped = block.strip()
+        if not stripped:
+            continue
+        if len(stripped) <= char_limit:
+            return stripped
+        return compact_excerpt(stripped, char_limit=char_limit, focus_terms=[symbol])
+    return None
+
+
 def compact_excerpt(text: str, *, char_limit: int = 1800, focus_terms: list[str] | None = None) -> str:
     stripped = text.strip()
     if len(stripped) <= char_limit:
@@ -728,11 +765,19 @@ def build_edit_spec_prompt(
 ) -> str:
     failure_block = "\n".join(f"- {item}" for item in failure_context) if failure_context else "- none"
     excerpt_char_limit = 1200 if target_file.endswith((".py", ".sh", ".json", ".yaml", ".yml")) else 1800
-    excerpt = compact_excerpt(
-        target_text,
-        char_limit=excerpt_char_limit,
-        focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
-    )
+    excerpt = None
+    if target_file.endswith(".py"):
+        excerpt = extract_python_symbol_excerpt(
+            target_text,
+            goal=request["goal"],
+            char_limit=min(excerpt_char_limit, 900),
+        )
+    if excerpt is None:
+        excerpt = compact_excerpt(
+            target_text,
+            char_limit=excerpt_char_limit,
+            focus_terms=focus_terms_from_goal(request["goal"], target_file=target_file),
+        )
     return textwrap.dedent(
         f"""\
         Governed execution bounded edit proposal.
@@ -973,7 +1018,8 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             target_text=target_text,
             failure_context=attempt_failure_context,
         )
-        edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=220)
+        edit_max_tokens = 180 if selected_target_file.endswith(".py") else 220
+        edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=edit_max_tokens)
         edit_answer = str(edit_response.get("answer") or "")
         try:
             parsed_spec = parse_json_answer_block(edit_answer)

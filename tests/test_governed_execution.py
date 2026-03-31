@@ -270,7 +270,35 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 3600)
+        self.assertLess(len(prompt), 3200)
+
+    def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
+        target_text = (
+            ("padding\n" * 200)
+            + "def make_pass_summary(\n    return {}\n)\n"
+            + ("middle\n" * 200)
+            + "def list_runs(*, log_root=None):\n"
+            + "    blocked_runs = []\n"
+            + "    return {\"runs\": blocked_runs}\n"
+            + ("tail\n" * 100)
+        )
+        excerpt = self.module.extract_python_symbol_excerpt(
+            target_text,
+            goal="Update scripts/_aoa_governed_execution.py so list_runs computes operator triage from the freshest request lineage.",
+            char_limit=500,
+        )
+        assert excerpt is not None
+        self.assertIn("def list_runs", excerpt)
+        self.assertIn("blocked_runs", excerpt)
+        self.assertNotIn("def make_pass_summary", excerpt)
+
+    def test_python_symbol_hints_from_goal_prefers_identifier_tokens(self) -> None:
+        hints = self.module.python_symbol_hints_from_goal(
+            "Update scripts/_aoa_governed_execution.py so list_runs computes latest_operator_action from request lineage."
+        )
+        self.assertIn("_aoa_governed_execution", hints)
+        self.assertIn("list_runs", hints)
+        self.assertIn("latest_operator_action", hints)
 
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
