@@ -900,6 +900,12 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 '- prefer one compact `exact_replace` that swaps the current two-line `blocked_runs` / `latest_blocked` block for exactly three short lines: freshest lineage list, filtered blocked runs, then `latest_blocked = blocked_runs[:1]`'
             )
+            extra_code_requirements.append(
+                '- the first replacement line should be `freshest_runs = freshest_runs_by_request_lineage(runs)`; do not start by filtering operator-action runs into `lineage_candidates` or any other pre-filtered list'
+            )
+            extra_code_requirements.append(
+                '- after that first line, filter `blocked_runs` from `freshest_runs`, then set `latest_blocked = blocked_runs[:1]`'
+            )
             lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
             if lineage_helper_block is not None:
                 related_excerpts.append(
