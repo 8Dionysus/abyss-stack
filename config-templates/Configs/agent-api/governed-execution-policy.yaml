@@ -2,11 +2,12 @@
   "surface_type": "runtime_governed_execution_policy",
   "schema_version": "v1",
   "policy_id": "agentic-governed-execution-v1",
-  "description": "Fail-closed governed mutation policy for the first abyss-stack-only execution lane; repo-scope expansion gate serves as evidence for later review only and does not widen scope by itself.",
+  "description": "Fail-closed governed mutation policy for abyss-stack and the first explicit external target; playbook meaning stays generic while runtime permissions become target-aware.",
   "enabled": true,
   "global_rules": {
     "gate_mode": "fail_closed",
     "canonical_gate_command": "aoa-status --autonomy --json",
+    "default_target_id": "abyss-stack",
     "require_clean_repo": true,
     "require_stable_base_head": true,
     "approval_milestones": [
@@ -16,7 +17,6 @@
     "max_worktree_repairs": 1,
     "auto_rollback_on_post_apply_failure": true,
     "break_glass_requires_reason": true,
-    "repo_scope": "abyss-stack",
     "log_root": "local:/srv/abyss-stack/Logs/governed-runs",
     "promotion_criteria": {
       "canary_proven": {
@@ -45,79 +45,131 @@
       "maximum_post_change_validation_failures": 0
     }
   },
-  "playbooks": {
-    "AOA-P-0011": {
-      "enabled": true,
-      "execution_kind": "mutation",
+  "targets": {
+    "abyss-stack": {
       "repo_scope": "abyss-stack",
-      "trust_state": "canary_proven",
-      "task_class": "docs_only",
-      "allowed_files": [
-        "docs/*.md",
-        "docs/**/*.md",
-        "config-templates/Configs/agent-api/governed-execution-policy.yaml",
-        "config-templates/Configs/agent-api/governed-canary-catalog.json",
-        "schemas/runtime-governed-execution-policy.schema.json",
-        "schemas/runtime-governed-execution-request.schema.json",
-        "schemas/runtime-governed-execution-canary-catalog.schema.json",
-        "scripts/validate_stack.py",
-        ".github/workflows/validate-stack.yml"
-      ],
-      "acceptance_commands": [
-        "python scripts/validate_stack.py"
-      ],
-      "break_glass_allowed": false,
-      "repair_allowed": true
+      "description": "Internal governed target for runtime-owned stack control, policy, and operator surfaces.",
+      "default_repo_root": "/home/dionysus/src/abyss-stack",
+      "playbooks": {
+        "AOA-P-0011": {
+          "enabled": true,
+          "execution_kind": "mutation",
+          "repo_scope": "abyss-stack",
+          "trust_state": "canary_proven",
+          "task_class": "docs_only",
+          "allowed_files": [
+            "docs/*.md",
+            "docs/**/*.md",
+            "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+            "config-templates/Configs/agent-api/governed-canary-catalog.json",
+            "schemas/runtime-governed-execution-policy.schema.json",
+            "schemas/runtime-governed-execution-request.schema.json",
+            "schemas/runtime-governed-execution-canary-catalog.schema.json",
+            "scripts/validate_stack.py",
+            ".github/workflows/validate-stack.yml"
+          ],
+          "acceptance_commands": [
+            "python scripts/validate_stack.py"
+          ],
+          "break_glass_allowed": false,
+          "repair_allowed": true
+        },
+        "AOA-P-0018": {
+          "enabled": true,
+          "execution_kind": "mutation",
+          "repo_scope": "abyss-stack",
+          "trust_state": "canary_proven",
+          "task_class": "governed_lane",
+          "allowed_files": [
+            "docs/*.md",
+            "docs/**/*.md",
+            "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+            "config-templates/Configs/agent-api/governed-canary-catalog.json",
+            "schemas/runtime-governed-execution-policy.schema.json",
+            "schemas/runtime-governed-execution-request.schema.json",
+            "schemas/runtime-governed-execution-canary-catalog.schema.json",
+            "scripts/_aoa_governed_execution.py",
+            "scripts/aoa-governed-run",
+            "scripts/validate_stack.py",
+            "tests/test_governed_execution.py",
+            ".github/workflows/validate-stack.yml"
+          ],
+          "acceptance_commands": [
+            "python scripts/validate_stack.py",
+            "python -m py_compile scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/validate_stack.py",
+            "python -m unittest tests.test_governed_execution"
+          ],
+          "break_glass_allowed": true,
+          "repair_allowed": true
+        },
+        "AOA-P-0002": {
+          "enabled": false,
+          "execution_kind": "mutation",
+          "repo_scope": "abyss-stack",
+          "trust_state": "experimental",
+          "task_class": "policy_surface",
+          "allowed_files": [],
+          "acceptance_commands": [],
+          "break_glass_allowed": false,
+          "repair_allowed": false
+        },
+        "AOA-P-0019": {
+          "enabled": false,
+          "execution_kind": "mutation",
+          "repo_scope": "abyss-stack",
+          "trust_state": "experimental",
+          "task_class": "validation_tightening",
+          "allowed_files": [],
+          "acceptance_commands": [],
+          "break_glass_allowed": false,
+          "repair_allowed": false
+        }
+      }
     },
-    "AOA-P-0018": {
-      "enabled": true,
-      "execution_kind": "mutation",
-      "repo_scope": "abyss-stack",
-      "trust_state": "canary_proven",
-      "task_class": "governed_lane",
-      "allowed_files": [
-        "docs/*.md",
-        "docs/**/*.md",
-        "config-templates/Configs/agent-api/governed-execution-policy.yaml",
-        "config-templates/Configs/agent-api/governed-canary-catalog.json",
-        "schemas/runtime-governed-execution-policy.schema.json",
-        "schemas/runtime-governed-execution-request.schema.json",
-        "schemas/runtime-governed-execution-canary-catalog.schema.json",
-        "scripts/_aoa_governed_execution.py",
-        "scripts/aoa-governed-run",
-        "scripts/validate_stack.py",
-        "tests/test_governed_execution.py",
-        ".github/workflows/validate-stack.yml"
-      ],
-      "acceptance_commands": [
-        "python scripts/validate_stack.py",
-        "python -m py_compile scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/validate_stack.py",
-        "python -m unittest tests.test_governed_execution"
-      ],
-      "break_glass_allowed": true,
-      "repair_allowed": true
-    },
-    "AOA-P-0002": {
-      "enabled": false,
-      "execution_kind": "mutation",
-      "repo_scope": "abyss-stack",
-      "trust_state": "experimental",
-      "task_class": "policy_surface",
-      "allowed_files": [],
-      "acceptance_commands": [],
-      "break_glass_allowed": false,
-      "repair_allowed": false
-    },
-    "AOA-P-0019": {
-      "enabled": false,
-      "execution_kind": "mutation",
-      "repo_scope": "abyss-stack",
-      "trust_state": "experimental",
-      "task_class": "validation_tightening",
-      "allowed_files": [],
-      "acceptance_commands": [],
-      "break_glass_allowed": false,
-      "repair_allowed": false
+    "aoa-routing": {
+      "repo_scope": "aoa-routing",
+      "description": "First external governed target for bounded thin-router wording and generated-surface refreshes only.",
+      "default_repo_root": "/srv/aoa-routing",
+      "playbooks": {
+        "AOA-P-0011": {
+          "enabled": true,
+          "execution_kind": "mutation",
+          "repo_scope": "aoa-routing",
+          "trust_state": "canary_proven",
+          "task_class": "docs_only",
+          "evidence_since_run_id": "20260331t185701z-090d1817",
+          "allowed_files": [
+            "README.md",
+            "ROADMAP.md",
+            "docs/*.md",
+            "docs/**/*.md",
+            "generated/*.json",
+            "generated/*.jsonl",
+            "scripts/build_router.py",
+            "scripts/validate_router.py",
+            "tests/test_build_router.py",
+            "tests/test_validate_router.py"
+          ],
+          "acceptance_commands": [
+            "python scripts/validate_router.py --techniques-root /srv/aoa-techniques --skills-root /srv/aoa-skills --evals-root /srv/aoa-evals --memo-root /srv/aoa-memo --agents-root /srv/aoa-agents --aoa-root /srv/Agents-of-Abyss --playbooks-root /srv/aoa-playbooks --kag-root /srv/aoa-kag --tos-root /srv/Tree-of-Sophia",
+            "python scripts/build_router.py --check --techniques-root /srv/aoa-techniques --skills-root /srv/aoa-skills --evals-root /srv/aoa-evals --memo-root /srv/aoa-memo --agents-root /srv/aoa-agents --aoa-root /srv/Agents-of-Abyss --playbooks-root /srv/aoa-playbooks --kag-root /srv/aoa-kag --tos-root /srv/Tree-of-Sophia",
+            "pytest"
+          ],
+          "break_glass_allowed": false,
+          "repair_allowed": true
+        },
+        "AOA-P-0018": {
+          "enabled": false,
+          "execution_kind": "mutation",
+          "repo_scope": "aoa-routing",
+          "trust_state": "experimental",
+          "task_class": "governed_lane",
+          "allowed_files": [],
+          "acceptance_commands": [],
+          "break_glass_allowed": false,
+          "repair_allowed": false
+        }
+      }
     }
   },
   "boundaries": {
@@ -125,6 +177,6 @@
     "does_not_define_playbook_meaning": true,
     "does_not_replace_route_api_advisory_surfaces": true,
     "does_not_replace_langchain_api_federated_advisory_run": true,
-    "first_mutation_scope_is_abyss_stack_only": true
+    "external_targets_require_explicit_policy": true
   }
 }

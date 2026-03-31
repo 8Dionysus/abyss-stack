@@ -45,6 +45,13 @@ SOURCE_CANARY_CATALOG_FALLBACK = (
 )
 DEFAULT_PROFILE_CLASS = "workhorse"
 TRUST_STATES = {"experimental", "canary_proven", "trusted"}
+TASK_CLASSES = {
+    "docs_only",
+    "policy_surface",
+    "validation_tightening",
+    "governed_lane",
+    "generated_surface",
+}
 FAILURE_CLASSES = {
     "autonomy_gate_failed",
     "policy_denied",
@@ -88,6 +95,20 @@ FOCUS_TERM_STOPWORDS = {
     "wording",
 }
 REQUEST_RETRY_SUFFIX_RE = re.compile(r"-retry(?:\d+)?(?=(?:\.[^.]+)+$|$)")
+BUILD_ROUTER_NOOP_GOAL_MARKERS = (
+    "no-op rebuild",
+    "git-stable",
+    "semantically unchanged",
+    "on-disk json or jsonl",
+    "editing generated files directly",
+)
+ROUTING_ROADMAP_GENERATED_SURFACE_GOAL_MARKERS = (
+    "generated-surface refresh lane",
+    "parity maintenance",
+    "sibling source repos",
+)
+BUILD_ROUTER_WRITE_LOOP_START = "for filename, payload in outputs.items():"
+BUILD_ROUTER_WRITE_LOOP_END = 'print(f"[ok] wrote {relative_posix(path)}")'
 
 
 def load_trials_module() -> Any:
@@ -231,35 +252,52 @@ def validate_policy(policy: dict[str, Any]) -> None:
         "policy global_rules.repo_scope_expansion_gate",
         global_rules.get("repo_scope_expansion_gate"),
     )
-    if not isinstance(policy.get("playbooks"), dict) or not policy["playbooks"]:
-        raise RuntimeError("policy playbooks must contain at least one entry")
-    for playbook_id, entry in policy["playbooks"].items():
-        if not isinstance(entry, dict):
-            raise RuntimeError(f"policy entry for {playbook_id} must be an object")
-        for required in (
-            "enabled",
-            "execution_kind",
-            "repo_scope",
-            "allowed_files",
-            "acceptance_commands",
-            "break_glass_allowed",
-            "repair_allowed",
-            "trust_state",
-            "task_class",
-        ):
-            if required not in entry:
-                raise RuntimeError(f"policy entry for {playbook_id} is missing {required}")
-        if entry.get("trust_state") not in TRUST_STATES:
-            raise RuntimeError(f"policy entry for {playbook_id} has invalid trust_state")
-        if not isinstance(entry.get("task_class"), str) or not entry["task_class"].strip():
-            raise RuntimeError(f"policy entry for {playbook_id} must declare a non-empty task_class")
+    targets = policy.get("targets")
+    if not isinstance(targets, dict) or not targets:
+        raise RuntimeError("policy targets must contain at least one entry")
+    default_target_id = str(global_rules.get("default_target_id") or "").strip()
+    if not default_target_id:
+        raise RuntimeError("policy global_rules.default_target_id must be a non-empty string")
+    if default_target_id not in targets:
+        raise RuntimeError("policy global_rules.default_target_id must refer to a configured target")
+    for target_id, target_entry in targets.items():
+        if not isinstance(target_entry, dict):
+            raise RuntimeError(f"policy target {target_id} must be an object")
+        repo_scope = str(target_entry.get("repo_scope") or "").strip()
+        if repo_scope != target_id:
+            raise RuntimeError(f"policy target {target_id} must declare repo_scope={target_id}")
+        if not isinstance(target_entry.get("default_repo_root"), str) or not target_entry["default_repo_root"].strip():
+            raise RuntimeError(f"policy target {target_id} must declare a non-empty default_repo_root")
+        playbooks = target_entry.get("playbooks")
+        if not isinstance(playbooks, dict) or not playbooks:
+            raise RuntimeError(f"policy target {target_id} must contain at least one playbook entry")
+        for playbook_id, entry in playbooks.items():
+            if not isinstance(entry, dict):
+                raise RuntimeError(f"policy entry for {target_id}/{playbook_id} must be an object")
+            for required in (
+                "enabled",
+                "execution_kind",
+                "repo_scope",
+                "allowed_files",
+                "acceptance_commands",
+                "break_glass_allowed",
+                "repair_allowed",
+                "trust_state",
+                "task_class",
+            ):
+                if required not in entry:
+                    raise RuntimeError(f"policy entry for {target_id}/{playbook_id} is missing {required}")
+            if str(entry.get("repo_scope") or "").strip() != target_id:
+                raise RuntimeError(f"policy entry for {target_id}/{playbook_id} must keep repo_scope={target_id}")
+            if entry.get("trust_state") not in TRUST_STATES:
+                raise RuntimeError(f"policy entry for {target_id}/{playbook_id} has invalid trust_state")
+            if entry.get("task_class") not in TASK_CLASSES:
+                raise RuntimeError(f"policy entry for {target_id}/{playbook_id} has unsupported task_class")
 
 
 def validate_canary_catalog(catalog: dict[str, Any]) -> None:
     if catalog.get("surface_type") != "runtime_governed_execution_canary_catalog":
         raise RuntimeError("governed canary catalog surface_type must equal runtime_governed_execution_canary_catalog")
-    if catalog.get("repo_scope") != "abyss-stack":
-        raise RuntimeError("governed canary catalog repo_scope must remain abyss-stack")
     canaries = catalog.get("canaries")
     if not isinstance(canaries, list) or not canaries:
         raise RuntimeError("governed canary catalog must contain at least one canary")
@@ -267,7 +305,7 @@ def validate_canary_catalog(catalog: dict[str, Any]) -> None:
     for entry in canaries:
         if not isinstance(entry, dict):
             raise RuntimeError("governed canary entries must be objects")
-        for required in ("canary_id", "title", "goal", "playbook_id", "task_class", "profile_class"):
+        for required in ("canary_id", "target_id", "title", "goal", "playbook_id", "task_class", "profile_class"):
             value = entry.get(required)
             if not isinstance(value, str) or not value.strip():
                 raise RuntimeError(f"governed canary entry is missing a non-empty {required}")
@@ -275,12 +313,7 @@ def validate_canary_catalog(catalog: dict[str, Any]) -> None:
         if canary_id in seen:
             raise RuntimeError(f"duplicate canary_id in governed canary catalog: {canary_id}")
         seen.add(canary_id)
-        if entry["task_class"] not in {
-            "docs_only",
-            "policy_surface",
-            "validation_tightening",
-            "governed_lane",
-        }:
+        if entry["task_class"] not in TASK_CLASSES:
             raise RuntimeError(f"unsupported canary task_class for {canary_id}: {entry['task_class']}")
 
 
@@ -292,26 +325,103 @@ def is_abyss_stack_checkout(path: Path) -> bool:
     )
 
 
-def resolve_default_repo_root() -> Path:
-    candidates = []
-    env_root = os.environ.get("AOA_SOURCE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root).expanduser())
-    if is_abyss_stack_checkout(SCRIPT_ROOT):
-        candidates.append(SCRIPT_ROOT)
-    candidates.append(Path.home() / "src" / "abyss-stack")
-    for candidate in candidates:
-        if is_abyss_stack_checkout(candidate):
+def is_aoa_routing_checkout(path: Path) -> bool:
+    return (
+        (path / "README.md").exists()
+        and (path / "scripts" / "build_router.py").exists()
+        and (path / "scripts" / "validate_router.py").exists()
+        and (path / "docs" / "FEDERATION_ENTRY_ABI.md").exists()
+    )
+
+
+def target_checkout_detector(target_id: str) -> Callable[[Path], bool]:
+    detectors: dict[str, Callable[[Path], bool]] = {
+        "abyss-stack": is_abyss_stack_checkout,
+        "aoa-routing": is_aoa_routing_checkout,
+    }
+    detector = detectors.get(target_id)
+    if detector is None:
+        raise RuntimeError(f"unsupported governed target_id: {target_id}")
+    return detector
+
+
+def infer_target_id_from_repo_root(repo_root: str | Path | None) -> str | None:
+    if repo_root is None:
+        return None
+    try:
+        resolved = Path(repo_root).expanduser().resolve()
+    except Exception:
+        return None
+    for target_id in ("abyss-stack", "aoa-routing"):
+        if target_checkout_detector(target_id)(resolved):
+            return target_id
+    return None
+
+
+def resolve_target_policy(policy: dict[str, Any], target_id: str) -> dict[str, Any]:
+    targets = policy.get("targets") or {}
+    entry = targets.get(target_id)
+    if not isinstance(entry, dict):
+        raise RuntimeError(f"target {target_id} is not present in governed execution policy")
+    return entry
+
+
+def candidate_repo_roots_for_target(
+    target_id: str,
+    *,
+    policy: dict[str, Any] | None = None,
+) -> list[Path]:
+    candidates: list[Path] = []
+    if policy is not None:
+        try:
+            target_policy = resolve_target_policy(policy, target_id)
+        except RuntimeError:
+            target_policy = {}
+        default_repo_root = target_policy.get("default_repo_root")
+        if isinstance(default_repo_root, str) and default_repo_root.strip():
+            candidates.append(Path(default_repo_root).expanduser())
+    if target_id == "abyss-stack":
+        env_root = os.environ.get("AOA_SOURCE_ROOT")
+        if env_root:
+            candidates.append(Path(env_root).expanduser())
+        if is_abyss_stack_checkout(SCRIPT_ROOT):
+            candidates.append(SCRIPT_ROOT)
+        candidates.append(Path.home() / "src" / "abyss-stack")
+        candidates.append(STACK_ROOT)
+    elif target_id == "aoa-routing":
+        env_root = os.environ.get("AOA_ROUTING_ROOT")
+        if env_root:
+            candidates.append(Path(env_root).expanduser())
+        candidates.append(Path("/srv/aoa-routing"))
+        candidates.append(Path.home() / "src" / "aoa-routing")
+    else:
+        raise RuntimeError(f"unsupported governed target_id: {target_id}")
+    return candidates
+
+
+def resolve_default_repo_root(target_id: str = "abyss-stack", *, policy: dict[str, Any] | None = None) -> Path:
+    detector = target_checkout_detector(target_id)
+    seen: set[str] = set()
+    for candidate in candidate_repo_roots_for_target(target_id, policy=policy):
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if detector(candidate):
             return candidate.resolve()
-    return SCRIPT_ROOT.resolve()
+    fallback = candidate_repo_roots_for_target(target_id, policy=policy)[0]
+    return fallback.resolve()
 
 
 def default_request_template() -> dict[str, Any]:
+    policy = load_policy_or_none()
+    target_id = str(((policy or {}).get("global_rules") or {}).get("default_target_id") or "abyss-stack")
     return {
         "goal": "Describe the bounded abyss-stack change you want to propose.",
+        "target_id": target_id,
         "playbook_id": "AOA-P-0011",
         "profile_class": DEFAULT_PROFILE_CLASS,
-        "repo_root": str(resolve_default_repo_root()),
+        "repo_root": str(resolve_default_repo_root(target_id, policy=policy)),
         "memo": None,
         "break_glass_reason": None,
         "canary_id": None,
@@ -322,6 +432,8 @@ def default_request_template() -> dict[str, Any]:
 def validate_request_shape(request: dict[str, Any]) -> None:
     if not isinstance(request.get("goal"), str) or not request["goal"].strip():
         raise RuntimeError("request goal must be a non-empty string")
+    if not isinstance(request.get("target_id"), str) or not request["target_id"].strip():
+        raise RuntimeError("request target_id must be a non-empty string")
     if bool(request.get("playbook_id")) == bool(request.get("playbook_select")):
         raise RuntimeError("request must include exactly one of playbook_id or playbook_select")
     if not isinstance(request.get("profile_class"), str) or not request["profile_class"].strip():
@@ -363,11 +475,19 @@ def request_from_canary(
 ) -> dict[str, Any]:
     catalog, _catalog_path = load_canary_catalog(catalog_path)
     canary = lookup_canary(catalog, canary_id)
+    policy = load_policy_or_none()
+    target_id = str(canary["target_id"])
+    resolved_repo_root = (
+        normalize_repo_root(repo_root, target_id=target_id)
+        if repo_root is not None
+        else resolve_default_repo_root(target_id, policy=policy)
+    )
     payload: dict[str, Any] = {
         "goal": canary["goal"],
+        "target_id": target_id,
         "playbook_id": canary["playbook_id"],
         "profile_class": canary.get("profile_class") or DEFAULT_PROFILE_CLASS,
-        "repo_root": str(Path(repo_root).expanduser().resolve()) if repo_root is not None else str(resolve_default_repo_root()),
+        "repo_root": str(resolved_repo_root),
         "memo": copy.deepcopy(canary.get("memo")),
         "break_glass_reason": None,
         "canary_id": canary["canary_id"],
@@ -400,6 +520,7 @@ def materialize_canary_requests(
         written.append(
             {
                 "canary_id": entry["canary_id"],
+                "target_id": entry["target_id"],
                 "task_class": entry["task_class"],
                 "playbook_id": entry["playbook_id"],
                 "request_file": str(target),
@@ -424,10 +545,13 @@ def resolve_request_canary_context(
         return None
     catalog, resolved_catalog = load_canary_catalog(catalog_path)
     canary = lookup_canary(catalog, str(canary_id))
+    if request.get("target_id") and request["target_id"] != canary["target_id"]:
+        raise RuntimeError("request target_id does not match the selected canary")
     if request.get("playbook_id") and request["playbook_id"] != canary["playbook_id"]:
         raise RuntimeError("request playbook_id does not match the selected canary")
     if request.get("task_class") and request["task_class"] != canary["task_class"]:
         raise RuntimeError("request task_class does not match the selected canary")
+    request["target_id"] = canary["target_id"]
     request["task_class"] = canary["task_class"]
     return {
         "catalog_path": str(resolved_catalog),
@@ -463,20 +587,27 @@ def resolve_playbook_id(
 ) -> dict[str, Any]:
     provider = advisory_provider or default_advisory_provider
     advisory = provider(request)
+    target_id = str(request.get("target_id") or "")
+    target_policy = resolve_target_policy(policy, target_id)
     playbook_id = advisory.get("playbook_id") or request.get("playbook_id")
     if not isinstance(playbook_id, str) or not playbook_id:
         raise RuntimeError("could not resolve playbook_id for governed execution")
-    playbook_policy = resolve_playbook_policy(policy, playbook_id)
+    playbook_policy = resolve_playbook_policy(policy, playbook_id, target_id)
+    advisory["target_id"] = target_id
+    advisory["target_policy"] = copy.deepcopy(target_policy)
     advisory["playbook_id"] = playbook_id
     advisory["policy"] = copy.deepcopy(playbook_policy)
     return advisory
 
 
-def resolve_playbook_policy(policy: dict[str, Any], playbook_id: str) -> dict[str, Any]:
-    playbooks = policy.get("playbooks") or {}
+def resolve_playbook_policy(policy: dict[str, Any], playbook_id: str, target_id: str) -> dict[str, Any]:
+    target_policy = resolve_target_policy(policy, target_id)
+    playbooks = target_policy.get("playbooks") or {}
     entry = playbooks.get(playbook_id)
     if not isinstance(entry, dict):
-        raise RuntimeError(f"playbook {playbook_id} is not present in governed execution policy")
+        raise RuntimeError(
+            f"playbook {playbook_id} is not present in governed execution policy for target {target_id}"
+        )
     return entry
 
 
@@ -572,15 +703,17 @@ def evaluate_autonomy_gate(
     }
 
 
-def normalize_repo_root(path: str | Path) -> Path:
+def normalize_repo_root(path: str | Path, *, target_id: str) -> Path:
     repo_root = Path(path).expanduser().resolve()
-    if not is_abyss_stack_checkout(repo_root):
-        raise RuntimeError(f"repo_root is not an abyss-stack checkout: {repo_root}")
+    if not target_checkout_detector(target_id)(repo_root):
+        raise RuntimeError(f"repo_root does not match governed target {target_id}: {repo_root}")
     return repo_root
 
 
 def matches_allowed_pattern(relative_path: str, pattern: str) -> bool:
-    return PurePosixPath(relative_path).match(pattern)
+    normalized_path = PurePosixPath("/" + relative_path.lstrip("/"))
+    normalized_pattern = "/" + pattern.lstrip("/")
+    return normalized_path.match(normalized_pattern)
 
 
 def path_allowed(relative_path: str, patterns: list[str]) -> bool:
@@ -639,18 +772,44 @@ def focus_terms_from_goal(goal: str, *, target_file: str) -> list[str]:
 
 def candidate_path_hints_from_goal(goal: str) -> list[str]:
     hints: list[str] = []
-    for raw in re.findall(r"`([^`]+)`|([A-Za-z0-9_./-]{4,})", goal):
-        token = (raw[0] or raw[1]).strip().lower()
-        if "/" not in token and "." not in token:
+    for raw in re.findall(r"`([^`]+)`|([A-Za-z0-9_./:-]{4,})", goal):
+        token_block = (raw[0] or raw[1]).strip().lower()
+        if not token_block:
             continue
-        if token.startswith("--"):
-            continue
-        if token and token not in hints:
-            hints.append(token)
+        for piece in re.split(r"\s+", token_block):
+            token = piece.strip("()[]{}<>,;:'\"")
+            if not token:
+                continue
+            token = token.rstrip(".")
+            if not token:
+                continue
+            if token.startswith("--"):
+                continue
+            if "/" not in token and "." not in token:
+                continue
+            if token and token not in hints:
+                hints.append(token)
     return hints
 
 
 def narrow_candidate_files(candidate_files: list[str], *, goal: str) -> list[str]:
+    goal_lower = goal.lower()
+    goal_plain = goal_lower.replace("`", "")
+    exclusive_matches = []
+    for item in candidate_files:
+        name = PurePosixPath(item).name.lower()
+        stem = PurePosixPath(item).stem.lower()
+        match_tokens = {item.lower(), name, stem}
+        if any(
+            re.search(rf"(?<![a-z0-9_]){re.escape(token)}\s+only(?![a-z0-9_])", goal_plain)
+            or re.search(rf"(?<![a-z0-9_])only\s+{re.escape(token)}(?![a-z0-9_])", goal_plain)
+            for token in match_tokens
+            if len(token) >= 4
+        ):
+            exclusive_matches.append(item)
+    if exclusive_matches:
+        return exclusive_matches
+
     hints = candidate_path_hints_from_goal(goal)
     if not hints:
         return candidate_files
@@ -800,6 +959,51 @@ def compact_python_block(text: str, *, char_limit: int, focus_terms: list[str] |
     return header + "\n" + compacted_body
 
 
+def markdown_heading_hints_from_goal(goal: str) -> list[str]:
+    hints: list[str] = []
+    goal_lower = goal.lower()
+    for match in re.finditer(r"([A-Za-z][A-Za-z0-9 /&_-]{2,}?)\s+section", goal, flags=re.IGNORECASE):
+        hint = re.sub(r"\s+", " ", match.group(1).strip().lower())
+        if hint and hint not in hints:
+            hints.append(hint)
+    if "build" in goal_lower and "validate" in goal_lower and "build and validate" not in hints:
+        hints.append("build and validate")
+    return hints
+
+
+def extract_markdown_section_excerpt(text: str, *, goal: str, char_limit: int) -> str | None:
+    lines = text.splitlines()
+    headings: list[tuple[int, int, str]] = []
+    for index, line in enumerate(lines):
+        match = re.match(r"^(#{1,6})\s+(.*\S)\s*$", line)
+        if match is None:
+            continue
+        headings.append((index, len(match.group(1)), match.group(2).strip()))
+    if not headings:
+        return None
+
+    hints = markdown_heading_hints_from_goal(goal)
+    if not hints:
+        return None
+
+    for hint in hints:
+        hint_terms = [term for term in re.split(r"[^a-z0-9]+", hint) if term]
+        for position, (start_index, level, heading_text) in enumerate(headings):
+            normalized_heading = heading_text.lower()
+            if hint not in normalized_heading and not all(term in normalized_heading for term in hint_terms):
+                continue
+            end_index = len(lines)
+            for next_index, next_level, _next_heading_text in headings[position + 1 :]:
+                if next_level <= level:
+                    end_index = next_index
+                    break
+            section_text = "\n".join(lines[start_index:end_index]).strip()
+            if not section_text:
+                continue
+            return compact_excerpt(section_text, char_limit=char_limit, focus_terms=hint_terms)
+    return None
+
+
 def build_target_selection_prompt(
     *,
     request: dict[str, Any],
@@ -851,9 +1055,78 @@ def build_edit_spec_prompt(
     request_lineage_goal = any(
         marker in goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
     )
-    extra_code_requirements: list[str] = []
+    build_router_noop_goal = target_file.endswith("build_router.py") and any(
+        marker in goal_lower
+        for marker in (
+            "no-op rebuild",
+            "git-stable",
+            "semantically unchanged",
+            "on-disk json or jsonl",
+            "editing generated files directly",
+        )
+    )
+    extra_requirements: list[str] = []
     if target_file.endswith(".py"):
         logic_focus_terms = focus_terms_from_goal(request["goal"], target_file=target_file)
+        if build_router_noop_goal:
+            extra_requirements.append(
+                "- for `build_router.py` no-op rebuild goals, change the existing `main()` write loop instead of the import block, comments, or docstrings"
+            )
+            extra_requirements.append(
+                "- prefer changing the `for filename, payload in outputs.items():` write loop after the `if args.check` branch; do not return a proposal that only rewrites the verification branch"
+            )
+            extra_requirements.append(
+                "- the edit must add real write-loop logic such as reading existing file content, comparing parsed payloads, or skipping a write when semantic content already matches"
+            )
+            extra_requirements.append(
+                "- prefer one `exact_replace` that replaces the whole current write loop block from `for filename, payload in outputs.items():` through `print(f\"[ok] wrote ...\")`; do not use `anchored_replace` when that block is already unique"
+            )
+            extra_requirements.append(
+                "- preserve the existing on-disk JSON or JSONL text when parsing that file yields the same payload as the freshly built output"
+            )
+            extra_requirements.append(
+                "- do not edit generated files directly; keep the fix inside `scripts/build_router.py`"
+            )
+            extra_requirements.append(
+                "- do not change `--check` semantics or generated payload meaning; only avoid formatting-only rewrites on semantic no-op rebuilds"
+            )
+            extra_requirements.append(
+                "- do not add explanatory comments; return only executable write-loop logic"
+            )
+            main_block = extract_python_named_block(target_text, symbol="main")
+            if main_block is not None:
+                excerpt = compact_python_block(
+                    main_block,
+                    char_limit=min(excerpt_char_limit, 700),
+                    focus_terms=[
+                        "for filename, payload",
+                        "path.write_text",
+                        "render_output_text",
+                        "args.check",
+                        "generated_dir",
+                    ],
+                )
+            render_output_block = extract_python_named_block(target_text, symbol="render_output_text")
+            if render_output_block is not None:
+                related_excerpts.append(
+                    compact_python_block(
+                        render_output_block,
+                        char_limit=320,
+                        focus_terms=["jsonl", "json.dumps", "sort_keys"],
+                    )
+                )
+            validate_generated_block = extract_python_named_block(
+                target_text,
+                symbol="validate_generated_dir_matches_outputs",
+            )
+            if validate_generated_block is not None:
+                related_excerpts.append(
+                    compact_python_block(
+                        validate_generated_block,
+                        char_limit=420,
+                        focus_terms=["actual_payload", "payload", "mismatches", "stale generated output"],
+                    )
+                )
         if request_lineage_goal or "recommended_action" in goal_lower:
             logic_focus_terms = [
                 "blocked_runs",
@@ -864,46 +1137,46 @@ def build_edit_spec_prompt(
                 "request_path",
             ] + logic_focus_terms
         if request_lineage_goal:
-            extra_code_requirements.append(
+            extra_requirements.append(
                 "- for request-lineage or latest-operator-action goals, prefer changing `list_runs` aggregation first; only extend `build_run_record` when the same patch immediately consumes that new field inside `list_runs`"
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 "- each governed run state already records `request_path`; prefer a single localized change inside `list_runs` that reads the existing state field instead of adding a helper-only field elsewhere"
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 "- `operator_triage.latest_operator_action` is rendered through the existing `triage_summary[\"recommended_action\"]` path here; do not reference a separate `operator_triage` field or introduce a standalone `latest_operator_action` local"
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- preserve the current `triage_summary` dict shape; do not add a sibling `"latest_operator_action"` key here'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- prefer changing the upstream `blocked_runs` / `latest_blocked` lineage selection so the existing `"recommended_action": (` block reads the correct freshest lineage'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- do not change only the fallback string or return a no-op edit; materially change which run becomes `latest_blocked`'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- do not sort by the raw `request_path` string; derive a lineage key from the request filename and strip any `-retry<number>` suffix before comparing runs'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- keep the freshest run by `updated_at` within each request lineage first, then choose `latest_blocked` from those lineage representatives'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- when a fresher run in the same lineage is running or completed, derive `blocked_runs` from `freshest_runs_by_request_lineage(runs)` before `latest_blocked`; do not keep older blocked retries in the active blocked set'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- do not submit a no-op replacement of the existing `"recommended_action": (` block; change which runs flow into `blocked_runs` or `latest_blocked`, then let the current consumer read that fresher lineage'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- do not call `freshest_runs_by_request_lineage()` on `blocked_runs` or `latest_blocked` again; introduce a fresh lineage list from full `runs` first, then filter that fresher list for operator-action runs'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- prefer one compact `exact_replace` that swaps the current two-line `blocked_runs` / `latest_blocked` block for exactly three short lines: freshest lineage list, filtered blocked runs, then `latest_blocked = blocked_runs[:1]`'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- the first replacement line should be `freshest_runs = freshest_runs_by_request_lineage(runs)`; do not start by filtering operator-action runs into `lineage_candidates` or any other pre-filtered list'
             )
-            extra_code_requirements.append(
+            extra_requirements.append(
                 '- after that first line, filter `blocked_runs` from `freshest_runs`, then set `latest_blocked = blocked_runs[:1]`'
             )
             lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
@@ -924,12 +1197,13 @@ def build_edit_spec_prompt(
                         focus_terms=["representatives", "request_path", "updated_at", "return sorted"],
                     )
                 )
-        excerpt = extract_python_symbol_excerpt(
-            target_text,
-            goal=request["goal"],
-            char_limit=min(excerpt_char_limit, 650),
-            focus_terms=logic_focus_terms,
-        )
+        if excerpt is None:
+            excerpt = extract_python_symbol_excerpt(
+                target_text,
+                goal=request["goal"],
+                char_limit=min(excerpt_char_limit, 650),
+                focus_terms=logic_focus_terms,
+            )
         if any(marker in goal_lower for marker in ("request lineage", "request_path")) and "list_runs" not in goal_lower:
             build_run_record_block = extract_python_named_block(target_text, symbol="build_run_record")
             if build_run_record_block is not None:
@@ -940,6 +1214,16 @@ def build_edit_spec_prompt(
                         focus_terms=['"request_path"', 'return {', '"run_id"', '"updated_at"'],
                     )
                 )
+    elif target_file.endswith(".md"):
+        excerpt = extract_markdown_section_excerpt(
+            target_text,
+            goal=request["goal"],
+            char_limit=min(excerpt_char_limit, 900),
+        )
+        if markdown_heading_hints_from_goal(request["goal"]):
+            extra_requirements.append(
+                "- when the goal names a documentation section, edit inside that named section instead of changing unrelated earlier prose"
+            )
     if excerpt is None:
         excerpt = compact_excerpt(
             target_text,
@@ -956,8 +1240,48 @@ def build_edit_spec_prompt(
             "```"
         )
     extra_requirements_block = ""
-    if extra_code_requirements:
-        extra_requirements_block = "\n" + "\n".join(extra_code_requirements)
+    if extra_requirements:
+        extra_requirements_block = "\n" + "\n".join(extra_requirements)
+    if build_router_noop_goal:
+        failure_block_compact = failure_block if failure_block != "- none" else "none"
+        helper_excerpt_block = ""
+        if related_excerpts:
+            helper_excerpt_text = "\n\n---\n\n".join(related_excerpts)
+            helper_excerpt_block = (
+                "\n\nHelper excerpts:\n"
+                "```text\n"
+                f"{helper_excerpt_text}\n"
+                "```"
+            )
+        return textwrap.dedent(
+            f"""\
+            Governed execution bounded edit proposal.
+            Return JSON only. Work on exactly one existing file: `{target_file}`.
+
+            Allowed response shapes:
+            {{"mode":"exact_replace","target_file":"{target_file}","old_text":"...","new_text":"..."}}
+            {{"mode":"anchored_replace","target_file":"{target_file}","anchor_before":"...","old_text":"...","new_text":"...","anchor_after":"..."}}
+
+            Requirements:
+            - prefer one compact edit inside `main()`
+            - do not touch imports, comments, docstrings, or generated files
+            - preserve the existing on-disk JSON or JSONL text when parsing that file yields the same payload as the freshly built output
+            - keep `--check` behavior and generated payload meaning unchanged
+            - if the existing parsed payload differs, keep writing the freshly built canonical text
+            - no comment-only or placeholder changes
+
+            Goal:
+            {request["goal"]}
+
+            Recent failure context:
+            {failure_block_compact}
+
+            Current `main()` excerpt:
+            ```text
+            {excerpt}
+            ```{helper_excerpt_block}
+            """
+        ).rstrip() + "\n"
     return textwrap.dedent(
         f"""\
         Governed execution bounded edit proposal.
@@ -1095,6 +1419,208 @@ def coerce_text_like_field(value: Any, *, field_name: str) -> str:
     raise RuntimeError(f"proposal {field_name} must be a string")
 
 
+def is_build_router_noop_goal(
+    *,
+    target_id: str | None,
+    selected_target_file: str,
+    goal: str,
+) -> bool:
+    if target_id is not None and target_id != "aoa-routing":
+        return False
+    if not selected_target_file.endswith("build_router.py"):
+        return False
+    goal_lower = goal.lower()
+    return any(marker in goal_lower for marker in BUILD_ROUTER_NOOP_GOAL_MARKERS)
+
+
+def is_routing_roadmap_generated_surface_goal(
+    *,
+    target_id: str | None,
+    selected_target_file: str,
+    goal: str,
+) -> bool:
+    if target_id is not None and target_id != "aoa-routing":
+        return False
+    if selected_target_file != "ROADMAP.md":
+        return False
+    goal_lower = goal.lower()
+    return all(marker in goal_lower for marker in ROUTING_ROADMAP_GENERATED_SURFACE_GOAL_MARKERS)
+
+
+def normalize_block_shape(text: str) -> str:
+    return "\n".join(line.lstrip().rstrip() for line in text.strip().splitlines() if line.strip())
+
+
+def extract_build_router_write_loop_block(target_text: str) -> str | None:
+    lines = target_text.splitlines()
+    start_indexes = [
+        index for index, line in enumerate(lines) if line.lstrip() == BUILD_ROUTER_WRITE_LOOP_START
+    ]
+    if not start_indexes:
+        return None
+    end_indexes = [index for index, line in enumerate(lines) if line.lstrip() == BUILD_ROUTER_WRITE_LOOP_END]
+    if len(end_indexes) != 1:
+        return None
+    end_index = end_indexes[0]
+    candidate_starts = [index for index in start_indexes if index < end_index]
+    if not candidate_starts:
+        return None
+    start_index = candidate_starts[-1]
+    block = "\n".join(lines[start_index : end_index + 1])
+    if "path.write_text(" not in block:
+        return None
+    return block
+
+
+def strip_full_line_comments(text: str) -> str:
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+    return "\n".join(lines).strip("\n")
+
+
+def normalize_build_router_new_text(new_text: str, *, loop_block: str) -> str:
+    comment_stripped = strip_full_line_comments(new_text)
+    if not comment_stripped:
+        return comment_stripped
+    lines = comment_stripped.splitlines()
+    loop_lines = loop_block.splitlines()
+    first_line_indent = loop_lines[0][: len(loop_lines[0]) - len(loop_lines[0].lstrip())]
+    if lines and lines[0] and not lines[0].startswith((" ", "\t")) and first_line_indent:
+        lines[0] = first_line_indent + lines[0]
+    return "\n".join(lines)
+
+
+def normalize_build_router_noop_raw_spec(
+    spec: dict[str, Any],
+    *,
+    target_id: str,
+    selected_target_file: str,
+    goal: str,
+    target_text: str,
+) -> dict[str, Any]:
+    if not is_build_router_noop_goal(
+        target_id=target_id,
+        selected_target_file=selected_target_file,
+        goal=goal,
+    ):
+        return spec
+    if not isinstance(spec, dict):
+        return spec
+    if str(spec.get("target_file") or "") != selected_target_file:
+        return spec
+    loop_block = extract_build_router_write_loop_block(target_text)
+    if loop_block is None:
+        return spec
+    try:
+        old_text = coerce_text_like_field(spec.get("old_text"), field_name="old_text")
+        new_text = coerce_text_like_field(spec.get("new_text"), field_name="new_text")
+    except RuntimeError:
+        return spec
+    normalized_new_text = normalize_build_router_new_text(new_text, loop_block=loop_block)
+    mode = str(spec.get("mode") or "")
+    if mode == "anchored_replace":
+        anchor_before = spec.get("anchor_before")
+        if isinstance(anchor_before, str) and anchor_before.strip():
+            if (
+                normalize_block_shape(old_text) == normalize_block_shape(anchor_before)
+                == normalize_block_shape(loop_block)
+            ):
+                return {
+                    "mode": "exact_replace",
+                    "target_file": selected_target_file,
+                    "old_text": loop_block,
+                    "new_text": normalized_new_text,
+                }
+    if mode == "exact_replace" and normalize_block_shape(old_text) == normalize_block_shape(loop_block):
+        return {
+            "mode": "exact_replace",
+            "target_file": selected_target_file,
+            "old_text": loop_block,
+            "new_text": normalized_new_text,
+        }
+    normalized = dict(spec)
+    normalized["old_text"] = old_text
+    normalized["new_text"] = normalized_new_text
+    return normalized
+
+
+def synthesize_build_router_noop_spec(
+    *,
+    selected_target_file: str,
+    target_text: str,
+) -> dict[str, Any]:
+    loop_block = extract_build_router_write_loop_block(target_text)
+    if loop_block is None:
+        raise RuntimeError("could not locate the unique build_router write loop block")
+    loop_lines = loop_block.splitlines()
+    if len(loop_lines) < 4:
+        raise RuntimeError("build_router write loop block is unexpectedly short")
+    loop_indent = loop_lines[0][: len(loop_lines[0]) - len(loop_lines[0].lstrip())]
+    body_indent = loop_lines[1][: len(loop_lines[1]) - len(loop_lines[1].lstrip())]
+    nested_indent = body_indent + "    "
+    deeper_indent = nested_indent + "    "
+    new_text = "\n".join(
+        [
+            f"{loop_indent}for filename, payload in outputs.items():",
+            f"{body_indent}path = generated_dir / filename",
+            f"{body_indent}rendered_text = render_output_text(filename, payload)",
+            f"{body_indent}if path.exists():",
+            f"{nested_indent}try:",
+            f"{deeper_indent}actual_text = path.read_text(encoding=\"utf-8\")",
+            f"{deeper_indent}if filename.endswith(\".jsonl\"):",
+            f"{deeper_indent}    actual_payload = [",
+            f"{deeper_indent}        json.loads(line)",
+            f"{deeper_indent}        for line in actual_text.splitlines()",
+            f"{deeper_indent}        if line.strip()",
+            f"{deeper_indent}    ]",
+            f"{deeper_indent}else:",
+            f"{deeper_indent}    actual_payload = json.loads(actual_text)",
+            f"{deeper_indent}if actual_payload == payload:",
+            f"{deeper_indent}    continue",
+            f"{nested_indent}except json.JSONDecodeError:",
+            f"{deeper_indent}pass",
+            f"{body_indent}path.write_text(rendered_text, encoding=\"utf-8\", newline=\"\\n\")",
+            f"{body_indent}print(f\"[ok] wrote {{relative_posix(path)}}\")",
+        ]
+    )
+    spec = {
+        "mode": "exact_replace",
+        "target_file": selected_target_file,
+        "old_text": loop_block,
+        "new_text": new_text,
+    }
+    validate_build_router_noop_spec(spec)
+    validate_edit_spec_candidate(
+        target_text,
+        selected_target_file=selected_target_file,
+        spec=spec,
+    )
+    return spec
+
+
+def synthesize_routing_roadmap_generated_surface_spec(
+    *,
+    selected_target_file: str,
+    target_text: str,
+) -> dict[str, Any]:
+    old_text = "- schema-backed validation that orientation never points authority at route-owned generated surfaces"
+    new_text = (
+        old_text
+        + "\n- router-owned generated-surface refresh stays a parity-maintenance lane for routing-owned outputs and must not transfer source authority from sibling repos"
+    )
+    spec = {
+        "mode": "exact_replace",
+        "target_file": selected_target_file,
+        "old_text": old_text,
+        "new_text": new_text,
+    }
+    validate_edit_spec_candidate(
+        target_text,
+        selected_target_file=selected_target_file,
+        spec=spec,
+    )
+    return spec
+
+
 def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> dict[str, Any]:
     if not isinstance(spec, dict):
         raise RuntimeError("proposal spec must be an object")
@@ -1125,6 +1651,13 @@ def normalize_edit_spec(spec: dict[str, Any], *, selected_target_file: str) -> d
             payload["mode"] = "exact_replace"
             return payload
         old_text_stripped = old_text.strip()
+        markdown_like_target = selected_target_file.endswith(".md")
+        if markdown_like_target and old_text_stripped == anchor_before.strip() and new_text.startswith(old_text):
+            payload["mode"] = "exact_replace"
+            return payload
+        if markdown_like_target and old_text_stripped == anchor_after.strip() and new_text.endswith(old_text):
+            payload["mode"] = "exact_replace"
+            return payload
         if old_text_stripped == anchor_before.strip() or old_text_stripped == anchor_after.strip():
             raise RuntimeError("proposal old_text must not duplicate anchored context")
         payload["anchor_before"] = anchor_before
@@ -1188,6 +1721,30 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
     return candidate_text
 
 
+def validate_build_router_noop_spec(spec: dict[str, Any]) -> None:
+    old_text = str(spec.get("old_text") or "")
+    new_text = str(spec.get("new_text") or "")
+    combined = old_text + "\n" + new_text
+    if any(line.lstrip().startswith("#") for line in new_text.splitlines()):
+        raise RuntimeError("proposal must not add explanatory comments to the build_router write loop")
+    if "if args.check" in combined and BUILD_ROUTER_WRITE_LOOP_START not in combined:
+        raise RuntimeError("proposal must change the build_router write loop")
+    if BUILD_ROUTER_WRITE_LOOP_START not in combined or "path.write_text(" not in combined:
+        raise RuntimeError("proposal must change the build_router write loop")
+    if "path.exists()" not in new_text or "path.read_text(" not in new_text:
+        raise RuntimeError("proposal must read existing output only when the file already exists")
+    if 'filename.endswith(".jsonl")' not in new_text or "splitlines()" not in new_text or "json.loads(" not in new_text:
+        raise RuntimeError("proposal must parse both JSON and JSONL output payloads before comparing")
+    if not re.search(r"\b[A-Za-z_][A-Za-z0-9_]*_payload\s*==\s*payload\b", new_text):
+        raise RuntimeError("proposal must compare parsed on-disk payloads against the freshly built payload")
+    if "continue" not in new_text:
+        raise RuntimeError("proposal must skip the write only for semantic no-op payload matches")
+    if "json.JSONDecodeError" not in new_text:
+        raise RuntimeError("proposal must preserve canonical writes when existing output is invalid")
+    if "path.write_text(" not in new_text or "render_output_text(" not in new_text:
+        raise RuntimeError("proposal must preserve the canonical write path")
+
+
 def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     run_dir = context.get("run_dir")
     fixture_path = os.environ.get("AOA_GOVERNED_EXECUTION_PROPOSAL_PATH")
@@ -1196,10 +1753,29 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise RuntimeError("fixture proposal payload must be an object")
         selected_target_file = str(payload.get("selected_target_file") or payload.get("target_file") or "")
+        target_text = ""
+        if selected_target_file:
+            candidate_path = context["repo_root"] / selected_target_file
+            if candidate_path.exists():
+                target_text = candidate_path.read_text(encoding="utf-8")
+        raw_spec = payload.get("spec") or payload
+        raw_spec = normalize_build_router_noop_raw_spec(
+            raw_spec,
+            target_id=str(context["request"].get("target_id") or ""),
+            selected_target_file=selected_target_file,
+            goal=str(context["request"].get("goal") or ""),
+            target_text=target_text,
+        )
         spec = normalize_edit_spec(
-            payload.get("spec") or payload,
+            raw_spec,
             selected_target_file=selected_target_file,
         )
+        if is_build_router_noop_goal(
+            target_id=str(context["request"].get("target_id") or ""),
+            selected_target_file=selected_target_file,
+            goal=str(context["request"].get("goal") or ""),
+        ):
+            validate_build_router_noop_spec(spec)
         return {
             "provider": "fixture",
             "selected_target_file": selected_target_file,
@@ -1246,6 +1822,58 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             raise RuntimeError("target selection chose a file outside the governed allowlist")
 
     target_text = (context["repo_root"] / selected_target_file).read_text(encoding="utf-8")
+    build_router_noop_goal = is_build_router_noop_goal(
+        target_id=str(context["request"].get("target_id") or ""),
+        selected_target_file=selected_target_file,
+        goal=str(context["request"].get("goal") or ""),
+    )
+    routing_roadmap_generated_surface_goal = is_routing_roadmap_generated_surface_goal(
+        target_id=str(context["request"].get("target_id") or ""),
+        selected_target_file=selected_target_file,
+        goal=str(context["request"].get("goal") or ""),
+    )
+    if build_router_noop_goal:
+        spec = synthesize_build_router_noop_spec(
+            selected_target_file=selected_target_file,
+            target_text=target_text,
+        )
+        return {
+            "provider": "deterministic-build-router-noop",
+            "selected_target_file": selected_target_file,
+            "spec": spec,
+            "candidate_files": prompt_candidates,
+            "target_prompt": target_prompt,
+            "edit_prompt": "",
+            "target_answer": target_answer,
+            "edit_answer": json.dumps(spec, ensure_ascii=True),
+            "notes": [
+                "Target candidate count: "
+                + str(len(prompt_candidates))
+                + ".",
+                "Synthesized deterministic build_router no-op write-loop patch.",
+            ],
+        }
+    if routing_roadmap_generated_surface_goal:
+        spec = synthesize_routing_roadmap_generated_surface_spec(
+            selected_target_file=selected_target_file,
+            target_text=target_text,
+        )
+        return {
+            "provider": "deterministic-routing-roadmap-generated-surface",
+            "selected_target_file": selected_target_file,
+            "spec": spec,
+            "candidate_files": prompt_candidates,
+            "target_prompt": target_prompt,
+            "edit_prompt": "",
+            "target_answer": target_answer,
+            "edit_answer": json.dumps(spec, ensure_ascii=True),
+            "notes": [
+                "Target candidate count: "
+                + str(len(prompt_candidates))
+                + ".",
+                "Synthesized deterministic aoa-routing ROADMAP generated-surface boundary wording patch.",
+            ],
+        }
     edit_failure_context = list(context.get("failure_context") or [])
     edit_prompt = ""
     edit_answer = ""
@@ -1272,6 +1900,8 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
             marker in request_goal_lower for marker in ("latest_operator_action", "request lineage", "request_path")
         )
         edit_max_tokens = 180 if selected_target_file.endswith(".py") else 220
+        if build_router_noop_goal:
+            edit_max_tokens = 320
         if selected_target_file.endswith(".py") and request_lineage_goal:
             edit_max_tokens = 260
         edit_response = run_federated_prompt(edit_prompt, context["request"], max_tokens=edit_max_tokens)
@@ -1285,7 +1915,16 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         )
         try:
             parsed_spec = parse_json_answer_block(edit_answer)
+            parsed_spec = normalize_build_router_noop_raw_spec(
+                parsed_spec,
+                target_id=str(context["request"].get("target_id") or ""),
+                selected_target_file=selected_target_file,
+                goal=str(context["request"].get("goal") or ""),
+                target_text=target_text,
+            )
             spec = normalize_edit_spec(parsed_spec, selected_target_file=selected_target_file)
+            if build_router_noop_goal:
+                validate_build_router_noop_spec(spec)
             validate_edit_spec_candidate(
                 target_text,
                 selected_target_file=selected_target_file,
@@ -1629,11 +2268,11 @@ def advance_milestone(approval: dict[str, Any], *, milestone: str, status: str, 
     return approval
 
 
-def ensure_policy_repo_scope(playbook_policy: dict[str, Any], repo_root: Path) -> None:
-    if playbook_policy.get("repo_scope") != "abyss-stack":
-        raise RuntimeError("playbook policy repo_scope must stay abyss-stack")
-    if not is_abyss_stack_checkout(repo_root):
-        raise RuntimeError(f"repo_root is outside the first governed scope: {repo_root}")
+def ensure_policy_repo_scope(playbook_policy: dict[str, Any], repo_root: Path, *, target_id: str) -> None:
+    if str(playbook_policy.get("repo_scope") or "").strip() != target_id:
+        raise RuntimeError(f"playbook policy repo_scope must stay aligned with target_id={target_id}")
+    if not target_checkout_detector(target_id)(repo_root):
+        raise RuntimeError(f"repo_root is outside the governed target scope {target_id}: {repo_root}")
 
 
 def write_proposal_artifacts(
@@ -1974,27 +2613,54 @@ def prepare_run(
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     request, request_path = load_request(request_file)
-    canary_context = resolve_request_canary_context(request)
-    policy, resolved_policy_path = load_policy(policy_path)
-    advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
-    playbook_policy = advisory["policy"]
-    repo_root = normalize_repo_root(request["repo_root"])
-    ensure_policy_repo_scope(playbook_policy, repo_root)
-    task_class = str(request.get("task_class") or playbook_policy.get("task_class") or "unknown")
-    trust_state_snapshot = str(playbook_policy.get("trust_state") or "experimental")
+    request_path_text = str(request_path)
+    target_id = str(request.get("target_id") or "")
+    run_id = make_run_id()
+    run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        canary_context = resolve_request_canary_context(request)
+        policy, resolved_policy_path = load_policy(policy_path)
+        advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
+        playbook_policy = advisory["policy"]
+        repo_root = normalize_repo_root(request["repo_root"], target_id=target_id)
+        ensure_policy_repo_scope(playbook_policy, repo_root, target_id=target_id)
+        task_class = str(request.get("task_class") or playbook_policy.get("task_class") or "unknown")
+        trust_state_snapshot = str(playbook_policy.get("trust_state") or "experimental")
+    except Exception as exc:
+        state = {
+            "run_id": run_id,
+            "target_id": target_id or infer_target_id_from_repo_root(request.get("repo_root")),
+            "repo_root": str(request.get("repo_root") or ""),
+            "playbook_id": request.get("playbook_id"),
+            "task_class": request.get("task_class"),
+            "trust_state_snapshot": "experimental",
+            "canary_id": request.get("canary_id"),
+            "request_path": request_path_text,
+            "phase": "preflight",
+            "status": "fail",
+            "break_glass_used": False,
+        }
+        return failure_result(
+            run_dir,
+            state=state,
+            phase="preflight",
+            failure_class="policy_denied",
+            reasons=[f"{type(exc).__name__}: {exc}"],
+            next_action="Repair the request target, repo_root, or governed policy before preparing a new run.",
+        )
     try:
         TRIALS.ensure_repo_tracked_clean(repo_root)
     except RuntimeError as exc:
-        run_id = make_run_id()
-        run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
         state = {
             "run_id": run_id,
+            "target_id": target_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
             "task_class": task_class,
             "trust_state_snapshot": trust_state_snapshot,
             "canary_id": request.get("canary_id"),
+            "request_path": request_path_text,
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -2008,17 +2674,16 @@ def prepare_run(
             next_action="Restore a clean tracked repo state before preparing a governed run.",
         )
 
-    run_id = make_run_id()
-    run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
     if playbook_policy.get("enabled") is not True:
         state = {
             "run_id": run_id,
+            "target_id": target_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
             "task_class": task_class,
             "trust_state_snapshot": trust_state_snapshot,
             "canary_id": request.get("canary_id"),
+            "request_path": request_path_text,
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -2034,11 +2699,13 @@ def prepare_run(
     if playbook_policy.get("execution_kind") != "mutation":
         state = {
             "run_id": run_id,
+            "target_id": target_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
             "task_class": task_class,
             "trust_state_snapshot": trust_state_snapshot,
             "canary_id": request.get("canary_id"),
+            "request_path": request_path_text,
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -2061,8 +2728,10 @@ def prepare_run(
     if not gate_result["allowed"]:
         state = {
             "run_id": run_id,
+            "target_id": target_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
+            "request_path": request_path_text,
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -2082,6 +2751,7 @@ def prepare_run(
         "schema_version": "v1",
         "run_id": run_id,
         "request_path": str(request_path),
+        "target_id": target_id,
         "repo_root": str(repo_root),
         "playbook_id": advisory["playbook_id"],
         "task_class": task_class,
@@ -2106,6 +2776,8 @@ def prepare_run(
             "policy_path": str(resolved_policy_path),
             "policy_id": policy["policy_id"],
             "global_rules": policy["global_rules"],
+            "target_id": target_id,
+            "target_policy": advisory["target_policy"],
             "playbook_id": advisory["playbook_id"],
             "playbook_policy": playbook_policy,
             "task_class": task_class,
@@ -2118,6 +2790,7 @@ def prepare_run(
             "artifact_kind": "aoa.governed-run.preflight-summary",
             "schema_version": "v1",
             "captured_at": utc_now(),
+            "target_id": target_id,
             "repo_root": str(repo_root),
             "base_head": base_head,
             "playbook_id": advisory["playbook_id"],
@@ -2458,6 +3131,12 @@ def observed_trust_state(criteria_map: dict[str, Any], aggregate: dict[str, Any]
     return {"observed_trust_state": "experimental", "evidence_gate": canary}
 
 
+def filter_records_since_run_id(records: list[dict[str, Any]], since_run_id: str | None) -> list[dict[str, Any]]:
+    if not since_run_id:
+        return records
+    return [record for record in records if str(record.get("run_id") or "") >= since_run_id]
+
+
 def promotion_summary(records: list[dict[str, Any]], policy: dict[str, Any] | None) -> dict[str, Any]:
     if policy is None:
         return {
@@ -2465,27 +3144,41 @@ def promotion_summary(records: list[dict[str, Any]], policy: dict[str, Any] | No
             "reason": "policy_unavailable",
         }
     criteria_map = (policy.get("global_rules") or {}).get("promotion_criteria") or {}
-    playbook_summaries: dict[str, Any] = {}
-    for playbook_id, entry in (policy.get("playbooks") or {}).items():
-        matching = [record for record in records if record.get("playbook_id") == playbook_id]
-        aggregate = aggregate_run_records(matching)
-        observed = observed_trust_state(criteria_map, aggregate)
-        configured = str(entry.get("trust_state") or "experimental")
-        recommended_next_state = configured
-        if trust_rank(observed["observed_trust_state"]) > trust_rank(configured):
-            recommended_next_state = observed["observed_trust_state"]
-        playbook_summaries[playbook_id] = {
-            "configured_trust_state": configured,
-            "observed_trust_state": observed["observed_trust_state"],
-            "recommended_next_state": recommended_next_state,
-            "task_class": entry.get("task_class"),
-            "aggregate": aggregate,
-            "evidence_gate": observed["evidence_gate"],
-            "recommended_action": (
-                f"Promote {playbook_id} from {configured} to {recommended_next_state}."
-                if recommended_next_state != configured
-                else f"Keep {playbook_id} at {configured} until more governed evidence lands."
-            ),
+    target_summaries: dict[str, Any] = {}
+    for target_id, target_entry in (policy.get("targets") or {}).items():
+        playbook_summaries: dict[str, Any] = {}
+        for playbook_id, entry in (target_entry.get("playbooks") or {}).items():
+            matching = [
+                record
+                for record in records
+                if record.get("target_id") == target_id and record.get("playbook_id") == playbook_id
+            ]
+            evidence_since_run_id = str(entry.get("evidence_since_run_id") or "").strip() or None
+            matching = filter_records_since_run_id(matching, evidence_since_run_id)
+            aggregate = aggregate_run_records(matching)
+            observed = observed_trust_state(criteria_map, aggregate)
+            configured = str(entry.get("trust_state") or "experimental")
+            recommended_next_state = configured
+            if trust_rank(observed["observed_trust_state"]) > trust_rank(configured):
+                recommended_next_state = observed["observed_trust_state"]
+            playbook_summaries[playbook_id] = {
+                "configured_trust_state": configured,
+                "observed_trust_state": observed["observed_trust_state"],
+                "recommended_next_state": recommended_next_state,
+                "task_class": entry.get("task_class"),
+                "evidence_since_run_id": evidence_since_run_id,
+                "aggregate": aggregate,
+                "evidence_gate": observed["evidence_gate"],
+                "recommended_action": (
+                    f"Promote {playbook_id}@{target_id} from {configured} to {recommended_next_state}."
+                    if recommended_next_state != configured
+                    else f"Keep {playbook_id}@{target_id} at {configured} until more governed evidence lands."
+                ),
+            }
+        target_summaries[target_id] = {
+            "repo_scope": target_entry.get("repo_scope"),
+            "default_repo_root": target_entry.get("default_repo_root"),
+            "playbooks": playbook_summaries,
         }
     gate_criteria = (policy.get("global_rules") or {}).get("repo_scope_expansion_gate") or {}
     global_aggregate = aggregate_run_records(records)
@@ -2493,7 +3186,7 @@ def promotion_summary(records: list[dict[str, Any]], policy: dict[str, Any] | No
     return {
         "available": True,
         "criteria": criteria_map,
-        "playbooks": playbook_summaries,
+        "targets": target_summaries,
         "repo_scope_expansion_gate": {
             "met": gate["met"],
             "aggregate": global_aggregate,
@@ -2512,10 +3205,12 @@ def build_run_record(run_dir: Path) -> dict[str, Any]:
     approval = load_approval(run_dir) if approval_artifact(run_dir).exists() else None
     summary = load_summary_or_synthesize(run_dir, state, approval)
     triage = summary.get("triage") or compute_triage(state, summary, approval)
+    target_id = state.get("target_id") or infer_target_id_from_repo_root(state.get("repo_root"))
     return {
         "run_id": state.get("run_id") or run_dir.name,
         "phase": state.get("phase"),
         "status": summary.get("status") or state.get("status"),
+        "target_id": target_id,
         "playbook_id": state.get("playbook_id"),
         "task_class": state.get("task_class"),
         "trust_state_snapshot": state.get("trust_state_snapshot"),
@@ -2558,13 +3253,16 @@ def render_run_index_explain(payload: dict[str, Any]) -> str:
                 f"- recommended_action: `{gate.get('recommended_action')}`",
             ]
         )
-    playbooks = (payload.get("promotion_summary") or {}).get("playbooks") or {}
-    if playbooks:
-        lines.extend(["", "## Playbooks", ""])
-        for playbook_id, item in sorted(playbooks.items()):
-            lines.append(
-                f"- {playbook_id}: configured=`{item.get('configured_trust_state')}` observed=`{item.get('observed_trust_state')}` recommended=`{item.get('recommended_next_state')}`"
-            )
+    targets = (payload.get("promotion_summary") or {}).get("targets") or {}
+    if targets:
+        lines.extend(["", "## Targets", ""])
+        for target_id, target_payload in sorted(targets.items()):
+            lines.append(f"- {target_id}:")
+            playbooks = target_payload.get("playbooks") or {}
+            for playbook_id, item in sorted(playbooks.items()):
+                lines.append(
+                    f"  {playbook_id}: configured=`{item.get('configured_trust_state')}` observed=`{item.get('observed_trust_state')}` recommended=`{item.get('recommended_next_state')}`"
+                )
     return "\n".join(lines)
 
 
@@ -2577,6 +3275,7 @@ def render_status_explain(payload: dict[str, Any]) -> str:
         "",
         f"- status: `{summary.get('status')}`",
         f"- phase: `{state.get('phase')}`",
+        f"- target_id: `{state.get('target_id')}`",
         f"- playbook_id: `{state.get('playbook_id')}`",
         f"- task_class: `{state.get('task_class')}`",
         f"- trust_state_snapshot: `{state.get('trust_state_snapshot')}`",
@@ -2600,11 +3299,19 @@ def request_lineage_key(request_path: Any) -> str:
     return REQUEST_RETRY_SUFFIX_RE.sub("", Path(path_text).name)
 
 
+def request_lineage_group_key(run: dict[str, Any]) -> str:
+    target_id = str(run.get("target_id") or infer_target_id_from_repo_root(run.get("repo_root")) or "")
+    lineage = request_lineage_key(run.get("request_path"))
+    if not lineage:
+        return ""
+    return f"{target_id}:{lineage}" if target_id else lineage
+
+
 def freshest_runs_by_request_lineage(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     representatives: dict[str, dict[str, Any]] = {}
     ungrouped: list[dict[str, Any]] = []
     for run in runs:
-        lineage = request_lineage_key(run.get("request_path"))
+        lineage = request_lineage_group_key(run)
         if not lineage:
             ungrouped.append(run)
             continue

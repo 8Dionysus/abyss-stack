@@ -6,12 +6,18 @@
   "additionalProperties": false,
   "required": [
     "goal",
+    "target_id",
     "profile_class",
     "repo_root"
   ],
   "properties": {
     "goal": {
       "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
       "minLength": 1
     },
     "playbook_id": {
@@ -94,6 +100,7 @@
         "policy_surface",
         "validation_tightening",
         "governed_lane",
+        "generated_surface",
         null
       ]
     }

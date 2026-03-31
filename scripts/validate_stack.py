@@ -609,21 +609,73 @@ def validate_paths(errors: list[str]) -> None:
         global_rules = governed_policy.get("global_rules")
         if not isinstance(global_rules, dict) or global_rules.get("gate_mode") != "fail_closed":
             errors.append("governed execution policy must set global_rules.gate_mode=fail_closed")
+        if not isinstance(global_rules, dict) or not isinstance(global_rules.get("default_target_id"), str):
+            errors.append("governed execution policy must declare global_rules.default_target_id")
         promotion_criteria = global_rules.get("promotion_criteria")
         if not isinstance(promotion_criteria, dict) or "canary_proven" not in promotion_criteria or "trusted" not in promotion_criteria:
             errors.append("governed execution policy must define promotion_criteria.canary_proven and promotion_criteria.trusted")
         repo_scope_gate = global_rules.get("repo_scope_expansion_gate")
         if not isinstance(repo_scope_gate, dict):
             errors.append("governed execution policy must define repo_scope_expansion_gate")
-        playbooks = governed_policy.get("playbooks")
-        if not isinstance(playbooks, dict) or "AOA-P-0011" not in playbooks:
-            errors.append("governed execution policy must include an AOA-P-0011 playbook entry")
+        targets = governed_policy.get("targets")
+        if not isinstance(targets, dict) or "abyss-stack" not in targets or "aoa-routing" not in targets:
+            errors.append("governed execution policy must declare explicit abyss-stack and aoa-routing targets")
         else:
-            playbook = playbooks.get("AOA-P-0011") or {}
-            if playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
-                errors.append("AOA-P-0011 governed policy entry must declare a valid trust_state")
-            if not isinstance(playbook.get("task_class"), str):
-                errors.append("AOA-P-0011 governed policy entry must declare task_class")
+            abyss_stack_target = targets.get("abyss-stack") or {}
+            routing_target = targets.get("aoa-routing") or {}
+            abyss_stack_playbooks = abyss_stack_target.get("playbooks") or {}
+            routing_playbooks = routing_target.get("playbooks") or {}
+            abyss_stack_playbook = abyss_stack_playbooks.get("AOA-P-0011") or {}
+            routing_playbook = routing_playbooks.get("AOA-P-0011") or {}
+            if abyss_stack_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
+                errors.append("abyss-stack AOA-P-0011 governed policy entry must declare a valid trust_state")
+            if routing_playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
+                errors.append("aoa-routing AOA-P-0011 governed policy entry must declare a valid trust_state")
+            if not isinstance(abyss_stack_playbook.get("task_class"), str):
+                errors.append("abyss-stack AOA-P-0011 governed policy entry must declare task_class")
+            if not isinstance(routing_playbook.get("task_class"), str):
+                errors.append("aoa-routing AOA-P-0011 governed policy entry must declare task_class")
+            if routing_playbook.get("evidence_since_run_id") is not None and not isinstance(
+                routing_playbook.get("evidence_since_run_id"), str
+            ):
+                errors.append("aoa-routing AOA-P-0011 governed policy evidence_since_run_id must be a string when set")
+            routing_acceptance = routing_playbook.get("acceptance_commands")
+            if not isinstance(routing_acceptance, list) or len(routing_acceptance) < 2:
+                errors.append("aoa-routing AOA-P-0011 governed policy entry must declare explicit acceptance commands")
+            else:
+                required_root_flags = (
+                    "--techniques-root /srv/aoa-techniques",
+                    "--skills-root /srv/aoa-skills",
+                    "--evals-root /srv/aoa-evals",
+                    "--memo-root /srv/aoa-memo",
+                    "--agents-root /srv/aoa-agents",
+                    "--aoa-root /srv/Agents-of-Abyss",
+                    "--playbooks-root /srv/aoa-playbooks",
+                    "--kag-root /srv/aoa-kag",
+                    "--tos-root /srv/Tree-of-Sophia",
+                )
+                for required_command in (
+                    "python scripts/validate_router.py",
+                    "python scripts/build_router.py --check",
+                ):
+                    command = next(
+                        (
+                            item
+                            for item in routing_acceptance
+                            if isinstance(item, str) and item.startswith(required_command)
+                        ),
+                        None,
+                    )
+                    if command is None:
+                        errors.append(
+                            f"aoa-routing AOA-P-0011 governed policy entry must include {required_command}"
+                        )
+                        continue
+                    for flag in required_root_flags:
+                        if flag not in command:
+                            errors.append(
+                                f"aoa-routing AOA-P-0011 governed policy {required_command} must pin {flag}"
+                            )
 
     try:
         canary_catalog = load_structured_object(
@@ -634,11 +686,13 @@ def validate_paths(errors: list[str]) -> None:
     else:
         if canary_catalog.get("surface_type") != "runtime_governed_execution_canary_catalog":
             errors.append("governed canary catalog must declare surface_type=runtime_governed_execution_canary_catalog")
-        if canary_catalog.get("repo_scope") != "abyss-stack":
-            errors.append("governed canary catalog must keep repo_scope=abyss-stack")
         canaries = canary_catalog.get("canaries")
         if not isinstance(canaries, list) or not canaries:
             errors.append("governed canary catalog must contain at least one canary entry")
+        else:
+            target_ids = {item.get("target_id") for item in canaries if isinstance(item, dict)}
+            if "abyss-stack" not in target_ids or "aoa-routing" not in target_ids:
+                errors.append("governed canary catalog must include abyss-stack and aoa-routing canaries")
 
 
 def validate_scripts(errors: list[str]) -> None:

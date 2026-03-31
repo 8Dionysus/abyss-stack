@@ -10,7 +10,7 @@
     "policy_id",
     "enabled",
     "global_rules",
-    "playbooks",
+    "targets",
     "boundaries"
   ],
   "properties": {
@@ -40,13 +40,13 @@
       "required": [
         "gate_mode",
         "canonical_gate_command",
+        "default_target_id",
         "require_clean_repo",
         "require_stable_base_head",
         "approval_milestones",
         "max_worktree_repairs",
         "auto_rollback_on_post_apply_failure",
         "break_glass_requires_reason",
-        "repo_scope",
         "log_root",
         "promotion_criteria",
         "repo_scope_expansion_gate"
@@ -60,6 +60,11 @@
         },
         "canonical_gate_command": {
           "type": "string",
+          "minLength": 1
+        },
+        "default_target_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
           "minLength": 1
         },
         "require_clean_repo": {
@@ -95,10 +100,6 @@
           "type": "boolean",
           "const": true
         },
-        "repo_scope": {
-          "type": "string",
-          "const": "abyss-stack"
-        },
         "log_root": {
           "type": "string",
           "minLength": 1
@@ -124,73 +125,37 @@
         }
       }
     },
-    "playbooks": {
+    "targets": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "enabled",
-          "execution_kind",
           "repo_scope",
-          "allowed_files",
-          "acceptance_commands",
-          "break_glass_allowed",
-          "repair_allowed",
-          "trust_state",
-          "task_class"
+          "default_repo_root",
+          "playbooks"
         ],
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "execution_kind": {
-            "type": "string",
-            "enum": [
-              "mutation"
-            ]
-          },
           "repo_scope": {
             "type": "string",
-            "const": "abyss-stack"
+            "pattern": "^[a-z0-9-]+$",
+            "minLength": 1
           },
-          "allowed_files": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "acceptance_commands": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "break_glass_allowed": {
-            "type": "boolean"
-          },
-          "repair_allowed": {
-            "type": "boolean"
-          },
-          "trust_state": {
+          "description": {
             "type": "string",
-            "enum": [
-              "experimental",
-              "canary_proven",
-              "trusted"
-            ]
+            "minLength": 1
           },
-          "task_class": {
+          "default_repo_root": {
             "type": "string",
-            "enum": [
-              "docs_only",
-              "policy_surface",
-              "validation_tightening",
-              "governed_lane"
-            ]
+            "minLength": 1
+          },
+          "playbooks": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "$ref": "#/$defs/playbookPolicy"
+            }
           }
         }
       }
@@ -203,7 +168,7 @@
         "does_not_define_playbook_meaning",
         "does_not_replace_route_api_advisory_surfaces",
         "does_not_replace_langchain_api_federated_advisory_run",
-        "first_mutation_scope_is_abyss_stack_only"
+        "external_targets_require_explicit_policy"
       ],
       "properties": {
         "owns_runtime_permissions_only": {
@@ -222,7 +187,7 @@
           "type": "boolean",
           "const": true
         },
-        "first_mutation_scope_is_abyss_stack_only": {
+        "external_targets_require_explicit_policy": {
           "type": "boolean",
           "const": true
         }
@@ -265,6 +230,79 @@
         "maximum_post_change_validation_failures": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "playbookPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "execution_kind",
+        "repo_scope",
+        "allowed_files",
+        "acceptance_commands",
+        "break_glass_allowed",
+        "repair_allowed",
+        "trust_state",
+        "task_class"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "execution_kind": {
+          "type": "string",
+          "enum": [
+            "mutation"
+          ]
+        },
+        "repo_scope": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1
+        },
+        "allowed_files": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "acceptance_commands": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "break_glass_allowed": {
+          "type": "boolean"
+        },
+        "repair_allowed": {
+          "type": "boolean"
+        },
+        "trust_state": {
+          "type": "string",
+          "enum": [
+            "experimental",
+            "canary_proven",
+            "trusted"
+          ]
+        },
+        "task_class": {
+          "type": "string",
+          "enum": [
+            "docs_only",
+            "policy_surface",
+            "validation_tightening",
+            "governed_lane",
+            "generated_surface"
+          ]
+        },
+        "evidence_since_run_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

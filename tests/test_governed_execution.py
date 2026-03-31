@@ -2,6 +2,7 @@ import importlib.util
 import json
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -39,9 +40,212 @@ def init_minimal_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
 
 
-def governed_request(repo_root: Path) -> dict:
+def init_minimal_routing_repo(root: Path) -> None:
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "generated").mkdir(parents=True, exist_ok=True)
+    (root / "README.md").write_text("# aoa-routing\n", encoding="utf-8")
+    (root / "CONTRIBUTING.md").write_text("contrib\n", encoding="utf-8")
+    (root / "ROADMAP.md").write_text("roadmap\n", encoding="utf-8")
+    (root / "docs" / "FEDERATION_ENTRY_ABI.md").write_text("thin router only\n", encoding="utf-8")
+    (root / "docs" / "target.md").write_text("alpha\nbeta\n", encoding="utf-8")
+    router_payload = {
+        "router_id": "two-stage",
+        "entries": [
+            {"id": "alpha", "path": "docs/target.md"},
+            {"id": "beta", "path": "docs/FEDERATION_ENTRY_ABI.md"},
+        ],
+    }
+    skill_entrypoints_payload = [
+        {"id": "alpha", "entry": "docs/target.md"},
+        {"id": "beta", "entry": "docs/FEDERATION_ENTRY_ABI.md"},
+    ]
+    router_events_payload = [
+        {"event": "router-built", "count": 2},
+        {"event": "entrypoints", "count": 2},
+    ]
+    (root / "generated" / "aoa_router.min.json").write_text("{\"ok\": true}\n", encoding="utf-8")
+    (root / "generated" / "two_stage_router.min.json").write_text(
+        json.dumps(router_payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (root / "generated" / "two_stage_skill_entrypoints.json").write_text(
+        json.dumps(skill_entrypoints_payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (root / "generated" / "two_stage_router_events.jsonl").write_text(
+        "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in router_events_payload),
+        encoding="utf-8",
+    )
+    (root / "scripts" / "build_router.py").write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env python3
+            from __future__ import annotations
+
+            import argparse
+            import json
+            from pathlib import Path
+            from typing import Any
+
+            REPO_ROOT = Path(__file__).resolve().parents[1]
+            GENERATED_DIR = REPO_ROOT / "generated"
+
+
+            def parse_args() -> argparse.Namespace:
+                parser = argparse.ArgumentParser(description="Build minimal routing generated surfaces.")
+                parser.add_argument("--check", action="store_true", help="Verify semantic parity only.")
+                return parser.parse_args()
+
+
+            def build_outputs() -> dict[str, Any]:
+                return {
+                    "two_stage_router.min.json": {
+                        "router_id": "two-stage",
+                        "entries": [
+                            {"id": "alpha", "path": "docs/target.md"},
+                            {"id": "beta", "path": "docs/FEDERATION_ENTRY_ABI.md"},
+                        ],
+                    },
+                    "two_stage_skill_entrypoints.json": [
+                        {"id": "alpha", "entry": "docs/target.md"},
+                        {"id": "beta", "entry": "docs/FEDERATION_ENTRY_ABI.md"},
+                    ],
+                    "two_stage_router_events.jsonl": [
+                        {"event": "router-built", "count": 2},
+                        {"event": "entrypoints", "count": 2},
+                    ],
+                }
+
+
+            def render_output_text(filename: str, payload: Any) -> str:
+                if filename.endswith(".jsonl"):
+                    return "".join(
+                        json.dumps(item, ensure_ascii=False, separators=(",", ":"), sort_keys=False) + "\\n"
+                        for item in payload
+                    )
+                return json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    indent=None,
+                    separators=(",", ":"),
+                    sort_keys=False,
+                ) + "\\n"
+
+
+            def relative_posix(path: Path) -> str:
+                return path.relative_to(REPO_ROOT).as_posix()
+
+
+            def validate_generated_dir_matches_outputs(outputs: dict[str, Any]) -> list[str]:
+                mismatches: list[str] = []
+                for filename, payload in outputs.items():
+                    path = GENERATED_DIR / filename
+                    if not path.exists():
+                        mismatches.append(relative_posix(path))
+                        continue
+                    actual_text = path.read_text(encoding="utf-8")
+                    try:
+                        if filename.endswith(".jsonl"):
+                            actual_payload = [
+                                json.loads(line)
+                                for line in actual_text.splitlines()
+                                if line.strip()
+                            ]
+                        else:
+                            actual_payload = json.loads(actual_text)
+                    except json.JSONDecodeError:
+                        mismatches.append(relative_posix(path))
+                        continue
+                    if actual_payload != payload:
+                        mismatches.append(relative_posix(path))
+                return mismatches
+
+
+            def main() -> int:
+                args = parse_args()
+                GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+                outputs = build_outputs()
+                if args.check:
+                    mismatches = validate_generated_dir_matches_outputs(outputs)
+                    if mismatches:
+                        raise SystemExit("; ".join(mismatches))
+                    return 0
+                for filename, payload in outputs.items():
+                    path = GENERATED_DIR / filename
+                    path.write_text(render_output_text(filename, payload), encoding="utf-8", newline="\\n")
+                    print(f"[ok] wrote {relative_posix(path)}")
+                return 0
+
+
+            if __name__ == "__main__":
+                raise SystemExit(main())
+            """
+        ),
+        encoding="utf-8",
+    )
+    (root / "scripts" / "validate_router.py").write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env python3
+            from __future__ import annotations
+
+            import subprocess
+            import sys
+            from pathlib import Path
+
+            REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+            def main() -> int:
+                subprocess.run(
+                    [sys.executable, str(REPO_ROOT / "scripts" / "build_router.py"), "--check"],
+                    cwd=REPO_ROOT,
+                    check=True,
+                )
+                print("ok")
+                return 0
+
+
+            if __name__ == "__main__":
+                raise SystemExit(main())
+            """
+        ),
+        encoding="utf-8",
+    )
+    (root / "tests" / "test_build_router.py").write_text(
+        textwrap.dedent(
+            """\
+            from __future__ import annotations
+
+            import subprocess
+            import sys
+            from pathlib import Path
+
+
+            def test_build_router_check_passes() -> None:
+                repo_root = Path(__file__).resolve().parents[1]
+                subprocess.run(
+                    [sys.executable, str(repo_root / "scripts" / "build_router.py"), "--check"],
+                    cwd=repo_root,
+                    check=True,
+                )
+            """
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True, text=True)
+
+
+def governed_request(repo_root: Path, *, target_id: str = "abyss-stack") -> dict:
     return {
         "goal": "Change beta to gamma in the target doc.",
+        "target_id": target_id,
         "playbook_id": "AOA-P-0011",
         "profile_class": "workhorse",
         "repo_root": str(repo_root),
@@ -60,13 +264,13 @@ def test_policy(enabled_break_glass: bool = False) -> dict:
         "global_rules": {
             "gate_mode": "fail_closed",
             "canonical_gate_command": "aoa-status --autonomy --json",
+            "default_target_id": "abyss-stack",
             "require_clean_repo": True,
             "require_stable_base_head": True,
             "approval_milestones": ["plan_freeze", "landing"],
             "max_worktree_repairs": 1,
             "auto_rollback_on_post_apply_failure": True,
             "break_glass_requires_reason": True,
-            "repo_scope": "abyss-stack",
             "log_root": "local:/tmp/governed-runs",
             "promotion_criteria": {
                 "canary_proven": {
@@ -95,40 +299,77 @@ def test_policy(enabled_break_glass: bool = False) -> dict:
                 "maximum_post_change_validation_failures": 0,
             },
         },
-        "playbooks": {
-            "AOA-P-0011": {
-                "enabled": True,
-                "execution_kind": "mutation",
+        "targets": {
+            "abyss-stack": {
                 "repo_scope": "abyss-stack",
-                "trust_state": "experimental",
-                "task_class": "docs_only",
-                "allowed_files": ["docs/target.md"],
-                "acceptance_commands": [
-                    "python -c \"from pathlib import Path; text = Path('docs/target.md').read_text(encoding='utf-8'); assert 'gamma' in text\""
-                ],
-                "break_glass_allowed": enabled_break_glass,
-                "repair_allowed": True,
+                "default_repo_root": "/tmp/abyss-stack",
+                "playbooks": {
+                    "AOA-P-0011": {
+                        "enabled": True,
+                        "execution_kind": "mutation",
+                        "repo_scope": "abyss-stack",
+                        "trust_state": "experimental",
+                        "task_class": "docs_only",
+                        "allowed_files": ["docs/target.md"],
+                        "acceptance_commands": [
+                            "python -c \"from pathlib import Path; text = Path('docs/target.md').read_text(encoding='utf-8'); assert 'gamma' in text\""
+                        ],
+                        "break_glass_allowed": enabled_break_glass,
+                        "repair_allowed": True
+                    },
+                    "AOA-P-0018": {
+                        "enabled": True,
+                        "execution_kind": "mutation",
+                        "repo_scope": "abyss-stack",
+                        "trust_state": "experimental",
+                        "task_class": "governed_lane",
+                        "allowed_files": ["docs/target.md", "scripts/validate_stack.py"],
+                        "acceptance_commands": [
+                            "python -c \"from pathlib import Path; Path('docs/target.md').read_text(encoding='utf-8')\""
+                        ],
+                        "break_glass_allowed": enabled_break_glass,
+                        "repair_allowed": True
+                    }
+                }
             },
-            "AOA-P-0018": {
-                "enabled": True,
-                "execution_kind": "mutation",
-                "repo_scope": "abyss-stack",
-                "trust_state": "experimental",
-                "task_class": "governed_lane",
-                "allowed_files": ["docs/target.md", "scripts/validate_stack.py"],
-                "acceptance_commands": [
-                    "python -c \"from pathlib import Path; Path('docs/target.md').read_text(encoding='utf-8')\""
-                ],
-                "break_glass_allowed": enabled_break_glass,
-                "repair_allowed": True,
-            },
+            "aoa-routing": {
+                "repo_scope": "aoa-routing",
+                "default_repo_root": "/tmp/aoa-routing",
+                "playbooks": {
+                    "AOA-P-0011": {
+                        "enabled": True,
+                        "execution_kind": "mutation",
+                        "repo_scope": "aoa-routing",
+                        "trust_state": "experimental",
+                        "task_class": "docs_only",
+                        "allowed_files": [
+                            "README.md",
+                            "ROADMAP.md",
+                            "docs/*.md",
+                            "docs/**/*.md",
+                            "generated/*.json",
+                            "generated/*.jsonl",
+                            "scripts/build_router.py",
+                            "scripts/validate_router.py",
+                            "tests/test_build_router.py",
+                        ],
+                        "acceptance_commands": [
+                            "python scripts/validate_router.py",
+                            "python scripts/build_router.py --check",
+                            "pytest"
+                        ],
+                        "break_glass_allowed": False,
+                        "repair_allowed": True
+                    }
+                }
+            }
         },
         "boundaries": {
             "owns_runtime_permissions_only": True,
             "does_not_define_playbook_meaning": True,
             "does_not_replace_route_api_advisory_surfaces": True,
             "does_not_replace_langchain_api_federated_advisory_run": True,
-            "first_mutation_scope_is_abyss_stack_only": True,
+            "external_targets_require_explicit_policy": True,
         },
     }
 
@@ -139,14 +380,41 @@ def test_canary_catalog() -> dict:
         "schema_version": "v1",
         "catalog_id": "test-governed-canaries",
         "description": "test canaries",
-        "repo_scope": "abyss-stack",
         "canaries": [
             {
                 "canary_id": "docs-truth-wording-alignment",
+                "target_id": "abyss-stack",
                 "title": "Docs truth wording alignment",
                 "goal": "Tighten docs wording inside abyss-stack.",
                 "playbook_id": "AOA-P-0011",
                 "task_class": "docs_only",
+                "profile_class": "workhorse",
+                "memo": None,
+            },
+            {
+                "canary_id": "routing-boundary-wording-alignment",
+                "target_id": "aoa-routing",
+                "title": "Routing boundary wording alignment",
+                "goal": "Tighten docs wording inside aoa-routing.",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "profile_class": "workhorse",
+                "memo": None,
+            },
+            {
+                "canary_id": "routing-generated-surface-refresh",
+                "target_id": "aoa-routing",
+                "title": "Routing generated surface refresh",
+                "goal": (
+                    "Update only `scripts/build_router.py` so its main write loop preserves the existing "
+                    "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
+                    "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
+                    "semantically unchanged `generated/two_stage_*` and "
+                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router meaning "
+                    "or editing generated files directly."
+                ),
+                "playbook_id": "AOA-P-0011",
+                "task_class": "generated_surface",
                 "profile_class": "workhorse",
                 "memo": None,
             }
@@ -165,9 +433,14 @@ class GovernedExecutionTests(unittest.TestCase):
         self.root = Path(self.temp_dir.name)
         self.repo_root = self.root / "repo"
         init_minimal_repo(self.repo_root)
+        self.routing_repo_root = self.root / "aoa-routing"
+        init_minimal_routing_repo(self.routing_repo_root)
         self.logs_root = self.root / "logs"
         self.policy_path = self.root / "policy.yaml"
-        write_json(self.policy_path, test_policy())
+        policy = test_policy()
+        policy["targets"]["abyss-stack"]["default_repo_root"] = str(self.repo_root)
+        policy["targets"]["aoa-routing"]["default_repo_root"] = str(self.routing_repo_root)
+        write_json(self.policy_path, policy)
         self.canary_catalog_path = self.root / "canaries.json"
         write_json(self.canary_catalog_path, test_canary_catalog())
         self.request_path = self.root / "request.json"
@@ -424,6 +697,59 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("\"request_path\"", prompt)
         self.assertNotIn("summary = load_summary_or_synthesize", prompt)
 
+    def test_build_edit_spec_prompt_focuses_build_router_noop_goal_on_main_loop(self) -> None:
+        target_text = (
+            "from build_two_stage_skill_router import build_outputs as build_two_stage_outputs\n"
+            + ("padding\n" * 180)
+            + "def render_output_text(filename: str, payload: Any) -> str:\n"
+            + "    if filename.endswith('.jsonl'):\n"
+            + "        return dump_jsonl(payload)\n"
+            + "    return json.dumps(payload, ensure_ascii=False, indent=None, separators=(',', ':'), sort_keys=False) + '\\n'\n"
+            + ("middle\n" * 120)
+            + "def validate_generated_dir_matches_outputs(outputs: dict[str, Any], *, generated_dir: Path) -> list[str]:\n"
+            + "    mismatches = []\n"
+            + "    actual_payload = json.loads('{}')\n"
+            + "    if actual_payload != payload:\n"
+            + "        mismatches.append('stale generated output')\n"
+            + "    return mismatches\n"
+            + ("middle\n" * 120)
+            + "def main() -> int:\n"
+            + "    args = parse_args()\n"
+            + "    outputs = build_outputs(...)\n"
+            + "    if args.check:\n"
+            + "        mismatches = validate_generated_dir_matches_outputs(outputs, generated_dir=generated_dir)\n"
+            + "        return 0\n"
+            + "    for filename, payload in outputs.items():\n"
+            + "        path = generated_dir / filename\n"
+            + "        path.write_text(render_output_text(filename, payload), encoding='utf-8', newline='\\n')\n"
+            + "    return 0\n"
+        )
+        prompt = self.module.build_edit_spec_prompt(
+            request={
+                "goal": (
+                    "Update only `scripts/build_router.py` so its main write loop preserves the "
+                    "existing on-disk JSON or JSONL text when the parsed file payload already "
+                    "equals the freshly built payload. This must stop no-op `python scripts/build_router.py` "
+                    "from dirtying semantically unchanged `generated/two_stage_*` and "
+                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router "
+                    "meaning or editing generated files directly."
+                )
+            },
+            playbook_id="AOA-P-0011",
+            target_file="scripts/build_router.py",
+            target_text=target_text,
+            failure_context=[],
+        )
+        self.assertIn("def main()", prompt)
+        self.assertIn("preserve the existing on-disk JSON or JSONL text", prompt)
+        self.assertIn("do not touch imports, comments, docstrings, or generated files", prompt)
+        self.assertIn("keep `--check` behavior and generated payload meaning unchanged", prompt)
+        self.assertIn("Helper excerpts", prompt)
+        self.assertIn("def validate_generated_dir_matches_outputs", prompt)
+        self.assertIn("def render_output_text", prompt)
+        self.assertNotIn("from build_two_stage_skill_router", prompt)
+        self.assertLess(len(prompt), 3200)
+
     def test_persist_proposal_attempt_artifacts_writes_error_artifact(self) -> None:
         run_dir = self.root / "run"
         self.module.persist_proposal_attempt_artifacts(
@@ -533,6 +859,65 @@ class GovernedExecutionTests(unittest.TestCase):
                 selected_target_file="docs/target.md",
             )
 
+    def test_normalize_build_router_noop_raw_spec_demotes_duplicate_anchor_to_exact_replace(self) -> None:
+        target_text = (self.routing_repo_root / "scripts" / "build_router.py").read_text(encoding="utf-8")
+        write_loop = self.module.extract_build_router_write_loop_block(target_text)
+        assert write_loop is not None
+        normalized = self.module.normalize_build_router_noop_raw_spec(
+            {
+                "mode": "anchored_replace",
+                "target_file": "scripts/build_router.py",
+                "anchor_before": self.module.normalize_block_shape(write_loop),
+                "anchor_after": "return 0",
+                "old_text": self.module.normalize_block_shape(write_loop),
+                "new_text": (
+                    "for filename, payload in outputs.items():\n"
+                    "    path = GENERATED_DIR / filename\n"
+                    "    # preserve semantically unchanged payloads\n"
+                    "    rendered_text = render_output_text(filename, payload)\n"
+                    "    if path.exists():\n"
+                    "        try:\n"
+                    "            actual_text = path.read_text(encoding=\"utf-8\")\n"
+                    "            if filename.endswith(\".jsonl\"):\n"
+                    "                actual_payload = [json.loads(line) for line in actual_text.splitlines() if line.strip()]\n"
+                    "            else:\n"
+                    "                actual_payload = json.loads(actual_text)\n"
+                    "            if actual_payload == payload:\n"
+                    "                continue\n"
+                    "        except json.JSONDecodeError:\n"
+                    "            pass\n"
+                    "    path.write_text(rendered_text, encoding=\"utf-8\", newline=\"\\n\")\n"
+                    "    print(f\"[ok] wrote {relative_posix(path)}\")"
+                ),
+            },
+            target_id="aoa-routing",
+            selected_target_file="scripts/build_router.py",
+            goal=(
+                "Update only `scripts/build_router.py` so its main write loop preserves the existing "
+                "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
+                "built payload."
+            ),
+            target_text=target_text,
+        )
+        self.assertEqual(normalized["mode"], "exact_replace")
+        self.assertEqual(normalized["old_text"], write_loop)
+        self.assertNotIn("# preserve semantically unchanged payloads", normalized["new_text"])
+        self.assertTrue(normalized["new_text"].startswith("    for filename, payload in outputs.items():"))
+
+    def test_synthesize_build_router_noop_spec_returns_exact_replace(self) -> None:
+        target_text = (self.routing_repo_root / "scripts" / "build_router.py").read_text(encoding="utf-8")
+        spec = self.module.synthesize_build_router_noop_spec(
+            selected_target_file="scripts/build_router.py",
+            target_text=target_text,
+        )
+        self.assertEqual(spec["mode"], "exact_replace")
+        self.assertEqual(spec["target_file"], "scripts/build_router.py")
+        self.assertIn("path.exists()", spec["new_text"])
+        self.assertIn('filename.endswith(".jsonl")', spec["new_text"])
+        self.assertIn("json.loads(", spec["new_text"])
+        self.assertIn("if actual_payload == payload:", spec["new_text"])
+        self.assertIn("continue", spec["new_text"])
+
     def test_normalize_edit_spec_rejects_partial_python_statement(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "partial Python statement"):
             self.module.normalize_edit_spec(
@@ -582,6 +967,110 @@ class GovernedExecutionTests(unittest.TestCase):
                     "old_text": "blocked_runs = []",
                     "new_text": "blocked_runs = []\nlineage_map: dict[str, str] = {}",
                 },
+            )
+
+    def test_validate_build_router_noop_spec_rejects_check_only_comment_change(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "build_router write loop"):
+            self.module.validate_build_router_noop_spec(
+                {
+                    "mode": "anchored_replace",
+                    "target_file": "scripts/build_router.py",
+                    "old_text": (
+                        "if args.check:\n"
+                        "    mismatches = validate_generated_dir_matches_outputs(outputs, generated_dir=generated_dir)\n"
+                        "    if mismatches:\n"
+                        "        raise RouterError('; '.join(mismatches))\n"
+                    ),
+                    "new_text": (
+                        "if args.check:\n"
+                        "    mismatches = validate_generated_dir_matches_outputs(outputs, generated_dir=generated_dir)\n"
+                        "    if mismatches:\n"
+                        "        raise RouterError('; '.join(mismatches))\n"
+                        "    # Skip write if semantically identical\n"
+                    ),
+                }
+            )
+
+    def test_validate_build_router_noop_spec_allows_real_write_loop_logic(self) -> None:
+        self.module.validate_build_router_noop_spec(
+            {
+                "mode": "exact_replace",
+                "target_file": "scripts/build_router.py",
+                "old_text": (
+                    "for filename, payload in outputs.items():\n"
+                    "    path = generated_dir / filename\n"
+                    "    path.write_text(render_output_text(filename, payload), encoding='utf-8', newline='\\n')\n"
+                ),
+                "new_text": (
+                    "for filename, payload in outputs.items():\n"
+                    "    path = generated_dir / filename\n"
+                    "    rendered_text = render_output_text(filename, payload)\n"
+                    "    if path.exists():\n"
+                    "        try:\n"
+                    "            actual_text = path.read_text(encoding='utf-8')\n"
+                    "            if filename.endswith(\".jsonl\"):\n"
+                    "                actual_payload = [json.loads(line) for line in actual_text.splitlines() if line.strip()]\n"
+                    "            else:\n"
+                    "                actual_payload = json.loads(actual_text)\n"
+                    "            if actual_payload == payload:\n"
+                    "                continue\n"
+                    "        except json.JSONDecodeError:\n"
+                    "            pass\n"
+                    "    path.write_text(rendered_text, encoding='utf-8', newline='\\n')\n"
+                ),
+            }
+        )
+
+    def test_validate_build_router_noop_spec_rejects_raw_text_only_comparison(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "parsed on-disk payloads"):
+            self.module.validate_build_router_noop_spec(
+                {
+                    "mode": "exact_replace",
+                    "target_file": "scripts/build_router.py",
+                    "old_text": (
+                        "for filename, payload in outputs.items():\n"
+                        "    path = generated_dir / filename\n"
+                        "    path.write_text(render_output_text(filename, payload), encoding='utf-8', newline='\\n')\n"
+                    ),
+                    "new_text": (
+                        "for filename, payload in outputs.items():\n"
+                        "    path = generated_dir / filename\n"
+                        "    rendered_text = render_output_text(filename, payload)\n"
+                        "    if path.exists():\n"
+                        "        try:\n"
+                        "            actual_text = path.read_text(encoding='utf-8')\n"
+                        "            if filename.endswith(\".jsonl\"):\n"
+                        "                actual_payload = [json.loads(line) for line in actual_text.splitlines() if line.strip()]\n"
+                        "            else:\n"
+                        "                actual_payload = json.loads(actual_text)\n"
+                        "            if actual_text == rendered_text:\n"
+                        "                continue\n"
+                        "        except json.JSONDecodeError:\n"
+                        "            pass\n"
+                        "    path.write_text(rendered_text, encoding='utf-8', newline='\\n')\n"
+                    ),
+                }
+            )
+
+    def test_validate_build_router_noop_spec_rejects_explanatory_comments(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "must not add explanatory comments"):
+            self.module.validate_build_router_noop_spec(
+                {
+                    "mode": "exact_replace",
+                    "target_file": "scripts/build_router.py",
+                    "old_text": (
+                        "for filename, payload in outputs.items():\n"
+                        "    path = generated_dir / filename\n"
+                        "    path.write_text(render_output_text(filename, payload), encoding='utf-8', newline='\\n')\n"
+                    ),
+                    "new_text": (
+                        "for filename, payload in outputs.items():\n"
+                        "    path = generated_dir / filename\n"
+                        "    # Only write when the payload really changed\n"
+                        "    rendered_text = render_output_text(filename, payload)\n"
+                        "    path.write_text(rendered_text, encoding='utf-8', newline='\\n')\n"
+                    ),
+                }
             )
 
     def test_validate_edit_spec_candidate_allows_reassignment_that_is_still_used(self) -> None:
@@ -713,9 +1202,95 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(mocked.call_count, 1)
         self.assertIn("Target candidate count: 1.", proposal["notes"])
 
+    def test_default_proposal_provider_uses_deterministic_build_router_noop_patch(self) -> None:
+        context = {
+            "request": {
+                "goal": (
+                    "Update only `scripts/build_router.py` so its main write loop preserves the existing "
+                    "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
+                    "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
+                    "semantically unchanged `generated/two_stage_*` and "
+                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router meaning "
+                    "or editing generated files directly."
+                ),
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "profile_class": "workhorse",
+            },
+            "playbook_id": "AOA-P-0011",
+            "allowed_files": [
+                "README.md",
+                "generated/*.json",
+                "generated/*.jsonl",
+                "scripts/build_router.py",
+                "scripts/validate_router.py",
+                "tests/test_build_router.py",
+            ],
+            "advisory_context": {"playbook": {"title": "bounded-change-safe", "summary": "test"}},
+            "repo_root": self.routing_repo_root,
+            "failure_context": [],
+        }
+        with patch.object(self.module, "run_federated_prompt") as mocked:
+            proposal = self.module.default_proposal_provider(context)
+        self.assertEqual(proposal["provider"], "deterministic-build-router-noop")
+        self.assertEqual(proposal["selected_target_file"], "scripts/build_router.py")
+        self.assertEqual(proposal["spec"]["mode"], "exact_replace")
+        self.assertEqual(mocked.call_count, 0)
+        self.assertIn("Synthesized deterministic build_router no-op write-loop patch.", proposal["notes"])
+
+    def test_default_proposal_provider_uses_deterministic_routing_roadmap_patch(self) -> None:
+        (self.routing_repo_root / "ROADMAP.md").write_text(
+            textwrap.dedent(
+                """\
+                ## Milestone 7
+
+                - schema-backed validation that orientation never points authority at route-owned generated surfaces
+                - a narrow handoff
+                """
+            ),
+            encoding="utf-8",
+        )
+        context = {
+            "request": {
+                "goal": (
+                    "Update aoa-routing ROADMAP only so the generated-surface refresh lane is described as "
+                    "router-owned parity maintenance that keeps thin-router boundaries intact and does not "
+                    "transfer authority from sibling source repos."
+                ),
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "profile_class": "workhorse",
+            },
+            "playbook_id": "AOA-P-0011",
+            "allowed_files": [
+                "README.md",
+                "ROADMAP.md",
+                "docs/*.md",
+                "docs/**/*.md",
+                "generated/*.json",
+                "generated/*.jsonl",
+                "scripts/build_router.py",
+                "scripts/validate_router.py",
+                "tests/test_build_router.py",
+            ],
+            "advisory_context": {"playbook": {"title": "bounded-change-safe", "summary": "test"}},
+            "repo_root": self.routing_repo_root,
+            "failure_context": [],
+        }
+        with patch.object(self.module, "run_federated_prompt") as mocked:
+            proposal = self.module.default_proposal_provider(context)
+        self.assertEqual(proposal["provider"], "deterministic-routing-roadmap-generated-surface")
+        self.assertEqual(proposal["selected_target_file"], "ROADMAP.md")
+        self.assertEqual(proposal["spec"]["mode"], "exact_replace")
+        self.assertEqual(mocked.call_count, 0)
+        self.assertIn(
+            "Synthesized deterministic aoa-routing ROADMAP generated-surface boundary wording patch.",
+            proposal["notes"],
+        )
+
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
-        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")
+        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011", "abyss-stack")
         self.assertTrue(entry["enabled"])
         self.assertEqual(entry["allowed_files"], ["docs/target.md"])
         self.assertEqual(entry["trust_state"], "experimental")
@@ -727,21 +1302,30 @@ class GovernedExecutionTests(unittest.TestCase):
             repo_root=self.repo_root,
         )
         self.assertEqual(payload["playbook_id"], "AOA-P-0011")
+        self.assertEqual(payload["target_id"], "abyss-stack")
         self.assertEqual(payload["task_class"], "docs_only")
         self.assertEqual(payload["canary_id"], "docs-truth-wording-alignment")
 
         materialized = self.module.materialize_canary_requests(
             self.root / "materialized-canaries",
             catalog_path=self.canary_catalog_path,
-            repo_root=self.repo_root,
         )
-        self.assertEqual(materialized["request_count"], 1)
+        self.assertEqual(materialized["request_count"], 3)
         request_file = Path(materialized["requests"][0]["request_file"])
         self.assertTrue(request_file.exists())
+        self.assertEqual(materialized["requests"][0]["target_id"], "abyss-stack")
+
+    def test_request_from_canary_rejects_wrong_repo_override_for_target(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "repo_root does not match governed target aoa-routing"):
+            self.module.request_from_canary(
+                "routing-boundary-wording-alignment",
+                catalog_path=self.canary_catalog_path,
+                repo_root=self.repo_root,
+            )
 
     def test_fail_closed_gate_mapping(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
-        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")
+        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011", "abyss-stack")
         blocked = self.module.evaluate_autonomy_gate(
             self.gate_payload(overall_status="degraded"),
             playbook_policy=entry,
@@ -754,7 +1338,7 @@ class GovernedExecutionTests(unittest.TestCase):
     def test_break_glass_requires_policy_allowance_and_reason(self) -> None:
         write_json(self.policy_path, test_policy(enabled_break_glass=True))
         policy, _ = self.module.load_policy(self.policy_path)
-        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")
+        entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011", "abyss-stack")
 
         missing_reason = self.module.evaluate_autonomy_gate(
             self.gate_payload(overall_status="degraded"),
@@ -775,8 +1359,253 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertTrue(allowed["break_glass_used"])
 
     def test_repo_scope_and_allowed_files_enforcement(self) -> None:
+        self.assertTrue(self.module.path_allowed("README.md", ["README.md"]))
         self.assertTrue(self.module.path_allowed("docs/target.md", ["docs/target.md"]))
+        self.assertTrue(self.module.path_allowed("generated/aoa_router.min.json", ["generated/*.json"]))
         self.assertFalse(self.module.path_allowed("scripts/validate_stack.py", ["docs/target.md"]))
+        self.assertFalse(self.module.path_allowed("tests/fixtures/Agents-of-Abyss/README.md", ["README.md"]))
+        self.assertFalse(
+            self.module.path_allowed(
+                "tests/fixtures/aoa-skills/generated/skill_catalog.min.json",
+                ["generated/*.json"],
+            )
+        )
+
+    def test_candidate_path_hints_from_goal_extracts_paths_from_backtick_commands(self) -> None:
+        hints = self.module.candidate_path_hints_from_goal(
+            "Document `python scripts/build_router.py --check` in README only without widening scope."
+        )
+        self.assertEqual(hints, ["scripts/build_router.py"])
+
+    def test_narrow_candidate_files_prefers_exclusive_readme_goal(self) -> None:
+        narrowed = self.module.narrow_candidate_files(
+            ["README.md", "scripts/build_router.py", "docs/FEDERATION_ENTRY_ABI.md"],
+            goal="Update README only so the Build and validate section documents `python scripts/build_router.py --check`.",
+        )
+        self.assertEqual(narrowed, ["README.md"])
+
+    def test_narrow_candidate_files_prefers_explicit_only_path_before_generated_mentions(self) -> None:
+        narrowed = self.module.narrow_candidate_files(
+            ["generated/two_stage_skill_entrypoints.json", "scripts/build_router.py"],
+            goal=(
+                "Update only `scripts/build_router.py` so its main write loop preserves the existing "
+                "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
+                "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
+                "semantically unchanged `generated/two_stage_*` and `generated/two_stage_skill_entrypoints.json`."
+            ),
+        )
+        self.assertEqual(narrowed, ["scripts/build_router.py"])
+
+    def test_extract_markdown_section_excerpt_prefers_named_section(self) -> None:
+        readme_text = (
+            "# aoa-routing\n\n"
+            "Intro.\n\n"
+            "## Build and validate\n\n"
+            "Run `python scripts/build_router.py`.\n\n"
+            "## Other section\n\n"
+            "Leave this alone.\n"
+        )
+        excerpt = self.module.extract_markdown_section_excerpt(
+            readme_text,
+            goal="Update README only so the Build and validate section documents `python scripts/build_router.py --check`.",
+            char_limit=400,
+        )
+        self.assertIsNotNone(excerpt)
+        self.assertIn("## Build and validate", excerpt)
+        self.assertIn("python scripts/build_router.py", excerpt)
+        self.assertNotIn("## Other section", excerpt)
+
+    def test_normalize_edit_spec_demotes_markdown_insertion_anchor_to_exact_replace(self) -> None:
+        normalized = self.module.normalize_edit_spec(
+            {
+                "mode": "anchored_replace",
+                "target_file": "README.md",
+                "anchor_before": "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```",
+                "anchor_after": "The optional wave-9 seam can also be exercised directly:",
+                "old_text": "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```",
+                "new_text": (
+                    "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```\n\n"
+                    "Check canonical parity:\n\n```bash\npython scripts/build_router.py --check\n```"
+                ),
+            },
+            selected_target_file="README.md",
+        )
+        self.assertEqual(normalized["mode"], "exact_replace")
+        self.assertEqual(normalized["target_file"], "README.md")
+
+    def test_enumerate_allowed_candidates_respects_root_anchored_patterns(self) -> None:
+        fixture_readme = self.routing_repo_root / "tests" / "fixtures" / "nested" / "README.md"
+        fixture_generated = (
+            self.routing_repo_root / "tests" / "fixtures" / "nested" / "generated" / "router.min.json"
+        )
+        fixture_generated.parent.mkdir(parents=True, exist_ok=True)
+        fixture_readme.write_text("fixture\n", encoding="utf-8")
+        fixture_generated.write_text("{\"fixture\": true}\n", encoding="utf-8")
+
+        candidates = self.module.enumerate_allowed_candidates(
+            self.routing_repo_root,
+            ["README.md", "generated/*.json"],
+        )
+        self.assertIn("README.md", candidates)
+        self.assertIn("generated/aoa_router.min.json", candidates)
+        self.assertNotIn("tests/fixtures/nested/README.md", candidates)
+        self.assertNotIn("tests/fixtures/nested/generated/router.min.json", candidates)
+
+    def test_prepare_run_fails_closed_on_wrong_target_root_pairing(self) -> None:
+        request_path = self.root / "routing-mismatch.request.json"
+        write_json(request_path, governed_request(self.repo_root, target_id="aoa-routing"))
+        result = self.module.prepare_run(
+            request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            gate_provider=lambda: self.gate_payload(),
+            advisory_provider=self.advisory_provider,
+            proposal_provider=self.proposal_provider,
+        )
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["failure_class"], "policy_denied")
+        self.assertIn("repo_root does not match governed target aoa-routing", " ".join(result["reasons"]))
+
+    def test_external_target_run_succeeds_against_routing_checkout(self) -> None:
+        request_path = self.root / "routing.request.json"
+        write_json(request_path, governed_request(self.routing_repo_root, target_id="aoa-routing"))
+        result = self.module.prepare_run(
+            request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            gate_provider=lambda: self.gate_payload(),
+            advisory_provider=self.advisory_provider,
+            proposal_provider=self.proposal_provider,
+        )
+        self.assertEqual(result["status"], "paused")
+        self.assertEqual(result["current_milestone"], "plan_freeze")
+        run_dir = self.logs_root / result["run_id"]
+        state = json.loads((run_dir / "run.state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["target_id"], "aoa-routing")
+        self.assertEqual(state["repo_root"], str(self.routing_repo_root))
+
+    def test_external_generated_surface_run_keeps_semantically_unchanged_outputs_git_stable(self) -> None:
+        request_path = self.root / "routing-generated.request.json"
+        write_json(
+            request_path,
+            {
+                "goal": (
+                    "Update only `scripts/build_router.py` so its main write loop preserves the existing "
+                    "on-disk JSON or JSONL text when the parsed file payload already equals the freshly "
+                    "built payload. This must stop no-op `python scripts/build_router.py` from dirtying "
+                    "semantically unchanged `generated/two_stage_*` and "
+                    "`generated/two_stage_skill_entrypoints.json`, without changing thin-router meaning "
+                    "or editing generated files directly."
+                ),
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "generated_surface",
+                "profile_class": "workhorse",
+                "repo_root": str(self.routing_repo_root),
+                "memo": None,
+                "break_glass_reason": None,
+            },
+        )
+        build_router_path = self.routing_repo_root / "scripts" / "build_router.py"
+        build_router_text = build_router_path.read_text(encoding="utf-8")
+        write_loop = self.module.extract_build_router_write_loop_block(build_router_text)
+        assert write_loop is not None
+
+        def generated_surface_provider(context: dict) -> dict:
+            spec = {
+                "mode": "exact_replace",
+                "target_file": "scripts/build_router.py",
+                "old_text": write_loop,
+                "new_text": (
+                    "    for filename, payload in outputs.items():\n"
+                    "        path = GENERATED_DIR / filename\n"
+                    "        rendered_text = render_output_text(filename, payload)\n"
+                    "        if path.exists():\n"
+                    "            try:\n"
+                    "                actual_text = path.read_text(encoding=\"utf-8\")\n"
+                    "                if filename.endswith(\".jsonl\"):\n"
+                    "                    actual_payload = [\n"
+                    "                        json.loads(line)\n"
+                    "                        for line in actual_text.splitlines()\n"
+                    "                        if line.strip()\n"
+                    "                    ]\n"
+                    "                else:\n"
+                    "                    actual_payload = json.loads(actual_text)\n"
+                    "                if actual_payload == payload:\n"
+                    "                    continue\n"
+                    "            except json.JSONDecodeError:\n"
+                    "                pass\n"
+                    "        path.write_text(rendered_text, encoding=\"utf-8\", newline=\"\\n\")\n"
+                    "        print(f\"[ok] wrote {relative_posix(path)}\")"
+                ),
+            }
+            return {
+                "provider": "fixture",
+                "selected_target_file": "scripts/build_router.py",
+                "spec": spec,
+                "candidate_files": ["scripts/build_router.py"],
+                "target_prompt": "",
+                "edit_prompt": "",
+                "target_answer": "{\"target_file\":\"scripts/build_router.py\"}",
+                "edit_answer": json.dumps(spec, ensure_ascii=True),
+                "notes": [],
+            }
+
+        first = self.module.prepare_run(
+            request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            gate_provider=lambda: self.gate_payload(),
+            advisory_provider=self.advisory_provider,
+            proposal_provider=generated_surface_provider,
+        )
+        self.assertEqual(first["status"], "paused")
+        self.assertEqual(first["current_milestone"], "plan_freeze")
+        run_id = first["run_id"]
+        run_dir = self.logs_root / run_id
+        approval_path = run_dir / "approval.status.json"
+        approval = json.loads(approval_path.read_text(encoding="utf-8"))
+        approval["current_milestone"] = "plan_freeze"
+        approval["status"] = "approved"
+        approval["approved"] = True
+        approval["milestones"]["plan_freeze"]["status"] = "approved"
+        approval["milestones"]["plan_freeze"]["approved"] = True
+        write_json(approval_path, approval)
+
+        second = self.module.resume_run(
+            run_id,
+            log_root=self.logs_root,
+            advisory_provider=self.advisory_provider,
+            proposal_provider=generated_surface_provider,
+        )
+        self.assertEqual(second["status"], "paused")
+        self.assertEqual(second["current_milestone"], "landing")
+
+        approval = json.loads(approval_path.read_text(encoding="utf-8"))
+        approval["current_milestone"] = "landing"
+        approval["status"] = "approved"
+        approval["approved"] = True
+        approval["milestones"]["landing"]["status"] = "approved"
+        approval["milestones"]["landing"]["approved"] = True
+        write_json(approval_path, approval)
+
+        third = self.module.resume_run(run_id, log_root=self.logs_root)
+        self.assertEqual(third["status"], "pass")
+        subprocess.run(
+            ["python", "scripts/build_router.py"],
+            cwd=self.routing_repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        generated_diff = subprocess.run(
+            ["git", "diff", "--name-only", "--", "generated"],
+            cwd=self.routing_repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(generated_diff.stdout.strip(), "")
 
     def test_green_run_reaches_landing_and_finishes_cleanly(self) -> None:
         first = self.module.prepare_run(
@@ -1063,13 +1892,21 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("beta", (self.repo_root / "docs" / "target.md").read_text(encoding="utf-8"))
 
     def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
-        def write_run(run_id: str, *, playbook_id: str, task_class: str, status: str) -> None:
+        def write_run(
+            run_id: str,
+            *,
+            target_id: str,
+            playbook_id: str,
+            task_class: str,
+            status: str,
+        ) -> None:
             run_dir = self.logs_root / run_id
             run_dir.mkdir(parents=True, exist_ok=True)
             write_json(
                 run_dir / "run.state.json",
                 {
                     "run_id": run_id,
+                    "target_id": target_id,
                     "repo_root": str(self.repo_root),
                     "playbook_id": playbook_id,
                     "task_class": task_class,
@@ -1108,17 +1945,25 @@ class GovernedExecutionTests(unittest.TestCase):
                 },
             )
 
-        write_run("r1", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
-        write_run("r2", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
-        write_run("r3", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
-        write_run("r4", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
-        write_run("r5", playbook_id="AOA-P-0018", task_class="validation_tightening", status="pass")
+        write_run("r1", target_id="abyss-stack", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
+        write_run("r2", target_id="abyss-stack", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
+        write_run("r3", target_id="abyss-stack", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
+        write_run("r4", target_id="abyss-stack", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
+        write_run(
+            "r5",
+            target_id="abyss-stack",
+            playbook_id="AOA-P-0018",
+            task_class="validation_tightening",
+            status="pass",
+        )
 
         index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
         self.assertEqual(index_payload["run_count"], 5)
         self.assertTrue(index_payload["promotion_summary"]["repo_scope_expansion_gate"]["met"])
         self.assertEqual(
-            index_payload["promotion_summary"]["playbooks"]["AOA-P-0011"]["observed_trust_state"],
+            index_payload["promotion_summary"]["targets"]["abyss-stack"]["playbooks"]["AOA-P-0011"][
+                "observed_trust_state"
+            ],
             "canary_proven",
         )
 
@@ -1304,3 +2149,44 @@ class GovernedExecutionTests(unittest.TestCase):
         index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
         self.assertEqual(index_payload["operator_triage"]["blocked_run_count"], 0)
         self.assertEqual(index_payload["operator_triage"]["blocked_run_ids"], [])
+
+    def test_promotion_summary_respects_evidence_since_run_id(self) -> None:
+        policy = test_policy()
+        policy["targets"]["aoa-routing"]["playbooks"]["AOA-P-0011"]["evidence_since_run_id"] = "r-pass-1"
+
+        records = [
+            {
+                "run_id": "r-fail-old",
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "generated_surface",
+                "status": "fail",
+                "failure_class": "post_change_validation_failure",
+                "break_glass_used": False,
+            },
+            {
+                "run_id": "r-pass-1",
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "generated_surface",
+                "status": "pass",
+                "failure_class": None,
+                "break_glass_used": False,
+            },
+            {
+                "run_id": "r-pass-2",
+                "target_id": "aoa-routing",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "status": "pass",
+                "failure_class": None,
+                "break_glass_used": False,
+            },
+        ]
+
+        summary = self.module.promotion_summary(records, policy)
+        routing_playbook = summary["targets"]["aoa-routing"]["playbooks"]["AOA-P-0011"]
+        self.assertEqual(routing_playbook["evidence_since_run_id"], "r-pass-1")
+        self.assertEqual(routing_playbook["aggregate"]["pass_count"], 2)
+        self.assertEqual(routing_playbook["aggregate"]["post_change_validation_failure_count"], 0)
+        self.assertEqual(routing_playbook["observed_trust_state"], "canary_proven")

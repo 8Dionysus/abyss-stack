@@ -1,12 +1,12 @@
 {
   "surface_type": "runtime_governed_execution_canary_catalog",
   "schema_version": "v1",
-  "catalog_id": "abyss-stack-governed-canaries-v1",
-  "description": "Public-safe canary request catalog for real-task governed execution inside abyss-stack.",
-  "repo_scope": "abyss-stack",
+  "catalog_id": "governed-canaries-v2",
+  "description": "Public-safe canary request catalog for bounded governed execution across abyss-stack and the first explicit external target.",
   "canaries": [
     {
       "canary_id": "docs-truth-wording-alignment",
+      "target_id": "abyss-stack",
       "title": "Docs truth wording alignment",
       "goal": "Tighten truth-surface wording in abyss-stack docs without widening scope or changing runtime semantics.",
       "playbook_id": "AOA-P-0011",
@@ -16,6 +16,7 @@
     },
     {
       "canary_id": "policy-surface-clarity-refresh",
+      "target_id": "abyss-stack",
       "title": "Policy surface clarity refresh",
       "goal": "Refine governed execution policy wording or catalog wording while keeping runtime permissions explicit and bounded.",
       "playbook_id": "AOA-P-0011",
@@ -25,6 +26,7 @@
     },
     {
       "canary_id": "validator-tightening-check",
+      "target_id": "abyss-stack",
       "title": "Validator tightening check",
       "goal": "Make a bounded validator or schema tightening change for governed execution without widening the runtime scope.",
       "playbook_id": "AOA-P-0018",
@@ -34,10 +36,31 @@
     },
     {
       "canary_id": "governed-triage-improvement",
+      "target_id": "abyss-stack",
       "title": "Governed triage improvement",
       "goal": "Improve governed execution status and operator triage surfaces while preserving fail-closed behavior.",
       "playbook_id": "AOA-P-0018",
       "task_class": "governed_lane",
+      "profile_class": "workhorse",
+      "memo": null
+    },
+    {
+      "canary_id": "routing-boundary-wording-alignment",
+      "target_id": "aoa-routing",
+      "title": "Routing boundary wording alignment",
+      "goal": "Clarify aoa-routing thin-router boundary wording without widening routing authority or changing owned meaning.",
+      "playbook_id": "AOA-P-0011",
+      "task_class": "docs_only",
+      "profile_class": "workhorse",
+      "memo": null
+    },
+    {
+      "canary_id": "routing-generated-surface-refresh",
+      "target_id": "aoa-routing",
+      "title": "Routing generated surface refresh",
+      "goal": "Make one bounded aoa-routing generated-surface or parity refresh that remains source-owned, validator-backed, and thin-router-safe.",
+      "playbook_id": "AOA-P-0011",
+      "task_class": "generated_surface",
       "profile_class": "workhorse",
       "memo": null
     }
