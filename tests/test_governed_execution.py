@@ -242,6 +242,18 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("under 240 characters", prompt)
         self.assertIn("never copy an entire section", prompt)
 
+    def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
+        narrowed = self.module.narrow_candidate_files(
+            [
+                "docs/TRUTH_SURFACES.md",
+                "scripts/_aoa_governed_execution.py",
+                "scripts/aoa-governed-run",
+                "tests/test_governed_execution.py",
+            ],
+            goal="Improve scripts/aoa-governed-run status --all and related triage rendering.",
+        )
+        self.assertEqual(narrowed, ["scripts/aoa-governed-run"])
+
     def test_apply_edit_spec_in_place_falls_back_to_exact_replace_when_anchor_shape_is_bad(self) -> None:
         target = self.repo_root / "docs" / "target.md"
         target.write_text("alpha\nbeta\nomega\n", encoding="utf-8")
@@ -326,14 +338,41 @@ class GovernedExecutionTests(unittest.TestCase):
             "failure_context": [],
         }
         responses = [
-            {"answer": '{"target_file":"docs/target.md"}'},
             {"answer": '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta"}'},
             {"answer": '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma"}'},
         ]
         with patch.object(self.module, "run_federated_prompt", side_effect=responses):
             proposal = self.module.default_proposal_provider(context)
         self.assertEqual(proposal["spec"]["new_text"], "gamma")
+        self.assertEqual(proposal["candidate_files"], ["docs/target.md"])
         self.assertIn("Edit proposal attempts: 2.", proposal["notes"])
+
+    def test_default_proposal_provider_skips_target_selection_when_goal_names_single_file(self) -> None:
+        context = {
+            "request": {
+                "goal": "Improve scripts/aoa-governed-run status --all wording only in scripts/aoa-governed-run.",
+                "playbook_id": "AOA-P-0018",
+                "profile_class": "workhorse",
+            },
+            "playbook_id": "AOA-P-0018",
+            "allowed_files": ["scripts/_aoa_governed_execution.py", "scripts/aoa-governed-run"],
+            "advisory_context": {"playbook": {"title": "governed-lane", "summary": "test"}},
+            "repo_root": self.repo_root,
+            "failure_context": [],
+        }
+        (self.repo_root / "scripts" / "aoa-governed-run").write_text("alpha\nbeta\n", encoding="utf-8")
+        with patch.object(
+            self.module,
+            "run_federated_prompt",
+            return_value={
+                "answer": '{"mode":"exact_replace","target_file":"scripts/aoa-governed-run","old_text":"beta","new_text":"gamma"}'
+            },
+        ) as mocked:
+            proposal = self.module.default_proposal_provider(context)
+        self.assertEqual(proposal["selected_target_file"], "scripts/aoa-governed-run")
+        self.assertEqual(proposal["candidate_files"], ["scripts/aoa-governed-run"])
+        self.assertEqual(mocked.call_count, 1)
+        self.assertIn("Target candidate count: 1.", proposal["notes"])
 
     def test_policy_parsing_and_playbook_lookup(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)

@@ -577,6 +577,31 @@ def focus_terms_from_goal(goal: str, *, target_file: str) -> list[str]:
     return terms
 
 
+def candidate_path_hints_from_goal(goal: str) -> list[str]:
+    hints: list[str] = []
+    for raw in re.findall(r"`([^`]+)`|([A-Za-z0-9_./-]{4,})", goal):
+        token = (raw[0] or raw[1]).strip().lower()
+        if "/" not in token and "." not in token:
+            continue
+        if token.startswith("--"):
+            continue
+        if token and token not in hints:
+            hints.append(token)
+    return hints
+
+
+def narrow_candidate_files(candidate_files: list[str], *, goal: str) -> list[str]:
+    hints = candidate_path_hints_from_goal(goal)
+    if not hints:
+        return candidate_files
+    narrowed = [
+        item
+        for item in candidate_files
+        if any(item.lower() == hint or item.lower().endswith("/" + hint) or hint in item.lower() for hint in hints)
+    ]
+    return narrowed or candidate_files
+
+
 def compact_excerpt(text: str, *, char_limit: int = 1800, focus_terms: list[str] | None = None) -> str:
     stripped = text.strip()
     if len(stripped) <= char_limit:
@@ -836,22 +861,28 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
     candidate_files = enumerate_allowed_candidates(context["repo_root"], context["allowed_files"])
     if not candidate_files:
         raise RuntimeError("no candidate files matched the governed execution allowlist")
+    prompt_candidates = narrow_candidate_files(candidate_files, goal=context["request"]["goal"])
 
-    target_prompt = build_target_selection_prompt(
-        request=context["request"],
-        playbook_id=context["playbook_id"],
-        candidate_files=candidate_files,
-        advisory_context=context["advisory_context"],
-        failure_context=context.get("failure_context") or [],
-    )
-    target_response = run_federated_prompt(target_prompt, context["request"], max_tokens=160)
-    target_answer = str(target_response.get("answer") or "")
-    selected_payload = parse_json_answer_block(target_answer)
-    if not isinstance(selected_payload, dict):
-        raise RuntimeError("target selection response did not contain a JSON object")
-    selected_target_file = str(selected_payload.get("target_file") or "")
-    if selected_target_file not in candidate_files:
-        raise RuntimeError("target selection chose a file outside the governed allowlist")
+    if len(prompt_candidates) == 1:
+        selected_target_file = prompt_candidates[0]
+        target_prompt = ""
+        target_answer = json.dumps({"target_file": selected_target_file}, ensure_ascii=True)
+    else:
+        target_prompt = build_target_selection_prompt(
+            request=context["request"],
+            playbook_id=context["playbook_id"],
+            candidate_files=prompt_candidates,
+            advisory_context=context["advisory_context"],
+            failure_context=context.get("failure_context") or [],
+        )
+        target_response = run_federated_prompt(target_prompt, context["request"], max_tokens=160)
+        target_answer = str(target_response.get("answer") or "")
+        selected_payload = parse_json_answer_block(target_answer)
+        if not isinstance(selected_payload, dict):
+            raise RuntimeError("target selection response did not contain a JSON object")
+        selected_target_file = str(selected_payload.get("target_file") or "")
+        if selected_target_file not in candidate_files:
+            raise RuntimeError("target selection chose a file outside the governed allowlist")
 
     target_text = (context["repo_root"] / selected_target_file).read_text(encoding="utf-8")
     edit_failure_context = list(context.get("failure_context") or [])
@@ -890,13 +921,14 @@ def default_proposal_provider(context: dict[str, Any]) -> dict[str, Any]:
         "provider": "langchain-api",
         "selected_target_file": selected_target_file,
         "spec": spec,
-        "candidate_files": candidate_files,
+        "candidate_files": prompt_candidates,
         "target_prompt": target_prompt,
         "edit_prompt": edit_prompt,
         "target_answer": target_answer,
         "edit_answer": edit_answer,
         "notes": [
             "Proposal generated through langchain-api /run/federated.",
+            f"Target candidate count: {len(prompt_candidates)}.",
             f"Edit proposal attempts: {edit_attempts}.",
         ],
     }
