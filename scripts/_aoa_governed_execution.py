@@ -1133,7 +1133,7 @@ def validate_edit_spec_candidate(target_text: str, *, selected_target_file: str,
             spec.get("new_text") or "",
         )
         for name in introduced_assignments:
-            if len(re.findall(rf"\\b{re.escape(name)}\\b", candidate_text)) <= 1:
+            if len(re.findall(rf"\b{re.escape(name)}\b", candidate_text)) <= 1:
                 raise RuntimeError("proposal introduces unused Python assignment")
     return candidate_text
 

@@ -528,6 +528,26 @@ class GovernedExecutionTests(unittest.TestCase):
                 },
             )
 
+    def test_validate_edit_spec_candidate_allows_reassignment_that_is_still_used(self) -> None:
+        candidate = self.module.validate_edit_spec_candidate(
+            (
+                "blocked_runs = []\n"
+                "latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)\n"
+                "triage_summary = {\n"
+                "    \"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\",\n"
+                "}\n"
+            ),
+            selected_target_file="scripts/_aoa_governed_execution.py",
+            spec={
+                "mode": "exact_replace",
+                "target_file": "scripts/_aoa_governed_execution.py",
+                "old_text": "latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)",
+                "new_text": "latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"request_path\") or item.get(\"updated_at\") or \"\"), reverse=True)",
+            },
+        )
+        self.assertIn("request_path", candidate)
+        self.assertIn("latest_blocked[0]", candidate)
+
     def test_parse_json_answer_block_salvages_truncated_string_at_end(self) -> None:
         parsed = self.module.parse_json_answer_block(
             '{"mode":"exact_replace","target_file":"docs/target.md","old_text":"beta","new_text":"gamma'
