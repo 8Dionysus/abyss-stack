@@ -894,6 +894,9 @@ def build_edit_spec_prompt(
             extra_code_requirements.append(
                 '- do not submit a no-op replacement of the existing `"recommended_action": (` block; change which runs flow into `blocked_runs` or `latest_blocked`, then let the current consumer read that fresher lineage'
             )
+            extra_code_requirements.append(
+                '- do not call `freshest_runs_by_request_lineage()` on `blocked_runs` or `latest_blocked` again; introduce a fresh lineage list from full `runs` first, then filter that fresher list for operator-action runs'
+            )
             lineage_helper_block = extract_python_named_block(target_text, symbol="request_lineage_key")
             if lineage_helper_block is not None:
                 related_excerpts.append(
@@ -901,6 +904,15 @@ def build_edit_spec_prompt(
                         lineage_helper_block,
                         char_limit=260,
                         focus_terms=["request_path", "retry", "return"],
+                    )
+                )
+            freshest_helper_block = extract_python_named_block(target_text, symbol="freshest_runs_by_request_lineage")
+            if freshest_helper_block is not None:
+                related_excerpts.append(
+                    compact_python_block(
+                        freshest_helper_block,
+                        char_limit=380,
+                        focus_terms=["representatives", "request_path", "updated_at", "return sorted"],
                     )
                 )
         excerpt = extract_python_symbol_excerpt(

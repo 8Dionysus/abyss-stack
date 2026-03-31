@@ -273,7 +273,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 4800)
+        self.assertLess(len(prompt), 5100)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -347,6 +347,9 @@ class GovernedExecutionTests(unittest.TestCase):
             + "def request_lineage_key(request_path: str) -> str:\n"
             + "    return request_path\n"
             + ("helper\n" * 20)
+            + "def freshest_runs_by_request_lineage(runs):\n"
+            + "    return runs\n"
+            + ("helper\n" * 20)
             + "def build_run_record(run_dir: Path) -> dict[str, Any]:\n"
             + "    state = load_state(run_dir)\n"
             + "    approval = load_approval(run_dir)\n"
@@ -384,8 +387,10 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn('keep the freshest run by `updated_at` within each request lineage first', prompt)
         self.assertIn('derive `blocked_runs` from `freshest_runs_by_request_lineage(runs)` before `latest_blocked`', prompt)
         self.assertIn('do not submit a no-op replacement of the existing `"recommended_action": (` block', prompt)
+        self.assertIn('do not call `freshest_runs_by_request_lineage()` on `blocked_runs` or `latest_blocked` again', prompt)
         self.assertIn("Relevant helper excerpt", prompt)
         self.assertIn("def request_lineage_key", prompt)
+        self.assertIn("def freshest_runs_by_request_lineage", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
 
     def test_build_edit_spec_prompt_includes_helper_excerpt_for_build_run_record_goal(self) -> None:
