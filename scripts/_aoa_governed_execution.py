@@ -870,16 +870,16 @@ def build_edit_spec_prompt(
                 "- each governed run state already records `request_path`; prefer a single localized change inside `list_runs` that reads the existing state field instead of adding a helper-only field elsewhere"
             )
             extra_code_requirements.append(
-                "- `operator_triage.latest_operator_action` is rendered through the existing `triage_summary[\"recommended_action\"]` path here; replace that in-place computation instead of introducing a standalone `latest_operator_action` local"
+                "- `operator_triage.latest_operator_action` is rendered through the existing `triage_summary[\"recommended_action\"]` path here; do not reference a separate `operator_triage` field or introduce a standalone `latest_operator_action` local"
             )
             extra_code_requirements.append(
                 '- preserve the current `triage_summary` dict shape; do not add a sibling `"latest_operator_action"` key here'
             )
             extra_code_requirements.append(
-                '- prefer `anchored_replace` scoped to the existing `"recommended_action": (` block instead of replacing a larger `triage_summary` fragment'
+                '- prefer changing the upstream `blocked_runs` / `latest_blocked` lineage selection so the existing `"recommended_action": (` block reads the correct freshest lineage'
             )
             extra_code_requirements.append(
-                "- do not return a no-op edit; `new_text` must materially change the current `recommended_action` computation"
+                '- do not change only the fallback string or return a no-op edit; materially change which run becomes `latest_blocked`'
             )
         excerpt = extract_python_symbol_excerpt(
             target_text,
