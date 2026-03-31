@@ -17,19 +17,49 @@
     "auto_rollback_on_post_apply_failure": true,
     "break_glass_requires_reason": true,
     "repo_scope": "abyss-stack",
-    "log_root": "local:/srv/abyss-stack/Logs/governed-runs"
+    "log_root": "local:/srv/abyss-stack/Logs/governed-runs",
+    "promotion_criteria": {
+      "canary_proven": {
+        "minimum_successful_runs": 2,
+        "minimum_task_classes": 1,
+        "maximum_scope_violations": 0,
+        "maximum_rollback_failures": 0,
+        "maximum_break_glass_runs": 0,
+        "maximum_post_change_validation_failures": 0
+      },
+      "trusted": {
+        "minimum_successful_runs": 5,
+        "minimum_task_classes": 3,
+        "maximum_scope_violations": 0,
+        "maximum_rollback_failures": 0,
+        "maximum_break_glass_runs": 0,
+        "maximum_post_change_validation_failures": 0
+      }
+    },
+    "repo_scope_expansion_gate": {
+      "minimum_successful_runs": 5,
+      "minimum_task_classes": 3,
+      "maximum_scope_violations": 0,
+      "maximum_rollback_failures": 0,
+      "maximum_break_glass_runs": 0,
+      "maximum_post_change_validation_failures": 0
+    }
   },
   "playbooks": {
     "AOA-P-0011": {
       "enabled": true,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
+      "trust_state": "experimental",
+      "task_class": "docs_only",
       "allowed_files": [
         "docs/*.md",
         "docs/**/*.md",
         "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+        "config-templates/Configs/agent-api/governed-canary-catalog.json",
         "schemas/runtime-governed-execution-policy.schema.json",
         "schemas/runtime-governed-execution-request.schema.json",
+        "schemas/runtime-governed-execution-canary-catalog.schema.json",
         "scripts/validate_stack.py",
         ".github/workflows/validate-stack.yml"
       ],
@@ -43,12 +73,16 @@
       "enabled": true,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
+      "trust_state": "experimental",
+      "task_class": "governed_lane",
       "allowed_files": [
         "docs/*.md",
         "docs/**/*.md",
         "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+        "config-templates/Configs/agent-api/governed-canary-catalog.json",
         "schemas/runtime-governed-execution-policy.schema.json",
         "schemas/runtime-governed-execution-request.schema.json",
+        "schemas/runtime-governed-execution-canary-catalog.schema.json",
         "scripts/_aoa_governed_execution.py",
         "scripts/aoa-governed-run",
         "scripts/validate_stack.py",
@@ -67,6 +101,8 @@
       "enabled": false,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
+      "trust_state": "experimental",
+      "task_class": "policy_surface",
       "allowed_files": [],
       "acceptance_commands": [],
       "break_glass_allowed": false,
@@ -76,6 +112,8 @@
       "enabled": false,
       "execution_kind": "mutation",
       "repo_scope": "abyss-stack",
+      "trust_state": "experimental",
+      "task_class": "validation_tightening",
       "allowed_files": [],
       "acceptance_commands": [],
       "break_glass_allowed": false,

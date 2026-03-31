@@ -1,0 +1,45 @@
+{
+  "surface_type": "runtime_governed_execution_canary_catalog",
+  "schema_version": "v1",
+  "catalog_id": "abyss-stack-governed-canaries-v1",
+  "description": "Public-safe canary request catalog for real-task governed execution inside abyss-stack.",
+  "repo_scope": "abyss-stack",
+  "canaries": [
+    {
+      "canary_id": "docs-truth-wording-alignment",
+      "title": "Docs truth wording alignment",
+      "goal": "Tighten truth-surface wording in abyss-stack docs without widening scope or changing runtime semantics.",
+      "playbook_id": "AOA-P-0011",
+      "task_class": "docs_only",
+      "profile_class": "workhorse",
+      "memo": null
+    },
+    {
+      "canary_id": "policy-surface-clarity-refresh",
+      "title": "Policy surface clarity refresh",
+      "goal": "Refine governed execution policy wording or catalog wording while keeping runtime permissions explicit and bounded.",
+      "playbook_id": "AOA-P-0011",
+      "task_class": "policy_surface",
+      "profile_class": "workhorse",
+      "memo": null
+    },
+    {
+      "canary_id": "validator-tightening-check",
+      "title": "Validator tightening check",
+      "goal": "Make a bounded validator or schema tightening change for governed execution without widening the runtime scope.",
+      "playbook_id": "AOA-P-0018",
+      "task_class": "validation_tightening",
+      "profile_class": "workhorse",
+      "memo": null
+    },
+    {
+      "canary_id": "governed-triage-improvement",
+      "title": "Governed triage improvement",
+      "goal": "Improve governed execution status and operator triage surfaces while preserving fail-closed behavior.",
+      "playbook_id": "AOA-P-0018",
+      "task_class": "governed_lane",
+      "profile_class": "workhorse",
+      "memo": null
+    }
+  ]
+}

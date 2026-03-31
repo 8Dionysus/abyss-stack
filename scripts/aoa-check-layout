@@ -111,6 +111,7 @@ if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   check_dir "${AOA_STACK_ROOT}/Logs/governed-runs"
   check_warn_file "agent API return policy" "${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml"
   check_warn_file "agent API governed execution policy" "${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml"
+  check_warn_file "agent API governed canary catalog" "${AOA_STACK_ROOT}/Configs/agent-api/governed-canary-catalog.json"
 fi
 
 if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then

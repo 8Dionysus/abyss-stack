@@ -234,8 +234,11 @@ Use:
 
 ```bash
 scripts/aoa-governed-run prepare-request --write /tmp/governed-request.json
+scripts/aoa-governed-run prepare-canary docs-truth-wording-alignment --write /tmp/governed-request.json
+scripts/aoa-governed-run materialize-canaries --write-dir /tmp/governed-canaries
 scripts/aoa-governed-run run --request-file /tmp/governed-request.json --until done
 scripts/aoa-governed-run resume <run-id>
+scripts/aoa-governed-run status --all --explain
 ```
 
 This lane:
@@ -247,6 +250,8 @@ This lane:
 - records `landing.diff` and `worktree.manifest.json` before main-checkout apply
 - writes `rollback.status.json` if post-apply validation fails
 - keeps runtime execution permissions in `config-templates/Configs/agent-api/governed-execution-policy.yaml`
+- may seed bounded real-task requests from `config-templates/Configs/agent-api/governed-canary-catalog.json`
+- now records trust evidence and operator triage instead of treating governed runs as opaque packets
 
 ## W1 grounded execution
 

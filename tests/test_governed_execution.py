@@ -67,28 +67,90 @@ def test_policy(enabled_break_glass: bool = False) -> dict:
             "auto_rollback_on_post_apply_failure": True,
             "break_glass_requires_reason": True,
             "repo_scope": "abyss-stack",
-            "log_root": "local:/tmp/governed-runs"
+            "log_root": "local:/tmp/governed-runs",
+            "promotion_criteria": {
+                "canary_proven": {
+                    "minimum_successful_runs": 2,
+                    "minimum_task_classes": 1,
+                    "maximum_scope_violations": 0,
+                    "maximum_rollback_failures": 0,
+                    "maximum_break_glass_runs": 0,
+                    "maximum_post_change_validation_failures": 0,
+                },
+                "trusted": {
+                    "minimum_successful_runs": 5,
+                    "minimum_task_classes": 3,
+                    "maximum_scope_violations": 0,
+                    "maximum_rollback_failures": 0,
+                    "maximum_break_glass_runs": 0,
+                    "maximum_post_change_validation_failures": 0,
+                },
+            },
+            "repo_scope_expansion_gate": {
+                "minimum_successful_runs": 5,
+                "minimum_task_classes": 3,
+                "maximum_scope_violations": 0,
+                "maximum_rollback_failures": 0,
+                "maximum_break_glass_runs": 0,
+                "maximum_post_change_validation_failures": 0,
+            },
         },
         "playbooks": {
             "AOA-P-0011": {
                 "enabled": True,
                 "execution_kind": "mutation",
                 "repo_scope": "abyss-stack",
+                "trust_state": "experimental",
+                "task_class": "docs_only",
                 "allowed_files": ["docs/target.md"],
                 "acceptance_commands": [
                     "python -c \"from pathlib import Path; text = Path('docs/target.md').read_text(encoding='utf-8'); assert 'gamma' in text\""
                 ],
                 "break_glass_allowed": enabled_break_glass,
-                "repair_allowed": True
-            }
+                "repair_allowed": True,
+            },
+            "AOA-P-0018": {
+                "enabled": True,
+                "execution_kind": "mutation",
+                "repo_scope": "abyss-stack",
+                "trust_state": "experimental",
+                "task_class": "governed_lane",
+                "allowed_files": ["docs/target.md", "scripts/validate_stack.py"],
+                "acceptance_commands": [
+                    "python -c \"from pathlib import Path; Path('docs/target.md').read_text(encoding='utf-8')\""
+                ],
+                "break_glass_allowed": enabled_break_glass,
+                "repair_allowed": True,
+            },
         },
         "boundaries": {
             "owns_runtime_permissions_only": True,
             "does_not_define_playbook_meaning": True,
             "does_not_replace_route_api_advisory_surfaces": True,
             "does_not_replace_langchain_api_federated_advisory_run": True,
-            "first_mutation_scope_is_abyss_stack_only": True
-        }
+            "first_mutation_scope_is_abyss_stack_only": True,
+        },
+    }
+
+
+def test_canary_catalog() -> dict:
+    return {
+        "surface_type": "runtime_governed_execution_canary_catalog",
+        "schema_version": "v1",
+        "catalog_id": "test-governed-canaries",
+        "description": "test canaries",
+        "repo_scope": "abyss-stack",
+        "canaries": [
+            {
+                "canary_id": "docs-truth-wording-alignment",
+                "title": "Docs truth wording alignment",
+                "goal": "Tighten docs wording inside abyss-stack.",
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "profile_class": "workhorse",
+                "memo": None,
+            }
+        ],
     }
 
 
@@ -106,6 +168,8 @@ class GovernedExecutionTests(unittest.TestCase):
         self.logs_root = self.root / "logs"
         self.policy_path = self.root / "policy.yaml"
         write_json(self.policy_path, test_policy())
+        self.canary_catalog_path = self.root / "canaries.json"
+        write_json(self.canary_catalog_path, test_canary_catalog())
         self.request_path = self.root / "request.json"
         write_json(self.request_path, governed_request(self.repo_root))
 
@@ -156,6 +220,26 @@ class GovernedExecutionTests(unittest.TestCase):
         entry = self.module.resolve_playbook_policy(policy, "AOA-P-0011")
         self.assertTrue(entry["enabled"])
         self.assertEqual(entry["allowed_files"], ["docs/target.md"])
+        self.assertEqual(entry["trust_state"], "experimental")
+
+    def test_prepare_canary_request_materializes_catalog_entry(self) -> None:
+        payload = self.module.request_from_canary(
+            "docs-truth-wording-alignment",
+            catalog_path=self.canary_catalog_path,
+            repo_root=self.repo_root,
+        )
+        self.assertEqual(payload["playbook_id"], "AOA-P-0011")
+        self.assertEqual(payload["task_class"], "docs_only")
+        self.assertEqual(payload["canary_id"], "docs-truth-wording-alignment")
+
+        materialized = self.module.materialize_canary_requests(
+            self.root / "materialized-canaries",
+            catalog_path=self.canary_catalog_path,
+            repo_root=self.repo_root,
+        )
+        self.assertEqual(materialized["request_count"], 1)
+        request_file = Path(materialized["requests"][0]["request_file"])
+        self.assertTrue(request_file.exists())
 
     def test_fail_closed_gate_mapping(self) -> None:
         policy, _ = self.module.load_policy(self.policy_path)
@@ -240,6 +324,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(third["status"], "pass")
         self.assertIn("docs/target.md", third["changed_files"])
         self.assertIn("gamma", (self.repo_root / "docs" / "target.md").read_text(encoding="utf-8"))
+        self.assertFalse(third["triage"]["operator_action_required"])
 
     def test_degraded_gate_blocks_before_worktree_creation(self) -> None:
         result = self.module.prepare_run(
@@ -414,6 +499,26 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(third["status"], "fail")
         self.assertEqual(third["failure_class"], "policy_denied")
 
+    def test_approval_mismatch_fails_resume(self) -> None:
+        first = self.module.prepare_run(
+            self.request_path,
+            policy_path=self.policy_path,
+            log_root=self.logs_root,
+            gate_provider=lambda: self.gate_payload(),
+            advisory_provider=self.advisory_provider,
+            proposal_provider=self.proposal_provider,
+        )
+        run_id = first["run_id"]
+        run_dir = self.logs_root / run_id
+        approval_path = run_dir / "approval.status.json"
+        approval = json.loads(approval_path.read_text(encoding="utf-8"))
+        approval["base_head"] = "deadbeef"
+        write_json(approval_path, approval)
+
+        result = self.module.resume_run(run_id, log_root=self.logs_root)
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["failure_class"], "approval_missing")
+
     def test_post_apply_failure_rolls_back_and_reports_status(self) -> None:
         result = self.module.prepare_run(
             self.request_path,
@@ -456,4 +561,69 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(failed["failure_class"], "post_change_validation_failure")
         rollback = json.loads((run_dir / "rollback.status.json").read_text(encoding="utf-8"))
         self.assertTrue(rollback["rollback_ok"])
+        self.assertIn("landing_diff_sha256", rollback)
         self.assertIn("beta", (self.repo_root / "docs" / "target.md").read_text(encoding="utf-8"))
+
+    def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
+        def write_run(run_id: str, *, playbook_id: str, task_class: str, status: str) -> None:
+            run_dir = self.logs_root / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            write_json(
+                run_dir / "run.state.json",
+                {
+                    "run_id": run_id,
+                    "repo_root": str(self.repo_root),
+                    "playbook_id": playbook_id,
+                    "task_class": task_class,
+                    "trust_state_snapshot": "experimental",
+                    "phase": "completed" if status == "pass" else "await_plan_approval",
+                    "status": status,
+                    "base_head": "abc123",
+                    "updated_at": "2026-03-30T00:00:00Z",
+                    "break_glass_used": False,
+                },
+            )
+            write_json(
+                run_dir / "approval.status.json",
+                {
+                    "run_id": run_id,
+                    "base_head": "abc123",
+                    "current_milestone": "landing" if status == "pass" else "plan_freeze",
+                    "status": "approved" if status == "pass" else "pending",
+                    "milestones": {
+                        "plan_freeze": {"status": "approved", "approved": True},
+                        "landing": {"status": "approved", "approved": True},
+                    },
+                },
+            )
+            write_json(
+                run_dir / "result.summary.json",
+                {
+                    "artifact_kind": "aoa.governed-run.result-summary",
+                    "schema_version": "v1",
+                    "run_id": run_id,
+                    "updated_at": "2026-03-30T00:00:00Z",
+                    "status": status,
+                    "phase": "completed" if status == "pass" else "await_plan_approval",
+                    "break_glass_used": False,
+                    "next_action": "ok" if status == "pass" else "review approval",
+                },
+            )
+
+        write_run("r1", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
+        write_run("r2", playbook_id="AOA-P-0011", task_class="docs_only", status="pass")
+        write_run("r3", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
+        write_run("r4", playbook_id="AOA-P-0018", task_class="governed_lane", status="pass")
+        write_run("r5", playbook_id="AOA-P-0018", task_class="validation_tightening", status="pass")
+
+        index_payload = self.module.list_runs(log_root=self.logs_root, policy_path=self.policy_path)
+        self.assertEqual(index_payload["run_count"], 5)
+        self.assertTrue(index_payload["promotion_summary"]["repo_scope_expansion_gate"]["met"])
+        self.assertEqual(
+            index_payload["promotion_summary"]["playbooks"]["AOA-P-0011"]["observed_trust_state"],
+            "canary_proven",
+        )
+
+        status_payload = self.module.status_run("r1", log_root=self.logs_root)
+        self.assertIn("triage", status_payload)
+        self.assertFalse(status_payload["triage"]["operator_action_required"])

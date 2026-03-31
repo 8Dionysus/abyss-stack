@@ -47,7 +47,9 @@
         "auto_rollback_on_post_apply_failure",
         "break_glass_requires_reason",
         "repo_scope",
-        "log_root"
+        "log_root",
+        "promotion_criteria",
+        "repo_scope_expansion_gate"
       ],
       "properties": {
         "gate_mode": {
@@ -100,6 +102,25 @@
         "log_root": {
           "type": "string",
           "minLength": 1
+        },
+        "promotion_criteria": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "canary_proven",
+            "trusted"
+          ],
+          "properties": {
+            "canary_proven": {
+              "$ref": "#/$defs/promotionCriteria"
+            },
+            "trusted": {
+              "$ref": "#/$defs/promotionCriteria"
+            }
+          }
+        },
+        "repo_scope_expansion_gate": {
+          "$ref": "#/$defs/promotionCriteria"
         }
       }
     },
@@ -116,7 +137,9 @@
           "allowed_files",
           "acceptance_commands",
           "break_glass_allowed",
-          "repair_allowed"
+          "repair_allowed",
+          "trust_state",
+          "task_class"
         ],
         "properties": {
           "enabled": {
@@ -151,6 +174,23 @@
           },
           "repair_allowed": {
             "type": "boolean"
+          },
+          "trust_state": {
+            "type": "string",
+            "enum": [
+              "experimental",
+              "canary_proven",
+              "trusted"
+            ]
+          },
+          "task_class": {
+            "type": "string",
+            "enum": [
+              "docs_only",
+              "policy_surface",
+              "validation_tightening",
+              "governed_lane"
+            ]
           }
         }
       }
@@ -185,6 +225,46 @@
         "first_mutation_scope_is_abyss_stack_only": {
           "type": "boolean",
           "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "promotionCriteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_successful_runs",
+        "minimum_task_classes",
+        "maximum_scope_violations",
+        "maximum_rollback_failures",
+        "maximum_break_glass_runs",
+        "maximum_post_change_validation_failures"
+      ],
+      "properties": {
+        "minimum_successful_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_task_classes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_scope_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_rollback_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_break_glass_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_post_change_validation_failures": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

@@ -58,6 +58,7 @@ This file maps the first migrated runtime modules to their intended services.
 - it remains a CLI-side execution surface rather than a long-running network service
 - the original `aoa-langgraph-pilot` remains useful as the W4-shaped comparison and fixture surface
 - `aoa-governed-run` is the first fail-closed governed mutation lane, gated by `aoa-status --autonomy --json` and scoped to `abyss-stack`
+- the same lane now exposes canary request materialization, promotion summaries, and operator triage through `aoa-governed-run status`
 - governed execution still consumes playbook and memo context through advisory seams; it does not turn `route-api` into an execution service
 
 ## `43-federation-router.yml`

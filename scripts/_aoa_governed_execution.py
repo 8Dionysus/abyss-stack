@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.machinery
 import importlib.util
 import json
@@ -31,7 +32,17 @@ POLICY_PATH_DEFAULT = Path(
 )
 STATUS_SCRIPT_DEFAULT = CONFIGS_ROOT / "scripts" / "aoa-status"
 SOURCE_POLICY_FALLBACK = SCRIPT_ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml"
+CANARY_CATALOG_PATH_DEFAULT = Path(
+    os.environ.get(
+        "AOA_GOVERNED_EXECUTION_CANARY_CATALOG_PATH",
+        str(STACK_ROOT / "Configs" / "agent-api" / "governed-canary-catalog.json"),
+    )
+)
+SOURCE_CANARY_CATALOG_FALLBACK = (
+    SCRIPT_ROOT / "config-templates" / "Configs" / "agent-api" / "governed-canary-catalog.json"
+)
 DEFAULT_PROFILE_CLASS = "workhorse"
+TRUST_STATES = {"experimental", "canary_proven", "trusted"}
 FAILURE_CLASSES = {
     "autonomy_gate_failed",
     "policy_denied",
@@ -89,6 +100,10 @@ def parse_yaml_or_json(text: str) -> dict[str, Any]:
     return payload
 
 
+def sha256_digest_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def resolve_policy_path(path: str | Path | None = None) -> Path:
     candidates: list[Path] = []
     if path is not None:
@@ -114,6 +129,50 @@ def load_policy(path: str | Path | None = None) -> tuple[dict[str, Any], Path]:
     return payload, policy_path
 
 
+def resolve_canary_catalog_path(path: str | Path | None = None) -> Path:
+    candidates: list[Path] = []
+    if path is not None:
+        candidates.append(Path(path))
+    candidates.append(CANARY_CATALOG_PATH_DEFAULT)
+    candidates.append(SOURCE_CANARY_CATALOG_FALLBACK)
+    seen: set[str] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser()
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        if resolved.exists():
+            return resolved
+    raise RuntimeError("governed canary catalog path could not be resolved")
+
+
+def load_canary_catalog(path: str | Path | None = None) -> tuple[dict[str, Any], Path]:
+    catalog_path = resolve_canary_catalog_path(path)
+    payload = parse_yaml_or_json(catalog_path.read_text(encoding="utf-8"))
+    validate_canary_catalog(payload)
+    return payload, catalog_path
+
+
+def validate_criteria_payload(label: str, payload: Any) -> None:
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{label} must be an object")
+    required_fields = (
+        "minimum_successful_runs",
+        "minimum_task_classes",
+        "maximum_scope_violations",
+        "maximum_rollback_failures",
+        "maximum_break_glass_runs",
+        "maximum_post_change_validation_failures",
+    )
+    for field in required_fields:
+        if field not in payload:
+            raise RuntimeError(f"{label} is missing {field}")
+        value = payload[field]
+        if not isinstance(value, int) or value < 0:
+            raise RuntimeError(f"{label}.{field} must be a non-negative integer")
+
+
 def validate_policy(policy: dict[str, Any]) -> None:
     if policy.get("surface_type") != "runtime_governed_execution_policy":
         raise RuntimeError("policy surface_type must equal runtime_governed_execution_policy")
@@ -124,6 +183,18 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise RuntimeError("policy global_rules must be an object")
     if global_rules.get("gate_mode") != "fail_closed":
         raise RuntimeError("policy gate_mode must be fail_closed")
+    validate_criteria_payload(
+        "policy global_rules.promotion_criteria.canary_proven",
+        (global_rules.get("promotion_criteria") or {}).get("canary_proven"),
+    )
+    validate_criteria_payload(
+        "policy global_rules.promotion_criteria.trusted",
+        (global_rules.get("promotion_criteria") or {}).get("trusted"),
+    )
+    validate_criteria_payload(
+        "policy global_rules.repo_scope_expansion_gate",
+        global_rules.get("repo_scope_expansion_gate"),
+    )
     if not isinstance(policy.get("playbooks"), dict) or not policy["playbooks"]:
         raise RuntimeError("policy playbooks must contain at least one entry")
     for playbook_id, entry in policy["playbooks"].items():
@@ -137,9 +208,44 @@ def validate_policy(policy: dict[str, Any]) -> None:
             "acceptance_commands",
             "break_glass_allowed",
             "repair_allowed",
+            "trust_state",
+            "task_class",
         ):
             if required not in entry:
                 raise RuntimeError(f"policy entry for {playbook_id} is missing {required}")
+        if entry.get("trust_state") not in TRUST_STATES:
+            raise RuntimeError(f"policy entry for {playbook_id} has invalid trust_state")
+        if not isinstance(entry.get("task_class"), str) or not entry["task_class"].strip():
+            raise RuntimeError(f"policy entry for {playbook_id} must declare a non-empty task_class")
+
+
+def validate_canary_catalog(catalog: dict[str, Any]) -> None:
+    if catalog.get("surface_type") != "runtime_governed_execution_canary_catalog":
+        raise RuntimeError("governed canary catalog surface_type must equal runtime_governed_execution_canary_catalog")
+    if catalog.get("repo_scope") != "abyss-stack":
+        raise RuntimeError("governed canary catalog repo_scope must remain abyss-stack")
+    canaries = catalog.get("canaries")
+    if not isinstance(canaries, list) or not canaries:
+        raise RuntimeError("governed canary catalog must contain at least one canary")
+    seen: set[str] = set()
+    for entry in canaries:
+        if not isinstance(entry, dict):
+            raise RuntimeError("governed canary entries must be objects")
+        for required in ("canary_id", "title", "goal", "playbook_id", "task_class", "profile_class"):
+            value = entry.get(required)
+            if not isinstance(value, str) or not value.strip():
+                raise RuntimeError(f"governed canary entry is missing a non-empty {required}")
+        canary_id = str(entry["canary_id"])
+        if canary_id in seen:
+            raise RuntimeError(f"duplicate canary_id in governed canary catalog: {canary_id}")
+        seen.add(canary_id)
+        if entry["task_class"] not in {
+            "docs_only",
+            "policy_surface",
+            "validation_tightening",
+            "governed_lane",
+        }:
+            raise RuntimeError(f"unsupported canary task_class for {canary_id}: {entry['task_class']}")
 
 
 def is_abyss_stack_checkout(path: Path) -> bool:
@@ -172,6 +278,8 @@ def default_request_template() -> dict[str, Any]:
         "repo_root": str(resolve_default_repo_root()),
         "memo": None,
         "break_glass_reason": None,
+        "canary_id": None,
+        "task_class": None,
     }
 
 
@@ -189,6 +297,10 @@ def validate_request_shape(request: dict[str, Any]) -> None:
         raise RuntimeError("request memo must be an object when present")
     if request.get("break_glass_reason") is not None and not isinstance(request["break_glass_reason"], str):
         raise RuntimeError("break_glass_reason must be a string when present")
+    if request.get("canary_id") is not None and not isinstance(request["canary_id"], str):
+        raise RuntimeError("canary_id must be a string when present")
+    if request.get("task_class") is not None and not isinstance(request["task_class"], str):
+        raise RuntimeError("task_class must be a string when present")
 
 
 def load_request(path: str | Path) -> tuple[dict[str, Any], Path]:
@@ -198,6 +310,93 @@ def load_request(path: str | Path) -> tuple[dict[str, Any], Path]:
         raise RuntimeError("request file must contain a JSON object")
     validate_request_shape(payload)
     return payload, request_path
+
+
+def lookup_canary(catalog: dict[str, Any], canary_id: str) -> dict[str, Any]:
+    for entry in catalog.get("canaries") or []:
+        if isinstance(entry, dict) and entry.get("canary_id") == canary_id:
+            return copy.deepcopy(entry)
+    raise RuntimeError(f"unknown governed canary_id: {canary_id}")
+
+
+def request_from_canary(
+    canary_id: str,
+    *,
+    catalog_path: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    catalog, _catalog_path = load_canary_catalog(catalog_path)
+    canary = lookup_canary(catalog, canary_id)
+    payload: dict[str, Any] = {
+        "goal": canary["goal"],
+        "playbook_id": canary["playbook_id"],
+        "profile_class": canary.get("profile_class") or DEFAULT_PROFILE_CLASS,
+        "repo_root": str(Path(repo_root).expanduser().resolve()) if repo_root is not None else str(resolve_default_repo_root()),
+        "memo": copy.deepcopy(canary.get("memo")),
+        "break_glass_reason": None,
+        "canary_id": canary["canary_id"],
+        "task_class": canary["task_class"],
+    }
+    validate_request_shape(payload)
+    return payload
+
+
+def materialize_canary_requests(
+    write_dir: str | Path,
+    *,
+    catalog_path: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    target_root = Path(write_dir).expanduser()
+    target_root.mkdir(parents=True, exist_ok=True)
+    catalog, resolved_catalog = load_canary_catalog(catalog_path)
+    written: list[dict[str, Any]] = []
+    for entry in catalog.get("canaries") or []:
+        if not isinstance(entry, dict):
+            continue
+        request = request_from_canary(
+            str(entry["canary_id"]),
+            catalog_path=resolved_catalog,
+            repo_root=repo_root,
+        )
+        target = target_root / f"{entry['canary_id']}.request.json"
+        target.write_text(json.dumps(request, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        written.append(
+            {
+                "canary_id": entry["canary_id"],
+                "task_class": entry["task_class"],
+                "playbook_id": entry["playbook_id"],
+                "request_file": str(target),
+            }
+        )
+    return {
+        "ok": True,
+        "catalog_path": str(resolved_catalog),
+        "write_dir": str(target_root),
+        "request_count": len(written),
+        "requests": written,
+    }
+
+
+def resolve_request_canary_context(
+    request: dict[str, Any],
+    *,
+    catalog_path: str | Path | None = None,
+) -> dict[str, Any] | None:
+    canary_id = request.get("canary_id")
+    if not canary_id:
+        return None
+    catalog, resolved_catalog = load_canary_catalog(catalog_path)
+    canary = lookup_canary(catalog, str(canary_id))
+    if request.get("playbook_id") and request["playbook_id"] != canary["playbook_id"]:
+        raise RuntimeError("request playbook_id does not match the selected canary")
+    if request.get("task_class") and request["task_class"] != canary["task_class"]:
+        raise RuntimeError("request task_class does not match the selected canary")
+    request["task_class"] = canary["task_class"]
+    return {
+        "catalog_path": str(resolved_catalog),
+        "canary": canary,
+    }
 
 
 def http_post_json(url: str, payload: dict[str, Any], *, timeout_s: float = 30.0) -> dict[str, Any]:
@@ -665,7 +864,83 @@ def make_pass_summary(
     }
 
 
+def validate_approval_against_state(approval: dict[str, Any], state: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    if approval.get("run_id") != state.get("run_id"):
+        reasons.append("approval run_id does not match governed run state")
+    if approval.get("base_head") != state.get("base_head"):
+        reasons.append("approval base_head does not match governed run state")
+    current_milestone = approval.get("current_milestone")
+    milestones = approval.get("milestones")
+    if not isinstance(milestones, dict) or current_milestone not in milestones:
+        reasons.append("approval current_milestone is not declared in approval milestones")
+    if approval.get("status") not in {"pending", "approved", "rejected"}:
+        reasons.append("approval status must be pending, approved, or rejected")
+    return reasons
+
+
+def compute_triage(
+    state: dict[str, Any],
+    summary: dict[str, Any],
+    approval: dict[str, Any] | None,
+) -> dict[str, Any]:
+    status = str(summary.get("status") or state.get("status") or "unknown")
+    milestone = str(summary.get("current_milestone") or (approval or {}).get("current_milestone") or "")
+    if status == "paused":
+        blocked_reason = "plan_approval_required" if milestone == "plan_freeze" else "landing_approval_required"
+        return {
+            "terminal": False,
+            "resumable": True,
+            "operator_action_required": True,
+            "blocked_reason": blocked_reason,
+            "recommended_action": str(summary.get("next_action") or "Review approval.status.json and resume."),
+            "safe_resume_command": f"scripts/aoa-governed-run resume {state['run_id']}",
+        }
+    if status == "fail":
+        return {
+            "terminal": True,
+            "resumable": False,
+            "operator_action_required": True,
+            "blocked_reason": summary.get("failure_class") or "governed_run_failed",
+            "recommended_action": str(summary.get("next_action") or "Inspect governed run artifacts before retrying."),
+            "safe_resume_command": None,
+        }
+    if status == "pass":
+        return {
+            "terminal": True,
+            "resumable": False,
+            "operator_action_required": False,
+            "blocked_reason": None,
+            "recommended_action": str(summary.get("next_action") or "No further action required."),
+            "safe_resume_command": None,
+        }
+    return {
+        "terminal": False,
+        "resumable": False,
+        "operator_action_required": True,
+        "blocked_reason": "unknown_state",
+        "recommended_action": "Inspect governed run state and approval artifacts.",
+        "safe_resume_command": None,
+    }
+
+
+def enrich_summary(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] | None) -> dict[str, Any]:
+    payload = copy.deepcopy(summary)
+    if state is None:
+        return payload
+    approval = None
+    approval_path = approval_artifact(run_dir)
+    if approval_path.exists():
+        approval = load_approval(run_dir)
+    payload["canary_id"] = state.get("canary_id")
+    payload["task_class"] = state.get("task_class")
+    payload["trust_state_snapshot"] = state.get("trust_state_snapshot")
+    payload["triage"] = compute_triage(state, payload, approval)
+    return payload
+
+
 def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] | None = None) -> None:
+    triage = summary.get("triage") or (compute_triage(state, summary, load_approval(run_dir)) if state is not None and approval_artifact(run_dir).exists() else None)
     lines = [
         f"# governed-run `{summary['run_id']}`",
         "",
@@ -675,6 +950,10 @@ def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] 
     if state is not None:
         lines.append(f"- repo_root: `{state.get('repo_root')}`")
         lines.append(f"- playbook_id: `{state.get('playbook_id')}`")
+        lines.append(f"- task_class: `{state.get('task_class')}`")
+        lines.append(f"- trust_state_snapshot: `{state.get('trust_state_snapshot')}`")
+        if state.get("canary_id"):
+            lines.append(f"- canary_id: `{state.get('canary_id')}`")
     if summary.get("failure_class"):
         lines.append(f"- failure_class: `{summary['failure_class']}`")
     if summary.get("current_milestone"):
@@ -687,6 +966,20 @@ def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] 
     if reasons:
         lines.extend(["", "## Reasons", ""])
         lines.extend(f"- {item}" for item in reasons)
+    if isinstance(triage, dict):
+        lines.extend(
+            [
+                "",
+                "## Triage",
+                "",
+                f"- terminal: `{triage.get('terminal')}`",
+                f"- resumable: `{triage.get('resumable')}`",
+                f"- operator_action_required: `{triage.get('operator_action_required')}`",
+                f"- blocked_reason: `{triage.get('blocked_reason')}`",
+            ]
+        )
+        if triage.get("safe_resume_command"):
+            lines.append(f"- safe_resume_command: `{triage['safe_resume_command']}`")
     lines.extend(["", "## Next Action", "", summary.get("next_action") or "None."])
     write_text(report_artifact(run_dir), "\n".join(lines))
 
@@ -705,8 +998,9 @@ def save_state(run_dir: Path, state: dict[str, Any]) -> None:
 
 
 def save_summary(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] | None = None) -> None:
-    write_json(result_artifact(run_dir), summary)
-    update_report(run_dir, summary, state=state)
+    payload = enrich_summary(run_dir, summary, state)
+    write_json(result_artifact(run_dir), payload)
+    update_report(run_dir, payload, state=state)
 
 
 def initialize_approval(run_dir: Path, *, run_id: str, base_head: str) -> dict[str, Any]:
@@ -836,7 +1130,7 @@ def failure_result(
     state["failure_reasons"] = reasons
     save_state(run_dir, state)
     save_summary(run_dir, summary, state=state)
-    return summary
+    return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
 
 
 def paused_result(
@@ -858,7 +1152,7 @@ def paused_result(
     state["status"] = "paused"
     save_state(run_dir, state)
     save_summary(run_dir, summary, state=state)
-    return summary
+    return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
 
 
 def pass_result(
@@ -879,7 +1173,7 @@ def pass_result(
     state["changed_files"] = changed_files
     save_state(run_dir, state)
     save_summary(run_dir, summary, state=state)
-    return summary
+    return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
 
 
 def apply_edit_spec_in_place(repo_root: Path, *, selected_target_file: str, spec: dict[str, Any]) -> None:
@@ -954,6 +1248,7 @@ def preview_proposal(
             "selected_target_file": selected_target_file,
             "changed_files": changed_files,
             "allowed_files": allowed_files,
+            "landing_diff_sha256": sha256_digest_text(landing_text),
         }
         write_json(run_dir / "worktree.manifest.json", worktree_manifest)
         acceptance_refs, acceptance_ok = TRIALS.run_acceptance_checks(
@@ -1022,6 +1317,8 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
             reasons=["base_head drifted before landing"],
             next_action="Start a new governed run from the current HEAD.",
         )
+    landing_diff_text = landing_diff_path.read_text(encoding="utf-8")
+    landing_diff_digest = sha256_digest_text(landing_diff_text)
 
     main_check_raw = TRIALS.git_command(repo_root, ["apply", "--check", str(landing_diff_path)], timeout_s=60)
     check_ref = TRIALS.persist_command_result(run_dir, "landing-apply-check", main_check_raw)
@@ -1067,6 +1364,7 @@ def apply_landing_diff(run_dir: Path, *, state: dict[str, Any], playbook_policy:
         "schema_version": "v1",
         "run_id": state["run_id"],
         "updated_at": utc_now(),
+        "landing_diff_sha256": landing_diff_digest,
         "reverse_exit_code": reverse_raw["exit_code"],
         "reverse_timed_out": reverse_raw["timed_out"],
         "reverse_stdout_path": reverse_ref["stdout_path"],
@@ -1105,11 +1403,14 @@ def prepare_run(
     proposal_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     request, request_path = load_request(request_file)
+    canary_context = resolve_request_canary_context(request)
     policy, resolved_policy_path = load_policy(policy_path)
     advisory = resolve_playbook_id(request, policy, advisory_provider=advisory_provider)
     playbook_policy = advisory["policy"]
     repo_root = normalize_repo_root(request["repo_root"])
     ensure_policy_repo_scope(playbook_policy, repo_root)
+    task_class = str(request.get("task_class") or playbook_policy.get("task_class") or "unknown")
+    trust_state_snapshot = str(playbook_policy.get("trust_state") or "experimental")
     try:
         TRIALS.ensure_repo_tracked_clean(repo_root)
     except RuntimeError as exc:
@@ -1120,6 +1421,9 @@ def prepare_run(
             "run_id": run_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
+            "canary_id": request.get("canary_id"),
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -1141,6 +1445,9 @@ def prepare_run(
             "run_id": run_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
+            "canary_id": request.get("canary_id"),
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -1158,6 +1465,9 @@ def prepare_run(
             "run_id": run_id,
             "repo_root": str(repo_root),
             "playbook_id": advisory["playbook_id"],
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
+            "canary_id": request.get("canary_id"),
             "phase": "preflight",
             "status": "fail",
             "break_glass_used": False,
@@ -1203,6 +1513,9 @@ def prepare_run(
         "request_path": str(request_path),
         "repo_root": str(repo_root),
         "playbook_id": advisory["playbook_id"],
+        "task_class": task_class,
+        "trust_state_snapshot": trust_state_snapshot,
+        "canary_id": request.get("canary_id"),
         "policy_path": str(resolved_policy_path),
         "base_head": base_head,
         "phase": "prepare_proposal",
@@ -1224,6 +1537,8 @@ def prepare_run(
             "global_rules": policy["global_rules"],
             "playbook_id": advisory["playbook_id"],
             "playbook_policy": playbook_policy,
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
         },
     )
     write_json(
@@ -1235,6 +1550,9 @@ def prepare_run(
             "repo_root": str(repo_root),
             "base_head": base_head,
             "playbook_id": advisory["playbook_id"],
+            "task_class": task_class,
+            "trust_state_snapshot": trust_state_snapshot,
+            "canary_context": canary_context,
             "break_glass_used": bool(gate_result["break_glass_used"]),
             "break_glass_reason": request.get("break_glass_reason"),
             "gate_result": gate_result,
@@ -1445,7 +1763,24 @@ def resume_run(
     policy_snapshot = json.loads((run_dir / "policy.snapshot.json").read_text(encoding="utf-8"))
     playbook_policy = policy_snapshot["playbook_policy"]
     advisory_context = json.loads((run_dir / "preflight.summary.json").read_text(encoding="utf-8"))["advisory_context"]
+
+    if state.get("phase") in {"failed", "completed"} or state.get("status") in {"fail", "pass"}:
+        existing = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
+        save_summary(run_dir, existing, state=state)
+        return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
+
     approval = load_approval(run_dir)
+    approval_errors = validate_approval_against_state(approval, state)
+
+    if approval_errors:
+        return failure_result(
+            run_dir,
+            state=state,
+            phase=str(state.get("phase") or "resume"),
+            failure_class="approval_missing",
+            reasons=approval_errors,
+            next_action="Repair approval.status.json so run_id, base_head, and milestone state match the governed run before resuming.",
+        )
 
     if state["phase"] == "await_plan_approval":
         if approval.get("current_milestone") != "plan_freeze" or approval.get("status") != "approved":
@@ -1478,10 +1813,213 @@ def resume_run(
 
     existing = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
     save_summary(run_dir, existing, state=state)
-    return existing
+    return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
 
 
-def list_runs(*, log_root: str | Path | None = None) -> dict[str, Any]:
+def trust_rank(trust_state: str) -> int:
+    order = {"experimental": 0, "canary_proven": 1, "trusted": 2}
+    return order.get(trust_state, -1)
+
+
+def evaluate_criteria(criteria: dict[str, Any], aggregate: dict[str, Any]) -> dict[str, Any]:
+    reasons: list[str] = []
+    if aggregate["pass_count"] < criteria["minimum_successful_runs"]:
+        reasons.append(
+            f"needs at least {criteria['minimum_successful_runs']} successful runs (has {aggregate['pass_count']})"
+        )
+    if aggregate["distinct_task_class_count"] < criteria["minimum_task_classes"]:
+        reasons.append(
+            f"needs at least {criteria['minimum_task_classes']} successful task classes (has {aggregate['distinct_task_class_count']})"
+        )
+    if aggregate["scope_violation_count"] > criteria["maximum_scope_violations"]:
+        reasons.append(
+            f"scope violations exceed allowance ({aggregate['scope_violation_count']} > {criteria['maximum_scope_violations']})"
+        )
+    if aggregate["rollback_failure_count"] > criteria["maximum_rollback_failures"]:
+        reasons.append(
+            f"rollback failures exceed allowance ({aggregate['rollback_failure_count']} > {criteria['maximum_rollback_failures']})"
+        )
+    if aggregate["break_glass_count"] > criteria["maximum_break_glass_runs"]:
+        reasons.append(
+            f"break-glass runs exceed allowance ({aggregate['break_glass_count']} > {criteria['maximum_break_glass_runs']})"
+        )
+    if aggregate["post_change_validation_failure_count"] > criteria["maximum_post_change_validation_failures"]:
+        reasons.append(
+            "post-change validation failures exceed allowance "
+            f"({aggregate['post_change_validation_failure_count']} > {criteria['maximum_post_change_validation_failures']})"
+        )
+    return {"met": not reasons, "reasons": reasons}
+
+
+def aggregate_run_records(records: list[dict[str, Any]]) -> dict[str, Any]:
+    successful_task_classes = sorted(
+        {
+            str(record.get("task_class"))
+            for record in records
+            if record.get("status") == "pass" and record.get("task_class")
+        }
+    )
+    return {
+        "run_count": len(records),
+        "pass_count": sum(1 for record in records if record.get("status") == "pass"),
+        "fail_count": sum(1 for record in records if record.get("status") == "fail"),
+        "paused_count": sum(1 for record in records if record.get("status") == "paused"),
+        "break_glass_count": sum(1 for record in records if record.get("break_glass_used")),
+        "scope_violation_count": sum(1 for record in records if record.get("failure_class") == "scope_violation"),
+        "rollback_failure_count": sum(1 for record in records if record.get("failure_class") == "rollback_failed"),
+        "post_change_validation_failure_count": sum(
+            1 for record in records if record.get("failure_class") == "post_change_validation_failure"
+        ),
+        "successful_task_classes": successful_task_classes,
+        "distinct_task_class_count": len(successful_task_classes),
+    }
+
+
+def observed_trust_state(criteria_map: dict[str, Any], aggregate: dict[str, Any]) -> dict[str, Any]:
+    trusted = evaluate_criteria(criteria_map["trusted"], aggregate)
+    if trusted["met"]:
+        return {"observed_trust_state": "trusted", "evidence_gate": trusted}
+    canary = evaluate_criteria(criteria_map["canary_proven"], aggregate)
+    if canary["met"]:
+        return {"observed_trust_state": "canary_proven", "evidence_gate": canary}
+    return {"observed_trust_state": "experimental", "evidence_gate": canary}
+
+
+def promotion_summary(records: list[dict[str, Any]], policy: dict[str, Any] | None) -> dict[str, Any]:
+    if policy is None:
+        return {
+            "available": False,
+            "reason": "policy_unavailable",
+        }
+    criteria_map = (policy.get("global_rules") or {}).get("promotion_criteria") or {}
+    playbook_summaries: dict[str, Any] = {}
+    for playbook_id, entry in (policy.get("playbooks") or {}).items():
+        matching = [record for record in records if record.get("playbook_id") == playbook_id]
+        aggregate = aggregate_run_records(matching)
+        observed = observed_trust_state(criteria_map, aggregate)
+        configured = str(entry.get("trust_state") or "experimental")
+        recommended_next_state = configured
+        if trust_rank(observed["observed_trust_state"]) > trust_rank(configured):
+            recommended_next_state = observed["observed_trust_state"]
+        playbook_summaries[playbook_id] = {
+            "configured_trust_state": configured,
+            "observed_trust_state": observed["observed_trust_state"],
+            "recommended_next_state": recommended_next_state,
+            "task_class": entry.get("task_class"),
+            "aggregate": aggregate,
+            "evidence_gate": observed["evidence_gate"],
+            "recommended_action": (
+                f"Promote {playbook_id} from {configured} to {recommended_next_state}."
+                if recommended_next_state != configured
+                else f"Keep {playbook_id} at {configured} until more governed evidence lands."
+            ),
+        }
+    gate_criteria = (policy.get("global_rules") or {}).get("repo_scope_expansion_gate") or {}
+    global_aggregate = aggregate_run_records(records)
+    gate = evaluate_criteria(gate_criteria, global_aggregate)
+    return {
+        "available": True,
+        "criteria": criteria_map,
+        "playbooks": playbook_summaries,
+        "repo_scope_expansion_gate": {
+            "met": gate["met"],
+            "aggregate": global_aggregate,
+            "reasons": gate["reasons"],
+            "recommended_action": (
+                "Do not widen governed repo scope yet."
+                if gate["reasons"]
+                else "Repo-scope expansion gate is green; widening can be reviewed deliberately."
+            ),
+        },
+    }
+
+
+def build_run_record(run_dir: Path) -> dict[str, Any]:
+    state = load_state(run_dir)
+    summary = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
+    approval = load_approval(run_dir) if approval_artifact(run_dir).exists() else None
+    triage = summary.get("triage") or compute_triage(state, summary, approval)
+    return {
+        "run_id": state.get("run_id") or run_dir.name,
+        "phase": state.get("phase"),
+        "status": summary.get("status") or state.get("status"),
+        "playbook_id": state.get("playbook_id"),
+        "task_class": state.get("task_class"),
+        "trust_state_snapshot": state.get("trust_state_snapshot"),
+        "canary_id": state.get("canary_id"),
+        "repo_root": state.get("repo_root"),
+        "updated_at": state.get("updated_at") or summary.get("updated_at"),
+        "break_glass_used": bool(summary.get("break_glass_used") or state.get("break_glass_used")),
+        "failure_class": summary.get("failure_class"),
+        "triage": triage,
+    }
+
+
+def load_policy_or_none(policy_path: str | Path | None = None) -> dict[str, Any] | None:
+    try:
+        policy, _ = load_policy(policy_path)
+        return policy
+    except Exception:
+        return None
+
+
+def render_run_index_explain(payload: dict[str, Any]) -> str:
+    lines = [
+        "# governed-run status index",
+        "",
+        f"- runs: `{payload.get('run_count')}`",
+    ]
+    triage = payload.get("operator_triage") or {}
+    if triage:
+        lines.append(f"- blocked_runs: `{triage.get('blocked_run_count')}`")
+        lines.append(f"- latest_operator_action: `{triage.get('recommended_action')}`")
+    gate = (payload.get("promotion_summary") or {}).get("repo_scope_expansion_gate") or {}
+    if gate:
+        lines.extend(
+            [
+                "",
+                "## Repo Scope Gate",
+                "",
+                f"- met: `{gate.get('met')}`",
+                f"- recommended_action: `{gate.get('recommended_action')}`",
+            ]
+        )
+    playbooks = (payload.get("promotion_summary") or {}).get("playbooks") or {}
+    if playbooks:
+        lines.extend(["", "## Playbooks", ""])
+        for playbook_id, item in sorted(playbooks.items()):
+            lines.append(
+                f"- {playbook_id}: configured=`{item.get('configured_trust_state')}` observed=`{item.get('observed_trust_state')}` recommended=`{item.get('recommended_next_state')}`"
+            )
+    return "\n".join(lines)
+
+
+def render_status_explain(payload: dict[str, Any]) -> str:
+    state = payload.get("state") or {}
+    summary = payload.get("summary") or {}
+    triage = payload.get("triage") or {}
+    lines = [
+        f"# governed-run `{payload.get('run_id')}`",
+        "",
+        f"- status: `{summary.get('status')}`",
+        f"- phase: `{state.get('phase')}`",
+        f"- playbook_id: `{state.get('playbook_id')}`",
+        f"- task_class: `{state.get('task_class')}`",
+        f"- trust_state_snapshot: `{state.get('trust_state_snapshot')}`",
+        f"- resumable: `{triage.get('resumable')}`",
+        f"- operator_action_required: `{triage.get('operator_action_required')}`",
+        f"- blocked_reason: `{triage.get('blocked_reason')}`",
+        "",
+        "## Next Action",
+        "",
+        str(triage.get("recommended_action") or summary.get("next_action") or "None."),
+    ]
+    if triage.get("safe_resume_command"):
+        lines.extend(["", "## Safe Resume", "", f"`{triage['safe_resume_command']}`"])
+    return "\n".join(lines)
+
+
+def list_runs(*, log_root: str | Path | None = None, policy_path: str | Path | None = None) -> dict[str, Any]:
     root = Path(log_root or LOG_ROOT_DEFAULT)
     runs: list[dict[str, Any]] = []
     if root.exists():
@@ -1491,22 +2029,26 @@ def list_runs(*, log_root: str | Path | None = None) -> dict[str, Any]:
             state_path = state_artifact(child)
             if not state_path.exists():
                 continue
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            runs.append(
-                {
-                    "run_id": state.get("run_id") or child.name,
-                    "phase": state.get("phase"),
-                    "status": state.get("status"),
-                    "playbook_id": state.get("playbook_id"),
-                    "repo_root": state.get("repo_root"),
-                    "updated_at": state.get("updated_at"),
-                }
-            )
+            runs.append(build_run_record(child))
+    blocked_runs = [run for run in runs if (run.get("triage") or {}).get("operator_action_required")]
+    latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+    triage_summary = {
+        "blocked_run_count": len(blocked_runs),
+        "blocked_run_ids": [run["run_id"] for run in blocked_runs],
+        "recommended_action": (
+            latest_blocked[0]["triage"]["recommended_action"]
+            if latest_blocked
+            else "No operator action required."
+        ),
+    }
+    promotion = promotion_summary(runs, load_policy_or_none(policy_path))
     return {
         "artifact_kind": "aoa.governed-run.status-index",
         "schema_version": "v1",
         "run_count": len(runs),
         "runs": runs,
+        "operator_triage": triage_summary,
+        "promotion_summary": promotion,
     }
 
 
@@ -1515,6 +2057,7 @@ def status_run(run_id: str, *, log_root: str | Path | None = None) -> dict[str, 
     state = load_state(run_dir)
     summary = json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
     approval = load_approval(run_dir)
+    triage = summary.get("triage") or compute_triage(state, summary, approval)
     return {
         "artifact_kind": "aoa.governed-run.status",
         "schema_version": "v1",
@@ -1522,4 +2065,5 @@ def status_run(run_id: str, *, log_root: str | Path | None = None) -> dict[str, 
         "state": state,
         "summary": summary,
         "approval": approval,
+        "triage": triage,
     }

@@ -39,6 +39,7 @@ templates for:
 
 - `return-policy.yaml`
 - `governed-execution-policy.yaml`
+- `governed-canary-catalog.json`
 
 `aoa-browser` is intentionally not templated here yet. In the current runtime
 it remains a runtime-only local image plus browser payload under

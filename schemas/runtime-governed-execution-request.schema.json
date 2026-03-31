@@ -76,6 +76,26 @@
     "break_glass_reason": {
       "type": "string",
       "minLength": 1
+    },
+    "canary_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "task_class": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "docs_only",
+        "policy_surface",
+        "validation_tightening",
+        "governed_lane",
+        null
+      ]
     }
   },
   "oneOf": [

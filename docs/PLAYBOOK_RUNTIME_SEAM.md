@@ -67,6 +67,7 @@ The first governed mutation lane does not change this seam into a playbook engin
 - `scripts/aoa-governed-run` resolves playbook cards through `POST /playbooks/inspect` or `POST /playbooks/select`
 - runtime permission semantics still live in `abyss-stack`
 - file scope, repo scope, break-glass allowance, and acceptance commands come from `${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml`
+- trust state, task class, and promotion rubric also live in the runtime policy layer rather than in `aoa-playbooks`
 - `aoa-playbooks` still owns playbook meaning; `abyss-stack` only owns the runtime permission overlay
 
 This keeps `/playbooks/*` advisory even when the governed lane uses those surfaces as input.

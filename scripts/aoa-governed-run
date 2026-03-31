@@ -21,6 +21,15 @@ def build_parser() -> argparse.ArgumentParser:
     prepare = subparsers.add_parser("prepare-request", help="Write a governed execution request template")
     prepare.add_argument("--write", required=True, help="Path to write the request JSON template")
 
+    prepare_canary = subparsers.add_parser("prepare-canary", help="Write a governed canary request template")
+    prepare_canary.add_argument("canary_id", help="Canary identifier from the governed canary catalog")
+    prepare_canary.add_argument("--write", required=True, help="Path to write the canary request JSON")
+    prepare_canary.add_argument("--repo-root", help="Override the repo_root placed into the request")
+
+    materialize = subparsers.add_parser("materialize-canaries", help="Write all governed canary request templates")
+    materialize.add_argument("--write-dir", required=True, help="Directory that should receive one request per canary")
+    materialize.add_argument("--repo-root", help="Override the repo_root placed into each request")
+
     run = subparsers.add_parser("run", help="Prepare a new governed run from a request file")
     run.add_argument("--request-file", required=True, help="Path to the governed request JSON")
     run.add_argument("--until", choices=("milestone", "done"), default="done")
@@ -31,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = subparsers.add_parser("status", help="Inspect governed run state")
     status.add_argument("--all", action="store_true", help="List all governed runs")
+    status.add_argument("--explain", action="store_true", help="Render a compact operator-facing summary instead of JSON")
     status.add_argument("run_id", nargs="?", help="Run identifier")
     return parser
 
@@ -48,6 +58,25 @@ def main() -> int:
         print(json.dumps({"ok": True, "request_file": str(target)}, indent=2, ensure_ascii=True))
         return 0
 
+    if args.command == "prepare-canary":
+        target = Path(args.write).expanduser()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = governed.request_from_canary(args.canary_id, repo_root=args.repo_root)
+        target.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        print(
+            json.dumps(
+                {"ok": True, "canary_id": args.canary_id, "request_file": str(target)},
+                indent=2,
+                ensure_ascii=True,
+            )
+        )
+        return 0
+
+    if args.command == "materialize-canaries":
+        payload = governed.materialize_canary_requests(args.write_dir, repo_root=args.repo_root)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 0
+
     if args.command == "run":
         payload = governed.prepare_run(args.request_file, until=args.until)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
@@ -63,10 +92,16 @@ def main() -> int:
             raise SystemExit("status accepts either --all or a run_id, not both")
         if args.all:
             payload = governed.list_runs()
+            if args.explain:
+                print(governed.render_run_index_explain(payload))
+                return 0
         else:
             if not args.run_id:
                 raise SystemExit("status requires --all or a run_id")
             payload = governed.status_run(args.run_id)
+            if args.explain:
+                print(governed.render_status_explain(payload))
+                return 0
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return 0
 

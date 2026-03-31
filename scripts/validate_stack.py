@@ -146,6 +146,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml",
+    ROOT / "config-templates" / "Configs" / "agent-api" / "governed-canary-catalog.json",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-memo.yaml",
@@ -162,6 +163,7 @@ REQUIRED_FILES = {
     ROOT / "schemas" / "runtime-benchmark.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-policy.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-request.schema.json",
+    ROOT / "schemas" / "runtime-governed-execution-canary-catalog.schema.json",
     ROOT / "schemas" / "runtime-memo-export-candidate.schema.json",
     ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
@@ -342,9 +344,12 @@ def validate_paths(errors: list[str]) -> None:
         "GOVERNED_EXECUTION.md",
         "prepare-wave W4 --lane docs",
         "apply-case W4 <case-id>",
+        "scripts/aoa-governed-run prepare-canary",
+        "scripts/aoa-governed-run materialize-canaries",
         "scripts/aoa-governed-run prepare-request",
         "scripts/aoa-governed-run run --request-file",
         "scripts/aoa-governed-run resume",
+        "status --all --explain",
         "scripts/aoa-w5-pilot materialize",
         "run-scenario <scenario-id> --until milestone",
         "resume-scenario <scenario-id>",
@@ -358,6 +363,7 @@ def validate_paths(errors: list[str]) -> None:
         "isolated git worktree",
         "landing.diff",
         "rollback.status.json",
+        "governed-canary-catalog.json",
         "source_authored",
         "live_available",
         "aoa-status --autonomy",
@@ -388,6 +394,8 @@ def validate_paths(errors: list[str]) -> None:
     governed_doc = (ROOT / "docs" / "GOVERNED_EXECUTION.md").read_text(encoding="utf-8")
     for required_snippet in (
         "aoa-governed-run prepare-request",
+        "aoa-governed-run prepare-canary",
+        "aoa-governed-run materialize-canaries",
         "aoa-governed-run run --request-file",
         "approval.status.json",
         "landing.diff",
@@ -395,8 +403,13 @@ def validate_paths(errors: list[str]) -> None:
         "autonomy_gate_failed",
         "policy_denied",
         "scope_violation",
+        "blocked_reason",
+        "safe_resume_command",
+        "canary_proven",
+        "trusted",
         "aoa-status --autonomy --json",
         "Configs/agent-api/governed-execution-policy.yaml",
+        "Configs/agent-api/governed-canary-catalog.json",
     ):
         if required_snippet not in governed_doc:
             errors.append(f"docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
@@ -462,6 +475,7 @@ def validate_paths(errors: list[str]) -> None:
         "python scripts/validate_stack.py --parity-check",
         "aoa-status --autonomy",
         "governed-execution-policy.yaml",
+        "governed-canary-catalog.json",
         "scripts/aoa-governed-run",
         "scripts/aoa-bootstrap-configs --force",
         "Logs/governed-runs",
@@ -526,6 +540,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/SERVICE_CATALOG.md must mention tos-source")
     if "aoa-governed-run" not in catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention aoa-governed-run")
+    if "promotion summaries" not in catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention promotion summaries")
 
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
@@ -560,6 +576,7 @@ def validate_paths(errors: list[str]) -> None:
     for required_snippet in (
         "aoa-governed-run",
         "governed-execution-policy.yaml",
+        "trust state",
         "runtime permission semantics still live in `abyss-stack`",
     ):
         if required_snippet not in playbook_runtime_doc:
@@ -586,9 +603,36 @@ def validate_paths(errors: list[str]) -> None:
         global_rules = governed_policy.get("global_rules")
         if not isinstance(global_rules, dict) or global_rules.get("gate_mode") != "fail_closed":
             errors.append("governed execution policy must set global_rules.gate_mode=fail_closed")
+        promotion_criteria = global_rules.get("promotion_criteria")
+        if not isinstance(promotion_criteria, dict) or "canary_proven" not in promotion_criteria or "trusted" not in promotion_criteria:
+            errors.append("governed execution policy must define promotion_criteria.canary_proven and promotion_criteria.trusted")
+        repo_scope_gate = global_rules.get("repo_scope_expansion_gate")
+        if not isinstance(repo_scope_gate, dict):
+            errors.append("governed execution policy must define repo_scope_expansion_gate")
         playbooks = governed_policy.get("playbooks")
         if not isinstance(playbooks, dict) or "AOA-P-0011" not in playbooks:
             errors.append("governed execution policy must include an AOA-P-0011 playbook entry")
+        else:
+            playbook = playbooks.get("AOA-P-0011") or {}
+            if playbook.get("trust_state") not in {"experimental", "canary_proven", "trusted"}:
+                errors.append("AOA-P-0011 governed policy entry must declare a valid trust_state")
+            if not isinstance(playbook.get("task_class"), str):
+                errors.append("AOA-P-0011 governed policy entry must declare task_class")
+
+    try:
+        canary_catalog = load_structured_object(
+            ROOT / "config-templates" / "Configs" / "agent-api" / "governed-canary-catalog.json"
+        )
+    except Exception as exc:
+        errors.append(f"governed canary catalog must parse cleanly: {exc}")
+    else:
+        if canary_catalog.get("surface_type") != "runtime_governed_execution_canary_catalog":
+            errors.append("governed canary catalog must declare surface_type=runtime_governed_execution_canary_catalog")
+        if canary_catalog.get("repo_scope") != "abyss-stack":
+            errors.append("governed canary catalog must keep repo_scope=abyss-stack")
+        canaries = canary_catalog.get("canaries")
+        if not isinstance(canaries, list) or not canaries:
+            errors.append("governed canary catalog must contain at least one canary entry")
 
 
 def validate_scripts(errors: list[str]) -> None:
@@ -730,6 +774,8 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/agent-api/" not in templates_readme:
         errors.append("config-templates/README.md must mention Configs/agent-api/")
+    if "governed-canary-catalog.json" not in templates_readme:
+        errors.append("config-templates/README.md must mention governed-canary-catalog.json")
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "Configs/agent-api/return-policy.yaml" not in deployment_doc:

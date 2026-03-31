@@ -148,6 +148,7 @@ Use `--force` only when you explicitly want template content to overwrite existi
 
 The agent-facing runtime may also consume a public-safe return policy file at `${AOA_STACK_ROOT}/Configs/agent-api/return-policy.yaml`, bootstrapped from `config-templates/`.
 The same bootstrap path now carries `${AOA_STACK_ROOT}/Configs/agent-api/governed-execution-policy.yaml` for the first governed mutation lane.
+It now also carries `${AOA_STACK_ROOT}/Configs/agent-api/governed-canary-catalog.json` for bounded real-task request seeding.
 When that template changes and the deployed runtime should consume the refreshed policy, run `scripts/aoa-bootstrap-configs --force` after `scripts/aoa-sync-configs`.
 The governed execution packet root lives at `${AOA_STACK_ROOT}/Logs/governed-runs/`, and the operator entrypoint is `scripts/aoa-governed-run`.
 
