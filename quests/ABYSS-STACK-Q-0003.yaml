@@ -7,7 +7,7 @@ owner_surface: guardrails/runtime-validation
 theme_ref: ''
 milestone_ref: ''
 kind: guardrail
-state: triaged
+state: done
 band: frontier
 difficulty: d3_seam
 risk: r3_side_effect
@@ -45,5 +45,10 @@ tags:
   - guardrails
   - doctor
   - render-truth
-notes: ''
+notes: >-
+  Stage 5 manual-live review closed this guardrail quest by naming the current
+  guarded runtime route explicitly: aoa-doctor, aoa-first-run --strict,
+  aoa-check-layout --strict, and render-truth must all precede aoa-up or
+  aoa-smoke for risky runtime mutation paths. Missing any one of those gates
+  keeps the route outside silent delegation.
 public_safe: true
