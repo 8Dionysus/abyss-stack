@@ -18,7 +18,7 @@ When something feels wrong, use this order:
 12. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
 13. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
 14. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
-15. inspect governed-run `artifacts/review_packet_manifest.json` when a bounded mutation run should have produced memo or eval review candidates
+15. inspect governed-run `artifacts/review_packet_manifest.json` and `artifacts/review_packet_audit.json` when a bounded mutation run should have produced memo or eval review candidates
 16. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
 17. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
 18. decide whether to fix forward or roll back
@@ -36,6 +36,8 @@ aoa-platform-adaptation --mode private --title "Short seam title" --summary "One
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
+scripts/aoa-governed-run audit <run-id>
+scripts/aoa-governed-run replay-review-packets <run-id>
 curl http://127.0.0.1:5402/playbooks/activation
 curl http://127.0.0.1:5402/kag/registry
 aoa-preset-profiles --preset agent-full --paths
@@ -92,6 +94,14 @@ aoa-export-runtime-evidence-selection \
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write
+```
+
+For governed-run review-packet audit and replay from stored context only:
+
+```bash
+scripts/aoa-governed-run audit <run-id>
+scripts/aoa-governed-run replay-review-packets <run-id>
+scripts/aoa-governed-run status <run-id> --explain
 ```
 
 For playbook advisory inspection through the localhost federation seam:

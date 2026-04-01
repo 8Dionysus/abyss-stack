@@ -38,6 +38,15 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("run_id", help="Run identifier")
     resume.add_argument("--until", choices=("milestone", "done"), default="done")
 
+    audit = subparsers.add_parser("audit", help="Audit review-packet readiness for an existing governed run")
+    audit.add_argument("run_id", help="Run identifier")
+
+    replay = subparsers.add_parser(
+        "replay-review-packets",
+        help="Rebuild review packets from stored governed-run context without rerunning the mutation lane",
+    )
+    replay.add_argument("run_id", help="Run identifier")
+
     status = subparsers.add_parser("status", help="Inspect governed run state")
     status.add_argument("--all", action="store_true", help="List all governed runs")
     status.add_argument("--explain", action="store_true", help="Render a compact operator-facing summary instead of JSON")
@@ -86,6 +95,16 @@ def main() -> int:
         payload = governed.resume_run(args.run_id, until=args.until)
         print(json.dumps(payload, indent=2, ensure_ascii=True))
         return 0 if payload.get("status") != "fail" else 1
+
+    if args.command == "audit":
+        payload = governed.audit_run(args.run_id)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 2 if payload.get("audit_verdict") == "blocked" else 0
+
+    if args.command == "replay-review-packets":
+        payload = governed.replay_review_packets(args.run_id)
+        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        return 2 if payload.get("audit_verdict") == "blocked" else 0
 
     if args.command == "status":
         if args.all and args.run_id:

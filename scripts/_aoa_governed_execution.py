@@ -118,6 +118,15 @@ EVAL_RUNTIME_TEMPLATE_INDEX_PATH = Path(
 MEMO_RUNTIME_WRITEBACK_TARGETS_PATH = Path(
     "Knowledge/federation/aoa-memo/generated/runtime_writeback_targets.min.json"
 )
+PLAYBOOK_REVIEW_PACKET_CONTRACTS_SOURCE_REF = (
+    "aoa-playbooks/generated/playbook_review_packet_contracts.min.json"
+)
+EVAL_RUNTIME_TEMPLATE_INDEX_SOURCE_REF = (
+    "aoa-evals/generated/runtime_candidate_template_index.min.json"
+)
+MEMO_RUNTIME_WRITEBACK_TARGETS_SOURCE_REF = (
+    "aoa-memo/generated/runtime_writeback_targets.min.json"
+)
 
 
 def load_trials_module() -> Any:
@@ -2121,6 +2130,10 @@ def review_packet_manifest_artifact(run_dir: Path) -> Path:
     return run_dir / "artifacts" / "review_packet_manifest.json"
 
 
+def review_packet_audit_artifact(run_dir: Path) -> Path:
+    return run_dir / "artifacts" / "review_packet_audit.json"
+
+
 def review_packet_inputs_dir(run_dir: Path) -> Path:
     return run_dir / "artifacts" / "review-packets" / "inputs"
 
@@ -2309,6 +2322,19 @@ def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] 
         lines.append(f"- emitted_review_packets: `{review_packets.get('emitted_candidate_artifact_count')}`")
         if review_packets.get("manifest_ref"):
             lines.append(f"- review_packet_manifest: `{review_packets.get('manifest_ref')}`")
+        if review_packets.get("audit_verdict"):
+            lines.append(f"- review_packet_audit_verdict: `{review_packets.get('audit_verdict')}`")
+        if review_packets.get("audit_ref"):
+            lines.append(f"- review_packet_audit: `{review_packets.get('audit_ref')}`")
+        blocked_packet_kinds = review_packets.get("blocked_packet_kinds") or []
+        if blocked_packet_kinds:
+            lines.append(
+                "- blocked_packet_kinds: `"
+                + ", ".join(str(item) for item in blocked_packet_kinds if isinstance(item, str) and item)
+                + "`"
+            )
+        if review_packets.get("safe_replay_command"):
+            lines.append(f"- safe_replay_command: `{review_packets.get('safe_replay_command')}`")
     reasons = summary.get("reasons") or []
     if reasons:
         lines.extend(["", "## Reasons", ""])
@@ -2328,6 +2354,19 @@ def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] 
         if triage.get("safe_resume_command"):
             lines.append(f"- safe_resume_command: `{triage['safe_resume_command']}`")
     lines.extend(["", "## Next Action", "", summary.get("next_action") or "None."])
+    review_targets = (review_packets or {}).get("recommended_review_targets") if isinstance(review_packets, dict) else []
+    if review_targets:
+        lines.extend(["", "## Recommended Review Targets", ""])
+        for item in review_targets:
+            if not isinstance(item, dict):
+                continue
+            owner_repo = item.get("owner_repo")
+            ref = item.get("ref")
+            why = item.get("why")
+            line = f"- {owner_repo}: `{ref}`" if owner_repo and ref else f"- `{ref or owner_repo}`"
+            if why:
+                line += f" ({why})"
+            lines.append(line)
     write_text(report_artifact(run_dir), "\n".join(lines))
 
 
@@ -2567,6 +2606,435 @@ def write_review_packet_input(
     return path
 
 
+def load_json_if_exists(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{path} must contain a JSON object")
+    return payload
+
+
+def local_ref_path(ref: Any) -> Path | None:
+    if not isinstance(ref, str) or not ref.startswith("local:"):
+        return None
+    raw_path = ref[len("local:") :].strip()
+    if not raw_path:
+        return None
+    return Path(raw_path).expanduser()
+
+
+def stored_review_packet_trace_provider(run_dir: Path) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    advisory_trace_path = advisory_trace_runtime_artifact(run_dir)
+
+    def provider(_request: dict[str, Any]) -> dict[str, Any]:
+        payload = load_json_if_exists(advisory_trace_path)
+        if payload is None:
+            raise RuntimeError("stored_advisory_trace_unavailable")
+        return payload
+
+    return provider
+
+
+def _playbook_review_packet_contract_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "playbook_id": payload.get("playbook_id"),
+        "playbook_name": payload.get("playbook_name"),
+        "scenario": payload.get("scenario"),
+        "expected_artifacts": payload.get("expected_artifacts"),
+        "eval_anchors": payload.get("eval_anchors"),
+        "memo_runtime_surfaces": payload.get("memo_runtime_surfaces"),
+        "candidate_packet_kinds": payload.get("candidate_packet_kinds"),
+        "review_required": payload.get("review_required"),
+        "source_review_refs": payload.get("source_review_refs"),
+        "gate_verdict": payload.get("gate_verdict"),
+    }
+
+
+def _eval_runtime_template_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "template_kind": payload.get("template_kind"),
+        "template_name": payload.get("template_name"),
+        "playbook_id": payload.get("playbook_id"),
+        "eval_anchor": payload.get("eval_anchor"),
+        "verdict_bundle_ref": payload.get("verdict_bundle_ref"),
+        "required_runtime_artifacts": payload.get("required_runtime_artifacts"),
+        "review_required": payload.get("review_required"),
+        "source_example_ref": payload.get("source_example_ref"),
+    }
+
+
+def _memo_writeback_target_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "runtime_surface": payload.get("runtime_surface"),
+        "target_kind": payload.get("target_kind"),
+        "writeback_class": payload.get("writeback_class"),
+        "requires_human_review": payload.get("requires_human_review"),
+        "review_state_default": payload.get("review_state_default"),
+        "runtime_refs": payload.get("runtime_refs"),
+        "notes": payload.get("notes"),
+    }
+
+
+def append_review_target(
+    targets: list[dict[str, str]],
+    seen: set[tuple[str, str]],
+    *,
+    owner_repo: str,
+    ref: str,
+    why: str,
+) -> None:
+    if not ref:
+        return
+    key = (owner_repo, ref)
+    if key in seen:
+        return
+    seen.add(key)
+    targets.append({"owner_repo": owner_repo, "ref": ref, "why": why})
+
+
+def review_packet_summary_with_audit(
+    review_packet_status: dict[str, Any] | None,
+    audit_payload: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(review_packet_status or {})
+    blocked_packet_kinds = [
+        entry.get("packet_kind")
+        for entry in audit_payload.get("packet_statuses", [])
+        if isinstance(entry, dict) and entry.get("status") in {"missing", "stale"}
+    ]
+    merged.update(
+        {
+            "audit_verdict": audit_payload.get("audit_verdict"),
+            "audit_ref": str(audit_payload.get("review_packet_audit_ref") or ""),
+            "replayable": audit_payload.get("replayable"),
+            "safe_replay_command": audit_payload.get("safe_replay_command"),
+            "blocked_packet_kinds": [item for item in blocked_packet_kinds if isinstance(item, str)],
+            "recommended_review_targets": audit_payload.get("recommended_review_targets", []),
+        }
+    )
+    return merged
+
+
+def audit_review_packets(
+    run_dir: Path,
+    *,
+    state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    state = state or load_state(run_dir)
+    approval = load_approval(run_dir) if approval_artifact(run_dir).exists() else None
+    summary = load_summary_or_synthesize(run_dir, state, approval)
+    manifest_path = review_packet_manifest_artifact(run_dir)
+    advisory_trace_path = advisory_trace_runtime_artifact(run_dir)
+    manifest_payload = load_json_if_exists(manifest_path)
+
+    playbook_id = str(
+        state.get("playbook_id")
+        or ((manifest_payload or {}).get("selected_playbook") or {}).get("playbook_id")
+        or ""
+    ).strip()
+    candidate_packet_kinds: list[str] = []
+    packet_statuses: list[dict[str, Any]] = []
+    contract_refs: list[str] = []
+    recommended_review_targets: list[dict[str, str]] = []
+    review_target_seen: set[tuple[str, str]] = set()
+    block_reasons: list[str] = []
+
+    replay_required_paths = [run_dir / "request.json", run_dir / "preflight.summary.json"]
+    replayable = bool(summary.get("status") == "pass") and all(path.exists() for path in replay_required_paths)
+
+    if manifest_payload is None:
+        block_reasons.append("review_packet_manifest_missing")
+    if not advisory_trace_path.exists():
+        block_reasons.append("advisory_trace_missing")
+
+    manifest_contract = None
+    matched_eval_entries: list[dict[str, Any]] = []
+    matched_memo_targets: list[dict[str, Any]] = []
+    emitted_refs: list[dict[str, Any]] = []
+    skipped_refs: list[dict[str, Any]] = []
+    if manifest_payload is not None:
+        raw_contract = manifest_payload.get("matched_playbook_packet_contract")
+        if isinstance(raw_contract, dict):
+            manifest_contract = raw_contract
+            candidate_packet_kinds = [
+                kind
+                for kind in raw_contract.get("candidate_packet_kinds", [])
+                if isinstance(kind, str) and kind
+            ]
+        else:
+            block_reasons.append("matched_playbook_packet_contract_missing")
+
+        matched_eval_entries = [
+            entry
+            for entry in manifest_payload.get("matched_eval_template_entries", [])
+            if isinstance(entry, dict)
+        ]
+        matched_memo_targets = [
+            entry
+            for entry in manifest_payload.get("matched_memo_writeback_targets", [])
+            if isinstance(entry, dict)
+        ]
+        emitted_refs = [
+            entry
+            for entry in manifest_payload.get("emitted_candidate_artifact_refs", [])
+            if isinstance(entry, dict)
+        ]
+        skipped_refs = [
+            entry
+            for entry in manifest_payload.get("skipped_packet_kinds", [])
+            if isinstance(entry, dict)
+        ]
+
+    if manifest_contract is not None:
+        contract_refs.append(PLAYBOOK_REVIEW_PACKET_CONTRACTS_SOURCE_REF)
+        for ref in manifest_contract.get("source_review_refs", []):
+            if isinstance(ref, str):
+                append_review_target(
+                    recommended_review_targets,
+                    review_target_seen,
+                    owner_repo="aoa-playbooks",
+                    ref=ref,
+                    why="Source-owned playbook review target for the governed packet set.",
+                )
+        try:
+            live_contract = playbook_review_packet_contract_by_id(playbook_id)
+        except Exception as exc:
+            block_reasons.append(f"live_playbook_review_packet_contract_unavailable:{type(exc).__name__}")
+        else:
+            if _playbook_review_packet_contract_projection(live_contract) != _playbook_review_packet_contract_projection(
+                manifest_contract
+            ):
+                block_reasons.append("playbook_review_packet_contract_drift")
+
+    if matched_eval_entries:
+        contract_refs.append(EVAL_RUNTIME_TEMPLATE_INDEX_SOURCE_REF)
+        live_eval_entries: dict[tuple[Any, Any], dict[str, Any]] | None = None
+        try:
+            live_eval_entries = {
+                (entry.get("template_kind"), entry.get("template_name")): entry
+                for entry in eval_runtime_candidate_templates()
+            }
+        except Exception as exc:
+            block_reasons.append(f"runtime_candidate_template_index_unavailable:{type(exc).__name__}")
+        for entry in matched_eval_entries:
+            template_name = str(entry.get("template_name") or "")
+            if live_eval_entries is not None:
+                key = (entry.get("template_kind"), template_name)
+                live_entry = live_eval_entries.get(key)
+                if live_entry is None:
+                    block_reasons.append(f"runtime_candidate_template_missing:{template_name or 'unknown'}")
+                elif _eval_runtime_template_projection(live_entry) != _eval_runtime_template_projection(entry):
+                    block_reasons.append(f"runtime_candidate_template_drift:{template_name or 'unknown'}")
+            source_example_ref = entry.get("source_example_ref")
+            if isinstance(source_example_ref, str):
+                append_review_target(
+                    recommended_review_targets,
+                    review_target_seen,
+                    owner_repo="aoa-evals",
+                    ref=source_example_ref,
+                    why="Runtime candidate packets remain eval-owned review inputs.",
+                )
+
+    if matched_memo_targets:
+        contract_refs.append(MEMO_RUNTIME_WRITEBACK_TARGETS_SOURCE_REF)
+        live_memo_targets: dict[Any, dict[str, Any]] | None = None
+        try:
+            live_memo_targets = {
+                entry.get("runtime_surface"): entry
+                for entry in memo_runtime_writeback_targets()
+                if isinstance(entry.get("runtime_surface"), str)
+            }
+        except Exception as exc:
+            block_reasons.append(f"runtime_writeback_targets_unavailable:{type(exc).__name__}")
+        for entry in matched_memo_targets:
+            runtime_surface = str(entry.get("runtime_surface") or "")
+            if live_memo_targets is not None:
+                live_entry = live_memo_targets.get(runtime_surface)
+                if live_entry is None:
+                    block_reasons.append(f"runtime_writeback_target_missing:{runtime_surface or 'unknown'}")
+                elif _memo_writeback_target_projection(live_entry) != _memo_writeback_target_projection(entry):
+                    block_reasons.append(f"runtime_writeback_target_drift:{runtime_surface or 'unknown'}")
+            local_runtime_refs = [
+                ref
+                for ref in entry.get("runtime_refs", [])
+                if isinstance(ref, str) and ref and not ref.startswith("repo:")
+            ]
+            if not local_runtime_refs:
+                local_runtime_refs = ["docs/RUNTIME_WRITEBACK_SEAM.md"]
+            for ref in local_runtime_refs:
+                append_review_target(
+                    recommended_review_targets,
+                    review_target_seen,
+                    owner_repo="aoa-memo",
+                    ref=ref,
+                    why="Memo writeback targets stay human-reviewed before source adoption.",
+                )
+
+    emitted_by_kind: dict[str, list[dict[str, Any]]] = {}
+    for entry in emitted_refs:
+        packet_kind = entry.get("packet_kind")
+        if isinstance(packet_kind, str):
+            emitted_by_kind.setdefault(packet_kind, []).append(entry)
+    skipped_by_kind = {
+        str(entry.get("packet_kind")): str(entry.get("reason") or "")
+        for entry in skipped_refs
+        if isinstance(entry.get("packet_kind"), str)
+    }
+
+    for packet_kind in candidate_packet_kinds:
+        emitted_entries = emitted_by_kind.get(packet_kind, [])
+        artifact_refs = [
+            str(entry.get("artifact_ref"))
+            for entry in emitted_entries
+            if isinstance(entry.get("artifact_ref"), str)
+        ]
+        missing_emitted_refs = [
+            ref
+            for ref in artifact_refs
+            if local_ref_path(ref) is None or not local_ref_path(ref).exists()
+        ]
+        if emitted_entries:
+            status = "stale" if missing_emitted_refs else "emitted"
+            reason = (
+                "missing emitted artifact refs: " + ", ".join(missing_emitted_refs)
+                if missing_emitted_refs
+                else None
+            )
+        elif packet_kind in skipped_by_kind:
+            status = "skipped"
+            reason = skipped_by_kind[packet_kind]
+        else:
+            status = "missing"
+            artifact_refs = []
+            reason = "expected packet kind did not emit and did not record a skip reason"
+        packet_statuses.append(
+            {
+                "packet_kind": packet_kind,
+                "status": status,
+                "artifact_refs": artifact_refs,
+                "reason": reason,
+            }
+        )
+
+    if block_reasons:
+        packet_statuses.append(
+            {
+                "packet_kind": "contract_refs",
+                "status": "stale",
+                "artifact_refs": [],
+                "reason": "; ".join(block_reasons),
+            }
+        )
+
+    packet_status_values = [entry["status"] for entry in packet_statuses if isinstance(entry.get("status"), str)]
+    if any(status in {"missing", "stale"} for status in packet_status_values):
+        audit_verdict = "blocked"
+    elif any(status == "skipped" for status in packet_status_values):
+        audit_verdict = "partial"
+    elif packet_status_values and all(status == "emitted" for status in packet_status_values):
+        audit_verdict = "ready"
+    else:
+        audit_verdict = "blocked"
+
+    audit_payload = {
+        "schema_version": 1,
+        "run_id": state.get("run_id") or run_dir.name,
+        "playbook_id": playbook_id,
+        "audit_verdict": audit_verdict,
+        "review_packet_manifest_ref": str(manifest_path),
+        "advisory_trace_ref": str(advisory_trace_path) if advisory_trace_path.exists() else None,
+        "packet_statuses": packet_statuses,
+        "contract_refs": list(dict.fromkeys(contract_refs)),
+        "recommended_review_targets": recommended_review_targets,
+        "replayable": replayable,
+        "safe_replay_command": (
+            f"scripts/aoa-governed-run replay-review-packets {state.get('run_id') or run_dir.name}"
+            if replayable
+            else None
+        ),
+    }
+    write_json(review_packet_audit_artifact(run_dir), audit_payload)
+    audit_payload["review_packet_audit_ref"] = str(review_packet_audit_artifact(run_dir))
+    return audit_payload
+
+
+def persist_review_packet_audit_summary(
+    run_dir: Path,
+    *,
+    state: dict[str, Any] | None = None,
+    review_packet_status: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    state = state or load_state(run_dir)
+    approval = load_approval(run_dir) if approval_artifact(run_dir).exists() else None
+    summary = load_summary_or_synthesize(run_dir, state, approval)
+    audit_payload = audit_review_packets(run_dir, state=state)
+    merged_review_packets = review_packet_summary_with_audit(review_packet_status or summary.get("review_packets"), audit_payload)
+    summary["review_packets"] = merged_review_packets
+    save_summary(run_dir, summary, state=state)
+    return audit_payload, merged_review_packets
+
+
+def audit_run(
+    run_id: str,
+    *,
+    log_root: str | Path | None = None,
+) -> dict[str, Any]:
+    run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
+    state = load_state(run_dir)
+    audit_payload, review_packets = persist_review_packet_audit_summary(run_dir, state=state)
+    return {
+        "artifact_kind": "aoa.governed-run.review-packet-audit-result",
+        "schema_version": "v1",
+        "run_id": run_id,
+        "audit_verdict": audit_payload.get("audit_verdict"),
+        "review_packets": review_packets,
+        "review_packet_audit": audit_payload,
+    }
+
+
+def replay_review_packets(
+    run_id: str,
+    *,
+    log_root: str | Path | None = None,
+) -> dict[str, Any]:
+    run_dir = Path(log_root or LOG_ROOT_DEFAULT) / run_id
+    state = load_state(run_dir)
+    if str(state.get("status") or "") != "pass":
+        raise RuntimeError("replay-review-packets requires a completed governed pass run")
+    request_path = run_dir / "request.json"
+    preflight_path = run_dir / "preflight.summary.json"
+    if not request_path.exists() or not preflight_path.exists():
+        missing = [path.name for path in (request_path, preflight_path) if not path.exists()]
+        raise RuntimeError("replay-review-packets requires stored inputs: " + ", ".join(missing))
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    advisory_context = preflight.get("advisory_context")
+    if not isinstance(request, dict) or not isinstance(advisory_context, dict):
+        raise RuntimeError("replay-review-packets requires dict-shaped request and advisory_context payloads")
+
+    review_packet_status = materialize_review_packets(
+        run_dir,
+        request=request,
+        state=state,
+        advisory_context=advisory_context,
+        advisory_trace_provider=stored_review_packet_trace_provider(run_dir),
+    )
+    audit_payload, merged_review_packets = persist_review_packet_audit_summary(
+        run_dir,
+        state=state,
+        review_packet_status=review_packet_status,
+    )
+    return {
+        "artifact_kind": "aoa.governed-run.review-packet-replay",
+        "schema_version": "v1",
+        "run_id": run_id,
+        "audit_verdict": audit_payload.get("audit_verdict"),
+        "review_packets": merged_review_packets,
+        "review_packet_audit": audit_payload,
+    }
+
+
 def export_wrapper_command(script_name: str, *, input_file: Path, extra_args: list[str] | None = None) -> list[str]:
     command = [
         "env",
@@ -2686,6 +3154,7 @@ def materialize_review_packets(
     request: dict[str, Any],
     state: dict[str, Any],
     advisory_context: dict[str, Any],
+    advisory_trace_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     playbook_id = str(state.get("playbook_id") or request.get("playbook_id") or "").strip()
     if not playbook_id:
@@ -2720,7 +3189,8 @@ def materialize_review_packets(
     advisory_trace_error: str | None = None
     if playbook_contract is not None:
         try:
-            advisory_trace = default_review_packet_trace_provider(request)
+            provider = advisory_trace_provider or default_review_packet_trace_provider
+            advisory_trace = provider(request)
         except Exception as exc:
             advisory_trace_error = f"{type(exc).__name__}: {exc}"
             advisory_trace = fallback_review_packet_trace(
@@ -2925,6 +3395,13 @@ def pass_result(
                     request=request,
                     state=state,
                     advisory_context=advisory_context,
+                )
+                audit_state = dict(state)
+                audit_state["phase"] = "completed"
+                audit_state["status"] = "pass"
+                review_packet_status = review_packet_summary_with_audit(
+                    review_packet_status,
+                    audit_review_packets(run_dir, state=audit_state),
                 )
         except Exception as exc:
             review_packet_status = {
@@ -3775,6 +4252,7 @@ def build_run_record(run_dir: Path) -> dict[str, Any]:
         "updated_at": state.get("updated_at") or summary.get("updated_at"),
         "break_glass_used": bool(summary.get("break_glass_used") or state.get("break_glass_used")),
         "failure_class": summary.get("failure_class"),
+        "review_packet_audit_verdict": ((summary.get("review_packets") or {}).get("audit_verdict")),
         "triage": triage,
     }
 
@@ -3826,6 +4304,18 @@ def render_status_explain(payload: dict[str, Any]) -> str:
     summary = payload.get("summary") or {}
     triage = payload.get("triage") or {}
     review_packets = summary.get("review_packets") or {}
+    review_packet_audit = payload.get("review_packet_audit") or {}
+    blocked_packet_kinds = review_packets.get("blocked_packet_kinds")
+    if not isinstance(blocked_packet_kinds, list):
+        blocked_packet_kinds = [
+            entry.get("packet_kind")
+            for entry in review_packet_audit.get("packet_statuses", [])
+            if isinstance(entry, dict) and entry.get("status") in {"missing", "stale"}
+        ]
+    recommended_review_targets = review_packets.get("recommended_review_targets")
+    if not isinstance(recommended_review_targets, list):
+        recommended_review_targets = review_packet_audit.get("recommended_review_targets") or []
+    safe_replay_command = review_packets.get("safe_replay_command") or review_packet_audit.get("safe_replay_command")
     lines = [
         f"# governed-run `{payload.get('run_id')}`",
         "",
@@ -3840,6 +4330,7 @@ def render_status_explain(payload: dict[str, Any]) -> str:
         f"- blocked_reason: `{triage.get('blocked_reason')}`",
         f"- review_packet_ready: `{review_packets.get('ready')}`",
         f"- emitted_review_packets: `{review_packets.get('emitted_candidate_artifact_count')}`",
+        f"- audit_verdict: `{review_packets.get('audit_verdict') or review_packet_audit.get('audit_verdict')}`",
         "",
         "## Next Action",
         "",
@@ -3849,8 +4340,29 @@ def render_status_explain(payload: dict[str, Any]) -> str:
         lines.extend(["", "## Review Packets", "", f"- manifest: `{review_packets['manifest_ref']}`"])
         if review_packets.get("advisory_trace_ref"):
             lines.append(f"- advisory_trace: `{review_packets['advisory_trace_ref']}`")
+        if review_packets.get("audit_ref") or review_packet_audit.get("review_packet_audit_ref"):
+            lines.append(
+                f"- audit: `{review_packets.get('audit_ref') or review_packet_audit.get('review_packet_audit_ref')}`"
+            )
+        if blocked_packet_kinds:
+            lines.append(
+                "- blocked_packet_kinds: `"
+                + ", ".join(str(item) for item in blocked_packet_kinds if isinstance(item, str) and item)
+                + "`"
+            )
+        if recommended_review_targets:
+            lines.append("- recommended_review_targets:")
+            for item in recommended_review_targets:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    f"  {item.get('owner_repo')}: `{item.get('ref')}`"
+                    + (f" ({item.get('why')})" if item.get("why") else "")
+                )
     if triage.get("safe_resume_command"):
         lines.extend(["", "## Safe Resume", "", f"`{triage['safe_resume_command']}`"])
+    if safe_replay_command:
+        lines.extend(["", "## Safe Replay", "", f"- safe_replay_command: `{safe_replay_command}`"])
     return "\n".join(lines)
 
 
@@ -3927,6 +4439,7 @@ def status_run(run_id: str, *, log_root: str | Path | None = None) -> dict[str, 
     approval = load_approval(run_dir)
     summary = load_summary_or_synthesize(run_dir, state, approval)
     triage = summary.get("triage") or compute_triage(state, summary, approval)
+    review_packet_audit = load_json_if_exists(review_packet_audit_artifact(run_dir))
     return {
         "artifact_kind": "aoa.governed-run.status",
         "schema_version": "v1",
@@ -3935,4 +4448,5 @@ def status_run(run_id: str, *, log_root: str | Path | None = None) -> dict[str, 
         "summary": summary,
         "approval": approval,
         "triage": triage,
+        "review_packet_audit": review_packet_audit,
     }

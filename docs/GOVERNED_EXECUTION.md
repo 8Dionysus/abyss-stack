@@ -69,6 +69,8 @@ scripts/aoa-governed-run prepare-canary docs-truth-wording-alignment --write /tm
 scripts/aoa-governed-run materialize-canaries --write-dir /tmp/governed-canaries
 scripts/aoa-governed-run run --request-file /tmp/request.json --until done
 scripts/aoa-governed-run resume <run-id>
+scripts/aoa-governed-run audit <run-id>
+scripts/aoa-governed-run replay-review-packets <run-id>
 scripts/aoa-governed-run status --all
 scripts/aoa-governed-run status <run-id>
 scripts/aoa-governed-run status --all --explain
@@ -94,9 +96,12 @@ When review-packet inputs are available, the governed lane writes:
 
 - `artifacts/advisory_trace.json`
 - `artifacts/review_packet_manifest.json`
+- `artifacts/review_packet_audit.json`
 - bounded raw input payloads for existing memo/eval export wrappers
 
 Those packets remain runtime-owned candidates until human review in the owner repos.
+`audit <run-id>` computes operator-facing packet readiness without mutating owner repos.
+`replay-review-packets <run-id>` reruns only the review-packet assembly lane from stored request, preflight, and advisory context.
 
 ## Trust states and promotion rubric
 
@@ -175,6 +180,13 @@ Examples:
 - `blocked_reason`
 - `recommended_action`
 - `safe_resume_command` when resumption is valid
+
+When review packets exist, `status --explain` also surfaces:
+
+- `audit_verdict`
+- blocked or missing packet kinds
+- recommended review targets
+- `safe_replay_command` when the stored run is replayable
 
 Use `--explain` when you want a one-screen summary instead of raw JSON.
 
