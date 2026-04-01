@@ -528,6 +528,39 @@ class GovernedExecutionTests(unittest.TestCase):
             / "playbook_review_packet_contracts.min.json",
             playbook_contracts,
         )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-playbooks"
+            / "generated"
+            / "playbook_review_intake.min.json",
+            {
+                "schema_version": 1,
+                "playbooks": [
+                    {
+                        "playbook_id": playbook_id,
+                        "playbook_name": "bounded-change-safe",
+                        "scenario": "bounded_change_safe",
+                        "gate_verdict": "hold",
+                        "gate_review_ref": "docs/gate-reviews/bounded-change-safe.md",
+                        "real_run_template_ref": "examples/playbook_activation.bounded-change-safe.example.json",
+                        "required_artifact_set": ["approval_record", "verification_pack"],
+                        "accepted_packet_kinds": [
+                            "memo_candidate",
+                            "runtime_evidence_selection_candidate",
+                            "artifact_hook_candidate",
+                        ],
+                        "source_review_refs": ["playbooks/bounded-change-safe/PLAYBOOK.md"],
+                        "review_outcome_targets": {
+                            "real_runs": ["docs/real-runs/2026-03-28.bounded-change-safe.md"],
+                            "gate_reviews": ["docs/gate-reviews/bounded-change-safe.md"],
+                        },
+                        "composition_posture": "awaiting-reviewed-run",
+                    }
+                ],
+            },
+        )
 
         eval_templates = {
             "schema_version": 1,
@@ -566,6 +599,53 @@ class GovernedExecutionTests(unittest.TestCase):
             / "generated"
             / "runtime_candidate_template_index.min.json",
             eval_templates,
+        )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+            / "generated"
+            / "runtime_candidate_intake.min.json",
+            {
+                "schema_version": 1,
+                "templates": (
+                    [
+                        {
+                            "template_kind": "runtime_evidence_selection",
+                            "template_name": "workhorse-q4-vs-q6-latency-tradeoff",
+                            "playbook_id": None,
+                            "eval_anchor": None,
+                            "verdict_bundle_ref": None,
+                            "required_runtime_artifacts": ["summary", "comparison-note"],
+                            "review_required": True,
+                            "review_guide_ref": "docs/RUNTIME_BENCH_PROMOTION_GUIDE.md",
+                            "owner_review_refs": [
+                                "docs/RUNTIME_BENCH_PROMOTION_GUIDE.md",
+                                "examples/runtime_evidence_selection.workhorse-local.example.json",
+                            ],
+                            "candidate_acceptance_posture": "candidate_until_eval_review",
+                        },
+                        {
+                            "template_kind": "artifact_to_verdict_hook",
+                            "template_name": "aoa-p-0011-approval-boundary-hook",
+                            "playbook_id": playbook_id,
+                            "eval_anchor": "aoa-approval-boundary-adherence",
+                            "verdict_bundle_ref": "repo:aoa-evals/bundles/aoa-approval-boundary-adherence/EVAL.md",
+                            "required_runtime_artifacts": ["approval_record", "verification_pack"],
+                            "review_required": True,
+                            "review_guide_ref": "docs/TRACE_EVAL_BRIDGE.md",
+                            "owner_review_refs": [
+                                "docs/TRACE_EVAL_BRIDGE.md",
+                                "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
+                            ],
+                            "candidate_acceptance_posture": "candidate_until_eval_review",
+                        },
+                    ]
+                    if include_eval_templates
+                    else []
+                ),
+            },
         )
         write_json(
             stack_root
@@ -627,6 +707,37 @@ class GovernedExecutionTests(unittest.TestCase):
             / "generated"
             / "runtime_writeback_targets.min.json",
             memo_targets,
+        )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-memo"
+            / "generated"
+            / "runtime_writeback_intake.min.json",
+            {
+                "schema_version": 1,
+                "targets": (
+                    [
+                        {
+                            "runtime_surface": "approval_record",
+                            "target_kind": "decision",
+                            "writeback_class": "memo_surviving_event",
+                            "requires_human_review": True,
+                            "review_state_default": "proposed",
+                            "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                            "owner_review_refs": [
+                                "docs/MEMORY_MODEL.md#approval-record",
+                                "docs/RUNTIME_WRITEBACK_SEAM.md",
+                                "docs/QUEST_EVIDENCE_WRITEBACK.md",
+                            ],
+                            "intake_posture": "review_before_writeback",
+                        }
+                    ]
+                    if include_memo_target
+                    else []
+                ),
+            },
         )
         write_json(
             stack_root
@@ -2339,6 +2450,159 @@ class GovernedExecutionTests(unittest.TestCase):
             f"scripts/aoa-governed-run replay-review-packets {run_id}",
         )
 
+    def test_handoff_brief_emits_review_handoff_bundle_for_complete_run(self) -> None:
+        self.install_review_packet_runtime_surfaces()
+        run_id = "run-review-handoff"
+        run_dir = self.logs_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            run_dir / "request.json",
+            {
+                "goal": "Review bounded change safe adoption.",
+                "playbook_id": "AOA-P-0011",
+                "repo_root": str(self.repo_root),
+            },
+        )
+        write_json(
+            run_dir / "preflight.summary.json",
+            {
+                "advisory_context": {
+                    "playbook_id": "AOA-P-0011",
+                    "playbook": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"},
+                }
+            },
+        )
+        state = {
+            "run_id": run_id,
+            "target_id": "abyss-stack",
+            "repo_root": str(self.repo_root),
+            "playbook_id": "AOA-P-0011",
+            "task_class": "docs_only",
+            "trust_state_snapshot": "canary_proven",
+            "phase": "completed",
+            "status": "pass",
+            "base_head": "abc123",
+            "changed_files": ["docs/target.md"],
+        }
+        write_json(run_dir / "run.state.json", state)
+        write_json(
+            run_dir / "artifacts" / "advisory_trace.json",
+            {
+                "selectors": {"playbook_id": "AOA-P-0011"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        )
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        ):
+            self.module.materialize_review_packets(
+                run_dir,
+                request={
+                    "goal": "Review bounded change safe adoption.",
+                    "playbook_id": "AOA-P-0011",
+                    "repo_root": str(self.repo_root),
+                },
+                state=state,
+                advisory_context={"playbook_id": "AOA-P-0011"},
+            )
+
+        payload = self.module.handoff_brief_run(run_id, log_root=self.logs_root)
+        bundle = json.loads((run_dir / "artifacts" / "review_handoff_bundle.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["handoff_readiness"], "ready")
+        self.assertEqual(bundle["playbook_id"], "AOA-P-0011")
+        self.assertEqual(bundle["audit_verdict"], "ready")
+        self.assertIn("aoa-playbooks", bundle["recommended_review_targets"])
+        self.assertIn("aoa-evals", bundle["recommended_review_targets"])
+        self.assertIn("aoa-memo", bundle["recommended_review_targets"])
+        self.assertTrue(bundle["operator_next_steps"])
+        self.assertEqual(
+            [entry["template_name"] for entry in bundle["eval_intake_entries"]],
+            [
+                "aoa-p-0011-approval-boundary-hook",
+                "workhorse-q4-vs-q6-latency-tradeoff",
+            ],
+        )
+
+    def test_handoff_brief_degrades_when_runtime_writeback_intake_surface_is_missing(self) -> None:
+        stack_root = self.install_review_packet_runtime_surfaces()
+        run_id = "run-review-handoff-blocked"
+        run_dir = self.logs_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            run_dir / "request.json",
+            {
+                "goal": "Review bounded change safe adoption.",
+                "playbook_id": "AOA-P-0011",
+                "repo_root": str(self.repo_root),
+            },
+        )
+        write_json(
+            run_dir / "preflight.summary.json",
+            {
+                "advisory_context": {
+                    "playbook_id": "AOA-P-0011",
+                    "playbook": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"},
+                }
+            },
+        )
+        state = {
+            "run_id": run_id,
+            "target_id": "abyss-stack",
+            "repo_root": str(self.repo_root),
+            "playbook_id": "AOA-P-0011",
+            "task_class": "docs_only",
+            "trust_state_snapshot": "canary_proven",
+            "phase": "completed",
+            "status": "pass",
+            "base_head": "abc123",
+            "changed_files": ["docs/target.md"],
+        }
+        write_json(run_dir / "run.state.json", state)
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        ):
+            self.module.materialize_review_packets(
+                run_dir,
+                request={
+                    "goal": "Review bounded change safe adoption.",
+                    "playbook_id": "AOA-P-0011",
+                    "repo_root": str(self.repo_root),
+                },
+                state=state,
+                advisory_context={"playbook_id": "AOA-P-0011"},
+            )
+
+        (
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-memo"
+            / "generated"
+            / "runtime_writeback_intake.min.json"
+        ).unlink()
+        payload = self.module.handoff_brief_run(run_id, log_root=self.logs_root)
+        bundle = payload["review_handoff_bundle"]
+
+        self.assertEqual(payload["handoff_readiness"], "blocked")
+        self.assertEqual(bundle["audit_verdict"], "ready")
+        reasons = {
+            (entry["packet_kind"], entry["status"]): entry["reason"]
+            for entry in bundle["missing_or_blocked_packet_kinds"]
+        }
+        self.assertIn(("memo_writeback_intake", "missing"), reasons)
+        self.assertIn("runtime_writeback_intake", reasons[("memo_writeback_intake", "missing")])
+
     def test_pass_result_persists_review_packet_summary_for_status_explain(self) -> None:
         self.install_review_packet_runtime_surfaces()
         run_dir = self.logs_root / "run-pass-summary"
@@ -2417,6 +2681,15 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("audit_verdict", rendered)
         self.assertIn("safe_replay_command", rendered)
         self.assertIn("playbooks/bounded-change-safe/PLAYBOOK.md", rendered)
+
+        handoff_payload = self.module.handoff_brief_run("run-pass-summary", log_root=self.logs_root)
+        self.assertEqual(handoff_payload["handoff_readiness"], "ready")
+        status_payload = self.module.status_run("run-pass-summary", log_root=self.logs_root)
+        rendered = self.module.render_status_explain(status_payload)
+        self.assertIn("review_handoff_bundle.json", rendered)
+        self.assertIn("handoff_readiness", rendered)
+        self.assertIn("grouped_review_targets", rendered)
+        self.assertIn("docs/RUNTIME_WRITEBACK_SEAM.md", rendered)
 
     def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
         def write_run(
