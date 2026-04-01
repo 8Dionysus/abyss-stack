@@ -1,0 +1,5 @@
+PyYAML
+pydantic
+pytest
+fastapi
+httpx
