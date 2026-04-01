@@ -14,6 +14,7 @@ required_files:
   - generated/eval_sections.full.json
   - generated/comparison_spine.json
   - generated/runtime_candidate_template_index.min.json
+  - generated/runtime_candidate_intake.min.json
   - examples/runtime_evidence_selection.workhorse-local.example.json
   - examples/runtime_evidence_selection.return-anchor-integrity.example.json
   - examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json

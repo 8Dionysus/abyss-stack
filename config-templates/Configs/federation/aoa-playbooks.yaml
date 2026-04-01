@@ -14,6 +14,7 @@ required_files:
   - generated/playbook_federation_surfaces.min.json
   - generated/playbook_review_status.min.json
   - generated/playbook_review_packet_contracts.min.json
+  - generated/playbook_review_intake.min.json
   - generated/playbook_handoff_contracts.json
   - generated/playbook_failure_catalog.json
   - generated/playbook_subagent_recipes.json
