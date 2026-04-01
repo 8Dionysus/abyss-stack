@@ -514,7 +514,7 @@ class GovernedExecutionTests(unittest.TestCase):
                         "artifact_hook_candidate",
                     ],
                     "review_required": True,
-                    "source_review_refs": ["docs/gate-reviews/bounded-change-safe.md"],
+                    "source_review_refs": ["playbooks/bounded-change-safe/PLAYBOOK.md"],
                     "gate_verdict": "hold",
                 }
             ],
@@ -609,8 +609,8 @@ class GovernedExecutionTests(unittest.TestCase):
                         "runtime_surface": "approval_record",
                         "target_kind": "decision",
                         "writeback_class": "memo_surviving_event",
-                        "requires_human_review": False,
-                        "review_state_default": "confirmed",
+                        "requires_human_review": True,
+                        "review_state_default": "proposed",
                         "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
                         "notes": "Fixture approval writeback.",
                     }
@@ -646,8 +646,8 @@ class GovernedExecutionTests(unittest.TestCase):
                             "target_kind": "decision",
                             "writeback_class": "memo_surviving_event",
                             "temperature_hint": "warm",
-                            "review_state_default": "confirmed",
-                            "requires_human_review": False,
+                            "review_state_default": "proposed",
+                            "requires_human_review": True,
                             "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
                             "notes": "Fixture approval writeback.",
                         }
@@ -2094,7 +2094,7 @@ class GovernedExecutionTests(unittest.TestCase):
                         "artifact_hook_candidate",
                     ],
                     "review_required": True,
-                    "source_review_refs": [],
+                    "source_review_refs": ["playbooks/bounded-change-safe/PLAYBOOK.md"],
                     "gate_verdict": "hold",
                 },
             },
@@ -2174,6 +2174,171 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertEqual(reasons["runtime_evidence_selection_candidate"], "no_runtime_evidence_selection_templates")
         self.assertEqual(reasons["artifact_hook_candidate"], "no_artifact_hook_templates")
 
+    def test_audit_review_packets_emits_review_packet_audit_for_complete_run(self) -> None:
+        self.install_review_packet_runtime_surfaces()
+        run_dir = self.logs_root / "run-review-packets-audit"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        request = {
+            "goal": "Review bounded change safe adoption.",
+            "playbook_id": "AOA-P-0011",
+            "repo_root": str(self.repo_root),
+        }
+        state = {
+            "run_id": "run-review-packets-audit",
+            "playbook_id": "AOA-P-0011",
+            "changed_files": ["docs/target.md"],
+            "status": "pass",
+        }
+
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        ):
+            self.module.materialize_review_packets(
+                run_dir,
+                request=request,
+                state=state,
+                advisory_context={"playbook_id": "AOA-P-0011"},
+            )
+
+        audit = self.module.audit_review_packets(run_dir, state=state)
+        self.assertEqual(audit["audit_verdict"], "ready")
+        self.assertTrue((run_dir / "artifacts" / "review_packet_audit.json").exists())
+        self.assertEqual(
+            audit["contract_refs"],
+            [
+                "aoa-playbooks/generated/playbook_review_packet_contracts.min.json",
+                "aoa-evals/generated/runtime_candidate_template_index.min.json",
+                "aoa-memo/generated/runtime_writeback_targets.min.json",
+            ],
+        )
+        recommended_targets = {(item["owner_repo"], item["ref"]) for item in audit["recommended_review_targets"]}
+        self.assertIn(("aoa-playbooks", "playbooks/bounded-change-safe/PLAYBOOK.md"), recommended_targets)
+        self.assertIn(
+            ("aoa-evals", "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"),
+            recommended_targets,
+        )
+        self.assertIn(("aoa-memo", "docs/MEMORY_MODEL.md#approval-record"), recommended_targets)
+
+    def test_audit_review_packets_blocks_when_emitted_artifact_is_missing(self) -> None:
+        stack_root = self.install_review_packet_runtime_surfaces()
+        run_dir = self.logs_root / "run-review-packets-blocked"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        request = {
+            "goal": "Review bounded change safe adoption.",
+            "playbook_id": "AOA-P-0011",
+            "repo_root": str(self.repo_root),
+        }
+        state = {
+            "run_id": "run-review-packets-blocked",
+            "playbook_id": "AOA-P-0011",
+            "changed_files": ["docs/target.md"],
+            "status": "pass",
+        }
+
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        ):
+            self.module.materialize_review_packets(
+                run_dir,
+                request=request,
+                state=state,
+                advisory_context={"playbook_id": "AOA-P-0011"},
+            )
+
+        (stack_root / "Logs" / "memo-exports" / "latest" / "approval_record.private.json").unlink()
+        audit = self.module.audit_review_packets(run_dir, state=state)
+        self.assertEqual(audit["audit_verdict"], "blocked")
+        memo_status = next(entry for entry in audit["packet_statuses"] if entry["packet_kind"] == "memo_candidate")
+        self.assertEqual(memo_status["status"], "stale")
+        self.assertIn("approval_record.private.json", memo_status["reason"])
+
+    def test_replay_review_packets_refreshes_manifest_and_audit_without_federated_rerun(self) -> None:
+        self.install_review_packet_runtime_surfaces()
+        run_id = "run-review-packets-replay"
+        run_dir = self.logs_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            run_dir / "request.json",
+            {
+                "goal": "Review bounded change safe adoption.",
+                "playbook_id": "AOA-P-0011",
+                "repo_root": str(self.repo_root),
+            },
+        )
+        write_json(
+            run_dir / "preflight.summary.json",
+            {
+                "advisory_context": {
+                    "playbook_id": "AOA-P-0011",
+                    "playbook": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"},
+                }
+            },
+        )
+        write_json(
+            run_dir / "run.state.json",
+            {
+                "run_id": run_id,
+                "target_id": "abyss-stack",
+                "repo_root": str(self.repo_root),
+                "playbook_id": "AOA-P-0011",
+                "task_class": "docs_only",
+                "trust_state_snapshot": "canary_proven",
+                "phase": "completed",
+                "status": "pass",
+                "base_head": "abc123",
+                "changed_files": ["docs/target.md"],
+            },
+        )
+        write_json(
+            run_dir / "result.summary.json",
+            {
+                "artifact_kind": "aoa.governed-run.result-summary",
+                "schema_version": "v1",
+                "run_id": run_id,
+                "updated_at": "2026-04-01T00:00:00Z",
+                "status": "pass",
+                "phase": "completed",
+                "break_glass_used": False,
+                "next_action": "Governed execution landed successfully.",
+            },
+        )
+        write_json(
+            run_dir / "artifacts" / "advisory_trace.json",
+            {
+                "trace_source": "stored-advisory",
+                "selectors": {"playbook_id": "AOA-P-0011"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        )
+
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            side_effect=AssertionError("replay should not rerun federated advisory"),
+        ):
+            payload = self.module.replay_review_packets(run_id, log_root=self.logs_root)
+
+        self.assertIn("review_packets", payload)
+        self.assertEqual(payload["audit_verdict"], "ready")
+        self.assertTrue((run_dir / "artifacts" / "review_packet_manifest.json").exists())
+        self.assertTrue((run_dir / "artifacts" / "review_packet_audit.json").exists())
+        summary = json.loads((run_dir / "result.summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(summary["review_packets"]["audit_verdict"], "ready")
+        self.assertEqual(
+            summary["review_packets"]["safe_replay_command"],
+            f"scripts/aoa-governed-run replay-review-packets {run_id}",
+        )
+
     def test_pass_result_persists_review_packet_summary_for_status_explain(self) -> None:
         self.install_review_packet_runtime_surfaces()
         run_dir = self.logs_root / "run-pass-summary"
@@ -2237,10 +2402,21 @@ class GovernedExecutionTests(unittest.TestCase):
             summary = self.module.pass_result(run_dir, state=state, changed_files=["docs/target.md"])
 
         self.assertTrue(summary["review_packets"]["ready"])
+        self.assertEqual(summary["review_packets"]["audit_verdict"], "ready")
+        self.assertTrue(summary["review_packets"]["audit_ref"].endswith("review_packet_audit.json"))
+        self.assertEqual(
+            summary["review_packets"]["safe_replay_command"],
+            "scripts/aoa-governed-run replay-review-packets run-pass-summary",
+        )
+        self.assertTrue(summary["review_packets"]["recommended_review_targets"])
         status_payload = self.module.status_run("run-pass-summary", log_root=self.logs_root)
+        self.assertEqual(status_payload["review_packet_audit"]["audit_verdict"], "ready")
         rendered = self.module.render_status_explain(status_payload)
         self.assertIn("review_packet_ready", rendered)
         self.assertIn("review_packet_manifest.json", rendered)
+        self.assertIn("audit_verdict", rendered)
+        self.assertIn("safe_replay_command", rendered)
+        self.assertIn("playbooks/bounded-change-safe/PLAYBOOK.md", rendered)
 
     def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
         def write_run(
