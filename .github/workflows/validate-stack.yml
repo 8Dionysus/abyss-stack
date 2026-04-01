@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install test dependencies
-        run: python -m pip install PyYAML pydantic pytest
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Install shellcheck, rsync, podman and podman-compose
         run: |
@@ -31,8 +31,8 @@ jobs:
       - name: Python syntax check
         run: python -m py_compile scripts/validate_stack.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index
 
-      - name: Run autonomy control-loop unit tests
-        run: python -m unittest tests.test_aoa_status_autonomy tests.test_route_api_closure_status tests.test_governed_execution tests.test_validate_stack_questbook
+      - name: Run Python test suite
+        run: python -m pytest -q
 
       - name: Shellcheck scripts
         run: |

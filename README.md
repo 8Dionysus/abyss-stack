@@ -199,6 +199,14 @@ The current Intel embeddings posture still uses OVMS; any move from OpenVINO ser
 The first live consumer step has now landed in `langchain-api` through opt-in `POST /run/federated`, which can consume advisory playbook and memo seams without changing the default `POST /run` path.
 The next large step is no longer bootstrap or mirror landing, or whether the live runtime should consume those seams at all; it is deciding how broadly and how deeply the runtime loop should rely on those already-landed seams.
 
+## Development
+
+```bash
+python -m pip install -r requirements-dev.txt
+python scripts/validate_stack.py
+python -m pytest -q
+```
+
 ## License
 
 Apache-2.0
