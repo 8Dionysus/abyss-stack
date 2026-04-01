@@ -53,8 +53,12 @@ Structured advisory read surfaces:
 - `POST /playbooks/subagent-recipe`
 - `POST /playbooks/automation-seed`
 
-`POST /playbooks/inspect` now returns the same compact playbook card as before, plus an optional `review_status` object when the mirrored review-status surface contains a gate-owned entry for that playbook.
-That review-status object is derived from `aoa-playbooks` real-run and gate-review Markdown; it is not a second authored truth surface inside the runtime.
+`POST /playbooks/inspect` now returns the same compact playbook card as before, plus:
+
+- an optional `review_status` object when the mirrored review-status surface contains a gate-owned entry for that playbook
+- an optional `review_packet_contract` object when the mirrored review-packet contract surface contains a derived review-packet entry for that playbook
+
+Both objects are derived from `aoa-playbooks` source-owned review material; neither becomes a second authored truth surface inside the runtime.
 
 These endpoints:
 - read only runtime-local mirrored data
@@ -75,6 +79,7 @@ The first governed mutation lane does not change this seam into a playbook engin
 - `aoa-playbooks` still owns playbook meaning; `abyss-stack` only owns the runtime permission overlay
 
 This keeps `/playbooks/*` advisory even when the governed lane uses those surfaces as input.
+The governed lane may use `review_packet_contract` only to materialize runtime-owned candidate packets for later human review; it must not mutate `aoa-playbooks` directly.
 
 ## What this phase does not do
 

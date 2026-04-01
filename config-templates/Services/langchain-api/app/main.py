@@ -698,6 +698,24 @@ def _playbook_review_status_note(card: dict[str, Any]) -> dict[str, Any] | None:
     return {key: value for key, value in note.items() if value not in (None, [], {})}
 
 
+def _playbook_review_packet_contract_note(card: dict[str, Any]) -> dict[str, Any] | None:
+    contract = card.get("review_packet_contract")
+    if not isinstance(contract, dict):
+        return None
+
+    note = {
+        "playbook_id": contract.get("playbook_id"),
+        "scenario": contract.get("scenario"),
+        "expected_artifacts": contract.get("expected_artifacts"),
+        "eval_anchors": contract.get("eval_anchors"),
+        "memo_runtime_surfaces": contract.get("memo_runtime_surfaces"),
+        "candidate_packet_kinds": contract.get("candidate_packet_kinds"),
+        "review_required": contract.get("review_required"),
+        "gate_verdict": contract.get("gate_verdict"),
+    }
+    return {key: value for key, value in note.items() if value not in (None, [], {})}
+
+
 def _compact_playbook_bucket(card: dict[str, Any]) -> dict[str, Any]:
     summary = _playbook_summary(card)
     bucket: dict[str, Any] = {
@@ -1096,6 +1114,9 @@ def _build_federated_prompt(
         review_status = _playbook_review_status_note(playbook_card)
         if review_status is not None:
             core_lines.append(_json_line("playbook_review_status", review_status))
+        review_packet_contract = _playbook_review_packet_contract_note(playbook_card)
+        if review_packet_contract is not None:
+            core_lines.append(_json_line("playbook_review_packet_contract", review_packet_contract))
     core_lines.append(_json_line("return_policy_snapshot", policy_snapshot))
     if memo_context is not None:
         core_lines.append(_json_line("memo_contract_note", memo_context["contract"]))
@@ -1154,6 +1175,9 @@ def _advisory_trace(
         review_status = _playbook_review_status_note(playbook_card)
         if review_status is not None:
             trace["playbook"]["review_status"] = review_status
+        review_packet_contract = _playbook_review_packet_contract_note(playbook_card)
+        if review_packet_contract is not None:
+            trace["playbook"]["review_packet_contract"] = review_packet_contract
     if memo_context is not None:
         trace["memo"] = {
             "selector": memo_context["selector"],

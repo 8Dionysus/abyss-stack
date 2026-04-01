@@ -168,6 +168,7 @@ def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path
         "object_capsules": load_json(mirror_root / "generated/memory_object_capsules.json"),
         "object_sections": load_json(mirror_root / "generated/memory_object_sections.full.json"),
         "checkpoint_contract": load_json(mirror_root / "examples/checkpoint_to_memory_contract.example.json"),
+        "runtime_writeback_targets": load_json(mirror_root / "generated/runtime_writeback_targets.min.json"),
         "recall_contracts": {
             "router": {
                 "semantic": load_json(mirror_root / "examples/recall_contract.router.semantic.json"),
@@ -203,6 +204,7 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
         "capsules": load_json(mirror_root / "generated/eval_capsules.json"),
         "sections": load_json(mirror_root / "generated/eval_sections.full.json"),
         "comparison_spine": load_json(mirror_root / "generated/comparison_spine.json"),
+        "runtime_candidate_template_index": load_json(mirror_root / "generated/runtime_candidate_template_index.min.json"),
         "runtime_evidence_templates": {
             "workhorse-local": load_json(mirror_root / "examples/runtime_evidence_selection.workhorse-local.example.json"),
             "return-anchor-integrity": load_json(
@@ -243,6 +245,7 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
         "activation": load_json_value(mirror_root / "generated/playbook_activation_surfaces.min.json"),
         "federation": load_json_value(mirror_root / "generated/playbook_federation_surfaces.min.json"),
         "review_status": load_json(mirror_root / "generated/playbook_review_status.min.json"),
+        "review_packet_contracts": load_json(mirror_root / "generated/playbook_review_packet_contracts.min.json"),
         "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
         "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
         "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
@@ -422,6 +425,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "catalog": {"version": layer.payloads["catalog"].get("catalog_version")},
                 "object_catalog": {"version": layer.payloads["object_catalog"].get("catalog_version")},
                 "checkpoint_contract": {"contract_id": layer.payloads["checkpoint_contract"].get("contract_id")},
+                "runtime_writeback_target_count": len(layer.payloads["runtime_writeback_targets"].get("targets", [])),
                 "router_recall_modes": sorted(layer.payloads["recall_contracts"]["router"].keys()),
                 "object_recall_modes": sorted(
                     key for key in layer.payloads["recall_contracts"]["object"].keys() if key != "working_return"
@@ -436,6 +440,9 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "capsules": {"version": layer.payloads["capsules"].get("capsule_version")},
                 "sections": {"version": layer.payloads["sections"].get("section_version")},
                 "comparison_spine": {"version": layer.payloads["comparison_spine"].get("comparison_spine_version")},
+                "runtime_candidate_template_count": len(
+                    layer.payloads["runtime_candidate_template_index"].get("templates", [])
+                ),
                 "runtime_evidence_templates": sorted(layer.payloads["runtime_evidence_templates"].keys()),
                 "hook_templates": sorted(layer.payloads["hook_templates"].keys()),
             }
@@ -445,6 +452,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "activation_count": len(layer.payloads["activation"]),
                 "federation_count": len(layer.payloads["federation"]),
                 "review_status_count": len(layer.payloads["review_status"].get("playbooks", [])),
+                "review_packet_contract_count": len(layer.payloads["review_packet_contracts"].get("playbooks", [])),
                 "handoff_playbook_count": len(layer.payloads["handoffs"]["playbooks"]),
                 "failure_count": len(layer.payloads["failures"]["failures"]),
                 "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
@@ -523,6 +531,8 @@ def layer_closure_reasons(layer: LayerStore) -> list[str]:
             reasons.append("memo object catalog version is missing")
         if not layer.payloads["checkpoint_contract"].get("contract_id"):
             reasons.append("checkpoint contract id is missing")
+        if not isinstance(layer.payloads["runtime_writeback_targets"].get("targets"), list):
+            reasons.append("runtime writeback targets surface is invalid")
         router_contracts = layer.payloads["recall_contracts"]["router"]
         if not all(mode in router_contracts for mode in ("semantic", "lineage")):
             reasons.append("router recall contracts are incomplete")
@@ -538,6 +548,8 @@ def layer_closure_reasons(layer: LayerStore) -> list[str]:
             reasons.append("eval sections version is missing")
         if layer.payloads["comparison_spine"].get("comparison_spine_version") is None:
             reasons.append("comparison spine version is missing")
+        if not isinstance(layer.payloads["runtime_candidate_template_index"].get("templates"), list):
+            reasons.append("runtime candidate template index is invalid")
         if not layer.payloads["runtime_evidence_templates"]:
             reasons.append("runtime evidence templates are missing")
         if not layer.payloads["hook_templates"]:
@@ -553,6 +565,8 @@ def layer_closure_reasons(layer: LayerStore) -> list[str]:
             reasons.append("playbook federation surfaces missing entries")
         if not isinstance(layer.payloads["review_status"].get("playbooks"), list):
             reasons.append("playbook review status surface is invalid")
+        if not isinstance(layer.payloads["review_packet_contracts"].get("playbooks"), list):
+            reasons.append("playbook review packet contracts surface is invalid")
         if not isinstance(layer.payloads["handoffs"].get("playbooks"), list) or not layer.payloads["handoffs"]["playbooks"]:
             reasons.append("playbook handoff contracts missing entries")
         if not isinstance(layer.payloads["failures"].get("failures"), list) or not layer.payloads["failures"]["failures"]:
@@ -789,6 +803,10 @@ def playbook_review_status_entries(store: AppStore) -> list[dict[str, Any]]:
     return playbooks_payload(store, "review_status").get("playbooks", [])
 
 
+def playbook_review_packet_contract_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "review_packet_contracts").get("playbooks", [])
+
+
 def require_playbook_registry_entry(store: AppStore, playbook_id: str) -> dict[str, Any]:
     for entry in playbook_registry_entries(store):
         if entry["id"] == playbook_id:
@@ -824,6 +842,13 @@ def optional_playbook_review_status_entry(store: AppStore, playbook_id: str) -> 
     return None
 
 
+def optional_playbook_review_packet_contract_entry(store: AppStore, playbook_id: str) -> dict[str, Any] | None:
+    for entry in playbook_review_packet_contract_entries(store):
+        if entry["playbook_id"] == playbook_id:
+            return entry
+    return None
+
+
 def playbook_subagent_recipes_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
     return [entry for entry in playbook_subagent_recipe_entries(store) if entry.get("playbook") == playbook_name]
 
@@ -838,6 +863,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
     activation_entry = optional_playbook_activation_entry(store, playbook_id)
     federation_entry = optional_playbook_federation_entry(store, playbook_id)
     review_status = optional_playbook_review_status_entry(store, playbook_id)
+    review_packet_contract = optional_playbook_review_packet_contract_entry(store, playbook_id)
     handoff_contract = optional_playbook_handoff_entry(store, playbook_id)
     subagent_recipes = playbook_subagent_recipes_for_name(store, playbook_name)
     automation_seeds = playbook_automation_seeds_for_name(store, playbook_name)
@@ -849,6 +875,8 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         source_files.append("aoa-playbooks/generated/playbook_federation_surfaces.min.json")
     if review_status is not None:
         source_files.append("aoa-playbooks/generated/playbook_review_status.min.json")
+    if review_packet_contract is not None:
+        source_files.append("aoa-playbooks/generated/playbook_review_packet_contracts.min.json")
     if handoff_contract is not None:
         source_files.append("aoa-playbooks/generated/playbook_handoff_contracts.json")
     if subagent_recipes:
@@ -863,6 +891,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         "activation_entry": activation_entry,
         "federation_entry": federation_entry,
         "review_status": review_status,
+        "review_packet_contract": review_packet_contract,
         "handoff_contract": handoff_contract,
         "subagent_recipes": subagent_recipes,
         "automation_seeds": automation_seeds,
@@ -878,6 +907,7 @@ def compact_playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         "registry_entry": card["registry_entry"],
         "activation_entry": card["activation_entry"],
         "federation_entry": card["federation_entry"],
+        "review_packet_contract": card["review_packet_contract"],
         "handoff_contract": card["handoff_contract"],
         "subagent_recipe_names": [entry["name"] for entry in card["subagent_recipes"]],
         "automation_seed_names": [entry["name"] for entry in card["automation_seeds"]],
@@ -1294,8 +1324,8 @@ def resolve_memo_recall_contract(
 
 def resolve_writeback_map(store: AppStore, runtime_surface: str) -> dict[str, Any]:
     checkpoint_contract = memo_payload(store, "checkpoint_contract")
-    for mapping in checkpoint_contract["mapping_rules"]:
-        if mapping["runtime_surface"] != runtime_surface:
+    for mapping in memo_payload(store, "runtime_writeback_targets").get("targets", []):
+        if mapping.get("runtime_surface") != runtime_surface:
             continue
         return {
             "ok": True,
@@ -1305,6 +1335,7 @@ def resolve_writeback_map(store: AppStore, runtime_surface: str) -> dict[str, An
             "runtime_boundary": checkpoint_contract["runtime_boundary"],
             "mapping": mapping,
             "source_files": [
+                "aoa-memo/generated/runtime_writeback_targets.min.json",
                 "aoa-memo/examples/checkpoint_to_memory_contract.example.json",
                 "aoa-memo/docs/RUNTIME_WRITEBACK_SEAM.md",
             ],
@@ -1404,7 +1435,10 @@ def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> di
         "ok": True,
         "name": template_name,
         "template": template,
-        "source_files": [f"aoa-evals/{rel_path}"],
+        "source_files": [
+            "aoa-evals/generated/runtime_candidate_template_index.min.json",
+            f"aoa-evals/{rel_path}",
+        ],
     }
 
 
@@ -1419,7 +1453,10 @@ def resolve_hook_template(store: AppStore, template_name: str) -> dict[str, Any]
         "ok": True,
         "name": template_name,
         "template": template,
-        "source_files": [f"aoa-evals/{rel_path}"],
+        "source_files": [
+            "aoa-evals/generated/runtime_candidate_template_index.min.json",
+            f"aoa-evals/{rel_path}",
+        ],
     }
 
 
