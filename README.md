@@ -196,8 +196,9 @@ The repository now includes:
 The current bounded local-worker posture is `llama.cpp`-first on `5403`, with Ollama retained on `5401` as the control and rollback path.
 `LangGraph` is now the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows, while the earlier W0-W4 runner lineage remains available as the historical baseline.
 The current Intel embeddings posture still uses OVMS; any move from OpenVINO serving to OpenVINO GenAI should be treated as a separate reviewed stack change.
-The first live consumer step has now landed in `langchain-api` through opt-in `POST /run/federated`, which can consume advisory playbook and memo seams without changing the default `POST /run` path.
-The next large step is no longer bootstrap or mirror landing, or whether the live runtime should consume those seams at all; it is deciding how broadly and how deeply the runtime loop should rely on those already-landed seams.
+The opt-in `POST /run/federated` path in `langchain-api` now consumes advisory playbook, memo, and bounded KAG seams without changing the default `POST /run` path.
+`route-api` stays advisory-only, but `POST /playbooks/inspect` now returns compact review-status posture when that surface exists, and `POST /run/federated` can enrich its `advisory_trace` with playbook review posture, memo writeback mapping, and compact KAG context.
+The next large step is no longer whether the runtime should consume these mirrored seams at all; it is how much additional real-run adoption and operational rigor should be layered on top without widening authority.
 
 ## Development
 

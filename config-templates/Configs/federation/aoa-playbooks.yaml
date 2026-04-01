@@ -12,6 +12,7 @@ required_files:
   - generated/playbook_registry.min.json
   - generated/playbook_activation_surfaces.min.json
   - generated/playbook_federation_surfaces.min.json
+  - generated/playbook_review_status.min.json
   - generated/playbook_handoff_contracts.json
   - generated/playbook_failure_catalog.json
   - generated/playbook_subagent_recipes.json
@@ -20,6 +21,7 @@ required_files:
   - schemas/playbook-registry.schema.json
   - schemas/playbook-activation-surface.schema.json
   - schemas/playbook-federation-surface.schema.json
+  - schemas/playbook-review-status.schema.json
   - examples/playbook_activation.long-horizon-model-tier-orchestra.example.json
   - examples/playbook_activation.restartable-inquiry-loop.example.json
   - examples/playbook_activation.cross-repo-boundary-rollout.example.json

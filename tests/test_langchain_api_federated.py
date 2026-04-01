@@ -148,6 +148,7 @@ class LangchainFederatedRunTests(unittest.TestCase):
         )
         self.assertEqual(body["advisory_trace"]["memo"]["resolution"], "capsule")
         self.assertEqual(body["advisory_trace"]["memo"]["sequence"], ["recall_contract", "inspect", "capsule"])
+        self.assertNotIn("writeback_map", body["advisory_trace"]["memo"])
         self.assertTrue(prompts)
         self.assertIn("## core", prompts[0])
         self.assertIn("## short", prompts[0])
@@ -263,6 +264,20 @@ class LangchainFederatedRunTests(unittest.TestCase):
                     },
                     "source_files": ["aoa-memo/examples/recall_contract.object.working.return.json"],
                 }
+            if path == "/memo/writeback-map":
+                return {
+                    "ok": True,
+                    "runtime_surface": "checkpoint_export",
+                    "contract_id": "aoa-memo.runtime-writeback.v1",
+                    "mapping": {
+                        "target_kind": "state_capsule",
+                        "writeback_class": "checkpoint_export",
+                        "temperature_hint": "hot",
+                        "review_state_default": "captured",
+                        "requires_human_review": False,
+                    },
+                    "source_files": ["aoa-memo/examples/checkpoint_to_memory_contract.example.json"],
+                }
             raise AssertionError(f"unexpected route-api call: {path}")
 
         with patch.object(self.module, "_route_api_post", side_effect=route_side_effect):
@@ -282,9 +297,14 @@ class LangchainFederatedRunTests(unittest.TestCase):
             [
                 ("/playbooks/inspect", {"playbook_id": "AOA-P-0019"}),
                 ("/memo/recall-contract", {"family": "object", "mode": "working", "return_ready": True}),
+                ("/memo/writeback-map", {"runtime_surface": "checkpoint_export"}),
             ],
         )
         self.assertEqual(response.json()["advisory_trace"]["memo"]["selector"]["source"], "playbook")
+        self.assertEqual(
+            response.json()["advisory_trace"]["memo"]["writeback_map"]["runtime_surface"],
+            "checkpoint_export",
+        )
 
     def test_explicit_memo_override_beats_playbook_default(self) -> None:
         calls: list[tuple[str, dict]] = []
@@ -318,6 +338,20 @@ class LangchainFederatedRunTests(unittest.TestCase):
                 return {"ok": True, "entry": {"id": "checkpoint-1", "kind": "state_capsule", "summary": "Inspect"}}
             if path == "/memo/expand":
                 return {"ok": True, "entry": {"id": "checkpoint-1", "summary": "Expanded"}}
+            if path == "/memo/writeback-map":
+                return {
+                    "ok": True,
+                    "runtime_surface": "checkpoint_export",
+                    "contract_id": "aoa-memo.runtime-writeback.v1",
+                    "mapping": {
+                        "target_kind": "state_capsule",
+                        "writeback_class": "checkpoint_export",
+                        "temperature_hint": "hot",
+                        "review_state_default": "captured",
+                        "requires_human_review": False,
+                    },
+                    "source_files": ["aoa-memo/examples/checkpoint_to_memory_contract.example.json"],
+                }
             raise AssertionError(f"unexpected route-api call: {path}")
 
         with patch.object(self.module, "_route_api_post", side_effect=route_side_effect):
@@ -343,13 +377,139 @@ class LangchainFederatedRunTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             [path for path, _ in calls],
-            ["/playbooks/inspect", "/memo/recall-contract", "/memo/inspect", "/memo/expand"],
+            [
+                "/playbooks/inspect",
+                "/memo/recall-contract",
+                "/memo/inspect",
+                "/memo/expand",
+                "/memo/writeback-map",
+            ],
         )
         self.assertEqual(
             calls[1][1],
             {"family": "object", "mode": "working", "return_ready": True},
         )
         self.assertEqual(response.json()["advisory_trace"]["memo"]["selector"]["source"], "request")
+        self.assertEqual(
+            response.json()["advisory_trace"]["memo"]["writeback_map"]["target_kind"],
+            "state_capsule",
+        )
+
+    def test_federated_run_accepts_kag_inspect_selector_and_emits_knowledge_access(self) -> None:
+        calls: list[tuple[str, dict]] = []
+        prompts: list[str] = []
+        playbook = {
+            "playbook_id": "AOA-P-0010",
+            "name": "Split Wave Cross Repo Rollout",
+            "registry_entry": {},
+            "activation_entry": {
+                "memo_recall_modes": ["episodic", "semantic"],
+                "memo_read_path": "inspect_capsule_then_expand",
+            },
+            "federation_entry": {},
+            "review_status": {"playbook_id": "AOA-P-0010", "gate_verdict": "hold", "reviewed_run_count": 0},
+            "source_files": ["aoa-playbooks/generated/playbook_activation_surfaces.min.json"],
+        }
+
+        def route_side_effect(path, payload):
+            calls.append((path, payload))
+            if path == "/playbooks/inspect":
+                return {"ok": True, "playbook": playbook}
+            if path == "/memo/recall-contract":
+                return {
+                    "ok": True,
+                    "contract": {"mode": "semantic", "inspect_surface": "generated/memory_catalog.min.json"},
+                    "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                }
+            if path == "/kag/inspect":
+                return {
+                    "ok": True,
+                    "surface_id": "AOA-K-0011",
+                    "registry_entry": {"id": "AOA-K-0011", "name": "tos-zarathustra-route-retrieval-surface"},
+                    "pack": {"surface_id": "AOA-K-0011", "route_count": 1},
+                    "source_files": ["aoa-kag/generated/tos_zarathustra_route_retrieval_pack.min.json"],
+                }
+            raise AssertionError(f"unexpected route-api call: {path}")
+
+        def backend_side_effect(req):
+            prompts.append(req.user_text)
+            return {"ok": True, "backend": "stub", "model": "m", "answer": "done"}
+
+        with patch.object(self.module, "_route_api_post", side_effect=route_side_effect):
+            with patch.object(self.module, "_invoke_run_backend", side_effect=backend_side_effect):
+                with patch.object(
+                    self.module,
+                    "_load_return_policy_snapshot",
+                    return_value={"policy_id": "agentic-default-return", "effective_profile_class": "workhorse"},
+                ):
+                    response = self.client.post(
+                        "/run/federated",
+                        json={
+                            "user_text": "hello",
+                            "playbook_id": "AOA-P-0010",
+                            "memo": {"family": "router", "mode": "semantic"},
+                            "kag": {"inspect_id": "AOA-K-0011"},
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [path for path, _ in calls],
+            ["/playbooks/inspect", "/memo/recall-contract", "/kag/inspect"],
+        )
+        self.assertIn("## knowledge_access", prompts[0])
+        self.assertEqual(response.json()["advisory_trace"]["kag"]["resolution"], "inspect")
+        self.assertEqual(
+            response.json()["advisory_trace"]["kag"]["context"]["surface_id"],
+            "AOA-K-0011",
+        )
+
+    def test_federated_run_accepts_kag_query_mode_selector(self) -> None:
+        calls: list[tuple[str, dict]] = []
+        prompts: list[str] = []
+
+        def route_side_effect(path, payload):
+            calls.append((path, payload))
+            if path == "/kag/query-mode":
+                return {
+                    "ok": True,
+                    "mode": "local_search",
+                    "reasoning_scenarios": [{"scenario_ref": "AOA-P-0008"}],
+                    "regrounding_modes": [{"mode_id": "source_export_reentry"}],
+                    "source_files": [
+                        "aoa-kag/generated/reasoning_handoff_pack.min.json",
+                        "aoa-kag/generated/return_regrounding_pack.min.json",
+                    ],
+                }
+            raise AssertionError(f"unexpected route-api call: {path}")
+
+        def backend_side_effect(req):
+            prompts.append(req.user_text)
+            return {"ok": True, "backend": "stub", "model": "m", "answer": "done"}
+
+        with patch.object(self.module, "_route_api_post", side_effect=route_side_effect):
+            with patch.object(self.module, "_invoke_run_backend", side_effect=backend_side_effect):
+                with patch.object(
+                    self.module,
+                    "_load_return_policy_snapshot",
+                    return_value={"policy_id": "agentic-default-return", "effective_profile_class": "workhorse"},
+                ):
+                    response = self.client.post(
+                        "/run/federated",
+                        json={
+                            "user_text": "hello",
+                            "kag": {"query_mode": "local_search"},
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls, [("/kag/query-mode", {"mode": "local_search"})])
+        self.assertIn("## knowledge_access", prompts[0])
+        self.assertEqual(response.json()["advisory_trace"]["kag"]["resolution"], "query_mode")
+        self.assertEqual(
+            response.json()["advisory_trace"]["selectors"]["kag"],
+            {"query_mode": "local_search"},
+        )
 
 
 if __name__ == "__main__":
