@@ -18,7 +18,6 @@ Do not use it for:
 - `ABYSS-STACK-Q-0003` — require render-truth, doctor, and first-run guardrails before risky infra mutations are delegated
 
 ## Frontier / codex-led
-- `ABYSS-STACK-Q-0001` — land repo-local questbook surface with infra-specific human-gate defaults
 - `ABYSS-STACK-Q-0002` — track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning
 
 ## Near

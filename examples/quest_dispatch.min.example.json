@@ -3,7 +3,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0001",
     "repo": "abyss-stack",
-    "state": "ready",
+    "state": "done",
     "band": "frontier",
     "difficulty": "d2_slice",
     "risk": "r1_repo_local",

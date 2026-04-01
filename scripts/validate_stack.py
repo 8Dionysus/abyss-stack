@@ -200,6 +200,7 @@ QUESTBOOK_REQUIRED_TOKENS = (
     "not generated state, deployed runtime state, or runtime authority",
 )
 QUESTBOOK_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
+CLOSED_QUEST_STATES = {"done", "dropped"}
 QUESTBOOK_INTEGRATION_REQUIRED_TOKENS = (
     "runtime, deployment, lifecycle, security, storage, and platform posture",
     "specialized AoA repositories still own their own doctrine and public meaning",
@@ -418,9 +419,6 @@ def validate_questbook_surface(errors: list[str]) -> None:
     except FileNotFoundError:
         questbook_text = ""
     else:
-        for quest_id in QUEST_IDS:
-            if quest_id not in questbook_text:
-                errors.append(f"QUESTBOOK.md must reference '{quest_id}'")
         for token in QUESTBOOK_REQUIRED_TOKENS:
             if token not in questbook_text:
                 errors.append(f"QUESTBOOK.md must contain '{token}'")
@@ -478,6 +476,8 @@ def validate_questbook_surface(errors: list[str]) -> None:
 
     expected_catalog = []
     expected_dispatch = []
+    active_quest_ids: list[str] = []
+    closed_quest_ids: list[str] = []
     for quest_id in QUEST_IDS:
         quest_path = ROOT / "quests" / f"{quest_id}.yaml"
         try:
@@ -496,6 +496,10 @@ def validate_questbook_surface(errors: list[str]) -> None:
             errors.append(f"{quest_id} repo must equal 'abyss-stack'")
         if quest_payload.get("public_safe") is not True:
             errors.append(f"{quest_id} public_safe must be true")
+        if quest_payload.get("state") in CLOSED_QUEST_STATES:
+            closed_quest_ids.append(quest_id)
+        else:
+            active_quest_ids.append(quest_id)
 
         notes = quest_payload.get("notes", "")
         if not isinstance(notes, str):
@@ -520,6 +524,13 @@ def validate_questbook_surface(errors: list[str]) -> None:
             expected_dispatch.append(build_expected_quest_dispatch_entry(quest_id, quest_payload))
         except Exception as exc:
             errors.append(f"{quest_id} dispatch alignment failed: {exc}")
+
+    for quest_id in active_quest_ids:
+        if quest_id not in questbook_text:
+            errors.append(f"QUESTBOOK.md must reference active quest id '{quest_id}'")
+    for quest_id in closed_quest_ids:
+        if quest_id in questbook_text:
+            errors.append(f"QUESTBOOK.md must not list closed quest id '{quest_id}'")
 
     try:
         catalog_payload = json.loads((ROOT / QUEST_CATALOG_EXAMPLE_PATH).read_text(encoding="utf-8"))

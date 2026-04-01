@@ -7,7 +7,7 @@ owner_surface: questbook/public-surface
 theme_ref: ''
 milestone_ref: ''
 kind: rollout
-state: ready
+state: done
 band: frontier
 difficulty: d2_slice
 risk: r1_repo_local
@@ -43,5 +43,6 @@ tags:
   - questbook
   - infra
   - human-gate
-notes: ''
+notes: Closed in the Phase 2 manual-first hygiene pass after the infra-specific
+  questbook surface, schemas, example projections, and guardrail defaults all landed.
 public_safe: true
