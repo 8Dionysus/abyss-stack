@@ -22,8 +22,9 @@ scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 
 The current allowlist includes:
 - selected docs such as `PLAYBOOK_EXECUTION_SEAM.md` and `PLAYBOOK_LIFECYCLE.md`
-- generated registry, activation, federation, handoff, failure, subagent-recipe, automation-seed, and composition surfaces
+- generated registry, activation, federation, review-status, handoff, failure, subagent-recipe, automation-seed, and composition surfaces
 - public-safe schemas for the mirrored registry and activation/federation surfaces
+- a public-safe schema for the mirrored review-status surface
 - public-safe example activation payloads
 
 Authored `playbooks/*/PLAYBOOK.md` bundles are intentionally not mirrored in this phase.
@@ -51,6 +52,9 @@ Structured advisory read surfaces:
 - `POST /playbooks/failure`
 - `POST /playbooks/subagent-recipe`
 - `POST /playbooks/automation-seed`
+
+`POST /playbooks/inspect` now returns the same compact playbook card as before, plus an optional `review_status` object when the mirrored review-status surface contains a gate-owned entry for that playbook.
+That review-status object is derived from `aoa-playbooks` real-run and gate-review Markdown; it is not a second authored truth surface inside the runtime.
 
 These endpoints:
 - read only runtime-local mirrored data

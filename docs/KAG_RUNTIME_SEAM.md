@@ -60,6 +60,7 @@ Structured reads include:
 
 These surfaces let the runtime inspect derived retrieval/regrounding metadata and inspect the `Tree-of-Sophia` handoff companion without mutating either side.
 `/kag/inspect` stays the same bounded entrypoint and now also resolves `AOA-K-0011` from the mirrored Zarathustra route retrieval pack without adding a new endpoint family.
+`langchain-api` may now consume these existing `/kag/*` advisory reads during opt-in `POST /run/federated` when a bounded `kag` selector is provided, but that does not promote KAG into a routing or runtime authority layer.
 
 ## Why `tos-source` is mirrored separately
 

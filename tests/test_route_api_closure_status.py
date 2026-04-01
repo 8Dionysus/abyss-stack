@@ -177,13 +177,42 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "include_composition_surfaces": True,
                 },
                 payloads={
-                    "registry": {"playbooks": [{"playbook_id": "AOA-P-0001"}]},
-                    "activation": [{"playbook_id": "AOA-P-0001"}],
-                    "federation": [{"playbook_id": "AOA-P-0001"}],
-                    "handoffs": {"playbooks": [{"playbook_id": "AOA-P-0001"}]},
+                    "registry": {
+                        "playbooks": [
+                            {
+                                "id": "AOA-P-0001",
+                                "name": "fixture-playbook",
+                                "scenario": "fixture_scenario",
+                            }
+                        ]
+                    },
+                    "activation": [{"playbook_id": "AOA-P-0001", "name": "fixture-playbook"}],
+                    "federation": [{"playbook_id": "AOA-P-0001", "name": "fixture-playbook"}],
+                    "review_status": {
+                        "schema_version": 1,
+                        "playbooks": [
+                            {
+                                "playbook_id": "AOA-P-0001",
+                                "playbook_name": "fixture-playbook",
+                                "scenario": "fixture_scenario",
+                                "gate_review_ref": "docs/gate-reviews/fixture-playbook.md",
+                                "gate_verdict": "composition-landed",
+                                "reviewed_run_count": 1,
+                                "reviewed_run_refs": ["docs/real-runs/fixture-playbook.md"],
+                                "latest_reviewed_run_ref": "docs/real-runs/fixture-playbook.md",
+                                "minimum_evidence_threshold": "One reviewed fixture run.",
+                                "next_trigger": "Only reopen if the fixture path materially changes.",
+                                "composition_signal_summary": {
+                                    "failure_or_follow_up": "Fixture follow-up posture is stable.",
+                                    "adjunct_candidate": "Fixture adjunct posture is stable.",
+                                },
+                            }
+                        ],
+                    },
+                    "handoffs": {"playbooks": [{"playbook_id": "AOA-P-0001", "name": "fixture-playbook"}]},
                     "failures": {"failures": [{"failure_id": "F-1"}]},
-                    "subagent_recipes": {"recipes": [{"recipe_id": "R-1"}]},
-                    "automation_seeds": {"seeds": [{"seed_id": "S-1"}]},
+                    "subagent_recipes": {"recipes": [{"recipe_id": "R-1", "playbook": "fixture-playbook"}]},
+                    "automation_seeds": {"seeds": [{"seed_id": "S-1", "playbook": "fixture-playbook"}]},
                     "composition_manifest": {"manifest_version": "1"},
                 },
             ),
@@ -306,3 +335,15 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertEqual(repo_payload["repo"], "Tree-of-Sophia")
         self.assertIn("aoa-kag/generated/federation_spine.min.json", repo_payload["source_files"])
         self.assertIn("tos-source/generated/kag_export.min.json", repo_payload["source_files"])
+
+    def test_playbook_card_includes_review_status_when_available(self) -> None:
+        store = self.make_store()
+
+        payload = self.module.playbook_card(store, "AOA-P-0001")
+
+        self.assertEqual(payload["review_status"]["gate_verdict"], "composition-landed")
+        self.assertEqual(payload["review_status"]["reviewed_run_count"], 1)
+        self.assertIn(
+            "aoa-playbooks/generated/playbook_review_status.min.json",
+            payload["source_files"],
+        )

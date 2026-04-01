@@ -242,6 +242,7 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
         "registry": load_json(mirror_root / "generated/playbook_registry.min.json"),
         "activation": load_json_value(mirror_root / "generated/playbook_activation_surfaces.min.json"),
         "federation": load_json_value(mirror_root / "generated/playbook_federation_surfaces.min.json"),
+        "review_status": load_json(mirror_root / "generated/playbook_review_status.min.json"),
         "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
         "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
         "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
@@ -443,6 +444,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "registry_count": len(layer.payloads["registry"]["playbooks"]),
                 "activation_count": len(layer.payloads["activation"]),
                 "federation_count": len(layer.payloads["federation"]),
+                "review_status_count": len(layer.payloads["review_status"].get("playbooks", [])),
                 "handoff_playbook_count": len(layer.payloads["handoffs"]["playbooks"]),
                 "failure_count": len(layer.payloads["failures"]["failures"]),
                 "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
@@ -549,6 +551,8 @@ def layer_closure_reasons(layer: LayerStore) -> list[str]:
             reasons.append("playbook activation surfaces missing entries")
         if not isinstance(layer.payloads["federation"], list) or not layer.payloads["federation"]:
             reasons.append("playbook federation surfaces missing entries")
+        if not isinstance(layer.payloads["review_status"].get("playbooks"), list):
+            reasons.append("playbook review status surface is invalid")
         if not isinstance(layer.payloads["handoffs"].get("playbooks"), list) or not layer.payloads["handoffs"]["playbooks"]:
             reasons.append("playbook handoff contracts missing entries")
         if not isinstance(layer.payloads["failures"].get("failures"), list) or not layer.payloads["failures"]["failures"]:
@@ -781,6 +785,10 @@ def playbook_automation_seed_entries(store: AppStore) -> list[dict[str, Any]]:
     return playbooks_payload(store, "automation_seeds")["seeds"]
 
 
+def playbook_review_status_entries(store: AppStore) -> list[dict[str, Any]]:
+    return playbooks_payload(store, "review_status").get("playbooks", [])
+
+
 def require_playbook_registry_entry(store: AppStore, playbook_id: str) -> dict[str, Any]:
     for entry in playbook_registry_entries(store):
         if entry["id"] == playbook_id:
@@ -809,6 +817,13 @@ def optional_playbook_handoff_entry(store: AppStore, playbook_id: str) -> dict[s
     return None
 
 
+def optional_playbook_review_status_entry(store: AppStore, playbook_id: str) -> dict[str, Any] | None:
+    for entry in playbook_review_status_entries(store):
+        if entry["playbook_id"] == playbook_id:
+            return entry
+    return None
+
+
 def playbook_subagent_recipes_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
     return [entry for entry in playbook_subagent_recipe_entries(store) if entry.get("playbook") == playbook_name]
 
@@ -822,6 +837,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
     playbook_name = registry_entry["name"]
     activation_entry = optional_playbook_activation_entry(store, playbook_id)
     federation_entry = optional_playbook_federation_entry(store, playbook_id)
+    review_status = optional_playbook_review_status_entry(store, playbook_id)
     handoff_contract = optional_playbook_handoff_entry(store, playbook_id)
     subagent_recipes = playbook_subagent_recipes_for_name(store, playbook_name)
     automation_seeds = playbook_automation_seeds_for_name(store, playbook_name)
@@ -831,6 +847,8 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         source_files.append("aoa-playbooks/generated/playbook_activation_surfaces.min.json")
     if federation_entry is not None:
         source_files.append("aoa-playbooks/generated/playbook_federation_surfaces.min.json")
+    if review_status is not None:
+        source_files.append("aoa-playbooks/generated/playbook_review_status.min.json")
     if handoff_contract is not None:
         source_files.append("aoa-playbooks/generated/playbook_handoff_contracts.json")
     if subagent_recipes:
@@ -844,6 +862,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         "registry_entry": registry_entry,
         "activation_entry": activation_entry,
         "federation_entry": federation_entry,
+        "review_status": review_status,
         "handoff_contract": handoff_contract,
         "subagent_recipes": subagent_recipes,
         "automation_seeds": automation_seeds,

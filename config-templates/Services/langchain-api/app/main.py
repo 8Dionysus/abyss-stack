@@ -67,6 +67,8 @@ PROFILE_CLASS = Literal["spark", "workhorse", "deep", "archive"]
 MEMO_FAMILY = Literal["router", "object"]
 MEMO_MODE = Literal["working", "semantic", "lineage"]
 MEMO_READ_PATH = Literal["inspect_only", "inspect_then_expand", "inspect_capsule_then_expand"]
+KAG_QUERY_MODE = Literal["local_search", "global_search", "drift_search"]
+KAG_REPO = Literal["Tree-of-Sophia", "aoa-techniques"]
 
 PLAYBOOK_MEMO_KEYS = (
     "memo_recall_modes",
@@ -168,17 +170,40 @@ class MemoSelector(BaseModel):
         return self
 
 
+class KagSelector(BaseModel):
+    inspect_id: str | None = None
+    query_mode: KAG_QUERY_MODE | None = None
+    regrounding_mode: str | None = None
+    repo: KAG_REPO | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "KagSelector":
+        selector_count = sum(
+            value is not None
+            for value in (
+                self.inspect_id,
+                self.query_mode,
+                self.regrounding_mode,
+                self.repo,
+            )
+        )
+        if selector_count != 1:
+            raise ValueError("kag requires exactly one selector")
+        return self
+
+
 class FederatedRunReq(RunReq):
     playbook_id: str | None = None
     playbook_select: PlaybookSelectReq | None = None
     memo: MemoSelector | None = None
+    kag: KagSelector | None = None
     profile_class: PROFILE_CLASS | None = None
 
     @model_validator(mode="after")
     def validate_selector_shape(self) -> "FederatedRunReq":
         if self.playbook_id is not None and self.playbook_select is not None:
             raise ValueError("use playbook_id or playbook_select, not both")
-        if self.playbook_id is None and self.playbook_select is None and self.memo is None:
+        if self.playbook_id is None and self.playbook_select is None and self.memo is None and self.kag is None:
             raise ValueError("run/federated requires at least one advisory selector")
         return self
 
@@ -656,6 +681,23 @@ def _playbook_summary(card: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in summary.items() if value not in (None, [], {})}
 
 
+def _playbook_review_status_note(card: dict[str, Any]) -> dict[str, Any] | None:
+    review_status = card.get("review_status")
+    if not isinstance(review_status, dict):
+        return None
+
+    note = {
+        "playbook_id": review_status.get("playbook_id"),
+        "gate_verdict": review_status.get("gate_verdict"),
+        "reviewed_run_count": review_status.get("reviewed_run_count"),
+        "latest_reviewed_run_ref": review_status.get("latest_reviewed_run_ref"),
+        "minimum_evidence_threshold": review_status.get("minimum_evidence_threshold"),
+        "next_trigger": review_status.get("next_trigger"),
+        "composition_signal_summary": review_status.get("composition_signal_summary"),
+    }
+    return {key: value for key, value in note.items() if value not in (None, [], {})}
+
+
 def _compact_playbook_bucket(card: dict[str, Any]) -> dict[str, Any]:
     summary = _playbook_summary(card)
     bucket: dict[str, Any] = {
@@ -769,6 +811,35 @@ def _memo_contract_note(contract: dict[str, Any]) -> dict[str, Any]:
         "support_artifact_refs": contract.get("support_artifact_refs"),
     }
     return {key: value for key, value in note.items() if value not in (None, [], {})}
+
+
+def _memo_writeback_note(writeback_map: dict[str, Any] | None) -> dict[str, Any] | None:
+    if writeback_map is None:
+        return None
+
+    mapping = writeback_map.get("mapping")
+    if not isinstance(mapping, dict):
+        return None
+
+    note = {
+        "runtime_surface": writeback_map.get("runtime_surface"),
+        "contract_id": writeback_map.get("contract_id"),
+        "target_kind": mapping.get("target_kind"),
+        "writeback_class": mapping.get("writeback_class"),
+        "temperature_hint": mapping.get("temperature_hint"),
+        "review_state_default": mapping.get("review_state_default"),
+        "requires_human_review": mapping.get("requires_human_review"),
+    }
+    return {key: value for key, value in note.items() if value not in (None, [], {})}
+
+
+def _kag_context_note(kag_context: dict[str, Any] | None) -> dict[str, Any] | None:
+    if kag_context is None:
+        return None
+    payload = kag_context.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    return payload
 
 
 def _resolve_playbook_card(req: FederatedRunReq) -> dict[str, Any] | None:
@@ -887,6 +958,90 @@ def _resolve_memo_context(plan: dict[str, Any]) -> dict[str, Any]:
     return context
 
 
+def _resolve_memo_writeback_map(memo_context: dict[str, Any] | None) -> dict[str, Any] | None:
+    if memo_context is None:
+        return None
+
+    selector = memo_context.get("selector")
+    if not isinstance(selector, dict) or not selector.get("return_ready"):
+        return None
+
+    response = _route_api_post("/memo/writeback-map", {"runtime_surface": "checkpoint_export"})
+    mapping = response.get("mapping")
+    if not isinstance(mapping, dict):
+        raise HTTPException(status_code=502, detail="route-api returned invalid memo writeback map")
+
+    return {
+        "runtime_surface": response.get("runtime_surface"),
+        "contract_type": response.get("contract_type"),
+        "contract_id": response.get("contract_id"),
+        "runtime_boundary": response.get("runtime_boundary"),
+        "mapping": mapping,
+        "source_files": response.get("source_files", []),
+    }
+
+
+def _resolve_kag_context(selector: KagSelector) -> dict[str, Any]:
+    selector_payload = selector.model_dump(exclude_none=True)
+
+    if selector.inspect_id is not None:
+        response = _route_api_post("/kag/inspect", {"surface_id": selector.inspect_id})
+        registry_entry = response.get("registry_entry")
+        pack = response.get("pack")
+        if not isinstance(registry_entry, dict) or not isinstance(pack, dict):
+            raise HTTPException(status_code=502, detail="route-api returned invalid kag inspect payload")
+        payload = {
+            "selector_kind": "inspect_id",
+            "surface_id": response.get("surface_id"),
+            "registry_entry": _pick_summary(registry_entry),
+            "pack": _pick_summary(pack),
+        }
+        resolution = "inspect"
+    elif selector.query_mode is not None:
+        response = _route_api_post("/kag/query-mode", {"mode": selector.query_mode})
+        scenarios = response.get("reasoning_scenarios")
+        regrounding_modes = response.get("regrounding_modes")
+        if not isinstance(scenarios, list) or not isinstance(regrounding_modes, list):
+            raise HTTPException(status_code=502, detail="route-api returned invalid kag query-mode payload")
+        payload = {
+            "selector_kind": "query_mode",
+            "mode": response.get("mode"),
+            "reasoning_scenarios": [_pick_summary(item) for item in scenarios],
+            "regrounding_modes": [_pick_summary(item) for item in regrounding_modes],
+        }
+        resolution = "query_mode"
+    elif selector.regrounding_mode is not None:
+        response = _route_api_post("/kag/regrounding", {"mode_id": selector.regrounding_mode})
+        regrounding_mode = response.get("regrounding_mode")
+        if not isinstance(regrounding_mode, dict):
+            raise HTTPException(status_code=502, detail="route-api returned invalid kag regrounding payload")
+        payload = {
+            "selector_kind": "regrounding_mode",
+            "mode_id": response.get("mode_id"),
+            "regrounding_mode": _pick_summary(regrounding_mode),
+        }
+        resolution = "regrounding"
+    else:
+        assert selector.repo is not None
+        response = _route_api_post("/kag/repo-entry", {"repo": selector.repo})
+        repo_entry = response.get("repo_entry")
+        if not isinstance(repo_entry, dict):
+            raise HTTPException(status_code=502, detail="route-api returned invalid kag repo-entry payload")
+        payload = {
+            "selector_kind": "repo",
+            "repo": response.get("repo"),
+            "repo_entry": _pick_summary(repo_entry),
+        }
+        resolution = "repo_entry"
+
+    return {
+        "selector": selector_payload,
+        "resolution": resolution,
+        "payload": payload,
+        "source_files": response.get("source_files", []),
+    }
+
+
 def _compact_memo_summary(memo_context: dict[str, Any] | None) -> Any:
     if memo_context is None:
         return None
@@ -909,6 +1064,13 @@ def _memory_access_payload(memo_context: dict[str, Any] | None) -> Any:
     return None
 
 
+def _knowledge_access_payload(kag_context: dict[str, Any] | None) -> Any:
+    note = _kag_context_note(kag_context)
+    if note is None:
+        return None
+    return note
+
+
 def _json_line(label: str, payload: Any) -> str:
     return f"{label}={json.dumps(payload, ensure_ascii=True, sort_keys=True)}"
 
@@ -922,6 +1084,8 @@ def _build_federated_prompt(
     *,
     playbook_card: dict[str, Any] | None,
     memo_context: dict[str, Any] | None,
+    memo_writeback_map: dict[str, Any] | None,
+    kag_context: dict[str, Any] | None,
     policy_snapshot: dict[str, Any],
 ) -> str:
     blocks: list[str] = []
@@ -929,9 +1093,15 @@ def _build_federated_prompt(
     core_lines: list[str] = []
     if playbook_card is not None:
         core_lines.append(_json_line("playbook_summary", _playbook_summary(playbook_card)))
+        review_status = _playbook_review_status_note(playbook_card)
+        if review_status is not None:
+            core_lines.append(_json_line("playbook_review_status", review_status))
     core_lines.append(_json_line("return_policy_snapshot", policy_snapshot))
     if memo_context is not None:
         core_lines.append(_json_line("memo_contract_note", memo_context["contract"]))
+    memo_writeback_note = _memo_writeback_note(memo_writeback_map)
+    if memo_writeback_note is not None:
+        core_lines.append(_json_line("memo_writeback_map", memo_writeback_note))
     if core_lines:
         blocks.append(_bucket_block("core", core_lines))
 
@@ -948,6 +1118,10 @@ def _build_federated_prompt(
     if memory_access is not None:
         blocks.append(_bucket_block("memory_access", [_json_line("memo_surface", memory_access)]))
 
+    knowledge_access = _knowledge_access_payload(kag_context)
+    if knowledge_access is not None:
+        blocks.append(_bucket_block("knowledge_access", [_json_line("kag_context", knowledge_access)]))
+
     blocks.append(_bucket_block("user", [req.user_text]))
     return "\n\n".join(blocks)
 
@@ -957,6 +1131,8 @@ def _advisory_trace(
     req: FederatedRunReq,
     playbook_card: dict[str, Any] | None,
     memo_context: dict[str, Any] | None,
+    memo_writeback_map: dict[str, Any] | None,
+    kag_context: dict[str, Any] | None,
     policy_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
     trace: dict[str, Any] = {
@@ -965,6 +1141,7 @@ def _advisory_trace(
             "playbook_select": req.playbook_select.model_dump(exclude_none=True)
             if req.playbook_select is not None
             else None,
+            "kag": req.kag.model_dump(exclude_none=True) if req.kag is not None else None,
             "profile_class": _effective_profile_class(req.profile_class),
         },
         "policy_snapshot": policy_snapshot,
@@ -974,6 +1151,9 @@ def _advisory_trace(
             "summary": _playbook_summary(playbook_card),
             "source_files": playbook_card.get("source_files", []),
         }
+        review_status = _playbook_review_status_note(playbook_card)
+        if review_status is not None:
+            trace["playbook"]["review_status"] = review_status
     if memo_context is not None:
         trace["memo"] = {
             "selector": memo_context["selector"],
@@ -982,6 +1162,16 @@ def _advisory_trace(
             "sequence": memo_context["sequence"],
             "resolution": memo_context["resolution"],
             "source_files": memo_context.get("contract_source_files", []),
+        }
+        memo_writeback_note = _memo_writeback_note(memo_writeback_map)
+        if memo_writeback_note is not None:
+            trace["memo"]["writeback_map"] = memo_writeback_note
+    if kag_context is not None:
+        trace["kag"] = {
+            "selector": kag_context["selector"],
+            "resolution": kag_context["resolution"],
+            "context": kag_context["payload"],
+            "source_files": kag_context.get("source_files", []),
         }
     return trace
 
@@ -1026,11 +1216,15 @@ def run_federated(req: FederatedRunReq) -> dict[str, Any]:
         if memo_plan is None and playbook_card is not None:
             memo_plan = _default_memo_plan_from_playbook(playbook_card)
         memo_context = _resolve_memo_context(memo_plan) if memo_plan is not None else None
+        memo_writeback_map = _resolve_memo_writeback_map(memo_context)
+        kag_context = _resolve_kag_context(req.kag) if req.kag is not None else None
         policy_snapshot = _load_return_policy_snapshot(req.profile_class)
         federated_prompt = _build_federated_prompt(
             req,
             playbook_card=playbook_card,
             memo_context=memo_context,
+            memo_writeback_map=memo_writeback_map,
+            kag_context=kag_context,
             policy_snapshot=policy_snapshot,
         )
         backend_req = RunReq(
@@ -1044,6 +1238,8 @@ def run_federated(req: FederatedRunReq) -> dict[str, Any]:
             req=req,
             playbook_card=playbook_card,
             memo_context=memo_context,
+            memo_writeback_map=memo_writeback_map,
+            kag_context=kag_context,
             policy_snapshot=policy_snapshot,
         )
         return response
