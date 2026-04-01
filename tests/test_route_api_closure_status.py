@@ -11,6 +11,7 @@ MODULE_PATH = REPO_ROOT / "config-templates" / "Services" / "route-api" / "app" 
 
 
 def load_module():
+    previous_fastapi = sys.modules.get("fastapi")
     fastapi_module = types.ModuleType("fastapi")
 
     class FastAPI:
@@ -50,7 +51,13 @@ def load_module():
     module = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous_fastapi is None:
+            sys.modules.pop("fastapi", None)
+        else:
+            sys.modules["fastapi"] = previous_fastapi
     return module
 
 
@@ -191,16 +198,34 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "allow_runtime_reasoning_handoff": True,
                 },
                 payloads={
-                    "registry": {"surfaces": [{"surface_id": "AOA-K-0005"}]},
+                    "registry": {"surfaces": [{"id": "AOA-K-0005"}, {"id": "AOA-K-0011"}]},
                     "federation_spine": {"repos": [{"repo": "Tree-of-Sophia"}]},
                     "tiny_consumer_bundle": {},
-                    "reasoning_handoff_pack": {"scenarios": [{"scenario_id": "S-1"}]},
-                    "return_regrounding_pack": {"modes": [{"mode_id": "local_search"}]},
+                    "reasoning_handoff_pack": {
+                        "scenarios": [
+                            {
+                                "scenario_ref": "AOA-P-0008",
+                                "compatible_query_modes": ["local_search"],
+                            }
+                        ]
+                    },
+                    "return_regrounding_pack": {
+                        "modes": [
+                            {
+                                "mode_id": "source_export_reentry",
+                                "query_mode_hint": "local_search",
+                            }
+                        ]
+                    },
                     "technique_lift_pack": {},
                     "tos_retrieval_axis_pack": {"axes": [{"axis_id": "ontology"}]},
                     "tos_text_chunk_map": {"chunks": [{"chunk_id": "c1"}]},
                     "cross_source_node_projection": {"projections": [{"projection_id": "p1"}]},
                     "counterpart_exposure_review": {},
+                    "tos_zarathustra_route_retrieval_pack": {
+                        "surface_id": "AOA-K-0011",
+                        "routes": [{"retrieval_id": "AOA-K-0011::thus-spoke-zarathustra/prologue-1"}],
+                    },
                 },
             ),
             tos_source=module.LayerStore(
@@ -244,3 +269,40 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         closure = payload["layers_status"]["aoa-playbooks"]["closure_status"]
         self.assertFalse(closure["consumer_ready"])
         self.assertIn("playbook registry missing entries", closure["reasons"])
+
+    def test_kag_structured_reads_stay_mirror_backed(self) -> None:
+        store = self.make_store()
+
+        inspect_payload = self.module.resolve_kag_inspect(store, "AOA-K-0011")
+        query_payload = self.module.resolve_kag_query_mode(store, "local_search")
+        regrounding_payload = self.module.resolve_kag_regrounding(store, "source_export_reentry")
+        repo_payload = self.module.resolve_kag_repo_entry(store, "Tree-of-Sophia")
+
+        self.assertEqual(inspect_payload["surface_id"], "AOA-K-0011")
+        self.assertEqual(inspect_payload["pack"]["surface_id"], "AOA-K-0011")
+        self.assertIn(
+            "aoa-kag/generated/tos_zarathustra_route_retrieval_pack.min.json",
+            inspect_payload["source_files"],
+        )
+        self.assertNotIn("tos_support", inspect_payload)
+
+        self.assertEqual(query_payload["mode"], "local_search")
+        self.assertTrue(query_payload["reasoning_scenarios"])
+        self.assertTrue(query_payload["regrounding_modes"])
+        self.assertEqual(
+            query_payload["source_files"],
+            [
+                "aoa-kag/generated/reasoning_handoff_pack.min.json",
+                "aoa-kag/generated/return_regrounding_pack.min.json",
+            ],
+        )
+
+        self.assertEqual(regrounding_payload["mode_id"], "source_export_reentry")
+        self.assertEqual(
+            regrounding_payload["source_files"],
+            ["aoa-kag/generated/return_regrounding_pack.min.json"],
+        )
+
+        self.assertEqual(repo_payload["repo"], "Tree-of-Sophia")
+        self.assertIn("aoa-kag/generated/federation_spine.min.json", repo_payload["source_files"])
+        self.assertIn("tos-source/generated/kag_export.min.json", repo_payload["source_files"])

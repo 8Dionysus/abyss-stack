@@ -11,6 +11,7 @@ From `aoa-kag`, the runtime mirrors:
 - reasoning handoff and recurrence regrounding packs
 - tiny consumer bundle and technique-lift pack
 - ToS retrieval-axis, text-chunk, and cross-source projection packs
+- the standalone Zarathustra route retrieval pack for `AOA-K-0011`
 - counterpart exposure review and supporting schemas/docs
 
 From `tos-source`, the runtime mirrors:
@@ -58,6 +59,7 @@ Structured reads include:
 - `/kag/projection`
 
 These surfaces let the runtime inspect derived retrieval/regrounding metadata and inspect the `Tree-of-Sophia` handoff companion without mutating either side.
+`/kag/inspect` stays the same bounded entrypoint and now also resolves `AOA-K-0011` from the mirrored Zarathustra route retrieval pack without adding a new endpoint family.
 
 ## Why `tos-source` is mirrored separately
 
