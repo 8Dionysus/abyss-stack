@@ -15,7 +15,7 @@ Do not use it for:
 - turning every local config experiment into a tracked quest
 
 ## Frontier / human-gated
-- `ABYSS-STACK-Q-0003` — require render-truth, doctor, and first-run guardrails before risky infra mutations are delegated
+- none right now
 
 ## Frontier / codex-led
 - `ABYSS-STACK-Q-0002` — track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning

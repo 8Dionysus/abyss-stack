@@ -49,7 +49,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0003",
     "repo": "abyss-stack",
-    "state": "triaged",
+    "state": "done",
     "band": "frontier",
     "difficulty": "d3_seam",
     "risk": "r3_side_effect",

@@ -35,5 +35,10 @@ Infra quests should answer one of these:
 - which machine-fit or bridge follow-up must stay visible
 - which route is too risky for small local wrappers and must stay human-gated
 
+The current guarded route for risky runtime mutation is:
+`aoa-doctor -> aoa-first-run --strict -> aoa-check-layout --strict -> render-truth`
+before `aoa-up` or `aoa-smoke`.
+If one of those gates is missing, the route stays out of delegation scope.
+
 The example files under `examples/` stay reviewable and source-owned.
 They do not become live runtime inputs, and they do not replace the deployed mirror under `/srv/abyss-stack`.
