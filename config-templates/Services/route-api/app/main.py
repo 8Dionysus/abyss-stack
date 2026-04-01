@@ -284,6 +284,9 @@ def load_kag_layer(config_path: Path, config: dict[str, Any], mirror_root: Path)
         "counterpart_exposure_review": load_json(
             mirror_root / "generated/counterpart_federation_exposure_review.min.json"
         ),
+        "tos_zarathustra_route_retrieval_pack": load_json(
+            mirror_root / "generated/tos_zarathustra_route_retrieval_pack.min.json"
+        ),
     }
 
     return LayerStore(
@@ -1454,6 +1457,10 @@ def resolve_kag_inspect(store: AppStore, surface_id: str) -> dict[str, Any]:
         "AOA-K-0007": ("tos_retrieval_axis_pack", "aoa-kag/generated/tos_retrieval_axis_pack.min.json"),
         "AOA-K-0008": ("counterpart_exposure_review", "aoa-kag/generated/counterpart_federation_exposure_review.min.json"),
         "AOA-K-0009": ("federation_spine", "aoa-kag/generated/federation_spine.min.json"),
+        "AOA-K-0011": (
+            "tos_zarathustra_route_retrieval_pack",
+            "aoa-kag/generated/tos_zarathustra_route_retrieval_pack.min.json",
+        ),
     }
     if surface_id not in pack_by_surface_id:
         raise HTTPException(status_code=404, detail=f"unsupported aoa-kag inspect surface_id={surface_id}")

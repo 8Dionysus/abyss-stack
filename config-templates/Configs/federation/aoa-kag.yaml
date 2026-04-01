@@ -12,6 +12,7 @@ required_files:
   - docs/FEDERATION_KAG_READINESS.md
   - docs/COUNTERPART_CONSUMER_CONTRACT.md
   - docs/TOS_RETRIEVAL_AXIS_PACK.md
+  - docs/TOS_ZARATHUSTRA_ROUTE_RETRIEVAL_PACK.md
   - generated/kag_registry.min.json
   - generated/federation_spine.min.json
   - generated/tiny_consumer_bundle.min.json
@@ -22,6 +23,7 @@ required_files:
   - generated/tos_text_chunk_map.min.json
   - generated/cross_source_node_projection.min.json
   - generated/counterpart_federation_exposure_review.min.json
+  - generated/tos_zarathustra_route_retrieval_pack.min.json
   - schemas/kag-registry.schema.json
   - schemas/federation-spine.schema.json
   - schemas/tiny-consumer-bundle.schema.json
@@ -32,5 +34,6 @@ required_files:
   - schemas/tos-text-chunk-map.schema.json
   - schemas/cross-source-node-projection.schema.json
   - schemas/counterpart-federation-exposure-review.schema.json
+  - schemas/tos-zarathustra-route-retrieval-pack.schema.json
   - schemas/counterpart-consumer-contract.schema.json
   - schemas/bridge-envelope.schema.json
