@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import sys
+from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_DIR = ROOT / "compose" / "profiles"
@@ -176,7 +177,73 @@ REQUIRED_FILES = {
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
     ROOT / "tests" / "test_governed_execution.py",
+    ROOT / "tests" / "test_validate_stack_questbook.py",
 }
+
+QUESTBOOK_PATH = Path("QUESTBOOK.md")
+QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
+QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
+QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
+QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
+QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
+QUEST_IDS = (
+    "ABYSS-STACK-Q-0001",
+    "ABYSS-STACK-Q-0002",
+    "ABYSS-STACK-Q-0003",
+    "ABYSS-STACK-Q-0004",
+)
+QUESTBOOK_REQUIRED_TOKENS = (
+    "deferred infrastructure obligations that belong to `abyss-stack`",
+    "render-truth, doctor, first-run, and runtime guardrail follow-through",
+    "source-owned meaning from AoA layer repos",
+    "examples/quest_catalog.min.example.json",
+    "not generated state, deployed runtime state, or runtime authority",
+)
+QUESTBOOK_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
+QUESTBOOK_INTEGRATION_REQUIRED_TOKENS = (
+    "runtime, deployment, lifecycle, security, storage, and platform posture",
+    "specialized AoA repositories still own their own doctrine and public meaning",
+    "high-risk routes should default toward stronger control modes and human gates",
+    "reviewable and source-owned",
+    "do not replace the deployed mirror under `/srv/abyss-stack`",
+)
+QUESTBOOK_INTEGRATION_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
+QUEST_SCHEMA_REQUIRED_FIELDS = (
+    "schema_version",
+    "id",
+    "title",
+    "repo",
+    "owner_surface",
+    "kind",
+    "state",
+    "band",
+    "difficulty",
+    "risk",
+    "control_mode",
+    "delegate_tier",
+    "write_scope",
+    "activation",
+    "anchor_ref",
+    "evidence",
+    "opened_at",
+    "touched_at",
+    "public_safe",
+)
+QUEST_DISPATCH_REQUIRED_FIELDS = (
+    "schema_version",
+    "id",
+    "repo",
+    "state",
+    "band",
+    "difficulty",
+    "risk",
+    "control_mode",
+    "delegate_tier",
+    "split_required",
+    "write_scope",
+    "activation_mode",
+    "public_safe",
+)
 
 MODULE_REQUIREMENTS = {
     "20-orchestration.yml": {"10-storage.yml"},
@@ -233,6 +300,246 @@ def load_structured_object(path: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise RuntimeError(f"{path.relative_to(ROOT)} must parse as an object")
     return payload
+
+
+def validate_quest_schema_envelope(
+    payload: object,
+    *,
+    title: str,
+    required_fields: Sequence[str],
+    schema_version: str,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(payload, dict):
+        errors.append(f"{label} must be a JSON object")
+        return
+    if payload.get("title") != title:
+        errors.append(f"{label} title must equal '{title}'")
+    if payload.get("type") != "object":
+        errors.append(f"{label} type must equal 'object'")
+    if payload.get("additionalProperties") is not False:
+        errors.append(f"{label} must set additionalProperties to false")
+
+    required = payload.get("required")
+    if required != list(required_fields):
+        errors.append(f"{label} required fields must stay aligned with the local quest contract")
+
+    properties = payload.get("properties")
+    if not isinstance(properties, dict):
+        errors.append(f"{label} properties must be an object")
+        return
+
+    version_payload = properties.get("schema_version")
+    if not isinstance(version_payload, dict) or version_payload.get("const") != schema_version:
+        errors.append(f"{label} schema_version.const must equal '{schema_version}'")
+
+
+def build_expected_quest_catalog_entry(quest_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": quest_id,
+        "title": payload["title"],
+        "repo": payload["repo"],
+        "theme_ref": payload.get("theme_ref", ""),
+        "milestone_ref": payload.get("milestone_ref", ""),
+        "state": payload["state"],
+        "band": payload["band"],
+        "kind": payload["kind"],
+        "difficulty": payload["difficulty"],
+        "risk": payload["risk"],
+        "owner_surface": payload["owner_surface"],
+        "source_path": f"quests/{quest_id}.yaml",
+        "public_safe": payload["public_safe"],
+    }
+
+
+def build_expected_quest_dispatch_entry(quest_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if quest_id == "ABYSS-STACK-Q-0003":
+        requires_artifacts = [
+            "bounded_plan",
+            "guardrail_check",
+            "verification_result",
+            "rollout_decision",
+        ]
+    elif quest_id == "ABYSS-STACK-Q-0004":
+        requires_artifacts = [
+            "bounded_plan",
+            "work_result",
+        ]
+    else:
+        requires_artifacts = [
+            "bounded_plan",
+            "work_result",
+            "verification_result",
+        ]
+
+    activation = payload.get("activation")
+    if not isinstance(activation, dict):
+        raise RuntimeError(f"{quest_id} activation must be an object")
+
+    return {
+        "schema_version": "quest_dispatch_v1",
+        "id": quest_id,
+        "repo": payload["repo"],
+        "state": payload["state"],
+        "band": payload["band"],
+        "difficulty": payload["difficulty"],
+        "risk": payload["risk"],
+        "control_mode": payload["control_mode"],
+        "delegate_tier": payload["delegate_tier"],
+        "split_required": payload["split_required"],
+        "write_scope": payload["write_scope"],
+        "requires_artifacts": requires_artifacts,
+        "activation_mode": activation["mode"],
+        "source_path": f"quests/{quest_id}.yaml",
+        "public_safe": payload["public_safe"],
+        "fallback_tier": payload["fallback_tier"],
+        "wrapper_class": payload["wrapper_class"],
+    }
+
+
+def validate_questbook_surface(errors: list[str]) -> None:
+    required_paths = (
+        QUESTBOOK_PATH,
+        QUESTBOOK_INTEGRATION_PATH,
+        QUEST_SCHEMA_PATH,
+        QUEST_DISPATCH_SCHEMA_PATH,
+        QUEST_CATALOG_EXAMPLE_PATH,
+        QUEST_DISPATCH_EXAMPLE_PATH,
+    ) + tuple(Path("quests") / f"{quest_id}.yaml" for quest_id in QUEST_IDS)
+
+    for relative_path in required_paths:
+        path = ROOT / relative_path
+        if not path.exists():
+            errors.append(f"missing required file: {relative_path.as_posix()}")
+
+    try:
+        questbook_text = (ROOT / QUESTBOOK_PATH).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        questbook_text = ""
+    else:
+        for quest_id in QUEST_IDS:
+            if quest_id not in questbook_text:
+                errors.append(f"QUESTBOOK.md must reference '{quest_id}'")
+        for token in QUESTBOOK_REQUIRED_TOKENS:
+            if token not in questbook_text:
+                errors.append(f"QUESTBOOK.md must contain '{token}'")
+        for token in QUESTBOOK_FORBIDDEN_TOKENS:
+            if token in questbook_text:
+                errors.append(f"QUESTBOOK.md must not mention '{token}'")
+
+    try:
+        integration_text = (ROOT / QUESTBOOK_INTEGRATION_PATH).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        integration_text = ""
+    else:
+        for token in QUESTBOOK_INTEGRATION_REQUIRED_TOKENS:
+            if token not in integration_text:
+                errors.append(f"{QUESTBOOK_INTEGRATION_PATH.as_posix()} must contain '{token}'")
+        for token in QUESTBOOK_INTEGRATION_FORBIDDEN_TOKENS:
+            if token in integration_text:
+                errors.append(f"{QUESTBOOK_INTEGRATION_PATH.as_posix()} must not mention '{token}'")
+
+    try:
+        quest_schema_payload = json.loads((ROOT / QUEST_SCHEMA_PATH).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        quest_schema_payload = None
+    except json.JSONDecodeError as exc:
+        errors.append(f"{QUEST_SCHEMA_PATH.as_posix()} must contain valid JSON: {exc}")
+        quest_schema_payload = None
+    if quest_schema_payload is not None:
+        validate_quest_schema_envelope(
+            quest_schema_payload,
+            title="abyss-stack work_quest_v1",
+            required_fields=QUEST_SCHEMA_REQUIRED_FIELDS,
+            schema_version="work_quest_v1",
+            label=QUEST_SCHEMA_PATH.as_posix(),
+            errors=errors,
+        )
+
+    try:
+        dispatch_schema_payload = json.loads(
+            (ROOT / QUEST_DISPATCH_SCHEMA_PATH).read_text(encoding="utf-8")
+        )
+    except FileNotFoundError:
+        dispatch_schema_payload = None
+    except json.JSONDecodeError as exc:
+        errors.append(f"{QUEST_DISPATCH_SCHEMA_PATH.as_posix()} must contain valid JSON: {exc}")
+        dispatch_schema_payload = None
+    if dispatch_schema_payload is not None:
+        validate_quest_schema_envelope(
+            dispatch_schema_payload,
+            title="abyss-stack quest_dispatch_v1",
+            required_fields=QUEST_DISPATCH_REQUIRED_FIELDS,
+            schema_version="quest_dispatch_v1",
+            label=QUEST_DISPATCH_SCHEMA_PATH.as_posix(),
+            errors=errors,
+        )
+
+    expected_catalog = []
+    expected_dispatch = []
+    for quest_id in QUEST_IDS:
+        quest_path = ROOT / "quests" / f"{quest_id}.yaml"
+        try:
+            quest_payload = load_structured_object(quest_path)
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            errors.append(f"{quest_path.relative_to(ROOT)} must parse cleanly: {exc}")
+            continue
+
+        if quest_payload.get("schema_version") != "work_quest_v1":
+            errors.append(f"{quest_id} schema_version must equal 'work_quest_v1'")
+        if quest_payload.get("id") != quest_id:
+            errors.append(f"{quest_path.relative_to(ROOT)} id must equal '{quest_id}'")
+        if quest_payload.get("repo") != "abyss-stack":
+            errors.append(f"{quest_id} repo must equal 'abyss-stack'")
+        if quest_payload.get("public_safe") is not True:
+            errors.append(f"{quest_id} public_safe must be true")
+
+        notes = quest_payload.get("notes", "")
+        if not isinstance(notes, str):
+            errors.append(f"{quest_id} notes must be a string")
+        elif "ATM10-Agent" in notes or "aoa-sdk" in notes:
+            errors.append(f"{quest_id} notes must stay in scope for the current contour")
+
+        if quest_id == "ABYSS-STACK-Q-0003":
+            if quest_payload.get("control_mode") != "human_gate":
+                errors.append("ABYSS-STACK-Q-0003 control_mode must stay human_gate")
+            if quest_payload.get("risk") != "r3_side_effect":
+                errors.append("ABYSS-STACK-Q-0003 risk must stay r3_side_effect")
+            anchor_ref = quest_payload.get("anchor_ref")
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RENDER_TRUTH.md":
+                errors.append("ABYSS-STACK-Q-0003 must stay anchored to docs/RENDER_TRUTH.md")
+            note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
+            if not isinstance(note, str) or "docs/FIRST_RUN.md" not in note or "docs/DOCTOR.md" not in note:
+                errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/FIRST_RUN.md and docs/DOCTOR.md")
+
+        try:
+            expected_catalog.append(build_expected_quest_catalog_entry(quest_id, quest_payload))
+            expected_dispatch.append(build_expected_quest_dispatch_entry(quest_id, quest_payload))
+        except Exception as exc:
+            errors.append(f"{quest_id} dispatch alignment failed: {exc}")
+
+    try:
+        catalog_payload = json.loads((ROOT / QUEST_CATALOG_EXAMPLE_PATH).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        catalog_payload = None
+    except json.JSONDecodeError as exc:
+        errors.append(f"{QUEST_CATALOG_EXAMPLE_PATH.as_posix()} must contain valid JSON: {exc}")
+        catalog_payload = None
+    if catalog_payload is not None and catalog_payload != expected_catalog:
+        errors.append("examples/quest_catalog.min.example.json must stay aligned with quests/*.yaml")
+
+    try:
+        dispatch_payload = json.loads((ROOT / QUEST_DISPATCH_EXAMPLE_PATH).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        dispatch_payload = None
+    except json.JSONDecodeError as exc:
+        errors.append(f"{QUEST_DISPATCH_EXAMPLE_PATH.as_posix()} must contain valid JSON: {exc}")
+        dispatch_payload = None
+    if dispatch_payload is not None and dispatch_payload != expected_dispatch:
+        errors.append("examples/quest_dispatch.min.example.json must stay aligned with quests/*.yaml")
 
 
 def iter_sync_managed_files() -> list[Path]:
@@ -1158,6 +1465,7 @@ def main() -> int:
     validate_paths(errors)
     validate_scripts(errors)
     validate_required_files(errors)
+    validate_questbook_surface(errors)
     validate_reference_platform(errors)
     validate_platform_adaptations(errors)
     validate_branch_policy(errors)

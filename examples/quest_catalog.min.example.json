@@ -1,0 +1,62 @@
+[
+  {
+    "id": "ABYSS-STACK-Q-0001",
+    "title": "Land repo-local questbook surface with infra-specific human-gate defaults",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "ready",
+    "band": "frontier",
+    "kind": "rollout",
+    "difficulty": "d2_slice",
+    "risk": "r1_repo_local",
+    "owner_surface": "questbook/public-surface",
+    "source_path": "quests/ABYSS-STACK-Q-0001.yaml",
+    "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0002",
+    "title": "Track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "triaged",
+    "band": "frontier",
+    "kind": "rollout",
+    "difficulty": "d3_seam",
+    "risk": "r2_contract",
+    "owner_surface": "profiles/rollout",
+    "source_path": "quests/ABYSS-STACK-Q-0002.yaml",
+    "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0003",
+    "title": "Require render-truth, doctor, and first-run guardrails before risky infra mutations are delegated",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "triaged",
+    "band": "frontier",
+    "kind": "guardrail",
+    "difficulty": "d3_seam",
+    "risk": "r3_side_effect",
+    "owner_surface": "guardrails/runtime-validation",
+    "source_path": "quests/ABYSS-STACK-Q-0003.yaml",
+    "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0004",
+    "title": "Capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "captured",
+    "band": "near",
+    "kind": "support",
+    "difficulty": "d2_slice",
+    "risk": "r1_repo_local",
+    "owner_surface": "platform-adaptation",
+    "source_path": "quests/ABYSS-STACK-Q-0004.yaml",
+    "public_safe": true
+  }
+]

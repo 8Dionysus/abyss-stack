@@ -1,0 +1,47 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0001
+title: Land repo-local questbook surface with infra-specific human-gate defaults
+summary: Create the repo-local tracked obligation layer and make high-risk infra posture visible from the start.
+repo: abyss-stack
+owner_surface: questbook/public-surface
+theme_ref: ''
+milestone_ref: ''
+kind: rollout
+state: ready
+band: frontier
+difficulty: d2_slice
+risk: r1_repo_local
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: verifier
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: false
+complexity_basis:
+  scope: 2
+  ambiguity: 1
+  boundary: 1
+  verification: 1
+parent: null
+depends_on: []
+activation:
+  mode: immediate
+anchor_ref:
+  artifact: architecture
+  ref: docs/ARCHITECTURE.md
+handoff_role: infra-maintainer
+evidence:
+  - QUESTBOOK.md exists
+  - quest and dispatch schemas exist
+  - starter quest and dispatch examples exist
+  - infra-specific control guidance is explicit
+harvest:
+  target: none
+opened_at: '2026-03-31'
+touched_at: '2026-03-31'
+tags:
+  - questbook
+  - infra
+  - human-gate
+notes: ''
+public_safe: true

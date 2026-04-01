@@ -1,0 +1,48 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0002
+title: Track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning
+summary: Use quests to keep profile and adaptation work visible without turning abyss-stack into the owner of AoA layer meaning.
+repo: abyss-stack
+owner_surface: profiles/rollout
+theme_ref: ''
+milestone_ref: ''
+kind: rollout
+state: triaged
+band: frontier
+difficulty: d3_seam
+risk: r2_contract
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: verifier
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 2
+  ambiguity: 1
+  boundary: 2
+  verification: 2
+parent: null
+depends_on: []
+activation:
+  mode: on_review_of
+  ref: docs/PROFILES.md
+  note: review when profile or preset surface changes
+anchor_ref:
+  artifact: profile-recipes
+  ref: docs/PROFILE_RECIPES.md
+handoff_role: infra-maintainer
+evidence:
+  - host-profile obligations receive stable quest IDs
+  - profile changes remain separate from source-owned layer doctrine
+  - rollout gates are named
+harvest:
+  target: none
+opened_at: '2026-03-31'
+touched_at: '2026-03-31'
+tags:
+  - profiles
+  - rollout
+  - adaptation
+notes: ''
+public_safe: true

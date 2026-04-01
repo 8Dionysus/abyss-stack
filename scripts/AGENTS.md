@@ -23,6 +23,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - Bash wrappers are operator-facing helpers and should be safe by default.
 - Shared env defaults, selector parsing, compose resolution, and probe helpers live in `scripts/aoa-lib.sh`.
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
+- `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
 - `scripts/aoa-host-facts` owns durable machine-readable host-facts capture. Keep it stdlib-only and secret-safe.
 - `scripts/aoa-machine-fit` owns the durable bounded record of what the current machine should prefer right now. Keep it stdlib-only and secret-safe.
 - `scripts/aoa-qwen-run` is the generic bounded prompt runner for `langchain-api /run`. Keep it stdlib-only and local-only.
