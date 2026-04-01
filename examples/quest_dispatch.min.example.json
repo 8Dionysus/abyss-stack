@@ -1,0 +1,94 @@
+[
+  {
+    "schema_version": "quest_dispatch_v1",
+    "id": "ABYSS-STACK-Q-0001",
+    "repo": "abyss-stack",
+    "state": "ready",
+    "band": "frontier",
+    "difficulty": "d2_slice",
+    "risk": "r1_repo_local",
+    "control_mode": "human_codex_copilot",
+    "delegate_tier": "planner",
+    "split_required": false,
+    "write_scope": "repo_local",
+    "requires_artifacts": [
+      "bounded_plan",
+      "work_result",
+      "verification_result"
+    ],
+    "activation_mode": "immediate",
+    "source_path": "quests/ABYSS-STACK-Q-0001.yaml",
+    "public_safe": true,
+    "fallback_tier": "verifier",
+    "wrapper_class": "hybrid"
+  },
+  {
+    "schema_version": "quest_dispatch_v1",
+    "id": "ABYSS-STACK-Q-0002",
+    "repo": "abyss-stack",
+    "state": "triaged",
+    "band": "frontier",
+    "difficulty": "d3_seam",
+    "risk": "r2_contract",
+    "control_mode": "human_codex_copilot",
+    "delegate_tier": "planner",
+    "split_required": true,
+    "write_scope": "repo_local",
+    "requires_artifacts": [
+      "bounded_plan",
+      "work_result",
+      "verification_result"
+    ],
+    "activation_mode": "on_review_of",
+    "source_path": "quests/ABYSS-STACK-Q-0002.yaml",
+    "public_safe": true,
+    "fallback_tier": "verifier",
+    "wrapper_class": "hybrid"
+  },
+  {
+    "schema_version": "quest_dispatch_v1",
+    "id": "ABYSS-STACK-Q-0003",
+    "repo": "abyss-stack",
+    "state": "triaged",
+    "band": "frontier",
+    "difficulty": "d3_seam",
+    "risk": "r3_side_effect",
+    "control_mode": "human_gate",
+    "delegate_tier": "verifier",
+    "split_required": true,
+    "write_scope": "repo_local",
+    "requires_artifacts": [
+      "bounded_plan",
+      "guardrail_check",
+      "verification_result",
+      "rollout_decision"
+    ],
+    "activation_mode": "immediate",
+    "source_path": "quests/ABYSS-STACK-Q-0003.yaml",
+    "public_safe": true,
+    "fallback_tier": "conductor",
+    "wrapper_class": "human_only"
+  },
+  {
+    "schema_version": "quest_dispatch_v1",
+    "id": "ABYSS-STACK-Q-0004",
+    "repo": "abyss-stack",
+    "state": "captured",
+    "band": "near",
+    "difficulty": "d2_slice",
+    "risk": "r1_repo_local",
+    "control_mode": "codex_supervised",
+    "delegate_tier": "planner",
+    "split_required": false,
+    "write_scope": "docs_only",
+    "requires_artifacts": [
+      "bounded_plan",
+      "work_result"
+    ],
+    "activation_mode": "on_review_of",
+    "source_path": "quests/ABYSS-STACK-Q-0004.yaml",
+    "public_safe": true,
+    "fallback_tier": "verifier",
+    "wrapper_class": "codex_primary"
+  }
+]

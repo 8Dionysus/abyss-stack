@@ -1,0 +1,50 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0004
+title: Capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift
+summary: Use quests to make platform adaptation obligations visible and reviewable over time.
+repo: abyss-stack
+owner_surface: platform-adaptation
+theme_ref: ''
+milestone_ref: ''
+kind: support
+state: captured
+band: near
+difficulty: d2_slice
+risk: r1_repo_local
+control_mode: codex_supervised
+delegate_tier: planner
+fallback_tier: verifier
+wrapper_class: codex_primary
+write_scope: docs_only
+split_required: false
+complexity_basis:
+  scope: 2
+  ambiguity: 1
+  boundary: 1
+  verification: 2
+parent: null
+depends_on: []
+activation:
+  mode: on_review_of
+  ref: docs/WINDOWS_BRIDGE.md
+  note: review when bridge or platform posture changes
+anchor_ref:
+  artifact: machine-fit-policy
+  ref: docs/MACHINE_FIT_POLICY.md
+handoff_role: infra-maintainer
+evidence:
+  - platform follow-ups receive stable quest IDs
+  - reference-platform and adaptation docs stay aligned
+  - drift is reduced instead of hidden in prose
+harvest:
+  target: technique
+  trigger_count: 2
+  note: repeat platform adaptation patterns may deserve reusable technique surfaces
+opened_at: '2026-03-31'
+touched_at: '2026-03-31'
+tags:
+  - windows
+  - platform
+  - machine-fit
+notes: ''
+public_safe: true

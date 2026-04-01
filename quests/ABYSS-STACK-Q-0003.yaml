@@ -1,0 +1,49 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0003
+title: Require render-truth, doctor, and first-run guardrails before risky infra mutations are delegated
+summary: Create explicit preconditions for risky infra work before any delegation or automation grows around it.
+repo: abyss-stack
+owner_surface: guardrails/runtime-validation
+theme_ref: ''
+milestone_ref: ''
+kind: guardrail
+state: triaged
+band: frontier
+difficulty: d3_seam
+risk: r3_side_effect
+control_mode: human_gate
+delegate_tier: verifier
+fallback_tier: conductor
+wrapper_class: human_only
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 2
+  ambiguity: 1
+  boundary: 2
+  verification: 3
+parent: null
+depends_on: []
+activation:
+  mode: immediate
+anchor_ref:
+  artifact: render-truth
+  ref: docs/RENDER_TRUTH.md
+  note: pair with docs/FIRST_RUN.md and docs/DOCTOR.md before risky writes
+handoff_role: infra-maintainer
+evidence:
+  - risky infra routes name render-truth and doctor gates
+  - small local wrappers stay leaf-only
+  - no silent side-effect delegation is normalized
+harvest:
+  target: playbook
+  trigger_count: 2
+  note: repeated guarded infra routes may deserve a playbook
+opened_at: '2026-03-31'
+touched_at: '2026-03-31'
+tags:
+  - guardrails
+  - doctor
+  - render-truth
+notes: ''
+public_safe: true
