@@ -139,6 +139,20 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "catalog": {"catalog_version": "1"},
                     "object_catalog": {"catalog_version": "1"},
                     "checkpoint_contract": {"contract_id": "checkpoint-contract"},
+                    "runtime_writeback_targets": {
+                        "schema_version": 1,
+                        "targets": [
+                            {
+                                "runtime_surface": "checkpoint_export",
+                                "target_kind": "state_capsule",
+                                "writeback_class": "checkpoint_export",
+                                "requires_human_review": False,
+                                "review_state_default": "captured",
+                                "runtime_refs": ["docs/example.md"],
+                                "notes": "fixture",
+                            }
+                        ],
+                    },
                     "recall_contracts": {
                         "router": {"semantic": {}, "lineage": {}},
                         "object": {
@@ -161,6 +175,21 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "capsules": {"capsule_version": "1"},
                     "sections": {"section_version": "1"},
                     "comparison_spine": {"comparison_spine_version": "1"},
+                    "runtime_candidate_template_index": {
+                        "schema_version": 1,
+                        "templates": [
+                            {
+                                "template_kind": "artifact_to_verdict_hook",
+                                "template_name": "fixture-hook",
+                                "playbook_id": "AOA-P-0001",
+                                "eval_anchor": "aoa-approval-boundary-adherence",
+                                "verdict_bundle_ref": "repo:aoa-evals/bundles/fixture/EVAL.md",
+                                "required_runtime_artifacts": ["approval_record"],
+                                "review_required": True,
+                                "source_example_ref": "examples/fixture.json",
+                            }
+                        ],
+                    },
                     "runtime_evidence_templates": {"workhorse-local": {}},
                     "hook_templates": {"restartable-inquiry-loop": {}},
                 },
@@ -206,6 +235,23 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                                     "failure_or_follow_up": "Fixture follow-up posture is stable.",
                                     "adjunct_candidate": "Fixture adjunct posture is stable.",
                                 },
+                            }
+                        ],
+                    },
+                    "review_packet_contracts": {
+                        "schema_version": 1,
+                        "playbooks": [
+                            {
+                                "playbook_id": "AOA-P-0001",
+                                "playbook_name": "fixture-playbook",
+                                "scenario": "fixture_scenario",
+                                "expected_artifacts": ["approval_record"],
+                                "eval_anchors": ["aoa-approval-boundary-adherence"],
+                                "memo_runtime_surfaces": ["checkpoint_export"],
+                                "candidate_packet_kinds": ["memo_candidate", "artifact_hook_candidate"],
+                                "review_required": True,
+                                "source_review_refs": ["docs/gate-reviews/fixture-playbook.md"],
+                                "gate_verdict": "composition-landed",
                             }
                         ],
                     },
@@ -343,7 +389,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["review_status"]["gate_verdict"], "composition-landed")
         self.assertEqual(payload["review_status"]["reviewed_run_count"], 1)
+        self.assertEqual(payload["review_packet_contract"]["candidate_packet_kinds"], ["memo_candidate", "artifact_hook_candidate"])
         self.assertIn(
             "aoa-playbooks/generated/playbook_review_status.min.json",
+            payload["source_files"],
+        )
+        self.assertIn(
+            "aoa-playbooks/generated/playbook_review_packet_contracts.min.json",
             payload["source_files"],
         )

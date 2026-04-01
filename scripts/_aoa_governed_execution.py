@@ -109,6 +109,15 @@ ROUTING_ROADMAP_GENERATED_SURFACE_GOAL_MARKERS = (
 )
 BUILD_ROUTER_WRITE_LOOP_START = "for filename, payload in outputs.items():"
 BUILD_ROUTER_WRITE_LOOP_END = 'print(f"[ok] wrote {relative_posix(path)}")'
+PLAYBOOK_REVIEW_PACKET_CONTRACTS_PATH = Path(
+    "Knowledge/federation/aoa-playbooks/generated/playbook_review_packet_contracts.min.json"
+)
+EVAL_RUNTIME_TEMPLATE_INDEX_PATH = Path(
+    "Knowledge/federation/aoa-evals/generated/runtime_candidate_template_index.min.json"
+)
+MEMO_RUNTIME_WRITEBACK_TARGETS_PATH = Path(
+    "Knowledge/federation/aoa-memo/generated/runtime_writeback_targets.min.json"
+)
 
 
 def load_trials_module() -> Any:
@@ -159,6 +168,13 @@ def parse_yaml_or_json(text: str) -> dict[str, Any]:
 
 def sha256_digest_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def slugify(text: str) -> str:
+    lowered = text.strip().lower()
+    lowered = re.sub(r"[^a-z0-9]+", "-", lowered)
+    lowered = lowered.strip("-")
+    return lowered or "candidate"
 
 
 def resolve_policy_path(path: str | Path | None = None) -> Path:
@@ -648,6 +664,118 @@ def default_advisory_provider(request: dict[str, Any]) -> dict[str, Any]:
             memo_payload,
         )
     return payload
+
+
+def default_review_packet_trace_provider(request: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "user_text": str(request.get("goal") or "Produce a bounded advisory trace for governed execution."),
+        "temperature": 0.0,
+        "max_tokens": 128,
+    }
+    for key in ("playbook_id", "playbook_select", "memo", "kag", "profile_class"):
+        value = request.get(key)
+        if value is not None:
+            payload[key] = value
+    response = http_post_json(f"{LANGCHAIN_API_BASE_URL}/run/federated", payload, timeout_s=180.0)
+    advisory_trace = response.get("advisory_trace")
+    if not isinstance(advisory_trace, dict):
+        raise RuntimeError("langchain-api /run/federated did not return advisory_trace")
+    return advisory_trace
+
+
+def load_runtime_mirror_json(relative_path: Path) -> dict[str, Any]:
+    path = STACK_ROOT / relative_path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"runtime mirror missing: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"runtime mirror invalid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"runtime mirror must be an object: {path}")
+    return payload
+
+
+def playbook_review_packet_contract_by_id(playbook_id: str) -> dict[str, Any] | None:
+    payload = load_runtime_mirror_json(PLAYBOOK_REVIEW_PACKET_CONTRACTS_PATH)
+    for entry in payload.get("playbooks", []):
+        if isinstance(entry, dict) and entry.get("playbook_id") == playbook_id:
+            return entry
+    return None
+
+
+def eval_runtime_candidate_templates() -> list[dict[str, Any]]:
+    payload = load_runtime_mirror_json(EVAL_RUNTIME_TEMPLATE_INDEX_PATH)
+    templates = payload.get("templates", [])
+    if not isinstance(templates, list):
+        raise RuntimeError("runtime candidate template index must contain templates list")
+    return [entry for entry in templates if isinstance(entry, dict)]
+
+
+def memo_runtime_writeback_targets() -> list[dict[str, Any]]:
+    payload = load_runtime_mirror_json(MEMO_RUNTIME_WRITEBACK_TARGETS_PATH)
+    targets = payload.get("targets", [])
+    if not isinstance(targets, list):
+        raise RuntimeError("runtime writeback targets surface must contain targets list")
+    return [entry for entry in targets if isinstance(entry, dict)]
+
+
+def fallback_review_packet_trace(
+    request: dict[str, Any],
+    advisory_context: dict[str, Any],
+    *,
+    playbook_contract: dict[str, Any] | None,
+) -> dict[str, Any]:
+    playbook_context = advisory_context.get("playbook")
+    playbook_summary: dict[str, Any] | None = None
+    if isinstance(playbook_context, dict):
+        playbook_summary = {
+            "playbook_id": playbook_context.get("playbook_id") or request.get("playbook_id"),
+            "name": playbook_context.get("name") or playbook_context.get("title"),
+            "scenario": ((playbook_context.get("registry_entry") or {}).get("scenario") if isinstance(playbook_context.get("registry_entry"), dict) else None),
+            "trigger": ((playbook_context.get("activation_entry") or {}).get("trigger") if isinstance(playbook_context.get("activation_entry"), dict) else None),
+        }
+        playbook_summary = {key: value for key, value in playbook_summary.items() if value not in (None, [], {})}
+    elif playbook_contract is not None:
+        playbook_summary = {
+            "playbook_id": playbook_contract.get("playbook_id"),
+            "name": playbook_contract.get("playbook_name"),
+            "scenario": playbook_contract.get("scenario"),
+        }
+
+    trace: dict[str, Any] = {
+        "selectors": {
+            "playbook_id": request.get("playbook_id"),
+            "playbook_select": request.get("playbook_select"),
+            "kag": request.get("kag"),
+            "profile_class": request.get("profile_class") or DEFAULT_PROFILE_CLASS,
+        },
+        "trace_source": "governed-fallback",
+    }
+    if playbook_summary is not None:
+        trace["playbook"] = {
+            "summary": playbook_summary,
+            "source_files": advisory_context.get("playbook_source_files") or [],
+        }
+        review_status = None
+        if isinstance(playbook_context, dict) and isinstance(playbook_context.get("review_status"), dict):
+            review_status = playbook_context["review_status"]
+        if review_status is not None:
+            trace["playbook"]["review_status"] = review_status
+        if playbook_contract is not None:
+            trace["playbook"]["review_packet_contract"] = playbook_contract
+    if isinstance(request.get("memo"), dict):
+        trace["memo"] = {
+            "selector": request["memo"],
+            "resolution": "requested_only",
+            "source_files": advisory_context.get("memo_contract", {}).get("source_files", []),
+        }
+    if isinstance(request.get("kag"), dict):
+        trace["kag"] = {
+            "selector": request["kag"],
+            "resolution": "requested_only",
+        }
+    return trace
 
 
 def default_gate_provider() -> dict[str, Any]:
@@ -1985,6 +2113,18 @@ def proposal_edit_spec_artifact(run_dir: Path) -> Path:
     return run_dir / "artifacts" / "proposal.edit-spec.json"
 
 
+def advisory_trace_runtime_artifact(run_dir: Path) -> Path:
+    return run_dir / "artifacts" / "advisory_trace.json"
+
+
+def review_packet_manifest_artifact(run_dir: Path) -> Path:
+    return run_dir / "artifacts" / "review_packet_manifest.json"
+
+
+def review_packet_inputs_dir(run_dir: Path) -> Path:
+    return run_dir / "artifacts" / "review-packets" / "inputs"
+
+
 def make_run_id() -> str:
     return f"{utc_now().replace(':', '').replace('-', '').lower()}-{uuid.uuid4().hex[:8]}"
 
@@ -2163,6 +2303,12 @@ def update_report(run_dir: Path, summary: dict[str, Any], state: dict[str, Any] 
     changed_files = summary.get("changed_files") or []
     if changed_files:
         lines.append(f"- changed_files: `{json.dumps(changed_files, ensure_ascii=True)}`")
+    review_packets = summary.get("review_packets")
+    if isinstance(review_packets, dict):
+        lines.append(f"- review_packet_ready: `{review_packets.get('ready')}`")
+        lines.append(f"- emitted_review_packets: `{review_packets.get('emitted_candidate_artifact_count')}`")
+        if review_packets.get("manifest_ref"):
+            lines.append(f"- review_packet_manifest: `{review_packets.get('manifest_ref')}`")
     reasons = summary.get("reasons") or []
     if reasons:
         lines.extend(["", "## Reasons", ""])
@@ -2377,12 +2523,419 @@ def paused_result(
     return json.loads(result_artifact(run_dir).read_text(encoding="utf-8"))
 
 
+def review_packet_eval_template_matches(
+    playbook_id: str,
+    playbook_contract: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    hook_templates: list[dict[str, Any]] = []
+    evidence_templates: list[dict[str, Any]] = []
+    contract_eval_anchors = {
+        anchor for anchor in playbook_contract.get("eval_anchors", []) if isinstance(anchor, str) and anchor
+    }
+    for entry in eval_runtime_candidate_templates():
+        template_kind = entry.get("template_kind")
+        if template_kind == "artifact_to_verdict_hook":
+            if entry.get("playbook_id") not in (None, playbook_id):
+                continue
+            if contract_eval_anchors and entry.get("eval_anchor") not in contract_eval_anchors:
+                continue
+            hook_templates.append(entry)
+        elif template_kind == "runtime_evidence_selection":
+            evidence_templates.append(entry)
+    return hook_templates, evidence_templates
+
+
+def review_packet_memo_target_matches(playbook_contract: dict[str, Any]) -> list[dict[str, Any]]:
+    surfaces = {
+        surface
+        for surface in playbook_contract.get("memo_runtime_surfaces", [])
+        if isinstance(surface, str) and surface
+    }
+    return [entry for entry in memo_runtime_writeback_targets() if entry.get("runtime_surface") in surfaces]
+
+
+def write_review_packet_input(
+    run_dir: Path,
+    *,
+    packet_kind: str,
+    stem: str,
+    payload: dict[str, Any],
+) -> Path:
+    path = review_packet_inputs_dir(run_dir) / packet_kind / f"{stem}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, payload)
+    return path
+
+
+def export_wrapper_command(script_name: str, *, input_file: Path, extra_args: list[str] | None = None) -> list[str]:
+    command = [
+        "env",
+        f"AOA_STACK_ROOT={STACK_ROOT}",
+        "python",
+        str(SCRIPT_ROOT / "scripts" / script_name),
+        "--input-file",
+        str(input_file),
+    ]
+    if extra_args:
+        command.extend(extra_args)
+    command.append("--write")
+    return command
+
+
+def run_export_wrapper(
+    run_dir: Path,
+    *,
+    label: str,
+    command: list[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    raw = run_command(command, cwd=SCRIPT_ROOT, timeout_s=180.0)
+    ref = TRIALS.persist_command_result(run_dir, label, raw)
+    if raw["exit_code"] != 0 or raw["timed_out"]:
+        raise RuntimeError(raw["stderr"].strip() or f"{label} failed")
+    payload = json.loads(raw["stdout"])
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{label} did not emit a JSON object")
+    return payload, ref
+
+
+def build_memo_candidate_payload(
+    *,
+    run_id: str,
+    playbook_contract: dict[str, Any],
+    memo_target: dict[str, Any],
+    changed_files: list[str],
+    advisory_trace_ref: Path,
+) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "playbook_id": playbook_contract.get("playbook_id"),
+        "candidate_kind": "memo_candidate",
+        "runtime_surface": memo_target.get("runtime_surface"),
+        "target_kind": memo_target.get("target_kind"),
+        "writeback_class": memo_target.get("writeback_class"),
+        "changed_files": changed_files,
+        "advisory_trace_ref": f"local:{advisory_trace_ref}",
+        "review_required": memo_target.get("requires_human_review"),
+        "notes": memo_target.get("notes"),
+    }
+
+
+def build_runtime_evidence_selection_payload(
+    *,
+    run_id: str,
+    playbook_contract: dict[str, Any],
+    template: dict[str, Any],
+    changed_files: list[str],
+    advisory_trace_ref: Path,
+) -> dict[str, Any]:
+    selection_id = f"{slugify(run_id)}--{slugify(str(template.get('template_name') or 'runtime-evidence-selection'))}"
+    required_runtime_artifacts = [
+        artifact for artifact in template.get("required_runtime_artifacts", []) if isinstance(artifact, str) and artifact
+    ]
+    return {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": selection_id,
+        "playbook_id": playbook_contract.get("playbook_id"),
+        "template_name": template.get("template_name"),
+        "candidate_eval_refs": (
+            [f"candidate:{template['eval_anchor']}"] if isinstance(template.get("eval_anchor"), str) else []
+        ),
+        "selected_evidence": [
+            {
+                "evidence_role": artifact,
+                "artifact_ref": f"governed-run:{run_id}:{artifact}",
+            }
+            for artifact in required_runtime_artifacts
+        ],
+        "selection_rationale": "Bounded governed-run review packet candidate assembled from advisory trace and contract matches.",
+        "review_required": bool(template.get("review_required", True)),
+        "source_example_ref": template.get("source_example_ref"),
+        "changed_files": changed_files,
+        "advisory_trace_ref": f"local:{advisory_trace_ref}",
+    }
+
+
+def build_artifact_hook_payload(
+    *,
+    run_id: str,
+    playbook_contract: dict[str, Any],
+    template: dict[str, Any],
+    changed_files: list[str],
+    advisory_trace_ref: Path,
+) -> dict[str, Any]:
+    hook_name = str(template.get("template_name") or "artifact-hook")
+    return {
+        "surface_type": "artifact_to_verdict_hook",
+        "hook_id": f"{slugify(hook_name)}--{run_id}",
+        "playbook_id": playbook_contract.get("playbook_id"),
+        "eval_anchor": template.get("eval_anchor"),
+        "verdict_bundle_ref": template.get("verdict_bundle_ref"),
+        "artifact_inputs": [
+            artifact for artifact in template.get("required_runtime_artifacts", []) if isinstance(artifact, str) and artifact
+        ],
+        "review_required": bool(template.get("review_required", True)),
+        "source_example_ref": template.get("source_example_ref"),
+        "changed_files": changed_files,
+        "advisory_trace_ref": f"local:{advisory_trace_ref}",
+    }
+
+
+def materialize_review_packets(
+    run_dir: Path,
+    *,
+    request: dict[str, Any],
+    state: dict[str, Any],
+    advisory_context: dict[str, Any],
+) -> dict[str, Any]:
+    playbook_id = str(state.get("playbook_id") or request.get("playbook_id") or "").strip()
+    if not playbook_id:
+        payload = {
+            "artifact_kind": "aoa.governed-run.review-packet-manifest",
+            "schema_version": "v1",
+            "run_id": state.get("run_id"),
+            "generated_at": utc_now(),
+            "selected_playbook": None,
+            "matched_playbook_packet_contract": None,
+            "matched_eval_template_entries": [],
+            "matched_memo_writeback_targets": [],
+            "emitted_candidate_artifact_refs": [],
+            "skipped_packet_kinds": [{"packet_kind": "all", "reason": "playbook_id_unavailable"}],
+        }
+        write_json(review_packet_manifest_artifact(run_dir), payload)
+        return {
+            "ready": False,
+            "manifest_ref": str(review_packet_manifest_artifact(run_dir)),
+            "advisory_trace_ref": None,
+            "emitted_candidate_artifact_count": 0,
+            "skipped_packet_kind_count": 1,
+        }
+
+    playbook_contract = None
+    playbook_context = advisory_context.get("playbook")
+    if isinstance(playbook_context, dict) and isinstance(playbook_context.get("review_packet_contract"), dict):
+        playbook_contract = playbook_context["review_packet_contract"]
+    if playbook_contract is None:
+        playbook_contract = playbook_review_packet_contract_by_id(playbook_id)
+
+    advisory_trace_error: str | None = None
+    if playbook_contract is not None:
+        try:
+            advisory_trace = default_review_packet_trace_provider(request)
+        except Exception as exc:
+            advisory_trace_error = f"{type(exc).__name__}: {exc}"
+            advisory_trace = fallback_review_packet_trace(
+                request,
+                advisory_context,
+                playbook_contract=playbook_contract,
+            )
+    else:
+        advisory_trace_error = "playbook_review_packet_contract_unavailable"
+        advisory_trace = fallback_review_packet_trace(request, advisory_context, playbook_contract=None)
+
+    advisory_trace_path = advisory_trace_runtime_artifact(run_dir)
+    write_json(advisory_trace_path, advisory_trace)
+
+    emitted_refs: list[dict[str, Any]] = []
+    skipped_packet_kinds: list[dict[str, Any]] = []
+    matched_eval_entries: list[dict[str, Any]] = []
+    matched_memo_targets: list[dict[str, Any]] = []
+    if playbook_contract is not None:
+        hook_templates, evidence_templates = review_packet_eval_template_matches(playbook_id, playbook_contract)
+        matched_eval_entries = hook_templates + evidence_templates
+        matched_memo_targets = review_packet_memo_target_matches(playbook_contract)
+
+    candidate_packet_kinds = [
+        kind for kind in (playbook_contract or {}).get("candidate_packet_kinds", []) if isinstance(kind, str) and kind
+    ]
+    for packet_kind in candidate_packet_kinds:
+        if packet_kind == "memo_candidate":
+            if not matched_memo_targets:
+                skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": "no_matched_memo_writeback_targets"})
+                continue
+            for memo_target in matched_memo_targets:
+                runtime_surface = str(memo_target.get("runtime_surface") or "memo-target")
+                input_path = write_review_packet_input(
+                    run_dir,
+                    packet_kind=packet_kind,
+                    stem=slugify(runtime_surface),
+                    payload=build_memo_candidate_payload(
+                        run_id=state["run_id"],
+                        playbook_contract=playbook_contract,
+                        memo_target=memo_target,
+                        changed_files=list(state.get("changed_files") or []),
+                        advisory_trace_ref=advisory_trace_path,
+                    ),
+                )
+                try:
+                    export_payload, ref = run_export_wrapper(
+                        run_dir,
+                        label=f"review-packet-memo-{slugify(runtime_surface)}",
+                        command=export_wrapper_command(
+                            "aoa-export-memo-candidate",
+                            input_file=input_path,
+                            extra_args=["--runtime-surface", runtime_surface],
+                        ),
+                    )
+                except Exception as exc:
+                    skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": f"{runtime_surface}: {type(exc).__name__}: {exc}"})
+                    continue
+                emitted_refs.append(
+                    {
+                        "packet_kind": packet_kind,
+                        "runtime_surface": runtime_surface,
+                        "input_ref": f"local:{input_path}",
+                        "artifact_ref": f"local:{STACK_ROOT / 'Logs' / 'memo-exports' / 'latest' / f'{runtime_surface}.private.json'}",
+                        "command_meta": ref["command_meta"],
+                        "record_id": export_payload.get("record_id"),
+                    }
+                )
+        elif packet_kind == "runtime_evidence_selection_candidate":
+            evidence_entries = [entry for entry in matched_eval_entries if entry.get("template_kind") == "runtime_evidence_selection"]
+            if not evidence_entries:
+                skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": "no_runtime_evidence_selection_templates"})
+                continue
+            for template in evidence_entries:
+                template_name = str(template.get("template_name") or "runtime-evidence-selection")
+                input_path = write_review_packet_input(
+                    run_dir,
+                    packet_kind=packet_kind,
+                    stem=slugify(template_name),
+                    payload=build_runtime_evidence_selection_payload(
+                        run_id=state["run_id"],
+                        playbook_contract=playbook_contract,
+                        template=template,
+                        changed_files=list(state.get("changed_files") or []),
+                        advisory_trace_ref=advisory_trace_path,
+                    ),
+                )
+                try:
+                    export_payload, ref = run_export_wrapper(
+                        run_dir,
+                        label=f"review-packet-evidence-{slugify(template_name)}",
+                        command=export_wrapper_command(
+                            "aoa-export-runtime-evidence-selection",
+                            input_file=input_path,
+                        ),
+                    )
+                except Exception as exc:
+                    skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": f"{template_name}: {type(exc).__name__}: {exc}"})
+                    continue
+                selection_id = str(export_payload.get("selection_id") or "")
+                emitted_refs.append(
+                    {
+                        "packet_kind": packet_kind,
+                        "template_name": template_name,
+                        "input_ref": f"local:{input_path}",
+                        "artifact_ref": f"local:{STACK_ROOT / 'Logs' / 'eval-exports' / 'latest' / 'runtime-evidence-selection' / f'{selection_id}.private.json'}",
+                        "command_meta": ref["command_meta"],
+                        "record_id": export_payload.get("record_id"),
+                    }
+                )
+        elif packet_kind == "artifact_hook_candidate":
+            hook_entries = [entry for entry in matched_eval_entries if entry.get("template_kind") == "artifact_to_verdict_hook"]
+            if not hook_entries:
+                skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": "no_artifact_hook_templates"})
+                continue
+            for template in hook_entries:
+                template_name = str(template.get("template_name") or "artifact-hook")
+                input_path = write_review_packet_input(
+                    run_dir,
+                    packet_kind=packet_kind,
+                    stem=slugify(template_name),
+                    payload=build_artifact_hook_payload(
+                        run_id=state["run_id"],
+                        playbook_contract=playbook_contract,
+                        template=template,
+                        changed_files=list(state.get("changed_files") or []),
+                        advisory_trace_ref=advisory_trace_path,
+                    ),
+                )
+                try:
+                    export_payload, ref = run_export_wrapper(
+                        run_dir,
+                        label=f"review-packet-hook-{slugify(template_name)}",
+                        command=export_wrapper_command(
+                            "aoa-export-artifact-hook-candidate",
+                            input_file=input_path,
+                        ),
+                    )
+                except Exception as exc:
+                    skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": f"{template_name}: {type(exc).__name__}: {exc}"})
+                    continue
+                hook_id = str(export_payload.get("hook_id") or "")
+                emitted_refs.append(
+                    {
+                        "packet_kind": packet_kind,
+                        "template_name": template_name,
+                        "input_ref": f"local:{input_path}",
+                        "artifact_ref": f"local:{STACK_ROOT / 'Logs' / 'eval-exports' / 'latest' / 'artifact-hook' / f'{hook_id}.private.json'}",
+                        "command_meta": ref["command_meta"],
+                        "record_id": export_payload.get("record_id"),
+                    }
+                )
+        else:
+            skipped_packet_kinds.append({"packet_kind": packet_kind, "reason": "unsupported_packet_kind"})
+
+    if advisory_trace_error is not None:
+        skipped_packet_kinds.append({"packet_kind": "advisory_trace", "reason": advisory_trace_error})
+
+    manifest_payload = {
+        "artifact_kind": "aoa.governed-run.review-packet-manifest",
+        "schema_version": "v1",
+        "run_id": state["run_id"],
+        "generated_at": utc_now(),
+        "selected_playbook": {
+            "playbook_id": playbook_id,
+            "playbook_name": (playbook_contract or {}).get("playbook_name") or (playbook_context or {}).get("name") or (playbook_context or {}).get("title"),
+        },
+        "matched_playbook_packet_contract": playbook_contract,
+        "matched_eval_template_entries": matched_eval_entries,
+        "matched_memo_writeback_targets": matched_memo_targets,
+        "advisory_trace_ref": f"local:{advisory_trace_path}",
+        "emitted_candidate_artifact_refs": emitted_refs,
+        "skipped_packet_kinds": skipped_packet_kinds,
+    }
+    write_json(review_packet_manifest_artifact(run_dir), manifest_payload)
+    return {
+        "ready": playbook_contract is not None,
+        "manifest_ref": str(review_packet_manifest_artifact(run_dir)),
+        "advisory_trace_ref": str(advisory_trace_path),
+        "emitted_candidate_artifact_count": len(emitted_refs),
+        "skipped_packet_kind_count": len(skipped_packet_kinds),
+    }
+
+
 def pass_result(
     run_dir: Path,
     *,
     state: dict[str, Any],
     changed_files: list[str],
 ) -> dict[str, Any]:
+    review_packet_status: dict[str, Any] | None = None
+    request_path = run_dir / "request.json"
+    preflight_path = run_dir / "preflight.summary.json"
+    if request_path.exists() and preflight_path.exists():
+        try:
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+            advisory_context = preflight.get("advisory_context")
+            if isinstance(request, dict) and isinstance(advisory_context, dict):
+                review_packet_status = materialize_review_packets(
+                    run_dir,
+                    request=request,
+                    state=state,
+                    advisory_context=advisory_context,
+                )
+        except Exception as exc:
+            review_packet_status = {
+                "ready": False,
+                "manifest_ref": None,
+                "advisory_trace_ref": None,
+                "emitted_candidate_artifact_count": 0,
+                "skipped_packet_kind_count": 1,
+                "materialization_error": f"{type(exc).__name__}: {exc}",
+            }
+
     summary = make_pass_summary(
         run_id=state["run_id"],
         phase="completed",
@@ -2390,6 +2943,8 @@ def pass_result(
         break_glass_used=bool(state.get("break_glass_used")),
         next_action="Governed execution landed successfully.",
     )
+    if review_packet_status is not None:
+        summary["review_packets"] = review_packet_status
     state["phase"] = "completed"
     state["status"] = "pass"
     state["changed_files"] = changed_files
@@ -3270,6 +3825,7 @@ def render_status_explain(payload: dict[str, Any]) -> str:
     state = payload.get("state") or {}
     summary = payload.get("summary") or {}
     triage = payload.get("triage") or {}
+    review_packets = summary.get("review_packets") or {}
     lines = [
         f"# governed-run `{payload.get('run_id')}`",
         "",
@@ -3282,11 +3838,17 @@ def render_status_explain(payload: dict[str, Any]) -> str:
         f"- resumable: `{triage.get('resumable')}`",
         f"- operator_action_required: `{triage.get('operator_action_required')}`",
         f"- blocked_reason: `{triage.get('blocked_reason')}`",
+        f"- review_packet_ready: `{review_packets.get('ready')}`",
+        f"- emitted_review_packets: `{review_packets.get('emitted_candidate_artifact_count')}`",
         "",
         "## Next Action",
         "",
         str(triage.get("recommended_action") or summary.get("next_action") or "None."),
     ]
+    if review_packets.get("manifest_ref"):
+        lines.extend(["", "## Review Packets", "", f"- manifest: `{review_packets['manifest_ref']}`"])
+        if review_packets.get("advisory_trace_ref"):
+            lines.append(f"- advisory_trace: `{review_packets['advisory_trace_ref']}`")
     if triage.get("safe_resume_command"):
         lines.extend(["", "## Safe Resume", "", f"`{triage['safe_resume_command']}`"])
     return "\n".join(lines)

@@ -16,6 +16,7 @@ required_files:
   - generated/memory_object_catalog.min.json
   - generated/memory_object_capsules.json
   - generated/memory_object_sections.full.json
+  - generated/runtime_writeback_targets.min.json
   - examples/checkpoint_to_memory_contract.example.json
   - examples/recall_contract.router.semantic.json
   - examples/recall_contract.router.lineage.json
@@ -25,3 +26,4 @@ required_files:
   - examples/recall_contract.object.working.return.json
   - schemas/checkpoint-to-memory-contract.schema.json
   - schemas/core-memory-contract.schema.json
+  - schemas/runtime-writeback-targets.schema.json

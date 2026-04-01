@@ -13,6 +13,7 @@ required_files:
   - generated/eval_capsules.json
   - generated/eval_sections.full.json
   - generated/comparison_spine.json
+  - generated/runtime_candidate_template_index.min.json
   - examples/runtime_evidence_selection.workhorse-local.example.json
   - examples/runtime_evidence_selection.return-anchor-integrity.example.json
   - examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json
@@ -20,3 +21,4 @@ required_files:
   - examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json
   - schemas/runtime-evidence-selection.schema.json
   - schemas/artifact-to-verdict-hook.schema.json
+  - schemas/runtime-candidate-template-index.schema.json

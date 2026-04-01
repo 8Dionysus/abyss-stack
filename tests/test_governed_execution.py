@@ -488,6 +488,177 @@ class GovernedExecutionTests(unittest.TestCase):
             "notes": [],
         }
 
+    def install_review_packet_runtime_surfaces(
+        self,
+        *,
+        playbook_id: str = "AOA-P-0011",
+        include_eval_templates: bool = True,
+        include_memo_target: bool = True,
+    ) -> Path:
+        stack_root = self.root / "stack"
+        self.module.STACK_ROOT = stack_root
+
+        playbook_contracts = {
+            "schema_version": 1,
+            "playbooks": [
+                {
+                    "playbook_id": playbook_id,
+                    "playbook_name": "bounded-change-safe",
+                    "scenario": "bounded_change_safe",
+                    "expected_artifacts": ["approval_record", "verification_pack"],
+                    "eval_anchors": ["aoa-approval-boundary-adherence"],
+                    "memo_runtime_surfaces": ["approval_record"] if include_memo_target else ["missing_surface"],
+                    "candidate_packet_kinds": [
+                        "memo_candidate",
+                        "runtime_evidence_selection_candidate",
+                        "artifact_hook_candidate",
+                    ],
+                    "review_required": True,
+                    "source_review_refs": ["docs/gate-reviews/bounded-change-safe.md"],
+                    "gate_verdict": "hold",
+                }
+            ],
+        }
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-playbooks"
+            / "generated"
+            / "playbook_review_packet_contracts.min.json",
+            playbook_contracts,
+        )
+
+        eval_templates = {
+            "schema_version": 1,
+            "templates": (
+                [
+                    {
+                        "template_kind": "runtime_evidence_selection",
+                        "template_name": "workhorse-q4-vs-q6-latency-tradeoff",
+                        "playbook_id": None,
+                        "eval_anchor": None,
+                        "verdict_bundle_ref": None,
+                        "required_runtime_artifacts": ["summary", "comparison-note"],
+                        "review_required": True,
+                        "source_example_ref": "examples/runtime_evidence_selection.workhorse-local.example.json",
+                    },
+                    {
+                        "template_kind": "artifact_to_verdict_hook",
+                        "template_name": "aoa-p-0011-approval-boundary-hook",
+                        "playbook_id": playbook_id,
+                        "eval_anchor": "aoa-approval-boundary-adherence",
+                        "verdict_bundle_ref": "repo:aoa-evals/bundles/aoa-approval-boundary-adherence/EVAL.md",
+                        "required_runtime_artifacts": ["approval_record", "verification_pack"],
+                        "review_required": True,
+                        "source_example_ref": "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
+                    },
+                ]
+                if include_eval_templates
+                else []
+            ),
+        }
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+            / "generated"
+            / "runtime_candidate_template_index.min.json",
+            eval_templates,
+        )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+            / "schemas"
+            / "runtime-evidence-selection.schema.json",
+            {"title": "fixture runtime evidence selection"},
+        )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+            / "schemas"
+            / "artifact-to-verdict-hook.schema.json",
+            {"title": "fixture artifact hook"},
+        )
+        for rel_path in (
+            "docs/RUNTIME_BENCH_PROMOTION_GUIDE.md",
+            "docs/TRACE_EVAL_BRIDGE.md",
+            "docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md",
+            "docs/RECURRENCE_PROOF_PROGRAM.md",
+            "examples/runtime_evidence_selection.workhorse-local.example.json",
+            "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+            "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
+        ):
+            path = stack_root / "Knowledge" / "federation" / "aoa-evals" / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.suffix == ".json":
+                write_json(path, {"fixture": rel_path})
+            else:
+                path.write_text(f"{rel_path}\n", encoding="utf-8")
+
+        memo_targets = {
+            "schema_version": 1,
+            "targets": (
+                [
+                    {
+                        "runtime_surface": "approval_record",
+                        "target_kind": "decision",
+                        "writeback_class": "memo_surviving_event",
+                        "requires_human_review": False,
+                        "review_state_default": "confirmed",
+                        "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                        "notes": "Fixture approval writeback.",
+                    }
+                ]
+                if include_memo_target
+                else []
+            ),
+        }
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-memo"
+            / "generated"
+            / "runtime_writeback_targets.min.json",
+            memo_targets,
+        )
+        write_json(
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-memo"
+            / "examples"
+            / "checkpoint_to_memory_contract.example.json",
+            {
+                "contract_type": "checkpoint_to_memory_contract",
+                "contract_id": "aoa-memo.runtime-writeback.v1",
+                "runtime_boundary": {"boundary": "fixture"},
+                "mapping_rules": (
+                    [
+                        {
+                            "runtime_surface": "approval_record",
+                            "target_kind": "decision",
+                            "writeback_class": "memo_surviving_event",
+                            "temperature_hint": "warm",
+                            "review_state_default": "confirmed",
+                            "requires_human_review": False,
+                            "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                            "notes": "Fixture approval writeback.",
+                        }
+                    ]
+                    if include_memo_target
+                    else []
+                ),
+            },
+        )
+        return stack_root
+
     def test_compact_excerpt_prefers_goal_focus_terms(self) -> None:
         text = "alpha\n" + ("padding\n" * 400) + "repo-scope expansion gate remains evidence only\n" + ("tail\n" * 200)
         excerpt = self.module.compact_excerpt(
@@ -1890,6 +2061,186 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertTrue(rollback["rollback_ok"])
         self.assertIn("landing_diff_sha256", rollback)
         self.assertIn("beta", (self.repo_root / "docs" / "target.md").read_text(encoding="utf-8"))
+
+    def test_materialize_review_packets_emits_manifest_and_private_candidate_refs(self) -> None:
+        stack_root = self.install_review_packet_runtime_surfaces()
+        run_dir = self.logs_root / "run-review-packets"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        request = {
+            "goal": "Review bounded change safe adoption.",
+            "playbook_id": "AOA-P-0011",
+            "repo_root": str(self.repo_root),
+        }
+        state = {
+            "run_id": "run-review-packets",
+            "playbook_id": "AOA-P-0011",
+            "changed_files": ["docs/target.md"],
+        }
+        advisory_context = {
+            "playbook_id": "AOA-P-0011",
+            "playbook": {
+                "playbook_id": "AOA-P-0011",
+                "name": "bounded-change-safe",
+                "review_packet_contract": {
+                    "playbook_id": "AOA-P-0011",
+                    "playbook_name": "bounded-change-safe",
+                    "scenario": "bounded_change_safe",
+                    "expected_artifacts": ["approval_record", "verification_pack"],
+                    "eval_anchors": ["aoa-approval-boundary-adherence"],
+                    "memo_runtime_surfaces": ["approval_record"],
+                    "candidate_packet_kinds": [
+                        "memo_candidate",
+                        "runtime_evidence_selection_candidate",
+                        "artifact_hook_candidate",
+                    ],
+                    "review_required": True,
+                    "source_review_refs": [],
+                    "gate_verdict": "hold",
+                },
+            },
+        }
+
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {
+                    "summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"},
+                    "review_packet_contract": advisory_context["playbook"]["review_packet_contract"],
+                },
+            },
+        ):
+            status = self.module.materialize_review_packets(
+                run_dir,
+                request=request,
+                state=state,
+                advisory_context=advisory_context,
+            )
+
+        self.assertTrue(status["ready"])
+        self.assertEqual(status["emitted_candidate_artifact_count"], 3)
+        manifest = json.loads((run_dir / "artifacts" / "review_packet_manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["selected_playbook"]["playbook_id"], "AOA-P-0011")
+        self.assertEqual(len(manifest["matched_eval_template_entries"]), 2)
+        self.assertEqual(len(manifest["matched_memo_writeback_targets"]), 1)
+        self.assertEqual(len(manifest["emitted_candidate_artifact_refs"]), 3)
+        self.assertTrue((stack_root / "Logs" / "memo-exports" / "latest" / "approval_record.private.json").exists())
+        self.assertTrue(
+            (
+                stack_root
+                / "Logs"
+                / "eval-exports"
+                / "latest"
+                / "runtime-evidence-selection"
+                / "run-review-packets--workhorse-q4-vs-q6-latency-tradeoff.private.json"
+            ).exists()
+        )
+        hook_ref = next(
+            entry["artifact_ref"]
+            for entry in manifest["emitted_candidate_artifact_refs"]
+            if entry["packet_kind"] == "artifact_hook_candidate"
+        )
+        self.assertIn(str(stack_root), hook_ref)
+        self.assertNotIn("/srv/abyss-stack", hook_ref)
+
+    def test_materialize_review_packets_records_skipped_packet_reasons(self) -> None:
+        self.install_review_packet_runtime_surfaces(include_eval_templates=False, include_memo_target=False)
+        run_dir = self.logs_root / "run-review-packets-skipped"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        request = {
+            "goal": "Review bounded change safe adoption.",
+            "playbook_id": "AOA-P-0011",
+            "repo_root": str(self.repo_root),
+        }
+        state = {
+            "run_id": "run-review-packets-skipped",
+            "playbook_id": "AOA-P-0011",
+            "changed_files": ["docs/target.md"],
+        }
+
+        status = self.module.materialize_review_packets(
+            run_dir,
+            request=request,
+            state=state,
+            advisory_context={"playbook_id": "AOA-P-0011"},
+        )
+
+        self.assertTrue(status["ready"])
+        self.assertEqual(status["emitted_candidate_artifact_count"], 0)
+        manifest = json.loads((run_dir / "artifacts" / "review_packet_manifest.json").read_text(encoding="utf-8"))
+        reasons = {entry["packet_kind"]: entry["reason"] for entry in manifest["skipped_packet_kinds"]}
+        self.assertEqual(reasons["memo_candidate"], "no_matched_memo_writeback_targets")
+        self.assertEqual(reasons["runtime_evidence_selection_candidate"], "no_runtime_evidence_selection_templates")
+        self.assertEqual(reasons["artifact_hook_candidate"], "no_artifact_hook_templates")
+
+    def test_pass_result_persists_review_packet_summary_for_status_explain(self) -> None:
+        self.install_review_packet_runtime_surfaces()
+        run_dir = self.logs_root / "run-pass-summary"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            run_dir / "request.json",
+            {
+                "goal": "Review bounded change safe adoption.",
+                "playbook_id": "AOA-P-0011",
+                "repo_root": str(self.repo_root),
+            },
+        )
+        write_json(
+            run_dir / "preflight.summary.json",
+            {
+                "advisory_context": {
+                    "playbook_id": "AOA-P-0011",
+                    "playbook": {
+                        "playbook_id": "AOA-P-0011",
+                        "name": "bounded-change-safe",
+                    },
+                }
+            },
+        )
+        state = {
+            "run_id": "run-pass-summary",
+            "target_id": "abyss-stack",
+            "repo_root": str(self.repo_root),
+            "playbook_id": "AOA-P-0011",
+            "task_class": "docs_only",
+            "trust_state_snapshot": "canary_proven",
+            "phase": "apply_main",
+            "status": "running",
+            "base_head": "abc123",
+            "break_glass_used": False,
+            "changed_files": ["docs/target.md"],
+        }
+        write_json(run_dir / "run.state.json", state)
+        write_json(
+            run_dir / "approval.status.json",
+            {
+                "run_id": "run-pass-summary",
+                "base_head": "abc123",
+                "current_milestone": "landing",
+                "status": "approved",
+                "milestones": {
+                    "plan_freeze": {"status": "approved", "approved": True},
+                    "landing": {"status": "approved", "approved": True},
+                },
+            },
+        )
+
+        with patch.object(
+            self.module,
+            "default_review_packet_trace_provider",
+            return_value={
+                "selectors": {"playbook_id": "AOA-P-0011", "profile_class": "workhorse"},
+                "playbook": {"summary": {"playbook_id": "AOA-P-0011", "name": "bounded-change-safe"}},
+            },
+        ):
+            summary = self.module.pass_result(run_dir, state=state, changed_files=["docs/target.md"])
+
+        self.assertTrue(summary["review_packets"]["ready"])
+        status_payload = self.module.status_run("run-pass-summary", log_root=self.logs_root)
+        rendered = self.module.render_status_explain(status_payload)
+        self.assertIn("review_packet_ready", rendered)
+        self.assertIn("review_packet_manifest.json", rendered)
 
     def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
         def write_run(

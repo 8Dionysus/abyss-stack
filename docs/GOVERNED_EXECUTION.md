@@ -86,9 +86,17 @@ The flow is:
 7. `landing` approval through `approval.status.json`
 8. landing diff apply back to the main checkout
 9. post-apply validation and automatic rollback on failure
+10. bounded review-packet materialization under `${AOA_STACK_ROOT}/Logs/governed-runs/<run-id>/artifacts/`
 
 The main checkout is never repaired autonomously after landing.
 Only the isolated worktree may use the bounded repair budget.
+When review-packet inputs are available, the governed lane writes:
+
+- `artifacts/advisory_trace.json`
+- `artifacts/review_packet_manifest.json`
+- bounded raw input payloads for existing memo/eval export wrappers
+
+Those packets remain runtime-owned candidates until human review in the owner repos.
 
 ## Trust states and promotion rubric
 

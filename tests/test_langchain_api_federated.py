@@ -511,6 +511,58 @@ class LangchainFederatedRunTests(unittest.TestCase):
             {"query_mode": "local_search"},
         )
 
+    def test_federated_run_carries_playbook_review_packet_contract_in_trace(self) -> None:
+        prompts: list[str] = []
+        playbook = {
+            "playbook_id": "AOA-P-0017",
+            "name": "split-wave-cross-repo-rollout",
+            "registry_entry": {"scenario": "split_wave_cross_repo_rollout"},
+            "activation_entry": {"trigger": "release_window"},
+            "federation_entry": {},
+            "review_status": {
+                "playbook_id": "AOA-P-0017",
+                "gate_verdict": "composition-landed",
+                "reviewed_run_count": 2,
+            },
+            "review_packet_contract": {
+                "playbook_id": "AOA-P-0017",
+                "scenario": "split_wave_cross_repo_rollout",
+                "expected_artifacts": ["boundary_map", "handoff_record"],
+                "eval_anchors": ["aoa-approval-boundary-adherence"],
+                "memo_runtime_surfaces": [],
+                "candidate_packet_kinds": [
+                    "runtime_evidence_selection_candidate",
+                    "artifact_hook_candidate",
+                ],
+                "review_required": True,
+                "gate_verdict": "composition-landed",
+            },
+            "source_files": ["aoa-playbooks/generated/playbook_review_packet_contracts.min.json"],
+        }
+
+        def route_side_effect(path, payload):
+            if path == "/playbooks/inspect":
+                return {"ok": True, "playbook": playbook}
+            raise AssertionError(f"unexpected route-api call: {path}")
+
+        def backend_side_effect(req):
+            prompts.append(req.user_text)
+            return {"ok": True, "backend": "stub", "model": "m", "answer": "done"}
+
+        with patch.object(self.module, "_route_api_post", side_effect=route_side_effect):
+            with patch.object(self.module, "_invoke_run_backend", side_effect=backend_side_effect):
+                response = self.client.post(
+                    "/run/federated",
+                    json={"user_text": "hello", "playbook_id": "AOA-P-0017"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("playbook_review_packet_contract", prompts[0])
+        self.assertEqual(
+            response.json()["advisory_trace"]["playbook"]["review_packet_contract"]["candidate_packet_kinds"],
+            ["runtime_evidence_selection_candidate", "artifact_hook_candidate"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
