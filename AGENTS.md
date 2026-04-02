@@ -1,14 +1,30 @@
-# AGENTS
+# AGENTS.md
 
-Rules for coding agents and maintainers working in `abyss-stack`.
+## Purpose
+
+`abyss-stack` is the infrastructure substrate of the AoA and ToS ecosystem. It owns runtime, deployment, storage, lifecycle, reference-platform posture, and infrastructure glue. It does not own layer meaning.
 
 ## Mission
 
 Move the stack forward without breaking locality, secrecy, recoverability, or the Fedora-first deployment posture.
 
-## Core protocol
+## Read first
 
-Use this order:
+1. `README.md`
+2. `CHARTER.md`
+3. `BOUNDARIES.md`
+4. `docs/ARCHITECTURE.md`
+5. `docs/SERVICE_CATALOG.md`
+6. `docs/PROFILES.md`
+7. `docs/PRESETS.md`
+8. `docs/PATHS.md`
+9. `docs/DEPLOYMENT.md`
+10. `docs/RUNBOOK.md`
+11. `docs/SECURITY.md`
+
+If a nearer `AGENTS.md` exists for the directory you are editing, follow that file first.
+
+## Workflow
 
 `PLAN -> DIFF -> APPLY -> VERIFY -> REPORT`
 
@@ -38,41 +54,20 @@ Use this order:
 
 ## Host-facts rule
 
-- `docs/REFERENCE_PLATFORM.md` owns the intended host posture.
-- `docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations.
-- `docs/MACHINE_FIT_POLICY.md` owns the current-machine adaptation policy and capture destinations.
-- `scripts/aoa-doctor` answers readiness, not durable inventory.
-- `scripts/aoa-host-facts` captures durable host facts.
-- `scripts/aoa-machine-fit` captures the bounded current-machine runtime posture.
+- `docs/REFERENCE_PLATFORM.md` owns the intended host posture
+- `docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations
+- `docs/MACHINE_FIT_POLICY.md` owns the current-machine adaptation policy and capture destinations
+- `scripts/aoa-doctor` answers readiness, not durable inventory
+- `scripts/aoa-host-facts` captures durable host facts
+- `scripts/aoa-machine-fit` captures the bounded current-machine runtime posture
 - public-safe artifacts may live under `docs/reference-platform/`
 - private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
 - private machine-fit captures belong under `${AOA_STACK_ROOT}/Logs/machine-fit/`
 
-## Repository reading order
+## Verify
 
-1. `README.md`
-2. `CHARTER.md`
-3. `BOUNDARIES.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/SERVICE_CATALOG.md`
-6. `docs/PROFILES.md`
-7. `docs/PRESETS.md`
-8. `docs/PROFILE_RECIPES.md`
-9. `docs/RENDER_TRUTH.md`
-10. `docs/RUNTIME_BENCH_POLICY.md`
-11. `docs/INTERNAL_PROBES.md`
-12. `docs/PATHS.md`
-13. `docs/WINDOWS_BRIDGE.md`
-14. `docs/WINDOWS_SETUP.md`
-15. `docs/WINDOWS_PERFORMANCE.md`
-16. `docs/STORAGE_LAYOUT.md`
-17. `docs/REFERENCE_PLATFORM.md`
-18. `docs/REFERENCE_PLATFORM_SPEC.md`
-19. `docs/DEPLOYMENT.md`
-20. `docs/FIRST_RUN.md`
-21. `docs/DOCTOR.md`
-22. `docs/SECRETS_BOOTSTRAP.md`
-23. `docs/LIFECYCLE.md`
-24. `docs/RUNBOOK.md`
-25. `docs/SECURITY.md`
-26. `docs/MIGRATION_FROM_OLD.md`
+- do not confuse source checkout with runtime root
+- keep runtime layers distinct from layer-owned meaning
+- keep public-safe docs and artifacts separate from private captures
+- if paths, ports, or host posture change, re-read the relevant path, deployment, runbook, and reference-platform docs before finishing
+- use the narrowest dry-run or public-safe validation available for the changed scripts, modules, or docs

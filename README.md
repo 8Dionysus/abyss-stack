@@ -1,30 +1,47 @@
 # abyss-stack
 
-`abyss-stack` is the infrastructure substrate of the AoA and ToS ecosystem.
+`abyss-stack` is the infrastructure substrate of the AoA and ToS ecosystem. It is **Fedora-first** in deployment posture while remaining **Windows-usable** for source work, path mapping, and hybrid workflows. It owns runtime, deployment, storage layout, lifecycle, security, reference-platform posture, and infrastructure glue. It does not own the authored meaning of the specialized AoA layers or ToS.
 
-It is **Fedora-first** in deployment posture, while remaining **Windows-usable** for source work, path mapping, and hybrid workflows.
+## Start here
 
-It owns runtime, deployment, storage layout, lifecycle, security, reference platform posture, and infra glue.
-It does **not** own the authored meaning of the specialized AoA layers.
+Read in this order:
+
+1. [CHARTER](CHARTER.md)
+2. [BOUNDARIES](BOUNDARIES.md)
+3. [docs/ARCHITECTURE](docs/ARCHITECTURE.md)
+4. [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md)
+5. [docs/PROFILES](docs/PROFILES.md) and [docs/PRESETS](docs/PRESETS.md)
+6. [docs/PATHS](docs/PATHS.md)
+7. [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [docs/RUNBOOK](docs/RUNBOOK.md), and [docs/SECURITY](docs/SECURITY.md)
+8. [ROADMAP](ROADMAP.md)
+
+Then branch by need:
+
+- **Windows host and WSL bridge**: [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
+- **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
+- **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
+- **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
+- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md)
 
 ## What this repository is for
 
 This repository is the right home for:
+
 - local and hybrid runtime topology
 - rootless Podman and systemd user orchestration
 - storage and mount contracts
 - service modules and deployment profiles
-- versioned build contexts for lightweight runtime helper services
-- runtime-facing return and bounded context-rebuild policy for agent-facing routes
+- versioned helper-service build contexts
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
-- current-machine fit policy, driver freshness posture, and bounded machine-local tuning guidance
+- current-machine fit policy and bounded machine-local tuning guidance
 - platform-adaptation policy and public-safe/private tuning record contracts
-- infra helper services that support AoA and ToS
+- infrastructure helper services that support AoA and ToS
 
 ## What this repository is not for
 
 This repository should not absorb:
+
 - technique canon
 - skill canon
 - eval canon
@@ -33,13 +50,7 @@ This repository should not absorb:
 - agent role contracts as primary truth
 - playbook meaning as primary truth
 - ToS authored corpus and philosophical source material
-
-## Relationship to the ecosystem
-
-- `Agents-of-Abyss` is the ecosystem center.
-- `Tree-of-Sophia` is the knowledge architecture counterpart.
-- `aoa-*` repositories own their specialized meaning.
-- `abyss-stack` owns the body those layers can run on.
+- AoA constitutional truth
 
 ## Quick path rule
 
@@ -47,70 +58,8 @@ This repository should not absorb:
 - deployed runtime root: `/srv/abyss-stack`
 - deployed config tree: `/srv/abyss-stack/Configs`
 - do not edit `/srv/abyss-stack` as if it were the source repository
-- if you need the full path model, read [docs/PATHS](docs/PATHS.md)
 
-## Start here
-
-1. Read [CHARTER](CHARTER.md).
-2. Read [BOUNDARIES](BOUNDARIES.md).
-3. Read [docs/ARCHITECTURE](docs/ARCHITECTURE.md).
-4. Read [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md).
-5. Read [docs/PROFILES](docs/PROFILES.md).
-6. Read [docs/PRESETS](docs/PRESETS.md).
-7. Read [docs/PROFILE_RECIPES](docs/PROFILE_RECIPES.md).
-8. Read [docs/RENDER_TRUTH](docs/RENDER_TRUTH.md).
-9. Read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md).
-10. Read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md).
-11. Read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md).
-12. Read [docs/INTERNAL_PROBES](docs/INTERNAL_PROBES.md).
-13. Read [docs/PATHS](docs/PATHS.md).
-14. Read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md).
-15. Read [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md).
-16. Read [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md).
-17. Read [docs/STORAGE_LAYOUT](docs/STORAGE_LAYOUT.md).
-18. Read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md).
-19. Read [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md).
-20. Read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md).
-21. Read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md).
-22. Read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md).
-23. Read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md).
-24. Read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md).
-25. Read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md).
-26. Read [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md).
-27. Read [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md).
-28. Read [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md).
-29. Read [docs/DEPLOYMENT](docs/DEPLOYMENT.md).
-30. Read [docs/FIRST_RUN](docs/FIRST_RUN.md).
-31. Read [docs/DOCTOR](docs/DOCTOR.md).
-32. Read [docs/SECRETS_BOOTSTRAP](docs/SECRETS_BOOTSTRAP.md).
-33. Read [docs/LIFECYCLE](docs/LIFECYCLE.md).
-34. Read [docs/RUNBOOK](docs/RUNBOOK.md).
-35. Read [docs/SECURITY](docs/SECURITY.md).
-36. Read [docs/MIGRATION_FROM_OLD](docs/MIGRATION_FROM_OLD.md).
-
-For the shortest next route by intent:
-- if you need the ecosystem center, layer map, or federation rules, go to [`Agents-of-Abyss`](https://github.com/8Dionysus/Agents-of-Abyss)
-- if you need the knowledge world and authored architecture, go to [`Tree-of-Sophia`](https://github.com/8Dionysus/Tree-of-Sophia)
-- if you need reusable practice, go to [`aoa-techniques`](https://github.com/8Dionysus/aoa-techniques)
-- if you need derived retrieval, reasoning-handoff, or regrounding packs, go to [`aoa-kag`](https://github.com/8Dionysus/aoa-kag)
-- if you need bounded execution workflows, go to [`aoa-skills`](https://github.com/8Dionysus/aoa-skills)
-- if you need portable proof surfaces, go to [`aoa-evals`](https://github.com/8Dionysus/aoa-evals)
-- if you need memory-layer meaning or recall contracts, go to [`aoa-memo`](https://github.com/8Dionysus/aoa-memo)
-- if you need playbook meaning, activation doctrine, or authored execution bundles, go to [`aoa-playbooks`](https://github.com/8Dionysus/aoa-playbooks)
-- if you need the Windows host and WSL bridge workflow, read [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), and [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
-- if you need runtime benchmark ownership, storage, and manifest rules, read [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md)
-- if you need the promoted local Qwen runtime path on `5403`, the retained Ollama control path on `5401`, or the bounded `llama.cpp` comparison and promotion lineage, read [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md)
-- if you need bounded local-model trial contracts, the adopted LangGraph execution posture, or the promoted W5/W6 local-worker path, read [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md)
-- if you need normative host posture or machine-readable host-facts capture, read [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md) and [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md)
-- if you need to tune the runtime to the current machine, confirm driver freshness, or decide which preset the host should prefer, read [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md)
-- if you need a compact record of platform-specific quirks, adaptations, and portability notes, read [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
-- if you need the repo merge and branch discipline, read [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md)
-- if you need the runtime-side memo mirror, recall seam, or export candidates, read [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md)
-- if you need the runtime-side eval mirror, `/evals/*` selection seam, or filesystem-first eval export candidates, read [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md)
-- if you need the runtime-side playbook mirror, `/playbooks/*` activation seam, or composition advisory surfaces, read [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md)
-- if you need the runtime-side KAG mirror, `/kag/*` advisory seam, or the `Tree-of-Sophia` handoff companion, read [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md)
-
-`abyss-stack` may consume public return anchors and checkpoint handles from sibling AoA repositories, but it only owns runtime rebuild policy and return-event logging.
+The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally narrower than the source checkout.
 
 ## Quick route table
 
@@ -126,88 +75,8 @@ For the shortest next route by intent:
 | `aoa-evals` | portable proof surfaces for bounded claims | you need evaluation and quality checks rather than runtime services |
 | `aoa-playbooks` | playbook doctrine, authored execution bundles, and playbook-owned meaning | you need playbook authority rather than runtime advisory mirrors |
 
-## Source checkout shape
+## Current posture
 
-```text
-abyss-stack/
-├─ README.md
-├─ CHARTER.md
-├─ BOUNDARIES.md
-├─ ROADMAP.md
-├─ AGENTS.md
-├─ docs/
-├─ schemas/
-├─ examples/
-├─ compose/
-├─ config-templates/
-├─ scripts/
-├─ systemd/
-├─ env/
-└─ .github/
-```
+`abyss-stack` is a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
-The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally narrower than the source checkout.
-It does not try to duplicate every source-only top-level surface such as `.github/`, `schemas/`, `examples/`, or contributor workflow files.
-
-## Module layout
-
-The stack is organized around explicit compose modules rather than one swollen file:
-
-- `10-storage.yml`
-- `20-orchestration.yml`
-- `30-local-inference.yml`
-- `31-intel-inference.yml`
-- `32-llamacpp-inference.yml`
-- `40-llm-gateway.yml`
-- `41-agent-api.yml`
-- `42-agent-api-intel.yml`
-- `44-llamacpp-agent-sidecar.yml`
-- `50-speech.yml`
-- `51-browser-tools.yml`
-- `60-monitoring.yml`
-
-## Lifecycle surfaces
-
-The repository now includes:
-- profile files under `compose/profiles/`
-- preset files under `compose/presets/`
-- deployment helpers under `scripts/`
-- config-template bootstrap helpers under `scripts/`
-- source-managed helper-service build contexts under `config-templates/Services/`
-- first-run and profile-introspection helpers under `scripts/`
-- host-doctor and bootstrap-rehearsal support
-- profile endpoint recipes and endpoint introspection helpers
-- internal-only probe helpers for hidden services
-- render-truth helpers for actual composed runtime output
-- runtime benchmark policy, schema, and example artifacts
-- reference-platform schema and host-facts capture support
-- machine-fit schema and current-host adaptation capture support
-- platform-adaptation schema, example artifacts, and capture support
-- preset-aware composition helpers and preset introspection
-- Windows host bridge scripts and WSL guidance docs
-- optional compose tuning overlays
-- human-facing wrappers under `scripts/`
-- a systemd user unit skeleton under `systemd/user/`
-- a repository validation workflow under `.github/workflows/`
-
-## Current status
-
-`abyss-stack` is now a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
-The current bounded local-worker posture is `llama.cpp`-first on `5403`, with Ollama retained on `5401` as the control and rollback path.
-`LangGraph` is now the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows, while the earlier W0-W4 runner lineage remains available as the historical baseline.
-The current Intel embeddings posture still uses OVMS; any move from OpenVINO serving to OpenVINO GenAI should be treated as a separate reviewed stack change.
-The opt-in `POST /run/federated` path in `langchain-api` now consumes advisory playbook, memo, and bounded KAG seams without changing the default `POST /run` path.
-`route-api` stays advisory-only, but `POST /playbooks/inspect` now returns compact review-status posture when that surface exists, and `POST /run/federated` can enrich its `advisory_trace` with playbook review posture, memo writeback mapping, and compact KAG context.
-The next large step is no longer whether the runtime should consume these mirrored seams at all; it is how much additional real-run adoption and operational rigor should be layered on top without widening authority.
-
-## Development
-
-```bash
-python -m pip install -r requirements-dev.txt
-python scripts/validate_stack.py
-python -m pytest -q
-```
-
-## License
-
-Apache-2.0
+The current bounded local-worker posture is `llama.cpp`-first on `5403`, with Ollama retained on `5401` as the control and rollback path. `LangGraph` is the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain bounded and explicit: they can enrich runtime behavior, but they do not replace source-owned meaning.
