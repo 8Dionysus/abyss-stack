@@ -3,9 +3,7 @@ services:
     environment:
       EMBEDDINGS_PROVIDER: ovms
     depends_on:
-      litellm:
-        condition: service_healthy
-      ollama:
+      llama-cpp:
         condition: service_started
       ovms:
         condition: service_healthy

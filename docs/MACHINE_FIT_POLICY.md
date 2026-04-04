@@ -29,7 +29,7 @@ Use this layer for:
 - preferred preset or profile selection for the current host
 - current driver posture for visible accelerators
 - package freshness for the host packages that matter to the runtime path
-- validated local runtime settings such as bounded `llama.cpp` serving posture or control-path fallback settings
+- validated local runtime settings such as canonical `llama.cpp` serving posture or bounded embeddings posture settings
 - warnings about noisy host envelopes that can distort latency-sensitive work
 - compact refs to host facts, benchmark evidence, and adaptation records
 
@@ -144,6 +144,5 @@ A bounded runtime comparison by itself does not change the preferred machine-fit
 Only a reviewed promotion decision should move a candidate path into the validated preferred runtime path.
 
 The current reviewed posture is:
-- `llama.cpp` as the preferred bounded local-worker path on `5403`
-- Ollama as the retained control and rollback path on `5401`
+- `llama.cpp` as the canonical bounded local-worker path on `5403`
 - the Intel embeddings path still on OVMS, with any OpenVINO GenAI migration handled as a separate reviewed change

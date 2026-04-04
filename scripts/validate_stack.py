@@ -249,7 +249,7 @@ QUEST_DISPATCH_REQUIRED_FIELDS = (
 MODULE_REQUIREMENTS = {
     "20-orchestration.yml": {"10-storage.yml"},
     "40-llm-gateway.yml": {"30-local-inference.yml"},
-    "41-agent-api.yml": {"40-llm-gateway.yml", "30-local-inference.yml"},
+    "41-agent-api.yml": {"32-llamacpp-inference.yml"},
     "42-agent-api-intel.yml": {"41-agent-api.yml", "31-intel-inference.yml"},
 }
 

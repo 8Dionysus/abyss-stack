@@ -13,24 +13,19 @@ It is narrower than a proof layer and narrower than a benchmark-only surface:
 
 ## Pilot lineage in this runtime
 
-Baseline control program:
+Canonical local-worker path:
 - `qwen-local-pilot-v1`
-
-Promoted local-worker path:
 - `w5-langgraph-llamacpp-v1`
 - `w6-bounded-autonomy-llamacpp-v1`
 
-Control baseline:
+Canonical runtime posture:
 - preset: `intel-full`
-- runtime path: `http://127.0.0.1:5401/run`
-- local Qwen posture:
-  - `LC_OLLAMA_NUM_THREAD=6`
-  - `LC_OLLAMA_NUM_BATCH=32`
-  - `LC_OLLAMA_THINK=false`
-
-Promoted bounded-worker path:
 - runtime path: `http://127.0.0.1:5403/run`
 - backend: `llama.cpp`
+- local Qwen posture:
+  - `AOA_LLAMACPP_THREADS=4`
+  - `AOA_LLAMACPP_BATCH_SIZE=512`
+  - `AOA_LLAMACPP_CTX_SIZE=4096`
 - orchestration: `LangGraph` for `W5`, `W6`, and the current bounded local-worker posture
 
 Durable program roots now in use:
@@ -166,7 +161,7 @@ Use [W5_PILOT](W5_PILOT.md) for the full W5 contract.
 The W5 runner:
 
 - defaults to `http://127.0.0.1:5403/run`
-- treats the promoted `llama.cpp` path as the primary substrate while keeping baseline `5401` as a control path
+- treats the canonical `llama.cpp` path as the primary substrate
 - keeps `LangGraph` as the primary orchestration layer
 - uses milestone gates instead of a monolithic `run-wave W5`
 - supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`

@@ -102,7 +102,7 @@ scripts/aoa-smoke --profile core
 
 ### Agent-facing runtime
 
-This is the generic local agent path and defaults to Ollama-backed embeddings:
+This is the generic local agent path and defaults to the canonical `llama.cpp` worker path. Embeddings stay disabled unless an explicit backend overlay is added:
 
 ```bash
 scripts/aoa-profile-modules --profile agentic --paths
@@ -149,15 +149,15 @@ scripts/aoa-local-ai-trials run-wave W0
 That flow keeps machine-readable trial truth under `Logs/local-ai-trials/` and writes Markdown mirrors to `Dionysus/reports/local-ai-trials/`.
 Use [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md) for the full contract.
 
-## Optional llama.cpp backend-parity pilot
+## Optional bounded llama.cpp pilot
 
-If you want to compare a bounded `llama.cpp` sidecar against the current validated Ollama path without replacing the canonical runtime:
+If you want to re-run the bounded `llama.cpp` pilot surfaces explicitly without changing the canonical runtime shape:
 
 ```bash
 scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
-That pilot resolves the resident Ollama GGUF blob, starts `llama-cpp` on a separate host port, exposes a sidecar `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
+That pilot re-verifies the bounded `llama.cpp` launch path, starts the explicit pilot sidecar when needed, exposes `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`. If the first locally resolved model candidate is rejected by `llama.cpp` on this machine, the pilot falls back to a locally cached curated `bartowski` candidate when one is already present.
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full contract.
 
 ## Compose optional layers manually

@@ -26,11 +26,28 @@ is_enabled() {
 
 if ! is_enabled "$AOA_OLLAMA_WARMUP_ENABLED"; then
   aoa_note "ollama warmup disabled"
+fi
+
+if has_module "32-llamacpp-inference.yml"; then
+  if ! is_enabled "$AOA_LLAMACPP_WARMUP_ENABLED"; then
+    aoa_note "llama.cpp warmup disabled"
+    exit 0
+  fi
+  command -v curl >/dev/null 2>&1 || aoa_die "curl is required"
+  wait_deadline=$((SECONDS + AOA_LLAMACPP_WARMUP_WAIT_S))
+  until curl -fsS --max-time 5 "$AOA_LLAMACPP_WARMUP_URL" >/dev/null 2>&1; do
+    if (( SECONDS >= wait_deadline )); then
+      aoa_note "warn llama.cpp warmup skipped because ${AOA_LLAMACPP_WARMUP_URL} did not become ready in ${AOA_LLAMACPP_WARMUP_WAIT_S}s"
+      exit 0
+    fi
+    sleep 2
+  done
+  aoa_note "llama.cpp warmup complete"
   exit 0
 fi
 
 if ! has_module "30-local-inference.yml"; then
-  aoa_note "skip ollama warmup because selected profiles do not include 30-local-inference.yml"
+  aoa_note "skip model warmup because selected profiles do not include a warmup-managed inference module"
   exit 0
 fi
 

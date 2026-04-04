@@ -13,28 +13,26 @@ They answer a simple question:
 The smallest useful local substrate:
 - `10-storage.yml`
 - `20-orchestration.yml`
-- `30-local-inference.yml`
+- `32-llamacpp-inference.yml`
 
 ### `agentic`
 
-A local agent-facing runtime surface with an Ollama-first embeddings path:
+A local agent-facing runtime surface with a canonical `llama.cpp` chat path:
 - `10-storage.yml`
 - `20-orchestration.yml`
-- `30-local-inference.yml`
-- `40-llm-gateway.yml`
+- `32-llamacpp-inference.yml`
 - `41-agent-api.yml`
 
-This profile keeps the default `POST /run` path unchanged.
+This profile keeps the default `POST /run` path on the canonical `langchain-api -> llama.cpp` lane.
 Its new `POST /run/federated` path stays opt-in and only becomes useful when the `federation` profile is also present and `AOA_FEDERATED_RUN_ENABLED=true`.
 
 ### `intel`
 
-The agentic surface plus Intel-oriented inference and an OVMS overlay for the agent API:
+The agentic surface plus Intel-oriented embeddings through OVMS:
 - `10-storage.yml`
 - `20-orchestration.yml`
-- `30-local-inference.yml`
+- `32-llamacpp-inference.yml`
 - `31-intel-inference.yml`
-- `40-llm-gateway.yml`
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
 
@@ -65,9 +63,8 @@ Profiles stay small and legible.
 A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
 
-The optional `llama.cpp` sidecar pilot deliberately stays outside the default profiles and presets.
-Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) when you want a bounded backend-parity comparison without redefining the validated canonical runtime path.
-When the promoted `langchain-api-llamacpp` worker is used as the governed-execution advisory path, keep `AOA_FEDERATED_RUN_ENABLED=true` for that sidecar so `POST /run/federated` remains available without changing mutation permissions.
+The optional `llama.cpp` benchmark lane deliberately stays outside the default profiles and presets.
+Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
 
 ## Dependency note
 

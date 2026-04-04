@@ -79,4 +79,4 @@ The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally na
 
 `abyss-stack` is a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
-The current bounded local-worker posture is `llama.cpp`-first on `5403`, with Ollama retained on `5401` as the control and rollback path. `LangGraph` is the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain bounded and explicit: they can enrich runtime behavior, but they do not replace source-owned meaning.
+The current bounded local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain bounded and explicit: they can enrich runtime behavior, but they do not replace source-owned meaning.

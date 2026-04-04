@@ -126,7 +126,7 @@ This runner stays on the intended `langchain-api /run` path and writes machine-l
 It performs one uncounted warmup call per case before measured repeats so warm-latency reads stay warm by definition instead of by accident.
 
 The default helper posture now targets the promoted local-worker path on `5403`.
-Use an explicit `--url`, `--backend-label`, `--runtime-variant`, and `--target-label` when you want to refresh the retained Ollama control path on `5401`.
+Use explicit `--url`, `--backend-label`, `--runtime-variant`, and `--target-label` only when you are refreshing an explicit challenger packet or keeping historical comparison lineage readable. Phase Alpha does not treat a second local control lane as part of the canonical operator path.
 
 Refresh the durable catalog after new runs:
 
@@ -151,7 +151,7 @@ Retention classes:
 
 Cohort layer:
 - `current-control`
-  The default local control-path runs to compare against first.
+  Historical cohort label retained for older comparison packets; current canonical reading starts from the promoted `llama.cpp` runs on `5403`.
 - `promotion-basis`
   The runs directly used by the current comparison/promotion verdict path.
 - `current-promoted`
@@ -159,7 +159,7 @@ Cohort layer:
 - `comparison-challenger`
   The latest challenger runs retained beside the promoted winner.
 - `legacy-baseline`
-  Older control-path runs kept for drift review.
+  Older comparison runs kept for lineage and drift review.
 
 ## Relationship to local trial programs
 
@@ -178,17 +178,16 @@ That helper may reuse runtime benchmark artifacts as evidence inside case packet
 
 ## Optional backend-parity pilot
 
-For a bounded refresh of the promoted `llama.cpp` path against the retained Ollama control path on the same host and the same `langchain-api /run` contract, use:
+For historical drift review or explicit challenger maintenance around the promoted `llama.cpp` path, use:
 
 ```bash
 scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
-That pilot runs a fresh Ollama control bench on `5401`, a fresh `llama.cpp` sidecar bench on `5403`, and writes a comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`.
-It remains a runtime-parity and challenger-evaluation aid even after the current `llama.cpp` promotion.
+That pilot writes a bounded comparison packet under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`. Historical packet lineage may still carry earlier baseline naming from the pre-cutover pilot family, but the canonical operator path stays on `5403`.
 
 Use the catalog layer to answer:
-- what the latest baseline run was for a target label
+- what the latest canonical run was for a target label
 - which comparison packet currently represents a pilot family
 - which promotion packet currently represents the active substrate verdict
 

@@ -24,7 +24,7 @@ MODEL = "qwen3.5:9b"
 STACK_ROOT = Path("/srv/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
-DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5401/run"
+DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
 LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
 LANGCHAIN_BASE_URL = DEFAULT_LANGCHAIN_RUN_URL.rsplit("/", 1)[0]
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
@@ -33,9 +33,9 @@ MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 DATE_STAMP = datetime.now().astimezone().date().isoformat()
 
 VALIDATED_POSTURE = {
-    "LC_OLLAMA_NUM_THREAD": "6",
-    "LC_OLLAMA_NUM_BATCH": "32",
-    "LC_OLLAMA_THINK": "false",
+    "AOA_LLAMACPP_THREADS": "4",
+    "AOA_LLAMACPP_BATCH_SIZE": "512",
+    "AOA_LLAMACPP_CTX_SIZE": "4096",
 }
 
 RUNTIME_SELECTION_DEFAULT = {

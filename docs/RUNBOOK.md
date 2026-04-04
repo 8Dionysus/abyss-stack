@@ -117,11 +117,11 @@ curl -X POST http://127.0.0.1:5402/playbooks/select \
 For the live federated run path through `langchain-api`:
 
 ```bash
-curl -X POST http://127.0.0.1:5401/run/federated \
+curl -X POST http://127.0.0.1:5403/run/federated \
   -H 'content-type: application/json' \
   -d '{"user_text":"Summarize the current route","playbook_id":"AOA-P-0008"}'
 
-curl -X POST http://127.0.0.1:5401/run/federated \
+curl -X POST http://127.0.0.1:5403/run/federated \
   -H 'content-type: application/json' \
   -d '{"user_text":"Use this memo card if it helps","memo":{"family":"router","mode":"semantic","id":"claim-1"}}'
 ```

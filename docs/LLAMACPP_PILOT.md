@@ -4,9 +4,9 @@
 
 This document defines the bounded `llama.cpp` sidecar pilot for `abyss-stack` and records the promoted runtime posture that came out of it.
 
-The pilot originally existed to answer a narrow question:
+The pilot originally existed to answer a narrow promotion question:
 
-**does a `llama.cpp` sidecar improve the local Qwen runtime posture on this machine without replacing the validated canonical Ollama path yet?**
+**does a bounded `llama.cpp` challenger improve the local Qwen runtime posture on this machine enough to become the canonical worker path?**
 
 That question is now answered positively for the current bounded local-worker path.
 
@@ -21,28 +21,26 @@ The pilot is:
 The pilot is not:
 - a silent replacement for the canonical local runtime
 - a proof-layer quality verdict
-- a claim that every service in the stack should immediately move off the retained control path
+- a claim that every other local runtime surface should reopen a second live lane
 
 ## Current promoted posture
 
 The current preferred bounded local-worker path is:
 
-`intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api`
+`intel-full -> langchain-api /run -> llama.cpp + route-api`
 
-The retained control and rollback path remains:
-
-`intel-full -> langchain-api /run -> ollama-native + route-api`
+Historical comparison artifacts may still use `sidecar`, `baseline`, or earlier service labels because the pilot family predates the canonical cutover.
 
 The pilot script remains intentionally useful after promotion:
-- to refresh bounded backend comparisons
-- to verify the promoted sidecar posture
-- to keep the control path honest without making it the default worker substrate
+- to refresh bounded source-resolution and challenger artifacts
+- to verify the canonical local-worker posture
+- to screen explicit candidate variants without reopening a second default local lane
 
 ## What the pilot reuses
 
 The pilot does not require a second large model download by default.
 
-It resolves the resident Ollama `qwen3.5:9b` manifest under:
+It resolves the resident local `qwen3.5:9b` manifest-backed GGUF candidate under:
 
 - `${AOA_STACK_ROOT}/Services/ollama/models/manifests/registry.ollama.ai/library/qwen3.5/9b`
 
@@ -50,22 +48,26 @@ Then it mounts the corresponding GGUF blob into the `llama.cpp` container as a r
 
 This keeps the pilot honest:
 - same local Qwen family
-- same quantized resident artifact
+- same resident artifact family when the manifest-backed candidate is usable
 - different serving runtime
 
-## Promoted and control services
+If the resident manifest-backed GGUF candidate fails a real `llama.cpp` startup on this machine, the pilot now falls back to locally cached curated `bartowski` candidates in `Q4_K_M` then `Q6_K` order when those files are already present under:
 
-When the promoted path is active, it uses two localhost-only services:
+- `${AOA_STACK_ROOT}/Logs/llamacpp/models/bartowski/`
+
+That fallback is still local-only and bounded:
+- no extra network download is required
+- the active canonical runtime remains unchanged
+- the sidecar only changes model file selection after an actual `llama.cpp` model-load failure
+
+## Canonical and explicit pilot services
+
+When the canonical promoted path is healthy, it relies on two localhost-only services:
 
 - `llama-cpp` -> `http://127.0.0.1:11435`
-- `langchain-api-llamacpp` -> `http://127.0.0.1:5403/health`
+- canonical `langchain-api /run` -> `http://127.0.0.1:5403/health`
 
-The control-path services stay in place:
-
-- `ollama` -> `http://127.0.0.1:11434`
-- `langchain-api` -> `http://127.0.0.1:5401/health`
-
-That separation preserves honest A/B comparison, rollback, and future challenger evaluation.
+Historical comparison packets may still refer to earlier sidecar and baseline service names. In the current Phase Alpha posture, those names should be read as archived artifact lineage, not as a second live control lane.
 
 ## Operator commands
 
@@ -94,6 +96,7 @@ scripts/aoa-llamacpp-pilot down
 
 - ensures the base preset is up
 - starts the `llama.cpp` sidecar services
+- retries with a locally cached curated `bartowski` candidate if the resident manifest-backed GGUF candidate is rejected by `llama.cpp`
 - waits for `llama.cpp` and `langchain-api-llamacpp` health
 
 ### `bench`
@@ -103,15 +106,16 @@ scripts/aoa-llamacpp-pilot down
 
 ### `run`
 
-- runs a fresh Ollama baseline bench on `5401`
-- runs a fresh `llama.cpp` sidecar bench on `5403`
+- replays the retained comparison workflow from the pre-cutover pilot family
+- should be treated as historical comparison maintenance rather than as the canonical operator path
+- uses the same fallback rule as `up` if the resident manifest-backed GGUF candidate does not load cleanly in `llama.cpp`
 - writes a comparison packet under:
   - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/llamacpp-sidecar-pilot-v1/`
 
 ### `promote`
 
 - screens the fixed `Q4_K_M` and `Q6_K` `bartowski` candidates on the same CPU-safe sidecar posture
-- chooses a winner only if the candidate stays stable and `exact-reply` is not more than `15%` slower than the fresh Ollama baseline
+- chooses a winner only if the candidate stays stable and `exact-reply` is not more than `15%` slower than the fresh historical comparison basis
 - runs `W0` on `http://127.0.0.1:5403/run` under `qwen-llamacpp-pilot-v1`
 - runs one disposable `W4` docs fixture dry-run under `langgraph-sidecar-llamacpp-v1`
 - writes the promotion packet under:
@@ -120,7 +124,7 @@ scripts/aoa-llamacpp-pilot down
 ### `status`
 
 - reports the latest saved comparison ref
-- reports current sidecar and baseline health
+- reports current canonical and retained historical-comparison health when available
 
 ### `verify`
 
@@ -195,7 +199,7 @@ These artifacts stay runtime-local.
 
 Promotion packets stay runtime-local too and capture:
 
-- fresh Ollama baseline smoke + bench
+- fresh historical comparison smoke + bench
 - both quant screening outcomes
 - winner selection
 - `W0` verdict on the sidecar path
@@ -212,8 +216,8 @@ Promotion required:
 - an explicit update to machine-fit and the validated runtime docs
 
 Current result:
-- `llama.cpp` is the preferred bounded local-worker path
-- Ollama remains the validated control and rollback path
+- `llama.cpp` is the canonical bounded local-worker path on `5403`
+- historical comparison artifacts may remain for drift review, but they do not create a second live control lane
 - any OpenVINO-side shift to OpenVINO GenAI should be reviewed separately from the `llama.cpp` promotion decision
 
 Promotion posture still has two layers:

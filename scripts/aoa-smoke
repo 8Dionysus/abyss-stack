@@ -53,6 +53,10 @@ if has_module "30-local-inference.yml"; then
   aoa_probe_http "ollama" "http://127.0.0.1:11434/api/tags" || failures=$((failures + 1))
 fi
 
+if has_module "32-llamacpp-inference.yml"; then
+  aoa_probe_http "llama-cpp" "http://127.0.0.1:11435/health" || failures=$((failures + 1))
+fi
+
 if has_module "31-intel-inference.yml"; then
   aoa_probe_http "ovms" "http://127.0.0.1:8200/v2/health/live" || failures=$((failures + 1))
 fi
@@ -62,7 +66,12 @@ if has_module "40-llm-gateway.yml"; then
 fi
 
 if has_module "41-agent-api.yml"; then
-  aoa_probe_http "langchain-api" "http://127.0.0.1:5401/health" || failures=$((failures + 1))
+  aoa_probe_http "langchain-api" "http://127.0.0.1:5403/health" || failures=$((failures + 1))
+  "${SCRIPT_DIR}/aoa-qwen-check" --case exact-reply --url "http://127.0.0.1:5403/run" || failures=$((failures + 1))
+fi
+
+if has_module "44-llamacpp-agent-sidecar.yml"; then
+  aoa_probe_http "langchain-api-llamacpp" "http://127.0.0.1:5403/health" || failures=$((failures + 1))
   "${SCRIPT_DIR}/aoa-qwen-check" --case exact-reply || failures=$((failures + 1))
 fi
 

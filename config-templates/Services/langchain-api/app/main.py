@@ -22,7 +22,7 @@ app = FastAPI()
 THINK_TAG_PREFIX_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 LITERAL_REPLY_PROMPT_RE = re.compile(r"^Reply exactly with:\s*(.+?)\s*$", re.DOTALL)
 
-BASE_URL = os.getenv("LC_BASE_URL", "http://ollama:11434/v1").rstrip("/")
+BASE_URL = os.getenv("LC_BASE_URL", "http://llama-cpp:8080/v1").rstrip("/")
 API_KEY = os.getenv("LC_API_KEY", "EMPTY")
 MODEL = os.getenv("LC_MODEL", "qwen3.5:9b")
 TIMEOUT = float(os.getenv("LC_TIMEOUT_S", "60"))
@@ -44,7 +44,7 @@ OLLAMA_NATIVE_CHAT_URL = os.getenv(
 OLLAMA_NUM_THREAD = os.getenv("LC_OLLAMA_NUM_THREAD", "").strip()
 OLLAMA_NUM_BATCH = os.getenv("LC_OLLAMA_NUM_BATCH", "").strip()
 OLLAMA_NUM_CTX = os.getenv("LC_OLLAMA_NUM_CTX", "").strip()
-EMBEDDINGS_PROVIDER = os.getenv("EMBEDDINGS_PROVIDER", "ovms").strip().lower()
+EMBEDDINGS_PROVIDER = os.getenv("EMBEDDINGS_PROVIDER", "disabled").strip().lower()
 OVMS_EMBEDDINGS_URL = os.getenv("OVMS_EMBEDDINGS_URL", "http://ovms:8000/v3/embeddings").rstrip("/")
 OVMS_EMBEDDINGS_MODEL = os.getenv("OVMS_EMBEDDINGS_MODEL", "qwen3-embed-0.6b-int8-ov")
 OLLAMA_EMBEDDINGS_URL = os.getenv("OLLAMA_EMBEDDINGS_URL", "http://ollama:11434/api/embed").rstrip("/")
@@ -1288,6 +1288,11 @@ def embeddings(req: EmbeddingsReq) -> dict[str, Any]:
             return _ovms_embeddings(req, items)
         if EMBEDDINGS_PROVIDER == "ollama":
             return _ollama_embeddings(req, items)
+        if EMBEDDINGS_PROVIDER == "disabled":
+            raise HTTPException(
+                status_code=503,
+                detail="embeddings_disabled: current runtime selection does not provide an embeddings backend",
+            )
         raise HTTPException(
             status_code=500,
             detail=f"unsupported_embeddings_provider: {EMBEDDINGS_PROVIDER}",

@@ -24,9 +24,8 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `32-llamacpp-inference.yml`
 
-- `llama-cpp` — promoted OpenAI-compatible GGUF serving surface for bounded local-worker flows
-- reuses a resolved local GGUF model file and now backs the preferred local Qwen worker path on `5403`
-- keeps Ollama in place as the control and rollback path
+- `llama-cpp` — canonical OpenAI-compatible GGUF serving surface for bounded local-worker flows
+- reuses a resolved local GGUF model file and backs the canonical local Qwen worker path
 
 ## `40-llm-gateway.yml`
 
@@ -34,8 +33,8 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `41-agent-api.yml`
 
-- `langchain-api` — base control-path agent-facing runtime API on `5401`
-- default embeddings path — Ollama-first
+- `langchain-api` — canonical agent-facing runtime API on `5403`
+- default embeddings path — disabled unless an explicit embeddings backend is layered in
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
 - returns the normal model answer plus a redacted `advisory_trace` when the federated path is enabled
@@ -47,9 +46,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `44-llamacpp-agent-sidecar.yml`
 
-- `langchain-api-llamacpp` — promoted bounded local-worker API bound to a `llama.cpp` backend on `5403`
-- is the preferred local Qwen worker path for the current promoted `W5/W6` substrate
-- preserves the base `langchain-api` service and `5401` path as the control and rollback surface
+- `langchain-api-llamacpp` — bounded alternate `llama.cpp` API surface used for explicit benchmark and promotion work
 - keeps embeddings on OVMS for the current Intel-aware posture
 - keeps `POST /run/federated` enabled on the sidecar path so governed execution can consume advisory playbook and memo seams while remaining fail-closed
 - joins the shared `abyss_default` runtime network so the advisory `route-api` remains reachable by service name even though the sidecar runs in its own compose project
@@ -97,10 +94,8 @@ Expected localhost-only services include:
 - qdrant
 - neo4j
 - n8n
-- ollama
 - ovms
 - llama-cpp
-- litellm
 - langchain-api
 - langchain-api-llamacpp
 - route-api

@@ -126,8 +126,8 @@
       "tools",
       "observability"
     ],
-    "preferred_runtime_path": "intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api",
-    "validated_acceleration_posture": "OVMS embeddings on Intel GPU; Qwen chat on the promoted llama.cpp path; Ollama remains the validated control path; Intel NPU is visible but not yet part of the validated canonical path.",
+    "preferred_runtime_path": "intel-full -> langchain-api /run -> llama.cpp + route-api",
+    "validated_acceleration_posture": "OVMS embeddings on Intel GPU when explicitly layered; Qwen chat on the canonical llama.cpp path; Intel NPU is visible but not yet part of the validated canonical path.",
     "validated_settings": {
       "AOA_LLAMACPP_DEVICE": "none",
       "AOA_LLAMACPP_NO_OP_OFFLOAD": "1",
@@ -155,7 +155,7 @@
   },
   "fit_verdict": {
     "status": "qualified",
-    "summary": "Preferred preset is intel-full. Qwen chat should stay on the promoted llama.cpp path, with Ollama retained as the control path. Relevant host packages are current in the configured Fedora repositories.",
+    "summary": "Preferred preset is intel-full. Qwen chat should stay on the canonical llama.cpp path, with OVMS retained as the reviewed Intel embeddings seam when explicitly layered. Relevant host packages are current in the configured Fedora repositories.",
     "next_actions": [
       "Run scripts/aoa-doctor --preset intel-full before launch.",
       "Refresh host facts when the host or kernel changes.",
@@ -165,7 +165,7 @@
       "kernel update",
       "linux-firmware update",
       "mesa or Intel runtime update",
-      "llama.cpp, Ollama control-path, or langchain-api runtime change",
+      "llama.cpp, OVMS embeddings, or langchain-api runtime change",
       "host load envelope change before latency-sensitive trials"
     ]
   },

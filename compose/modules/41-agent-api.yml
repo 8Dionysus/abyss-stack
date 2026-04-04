@@ -5,12 +5,13 @@ services:
     env_file:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
-      LC_BASE_URL: http://litellm:4000/v1
+      LC_BASE_URL: http://llama-cpp:8080/v1
       LC_API_KEY: EMPTY
       LC_MODEL: "qwen3.5:9b"
       LC_TIMEOUT_S: 300
       LC_OLLAMA_THINK: "false"
-      LC_OLLAMA_NATIVE_CHAT: "${LC_OLLAMA_NATIVE_CHAT:-true}"
+      LC_OLLAMA_NATIVE_CHAT: "${LC_OLLAMA_NATIVE_CHAT:-false}"
+      LC_OPENAI_LITERAL_COMPLETIONS: "true"
       LC_OLLAMA_NATIVE_CHAT_URL: http://ollama:11434/api/chat
       LC_OLLAMA_NUM_THREAD: "${LC_OLLAMA_NUM_THREAD:-6}"
       LC_OLLAMA_NUM_BATCH: "${LC_OLLAMA_NUM_BATCH:-32}"
@@ -19,7 +20,7 @@ services:
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"
       AOA_FEDERATED_RUN_ENABLED: "${AOA_FEDERATED_RUN_ENABLED:-false}"
       AOA_ROUTE_API_BASE_URL: "${AOA_ROUTE_API_BASE_URL:-http://route-api:5402}"
-      EMBEDDINGS_PROVIDER: "${AOA_EMBEDDINGS_PROVIDER:-ollama}"
+      EMBEDDINGS_PROVIDER: "${AOA_EMBEDDINGS_PROVIDER:-disabled}"
       OVMS_EMBEDDINGS_URL: http://ovms:8000/v3/embeddings
       OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
       OLLAMA_EMBEDDINGS_URL: http://ollama:11434/api/embed
@@ -29,12 +30,10 @@ services:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns:/app/logs/returns:Z"
     depends_on:
-      litellm:
-        condition: service_healthy
-      ollama:
+      llama-cpp:
         condition: service_started
     ports:
-      - "127.0.0.1:5401:5401"
+      - "127.0.0.1:${AOA_LANGCHAIN_HOST_PORT:-5403}:5401"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5401/health', timeout=2).read()"]
       interval: 5s

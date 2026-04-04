@@ -419,11 +419,11 @@ def main() -> int:
     current_overlays = parse_overlays(os.environ.get("AOA_EXTRA_COMPOSE_FILES", ""))
     if drm_nodes["dev_dri_present"] and ai_devices:
         validated_acceleration_posture = (
-            "OVMS embeddings on Intel GPU; Qwen chat on the promoted llama.cpp path; Ollama remains the validated control path; Intel NPU is visible but not yet part of the validated canonical path."
+            "OVMS embeddings on Intel GPU when explicitly layered; Qwen chat on the canonical llama.cpp path; Intel NPU is visible but not yet part of the validated canonical path."
         )
     elif drm_nodes["dev_dri_present"]:
         validated_acceleration_posture = (
-            "Intel GPU is available for OVMS-side acceleration; Qwen chat prefers llama.cpp while Ollama remains the control path."
+            "Intel GPU is available for OVMS-side acceleration when explicitly layered; Qwen chat prefers the canonical llama.cpp path."
         )
     else:
         validated_acceleration_posture = (
@@ -526,7 +526,7 @@ def main() -> int:
 
     summary_parts = [
         f"Preferred preset is {preferred_preset}.",
-        "Qwen chat should stay on the promoted llama.cpp path, with Ollama retained as the control path.",
+        "Qwen chat should stay on the canonical llama.cpp path, with OVMS retained as the reviewed Intel embeddings seam when explicitly layered.",
     ]
     if freshness_state == "up-to-date":
         summary_parts.append("Relevant host packages are current in the configured Fedora repositories.")
@@ -584,9 +584,9 @@ def main() -> int:
         "runtime_recommendation": {
             "preferred_preset": preferred_preset,
             "preferred_profile_set": preferred_profiles,
-            "preferred_runtime_path": "intel-full -> langchain-api-llamacpp /run -> llama.cpp + route-api"
+            "preferred_runtime_path": "intel-full -> langchain-api /run -> llama.cpp + route-api"
             if preferred_preset == "intel-full"
-            else "agent-full -> langchain-api /run -> litellm/ollama + route-api",
+            else "agent-full -> langchain-api /run -> llama.cpp + route-api",
             "validated_acceleration_posture": validated_acceleration_posture,
             "validated_settings": validated_settings,
             "recommended_overlays": [],
@@ -614,7 +614,7 @@ def main() -> int:
                 "kernel update",
                 "linux-firmware update",
                 "mesa or Intel runtime update",
-                "llama.cpp, Ollama control-path, or langchain-api runtime change",
+                "llama.cpp, OVMS embeddings, or langchain-api runtime change",
                 "host load envelope change before latency-sensitive trials",
             ],
         },

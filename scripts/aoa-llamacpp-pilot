@@ -262,13 +262,80 @@ def wait_for_llama(timeout_s: float) -> dict[str, Any]:
     }
 
 
+def ollama_runtime_details() -> dict[str, Any] | None:
+    try:
+        status, payload = http_get_json("http://127.0.0.1:11434/api/tags", timeout_s=2.0)
+        if status == 200 and payload:
+            for item in payload.get("models", []):
+                if item.get("name") == "qwen3.5:9b":
+                    return item
+    except Exception:
+        return None
+    return None
+
+
+def ensure_gguf_model(path: Path) -> None:
+    with path.open("rb") as handle:
+        header = handle.read(4)
+    if header != b"GGUF":
+        raise SystemExit(f"error: resolved model is not a GGUF file: {path}")
+
+
+def quant_for_model_path(path: Path) -> str | None:
+    try:
+        relative = path.resolve().relative_to(MODEL_STORE_ROOT.resolve())
+    except ValueError:
+        return None
+    for spec in CANDIDATE_MODEL_SPECS:
+        if relative.as_posix() == spec["filename"]:
+            return spec["quant"]
+    return None
+
+
+def build_model_info(
+    *,
+    blob_path: Path,
+    manifest_path: Path | None,
+    blob_digest: str | None,
+    reuse_strategy: str,
+    runtime_details: dict[str, Any] | None,
+    fallback_from: str | None = None,
+) -> dict[str, Any]:
+    ensure_gguf_model(blob_path)
+    payload = {
+        "resolved_at": utc_now(),
+        "manifest_path": str(manifest_path) if manifest_path else None,
+        "model_host_path": str(blob_path),
+        "blob_digest": blob_digest,
+        "blob_size_bytes": blob_path.stat().st_size,
+        "model_alias": "qwen3.5:9b",
+        "runtime_details": runtime_details,
+        "reuse_strategy": reuse_strategy,
+    }
+    quant = quant_for_model_path(blob_path)
+    if quant is not None:
+        payload["candidate_quant"] = quant
+    if fallback_from is not None:
+        payload["fallback_from"] = fallback_from
+    return payload
+
+
 def resolve_model_info(model_host_path: str | None = None) -> dict[str, Any]:
+    runtime_details = ollama_runtime_details()
     if model_host_path:
         blob_path = Path(model_host_path).expanduser().resolve()
         if not blob_path.exists():
             raise SystemExit(f"error: model host path does not exist: {blob_path}")
-        manifest_path = None
-        blob_digest = None
+        reuse_strategy = "explicit_model_host_path"
+        if quant_for_model_path(blob_path) is not None:
+            reuse_strategy = "curated_bartowski_candidate"
+        return build_model_info(
+            blob_path=blob_path,
+            manifest_path=None,
+            blob_digest=None,
+            reuse_strategy=reuse_strategy,
+            runtime_details=runtime_details,
+        )
     else:
         if not OLLAMA_MANIFEST.exists():
             raise SystemExit(f"error: missing Ollama manifest: {OLLAMA_MANIFEST}")
@@ -289,32 +356,13 @@ def resolve_model_info(model_host_path: str | None = None) -> dict[str, Any]:
             raise SystemExit(f"error: resolved GGUF blob does not exist: {blob_path}")
         manifest_path = OLLAMA_MANIFEST
 
-    with blob_path.open("rb") as handle:
-        header = handle.read(4)
-    if header != b"GGUF":
-        raise SystemExit(f"error: resolved model is not a GGUF file: {blob_path}")
-
-    ollama_runtime = None
-    try:
-        status, payload = http_get_json("http://127.0.0.1:11434/api/tags", timeout_s=2.0)
-        if status == 200 and payload:
-            for item in payload.get("models", []):
-                if item.get("name") == "qwen3.5:9b":
-                    ollama_runtime = item
-                    break
-    except Exception:
-        ollama_runtime = None
-
-    return {
-        "resolved_at": utc_now(),
-        "manifest_path": str(manifest_path) if manifest_path else None,
-        "model_host_path": str(blob_path),
-        "blob_digest": blob_digest,
-        "blob_size_bytes": blob_path.stat().st_size,
-        "model_alias": "qwen3.5:9b",
-        "runtime_details": ollama_runtime,
-        "reuse_strategy": "resident_ollama_gguf_blob",
-    }
+    return build_model_info(
+        blob_path=blob_path,
+        manifest_path=manifest_path,
+        blob_digest=blob_digest,
+        reuse_strategy="resident_ollama_gguf_blob",
+        runtime_details=runtime_details,
+    )
 
 
 def candidate_model_info() -> list[dict[str, Any]]:
@@ -328,6 +376,25 @@ def candidate_model_info() -> list[dict[str, Any]]:
                 "exists": model_path.exists(),
                 "size_bytes": model_path.stat().st_size if model_path.exists() else None,
             }
+        )
+    return items
+
+
+def curated_fallback_model_infos(*, fallback_from: str) -> list[dict[str, Any]]:
+    runtime_details = ollama_runtime_details()
+    items: list[dict[str, Any]] = []
+    for spec in candidate_model_info():
+        if not spec["exists"]:
+            continue
+        items.append(
+            build_model_info(
+                blob_path=Path(spec["model_host_path"]),
+                manifest_path=None,
+                blob_digest=None,
+                reuse_strategy="curated_bartowski_fallback",
+                runtime_details=runtime_details,
+                fallback_from=fallback_from,
+            )
         )
     return items
 
@@ -456,6 +523,92 @@ def up_langchain_sidecar(model_host_path: Path) -> None:
 
 def stop_sidecars() -> None:
     run_cmd(sidecar_compose_cmd("down"), env=base_env(), cwd=CONFIGS_ROOT, check=False)
+
+
+def should_try_curated_fallback(*, model_info: dict[str, Any], llama_ready: dict[str, Any]) -> bool:
+    return (
+        model_info.get("reuse_strategy") == "resident_ollama_gguf_blob"
+        and llama_ready.get("error") == "llama.cpp reported a model-load failure"
+    )
+
+
+def start_candidate_sidecar(
+    *,
+    model_info: dict[str, Any],
+    wait_timeout: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    model_path = Path(model_info["model_host_path"])
+    up_llama_sidecar(model_path)
+    llama_ready = wait_for_llama(wait_timeout)
+    if not llama_ready["ready"]:
+        return llama_ready, {
+            "ready": False,
+            "status": None,
+            "payload": None,
+            "url": CANDIDATE_HEALTH_URL,
+            "name": "langchain-api-llamacpp",
+        }
+    up_langchain_sidecar(model_path)
+    candidate_ready = wait_for_url(
+        "langchain-api-llamacpp",
+        CANDIDATE_HEALTH_URL,
+        timeout_s=wait_timeout,
+    )
+    return llama_ready, candidate_ready
+
+
+def resolve_startable_model(
+    *,
+    initial_model_info: dict[str, Any],
+    wait_timeout: float,
+    allow_curated_fallback: bool,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    attempts: list[dict[str, Any]] = []
+    candidates = [initial_model_info]
+    if allow_curated_fallback:
+        candidates.extend(curated_fallback_model_infos(fallback_from=initial_model_info["model_host_path"]))
+
+    chosen_model = initial_model_info
+    llama_ready: dict[str, Any] = {
+        "ready": False,
+        "status": None,
+        "payload": None,
+        "url": LLAMACPP_HEALTH_URL,
+        "name": "llama-cpp",
+    }
+    candidate_ready: dict[str, Any] = {
+        "ready": False,
+        "status": None,
+        "payload": None,
+        "url": CANDIDATE_HEALTH_URL,
+        "name": "langchain-api-llamacpp",
+    }
+
+    for index, model_info in enumerate(candidates):
+        if index > 0:
+            stop_sidecars()
+        llama_ready, candidate_ready = start_candidate_sidecar(
+            model_info=model_info,
+            wait_timeout=wait_timeout,
+        )
+        chosen_model = model_info
+        attempts.append(
+            {
+                "model_host_path": model_info["model_host_path"],
+                "reuse_strategy": model_info["reuse_strategy"],
+                "candidate_quant": model_info.get("candidate_quant"),
+                "llama_cpp_ready": bool(llama_ready.get("ready")),
+                "langchain_api_llamacpp_ready": bool(candidate_ready.get("ready")),
+                "llama_cpp_error": llama_ready.get("error"),
+            }
+        )
+        if llama_ready["ready"] and candidate_ready["ready"]:
+            return chosen_model, llama_ready, candidate_ready, attempts
+        if not should_try_curated_fallback(model_info=model_info, llama_ready=llama_ready):
+            break
+
+    stop_sidecars()
+    return chosen_model, llama_ready, candidate_ready, attempts
 
 
 def parse_bench_output(stdout: str) -> tuple[Path, dict[str, Any]]:
@@ -985,39 +1138,16 @@ def up_command(args: argparse.Namespace) -> int:
     model_info = resolve_model_info(args.model_host_path)
     run_doctor(args.preset)
     ensure_base_ready(args.preset, args.wait_timeout)
-    model_path = Path(model_info["model_host_path"])
-    up_llama_sidecar(model_path)
-    llama_ready = wait_for_llama(args.wait_timeout)
-    if not llama_ready["ready"]:
-        stop_sidecars()
-        payload = {
-            "pilot_id": PILOT_ID,
-            "preset": args.preset,
-            "model_info": model_info,
-            "llama_cpp": llama_ready,
-            "langchain_api_llamacpp": {
-                "ready": False,
-                "status": None,
-                "payload": None,
-                "url": CANDIDATE_HEALTH_URL,
-                "name": "langchain-api-llamacpp",
-            },
-        }
-        print(json.dumps(payload, indent=2, ensure_ascii=True))
-        return 1
-
-    up_langchain_sidecar(model_path)
-    candidate_ready = wait_for_url(
-        "langchain-api-llamacpp",
-        CANDIDATE_HEALTH_URL,
-        timeout_s=args.wait_timeout,
+    model_info, llama_ready, candidate_ready, attempts = resolve_startable_model(
+        initial_model_info=model_info,
+        wait_timeout=args.wait_timeout,
+        allow_curated_fallback=args.model_host_path is None,
     )
-    if not candidate_ready["ready"]:
-        stop_sidecars()
     payload = {
         "pilot_id": PILOT_ID,
         "preset": args.preset,
         "model_info": model_info,
+        "model_attempts": attempts,
         "llama_cpp": llama_ready,
         "langchain_api_llamacpp": candidate_ready,
     }
@@ -1055,19 +1185,21 @@ def run_command(args: argparse.Namespace) -> int:
         runtime_variant="Q4_K_M via Ollama",
         target_label="workhorse-local-qwen3.5-9b-ollama-baseline",
     )
-    model_path = Path(model_info["model_host_path"])
-    up_llama_sidecar(model_path)
-    llama_ready = wait_for_llama(args.wait_timeout)
+    model_info, llama_ready, candidate_ready, attempts = resolve_startable_model(
+        initial_model_info=model_info,
+        wait_timeout=args.wait_timeout,
+        allow_curated_fallback=args.model_host_path is None,
+    )
     if not llama_ready["ready"]:
-        stop_sidecars()
         detail = llama_ready.get("error") or "llama.cpp sidecar did not become healthy in time"
+        if attempts:
+            detail = f"{detail}; attempts={json.dumps(attempts, ensure_ascii=True)}"
         raise SystemExit(f"error: {detail}")
-
-    up_langchain_sidecar(model_path)
-    candidate_ready = wait_for_url("langchain-api-llamacpp", CANDIDATE_HEALTH_URL, timeout_s=args.wait_timeout)
     if not candidate_ready["ready"]:
-        stop_sidecars()
-        raise SystemExit("error: langchain-api-llamacpp did not become healthy in time")
+        detail = "langchain-api-llamacpp did not become healthy in time"
+        if attempts:
+            detail = f"{detail}; attempts={json.dumps(attempts, ensure_ascii=True)}"
+        raise SystemExit(f"error: {detail}")
 
     candidate = run_bench(
         preset=args.preset,

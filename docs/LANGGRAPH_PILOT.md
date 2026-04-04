@@ -14,7 +14,7 @@ Program id:
 - `langgraph-sidecar-llamacpp-v1` for the disposable backend-promotion fixture gate
 
 Current origin runtime path:
-- `intel-full -> langchain-api /run -> ollama-native`
+- `intel-full -> langchain-api /run -> llama.cpp`
 
 Current cases:
 - `8dionysus-profile-routing-clarity`

@@ -28,7 +28,7 @@ FIXTURE_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
 PROGRAM_ID = DEFAULT_PROGRAM_ID
 WAVE_ID = "W4"
 MODEL = "qwen3.5:9b"
-DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5401/run"
+DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
 LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]

@@ -29,20 +29,17 @@ Or combine host-facing and internal-only checks in one pass:
 scripts/aoa-smoke --with-internal --profile <name>
 ```
 
-For profiles that include local Ollama inference, `aoa-up` now performs a post-start warmup of `qwen3.5:9b` and relies on Ollama keep-alive to avoid repeated cold loads during normal short idle periods.
+For profiles that include canonical `llama.cpp` inference, `aoa-up` now performs a bounded readiness wait on the `llama.cpp` health surface before handing control back to the operator.
 
-## Optional sidecar runtime pilot
+## Optional benchmark lane
 
-If you want a bounded `llama.cpp` backend-parity check without replacing the validated Ollama path, use:
+If you want a bounded alternate `llama.cpp` benchmark or promotion lane beyond the canonical runtime path, use:
 
 ```bash
 scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
-That pilot keeps:
-- the canonical `langchain-api` on `127.0.0.1:5401`
-- the `llama.cpp` sidecar on `127.0.0.1:11435`
-- the sidecar `langchain-api-llamacpp` on `127.0.0.1:5403`
+That lane is separate from the canonical profile-driven runtime and exists only for explicit benchmark or promotion work.
 
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full operator contract.
 
@@ -60,7 +57,7 @@ Good for validating storage, orchestration, and local model-serving basics.
 - `qdrant` -> `http://127.0.0.1:6333/`
 - `neo4j` -> `http://127.0.0.1:7474/`
 - `n8n` -> `http://127.0.0.1:5678/`
-- `ollama` -> `http://127.0.0.1:11434/api/tags`
+- `llama-cpp` -> `http://127.0.0.1:11435/health`
 
 ### First checks
 
@@ -77,13 +74,12 @@ scripts/aoa-smoke --profile core
 ### What it is for
 
 The generic local agent runtime.
-This profile is Ollama-first for embeddings and does not require OVMS.
+This profile uses `langchain-api -> llama.cpp` as the canonical chat path and does not require OVMS.
 
 ### Host-facing endpoints
 
 All `core` endpoints, plus:
-- `litellm` -> `127.0.0.1:4000`
-- `langchain-api` -> `http://127.0.0.1:5401/health`
+- `langchain-api` -> `http://127.0.0.1:5403/health`
 
 ### First checks
 
@@ -102,7 +98,7 @@ scripts/aoa-qwen-bench --profile agentic
 ### What it is for
 
 The Intel-aware agent runtime.
-This profile adds OVMS and applies the Intel overlay for the agent API, switching embeddings to OVMS.
+This profile adds OVMS and applies the Intel overlay for the canonical agent API, switching embeddings to OVMS while keeping the chat path on `llama.cpp`.
 
 ### Host-facing endpoints
 
