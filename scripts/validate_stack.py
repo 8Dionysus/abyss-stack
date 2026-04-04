@@ -199,15 +199,25 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
 
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
+RPG_RUNTIME_FRONTEND_POSTURE_PATH = Path("docs") / "RPG_RUNTIME_FRONTEND_POSTURE.md"
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
+AGENT_BUILD_SNAPSHOT_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot.schema.json"
+REPUTATION_LEDGER_SCHEMA_PATH = Path("schemas") / "reputation_ledger.schema.json"
+QUEST_RUN_RESULT_SCHEMA_PATH = Path("schemas") / "quest_run_result.schema.json"
+FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle.schema.json"
 QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
+AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = Path("examples") / "agent_build_snapshot.example.json"
+REPUTATION_LEDGER_EXAMPLE_PATH = Path("examples") / "reputation_ledger.example.json"
+QUEST_RUN_RESULT_EXAMPLE_PATH = Path("examples") / "quest_run_result.example.json"
+FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH = Path("examples") / "frontend_projection_bundle.example.json"
 QUEST_IDS = (
     "ABYSS-STACK-Q-0001",
     "ABYSS-STACK-Q-0002",
     "ABYSS-STACK-Q-0003",
     "ABYSS-STACK-Q-0004",
+    "ABYSS-STACK-Q-0005",
 )
 QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
@@ -420,10 +430,19 @@ def validate_questbook_surface(errors: list[str]) -> None:
     required_paths = (
         QUESTBOOK_PATH,
         QUESTBOOK_INTEGRATION_PATH,
+        RPG_RUNTIME_FRONTEND_POSTURE_PATH,
         QUEST_SCHEMA_PATH,
         QUEST_DISPATCH_SCHEMA_PATH,
+        AGENT_BUILD_SNAPSHOT_SCHEMA_PATH,
+        REPUTATION_LEDGER_SCHEMA_PATH,
+        QUEST_RUN_RESULT_SCHEMA_PATH,
+        FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH,
         QUEST_CATALOG_EXAMPLE_PATH,
         QUEST_DISPATCH_EXAMPLE_PATH,
+        AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH,
+        REPUTATION_LEDGER_EXAMPLE_PATH,
+        QUEST_RUN_RESULT_EXAMPLE_PATH,
+        FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH,
     ) + tuple(Path("quests") / f"{quest_id}.yaml" for quest_id in QUEST_IDS)
 
     for relative_path in required_paths:
@@ -454,6 +473,23 @@ def validate_questbook_surface(errors: list[str]) -> None:
         for token in QUESTBOOK_INTEGRATION_FORBIDDEN_TOKENS:
             if token in integration_text:
                 errors.append(f"{QUESTBOOK_INTEGRATION_PATH.as_posix()} must not mention '{token}'")
+
+    try:
+        rpg_runtime_frontend_text = (ROOT / RPG_RUNTIME_FRONTEND_POSTURE_PATH).read_text(
+            encoding="utf-8"
+        )
+    except FileNotFoundError:
+        rpg_runtime_frontend_text = ""
+    else:
+        required_tokens = (
+            "`abyss-stack` owns runtime state and service delivery.",
+            "It does not own upstream meaning.",
+            "The frontend must not become an authority surface.",
+            "It must never pretend to be the soul.",
+        )
+        for token in required_tokens:
+            if token not in rpg_runtime_frontend_text:
+                errors.append(f"{RPG_RUNTIME_FRONTEND_POSTURE_PATH.as_posix()} must contain '{token}'")
 
     try:
         quest_schema_payload = json.loads((ROOT / QUEST_SCHEMA_PATH).read_text(encoding="utf-8"))
@@ -490,6 +526,48 @@ def validate_questbook_surface(errors: list[str]) -> None:
             label=QUEST_DISPATCH_SCHEMA_PATH.as_posix(),
             errors=errors,
         )
+
+    schema_expectations = (
+        (AGENT_BUILD_SNAPSHOT_SCHEMA_PATH, "agent_build_snapshot_v1"),
+        (REPUTATION_LEDGER_SCHEMA_PATH, "reputation_ledger_v1"),
+        (QUEST_RUN_RESULT_SCHEMA_PATH, "quest_run_result_v1"),
+        (FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH, "frontend_projection_bundle_v1"),
+    )
+    for path, expected_title in schema_expectations:
+        try:
+            payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+        except json.JSONDecodeError as exc:
+            errors.append(f"{path.as_posix()} must contain valid JSON: {exc}")
+            continue
+        if not isinstance(payload, dict):
+            errors.append(f"{path.as_posix()} must be a JSON object")
+            continue
+        if payload.get("title") != expected_title:
+            errors.append(f"{path.as_posix()} title must equal '{expected_title}'")
+
+    example_expectations = (
+        (AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH, "agent_build_snapshot_v1"),
+        (REPUTATION_LEDGER_EXAMPLE_PATH, "reputation_ledger_v1"),
+        (QUEST_RUN_RESULT_EXAMPLE_PATH, "quest_run_result_v1"),
+        (FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH, "frontend_projection_bundle_v1"),
+    )
+    for path, expected_version in example_expectations:
+        try:
+            payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+        except json.JSONDecodeError as exc:
+            errors.append(f"{path.as_posix()} must contain valid JSON: {exc}")
+            continue
+        if not isinstance(payload, dict):
+            errors.append(f"{path.as_posix()} must be a JSON object")
+            continue
+        if payload.get("schema_version") != expected_version:
+            errors.append(f"{path.as_posix()} schema_version must equal '{expected_version}'")
+        if payload.get("public_safe") is not True:
+            errors.append(f"{path.as_posix()} public_safe must be true")
 
     expected_catalog = []
     expected_dispatch = []
@@ -535,6 +613,23 @@ def validate_questbook_surface(errors: list[str]) -> None:
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "docs/FIRST_RUN.md" not in note or "docs/DOCTOR.md" not in note:
                 errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/FIRST_RUN.md and docs/DOCTOR.md")
+        elif quest_id == "ABYSS-STACK-Q-0005":
+            if quest_payload.get("kind") != "doctrine":
+                errors.append("ABYSS-STACK-Q-0005 kind must stay doctrine")
+            anchor_ref = quest_payload.get("anchor_ref")
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RPG_RUNTIME_FRONTEND_POSTURE.md":
+                errors.append(
+                    "ABYSS-STACK-Q-0005 must stay anchored to docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
+                )
+            note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
+            if not isinstance(note, str) or "shadow authority layer" not in note:
+                errors.append(
+                    "ABYSS-STACK-Q-0005 anchor note must mention the shadow authority risk"
+                )
+            if not isinstance(notes, str) or "global rank engine" not in notes or "auto-complete quest writer" not in notes:
+                errors.append(
+                    "ABYSS-STACK-Q-0005 notes must keep the runtime authority guardrail language"
+                )
 
         try:
             expected_catalog.append(build_expected_quest_catalog_entry(quest_id, quest_payload))

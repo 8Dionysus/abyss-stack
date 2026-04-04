@@ -1,0 +1,52 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0005
+title: Land the first runtime and frontend service contracts for the AoA RPG layer
+summary: Define the runtime-owned build snapshot, reputation ledger, quest run result, and projection bundle contracts without absorbing upstream meaning.
+repo: abyss-stack
+owner_surface: runtime/rpg-service-contracts
+theme_ref: ''
+milestone_ref: ''
+kind: doctrine
+state: captured
+band: frontier
+difficulty: d3_seam
+risk: r2_contract
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: conductor
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 2
+  ambiguity: 2
+  boundary: 3
+  verification: 2
+parent: null
+depends_on:
+  - AOA-Q-0006
+activation:
+  mode: manual
+  note: open when the federation-level RFC is ready and runtime/service boundaries can be planted cleanly
+anchor_ref:
+  artifact: rpg_runtime_frontend_posture
+  ref: docs/RPG_RUNTIME_FRONTEND_POSTURE.md
+  note: runtime must own live state without becoming a shadow authority layer
+handoff_role: runtime-maintainer
+evidence:
+  - build snapshot contract is explicit
+  - reputation ledger is scoped and cited
+  - quest run result does not overrule quest state
+  - projection bundle preserves source refs and canonical keys
+harvest:
+  target: none
+opened_at: '2026-04-01'
+touched_at: '2026-04-01'
+tags:
+  - runtime
+  - frontend
+  - rpg
+  - contracts
+notes: >
+  Keep service contracts public-safe and source-linked. Do not create a global rank engine, hidden score service, or auto-complete quest writer in this pass.
+public_safe: true

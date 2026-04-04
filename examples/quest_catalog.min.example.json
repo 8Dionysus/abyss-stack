@@ -58,5 +58,20 @@
     "owner_surface": "platform-adaptation",
     "source_path": "quests/ABYSS-STACK-Q-0004.yaml",
     "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0005",
+    "title": "Land the first runtime and frontend service contracts for the AoA RPG layer",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "captured",
+    "band": "frontier",
+    "kind": "doctrine",
+    "difficulty": "d3_seam",
+    "risk": "r2_contract",
+    "owner_surface": "runtime/rpg-service-contracts",
+    "source_path": "quests/ABYSS-STACK-Q-0005.yaml",
+    "public_safe": true
   }
 ]

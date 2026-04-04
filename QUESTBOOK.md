@@ -19,6 +19,7 @@ Do not use it for:
 
 ## Frontier / codex-led
 - `ABYSS-STACK-Q-0002` — track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning
+- `ABYSS-STACK-Q-0005` — land the first runtime and frontend service contracts for the AoA RPG layer without absorbing upstream meaning
 
 ## Near
 - `ABYSS-STACK-Q-0004` — capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift
