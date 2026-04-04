@@ -40,5 +40,23 @@ The current guarded route for risky runtime mutation is:
 before `aoa-up` or `aoa-smoke`.
 If one of those gates is missing, the route stays out of delegation scope.
 
+## Installed quest-harvest posture
+
+`aoa-quest-harvest` may assist this repo only as a post-session installed skill after a reviewed run, closure, or pause.
+
+- it is not used inside an active route
+- it does not define orchestrator identity
+- it does not replace infra ownership, playbook canon, memo writeback, or eval proof
+- one anecdotal repeat is not enough to promote an infra obligation
+
+Its allowed verdicts are:
+
+- `keep/open quest`
+- `promote to skill`
+- `promote to playbook`
+- `promote to orchestrator surface`
+- `promote to proof surface`
+- `promote to memo surface`
+
 The example files under `examples/` stay reviewable and source-owned.
 They do not become live runtime inputs, and they do not replace the deployed mirror under `/srv/abyss-stack`.
