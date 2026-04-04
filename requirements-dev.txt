@@ -3,3 +3,4 @@ pydantic
 pytest
 fastapi
 httpx
+jsonschema

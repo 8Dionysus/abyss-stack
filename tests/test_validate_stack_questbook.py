@@ -23,18 +23,30 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             Path("QUESTBOOK.md"),
             Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md",
             Path("docs") / "RPG_RUNTIME_FRONTEND_POSTURE.md",
+            Path("docs") / "RPG_RUNTIME_COLLECTIONS.md",
+            Path("docs") / "RPG_RUNTIME_BUILDERS.md",
+            Path("docs") / "RPG_ROUTE_API_SEAM.md",
+            Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md",
             Path("schemas") / "quest.schema.json",
             Path("schemas") / "quest_dispatch.schema.json",
             Path("schemas") / "agent_build_snapshot.schema.json",
             Path("schemas") / "reputation_ledger.schema.json",
             Path("schemas") / "quest_run_result.schema.json",
             Path("schemas") / "frontend_projection_bundle.schema.json",
+            Path("schemas") / "agent_build_snapshot_collection.schema.json",
+            Path("schemas") / "reputation_ledger_collection.schema.json",
+            Path("schemas") / "quest_run_result_collection.schema.json",
+            Path("schemas") / "frontend_projection_bundle_collection.schema.json",
             Path("examples") / "quest_catalog.min.example.json",
             Path("examples") / "quest_dispatch.min.example.json",
             Path("examples") / "agent_build_snapshot.example.json",
             Path("examples") / "reputation_ledger.example.json",
             Path("examples") / "quest_run_result.example.json",
             Path("examples") / "frontend_projection_bundle.example.json",
+            Path("generated") / "rpg" / "agent_build_snapshots.json",
+            Path("generated") / "rpg" / "reputation_ledgers.json",
+            Path("generated") / "rpg" / "quest_run_results.json",
+            Path("generated") / "rpg" / "frontend_projection_bundles.json",
         ):
             write_text(
                 repo_root / relative_path,
@@ -200,6 +212,53 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
 
         self.assertTrue(
             any("examples/agent_build_snapshot.example.json schema_version must equal 'agent_build_snapshot_v1'" in error for error in errors)
+        )
+
+    def test_missing_rpg_runtime_collections_doc_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            (repo_root / "docs" / "RPG_RUNTIME_COLLECTIONS.md").unlink()
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
+        )
+
+    def test_generated_collection_schema_version_drift_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "generated" / "rpg" / "agent_build_snapshots.json",
+                (repo_root / "generated" / "rpg" / "agent_build_snapshots.json")
+                .read_text(encoding="utf-8")
+                .replace(
+                    '"schema_version": "agent_build_snapshot_collection_v1"',
+                    '"schema_version": "agent_build_snapshot_collection_v999"',
+                    1,
+                ),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("generated/rpg/agent_build_snapshots.json schema_version must equal 'agent_build_snapshot_collection_v1'" in error for error in errors)
+        )
+
+    def test_runtime_projection_anchor_drift_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml",
+                (repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml")
+                .read_text(encoding="utf-8")
+                .replace("ref: docs/RPG_RUNTIME_COLLECTIONS.md", "ref: docs/RPG_ROUTE_API_SEAM.md"),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("ABYSS-STACK-Q-0006 must stay anchored to docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
         )
 
 

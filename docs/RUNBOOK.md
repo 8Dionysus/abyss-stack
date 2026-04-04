@@ -23,6 +23,7 @@ When something feels wrong, use this order:
 17. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
 18. decide whether to fix forward or roll back
 19. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
+20. inspect `${AOA_STACK_ROOT}/Logs/rpg/latest/` and `${AOA_STACK_ROOT}/Logs/rpg/records/` when the body-facing RPG transport looks stale, uncited, or out of parity with committed `generated/rpg/`
 
 ## Useful commands
 
@@ -36,6 +37,7 @@ aoa-platform-adaptation --mode private --title "Short seam title" --summary "One
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
+python scripts/aoa-rpg-runtime-projection --check
 scripts/aoa-governed-run audit <run-id>
 scripts/aoa-governed-run replay-review-packets <run-id>
 curl http://127.0.0.1:5402/playbooks/activation
@@ -94,6 +96,13 @@ aoa-export-runtime-evidence-selection \
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write
+```
+
+For filesystem-first RPG runtime projection refresh and parity check:
+
+```bash
+python scripts/aoa-rpg-runtime-projection
+python scripts/aoa-rpg-runtime-projection --check
 ```
 
 For governed-run review-packet audit and replay from stored context only:

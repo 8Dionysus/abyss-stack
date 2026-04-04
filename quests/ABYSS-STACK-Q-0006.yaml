@@ -1,0 +1,55 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0006
+title: Materialize filesystem-first RPG runtime collections and derived bundles without widening route or quest authority
+summary: Land the body-facing RPG collection wrappers, committed transport files, and runtime latest/records copies while keeping route and frontend seams read-only.
+repo: abyss-stack
+owner_surface: runtime/rpg-runtime-projection
+theme_ref: ''
+milestone_ref: ''
+kind: doctrine
+state: captured
+band: frontier
+difficulty: d3_seam
+risk: r2_contract
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: conductor
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 3
+  ambiguity: 2
+  boundary: 3
+  verification: 3
+parent: null
+depends_on:
+  - AOA-Q-0008
+  - ABYSS-STACK-Q-0005
+activation:
+  mode: manual
+  note: open when the runtime body needs committed transport collections and live latest/records copies
+anchor_ref:
+  artifact: rpg_runtime_collections
+  ref: docs/RPG_RUNTIME_COLLECTIONS.md
+  note: runtime collections stay read models and must not widen route or quest authority
+handoff_role: runtime-maintainer
+evidence:
+  - committed generated transport files exist under generated/rpg/
+  - live runtime copies exist under Logs/rpg/latest/
+  - parity checks reject drift between committed and live copies
+  - frontend bundles remain derived and cited
+harvest:
+  target: none
+opened_at: '2026-04-04'
+touched_at: '2026-04-04'
+tags:
+  - runtime
+  - rpg
+  - projections
+  - collections
+  - filesystem-first
+notes: >
+  Keep the transport public-safe and cited. Do not add live /rpg/* endpoints, reward logic,
+  unlock writes, or source quest mutation in this pass.
+public_safe: true

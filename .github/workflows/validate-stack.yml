@@ -29,7 +29,7 @@ jobs:
         run: python scripts/validate_stack.py
 
       - name: Python syntax check
-        run: python -m py_compile scripts/validate_stack.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index
+        run: python -m py_compile scripts/validate_stack.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index scripts/aoa-rpg-runtime-projection
 
       - name: Run Python test suite
         run: python -m pytest -q
@@ -106,6 +106,8 @@ jobs:
           scripts/aoa-render-services --preset agent-full
           scripts/aoa-render-services --preset intel-full
           scripts/aoa-render-config --profile core >/dev/null
+          python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
+          python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
           scripts/aoa-render-config --profile agentic --write "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-agentic.rendered.yml"

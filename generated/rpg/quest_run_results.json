@@ -1,0 +1,104 @@
+{
+  "schema_version": "quest_run_result_collection_v1",
+  "runs": [
+    {
+      "schema_version": "quest_run_result_v1",
+      "run_id": "QRR-2026-04-01-0001",
+      "quest_ref": "AOA-Q-0008",
+      "owner_repo": "Agents-of-Abyss",
+      "started_at": "2026-04-01T17:30:00Z",
+      "finished_at": "2026-04-01T18:15:00Z",
+      "orchestrator": {
+        "orchestrator_id": "codex-primary",
+        "orchestrator_kind": "codex",
+        "run_mode": "orchestrated_loop"
+      },
+      "execution": {
+        "wrapper_class": "codex_primary",
+        "control_mode": "human_codex_copilot",
+        "difficulty": "d4_architecture",
+        "risk": "r2_contract",
+        "party": [
+          "AOA-A-0002",
+          "AOA-A-0004"
+        ],
+        "build_snapshot_refs": [
+          "abyss-stack/generated/rpg/agent_build_snapshots.json#build.AOA-A-0002.codex.2026-04-01T18:00:00Z"
+        ],
+        "ability_ids": [
+          "ability.aoa-change-protocol"
+        ],
+        "feat_ids": [
+          "feat.AOA-T-0013"
+        ],
+        "artifact_ids": [],
+        "toolset_refs": [
+          "toolset.codex.default",
+          "toolset.git.readwrite"
+        ]
+      },
+      "outcome": {
+        "run_status": "completed",
+        "quest_state_hint": "done",
+        "summary": "Filesystem-first RPG collections and runtime copies were materialized without widening source ownership or route-api authority."
+      },
+      "artifact_refs": [
+        "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
+        "abyss-stack/docs/RPG_RUNTIME_COLLECTIONS.md",
+        "abyss-stack/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
+      ],
+      "proof_refs": [
+        "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
+      ],
+      "chronicle_refs": [
+        "aoa-memo/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
+      ],
+      "progression_effects": {
+        "evidence_refs": [
+          "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
+        ],
+        "axis_delta_preview": {
+          "boundary_integrity": 1,
+          "execution_reliability": 1,
+          "change_legibility": 1,
+          "review_sharpness": 0,
+          "proof_discipline": 1,
+          "provenance_hygiene": 0,
+          "deep_readiness": 0
+        },
+        "unlock_candidate_ids": [
+          "unlock.rpg.runtime-projection.inspect"
+        ]
+      },
+      "reputation_effects": [
+        {
+          "axis": "proof_trust",
+          "owner_scope": "aoa-evals",
+          "delta": 4,
+          "cause_ref": "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
+        },
+        {
+          "axis": "boundary_trust",
+          "owner_scope": "Agents-of-Abyss",
+          "delta": 3,
+          "cause_ref": "abyss-stack/generated/rpg/quest_run_results.json#QRR-2026-04-01-0001"
+        }
+      ],
+      "penalties": [],
+      "next_hops": [
+        {
+          "action": "inspect",
+          "target_ref": "abyss-stack/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
+          "note": "Keep the frontend bundle derived and cited."
+        },
+        {
+          "action": "handoff",
+          "target_ref": "Dionysus/seed_rpg_runtime_projection_pack.md",
+          "note": "Sync the seed lineage after the runtime body lands."
+        }
+      ],
+      "notes": "Generated transport run envelope for the body-facing RPG slice. Quest-state motion remains a hint, not a source write.",
+      "public_safe": true
+    }
+  ]
+}

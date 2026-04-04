@@ -1,0 +1,47 @@
+{
+  "schema_version": "reputation_ledger_collection_v1",
+  "ledgers": [
+    {
+      "schema_version": "reputation_ledger_v1",
+      "ledger_id": "ledger.agent.AOA-A-0002.2026-04-01",
+      "subject_ref": "AOA-A-0002",
+      "subject_kind": "agent",
+      "generated_at": "2026-04-01T18:20:00Z",
+      "slices": [
+        {
+          "slice_id": "slice.proof.AOA-A-0002",
+          "axis": "proof_trust",
+          "owner_scope": "aoa-evals",
+          "standing": 72,
+          "last_delta": 4,
+          "cause_kind": "eval_verdict",
+          "cause_ref": "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001",
+          "evidence_refs": [
+            "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001",
+            "abyss-stack/generated/rpg/quest_run_results.json#QRR-2026-04-01-0001"
+          ],
+          "freshness": "warm",
+          "recorded_at": "2026-04-01T18:20:00Z"
+        },
+        {
+          "slice_id": "slice.boundary.AOA-A-0002",
+          "axis": "boundary_trust",
+          "owner_scope": "Agents-of-Abyss",
+          "standing": 68,
+          "last_delta": 3,
+          "cause_kind": "quest_run",
+          "cause_ref": "abyss-stack/generated/rpg/quest_run_results.json#QRR-2026-04-01-0001",
+          "evidence_refs": [
+            "abyss-stack/generated/rpg/quest_run_results.json#QRR-2026-04-01-0001",
+            "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md"
+          ],
+          "freshness": "hot",
+          "recorded_at": "2026-04-01T18:20:00Z",
+          "notes": "Runtime collection refresh stayed downstream of source-owned meaning."
+        }
+      ],
+      "notes": "Generated transport ledger for the body-facing RPG slice. Standing remains scoped and cited.",
+      "public_safe": true
+    }
+  ]
+}
