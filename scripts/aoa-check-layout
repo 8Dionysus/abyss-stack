@@ -46,6 +46,17 @@ check_dir() {
   fi
 }
 
+check_file() {
+  local label="$1"
+  local path="$2"
+  if [[ -e "$path" ]]; then
+    aoa_note "ok   file $label -> $path"
+  else
+    aoa_note "fail file $label -> $path"
+    errors=$((errors + 1))
+  fi
+}
+
 check_warn_file() {
   local label="$1"
   local path="$2"
@@ -177,6 +188,8 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-memo sections" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/generated/memory_sections.full.json"
   check_warn_file "aoa-memo object catalog" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/generated/memory_object_catalog.min.json"
   check_warn_file "aoa-memo object sections" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/generated/memory_object_sections.full.json"
+  check_file "aoa-memo runtime writeback targets" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/generated/runtime_writeback_targets.min.json"
+  check_file "aoa-memo runtime writeback intake" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/generated/runtime_writeback_intake.min.json"
   check_warn_file "aoa-memo checkpoint contract example" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/examples/checkpoint_to_memory_contract.example.json"
   check_warn_file "aoa-memo router semantic recall contract" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/examples/recall_contract.router.semantic.json"
   check_warn_file "aoa-memo router lineage recall contract" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/examples/recall_contract.router.lineage.json"
@@ -195,8 +208,10 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-evals capsules" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/eval_capsules.json"
   check_warn_file "aoa-evals sections" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/eval_sections.full.json"
   check_warn_file "aoa-evals comparison spine" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/comparison_spine.json"
-  check_warn_file "aoa-evals workhorse evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.workhorse-local.example.json"
-  check_warn_file "aoa-evals return evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.return-anchor-integrity.example.json"
+  check_file "aoa-evals runtime candidate template index" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/runtime_candidate_template_index.min.json"
+  check_file "aoa-evals runtime candidate intake" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/runtime_candidate_intake.min.json"
+  check_file "aoa-evals workhorse evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.workhorse-local.example.json"
+  check_file "aoa-evals return evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.return-anchor-integrity.example.json"
   check_warn_file "aoa-evals self-agent hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
   check_warn_file "aoa-evals model-tier hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
   check_warn_file "aoa-evals restartable hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
@@ -210,6 +225,8 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-playbooks activation" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_activation_surfaces.min.json"
   check_warn_file "aoa-playbooks federation" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_federation_surfaces.min.json"
   check_warn_file "aoa-playbooks review status" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_review_status.min.json"
+  check_file "aoa-playbooks review packet contracts" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_review_packet_contracts.min.json"
+  check_file "aoa-playbooks review intake" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_review_intake.min.json"
   check_warn_file "aoa-playbooks handoffs" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_handoff_contracts.json"
   check_warn_file "aoa-playbooks failures" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_failure_catalog.json"
   check_warn_file "aoa-playbooks subagent recipes" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_subagent_recipes.json"

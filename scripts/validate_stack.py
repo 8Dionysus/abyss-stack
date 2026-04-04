@@ -180,6 +180,23 @@ REQUIRED_FILES = {
     ROOT / "tests" / "test_validate_stack_questbook.py",
 }
 
+FEDERATION_REQUIRED_RUNTIME_INPUTS = {
+    Path("config-templates") / "Configs" / "federation" / "aoa-memo.yaml": {
+        "generated/runtime_writeback_targets.min.json",
+        "generated/runtime_writeback_intake.min.json",
+    },
+    Path("config-templates") / "Configs" / "federation" / "aoa-evals.yaml": {
+        "generated/runtime_candidate_template_index.min.json",
+        "generated/runtime_candidate_intake.min.json",
+        "examples/runtime_evidence_selection.workhorse-local.example.json",
+        "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+    },
+    Path("config-templates") / "Configs" / "federation" / "aoa-playbooks.yaml": {
+        "generated/playbook_review_packet_contracts.min.json",
+        "generated/playbook_review_intake.min.json",
+    },
+}
+
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
@@ -1038,6 +1055,31 @@ def validate_required_files(errors: list[str]) -> None:
             errors.append(f"missing required file: {path.relative_to(ROOT)}")
 
 
+def validate_federation_required_files(errors: list[str]) -> None:
+    for rel_path, expected_refs in FEDERATION_REQUIRED_RUNTIME_INPUTS.items():
+        path = ROOT / rel_path
+        try:
+            payload = load_structured_object(path)
+        except Exception as exc:
+            errors.append(f"{rel_path.as_posix()} must stay loadable: {exc}")
+            continue
+
+        required_files = payload.get("required_files")
+        if not isinstance(required_files, list):
+            errors.append(f"{rel_path.as_posix()} must expose required_files as a list")
+            continue
+
+        configured_refs = {
+            item for item in required_files if isinstance(item, str)
+        }
+        missing_refs = sorted(expected_refs - configured_refs)
+        if missing_refs:
+            errors.append(
+                f"{rel_path.as_posix()} must list required_files for runtime-loaded federation inputs: "
+                + ", ".join(missing_refs)
+            )
+
+
 def validate_reference_platform(errors: list[str]) -> None:
     reference_platform = (ROOT / "docs" / "REFERENCE_PLATFORM.md").read_text(
         encoding="utf-8"
@@ -1476,6 +1518,7 @@ def main() -> int:
     validate_paths(errors)
     validate_scripts(errors)
     validate_required_files(errors)
+    validate_federation_required_files(errors)
     validate_questbook_surface(errors)
     validate_reference_platform(errors)
     validate_platform_adaptations(errors)

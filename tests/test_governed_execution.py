@@ -2603,6 +2603,55 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn(("memo_writeback_intake", "missing"), reasons)
         self.assertIn("runtime_writeback_intake", reasons[("memo_writeback_intake", "missing")])
 
+    def test_review_packet_eval_template_matches_skip_non_matching_scoped_evidence_templates(self) -> None:
+        stack_root = self.install_review_packet_runtime_surfaces()
+        template_index_path = (
+            stack_root
+            / "Knowledge"
+            / "federation"
+            / "aoa-evals"
+            / "generated"
+            / "runtime_candidate_template_index.min.json"
+        )
+        payload = json.loads(template_index_path.read_text(encoding="utf-8"))
+        payload["templates"].extend(
+            [
+                {
+                    "template_kind": "runtime_evidence_selection",
+                    "template_name": "foreign-playbook-evidence",
+                    "playbook_id": "AOA-P-9999",
+                    "eval_anchor": "aoa-foreign-anchor",
+                    "verdict_bundle_ref": None,
+                    "required_runtime_artifacts": ["summary"],
+                    "review_required": True,
+                    "source_example_ref": "examples/runtime_evidence_selection.foreign-playbook.example.json",
+                },
+                {
+                    "template_kind": "runtime_evidence_selection",
+                    "template_name": "foreign-anchor-evidence",
+                    "playbook_id": None,
+                    "eval_anchor": "aoa-foreign-anchor",
+                    "verdict_bundle_ref": None,
+                    "required_runtime_artifacts": ["summary"],
+                    "review_required": True,
+                    "source_example_ref": "examples/runtime_evidence_selection.foreign-anchor.example.json",
+                },
+            ]
+        )
+        write_json(template_index_path, payload)
+        contract = self.module.playbook_review_packet_contract_by_id("AOA-P-0011")
+
+        hook_templates, evidence_templates = self.module.review_packet_eval_template_matches(
+            "AOA-P-0011",
+            contract,
+        )
+
+        self.assertEqual([entry["template_name"] for entry in hook_templates], ["aoa-p-0011-approval-boundary-hook"])
+        self.assertEqual(
+            [entry["template_name"] for entry in evidence_templates],
+            ["workhorse-q4-vs-q6-latency-tradeoff"],
+        )
+
     def test_pass_result_persists_review_packet_summary_for_status_explain(self) -> None:
         self.install_review_packet_runtime_surfaces()
         run_dir = self.logs_root / "run-pass-summary"
@@ -2690,6 +2739,44 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("handoff_readiness", rendered)
         self.assertIn("grouped_review_targets", rendered)
         self.assertIn("docs/RUNTIME_WRITEBACK_SEAM.md", rendered)
+
+    def test_render_status_explain_uses_handoff_bundle_readiness_fallback(self) -> None:
+        rendered = self.module.render_status_explain(
+            {
+                "run_id": "run-fallback",
+                "summary": {
+                    "status": "paused",
+                    "review_packets": {
+                        "ready": True,
+                        "emitted_candidate_artifact_count": 1,
+                        "audit_verdict": None,
+                        "handoff_readiness": None,
+                    },
+                },
+                "state": {
+                    "phase": "handoff",
+                    "target_id": "abyss-stack",
+                    "playbook_id": "AOA-P-0011",
+                    "task_class": "docs_only",
+                    "trust_state_snapshot": "canary_proven",
+                },
+                "triage": {
+                    "resumable": True,
+                    "operator_action_required": True,
+                    "blocked_reason": None,
+                    "recommended_action": "inspect handoff bundle",
+                },
+                "review_packet_audit": {"audit_verdict": "partial", "recommended_review_targets": []},
+                "review_handoff_bundle": {
+                    "audit_verdict": "ready",
+                    "handoff_readiness": "blocked",
+                    "recommended_review_targets": {},
+                },
+            }
+        )
+
+        self.assertIn("- audit_verdict: `partial`", rendered)
+        self.assertIn("- handoff_readiness: `blocked`", rendered)
 
     def test_status_and_list_runs_include_triage_and_promotion_summary(self) -> None:
         def write_run(

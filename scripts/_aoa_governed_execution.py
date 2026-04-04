@@ -2636,6 +2636,11 @@ def review_packet_eval_template_matches(
                 continue
             hook_templates.append(entry)
         elif template_kind == "runtime_evidence_selection":
+            if entry.get("playbook_id") not in (None, playbook_id):
+                continue
+            eval_anchor = entry.get("eval_anchor")
+            if contract_eval_anchors and eval_anchor is not None and eval_anchor not in contract_eval_anchors:
+                continue
             evidence_templates.append(entry)
     return hook_templates, evidence_templates
 
@@ -4769,7 +4774,7 @@ def render_status_explain(payload: dict[str, Any]) -> str:
         f"- review_packet_ready: `{review_packets.get('ready')}`",
         f"- emitted_review_packets: `{review_packets.get('emitted_candidate_artifact_count')}`",
         f"- audit_verdict: `{review_packets.get('audit_verdict') or review_packet_audit.get('audit_verdict')}`",
-        f"- handoff_readiness: `{review_packets.get('handoff_readiness') or review_handoff_bundle.get('audit_verdict')}`",
+        f"- handoff_readiness: `{review_packets.get('handoff_readiness') or review_handoff_bundle.get('handoff_readiness')}`",
         "",
         "## Next Action",
         "",
