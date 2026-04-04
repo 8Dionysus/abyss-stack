@@ -73,5 +73,20 @@
     "owner_surface": "runtime/rpg-service-contracts",
     "source_path": "quests/ABYSS-STACK-Q-0005.yaml",
     "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0006",
+    "title": "Materialize filesystem-first RPG runtime collections and derived bundles without widening route or quest authority",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "captured",
+    "band": "frontier",
+    "kind": "doctrine",
+    "difficulty": "d3_seam",
+    "risk": "r2_contract",
+    "owner_surface": "runtime/rpg-runtime-projection",
+    "source_path": "quests/ABYSS-STACK-Q-0006.yaml",
+    "public_safe": true
   }
 ]

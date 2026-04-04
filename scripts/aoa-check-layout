@@ -115,6 +115,8 @@ check_warn_file "alertmanager config" "${AOA_STACK_ROOT}/Configs/monitoring/aler
 check_warn_file "grafana datasource" "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources/prometheus.yml"
 check_warn_file "tts voices" "${AOA_STACK_ROOT}/Configs/tts/voices.yaml"
 check_warn_file "litellm config" "${AOA_STACK_ROOT}/Services/litellm/config.yaml"
+check_dir "${AOA_STACK_ROOT}/Logs/rpg/latest"
+check_dir "${AOA_STACK_ROOT}/Logs/rpg/records"
 
 if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   aoa_note "selected runtime includes 41-agent-api.yml; checking return-policy contract"

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/quest_run_result_collection_v1.schema.json",
+  "title": "quest_run_result_collection_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "quest_run_result_collection_v1"
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/agent_build_snapshot_collection_v1.schema.json",
+  "title": "agent_build_snapshot_collection_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "builds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "agent_build_snapshot_collection_v1"
+    },
+    "builds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

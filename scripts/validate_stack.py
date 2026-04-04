@@ -56,6 +56,7 @@ REQUIRED_SCRIPTS = {
     "aoa-w6-pilot",
     "aoa-llamacpp-pilot",
     "aoa-runtime-bench-index",
+    "aoa-rpg-runtime-projection",
     "aoa-qwen-check",
     "aoa-qwen-run",
     "aoa-qwen-bench",
@@ -113,6 +114,10 @@ REQUIRED_FILES = {
     ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
     ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
     ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
+    ROOT / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
+    ROOT / "docs" / "RPG_RUNTIME_BUILDERS.md",
+    ROOT / "docs" / "RPG_ROUTE_API_SEAM.md",
+    ROOT / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -170,14 +175,23 @@ REQUIRED_FILES = {
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
+    ROOT / "schemas" / "agent_build_snapshot_collection.schema.json",
+    ROOT / "schemas" / "reputation_ledger_collection.schema.json",
+    ROOT / "schemas" / "quest_run_result_collection.schema.json",
+    ROOT / "schemas" / "frontend_projection_bundle_collection.schema.json",
     ROOT / "examples" / "runtime_benchmark.workhorse-local.example.json",
     ROOT / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json",
     ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
     ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
+    ROOT / "generated" / "rpg" / "agent_build_snapshots.json",
+    ROOT / "generated" / "rpg" / "reputation_ledgers.json",
+    ROOT / "generated" / "rpg" / "quest_run_results.json",
+    ROOT / "generated" / "rpg" / "frontend_projection_bundles.json",
     ROOT / "tests" / "test_governed_execution.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
+    ROOT / "tests" / "test_rpg_runtime_projection.py",
 }
 
 FEDERATION_REQUIRED_RUNTIME_INPUTS = {
@@ -200,24 +214,37 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
 RPG_RUNTIME_FRONTEND_POSTURE_PATH = Path("docs") / "RPG_RUNTIME_FRONTEND_POSTURE.md"
+RPG_RUNTIME_COLLECTIONS_PATH = Path("docs") / "RPG_RUNTIME_COLLECTIONS.md"
+RPG_RUNTIME_BUILDERS_PATH = Path("docs") / "RPG_RUNTIME_BUILDERS.md"
+RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
+RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
 AGENT_BUILD_SNAPSHOT_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot.schema.json"
 REPUTATION_LEDGER_SCHEMA_PATH = Path("schemas") / "reputation_ledger.schema.json"
 QUEST_RUN_RESULT_SCHEMA_PATH = Path("schemas") / "quest_run_result.schema.json"
 FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle.schema.json"
+AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot_collection.schema.json"
+REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH = Path("schemas") / "reputation_ledger_collection.schema.json"
+QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = Path("schemas") / "quest_run_result_collection.schema.json"
+FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle_collection.schema.json"
 QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
 AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = Path("examples") / "agent_build_snapshot.example.json"
 REPUTATION_LEDGER_EXAMPLE_PATH = Path("examples") / "reputation_ledger.example.json"
 QUEST_RUN_RESULT_EXAMPLE_PATH = Path("examples") / "quest_run_result.example.json"
 FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH = Path("examples") / "frontend_projection_bundle.example.json"
+GENERATED_AGENT_BUILD_SNAPSHOTS_PATH = Path("generated") / "rpg" / "agent_build_snapshots.json"
+GENERATED_REPUTATION_LEDGERS_PATH = Path("generated") / "rpg" / "reputation_ledgers.json"
+GENERATED_QUEST_RUN_RESULTS_PATH = Path("generated") / "rpg" / "quest_run_results.json"
+GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH = Path("generated") / "rpg" / "frontend_projection_bundles.json"
 QUEST_IDS = (
     "ABYSS-STACK-Q-0001",
     "ABYSS-STACK-Q-0002",
     "ABYSS-STACK-Q-0003",
     "ABYSS-STACK-Q-0004",
     "ABYSS-STACK-Q-0005",
+    "ABYSS-STACK-Q-0006",
 )
 QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
@@ -431,18 +458,30 @@ def validate_questbook_surface(errors: list[str]) -> None:
         QUESTBOOK_PATH,
         QUESTBOOK_INTEGRATION_PATH,
         RPG_RUNTIME_FRONTEND_POSTURE_PATH,
+        RPG_RUNTIME_COLLECTIONS_PATH,
+        RPG_RUNTIME_BUILDERS_PATH,
+        RPG_ROUTE_API_SEAM_PATH,
+        RPG_FRONTEND_PROJECTION_SEAM_PATH,
         QUEST_SCHEMA_PATH,
         QUEST_DISPATCH_SCHEMA_PATH,
         AGENT_BUILD_SNAPSHOT_SCHEMA_PATH,
         REPUTATION_LEDGER_SCHEMA_PATH,
         QUEST_RUN_RESULT_SCHEMA_PATH,
         FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH,
+        AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH,
+        REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH,
+        QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH,
+        FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH,
         QUEST_CATALOG_EXAMPLE_PATH,
         QUEST_DISPATCH_EXAMPLE_PATH,
         AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH,
         REPUTATION_LEDGER_EXAMPLE_PATH,
         QUEST_RUN_RESULT_EXAMPLE_PATH,
         FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH,
+        GENERATED_AGENT_BUILD_SNAPSHOTS_PATH,
+        GENERATED_REPUTATION_LEDGERS_PATH,
+        GENERATED_QUEST_RUN_RESULTS_PATH,
+        GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH,
     ) + tuple(Path("quests") / f"{quest_id}.yaml" for quest_id in QUEST_IDS)
 
     for relative_path in required_paths:
@@ -491,6 +530,49 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if token not in rpg_runtime_frontend_text:
                 errors.append(f"{RPG_RUNTIME_FRONTEND_POSTURE_PATH.as_posix()} must contain '{token}'")
 
+    doc_expectations = (
+        (
+            RPG_RUNTIME_COLLECTIONS_PATH,
+            (
+                "`abyss-stack` owns the collections.",
+                "It does not own the upstream meanings the collections cite.",
+                "A runtime collection is a read model with memory.",
+            ),
+        ),
+        (
+            RPG_RUNTIME_BUILDERS_PATH,
+            (
+                "Builders may assemble runtime-owned collections.",
+                "Builders may not invent upstream meaning.",
+                "Build upstream, collect downstream, project last.",
+            ),
+        ),
+        (
+            RPG_ROUTE_API_SEAM_PATH,
+            (
+                "It is not implemented in this wave.",
+                "`/rpg/*` is advisory and read-only.",
+                "The seam should read like a lantern, not a wand.",
+            ),
+        ),
+        (
+            RPG_FRONTEND_PROJECTION_SEAM_PATH,
+            (
+                "The frontend reads derived bundles.",
+                "It does not become a new authority surface.",
+                "Keep the source refs audible.",
+            ),
+        ),
+    )
+    for path, tokens in doc_expectations:
+        try:
+            text = (ROOT / path).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        for token in tokens:
+            if token not in text:
+                errors.append(f"{path.as_posix()} must contain '{token}'")
+
     try:
         quest_schema_payload = json.loads((ROOT / QUEST_SCHEMA_PATH).read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -532,6 +614,10 @@ def validate_questbook_surface(errors: list[str]) -> None:
         (REPUTATION_LEDGER_SCHEMA_PATH, "reputation_ledger_v1"),
         (QUEST_RUN_RESULT_SCHEMA_PATH, "quest_run_result_v1"),
         (FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH, "frontend_projection_bundle_v1"),
+        (AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH, "agent_build_snapshot_collection_v1"),
+        (REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH, "reputation_ledger_collection_v1"),
+        (QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH, "quest_run_result_collection_v1"),
+        (FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH, "frontend_projection_bundle_collection_v1"),
     )
     for path, expected_title in schema_expectations:
         try:
@@ -568,6 +654,66 @@ def validate_questbook_surface(errors: list[str]) -> None:
             errors.append(f"{path.as_posix()} schema_version must equal '{expected_version}'")
         if payload.get("public_safe") is not True:
             errors.append(f"{path.as_posix()} public_safe must be true")
+
+    generated_expectations = (
+        (
+            GENERATED_AGENT_BUILD_SNAPSHOTS_PATH,
+            "agent_build_snapshot_collection_v1",
+            "builds",
+            "agent_build_snapshot_v1",
+        ),
+        (
+            GENERATED_REPUTATION_LEDGERS_PATH,
+            "reputation_ledger_collection_v1",
+            "ledgers",
+            "reputation_ledger_v1",
+        ),
+        (
+            GENERATED_QUEST_RUN_RESULTS_PATH,
+            "quest_run_result_collection_v1",
+            "runs",
+            "quest_run_result_v1",
+        ),
+        (
+            GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH,
+            "frontend_projection_bundle_collection_v1",
+            "bundles",
+            "frontend_projection_bundle_v1",
+        ),
+    )
+    for path, expected_version, array_key, item_version in generated_expectations:
+        try:
+            payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+        except json.JSONDecodeError as exc:
+            errors.append(f"{path.as_posix()} must contain valid JSON: {exc}")
+            continue
+        if not isinstance(payload, dict):
+            errors.append(f"{path.as_posix()} must be a JSON object")
+            continue
+        if payload.get("schema_version") != expected_version:
+            errors.append(f"{path.as_posix()} schema_version must equal '{expected_version}'")
+        items = payload.get(array_key)
+        if not isinstance(items, list) or not items:
+            errors.append(f"{path.as_posix()} must include a non-empty '{array_key}' array")
+            continue
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                errors.append(f"{path.as_posix()} item {index} must be a JSON object")
+                continue
+            if item.get("schema_version") != item_version:
+                errors.append(
+                    f"{path.as_posix()} item {index} schema_version must equal '{item_version}'"
+                )
+            if item.get("public_safe") is not True:
+                errors.append(f"{path.as_posix()} item {index} public_safe must be true")
+        if path == GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH:
+            first_bundle = items[0]
+            if first_bundle.get("vocabulary_overlay_ref") != "Agents-of-Abyss/generated/dual_vocabulary_overlay.json":
+                errors.append(
+                    "generated/rpg/frontend_projection_bundles.json must reference Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
+                )
 
     expected_catalog = []
     expected_dispatch = []
@@ -629,6 +775,23 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if not isinstance(notes, str) or "global rank engine" not in notes or "auto-complete quest writer" not in notes:
                 errors.append(
                     "ABYSS-STACK-Q-0005 notes must keep the runtime authority guardrail language"
+                )
+        elif quest_id == "ABYSS-STACK-Q-0006":
+            if quest_payload.get("kind") != "doctrine":
+                errors.append("ABYSS-STACK-Q-0006 kind must stay doctrine")
+            anchor_ref = quest_payload.get("anchor_ref")
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RPG_RUNTIME_COLLECTIONS.md":
+                errors.append(
+                    "ABYSS-STACK-Q-0006 must stay anchored to docs/RPG_RUNTIME_COLLECTIONS.md"
+                )
+            note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
+            if not isinstance(note, str) or "read models" not in note or "route or quest authority" not in note:
+                errors.append(
+                    "ABYSS-STACK-Q-0006 anchor note must mention read models and route or quest authority"
+                )
+            if not isinstance(notes, str) or "live /rpg/* endpoints" not in notes or "quest mutation" not in notes:
+                errors.append(
+                    "ABYSS-STACK-Q-0006 notes must keep the no-live-endpoints and no-quest-mutation guardrails"
                 )
 
         try:
@@ -997,6 +1160,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
     if "Logs/eval-exports/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
+    if "Logs/rpg/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/rpg/")
+    if "generated/rpg/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention generated/rpg/")
 
     lifecycle_doc = (ROOT / "docs" / "LIFECYCLE.md").read_text(encoding="utf-8")
     for required_snippet in (
