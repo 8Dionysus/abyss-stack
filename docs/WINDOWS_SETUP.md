@@ -74,10 +74,10 @@ pwsh -File scripts/aoa.ps1 -Distro Fedora doctor --preset agent-full
 If you want to exercise the bounded overlay path with the shipped placeholder example:
 
 ```powershell
-pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/ollama.cpu.yml --preset agent-full
+pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --preset agent-full
 ```
 
-Treat `compose/tuning/ollama.cpu.yml` as a placeholder overlay that proves the path works. It is not a claim that this repository ships a fully validated CPU tuning profile.
+Treat `compose/tuning/llamacpp.cpu.yml` as a placeholder overlay that proves the path works. It is not a claim that this repository ships a fully validated CPU tuning profile.
 
 ## Important habit
 

@@ -17,30 +17,30 @@ Relative overlay paths are resolved inside `${AOA_CONFIGS_ROOT}`.
 
 That means:
 
-- `compose/tuning/ollama.cpu.yml`
+- `compose/tuning/llamacpp.cpu.yml`
 
 resolves to:
 
-- `${AOA_CONFIGS_ROOT}/compose/tuning/ollama.cpu.yml`
+- `${AOA_CONFIGS_ROOT}/compose/tuning/llamacpp.cpu.yml`
 
 ## Placeholder example
 
-- `ollama.cpu.yml`
+- `llamacpp.cpu.yml`
 
 Example on Linux:
 
 ```bash
-export AOA_EXTRA_COMPOSE_FILES=compose/tuning/ollama.cpu.yml
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.cpu.yml
 scripts/aoa-up --profile core
 ```
 
 Example on Windows:
 
 ```powershell
-pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/ollama.cpu.yml --profile core
+pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile core
 ```
 
-`ollama.cpu.yml` is intentionally a placeholder overlay that proves the overlay path works without claiming a measured or production-grade CPU tuning contract.
+`llamacpp.cpu.yml` is intentionally a placeholder overlay that proves the overlay path works without claiming a measured or production-grade CPU tuning contract.
 
 ## Why this directory exists
 

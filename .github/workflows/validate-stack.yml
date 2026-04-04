@@ -138,7 +138,7 @@ jobs:
             "$AOA_STACK_ROOT/Secrets/Configs/ovms-api.env" \
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
 
-          export AOA_EXTRA_COMPOSE_FILES="compose/tuning/ollama.cpu.yml"
+          export AOA_EXTRA_COMPOSE_FILES="compose/tuning/llamacpp.cpu.yml"
           scripts/aoa-render-config --profile core >/dev/null
 
           printf 'GGUFTEST' > "$RUNNER_TEMP/qwen3.5-9b.gguf"

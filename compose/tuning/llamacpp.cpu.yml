@@ -1,6 +1,6 @@
 # Placeholder overlay that exercises AOA_EXTRA_COMPOSE_FILES without claiming a
 # validated CPU tuning contract.
 services:
-  ollama:
+  llama-cpp:
     labels:
-      aoa.tuning.overlay: "ollama.cpu.placeholder"
+      aoa.tuning.overlay: "llamacpp.cpu.placeholder"

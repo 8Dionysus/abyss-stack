@@ -76,7 +76,7 @@ Relative overlay paths are resolved inside `${AOA_CONFIGS_ROOT}`.
 Example:
 
 ```powershell
-pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/ollama.cpu.yml --preset agent-full
+pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --preset agent-full
 ```
 
 That keeps profiles and presets canonical while still allowing carefully bounded overlays.

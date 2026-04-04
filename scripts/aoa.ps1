@@ -104,7 +104,7 @@ Usage:
   pwsh -File scripts/aoa.ps1 doctor --preset agent-full
   pwsh -File scripts/aoa.ps1 first-run --strict
   pwsh -File scripts/aoa.ps1 up --preset agent-full
-  pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/ollama.cpu.yml --preset agent-full
+  pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --preset agent-full
 
 Optional PowerShell parameters:
   -Distro <name>       Use a specific WSL distro instead of the default one.
