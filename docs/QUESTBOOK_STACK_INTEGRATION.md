@@ -20,6 +20,7 @@ Use stable anchors such as:
 - `docs/PROFILES.md`
 - `docs/PRESETS.md`
 - `docs/PROFILE_RECIPES.md`
+- `docs/RPG_RUNTIME_FRONTEND_POSTURE.md`
 - `docs/RENDER_TRUTH.md`
 - `docs/FIRST_RUN.md`
 - `docs/DOCTOR.md`
@@ -33,6 +34,7 @@ Infra quests should answer one of these:
 - which platform or profile obligation survived the current diff
 - which guardrail is required before a risky mutation route
 - which machine-fit or bridge follow-up must stay visible
+- which runtime/frontend contract boundary must stay explicit without absorbing upstream meaning
 - which route is too risky for small local wrappers and must stay human-gated
 
 The current guarded route for risky runtime mutation is:

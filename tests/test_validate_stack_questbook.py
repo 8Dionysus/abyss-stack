@@ -22,10 +22,19 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
         for relative_path in (
             Path("QUESTBOOK.md"),
             Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md",
+            Path("docs") / "RPG_RUNTIME_FRONTEND_POSTURE.md",
             Path("schemas") / "quest.schema.json",
             Path("schemas") / "quest_dispatch.schema.json",
+            Path("schemas") / "agent_build_snapshot.schema.json",
+            Path("schemas") / "reputation_ledger.schema.json",
+            Path("schemas") / "quest_run_result.schema.json",
+            Path("schemas") / "frontend_projection_bundle.schema.json",
             Path("examples") / "quest_catalog.min.example.json",
             Path("examples") / "quest_dispatch.min.example.json",
+            Path("examples") / "agent_build_snapshot.example.json",
+            Path("examples") / "reputation_ledger.example.json",
+            Path("examples") / "quest_run_result.example.json",
+            Path("examples") / "frontend_projection_bundle.example.json",
         ):
             write_text(
                 repo_root / relative_path,
@@ -161,6 +170,36 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
 
         self.assertTrue(
             any("examples/quest_dispatch.min.example.json" in error for error in errors)
+        )
+
+    def test_missing_rpg_runtime_frontend_posture_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            (repo_root / "docs" / "RPG_RUNTIME_FRONTEND_POSTURE.md").unlink()
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("docs/RPG_RUNTIME_FRONTEND_POSTURE.md" in error for error in errors)
+        )
+
+    def test_runtime_example_schema_version_drift_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "examples" / "agent_build_snapshot.example.json",
+                (repo_root / "examples" / "agent_build_snapshot.example.json")
+                .read_text(encoding="utf-8")
+                .replace(
+                    '"schema_version": "agent_build_snapshot_v1"',
+                    '"schema_version": "agent_build_snapshot_v999"',
+                ),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("examples/agent_build_snapshot.example.json schema_version must equal 'agent_build_snapshot_v1'" in error for error in errors)
         )
 
 

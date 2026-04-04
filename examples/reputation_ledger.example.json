@@ -1,0 +1,57 @@
+{
+  "schema_version": "reputation_ledger_v1",
+  "ledger_id": "ledger.agent.AOA-A-0002.2026-04-01",
+  "subject_ref": "AOA-A-0002",
+  "subject_kind": "agent",
+  "generated_at": "2026-04-01T18:20:00Z",
+  "slices": [
+    {
+      "slice_id": "slice.proof.AOA-A-0002",
+      "axis": "proof_trust",
+      "owner_scope": "aoa-evals",
+      "standing": 72,
+      "last_delta": 4,
+      "cause_kind": "eval_verdict",
+      "cause_ref": "aoa-evals/reports/progression-evidence/PE-2026-04-01-0001.json",
+      "evidence_refs": [
+        "aoa-evals/reports/progression-evidence/PE-2026-04-01-0001.json",
+        "aoa-evals/examples/progression_evidence.example.json"
+      ],
+      "freshness": "warm",
+      "recorded_at": "2026-04-01T18:20:00Z"
+    },
+    {
+      "slice_id": "slice.boundary.AOA-A-0002",
+      "axis": "boundary_trust",
+      "owner_scope": "Agents-of-Abyss",
+      "standing": 68,
+      "last_delta": 3,
+      "cause_kind": "quest_run",
+      "cause_ref": "runs/QRR-2026-04-01-0001.json",
+      "evidence_refs": [
+        "runs/QRR-2026-04-01-0001.json",
+        "aoa-memo/chronicles/QR-2026-04-01-0001.json"
+      ],
+      "freshness": "hot",
+      "recorded_at": "2026-04-01T18:20:00Z"
+    },
+    {
+      "slice_id": "slice.review.AOA-A-0002",
+      "axis": "review_trust",
+      "owner_scope": "aoa-routing",
+      "standing": 51,
+      "last_delta": -2,
+      "cause_kind": "reanchor",
+      "cause_ref": "runs/QRR-2026-03-27-0003.json",
+      "evidence_refs": [
+        "runs/QRR-2026-03-27-0003.json",
+        "aoa-evals/reports/progression-evidence/PE-2026-03-27-0003.json"
+      ],
+      "freshness": "cool",
+      "recorded_at": "2026-03-27T14:00:00Z",
+      "notes": "Pair review required after a drift-heavy return route."
+    }
+  ],
+  "notes": "Example only. Standing is scoped and cited rather than universal.",
+  "public_safe": true
+}

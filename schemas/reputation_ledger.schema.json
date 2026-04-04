@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/reputation_ledger_v1.schema.json",
+  "title": "reputation_ledger_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ledger_id",
+    "subject_ref",
+    "subject_kind",
+    "generated_at",
+    "slices",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "reputation_ledger_v1"
+    },
+    "ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_kind": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "party",
+        "artifact",
+        "campaign"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "slices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slice_id",
+          "axis",
+          "owner_scope",
+          "standing",
+          "last_delta",
+          "cause_kind",
+          "cause_ref",
+          "evidence_refs",
+          "freshness",
+          "recorded_at"
+        ],
+        "properties": {
+          "slice_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "axis": {
+            "type": "string",
+            "enum": [
+              "proof_trust",
+              "handoff_trust",
+              "provenance_trust",
+              "campaign_discipline",
+              "boundary_trust",
+              "review_trust"
+            ]
+          },
+          "owner_scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "standing": {
+            "type": "integer",
+            "minimum": -100,
+            "maximum": 100
+          },
+          "last_delta": {
+            "type": "integer",
+            "minimum": -20,
+            "maximum": 20
+          },
+          "cause_kind": {
+            "type": "string",
+            "enum": [
+              "eval_verdict",
+              "quest_run",
+              "manual_review",
+              "campaign_review",
+              "reanchor",
+              "artifact_review"
+            ]
+          },
+          "cause_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "warm",
+              "cool",
+              "cold"
+            ]
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,550 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/frontend_projection_bundle_v1.schema.json",
+  "title": "frontend_projection_bundle_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bundle_id",
+    "generated_at",
+    "vocabulary_overlay_ref",
+    "views",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "frontend_projection_bundle_v1"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "vocabulary_overlay_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "build_snapshots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "reputation_ledgers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "quest_run_results": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "quest_board_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "campaign_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "views": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_sheet_cards",
+        "quest_board_cards",
+        "campaign_lane_cards"
+      ],
+      "properties": {
+        "agent_sheet_cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "agent_id",
+              "build_snapshot_ref",
+              "display_name",
+              "class_archetype",
+              "rank",
+              "primary_axes",
+              "resources"
+            ],
+            "properties": {
+              "agent_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "build_snapshot_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "class_archetype": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rank": {
+                "type": "string",
+                "enum": [
+                  "initiate",
+                  "adept",
+                  "specialist",
+                  "veteran",
+                  "master"
+                ]
+              },
+              "primary_axes": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "axis",
+                    "value"
+                  ],
+                  "properties": {
+                    "axis": {
+                      "type": "string",
+                      "enum": [
+                        "boundary_integrity",
+                        "execution_reliability",
+                        "change_legibility",
+                        "review_sharpness",
+                        "proof_discipline",
+                        "provenance_hygiene",
+                        "deep_readiness"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "resource",
+                    "current",
+                    "max"
+                  ],
+                  "properties": {
+                    "resource": {
+                      "type": "string",
+                      "enum": [
+                        "integrity_budget",
+                        "focus_budget",
+                        "deep_budget",
+                        "recall_budget",
+                        "autonomy_budget"
+                      ]
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "equipped_ability_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "passive_feat_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "artifact_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "reputation_panel_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "active_quest_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "quest_board_cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "quest_ref",
+              "title",
+              "owner_repo",
+              "state",
+              "band",
+              "difficulty",
+              "risk",
+              "source_ref"
+            ],
+            "properties": {
+              "quest_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner_repo": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "captured",
+                  "triaged",
+                  "ready",
+                  "active",
+                  "blocked",
+                  "reanchor",
+                  "done",
+                  "dropped"
+                ]
+              },
+              "band": {
+                "type": "string",
+                "enum": [
+                  "frontier",
+                  "near",
+                  "latent",
+                  "parked"
+                ]
+              },
+              "difficulty": {
+                "type": "string",
+                "enum": [
+                  "d0_probe",
+                  "d1_patch",
+                  "d2_slice",
+                  "d3_seam",
+                  "d4_architecture",
+                  "d5_doctrine"
+                ]
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "r0_readonly",
+                  "r1_repo_local",
+                  "r2_contract",
+                  "r3_side_effect"
+                ]
+              },
+              "recommended_agents": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "reward_hints": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "penalty_hints": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "campaign_lane_cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "campaign_ref",
+              "title",
+              "status",
+              "stage_label",
+              "anchor_refs",
+              "source_ref"
+            ],
+            "properties": {
+              "campaign_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "seed",
+                  "proven",
+                  "promoted",
+                  "canonical",
+                  "deprecated"
+                ]
+              },
+              "stage_label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "anchor_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "recommended_build_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "progression_timeline_entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entry_id",
+              "agent_ref",
+              "event_kind",
+              "summary",
+              "source_ref",
+              "occurred_at"
+            ],
+            "properties": {
+              "entry_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "agent_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_kind": {
+                "type": "string",
+                "enum": [
+                  "rank_change",
+                  "unlock",
+                  "reputation_shift",
+                  "artifact_gain",
+                  "reanchor",
+                  "campaign_milestone"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "occurred_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "artifact_case_cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact_id",
+              "label",
+              "status"
+            ],
+            "properties": {
+              "artifact_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "equipped",
+                  "vaulted",
+                  "detuned",
+                  "retired"
+                ]
+              },
+              "source_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "reputation_panels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "panel_id",
+              "subject_ref",
+              "ledger_ref",
+              "highlighted_slices"
+            ],
+            "properties": {
+              "panel_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subject_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ledger_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "highlighted_slices": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "axis",
+                    "standing"
+                  ],
+                  "properties": {
+                    "axis": {
+                      "type": "string",
+                      "enum": [
+                        "proof_trust",
+                        "handoff_trust",
+                        "provenance_trust",
+                        "campaign_discipline",
+                        "boundary_trust",
+                        "review_trust"
+                      ]
+                    },
+                    "standing": {
+                      "type": "integer",
+                      "minimum": -100,
+                      "maximum": 100
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  }
+}
