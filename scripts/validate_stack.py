@@ -165,6 +165,8 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "federation" / "tos-source.yaml",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
+    ROOT / "config-templates" / "Services" / "aoa-browser" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "aoa-browser" / "app.py",
     ROOT / "config-templates" / "Services" / "litellm" / "config.yaml",
     ROOT / "config-templates" / "Services" / "route-api" / "Dockerfile",
     ROOT / "config-templates" / "Services" / "route-api" / "requirements.txt",
@@ -197,6 +199,7 @@ REQUIRED_FILES = {
     ROOT / "generated" / "rpg" / "quest_run_results.json",
     ROOT / "generated" / "rpg" / "frontend_projection_bundles.json",
     ROOT / "tests" / "test_governed_execution.py",
+    ROOT / "tests" / "test_validate_stack_required_files.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
     ROOT / "tests" / "test_validate_stack_runtime_hygiene.py",
     ROOT / "tests" / "test_rpg_runtime_projection.py",
@@ -1765,16 +1768,26 @@ def validate_federation_landing(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/federation/" not in templates_readme:
         errors.append("config-templates/README.md must mention Configs/federation/")
+    if "Services/aoa-browser/" not in templates_readme:
+        errors.append("config-templates/README.md must mention Services/aoa-browser/")
     if "Services/route-api/" not in templates_readme:
         errors.append("config-templates/README.md must mention Services/route-api/")
 
     services_readme = (ROOT / "config-templates" / "Services" / "README.md").read_text(encoding="utf-8")
+    if "aoa-browser/" not in services_readme:
+        errors.append("config-templates/Services/README.md must mention aoa-browser/")
+    if "aoa-browser/ms-playwright/" not in services_readme:
+        errors.append("config-templates/Services/README.md must mention aoa-browser/ms-playwright/")
     if "route-api/" not in services_readme:
         errors.append("config-templates/Services/README.md must mention route-api/")
 
     storage_layout_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation" not in storage_layout_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation")
+    if "source-managed build context" not in storage_layout_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention the aoa-browser source-managed build context")
+    if "Services/aoa-browser/ms-playwright/" not in storage_layout_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Services/aoa-browser/ms-playwright/")
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "aoa-sync-federation-surfaces --layer aoa-agents" not in deployment_doc:

@@ -61,7 +61,7 @@ Not every runtime subtree is source-managed yet.
 Current intentional seam:
 
 - `Services/aoa-browser/ms-playwright/` remains runtime-only browser payload
-- the `aoa-browser` service currently depends on a prebuilt local image rather than a source-managed build context in this repository
+- the `aoa-browser` service now uses a source-managed build context, but its browser payload remains machine-local runtime state
 
 ## Secret rule
 

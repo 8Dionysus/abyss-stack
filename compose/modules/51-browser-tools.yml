@@ -16,6 +16,7 @@ services:
       start_period: 5s
 
   aoa-browser:
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/aoa-browser"
     image: localhost/aoa-browser-img:latest
     container_name: aoa-browser
     restart: unless-stopped
