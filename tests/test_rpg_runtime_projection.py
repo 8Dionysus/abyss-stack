@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -74,6 +75,13 @@ class RpgRuntimeProjectionScriptTests(unittest.TestCase):
         check_result = self.run_script("--check")
         self.assertEqual(check_result.returncode, 0, msg=check_result.stderr)
 
+    def test_check_passes_without_runtime_latest_when_generated_is_current(self) -> None:
+        result = self.run_script("--generated-only")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+        check_result = self.run_script("--check")
+        self.assertEqual(check_result.returncode, 0, msg=check_result.stderr)
+
     def test_check_fails_on_runtime_drift(self) -> None:
         result = self.run_script()
         self.assertEqual(result.returncode, 0, msg=result.stderr)
@@ -86,6 +94,27 @@ class RpgRuntimeProjectionScriptTests(unittest.TestCase):
         check_result = self.run_script("--check")
         self.assertNotEqual(check_result.returncode, 0)
         self.assertIn("must match generated/rpg/quest_run_results.json", check_result.stderr)
+
+    def test_help_does_not_require_jsonschema_at_import_time(self) -> None:
+        blocker_dir = Path(self.temp_dir.name) / "block-jsonschema"
+        blocker_dir.mkdir(parents=True, exist_ok=True)
+        (blocker_dir / "jsonschema.py").write_text(
+            "raise ModuleNotFoundError('jsonschema blocked for test')\n",
+            encoding="utf-8",
+        )
+
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(blocker_dir)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("usage:", result.stdout.lower())
 
 
 if __name__ == "__main__":

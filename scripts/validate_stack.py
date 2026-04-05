@@ -1524,13 +1524,17 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
 
     def read_required_json(relative_path: Path) -> dict[str, object] | None:
         try:
-            return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+            payload = json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
         except FileNotFoundError:
             errors.append(f"missing required file: {relative_path.as_posix()}")
             return None
         except json.JSONDecodeError as exc:
             errors.append(f"{relative_path.as_posix()} must contain valid JSON: {exc}")
             return None
+        if not isinstance(payload, dict):
+            errors.append(f"{relative_path.as_posix()} must contain a top-level JSON object")
+            return None
+        return payload
 
     cache_doc = read_required_text(Path("docs") / "GATEWAY_CACHE_POLICY.md")
     for snippet in (

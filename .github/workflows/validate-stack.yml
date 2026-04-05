@@ -106,8 +106,8 @@ jobs:
           scripts/aoa-render-services --preset agent-full
           scripts/aoa-render-services --preset intel-full
           scripts/aoa-render-config --profile core >/dev/null
-          python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
+          python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
           scripts/aoa-render-config --profile agentic --write "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
           grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
