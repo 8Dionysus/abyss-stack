@@ -433,6 +433,7 @@ def main() -> int:
     latest_adaptation = DEFAULT_STACK_ROOT / "Logs" / "platform-adaptations" / "latest" / "latest.private.json"
     adaptation_record = read_json(latest_adaptation)
     validated_settings: dict[str, str] = {}
+    recommended_overlays: list[str] = []
     if preferred_preset == "intel-full":
         validated_settings = {
             "AOA_LLAMACPP_DEVICE": "none",
@@ -457,6 +458,11 @@ def main() -> int:
             if isinstance(adaptation_record.get("adaptation"), dict)
             else {}
         )
+        raw_overlays = (
+            adaptation_record.get("adaptation", {}).get("overlays", [])
+            if isinstance(adaptation_record.get("adaptation"), dict)
+            else []
+        )
         if isinstance(raw_settings, dict) and (
             adaptation_hardware_class is None or adaptation_hardware_class == hardware_class
         ):
@@ -473,6 +479,14 @@ def main() -> int:
                     for key, value in raw_settings.items()
                     if value is not None
                 }
+        if isinstance(raw_overlays, list) and (
+            adaptation_hardware_class is None or adaptation_hardware_class == hardware_class
+        ):
+            recommended_overlays = [
+                str(value)
+                for value in raw_overlays
+                if value is not None and str(value).strip()
+            ]
 
     host_facts_ref = args.host_facts_ref
     if host_facts_ref is None:
@@ -536,6 +550,8 @@ def main() -> int:
         summary_parts.append("Package freshness could not be confirmed from the current package-manager context.")
     if not latency_trial_ready:
         summary_parts.append("Current host load is noisy for latency-sensitive trials.")
+    if recommended_overlays:
+        summary_parts.append("A bounded compose overlay is recommended for this host fit.")
 
     record = {
         "artifact_kind": "aoa.machine-fit",
@@ -589,7 +605,7 @@ def main() -> int:
             else "agent-full -> langchain-api /run -> llama.cpp + route-api",
             "validated_acceleration_posture": validated_acceleration_posture,
             "validated_settings": validated_settings,
-            "recommended_overlays": [],
+            "recommended_overlays": recommended_overlays,
             "current_overlays": current_overlays,
             "host_facts_ref": host_facts_ref,
             "platform_adaptation_ref": platform_adaptation_ref,

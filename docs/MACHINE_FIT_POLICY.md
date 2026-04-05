@@ -30,6 +30,7 @@ Use this layer for:
 - current driver posture for visible accelerators
 - package freshness for the host packages that matter to the runtime path
 - validated local runtime settings such as canonical `llama.cpp` serving posture or bounded embeddings posture settings
+- bounded compose overlays that should travel with the current host posture
 - warnings about noisy host envelopes that can distort latency-sensitive work
 - compact refs to host facts, benchmark evidence, and adaptation records
 
@@ -48,6 +49,7 @@ Do not use this layer for:
 - runtime benchmarks record measured behavior on the intended path
 
 The machine-fit layer is the operational bridge between inventory and retestable posture.
+When a current private machine-fit record exists, the lifecycle wrappers may auto-apply its validated settings and recommended overlays for the deployed runtime.
 
 ## Artifact surfaces
 
@@ -115,6 +117,7 @@ A strong machine-fit record captures:
 - whether relevant host packages are current in configured repos
 - the preferred preset or profile set
 - the bounded validated runtime settings worth reusing
+- any bounded recommended overlays worth auto-applying on that host
 - whether the current host envelope is quiet enough for latency-sensitive work
 - what to re-test when the machine drifts
 

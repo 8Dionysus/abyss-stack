@@ -1,0 +1,5 @@
+services:
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    security_opt:
+      - label=disable

@@ -149,6 +149,7 @@ REQUIRED_FILES = {
     ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "llamacpp.cpu.yml",
+    ROOT / "compose" / "tuning" / "llamacpp.runtime-fallback.yml",
     ROOT / "compose" / "modules" / "32-llamacpp-inference.yml",
     ROOT / "compose" / "modules" / "43-federation-router.yml",
     ROOT / "compose" / "modules" / "44-llamacpp-agent-sidecar.yml",

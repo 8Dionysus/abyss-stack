@@ -7,6 +7,7 @@ Use it when you need one compact artifact that says:
 - which runtime selection the stack should currently prefer
 - whether the relevant host package set looks fresh in configured repos
 - what bounded tuning posture is worth carrying forward on that machine
+- which bounded overlays should travel with that posture
 
 Surfaces:
 - `schema.v1.json` — machine-readable contract

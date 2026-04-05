@@ -239,6 +239,7 @@ Treat the rendered output as potentially secret-bearing.
 You can pass several profiles or presets.
 
 If you need to layer a bounded overlay, use `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` with `scripts/aoa.ps1` on Windows.
+If a current private machine-fit record exists, the wrappers also auto-apply its `recommended_overlays` and `validated_settings` unless `AOA_MACHINE_FIT_AUTO_APPLY=false`.
 
 ## Recommended first deployment flow
 
@@ -263,6 +264,8 @@ scripts/aoa-sync-federation-surfaces --layer tos-source   # optional
 scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
+
+After that capture, `aoa-up`, `aoa-down`, `aoa-render-services`, and `aoa-render-config` automatically honor the latest machine-fit posture unless you explicitly disable it.
 
 Then create secrets per [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md).
 

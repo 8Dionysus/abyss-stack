@@ -163,6 +163,12 @@
             "type": "string"
           }
         },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "settings": {
           "type": "object",
           "additionalProperties": {

@@ -103,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--hypothesis", default="")
     parser.add_argument("--confirmed-by", action="append", default=[])
     parser.add_argument("--action", action="append", default=[])
+    parser.add_argument("--overlay", action="append", default=[])
     parser.add_argument("--setting", action="append", default=[], type=parse_key_value)
     parser.add_argument("--route-change", default=None)
     parser.add_argument("--before", action="append", default=[], type=parse_key_value)
@@ -155,6 +156,7 @@ def main() -> int:
         },
         "adaptation": {
             "actions": args.action,
+            "overlays": args.overlay,
             "settings": {key: value for key, value in args.setting},
             "route_change": args.route_change,
         },

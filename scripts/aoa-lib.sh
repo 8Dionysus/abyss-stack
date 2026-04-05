@@ -31,6 +31,8 @@ AOA_LOG_TAIL="${AOA_LOG_TAIL:-200}"
 AOA_WAIT_TIMEOUT_S="${AOA_WAIT_TIMEOUT_S:-120}"
 AOA_WAIT_INTERVAL_S="${AOA_WAIT_INTERVAL_S:-5}"
 AOA_EXTRA_COMPOSE_FILES="${AOA_EXTRA_COMPOSE_FILES:-}"
+AOA_MACHINE_FIT_AUTO_APPLY="${AOA_MACHINE_FIT_AUTO_APPLY:-true}"
+AOA_MACHINE_FIT_PATH="${AOA_MACHINE_FIT_PATH:-${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json}"
 
 export AOA_STACK_ROOT
 export AOA_CONFIGS_ROOT
@@ -58,6 +60,8 @@ export AOA_STACK_PRESET
 export AOA_STACK_PROFILE
 export AOA_STACK_DEFAULT_PROFILE
 export AOA_EXTRA_COMPOSE_FILES
+export AOA_MACHINE_FIT_AUTO_APPLY
+export AOA_MACHINE_FIT_PATH
 
 AOA_MODULES_DIR="${AOA_CONFIGS_ROOT}/compose/modules"
 AOA_PROFILES_DIR="${AOA_CONFIGS_ROOT}/compose/profiles"
@@ -112,6 +116,82 @@ aoa_join_csv() {
   fi
   local IFS=,
   printf '%s' "${items[*]}"
+}
+
+aoa_join_expanded_specs() {
+  local spec
+  local -a merged=()
+  local -A seen_specs=()
+
+  while IFS= read -r spec; do
+    [[ -n "$spec" ]] || continue
+    if [[ -z "${seen_specs[$spec]+x}" ]]; then
+      seen_specs["$spec"]=1
+      merged+=("$spec")
+    fi
+  done < <(aoa_expand_specs "$@")
+
+  aoa_join_csv "${merged[@]}"
+}
+
+aoa_apply_machine_fit_runtime_posture() {
+  local record_type key value
+  local -a recommended_overlays=()
+
+  [[ "${AOA_MACHINE_FIT_AUTO_APPLY}" == "true" ]] || return 0
+  [[ "${AOA_MACHINE_FIT_APPLIED:-0}" == "1" ]] && return 0
+  AOA_MACHINE_FIT_APPLIED=1
+
+  [[ -f "${AOA_MACHINE_FIT_PATH}" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  while IFS=$'\t' read -r record_type key value; do
+    case "$record_type" in
+      SETTING)
+        [[ "$key" =~ ^AOA_[A-Z0-9_]+$ ]] || continue
+        if [[ -z "${!key+x}" ]]; then
+          export "${key}=${value}"
+        fi
+        ;;
+      OVERLAY)
+        [[ -n "$key" ]] && recommended_overlays+=("$key")
+        ;;
+    esac
+  done < <(
+    python3 - "${AOA_MACHINE_FIT_PATH}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(0)
+
+runtime = payload.get("runtime_recommendation")
+if not isinstance(runtime, dict):
+    raise SystemExit(0)
+
+settings = runtime.get("validated_settings")
+if isinstance(settings, dict):
+    for key, value in settings.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            continue
+        print(f"SETTING\t{key}\t{value}")
+
+recommended_overlays = runtime.get("recommended_overlays")
+if isinstance(recommended_overlays, list):
+    for overlay in recommended_overlays:
+        if isinstance(overlay, str) and overlay.strip():
+            print(f"OVERLAY\t{overlay}\t")
+PY
+  )
+
+  if ((${#recommended_overlays[@]} > 0)); then
+    AOA_EXTRA_COMPOSE_FILES="$(aoa_join_expanded_specs "${recommended_overlays[@]}" "$AOA_EXTRA_COMPOSE_FILES")"
+    export AOA_EXTRA_COMPOSE_FILES
+  fi
 }
 
 # shellcheck disable=SC2120
@@ -208,6 +288,7 @@ aoa_parse_profile_args() {
   AOA_STACK_PROFILE="$(aoa_join_csv "${AOA_ACTIVE_PROFILES[@]}")"
   export AOA_STACK_PRESET
   export AOA_STACK_PROFILE
+  aoa_apply_machine_fit_runtime_posture
 }
 
 aoa_detect_compose() {
