@@ -150,8 +150,7 @@ aoa_apply_machine_fit_runtime_posture() {
       SETTING)
         [[ "$key" =~ ^AOA_[A-Z0-9_]+$ ]] || continue
         if [[ -z "${!key+x}" ]]; then
-          printf -v "$key" '%s' "$value"
-          export "$key"
+          export "${key}=${value}"
         fi
         ;;
       OVERLAY)
