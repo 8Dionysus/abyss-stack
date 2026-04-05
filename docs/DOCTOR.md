@@ -45,6 +45,14 @@ Use `scripts/aoa-machine-fit` to capture the bounded current-machine runtime pos
 
 The two surfaces complement each other and should not absorb each other's job.
 
+## Relationship to local ops status
+
+`aoa-doctor` remains readiness-only.
+It is not a usage monitor and it is not the future cache-status console.
+
+If a later local ops status surface exists, treat it as post-start runtime readout rather than as a replacement for the doctor pass.
+See `docs/LOCAL_OPS_DOCTOR_SPLIT.md` for the bounded split.
+
 ## Usage
 
 Basic check using the default base profile:

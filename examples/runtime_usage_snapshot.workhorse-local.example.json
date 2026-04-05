@@ -1,0 +1,66 @@
+{
+  "surface_type": "runtime_usage_snapshot",
+  "schema_version": "v1",
+  "snapshot_id": "2026-04-04T181500Z__workhorse-local__usage-001",
+  "generated_at": "2026-04-04T18:15:00Z",
+  "target_surface": {
+    "profile_class": "workhorse",
+    "service_name": "langchain-api",
+    "module_ref": "compose/modules/41-agent-api.yml"
+  },
+  "policy_mode": "graceful_degrade",
+  "request_window": {
+    "window_label": "per-request",
+    "limit_units": 4800,
+    "used_units": 3620,
+    "remaining_units": 1180
+  },
+  "session_window": {
+    "window_label": "session",
+    "limit_units": 24000,
+    "used_units": 15320,
+    "remaining_units": 8680
+  },
+  "hourly_window": {
+    "window_label": "hourly",
+    "limit_units": 120000,
+    "used_units": 110400,
+    "remaining_units": 9600
+  },
+  "daily_window": {
+    "window_label": "daily",
+    "limit_units": 600000,
+    "used_units": 248000,
+    "remaining_units": 352000
+  },
+  "degrade_state": {
+    "active": true,
+    "mode": "graceful_degrade",
+    "reason": "hourly window near cap"
+  },
+  "strict_stop": {
+    "active": false,
+    "trigger_window": null,
+    "reason": null
+  },
+  "baseline_cost_estimate": {
+    "unit": "normalized_cost_units",
+    "value_units": 110400,
+    "comparison_basis": "hourly baseline without dedup or shortened local work"
+  },
+  "savings_estimate": {
+    "unit": "normalized_cost_units",
+    "value_units": 14800,
+    "comparison_basis": "suppressed duplicate or shortened local work over the active hourly window"
+  },
+  "reset_at": "2026-04-04T19:00:00Z",
+  "boundary": {
+    "supports_runtime_claims_only": true,
+    "does_not_prove": [
+      "response quality",
+      "portable eval truth",
+      "route correctness",
+      "cross-host economics"
+    ]
+  }
+}

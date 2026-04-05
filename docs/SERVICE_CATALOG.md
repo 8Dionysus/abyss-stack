@@ -38,6 +38,8 @@ This file maps the first migrated runtime modules to their intended services.
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
 - returns the normal model answer plus a redacted `advisory_trace` when the federated path is enabled
+- future gateway cache-lane status contract is documented in `docs/GATEWAY_CACHE_POLICY.md`; it is a status-only runtime artifact and does not add new HTTP endpoints in this wave
+- future runtime usage and budget readout is documented in `docs/USAGE_BUDGET_POLICY.md`; it remains a bounded runtime artifact, not routing, billing, or quality authority
 
 ## `42-agent-api-intel.yml`
 
@@ -59,6 +61,7 @@ This file maps the first migrated runtime modules to their intended services.
 - `aoa-governed-run` is the first fail-closed governed mutation lane, gated by `aoa-status --autonomy --json` and scoped to `abyss-stack`
 - the same lane now exposes canary request materialization, promotion summaries, and operator triage through `aoa-governed-run status`
 - governed execution still consumes playbook and memo context through advisory seams; it does not turn `route-api` into an execution service
+- `docs/LOCAL_OPS_DOCTOR_SPLIT.md` preserves `aoa-doctor` as readiness-only while future local ops readout stays a separate bounded status surface
 
 ## `43-federation-router.yml`
 
