@@ -41,10 +41,19 @@ harvest:
   trigger_count: 2
   note: repeat platform adaptation patterns may deserve reusable technique surfaces
 opened_at: '2026-03-31'
-touched_at: '2026-03-31'
+touched_at: '2026-04-05'
 tags:
   - windows
   - platform
   - machine-fit
-notes: ''
+notes: >-
+  2026-04-05 harvest review: keep/open quest. The reviewed repeated unit is
+  host-specific runtime remediation routed through platform adaptation and
+  machine-fit overlays instead of runtime-only overrides. Reject immediate
+  promotion to skill because the route is not leaf-workflow-shaped. Reject
+  immediate promotion to playbook because only one fully reviewed concrete
+  remediation run exists so far; the earlier machine-fit and platform
+  adaptation changes mainly planted the surfaces that this run used. Re-run
+  harvest after a second distinct host-fit remediation lands through the same
+  route.
 public_safe: true
