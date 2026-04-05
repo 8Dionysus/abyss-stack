@@ -1,0 +1,62 @@
+{
+  "surface_type": "runtime_gateway_cache_status",
+  "schema_version": "v1",
+  "status_id": "2026-04-04T180500Z__gateway-local__cache-status-001",
+  "generated_at": "2026-04-04T18:05:00Z",
+  "target_surface": {
+    "service_name": "langchain-api",
+    "status_scope": "gateway-local",
+    "module_ref": "compose/modules/41-agent-api.yml"
+  },
+  "cache_key_strategy": "normalized_request_signature",
+  "normalization_rules": [
+    "normalize selected request headers before keying",
+    "preserve resolved model target in the key",
+    "drop transient trace headers from the key"
+  ],
+  "inflight_state": {
+    "deduplication_enabled": true,
+    "replay_mode": "coalesce_waiters",
+    "active_request_count": 1
+  },
+  "ttl_window": {
+    "completed_ttl_seconds": 90,
+    "stale_after_seconds": 120,
+    "eviction_policy": "ttl_only"
+  },
+  "bypass_reason": null,
+  "hit_state": {
+    "classification": "hit",
+    "hit_rate_1h": 0.42,
+    "last_decision_at": "2026-04-04T18:04:51Z"
+  },
+  "recent_decisions": [
+    {
+      "request_id": "req-hit-001",
+      "decision": "hit",
+      "cache_control": "max-age=60",
+      "bypass_reason": null
+    },
+    {
+      "request_id": "req-inflight-002",
+      "decision": "inflight_replay",
+      "cache_control": "max-age=60",
+      "bypass_reason": null
+    },
+    {
+      "request_id": "req-bypass-003",
+      "decision": "bypass",
+      "cache_control": "no-cache",
+      "bypass_reason": "no_cache_header"
+    }
+  ],
+  "boundary": {
+    "supports_runtime_claims_only": true,
+    "does_not_prove": [
+      "route correctness",
+      "response correctness",
+      "memo canon",
+      "eval canon"
+    ]
+  }
+}

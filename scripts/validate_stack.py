@@ -118,6 +118,9 @@ REQUIRED_FILES = {
     ROOT / "docs" / "RPG_RUNTIME_BUILDERS.md",
     ROOT / "docs" / "RPG_ROUTE_API_SEAM.md",
     ROOT / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
+    ROOT / "docs" / "GATEWAY_CACHE_POLICY.md",
+    ROOT / "docs" / "USAGE_BUDGET_POLICY.md",
+    ROOT / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md",
     ROOT / "docs" / "INTERNAL_PROBES.md",
     ROOT / "docs" / "REFERENCE_PLATFORM.md",
     ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
@@ -175,6 +178,8 @@ REQUIRED_FILES = {
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
+    ROOT / "schemas" / "runtime-gateway-cache-status.schema.json",
+    ROOT / "schemas" / "runtime-usage-snapshot.schema.json",
     ROOT / "schemas" / "agent_build_snapshot_collection.schema.json",
     ROOT / "schemas" / "reputation_ledger_collection.schema.json",
     ROOT / "schemas" / "quest_run_result_collection.schema.json",
@@ -185,12 +190,15 @@ REQUIRED_FILES = {
     ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
+    ROOT / "examples" / "runtime_gateway_cache_status.gateway-local.example.json",
+    ROOT / "examples" / "runtime_usage_snapshot.workhorse-local.example.json",
     ROOT / "generated" / "rpg" / "agent_build_snapshots.json",
     ROOT / "generated" / "rpg" / "reputation_ledgers.json",
     ROOT / "generated" / "rpg" / "quest_run_results.json",
     ROOT / "generated" / "rpg" / "frontend_projection_bundles.json",
     ROOT / "tests" / "test_governed_execution.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
+    ROOT / "tests" / "test_validate_stack_runtime_hygiene.py",
     ROOT / "tests" / "test_rpg_runtime_projection.py",
 }
 
@@ -1506,6 +1514,249 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
         errors.append("runtime-return-event.schema.json must pin surface_type.const to runtime_return_event")
 
 
+def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
+    def read_required_text(relative_path: Path) -> str:
+        try:
+            return (ROOT / relative_path).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            errors.append(f"missing required file: {relative_path.as_posix()}")
+            return ""
+
+    def read_required_json(relative_path: Path) -> dict[str, object] | None:
+        try:
+            return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            errors.append(f"missing required file: {relative_path.as_posix()}")
+            return None
+        except json.JSONDecodeError as exc:
+            errors.append(f"{relative_path.as_posix()} must contain valid JSON: {exc}")
+            return None
+
+    cache_doc = read_required_text(Path("docs") / "GATEWAY_CACHE_POLICY.md")
+    for snippet in (
+        "request deduplication",
+        "inflight replay",
+        "completed TTL",
+        "cache key normalization",
+        "no-cache bypass",
+        "eviction",
+        "hit rate",
+        "It does not own truth.",
+        "It does not grant routing authority.",
+        "It does not lock the stack to one vendor.",
+        "This wave documents the contract only. It does not activate live cache behavior.",
+        "`runtime_gateway_cache_status_v1`",
+    ):
+        if snippet not in cache_doc:
+            errors.append(f"docs/GATEWAY_CACHE_POLICY.md must mention `{snippet}`")
+
+    usage_doc = read_required_text(Path("docs") / "USAGE_BUDGET_POLICY.md")
+    for snippet in (
+        "per-request",
+        "session",
+        "hourly",
+        "daily",
+        "graceful degrade",
+        "strict stop",
+        "reset window",
+        "baseline cost",
+        "savings",
+        "It must not turn runtime budget posture into proof semantics.",
+        "It does not create wallet, payment, or vendor-analysis obligations.",
+        "This wave documents status surfaces only.",
+        "`runtime_usage_snapshot_v1`",
+    ):
+        if snippet not in usage_doc:
+            errors.append(f"docs/USAGE_BUDGET_POLICY.md must mention `{snippet}`")
+
+    doctor_split_doc = read_required_text(Path("docs") / "LOCAL_OPS_DOCTOR_SPLIT.md")
+    for snippet in (
+        "`aoa-doctor` remains readiness-only.",
+        "gateway reachability",
+        "log presence",
+        "basic config health",
+        "local floor availability",
+        "It does not become a usage monitor.",
+        "bounded local ops status surface",
+        "This wave does not add new `aoa-doctor` exit semantics.",
+    ):
+        if snippet not in doctor_split_doc:
+            errors.append(f"docs/LOCAL_OPS_DOCTOR_SPLIT.md must mention `{snippet}`")
+
+    service_catalog_doc = read_required_text(Path("docs") / "SERVICE_CATALOG.md")
+    for snippet in (
+        "docs/GATEWAY_CACHE_POLICY.md",
+        "docs/USAGE_BUDGET_POLICY.md",
+        "docs/LOCAL_OPS_DOCTOR_SPLIT.md",
+        "does not add new HTTP endpoints in this wave",
+        "bounded runtime artifact",
+    ):
+        if snippet not in service_catalog_doc:
+            errors.append(f"docs/SERVICE_CATALOG.md must mention `{snippet}`")
+
+    runbook_doc = read_required_text(Path("docs") / "RUNBOOK.md")
+    for snippet in (
+        "runtime_gateway_cache_status",
+        "runtime_usage_snapshot",
+        "Logs/runtime-gateway/cache-status/latest/",
+        "Logs/runtime-usage/latest/",
+        "absence is not a failure in this wave",
+    ):
+        if snippet not in runbook_doc:
+            errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")
+
+    doctor_doc = read_required_text(Path("docs") / "DOCTOR.md")
+    for snippet in (
+        "docs/LOCAL_OPS_DOCTOR_SPLIT.md",
+        "readiness-only",
+        "usage monitor",
+    ):
+        if snippet not in doctor_doc:
+            errors.append(f"docs/DOCTOR.md must mention `{snippet}`")
+
+    cache_schema = read_required_json(Path("schemas") / "runtime-gateway-cache-status.schema.json")
+    if cache_schema and cache_schema.get("title") != "abyss-stack runtime gateway cache status":
+        errors.append(
+            "runtime-gateway-cache-status.schema.json must describe abyss-stack runtime gateway cache status"
+        )
+    if cache_schema:
+        cache_required = cache_schema.get("required")
+        if not isinstance(cache_required, list):
+            errors.append("runtime-gateway-cache-status.schema.json must declare a required field list")
+        else:
+            for field in (
+                "cache_key_strategy",
+                "normalization_rules",
+                "inflight_state",
+                "ttl_window",
+                "bypass_reason",
+                "hit_state",
+                "generated_at",
+            ):
+                if field not in cache_required:
+                    errors.append(
+                        f"runtime-gateway-cache-status.schema.json must require `{field}`"
+                    )
+        cache_properties = cache_schema.get("properties")
+        cache_surface_type = (
+            cache_properties.get("surface_type", {})
+            if isinstance(cache_properties, dict)
+            else {}
+        )
+        if not isinstance(cache_surface_type, dict) or cache_surface_type.get("const") != "runtime_gateway_cache_status":
+            errors.append(
+                "runtime-gateway-cache-status.schema.json must pin surface_type.const to runtime_gateway_cache_status"
+            )
+
+    usage_schema = read_required_json(Path("schemas") / "runtime-usage-snapshot.schema.json")
+    if usage_schema and usage_schema.get("title") != "abyss-stack runtime usage snapshot":
+        errors.append(
+            "runtime-usage-snapshot.schema.json must describe abyss-stack runtime usage snapshot"
+        )
+    if usage_schema:
+        usage_required = usage_schema.get("required")
+        if not isinstance(usage_required, list):
+            errors.append("runtime-usage-snapshot.schema.json must declare a required field list")
+        else:
+            for field in (
+                "request_window",
+                "session_window",
+                "hourly_window",
+                "daily_window",
+                "policy_mode",
+                "degrade_state",
+                "strict_stop",
+                "baseline_cost_estimate",
+                "savings_estimate",
+                "reset_at",
+            ):
+                if field not in usage_required:
+                    errors.append(f"runtime-usage-snapshot.schema.json must require `{field}`")
+        usage_properties = usage_schema.get("properties")
+        usage_surface_type = (
+            usage_properties.get("surface_type", {})
+            if isinstance(usage_properties, dict)
+            else {}
+        )
+        if not isinstance(usage_surface_type, dict) or usage_surface_type.get("const") != "runtime_usage_snapshot":
+            errors.append(
+                "runtime-usage-snapshot.schema.json must pin surface_type.const to runtime_usage_snapshot"
+            )
+
+    cache_example = read_required_json(
+        Path("examples") / "runtime_gateway_cache_status.gateway-local.example.json"
+    )
+    if cache_example:
+        if cache_example.get("surface_type") != "runtime_gateway_cache_status":
+            errors.append(
+                "runtime gateway cache status example must use surface_type runtime_gateway_cache_status"
+            )
+        if cache_example.get("schema_version") != "v1":
+            errors.append("runtime gateway cache status example must use schema_version v1")
+        boundary = cache_example.get("boundary")
+        if not isinstance(boundary, dict) or boundary.get("supports_runtime_claims_only") is not True:
+            errors.append("runtime gateway cache status example must stay runtime-claims-only")
+        recent_decisions = cache_example.get("recent_decisions")
+        if not isinstance(recent_decisions, list):
+            errors.append("runtime gateway cache status example must include recent_decisions")
+        else:
+            decision_kinds = {
+                item.get("decision")
+                for item in recent_decisions
+                if isinstance(item, dict)
+            }
+            for expected in ("hit", "inflight_replay", "bypass"):
+                if expected not in decision_kinds:
+                    errors.append(
+                        f"runtime gateway cache status example must include a `{expected}` decision"
+                    )
+            if not any(
+                isinstance(item, dict)
+                and item.get("decision") == "bypass"
+                and item.get("cache_control") == "no-cache"
+                and item.get("bypass_reason") == "no_cache_header"
+                for item in recent_decisions
+            ):
+                errors.append(
+                    "runtime gateway cache status example must show Cache-Control: no-cache bypass"
+                )
+
+    usage_example_path = Path("examples") / "runtime_usage_snapshot.workhorse-local.example.json"
+    usage_example_text = read_required_text(usage_example_path)
+    usage_example = read_required_json(usage_example_path)
+    if usage_example:
+        if usage_example.get("surface_type") != "runtime_usage_snapshot":
+            errors.append("runtime usage snapshot example must use surface_type runtime_usage_snapshot")
+        if usage_example.get("schema_version") != "v1":
+            errors.append("runtime usage snapshot example must use schema_version v1")
+        if usage_example.get("policy_mode") not in {
+            "observe_only",
+            "soft_cap",
+            "graceful_degrade",
+            "strict_stop",
+        }:
+            errors.append("runtime usage snapshot example must use a supported policy_mode")
+        baseline_estimate = usage_example.get("baseline_cost_estimate")
+        if not isinstance(baseline_estimate, dict) or baseline_estimate.get("unit") != "normalized_cost_units":
+            errors.append(
+                "runtime usage snapshot example must express baseline_cost_estimate in normalized_cost_units"
+            )
+        savings_estimate = usage_example.get("savings_estimate")
+        if not isinstance(savings_estimate, dict) or savings_estimate.get("unit") != "normalized_cost_units":
+            errors.append(
+                "runtime usage snapshot example must express savings_estimate in normalized_cost_units"
+            )
+        boundary = usage_example.get("boundary")
+        if not isinstance(boundary, dict) or boundary.get("supports_runtime_claims_only") is not True:
+            errors.append("runtime usage snapshot example must stay runtime-claims-only")
+        lowered_usage_example = usage_example_text.lower()
+        for forbidden in ("wallet", "payment", "billing", "invoice"):
+            if forbidden in lowered_usage_example:
+                errors.append(
+                    f"runtime usage snapshot example must stay free of {forbidden} semantics"
+                )
+
+
 def validate_federation_landing(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/federation/" not in templates_readme:
@@ -1790,6 +2041,7 @@ def main() -> int:
     validate_playbook_runtime_seam(errors)
     validate_kag_runtime_seam(errors)
     validate_return_runtime_contract(errors)
+    validate_runtime_hygiene_contracts(errors)
     validate_federation_landing(errors)
     if args.parity_check:
         validate_deployed_parity(errors, Path(args.deployed_configs_root))

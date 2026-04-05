@@ -24,6 +24,10 @@ Move the stack forward without breaking locality, secrecy, recoverability, or th
 
 If a nearer `AGENTS.md` exists for the directory you are editing, follow that file first.
 
+## Audit contract
+
+For repository audits and GitHub review, read `AUDIT.md` after the core docs and also follow the nearest nested `AGENTS.md` in touched subdirectories.
+
 ## Workflow
 
 `PLAN -> DIFF -> APPLY -> VERIFY -> REPORT`
@@ -71,3 +75,22 @@ If a nearer `AGENTS.md` exists for the directory you are editing, follow that fi
 - keep public-safe docs and artifacts separate from private captures
 - if paths, ports, or host posture change, re-read the relevant path, deployment, runbook, and reference-platform docs before finishing
 - use the narrowest dry-run or public-safe validation available for the changed scripts, modules, or docs
+
+## Review guidelines
+
+For GitHub review in this repository, treat the following as P0:
+
+- committed live secrets or secret-bearing rendered configs
+- a change that widens default host exposure beyond localhost without explicit operator intent
+- a bootstrap or runtime change that can destroy data without rollback guidance
+
+Treat the following as P1:
+
+- env examples drifting away from actual runtime consumers
+- path mapping drift away from `/srv/abyss-stack`, `Configs`, or `Secrets`
+- profile/preset/module changes without matching render/introspection verification
+- hidden breaking changes in doctor/bootstrap/first-run helpers
+- runtime substrate starting to author meaning that belongs in AoA or ToS
+- claiming validation that was not actually run
+
+Ignore trivial wording nits unless the task explicitly asks for copyediting.

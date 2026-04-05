@@ -24,6 +24,8 @@ When something feels wrong, use this order:
 18. decide whether to fix forward or roll back
 19. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
 20. inspect `${AOA_STACK_ROOT}/Logs/rpg/latest/` and `${AOA_STACK_ROOT}/Logs/rpg/records/` when the body-facing RPG transport looks stale, uncited, or out of parity with committed `generated/rpg/`
+21. inspect `${AOA_STACK_ROOT}/Logs/runtime-gateway/cache-status/latest/` when a local `runtime_gateway_cache_status` artifact exists and the question is dedup, inflight replay, or `no-cache` bypass posture
+22. inspect `${AOA_STACK_ROOT}/Logs/runtime-usage/latest/` when a local `runtime_usage_snapshot` exists and the question is degrade posture, strict stop, or reset-window pressure
 
 ## Useful commands
 
@@ -137,6 +139,24 @@ curl -X POST http://127.0.0.1:5403/run/federated \
 
 Expect `503` when `AOA_FEDERATED_RUN_ENABLED` is off or `route-api` is not currently reachable.
 Expect `409` when a playbook filter matches more than one playbook and the runtime refuses to guess.
+
+For planned gateway cache-status inspection when the artifact exists locally:
+
+```bash
+jq . "${AOA_STACK_ROOT}/Logs/runtime-gateway/cache-status/latest/gateway-local.json"
+```
+
+Read `hit_state`, `inflight_state`, and `recent_decisions` there.
+Its absence is not a failure in this wave because the contract lands before live cache activation.
+
+For planned runtime usage snapshot inspection when the artifact exists locally:
+
+```bash
+jq . "${AOA_STACK_ROOT}/Logs/runtime-usage/latest/workhorse-local.snapshot.json"
+```
+
+Read `policy_mode`, `degrade_state`, `strict_stop`, `baseline_cost_estimate`, `savings_estimate`, and `reset_at` there.
+Its absence is not a failure in this wave because the contract lands before live aggregation.
 
 For KAG and `Tree-of-Sophia` handoff inspection through the localhost federation seam:
 
