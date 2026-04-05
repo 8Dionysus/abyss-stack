@@ -8,8 +8,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-import jsonschema
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
@@ -42,6 +40,14 @@ def write_json(path: Path, payload: dict) -> None:
 
 def fragment_ref(relative_path: str, fragment_id: str) -> str:
     return f"{relative_path}#{fragment_id}"
+
+
+def require_jsonschema():
+    try:
+        import jsonschema
+    except ModuleNotFoundError as exc:
+        raise SystemExit("error: jsonschema is required to validate RPG runtime projection outputs") from exc
+    return jsonschema
 
 
 def build_collections(repo_root: Path) -> dict[str, dict]:
@@ -201,6 +207,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
 
 
 def validate_collection(repo_root: Path, filename: str, array_key: str, collection_version: str, item_version: str, payload: dict) -> None:
+    jsonschema = require_jsonschema()
     collection_schema_name = {
         "agent_build_snapshots.json": "agent_build_snapshot_collection.schema.json",
         "reputation_ledgers.json": "reputation_ledger_collection.schema.json",
@@ -261,14 +268,48 @@ def materialize_runtime(stack_root: Path, collections: dict[str, dict], *, write
 def check_parity(repo_root: Path, stack_root: Path) -> None:
     expected = build_collections(repo_root)
     validate_all(repo_root, expected)
+    latest_root = stack_root / "Logs" / "rpg" / "latest"
+    latest_paths = {
+        filename: latest_root / filename
+        for filename, *_ in GENERATED_COLLECTIONS
+    }
+    runtime_files_present = {
+        filename: path.exists()
+        for filename, path in latest_paths.items()
+    }
+    if any(runtime_files_present.values()) and not all(runtime_files_present.values()):
+        missing = ", ".join(
+            filename
+            for filename, present in runtime_files_present.items()
+            if not present
+        )
+        raise SystemExit(f"error: Logs/rpg/latest is partially populated; missing: {missing}")
 
-    for filename, *_ in GENERATED_COLLECTIONS:
+    for filename, array_key, collection_version, item_version in GENERATED_COLLECTIONS:
         generated_payload = read_json(repo_root / "generated" / "rpg" / filename)
-        latest_payload = read_json(stack_root / "Logs" / "rpg" / "latest" / filename)
-        validate_all(repo_root, {filename: generated_payload, **{key: value for key, value in expected.items() if key != filename}})
-        validate_all(repo_root, {filename: latest_payload, **{key: value for key, value in expected.items() if key != filename}})
+        validate_collection(
+            repo_root,
+            filename,
+            array_key,
+            collection_version,
+            item_version,
+            generated_payload,
+        )
         if generated_payload != expected[filename]:
             raise SystemExit(f"error: generated/rpg/{filename} is out of sync with builder output")
+
+        if not runtime_files_present[filename]:
+            continue
+
+        latest_payload = read_json(latest_paths[filename])
+        validate_collection(
+            repo_root,
+            filename,
+            array_key,
+            collection_version,
+            item_version,
+            latest_payload,
+        )
         if latest_payload != generated_payload:
             raise SystemExit(f"error: Logs/rpg/latest/{filename} must match generated/rpg/{filename}")
 

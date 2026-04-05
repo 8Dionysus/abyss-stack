@@ -75,6 +75,24 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
             any("runtime_gateway_cache_status" in error for error in errors)
         )
 
+    def test_gateway_schema_top_level_array_fails_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "schemas" / "runtime-gateway-cache-status.schema.json",
+                "[]\n",
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any(
+                "schemas/runtime-gateway-cache-status.schema.json must contain a top-level JSON object"
+                == error
+                for error in errors
+            )
+        )
+
     def test_cache_example_requires_inflight_replay_and_no_cache_bypass(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
