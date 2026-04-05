@@ -61,6 +61,7 @@ class AutonomyCollectorTests(unittest.TestCase):
         *,
         parity: dict | None = None,
         verify: dict | None = None,
+        route_requirement: dict | None = None,
         route_health: dict | None = None,
         route_surface: dict | None = None,
         federation: dict | None = None,
@@ -69,6 +70,12 @@ class AutonomyCollectorTests(unittest.TestCase):
     ) -> dict:
         parity = parity or make_check(status="pass", summary="parity green", detail={})
         verify = verify or make_check(status="pass", summary="verify green", detail={"payload": {"ok": True}})
+        route_requirement = route_requirement or {
+            "required": True,
+            "route_api_container_state": "running",
+            "federated_consumer_enabled": True,
+            "reason": "route-api container state is running",
+        }
         route_health = route_health or make_check(
             status="pass",
             summary="health green",
@@ -114,21 +121,26 @@ class AutonomyCollectorTests(unittest.TestCase):
         w6 = w6 or wave_check(status="pass", trial_proven=True, live_available=True)
 
         with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
-            with patch.object(self.module, "run_parity_check", return_value=parity):
-                with patch.object(self.module, "run_llamacpp_verify", return_value=verify):
-                    with patch.object(self.module, "fetch_route_api_health", return_value=route_health):
+                with patch.object(self.module, "run_parity_check", return_value=parity):
+                    with patch.object(self.module, "run_llamacpp_verify", return_value=verify):
                         with patch.object(
                             self.module,
-                            "fetch_route_api_surface_status",
-                            return_value=route_surface,
+                            "route_api_requirement",
+                            return_value=route_requirement,
                         ):
-                            with patch.object(
-                                self.module,
-                                "run_federation_layer_checks",
-                                return_value=federation,
-                            ):
-                                with patch.object(self.module, "summarize_wave", side_effect=[w5, w6]):
-                                    return self.module.collect_autonomy_status(source_root=REPO_ROOT)
+                            with patch.object(self.module, "fetch_route_api_health", return_value=route_health):
+                                with patch.object(
+                                    self.module,
+                                    "fetch_route_api_surface_status",
+                                    return_value=route_surface,
+                                ):
+                                    with patch.object(
+                                        self.module,
+                                        "run_federation_layer_checks",
+                                        return_value=federation,
+                                    ):
+                                        with patch.object(self.module, "summarize_wave", side_effect=[w5, w6]):
+                                            return self.module.collect_autonomy_status(source_root=REPO_ROOT)
 
     def test_green_path_returns_pass_and_live_available(self) -> None:
         payload = self.collect_payload()
@@ -189,3 +201,35 @@ class AutonomyCollectorTests(unittest.TestCase):
         self.assertIn("trial_live_gap:W5", payload["degradation_reasons"])
         self.assertFalse(payload["truth_status"]["control_plane"]["live_available"])
 
+    def test_route_api_not_enabled_does_not_fail_the_default_runtime_shape(self) -> None:
+        payload = self.collect_payload(
+            route_requirement={
+                "required": False,
+                "route_api_container_state": "missing",
+                "federated_consumer_enabled": False,
+                "reason": "federation profile is not active and federated advisory consumption is disabled",
+            },
+            route_health=make_check(
+                status="not_enabled",
+                summary="route-api health is not required in the current runtime shape",
+                detail={},
+            ),
+            route_surface=make_check(
+                status="not_enabled",
+                summary="route-api closure reporting is not required in the current runtime shape",
+                detail={},
+            ),
+            federation={
+                "status": "not_enabled",
+                "summary": "federation seam checks are not required in the current runtime shape",
+                "layers": {},
+                "detail": {},
+            },
+        )
+
+        self.assertEqual(payload["overall_status"], "pass")
+        self.assertEqual(payload["checks"]["route_api_health"]["status"], "not_enabled")
+        self.assertEqual(payload["checks"]["route_api_surface_status"]["status"], "not_enabled")
+        self.assertEqual(payload["checks"]["federation_layers"]["status"], "not_enabled")
+        self.assertEqual(payload["degradation_reasons"], [])
+        self.assertTrue(payload["truth_status"]["control_plane"]["live_available"])

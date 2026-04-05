@@ -50,7 +50,7 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
-The green repo-scope expansion gate serves as evidence for later review only; it does not widen the governed repo scope during the current wave. The first governed wave remains mutation-only and `abyss-stack`-only.
+The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current wave. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
 For seeded canary preparation, use:
 
@@ -120,7 +120,7 @@ Promotion remains evidence-based rather than implicit:
 - `trusted` requires a broader run count and multiple successful task classes
 - repo-scope expansion remains a separate gate and is not implied by one playbook becoming trusted
 
-This keeps the first lane inside `abyss-stack` until the operator has real evidence rather than mechanism-only confidence.
+This keeps the default lane inside `abyss-stack` until the operator has real evidence rather than mechanism-only confidence, even though bounded external-target policy support may already exist under explicit review.
 
 ## Minimum packet set
 

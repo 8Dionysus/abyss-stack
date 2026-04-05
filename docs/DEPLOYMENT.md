@@ -138,7 +138,18 @@ scripts/aoa-status --autonomy --json
 ```
 
 to confirm the canonical source checkout still matches the deployed `Configs` mirror for repo-managed paths.
-Use `aoa-status --autonomy --json` for the operator-readable control-loop verdict after parity, runtime verify, route-api health, and federated closure are all expected to agree.
+Use `aoa-status --autonomy --json` for the operator-readable control-loop verdict after parity and promoted runtime verify.
+When the `federation` profile is active, the same verdict also requires route-api health, closure, and federation layer checks to agree.
+When the `federation` profile is not active and federated advisory consumption is disabled, route-api checks should appear as `not_enabled` rather than as hard failures.
+
+The shortest honest verify path for the current promoted runtime is:
+
+```bash
+python scripts/validate_stack.py
+python scripts/validate_stack.py --parity-check
+python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60
+bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json
+```
 
 ### `scripts/aoa-bootstrap-configs`
 
@@ -182,7 +193,7 @@ The mirror targets for these layers are:
 - `${AOA_STACK_ROOT}/Knowledge/federation/aoa-kag`
 - `${AOA_STACK_ROOT}/Knowledge/federation/tos-source`
 
-For closure-aware operator checks, prefer:
+For closure-aware operator checks on an active federation seam, prefer:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --check --json --layer aoa-routing

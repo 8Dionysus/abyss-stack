@@ -77,6 +77,13 @@ The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally na
 
 ## Current posture
 
-`abyss-stack` is a live multi-service runtime with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
+`abyss-stack` currently exposes a deployed multi-service runtime substrate with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
-The current bounded local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain bounded and explicit: they can enrich runtime behavior, but they do not replace source-owned meaning.
+The current bounded promoted local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain opt-in, bounded, and explicit: they can enrich runtime behavior when the `federation` profile is active, but they do not replace source-owned meaning and they should not be read as blanket proof of full federated control-plane coherence.
+
+To verify the current promoted path, use this order:
+
+1. `python scripts/validate_stack.py`
+2. `python scripts/validate_stack.py --parity-check`
+3. `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
+4. `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`

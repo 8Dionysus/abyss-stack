@@ -108,6 +108,47 @@ def run_command(
         }
 
 
+def container_state(name: str) -> str:
+    result = run_command(
+        ["podman", "inspect", "--format", "{{.State.Status}}", name],
+        timeout_s=15.0,
+    )
+    if result["exit_code"] != 0:
+        return "missing"
+    status = str(result["stdout"]).strip()
+    return status or "unknown"
+
+
+def container_env_flag(name: str, env_name: str) -> bool:
+    if container_state(name) != "running":
+        return False
+    result = run_command(
+        ["podman", "exec", name, "/bin/sh", "-c", f'printf %s "${{{env_name}:-}}"'],
+        timeout_s=15.0,
+    )
+    if result["exit_code"] != 0:
+        return False
+    return str(result["stdout"]).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def route_api_requirement() -> dict[str, Any]:
+    route_api_state = container_state("route-api")
+    federated_consumer_enabled = container_env_flag("langchain-api", "AOA_FEDERATED_RUN_ENABLED")
+    required = route_api_state != "missing" or federated_consumer_enabled
+    if route_api_state != "missing":
+        reason = f"route-api container state is {route_api_state}"
+    elif federated_consumer_enabled:
+        reason = "langchain-api has AOA_FEDERATED_RUN_ENABLED=true"
+    else:
+        reason = "federation profile is not active and federated advisory consumption is disabled"
+    return {
+        "required": required,
+        "route_api_container_state": route_api_state,
+        "federated_consumer_enabled": federated_consumer_enabled,
+        "reason": reason,
+    }
+
+
 def load_json_text(text: str) -> dict[str, Any]:
     payload = json.loads(text)
     if not isinstance(payload, dict):
@@ -217,7 +258,13 @@ def run_llamacpp_verify() -> dict[str, Any]:
     )
 
 
-def fetch_route_api_health() -> dict[str, Any]:
+def fetch_route_api_health(requirement: dict[str, Any]) -> dict[str, Any]:
+    if not requirement["required"]:
+        return make_check(
+            status="not_enabled",
+            summary="route-api health is not required in the current runtime shape",
+            detail=requirement,
+        )
     url = f"{ROUTE_API_BASE_URL.rstrip('/')}/health"
     try:
         payload = http_get_json(url)
@@ -254,7 +301,13 @@ def valid_closure_summary(payload: Any) -> bool:
     )
 
 
-def fetch_route_api_surface_status() -> dict[str, Any]:
+def fetch_route_api_surface_status(requirement: dict[str, Any]) -> dict[str, Any]:
+    if not requirement["required"]:
+        return make_check(
+            status="not_enabled",
+            summary="route-api closure reporting is not required in the current runtime shape",
+            detail=requirement,
+        )
     url = f"{ROUTE_API_BASE_URL.rstrip('/')}/surface-status"
     try:
         payload = http_get_json(url)
@@ -322,7 +375,14 @@ def run_federation_layer_check(layer: str) -> dict[str, Any]:
     )
 
 
-def run_federation_layer_checks() -> dict[str, Any]:
+def run_federation_layer_checks(requirement: dict[str, Any]) -> dict[str, Any]:
+    if not requirement["required"]:
+        return {
+            "status": "not_enabled",
+            "summary": "federation seam checks are not required in the current runtime shape",
+            "layers": {},
+            "detail": requirement,
+        }
     layer_checks = {layer: run_federation_layer_check(layer) for layer in FEDERATION_LAYERS}
     failing_layers = sorted(
         layer for layer, check in layer_checks.items() if check["status"] != "pass"
@@ -385,6 +445,7 @@ def control_truth_status(
     source_root: Path | None,
     parity_check: dict[str, Any],
     llamacpp_verify: dict[str, Any],
+    route_api_requirement: dict[str, Any],
     route_api_health: dict[str, Any],
     route_api_surface_status: dict[str, Any],
     federation_layers: dict[str, Any],
@@ -401,14 +462,19 @@ def control_truth_status(
         w5["detail"]["truth_status"]["trial_proven"]
         and w6["detail"]["truth_status"]["trial_proven"]
     )
+    route_api_required = bool(route_api_requirement["required"])
     surface_closure = route_api_surface_status.get("detail", {}).get("closure_summary") or {}
+    route_api_ready = (
+        route_api_health["status"] == "pass"
+        and route_api_surface_status["status"] == "pass"
+        and surface_closure.get("closure_ready") is True
+    )
+    federation_ready = federation_layers["status"] == "pass"
     live_available = bool(
         parity_check["status"] == "pass"
         and llamacpp_verify["status"] == "pass"
-        and route_api_health["status"] == "pass"
-        and route_api_surface_status["status"] == "pass"
-        and surface_closure.get("closure_ready") is True
-        and federation_layers["status"] == "pass"
+        and (not route_api_required or route_api_ready)
+        and (not route_api_required or federation_ready)
         and w5["detail"]["truth_status"]["live_available"]
         and w6["detail"]["truth_status"]["live_available"]
     )
@@ -416,8 +482,16 @@ def control_truth_status(
         "control_plane source_authored tracks whether the canonical source checkout is discoverable for parity checks.",
         "control_plane deployed tracks whether the deployed operator scripts are present under /srv/abyss-stack/Configs/scripts.",
         "control_plane trial_proven requires both W5 and W6 to remain trial_proven.",
-        "control_plane live_available requires parity, promoted runtime verify, route-api health, route-api closure, federation layer checks, and W5/W6 live availability.",
+        "control_plane live_available requires parity, promoted runtime verify, and W5/W6 live availability.",
     ]
+    if route_api_required:
+        notes.append(
+            "Because the federation seam is active, live_available also requires route-api health, route-api closure, and federation layer checks."
+        )
+    else:
+        notes.append(
+            "Because the federation seam is not active in the current runtime shape, route-api and federation checks are reported as not_enabled and do not gate live_available."
+        )
     return {
         "control_plane": {
             "source_authored": source_authored,
@@ -454,9 +528,10 @@ def collect_autonomy_status(
     resolved_source_root = source_root or resolve_source_root()
     parity = run_parity_check(resolved_source_root)
     verify = run_llamacpp_verify()
-    route_health = fetch_route_api_health()
-    route_surface = fetch_route_api_surface_status()
-    federation = run_federation_layer_checks()
+    route_requirement = route_api_requirement()
+    route_health = fetch_route_api_health(route_requirement)
+    route_surface = fetch_route_api_surface_status(route_requirement)
+    federation = run_federation_layer_checks(route_requirement)
     w5 = summarize_wave("W5", W5_INDEX_PATH)
     w6 = summarize_wave("W6", W6_INDEX_PATH)
 
@@ -468,19 +543,21 @@ def collect_autonomy_status(
             degradation_reasons.append("source_runtime_drift")
     if verify["status"] != "pass":
         degradation_reasons.append("llamacpp_verify_failed")
-    if route_health["status"] != "pass":
+    if route_health["status"] not in {"pass", "not_enabled"}:
         degradation_reasons.append("route_api_health_failed")
-    if route_surface["status"] != "pass":
+    if route_surface["status"] not in {"pass", "not_enabled"}:
         degradation_reasons.append("route_api_surface_status_invalid")
 
     surface_closure = route_surface.get("detail", {}).get("closure_summary") or {}
-    for layer in surface_closure.get("degraded_layers", []):
-        degradation_reasons.append(f"closure_gap:{layer}")
-    for layer in surface_closure.get("failing_layers", []):
-        degradation_reasons.append(f"closure_gap:{layer}")
-    for layer, check in federation["layers"].items():
-        if check["status"] != "pass":
-            degradation_reasons.append(f"federation_layer_failed:{layer}")
+    if route_surface["status"] == "pass":
+        for layer in surface_closure.get("degraded_layers", []):
+            degradation_reasons.append(f"closure_gap:{layer}")
+        for layer in surface_closure.get("failing_layers", []):
+            degradation_reasons.append(f"closure_gap:{layer}")
+    if federation["status"] != "not_enabled":
+        for layer, check in federation["layers"].items():
+            if check["status"] != "pass":
+                degradation_reasons.append(f"federation_layer_failed:{layer}")
     if w5["detail"]["truth_status"]["trial_proven"] and not w5["detail"]["truth_status"]["live_available"]:
         degradation_reasons.append("trial_live_gap:W5")
     elif w5["status"] != "pass":
@@ -511,6 +588,7 @@ def collect_autonomy_status(
         source_root=resolved_source_root,
         parity_check=parity,
         llamacpp_verify=verify,
+        route_api_requirement=route_requirement,
         route_api_health=route_health,
         route_api_surface_status=route_surface,
         federation_layers=federation,
@@ -524,6 +602,7 @@ def collect_autonomy_status(
         "checks": {
             "parity_check": parity,
             "llamacpp_verify": verify,
+            "route_api_requirement": route_requirement,
             "route_api_health": route_health,
             "route_api_surface_status": route_surface,
             "federation_layers": federation,

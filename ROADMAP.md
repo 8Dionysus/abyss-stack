@@ -11,7 +11,13 @@ Phases 0 through 6 have already been landed as source and runtime seams:
 - `aoa-agents`, `aoa-routing`, `aoa-memo`, `aoa-evals`, `aoa-playbooks`, and `aoa-kag` advisory/read-export landings
 - `Tree-of-Sophia` source-owned handoff companion landing
 
-The main remaining work is live runtime-loop consumption, operational cutover choices, and platform hardening rather than another large mirror phase.
+The main remaining work is live runtime-loop consumption, operational cutover choices, platform hardening, and keeping deployed/runtime truth aligned with source-authored posture.
+
+Those landings should be read carefully:
+
+- landed seams in source and deployed mirrors are not the same thing as a fully green federated control-plane verdict
+- the `federation` profile remains opt-in rather than part of the default promoted presets
+- current operator truth still depends on parity, promoted runtime verify, and `aoa-status --autonomy --json`
 
 ## Phase 0: structured bootstrap
 
