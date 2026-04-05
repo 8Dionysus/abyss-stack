@@ -18,6 +18,7 @@ Relative overlay paths are resolved inside `${AOA_CONFIGS_ROOT}`.
 That means:
 
 - `compose/tuning/llamacpp.cpu.yml`
+- `compose/tuning/llamacpp.runtime-fallback.yml`
 
 resolves to:
 
@@ -41,6 +42,14 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 ```
 
 `llamacpp.cpu.yml` is intentionally a placeholder overlay that proves the overlay path works without claiming a measured or production-grade CPU tuning contract.
+
+## Machine-fit overlays
+
+- `llamacpp.runtime-fallback.yml`
+
+This overlay is a bounded host-fit fallback for `llama-cpp`.
+It switches the container to `ghcr.io/ggml-org/llama.cpp:server` and disables SELinux relabeling for the current single-file GGUF mount posture.
+`aoa-up` and related wrappers can apply it automatically when the latest machine-fit record recommends it.
 
 ## Why this directory exists
 

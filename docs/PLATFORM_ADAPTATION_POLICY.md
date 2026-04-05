@@ -15,6 +15,7 @@ Use this surface for:
 - WSL or Windows bridge performance notes
 - backend route changes caused by platform behavior
 - filesystem, mount, cgroup, or container-runtime peculiarities
+- bounded compose overlays that should be re-applied on matching hosts
 - platform-local adaptations that should be easy to reapply or retest later
 
 Do not use this surface for:
@@ -124,6 +125,7 @@ scripts/aoa-platform-adaptation \
   --title "Short seam title" \
   --summary "One bounded summary" \
   --issue-class performance \
+  --overlay compose/tuning/example.yml \
   --write "${AOA_STACK_ROOT}/Logs/platform-adaptations/latest/latest.private.json"
 ```
 

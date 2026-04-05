@@ -36,6 +36,9 @@ These helpers make it easy to see what a preset, profile, or profile-combination
 
 You may optionally layer bounded overlays after the canonical module list through `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` on the Windows bridge.
 
+When `${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json` exists, the wrapper scripts also auto-apply its `validated_settings` and `recommended_overlays` before compose resolution.
+Explicit environment variables still win, and you can disable the auto-apply bridge with `AOA_MACHINE_FIT_AUTO_APPLY=false`.
+
 ## Human-facing wrappers
 
 The repository also includes these runtime wrappers under `scripts/`:
@@ -76,7 +79,8 @@ Presets expand before direct `--profile` additions.
 Expected pattern:
 - one or more presets and profiles resolve to an ordered profile list
 - that profile list resolves to an ordered module list
-- compose files are applied in that order, with any bounded extra compose overlays appended after the canonical module files
+- machine-fit validated settings are applied next when a current machine-fit record exists and auto-apply is enabled
+- compose files are applied in that order, with machine-fit recommended overlays first and any explicit bounded extra compose overlays appended after them
 - the rendered Compose view is inspectable before launch
 - systemd user unit becomes the stable operator entrypoint
 
