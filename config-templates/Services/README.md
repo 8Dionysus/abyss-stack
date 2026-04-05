@@ -13,6 +13,7 @@ Bootstrap behavior:
 
 Current source-managed service trees:
 
+- `aoa-browser/`
 - `docs-api/`
 - `langchain-api/`
 - `litellm/`
@@ -22,6 +23,6 @@ Current source-managed service trees:
 
 Intentionally still runtime-only:
 
-- `aoa-browser/`
-  - current contract is a prebuilt local image plus browser payload under
+- `aoa-browser/ms-playwright/`
+  - Playwright browser payload is machine-local runtime state under
     `${AOA_STACK_ROOT}/Services/aoa-browser/ms-playwright`

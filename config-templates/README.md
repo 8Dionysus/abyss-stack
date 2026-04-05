@@ -24,6 +24,7 @@ scripts/aoa-bootstrap-configs
 - `Configs/tts/`
 - `Configs/ollama/`
 - `Services/docs-api/`
+- `Services/aoa-browser/`
 - `Services/langchain-api/`
 - `Services/litellm/`
 - `Services/qwen3-tts-api/`
@@ -41,6 +42,6 @@ templates for:
 - `governed-execution-policy.yaml`
 - `governed-canary-catalog.json`
 
-`aoa-browser` is intentionally not templated here yet. In the current runtime
-it remains a runtime-only local image plus browser payload under
-`/srv/abyss-stack/Services/aoa-browser/`.
+`aoa-browser` is now source-managed here as a lightweight browser-helper build
+context. The Playwright browser payload under
+`/srv/abyss-stack/Services/aoa-browser/ms-playwright/` remains runtime-only.
