@@ -70,6 +70,14 @@ Each wave must own:
 
 - `wave-index.json`
 - `wave-index.md`
+- `W*-closeout.json`
+- `W*-closeout.md`
+
+When a wave reaches a terminal gate result (`pass` or `fail`), the runner also
+attempts one bounded reviewed closeout handoff into `aoa-sdk` and records the
+machine-readable result locally as:
+
+- `W*-closeout.submit.json`
 
 The fixed report sections are:
 
@@ -114,6 +122,8 @@ What the helper does now:
 - prepares `W4` proposals through a staged supervised-edit flow
 - applies approved `W4` cases only after isolated worktree validation
 - restores the baseline after the parity sample
+- writes stable `W*-closeout.{json,md}` aliases for wave-level handoff surfaces
+- attempts one audit-only reviewed closeout submission into `aoa-sdk` when a wave reaches a terminal gate result
 
 What it does not do:
 

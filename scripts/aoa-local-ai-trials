@@ -29,6 +29,9 @@ LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
 LANGCHAIN_BASE_URL = DEFAULT_LANGCHAIN_RUN_URL.rsplit("/", 1)[0]
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
+AOA_SDK_ROOT = Path("/srv/aoa-sdk")
+AOA_CLOSEOUT_TRIGGER = "runtime-wave-closeout"
+TERMINAL_WAVE_GATE_RESULTS = {"pass", "fail"}
 
 DATE_STAMP = datetime.now().astimezone().date().isoformat()
 
@@ -886,6 +889,188 @@ def render_wave_index_md(index_payload: dict[str, Any]) -> str:
     if index_payload.get("gate_detail"):
         lines.extend(["", "## Gate Detail", "```json", json.dumps(index_payload["gate_detail"], indent=2, ensure_ascii=True), "```"])
     return "\n".join(lines)
+
+
+def wave_closeout_base_name(wave_id: str) -> str:
+    return f"{wave_id}-closeout"
+
+
+def wave_closeout_session_ref(wave_id: str) -> str:
+    return f"session:abyss-stack:{PROGRAM_ID}:{wave_id}:closeout"
+
+
+def wave_closeout_id(wave_id: str) -> str:
+    return f"{PROGRAM_ID}-{wave_id}-closeout"
+
+
+def write_wave_surfaces(
+    *,
+    log_root: Path,
+    mirror_root: Path,
+    wave_id: str,
+    index_payload: dict[str, Any],
+    submit_closeout: bool = False,
+) -> None:
+    index_base = wave_index_name(wave_id)
+    index_json_path = log_root / f"{index_base}.json"
+    index_md_path = log_root / f"{index_base}.md"
+    mirror_index_md_path = mirror_root / f"{index_base}.md"
+    index_md = render_wave_index_md(index_payload)
+
+    write_json(index_json_path, index_payload)
+    write_text(index_md_path, index_md)
+    write_text(mirror_index_md_path, index_md)
+
+    closeout_base = wave_closeout_base_name(wave_id)
+    closeout_json_path = log_root / f"{closeout_base}.json"
+    closeout_md_path = log_root / f"{closeout_base}.md"
+    closeout_submit_status_path = log_root / f"{closeout_base}.submit.json"
+    mirror_closeout_md_path = mirror_root / f"{closeout_base}.md"
+
+    write_json(closeout_json_path, index_payload)
+    write_text(closeout_md_path, index_md)
+    write_text(mirror_closeout_md_path, index_md)
+
+    if not submit_closeout:
+        return
+
+    gate_result = str(index_payload.get("gate_result") or "not-run")
+    status_payload: dict[str, Any] = {
+        "artifact_kind": "aoa.local-ai-trial.wave-closeout-submit",
+        "program_id": PROGRAM_ID,
+        "wave_id": wave_id,
+        "closeout_id": wave_closeout_id(wave_id),
+        "session_ref": wave_closeout_session_ref(wave_id),
+        "attempted_at": utc_now(),
+        "gate_result": gate_result,
+        "reviewed_artifact_path": str(closeout_md_path),
+        "audit_refs": [str(closeout_json_path), str(index_md_path)],
+    }
+    if gate_result not in TERMINAL_WAVE_GATE_RESULTS:
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "skipped",
+                "reason": f"gate_result {gate_result!r} is not terminal",
+            },
+        )
+        return
+
+    aoa_bin = shutil.which("aoa")
+    if aoa_bin is None:
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "failed",
+                "reason": "missing `aoa` command in PATH",
+            },
+        )
+        return
+    if not AOA_SDK_ROOT.exists():
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "failed",
+                "reason": f"missing aoa-sdk root: {AOA_SDK_ROOT}",
+            },
+        )
+        return
+
+    command = [
+        aoa_bin,
+        "closeout",
+        "submit-reviewed",
+        str(closeout_md_path),
+        "--session-ref",
+        wave_closeout_session_ref(wave_id),
+        "--audit-ref",
+        str(closeout_json_path),
+        "--audit-ref",
+        str(index_md_path),
+        "--closeout-id",
+        wave_closeout_id(wave_id),
+        "--trigger",
+        AOA_CLOSEOUT_TRIGGER,
+        "--allow-empty",
+        "--overwrite",
+        "--root",
+        str(AOA_SDK_ROOT),
+        "--json",
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "failed",
+                "reason": "aoa closeout submit-reviewed timed out",
+                "command": command,
+                "timeout_s": 120,
+                "stdout": exc.stdout or "",
+                "stderr": exc.stderr or "",
+            },
+        )
+        return
+
+    if completed.returncode != 0:
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "failed",
+                "reason": "aoa closeout submit-reviewed returned a non-zero exit code",
+                "command": command,
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            },
+        )
+        return
+
+    try:
+        submit_payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        write_json(
+            closeout_submit_status_path,
+            {
+                **status_payload,
+                "status": "failed",
+                "reason": f"invalid JSON from aoa closeout submit-reviewed: {exc}",
+                "command": command,
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            },
+        )
+        return
+
+    build_report = submit_payload.get("build_report") or {}
+    enqueue_report = build_report.get("enqueue_report") or {}
+    write_json(
+        closeout_submit_status_path,
+        {
+            **status_payload,
+            "status": "submitted",
+            "command": command,
+            "audit_only": bool(submit_payload.get("audit_only")),
+            "request_path": submit_payload.get("request_path"),
+            "manifest_path": build_report.get("manifest_path"),
+            "queued_manifest_path": enqueue_report.get("queued_manifest_path"),
+            "queue_depth": enqueue_report.get("queue_depth"),
+            "stdout": completed.stdout,
+        },
+    )
 
 
 def contract_paths(log_root: Path) -> dict[str, Path]:
@@ -1962,11 +2147,13 @@ def materialize_program(log_root: Path, mirror_root: Path, catalog: dict[str, li
                 for case in cases
             ],
         }
-        index_base = wave_index_name(wave_id)
-        write_json(log_root / f"{index_base}.json", index_payload)
-        index_md = render_wave_index_md(index_payload)
-        write_text(log_root / f"{index_base}.md", index_md)
-        write_text(mirror_root / f"{index_base}.md", index_md)
+        write_wave_surfaces(
+            log_root=log_root,
+            mirror_root=mirror_root,
+            wave_id=wave_id,
+            index_payload=index_payload,
+            submit_closeout=False,
+        )
 
     write_text(mirror_root / "README.md", mirror_program_readme())
 
@@ -2034,9 +2221,13 @@ def refresh_wave(log_root: Path, mirror_root: Path, wave_id: str) -> None:
         gate_result=str(index_payload.get("gate_result") or "not-run")
     )
 
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id=wave_id,
+        index_payload=index_payload,
+        submit_closeout=False,
+    )
 
 
 def load_case_spec(log_root: Path, wave_id: str, case_id: str) -> dict[str, Any]:
@@ -2309,10 +2500,13 @@ def ensure_wave_materialized(
                 for case in cases
             ],
         }
-        write_json(index_json_path, index_payload)
-        index_md = render_wave_index_md(index_payload)
-        write_text(log_root / f"{index_base}.md", index_md)
-        write_text(mirror_root / f"{index_base}.md", index_md)
+        write_wave_surfaces(
+            log_root=log_root,
+            mirror_root=mirror_root,
+            wave_id=wave_id,
+            index_payload=index_payload,
+            submit_closeout=False,
+        )
 
 
 def extract_string_list(value: Any, *, field_name: str) -> list[str]:
@@ -2833,11 +3027,13 @@ def run_w1(log_root: Path, mirror_root: Path) -> None:
         ],
         "gate_detail": gate_detail,
     }
-    index_base = wave_index_name("W1")
-    write_json(log_root / f"{index_base}.json", index_payload)
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id="W1",
+        index_payload=index_payload,
+        submit_closeout=True,
+    )
 
 
 def w2_boundary_note() -> str:
@@ -4026,11 +4222,13 @@ def run_w2(log_root: Path, mirror_root: Path) -> None:
         ],
         "gate_detail": gate_detail,
     }
-    index_base = wave_index_name("W2")
-    write_json(log_root / f"{index_base}.json", index_payload)
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id="W2",
+        index_payload=index_payload,
+        submit_closeout=True,
+    )
 
 
 def resolve_w3_source_entries(
@@ -4854,11 +5052,13 @@ def run_w3(log_root: Path, mirror_root: Path) -> None:
         ],
         "gate_detail": gate_detail,
     }
-    index_base = wave_index_name("W3")
-    write_json(log_root / f"{index_base}.json", index_payload)
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id="W3",
+        index_payload=index_payload,
+        submit_closeout=True,
+    )
 
 
 def repo_root_for_w4_case(case: dict[str, Any]) -> Path:
@@ -6792,11 +6992,13 @@ def update_w4_index(log_root: Path, mirror_root: Path, catalog: dict[str, list[d
             "next_action": next_action,
         },
     }
-    index_base = wave_index_name("W4")
-    write_json(log_root / f"{index_base}.json", index_payload)
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id="W4",
+        index_payload=index_payload,
+        submit_closeout=True,
+    )
 
 
 def prepare_w4(log_root: Path, mirror_root: Path, lane: str) -> None:
@@ -7814,11 +8016,13 @@ def run_w0(log_root: Path, mirror_root: Path) -> None:
         ],
         "gate_detail": gate_detail,
     }
-    index_base = wave_index_name("W0")
-    write_json(log_root / f"{index_base}.json", index_payload)
-    index_md = render_wave_index_md(index_payload)
-    write_text(log_root / f"{index_base}.md", index_md)
-    write_text(mirror_root / f"{index_base}.md", index_md)
+    write_wave_surfaces(
+        log_root=log_root,
+        mirror_root=mirror_root,
+        wave_id="W0",
+        index_payload=index_payload,
+        submit_closeout=True,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
