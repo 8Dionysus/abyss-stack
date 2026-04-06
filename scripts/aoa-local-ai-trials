@@ -32,6 +32,8 @@ MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 AOA_SDK_ROOT = Path("/srv/aoa-sdk")
 AOA_CLOSEOUT_TRIGGER = "runtime-wave-closeout"
 TERMINAL_WAVE_GATE_RESULTS = {"pass", "fail"}
+RUNTIME_RECEIPT_ROOT = STACK_ROOT / ".aoa" / "live_receipts"
+RUNTIME_WAVE_CLOSEOUT_RECEIPT_LOG = RUNTIME_RECEIPT_ROOT / "runtime-wave-closeouts.jsonl"
 
 DATE_STAMP = datetime.now().astimezone().date().isoformat()
 
@@ -353,6 +355,12 @@ def write_text(path: Path, text: str) -> None:
 def write_text_exact(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 
 def absolute(path: str | Path) -> str:
@@ -903,6 +911,95 @@ def wave_closeout_id(wave_id: str) -> str:
     return f"{PROGRAM_ID}-{wave_id}-closeout"
 
 
+def runtime_wave_closeout_event_id(wave_id: str) -> str:
+    return f"evt-runtime-wave-closeout-{PROGRAM_ID}-{wave_id}"
+
+
+def runtime_wave_closeout_run_ref(wave_id: str) -> str:
+    return f"run:abyss-stack:aoa-local-ai-trials:{PROGRAM_ID}:{wave_id}:closeout"
+
+
+def runtime_wave_closeout_receipt(
+    *,
+    wave_id: str,
+    index_payload: dict[str, Any],
+    closeout_json_path: Path,
+    closeout_md_path: Path,
+    index_md_path: Path,
+    closeout_submit_status_path: Path,
+    status_payload: dict[str, Any],
+) -> dict[str, Any]:
+    reviewed_handoff_status = str(status_payload.get("status") or "unknown")
+    truth_status = index_payload.get("truth_status")
+    if not isinstance(truth_status, dict):
+        truth_status = {}
+    return {
+        "event_kind": "runtime_wave_closeout_receipt",
+        "event_id": runtime_wave_closeout_event_id(wave_id),
+        "observed_at": utc_now(),
+        "run_ref": runtime_wave_closeout_run_ref(wave_id),
+        "session_ref": wave_closeout_session_ref(wave_id),
+        "actor_ref": "abyss-stack:aoa-local-ai-trials",
+        "object_ref": {
+            "repo": "abyss-stack",
+            "kind": "runtime_wave_closeout",
+            "id": f"{PROGRAM_ID}:{wave_id}",
+            "version": "runtime",
+        },
+        "evidence_refs": [
+            {"kind": "wave_closeout_json", "ref": str(closeout_json_path)},
+            {"kind": "wave_closeout_md", "ref": str(closeout_md_path)},
+            {"kind": "wave_index_md", "ref": str(index_md_path)},
+            {"kind": "closeout_submit_status", "ref": str(closeout_submit_status_path)},
+        ],
+        "payload": {
+            "program_id": PROGRAM_ID,
+            "wave_id": wave_id,
+            "closeout_id": wave_closeout_id(wave_id),
+            "gate_result": str(index_payload.get("gate_result") or "not-run"),
+            "case_count": int(index_payload.get("case_count") or 0),
+            "status_counts": index_payload.get("status_counts", {}),
+            "next_action": index_payload.get("next_action", "unspecified"),
+            "truth_status": truth_status,
+            "terminal_gate": str(index_payload.get("gate_result") or "")
+            in TERMINAL_WAVE_GATE_RESULTS,
+            "reviewed_closeout_handoff_status": reviewed_handoff_status,
+            "reviewed_closeout_audit_only": bool(status_payload.get("audit_only")),
+            "reviewed_closeout_request_path": status_payload.get("request_path"),
+            "reviewed_closeout_manifest_path": status_payload.get("manifest_path"),
+            "reviewed_closeout_queued_manifest_path": status_payload.get(
+                "queued_manifest_path"
+            ),
+            "reviewed_closeout_queue_depth": status_payload.get("queue_depth"),
+            "reviewed_closeout_reason": status_payload.get("reason"),
+        },
+    }
+
+
+def publish_runtime_wave_closeout_receipt(
+    *,
+    wave_id: str,
+    index_payload: dict[str, Any],
+    closeout_json_path: Path,
+    closeout_md_path: Path,
+    index_md_path: Path,
+    closeout_submit_status_path: Path,
+    status_payload: dict[str, Any],
+) -> Path:
+    receipt = runtime_wave_closeout_receipt(
+        wave_id=wave_id,
+        index_payload=index_payload,
+        closeout_json_path=closeout_json_path,
+        closeout_md_path=closeout_md_path,
+        index_md_path=index_md_path,
+        closeout_submit_status_path=closeout_submit_status_path,
+        status_payload=status_payload,
+    )
+    append_jsonl(RUNTIME_WAVE_CLOSEOUT_RECEIPT_LOG, receipt)
+    write_json(log_root := closeout_submit_status_path.with_suffix(".receipt.json"), receipt)
+    return log_root
+
+
 def write_wave_surfaces(
     *,
     log_root: Path,
@@ -947,35 +1044,56 @@ def write_wave_surfaces(
         "audit_refs": [str(closeout_json_path), str(index_md_path)],
     }
     if gate_result not in TERMINAL_WAVE_GATE_RESULTS:
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "skipped",
-                "reason": f"gate_result {gate_result!r} is not terminal",
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "skipped",
+            "reason": f"gate_result {gate_result!r} is not terminal",
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
 
     aoa_bin = shutil.which("aoa")
     if aoa_bin is None:
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "failed",
-                "reason": "missing `aoa` command in PATH",
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "failed",
+            "reason": "missing `aoa` command in PATH",
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
     if not AOA_SDK_ROOT.exists():
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "failed",
-                "reason": f"missing aoa-sdk root: {AOA_SDK_ROOT}",
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "failed",
+            "reason": f"missing aoa-sdk root: {AOA_SDK_ROOT}",
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
 
@@ -1009,67 +1127,95 @@ def write_wave_surfaces(
             timeout=120,
         )
     except subprocess.TimeoutExpired as exc:
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "failed",
-                "reason": "aoa closeout submit-reviewed timed out",
-                "command": command,
-                "timeout_s": 120,
-                "stdout": exc.stdout or "",
-                "stderr": exc.stderr or "",
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "failed",
+            "reason": "aoa closeout submit-reviewed timed out",
+            "command": command,
+            "timeout_s": 120,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
 
     if completed.returncode != 0:
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "failed",
-                "reason": "aoa closeout submit-reviewed returned a non-zero exit code",
-                "command": command,
-                "exit_code": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "failed",
+            "reason": "aoa closeout submit-reviewed returned a non-zero exit code",
+            "command": command,
+            "exit_code": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
 
     try:
         submit_payload = json.loads(completed.stdout)
     except json.JSONDecodeError as exc:
-        write_json(
-            closeout_submit_status_path,
-            {
-                **status_payload,
-                "status": "failed",
-                "reason": f"invalid JSON from aoa closeout submit-reviewed: {exc}",
-                "command": command,
-                "exit_code": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            },
+        final_status_payload = {
+            **status_payload,
+            "status": "failed",
+            "reason": f"invalid JSON from aoa closeout submit-reviewed: {exc}",
+            "command": command,
+            "exit_code": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+        write_json(closeout_submit_status_path, final_status_payload)
+        publish_runtime_wave_closeout_receipt(
+            wave_id=wave_id,
+            index_payload=index_payload,
+            closeout_json_path=closeout_json_path,
+            closeout_md_path=closeout_md_path,
+            index_md_path=index_md_path,
+            closeout_submit_status_path=closeout_submit_status_path,
+            status_payload=final_status_payload,
         )
         return
 
     build_report = submit_payload.get("build_report") or {}
     enqueue_report = build_report.get("enqueue_report") or {}
-    write_json(
-        closeout_submit_status_path,
-        {
-            **status_payload,
-            "status": "submitted",
-            "command": command,
-            "audit_only": bool(submit_payload.get("audit_only")),
-            "request_path": submit_payload.get("request_path"),
-            "manifest_path": build_report.get("manifest_path"),
-            "queued_manifest_path": enqueue_report.get("queued_manifest_path"),
-            "queue_depth": enqueue_report.get("queue_depth"),
-            "stdout": completed.stdout,
-        },
+    final_status_payload = {
+        **status_payload,
+        "status": "submitted",
+        "command": command,
+        "audit_only": bool(submit_payload.get("audit_only")),
+        "request_path": submit_payload.get("request_path"),
+        "manifest_path": build_report.get("manifest_path"),
+        "queued_manifest_path": enqueue_report.get("queued_manifest_path"),
+        "queue_depth": enqueue_report.get("queue_depth"),
+        "stdout": completed.stdout,
+    }
+    write_json(closeout_submit_status_path, final_status_payload)
+    publish_runtime_wave_closeout_receipt(
+        wave_id=wave_id,
+        index_payload=index_payload,
+        closeout_json_path=closeout_json_path,
+        closeout_md_path=closeout_md_path,
+        index_md_path=index_md_path,
+        closeout_submit_status_path=closeout_submit_status_path,
+        status_payload=final_status_payload,
     )
 
 
