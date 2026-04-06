@@ -79,6 +79,15 @@ machine-readable result locally as:
 
 - `W*-closeout.submit.json`
 
+The same closeout step also publishes one owner-local runtime receipt to the
+canonical stats intake log:
+
+- `/srv/abyss-stack/.aoa/live_receipts/runtime-wave-closeouts.jsonl`
+
+Each closeout submit result also gets a sibling artifact for direct inspection:
+
+- `W*-closeout.submit.receipt.json`
+
 The fixed report sections are:
 
 - `Goal`
@@ -124,6 +133,7 @@ What the helper does now:
 - restores the baseline after the parity sample
 - writes stable `W*-closeout.{json,md}` aliases for wave-level handoff surfaces
 - attempts one audit-only reviewed closeout submission into `aoa-sdk` when a wave reaches a terminal gate result
+- appends one `runtime_wave_closeout_receipt` to the owner-local live receipt log for derived stats
 
 What it does not do:
 
