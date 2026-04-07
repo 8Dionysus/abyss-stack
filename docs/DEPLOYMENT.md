@@ -138,6 +138,9 @@ scripts/aoa-status --autonomy --json
 ```
 
 to confirm the canonical source checkout still matches the deployed `Configs` mirror for repo-managed paths.
+The scheduled source-rooted mirror canary in `.github/workflows/mirror-canary.yml`
+rehearses the same parity flow against a temporary runtime root so source/deployed
+drift can surface before operator rollout.
 Use `aoa-status --autonomy --json` for the operator-readable control-loop verdict after parity and promoted runtime verify.
 When the `federation` profile is active, the same verdict also requires route-api health, closure, and federation layer checks to agree.
 When the `federation` profile is not active and federated advisory consumption is disabled, route-api checks should appear as `not_enabled` rather than as hard failures.
