@@ -431,8 +431,8 @@ def run_phase_aware_skill_dispatch(
             "reason": "aoa skills dispatch timed out",
             "command": command,
             "timeout_s": AOA_SKILL_DISPATCH_TIMEOUT_S,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
+            "stdout": coerce_subprocess_text(exc.stdout),
+            "stderr": coerce_subprocess_text(exc.stderr),
         }
         write_json(log_path, final_report)
         print(f"[skills:{phase}] failed: aoa skills dispatch timed out")
@@ -686,6 +686,14 @@ def format_command(parts: list[str]) -> str:
     return shlex.join(parts)
 
 
+def coerce_subprocess_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
 def run_command(parts: list[str], *, cwd: Path | None = None, timeout_s: float | None = None) -> dict[str, Any]:
     started = time.perf_counter()
     started_at = utc_now()
@@ -705,8 +713,8 @@ def run_command(parts: list[str], *, cwd: Path | None = None, timeout_s: float |
     except subprocess.TimeoutExpired as exc:
         timed_out = True
         exit_code = 124
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
+        stdout = coerce_subprocess_text(exc.stdout)
+        stderr = coerce_subprocess_text(exc.stderr)
     finished_at = utc_now()
     elapsed_s = round(time.perf_counter() - started, 3)
     return {
@@ -1255,8 +1263,8 @@ def write_wave_surfaces(
             "reason": "aoa closeout submit-reviewed timed out",
             "command": command,
             "timeout_s": 120,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
+            "stdout": coerce_subprocess_text(exc.stdout),
+            "stderr": coerce_subprocess_text(exc.stderr),
         }
         write_json(closeout_submit_status_path, final_status_payload)
         publish_runtime_wave_closeout_receipt(
@@ -7154,6 +7162,19 @@ def w4_docs_lane_state(log_root: Path, catalog: dict[str, list[dict[str, Any]]])
     }
 
 
+def should_submit_wave_closeout(log_root: Path, wave_id: str, gate_result: str) -> bool:
+    if gate_result not in TERMINAL_WAVE_GATE_RESULTS:
+        return False
+    submit_status_path = log_root / f"{wave_closeout_base_name(wave_id)}.submit.json"
+    if not submit_status_path.exists():
+        return True
+    try:
+        existing = load_json_file(submit_status_path)
+    except (OSError, json.JSONDecodeError):
+        return True
+    return str(existing.get("gate_result") or "") not in TERMINAL_WAVE_GATE_RESULTS
+
+
 def update_w4_index(log_root: Path, mirror_root: Path, catalog: dict[str, list[dict[str, Any]]]) -> None:
     results_by_id: dict[str, dict[str, Any]] = {}
     proposal_summaries: dict[str, dict[str, Any]] = {}
@@ -7265,7 +7286,7 @@ def update_w4_index(log_root: Path, mirror_root: Path, catalog: dict[str, list[d
         mirror_root=mirror_root,
         wave_id="W4",
         index_payload=index_payload,
-        submit_closeout=True,
+        submit_closeout=should_submit_wave_closeout(log_root, "W4", gate_result),
     )
 
 
