@@ -107,6 +107,76 @@ class AoALocalAiTrialsTests(unittest.TestCase):
 
         self.assertEqual([True, False], submit_flags)
 
+    def test_update_w4_index_resubmits_closeout_when_terminal_gate_changes(self) -> None:
+        module = load_module()
+        catalog = {
+            "W4": [
+                {
+                    "case_id": f"case-{index}",
+                    "repo_scope": "aoa-skills",
+                    "task_family": "docs",
+                    "title": f"Case {index}",
+                }
+                for index in range(6)
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            log_root = root / "logs"
+            mirror_root = root / "mirror"
+            log_root.mkdir(parents=True)
+            mirror_root.mkdir(parents=True)
+            for index, case in enumerate(catalog["W4"]):
+                case_root = module.case_dir(log_root, "W4", case["case_id"])
+                case_root.mkdir(parents=True, exist_ok=True)
+                status = "fail" if index == 0 else "pass"
+                (case_root / "result.summary.json").write_text(
+                    json.dumps({"case_id": case["case_id"], "status": status}) + "\n",
+                    encoding="utf-8",
+                )
+
+            submit_flags: list[bool] = []
+            submitted_gate_results: list[str] = []
+
+            def fake_write_wave_surfaces(
+                *,
+                log_root: Path,
+                mirror_root: Path,
+                wave_id: str,
+                index_payload: dict[str, object],
+                submit_closeout: bool = False,
+            ) -> None:
+                submit_flags.append(submit_closeout)
+                if submit_closeout:
+                    submitted_gate_results.append(str(index_payload["gate_result"]))
+                    status_path = log_root / f"{module.wave_closeout_base_name(wave_id)}.submit.json"
+                    status_path.write_text(
+                        json.dumps(
+                            {
+                                "gate_result": index_payload["gate_result"],
+                                "status": "submitted",
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+            with patch.object(module, "W4_DOC_CASE_IDS", set()):
+                with patch.object(module, "write_wave_surfaces", side_effect=fake_write_wave_surfaces):
+                    module.update_w4_index(log_root, mirror_root, catalog)
+                    first_case_path = (
+                        module.case_dir(log_root, "W4", catalog["W4"][0]["case_id"]) / "result.summary.json"
+                    )
+                    first_case_path.write_text(
+                        json.dumps({"case_id": catalog["W4"][0]["case_id"], "status": "pass"}) + "\n",
+                        encoding="utf-8",
+                    )
+                    module.update_w4_index(log_root, mirror_root, catalog)
+
+        self.assertEqual([True, True], submit_flags)
+        self.assertEqual(["fail", "pass"], submitted_gate_results)
+
 
 if __name__ == "__main__":
     unittest.main()
