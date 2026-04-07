@@ -7172,7 +7172,7 @@ def should_submit_wave_closeout(log_root: Path, wave_id: str, gate_result: str) 
         existing = load_json_file(submit_status_path)
     except (OSError, json.JSONDecodeError):
         return True
-    return str(existing.get("gate_result") or "") not in TERMINAL_WAVE_GATE_RESULTS
+    return str(existing.get("gate_result") or "") != gate_result
 
 
 def update_w4_index(log_root: Path, mirror_root: Path, catalog: dict[str, list[dict[str, Any]]]) -> None:
