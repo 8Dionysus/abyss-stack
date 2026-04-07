@@ -21,6 +21,7 @@ DEFAULT_PROGRAM_ID = "qwen-local-pilot-v1"
 PROGRAM_ID = DEFAULT_PROGRAM_ID
 MODEL = "qwen3.5:9b"
 
+SOURCE_ROOT = Path(__file__).resolve().parents[1]
 STACK_ROOT = Path("/srv/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
@@ -31,6 +32,7 @@ LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 AOA_SDK_ROOT = Path("/srv/aoa-sdk")
 AOA_CLOSEOUT_TRIGGER = "runtime-wave-closeout"
+AOA_SKILL_DISPATCH_TIMEOUT_S = 90
 TERMINAL_WAVE_GATE_RESULTS = {"pass", "fail"}
 RUNTIME_RECEIPT_ROOT = STACK_ROOT / ".aoa" / "live_receipts"
 RUNTIME_WAVE_CLOSEOUT_RECEIPT_LOG = RUNTIME_RECEIPT_ROOT / "runtime-wave-closeouts.jsonl"
@@ -361,6 +363,126 @@ def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def run_phase_aware_skill_dispatch(
+    *,
+    phase: str,
+    repo_root: Path,
+    log_path: Path,
+    intent_text: str,
+    mutation_surface: str = "none",
+    closeout_path: Path | None = None,
+) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "artifact_kind": "aoa.local-ai-trial.skill-dispatch-report",
+        "program_id": PROGRAM_ID,
+        "phase": phase,
+        "repo_root": str(repo_root.resolve()),
+        "intent_text": intent_text,
+        "mutation_surface": mutation_surface,
+        "executed_at": utc_now(),
+    }
+    aoa_bin = shutil.which("aoa")
+    if aoa_bin is None:
+        final_report = {**report, "status": "failed", "reason": "missing `aoa` command in PATH"}
+        write_json(log_path, final_report)
+        print(f"[skills:{phase}] failed: missing `aoa` command in PATH")
+        return final_report
+    if not AOA_SDK_ROOT.exists():
+        final_report = {
+            **report,
+            "status": "failed",
+            "reason": f"missing aoa-sdk root: {AOA_SDK_ROOT}",
+        }
+        write_json(log_path, final_report)
+        print(f"[skills:{phase}] failed: missing aoa-sdk root {AOA_SDK_ROOT}")
+        return final_report
+
+    command = [
+        aoa_bin,
+        "skills",
+        "dispatch",
+        str(repo_root.resolve()),
+        "--phase",
+        phase,
+        "--intent-text",
+        intent_text,
+        "--mutation-surface",
+        mutation_surface,
+        "--root",
+        str(AOA_SDK_ROOT),
+        "--json",
+    ]
+    if closeout_path is not None:
+        command.extend(["--closeout-path", str(closeout_path.resolve())])
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=AOA_SKILL_DISPATCH_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        final_report = {
+            **report,
+            "status": "failed",
+            "reason": "aoa skills dispatch timed out",
+            "command": command,
+            "timeout_s": AOA_SKILL_DISPATCH_TIMEOUT_S,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        }
+        write_json(log_path, final_report)
+        print(f"[skills:{phase}] failed: aoa skills dispatch timed out")
+        return final_report
+
+    if completed.returncode != 0:
+        final_report = {
+            **report,
+            "status": "failed",
+            "reason": "aoa skills dispatch returned a non-zero exit code",
+            "command": command,
+            "exit_code": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+        write_json(log_path, final_report)
+        print(f"[skills:{phase}] failed: non-zero exit code {completed.returncode}")
+        return final_report
+
+    try:
+        dispatch_payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        final_report = {
+            **report,
+            "status": "failed",
+            "reason": f"invalid JSON from aoa skills dispatch: {exc}",
+            "command": command,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+        write_json(log_path, final_report)
+        print(f"[skills:{phase}] failed: invalid JSON from aoa skills dispatch")
+        return final_report
+
+    final_report = {
+        **report,
+        "status": "dispatched",
+        "command": command,
+        "dispatch_report": dispatch_payload,
+        "stdout": completed.stdout,
+    }
+    write_json(log_path, final_report)
+    activate_now = [item["skill_name"] for item in dispatch_payload.get("activate_now", [])]
+    must_confirm = [item["skill_name"] for item in dispatch_payload.get("must_confirm", [])]
+    blocked = dispatch_payload.get("blocked_actions", [])
+    print(
+        f"[skills:{phase}] activate_now={activate_now or ['none']} "
+        f"must_confirm={must_confirm or ['none']} blocked={blocked or ['none']}"
+    )
+    return final_report
 
 
 def absolute(path: str | Path) -> str:
@@ -7319,6 +7441,29 @@ def w4_failure_summary(
     )
 
 
+def mutation_surface_for_w4_case(case: dict[str, Any], repo_root: Path) -> str:
+    if repo_root.name == "abyss-stack":
+        return "runtime"
+    if case.get("lane") == "generated":
+        return "repo-config"
+    return "code"
+
+
+def pre_mutation_intent_text(case: dict[str, Any]) -> str:
+    notes = case.get("notes") or []
+    note_text = " ".join(str(item) for item in notes if isinstance(item, str))
+    return " ".join(
+        part
+        for part in [
+            str(case.get("title") or ""),
+            str(case.get("task_family") or ""),
+            str(case.get("execution_mode") or ""),
+            note_text,
+        ]
+        if part
+    )
+
+
 def apply_w4_case(
     case: dict[str, Any],
     *,
@@ -7445,6 +7590,31 @@ def apply_w4_case(
             command_refs=command_refs,
             artifact_refs=artifact_refs,
             next_action="Re-run prepare-wave for this case and review the refreshed proposal before applying again.",
+        )
+        return
+
+    pre_mutation_dispatch_path = case_root / "artifacts" / "pre-mutation.dispatch.json"
+    pre_mutation_report = run_phase_aware_skill_dispatch(
+        phase="pre-mutation",
+        repo_root=repo_root,
+        log_path=pre_mutation_dispatch_path,
+        intent_text=pre_mutation_intent_text(case),
+        mutation_surface=mutation_surface_for_w4_case(case, repo_root),
+    )
+    artifact_refs.append(str(pre_mutation_dispatch_path))
+    if pre_mutation_report.get("status") != "dispatched":
+        w4_failure_summary(
+            case,
+            log_root=log_root,
+            mirror_root=mirror_root,
+            failure_class="preflight_failure",
+            reviewer_notes="W4 apply-case stopped because phase-aware pre-mutation dispatch was unavailable.",
+            boundary_notes=w4_boundary_note(),
+            highlights=[f"Repo root: `{repo_root}`.", f"Dispatch log: `{pre_mutation_dispatch_path}`."],
+            failures=[str(pre_mutation_report.get("reason") or "phase-aware pre-mutation dispatch failed")],
+            command_refs=command_refs,
+            artifact_refs=artifact_refs,
+            next_action="Repair `aoa skills dispatch` availability before rerunning this W4 apply-case.",
         )
         return
 
@@ -8218,6 +8388,13 @@ def main() -> int:
         return 0
 
     if args.command == "run-wave":
+        ingress_dispatch_path = log_root / "waves" / args.wave_id / "_dispatch" / "ingress.dispatch.json"
+        run_phase_aware_skill_dispatch(
+            phase="ingress",
+            repo_root=SOURCE_ROOT,
+            log_path=ingress_dispatch_path,
+            intent_text=str(WAVE_METADATA[args.wave_id]["summary"]),
+        )
         if args.wave_id == "W0":
             run_w0(log_root, mirror_root)
             print(f"executed {PROGRAM_ID} {args.wave_id} at {log_root}")

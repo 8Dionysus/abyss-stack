@@ -130,6 +130,8 @@ What the helper does now:
 - executes `W3` through grounded exact-only selection on the same `langchain-api /run` path
 - prepares `W4` proposals through a staged supervised-edit flow
 - applies approved `W4` cases only after isolated worktree validation
+- runs one phase-aware `aoa skills dispatch --phase ingress` pass at `run-wave` start
+- runs one phase-aware `aoa skills dispatch --phase pre-mutation` pass before any `W4 apply-case` mutation attempt
 - restores the baseline after the parity sample
 - writes stable `W*-closeout.{json,md}` aliases for wave-level handoff surfaces
 - attempts one audit-only reviewed closeout submission into `aoa-sdk` when a wave reaches a terminal gate result
@@ -332,6 +334,7 @@ The `W4` flow:
 - builds `proposal.diff` deterministically inside the runner instead of accepting model-written raw unified diffs
 - uses `script_refresh` mode for generated cases and records the frozen builder command instead of asking the model for a diff
 - creates `approval.status.json` per case and requires explicit `approved` status before any mutation
+- logs one `pre-mutation.dispatch.json` artifact per case so the operator can see `must_confirm` risk gates before mutation
 - runs every mutation first in an isolated git worktree
 - validates touched files against the frozen allowed-file scope before landing
 - reruns acceptance checks in the main repo only after the worktree passes
