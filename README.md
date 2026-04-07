@@ -21,7 +21,7 @@ Then branch by need:
 - **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md)
+- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), and [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md)
 
 ## What this repository is for
 
@@ -80,6 +80,17 @@ The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally na
 `abyss-stack` currently exposes a deployed multi-service runtime substrate with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
 The current bounded promoted local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain opt-in, bounded, and explicit: they can enrich runtime behavior when the `federation` profile is active, but they do not replace source-owned meaning and they should not be read as blanket proof of full federated control-plane coherence.
+
+Antifragility wave two stays contract-only in this repository. It adds
+runtime-side doctrine plus receipt schemas/examples for degradation and
+repair-safe closeout without changing live services, scripts, or deployment
+behavior.
+Current contract surfaces are `docs/ANTIFRAGILITY_RUNTIME.md`,
+`docs/REPAIR_SAFE_CLOSEOUT.md`,
+`schemas/service_degradation_receipt_v1.json`,
+`schemas/repair_safe_closeout_receipt_v1.json`,
+`examples/service_degradation_receipt.example.json`, and
+`examples/repair_safe_closeout_receipt.example.json`.
 
 To verify the current promoted path, use this order:
 

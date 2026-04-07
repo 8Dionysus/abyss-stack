@@ -1,0 +1,37 @@
+{
+  "schema_version": "service_degradation_receipt_v1",
+  "receipt_id": "runtime:degrade:langchain-api:2026-04-07T13:19:54Z",
+  "timestamp_utc": "2026-04-07T13:19:54Z",
+  "repo": "abyss-stack",
+  "surface": "runtime-service",
+  "service": "langchain-api",
+  "profile": "autonomy",
+  "incident_class": "upstream_model_path_unhealthy",
+  "severity": "medium",
+  "mode_before": "full-service",
+  "mode_after": "degraded-manual-review",
+  "degraded": true,
+  "containment": {
+    "kind": "service",
+    "value": "langchain-api",
+    "notes": "The degradation remains bounded to the langchain-api service lane. Storage and monitoring remain intact."
+  },
+  "unsafe_repair_blocked": true,
+  "operator_visible": true,
+  "evidence_refs": [
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:19:54Z",
+    "python:/srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60#2026-04-07T13:19:40Z"
+  ],
+  "host_facts_refs": [
+    "generated/host_facts.current.json#machine:fedora-workstation"
+  ],
+  "machine_fit_refs": [
+    "generated/machine_fit.current.json#profile:autonomy"
+  ],
+  "suggested_next_checks": [
+    "python scripts/validate_stack.py --parity-check",
+    "review the bounded langchain-api service logs"
+  ],
+  "notes": "Do not restart unrelated services automatically.",
+  "supersedes": []
+}

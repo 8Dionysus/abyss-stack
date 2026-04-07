@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.local/abyss-stack/schemas/repair_safe_closeout_receipt_v1.json",
+  "title": "repair_safe_closeout_receipt_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "timestamp_utc",
+    "repo",
+    "closeout_scope",
+    "source_receipt_refs",
+    "reviewed",
+    "actions_taken",
+    "actions_deferred",
+    "restart_performed",
+    "rollback_ready",
+    "mutation_widening_blocked",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "repair_safe_closeout_receipt_v1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "closeout_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "source_receipt_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "reviewed": {
+      "type": "boolean"
+    },
+    "actions_taken": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "target",
+          "safe"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "restart_service",
+              "reload_unit",
+              "rebuild_context",
+              "config_review",
+              "no_action"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "safe": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "actions_deferred": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "restart_performed": {
+      "type": "boolean"
+    },
+    "rollback_ready": {
+      "type": "boolean"
+    },
+    "mutation_widening_blocked": {
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "emitted_to": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "next_checks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
