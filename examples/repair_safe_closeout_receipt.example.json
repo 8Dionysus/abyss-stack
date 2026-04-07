@@ -1,0 +1,42 @@
+{
+  "schema_version": "repair_safe_closeout_receipt_v1",
+  "receipt_id": "runtime:closeout:langchain-api:2026-04-07T13:40:00Z",
+  "timestamp_utc": "2026-04-07T13:40:00Z",
+  "repo": "abyss-stack",
+  "closeout_scope": {
+    "kind": "service",
+    "value": "langchain-api",
+    "notes": "Reviewed closeout remains bounded to the langchain-api service lane."
+  },
+  "source_receipt_refs": [
+    "abyss-stack:service_degradation_receipt_v1#runtime:degrade:langchain-api:2026-04-07T13:19:54Z"
+  ],
+  "reviewed": true,
+  "actions_taken": [
+    {
+      "kind": "restart_service",
+      "target": "langchain-api",
+      "safe": true,
+      "note": "Reviewed restart after bounded log inspection."
+    }
+  ],
+  "actions_deferred": [
+    "rebuild the full autonomy profile",
+    "refresh image tags in the source checkout before the next deployment window"
+  ],
+  "restart_performed": true,
+  "rollback_ready": true,
+  "mutation_widening_blocked": true,
+  "evidence_refs": [
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:39:45Z",
+    "python scripts/validate_stack.py --parity-check#2026-04-07T13:39:10Z"
+  ],
+  "emitted_to": [
+    "aoa-sdk:closeout_manifest#session:2026-04-07-antifragility-wave-2"
+  ],
+  "next_checks": [
+    "python scripts/validate_stack.py",
+    "confirm langchain-api stays healthy for the next bounded workload"
+  ],
+  "notes": "Repair stayed reviewed and bounded. No hidden fan-out restarts were performed."
+}
