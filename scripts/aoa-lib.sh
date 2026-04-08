@@ -78,6 +78,7 @@ AOA_PROFILE_MODULE_NAMES=()
 AOA_PROFILE_MODULE_FILES=()
 AOA_EXTRA_COMPOSE_FILE_SPECS=()
 AOA_EXTRA_COMPOSE_FILE_PATHS=()
+AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS=()
 
 aoa_die() {
   printf 'error: %s\n' "$*" >&2
@@ -134,13 +135,33 @@ aoa_join_expanded_specs() {
   aoa_join_csv "${merged[@]}"
 }
 
+aoa_compose_service_names() {
+  local file
+  for file in "$@"; do
+    [[ -f "$file" ]] || continue
+    awk '
+      /^services:[[:space:]]*$/ { in_services = 1; next }
+      in_services && /^[^[:space:]]/ { in_services = 0 }
+      in_services && /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {
+        name = $1
+        sub(/:$/, "", name)
+        sub(/^  /, "", name)
+        print name
+      }
+    ' "$file"
+  done | sort -u
+}
+
 aoa_apply_machine_fit_runtime_posture() {
-  local record_type key value
+  local overlay_path overlay_spec overlay_touches record_type service_name key value
+  local -a filtered_overlays=()
   local -a recommended_overlays=()
+  local -A selected_services=()
 
   [[ "${AOA_MACHINE_FIT_AUTO_APPLY}" == "true" ]] || return 0
   [[ "${AOA_MACHINE_FIT_APPLIED:-0}" == "1" ]] && return 0
   AOA_MACHINE_FIT_APPLIED=1
+  AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS=()
 
   [[ -f "${AOA_MACHINE_FIT_PATH}" ]] || return 0
   command -v python3 >/dev/null 2>&1 || return 0
@@ -188,8 +209,38 @@ if isinstance(recommended_overlays, list):
 PY
   )
 
+  while IFS= read -r service_name; do
+    [[ -n "$service_name" ]] || continue
+    selected_services["$service_name"]=1
+  done < <(aoa_compose_service_names "${AOA_PROFILE_MODULE_FILES[@]}")
+
   if ((${#recommended_overlays[@]} > 0)); then
-    AOA_EXTRA_COMPOSE_FILES="$(aoa_join_expanded_specs "${recommended_overlays[@]}" "$AOA_EXTRA_COMPOSE_FILES")"
+    for overlay_spec in "${recommended_overlays[@]}"; do
+      if [[ "$overlay_spec" == /* ]]; then
+        overlay_path="$overlay_spec"
+      else
+        overlay_path="${AOA_CONFIGS_ROOT}/${overlay_spec}"
+      fi
+
+      [[ -f "$overlay_path" ]] || aoa_die "machine-fit overlay not found: $overlay_path"
+
+      overlay_touches=0
+      while IFS= read -r service_name; do
+        [[ -n "$service_name" ]] || continue
+        if [[ -n "${selected_services[$service_name]+x}" ]]; then
+          overlay_touches=1
+          break
+        fi
+      done < <(aoa_compose_service_names "$overlay_path")
+
+      if ((overlay_touches)); then
+        filtered_overlays+=("$overlay_spec")
+      else
+        AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS+=("$overlay_spec")
+      fi
+    done
+
+    AOA_EXTRA_COMPOSE_FILES="$(aoa_join_expanded_specs "${filtered_overlays[@]}" "$AOA_EXTRA_COMPOSE_FILES")"
     export AOA_EXTRA_COMPOSE_FILES
   fi
 }
@@ -288,7 +339,6 @@ aoa_parse_profile_args() {
   AOA_STACK_PROFILE="$(aoa_join_csv "${AOA_ACTIVE_PROFILES[@]}")"
   export AOA_STACK_PRESET
   export AOA_STACK_PROFILE
-  aoa_apply_machine_fit_runtime_posture
 }
 
 aoa_detect_compose() {
@@ -391,6 +441,7 @@ aoa_resolve_modules() {
   done
 
   ((${#AOA_PROFILE_MODULE_FILES[@]} > 0)) || aoa_die "resolved profiles produced zero modules"
+  aoa_apply_machine_fit_runtime_posture
 }
 
 aoa_resolve_extra_compose_files() {
@@ -474,6 +525,12 @@ aoa_print_profile_summary() {
   if ((${#AOA_EXTRA_COMPOSE_FILE_SPECS[@]} > 0)); then
     aoa_note "extra compose files:"
     for overlay_spec in "${AOA_EXTRA_COMPOSE_FILE_SPECS[@]}"; do
+      aoa_note "- ${overlay_spec}"
+    done
+  fi
+  if ((${#AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS[@]} > 0)); then
+    aoa_note "machine-fit overlays skipped (no selected service match):"
+    for overlay_spec in "${AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS[@]}"; do
       aoa_note "- ${overlay_spec}"
     done
   fi

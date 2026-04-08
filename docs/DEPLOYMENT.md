@@ -243,7 +243,7 @@ Treat the rendered output as potentially secret-bearing.
 You can pass several profiles or presets.
 
 If you need to layer a bounded overlay, use `AOA_EXTRA_COMPOSE_FILES` on Linux or `-Overlay` with `scripts/aoa.ps1` on Windows.
-If a current private machine-fit record exists, the wrappers also auto-apply its `recommended_overlays` and `validated_settings` unless `AOA_MACHINE_FIT_AUTO_APPLY=false`.
+If a current private machine-fit record exists, the wrappers also auto-apply its `validated_settings` and only those `recommended_overlays` that touch the selected services unless `AOA_MACHINE_FIT_AUTO_APPLY=false`.
 
 ## Recommended first deployment flow
 

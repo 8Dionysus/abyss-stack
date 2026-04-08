@@ -16,6 +16,7 @@ from .models import (
 from .neo4j_store import describe_neo4j_store
 from .projector import PreviewProjector
 from .tos_reader import ToSReader, ToSReaderError
+from .ui import render_index
 
 
 settings = load_settings()
@@ -32,30 +33,7 @@ def _handle_reader_error(exc: ToSReaderError) -> HTTPException:
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
-    return f"""
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>tos-graph</title>
-    <style>
-      body {{ font-family: ui-monospace, SFMono-Regular, monospace; margin: 2rem; background: #f4efe6; color: #1b1b1b; }}
-      .card {{ max-width: 880px; background: #fffdf8; border: 1px solid #d7ccb8; padding: 1.25rem; }}
-      code {{ background: #efe6d8; padding: 0.1rem 0.25rem; }}
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>tos-graph</h1>
-      <p>Preview-first route helper for Tree of Sophia.</p>
-      <p>Default route: <code>{settings.route_default}</code></p>
-      <p>Projection mode: <code>{settings.projection_mode}</code></p>
-      <p>Write enabled: <code>{str(settings.write_enabled).lower()}</code></p>
-      <p>Primary APIs: <code>/health</code>, <code>/api/routes</code>, <code>/api/tree</code>, <code>/api/graph</code>.</p>
-    </div>
-  </body>
-</html>
-""".strip()
+    return render_index(settings, neo4j_status)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -92,7 +70,7 @@ def route_graph(route: str | None = None) -> RouteGraphResponse:
         raise _handle_reader_error(exc) from exc
 
 
-@app.get("/api/nodes/{node_id}")
+@app.get("/api/nodes/{node_id:path}")
 def node_detail(node_id: str) -> dict[str, Any]:
     try:
         return reader.get_node(node_id)
@@ -100,7 +78,7 @@ def node_detail(node_id: str) -> dict[str, Any]:
         raise _handle_reader_error(exc) from exc
 
 
-@app.get("/api/edges/{edge_id}")
+@app.get("/api/edges/{edge_id:path}")
 def edge_detail(edge_id: str) -> dict[str, Any]:
     try:
         return reader.get_edge(edge_id)

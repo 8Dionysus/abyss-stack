@@ -88,7 +88,7 @@ This file maps the first migrated runtime modules to their intended services.
 - `tos-graph` — preview-first route helper for Tree of Sophia graph curation on `5410`
 - reads canonical ToS source files from the mounted `AOA_TOS_ROOT`
 - keeps Neo4j in projection-only posture and does not treat mirrored `tos-source` advisory surfaces as canonical edit input
-- current first slice exposes health and route/tree/graph inspection APIs while writeback remains deferred
+- current first slice exposes a route-first localhost UI, health and route/tree/graph inspection APIs, and preview-only sync posture while writeback remains deferred
 
 ## `60-monitoring.yml`
 

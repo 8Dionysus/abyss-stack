@@ -201,6 +201,8 @@ scripts/aoa-smoke --profile federation
 A preview-first route helper for Tree of Sophia graph curation.
 This slice uses the storage substrate so `neo4j` is available, but it keeps the
 helper itself read-first and localhost-only.
+Machine-fit overlays that do not touch the selected services are skipped
+automatically in this profile, so it does not silently pull in `llama-cpp`.
 
 ### Host-facing endpoints
 

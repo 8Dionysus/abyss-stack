@@ -188,6 +188,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "neo4j_store.py",
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "projector.py",
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "tos_reader.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "ui.py",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-policy.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-request.schema.json",

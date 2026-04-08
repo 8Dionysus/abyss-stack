@@ -45,7 +45,8 @@ This owner-repo landing stays preview-first:
 1. define the contract and quest anchors
 2. land a read-only vertical slice
 3. verify route-first projection, inspector posture, and localhost bind
-4. only then consider validator-gated patch preview and apply
+4. keep curation-profile launch narrow even when unrelated machine-fit overlays exist
+5. only then consider validator-gated patch preview and apply
 
 Do not jump straight to canonical writeback from a staging bundle.
 
