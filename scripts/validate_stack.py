@@ -266,6 +266,10 @@ DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
 DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
 ABYSS_SAFE_INFRA_SKILL_PATH = Path(".agents") / "skills" / "abyss-safe-infra-change"
 ABYSS_SANITIZED_SHARE_SKILL_PATH = Path(".agents") / "skills" / "abyss-sanitized-share"
+OVERLAY_SKILL_INSTALL_TARGETS = {
+    ABYSS_SAFE_INFRA_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-safe-infra-change",
+    ABYSS_SANITIZED_SHARE_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-sanitized-share",
+}
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
 DIAGNOSTIC_TARGET_SCHEMA_PATH = Path("schemas") / "diagnostic_target.schema.json"
@@ -2180,12 +2184,44 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         (ABYSS_SAFE_INFRA_SKILL_PATH, "repo-local abyss overlay skill surface"),
         (ABYSS_SANITIZED_SHARE_SKILL_PATH, "repo-local abyss overlay skill surface"),
     ):
-        local_skill_root = ROOT / skill_path
-        local_skill_md = local_skill_root / "SKILL.md"
-        if not local_skill_root.is_dir():
-            errors.append(f"{skill_path.as_posix()} must be installed as a {description}")
-        elif not local_skill_md.is_file():
+        _validate_overlay_skill_surface(
+            errors=errors,
+            skill_path=skill_path,
+            description=description,
+            expected_target=OVERLAY_SKILL_INSTALL_TARGETS.get(skill_path),
+        )
+
+
+def _matches_checkout_safe_overlay_install(path: Path, expected_target: str) -> bool:
+    if path.is_symlink():
+        try:
+            return path.readlink().as_posix() == expected_target
+        except OSError:
+            return False
+    if path.is_file():
+        try:
+            return path.read_text(encoding="utf-8").strip() == expected_target
+        except (OSError, UnicodeDecodeError):
+            return False
+    return False
+
+
+def _validate_overlay_skill_surface(
+    *,
+    errors: list[str],
+    skill_path: Path,
+    description: str,
+    expected_target: str | None = None,
+) -> None:
+    local_skill_root = ROOT / skill_path
+    local_skill_md = local_skill_root / "SKILL.md"
+    if local_skill_root.is_dir():
+        if not local_skill_md.is_file():
             errors.append(f"{skill_path.as_posix()} must contain SKILL.md")
+        return
+    if expected_target and _matches_checkout_safe_overlay_install(local_skill_root, expected_target):
+        return
+    errors.append(f"{skill_path.as_posix()} must be installed as a {description}")
 
 
 def validate_federation_landing(errors: list[str]) -> None:
