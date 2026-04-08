@@ -433,15 +433,15 @@ INDEX_TEMPLATE = """<!doctype html>
       <section class="hero panel">
         <div class="hero-top">
           <div>
-            <div class="kicker">Preview-first ToS graph curation</div>
+            <div class="kicker">Projection-only ToS graph curation</div>
             <h1 class="brand">Route-first reading surface for Tree of Sophia</h1>
           </div>
           <div class="chip-row" id="heroChips"></div>
         </div>
         <p class="hero-copy">
           Canon stays in Tree of Sophia, Neo4j stays a projection, and this helper stays localhost-only.
-          The current slice is read-first: navigate routes, inspect nodes and edges, and preview the shape
-          of a sync without crossing into writeback.
+          The current slice is read-first and projection-capable: navigate routes, inspect nodes and edges,
+          and sync a route-scoped projection into Neo4j without crossing into writeback.
         </p>
         <div class="hero-bottom">
           <div class="chip-row">
@@ -478,12 +478,12 @@ INDEX_TEMPLATE = """<!doctype html>
           <div class="section-head">
             <div>
               <div class="eyebrow">Projection</div>
-              <h3>Sync preview</h3>
+              <h3>Route sync</h3>
             </div>
-            <button class="ghost-button" id="syncButton" type="button">Preview sync counts</button>
+            <button class="ghost-button" id="syncButton" type="button">Sync route projection</button>
           </div>
           <div id="syncStatus" class="status-banner info">
-            Preview-only lane: no Neo4j mutation is attempted in this slice.
+            Route-scoped sync is available when Neo4j credentials are ready; otherwise this lane falls back to preview counts.
           </div>
         </div>
       </aside>
@@ -698,13 +698,21 @@ INDEX_TEMPLATE = """<!doctype html>
       }
 
       function renderHero() {
+        const neo4jConfigured = state.health?.neo4j_configured ?? boot.neo4j.configured;
+        const neo4jReady = state.health?.neo4j_ready ?? boot.neo4j.ready;
+        const neo4jChip = neo4jReady
+          ? "route sync ready"
+          : neo4jConfigured
+            ? "preview fallback"
+            : "not configured";
         q("routeChip").textContent = state.route || boot.route_default;
         q("heroChips").innerHTML = `
-          <span class="chip"><strong>Neo4j</strong> ${boot.neo4j.configured ? "configured preview" : "deferred preview"}</span>
+          <span class="chip"><strong>Neo4j</strong> ${neo4jChip}</span>
+          <span class="chip"><strong>Database</strong> ${escapeHtml(boot.neo4j.database || "n/a")}</span>
           <span class="chip"><strong>ToS mount</strong> ${state.health?.tos_root_exists ? "present" : "missing"}</span>
           <span class="chip"><strong>Routes visible</strong> ${state.routes.length}</span>
         `;
-        q("heroNote").textContent = boot.neo4j.note;
+        q("heroNote").textContent = state.health?.neo4j_note || boot.neo4j.note;
       }
 
       function renderMetrics() {
@@ -941,10 +949,18 @@ INDEX_TEMPLATE = """<!doctype html>
         const banner = q("syncStatus");
         if (!state.syncResult) {
           banner.className = "status-banner info";
-          banner.textContent = boot.neo4j.note;
+          banner.textContent = state.health?.neo4j_note || boot.neo4j.note;
           return;
         }
-        banner.className = "status-banner ok";
+        const deletedNote = typeof state.syncResult.deleted_node_count === "number" || typeof state.syncResult.deleted_edge_count === "number"
+          ? ` Cleared ${state.syncResult.deleted_node_count || 0} prior nodes and ${state.syncResult.deleted_edge_count || 0} prior edges for this route before reproject.`
+          : "";
+        if (state.syncResult.status === "route_synced") {
+          banner.className = "status-banner ok";
+          banner.innerHTML = `Route sync for <span class="code">${escapeHtml(state.syncResult.route)}</span>: ${state.syncResult.node_count} nodes, ${state.syncResult.edge_count} edges, target <span class="code">${escapeHtml(state.syncResult.projection_target)}</span>. ${escapeHtml(state.syncResult.note)}${escapeHtml(deletedNote)}`;
+          return;
+        }
+        banner.className = "status-banner info";
         banner.innerHTML = `Preview sync for <span class="code">${escapeHtml(state.syncResult.route)}</span>: ${state.syncResult.node_count} nodes, ${state.syncResult.edge_count} edges, target <span class="code">${escapeHtml(state.syncResult.projection_target)}</span>. ${escapeHtml(state.syncResult.note)}`;
       }
 
@@ -999,10 +1015,15 @@ INDEX_TEMPLATE = """<!doctype html>
         }
       }
 
-      async function previewSync() {
+      function syncButtonLabel() {
+        const neo4jReady = state.health?.neo4j_ready ?? boot.neo4j.ready;
+        return neo4jReady ? "Sync route projection" : "Preview sync counts";
+      }
+
+      async function syncRouteProjection() {
         if (!state.route) return;
         q("syncButton").disabled = true;
-        q("syncButton").textContent = "Previewing...";
+        q("syncButton").textContent = "Syncing...";
         try {
           state.syncResult = await fetchJson(`/api/project/sync?route=${encodeURIComponent(state.route)}`, { method: "POST" });
           renderSyncStatus();
@@ -1011,18 +1032,19 @@ INDEX_TEMPLATE = """<!doctype html>
           q("syncStatus").textContent = error.message || String(error);
         } finally {
           q("syncButton").disabled = false;
-          q("syncButton").textContent = "Preview sync counts";
+          q("syncButton").textContent = syncButtonLabel();
         }
       }
 
       async function bootstrap() {
-        q("syncButton").addEventListener("click", previewSync);
+        q("syncButton").addEventListener("click", syncRouteProjection);
         window.addEventListener("hashchange", () => {
           const route = routeFromHash();
           if (route && route !== state.route) void loadRoute(route);
         });
         await loadRoutes();
         await loadRoute(state.route || boot.route_default);
+        q("syncButton").textContent = syncButtonLabel();
       }
 
       void bootstrap();
@@ -1040,8 +1062,10 @@ def render_index(settings: TosGraphSettings, neo4j_status: Neo4jStoreStatus) -> 
             "write_enabled": settings.write_enabled,
             "neo4j": {
                 "configured": neo4j_status.configured,
+                "ready": neo4j_status.ready,
                 "uri": neo4j_status.uri,
                 "user": neo4j_status.user,
+                "database": neo4j_status.database,
                 "note": neo4j_status.note,
             },
         },

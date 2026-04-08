@@ -198,9 +198,9 @@ scripts/aoa-smoke --profile federation
 
 ### What it is for
 
-A preview-first route helper for Tree of Sophia graph curation.
+A route-first helper for Tree of Sophia graph curation.
 This slice uses the storage substrate so `neo4j` is available, but it keeps the
-helper itself read-first and localhost-only.
+helper itself projection-only, read-first, and localhost-only.
 Machine-fit overlays that do not touch the selected services are skipped
 automatically in this profile, so it does not silently pull in `llama-cpp`.
 
@@ -224,6 +224,9 @@ scripts/aoa-smoke --profile curation
 
 Before launch, ensure `AOA_TOS_ROOT` points at the real `Tree-of-Sophia`
 checkout and `Secrets/Configs/tos-graph.env` exists in the deployed runtime.
+If `TOS_GRAPH_NEO4J_PASSWORD` is not set there, `tos-graph` falls back to the
+mounted `${AOA_STACK_ROOT}/Configs/stack.env` and derives the password from
+`NEO4J_AUTH`.
 
 ## `tools`
 

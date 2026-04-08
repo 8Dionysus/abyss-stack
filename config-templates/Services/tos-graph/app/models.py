@@ -11,6 +11,9 @@ class HealthResponse(BaseModel):
     route_default: str
     write_enabled: bool
     projection_mode: str
+    neo4j_configured: bool
+    neo4j_ready: bool
+    neo4j_note: str
     tos_root: str
     tos_root_exists: bool
 
@@ -50,3 +53,5 @@ class ProjectSyncResponse(BaseModel):
     edge_count: int
     projection_target: str
     note: str
+    deleted_node_count: int | None = None
+    deleted_edge_count: int | None = None

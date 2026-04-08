@@ -6,11 +6,13 @@ services:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/tos-graph.env"
     environment:
       TOS_GRAPH_CONFIG_PATH: /app/config/config.yaml
+      TOS_GRAPH_STACK_ENV_PATH: /app/config/runtime-stack.env
       TOS_GRAPH_TOS_ROOT: /workspace/Tree-of-Sophia
       TOS_GRAPH_LOG_ROOT: /app/logs
       TOS_GRAPH_WRITE_ENABLED: "${TOS_GRAPH_WRITE_ENABLED:-false}"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/tos-graph/config.yaml:/app/config/config.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/stack.env:/app/config/runtime-stack.env:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/tos-graph:/app/logs:Z"
       - "${AOA_TOS_ROOT:-/srv/Tree-of-Sophia}:/workspace/Tree-of-Sophia:ro,Z"
     depends_on:

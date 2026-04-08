@@ -9,7 +9,8 @@ source:
   registry_root: tree/registries
 
 projection:
-  mode: preview_only
+  mode: route_sync
+  database: neo4j
   neo4j_shadow: true
 
 ui:

@@ -81,6 +81,11 @@ Related stack-level defaults that usually belong in `/srv/abyss-stack/Configs/st
 - `AOA_TOS_ROOT=/srv/Tree-of-Sophia`
 - `AOA_TOS_GRAPH_HOST_PORT=5410`
 - `TOS_GRAPH_WRITE_ENABLED=false`
+- `NEO4J_AUTH=neo4j/<runtime-secret>`
+
+If `TOS_GRAPH_NEO4J_PASSWORD` is omitted from `tos-graph.env`, the helper
+derives Neo4j credentials from the mounted stack-level `NEO4J_AUTH` value at
+runtime instead of duplicating the secret into a second committed example.
 
 ## Minimum expectation
 

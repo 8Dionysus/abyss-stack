@@ -52,17 +52,17 @@ It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}
 
 ### `curation`
 
-A preview-first ToS graph helper surface:
+A route-first ToS graph helper surface:
 - `10-storage.yml`
 - `52-tos-graph.yml`
 
 This profile keeps the route helper on top of the storage substrate so `neo4j`
 is available without silently widening the rest of the runtime.
 The current slice stays read-first: it loads canonical ToS files from
-`AOA_TOS_ROOT`, exposes a localhost-only helper on `5410`, and keeps writeback
-deferred. Machine-fit overlays that do not touch these services are skipped
-automatically, so `curation` stays narrow even when the host has a broader
-runtime recommendation on file.
+`AOA_TOS_ROOT`, exposes a localhost-only helper on `5410`, syncs route-scoped
+projection state into Neo4j, and keeps writeback deferred. Machine-fit overlays
+that do not touch these services are skipped automatically, so `curation` stays
+narrow even when the host has a broader runtime recommendation on file.
 
 ### `tools`
 
@@ -169,7 +169,7 @@ aoa-up --profile agentic --profile federation
 
 If you want the live advisory consumer as well, enable `AOA_FEDERATED_RUN_ENABLED=true` for `langchain-api` before starting the combined profile.
 
-Bring up the preview-first ToS graph helper:
+Bring up the route-first ToS graph helper:
 
 ```bash
 aoa-profile-modules --profile curation --paths

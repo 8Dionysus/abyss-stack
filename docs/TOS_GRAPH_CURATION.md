@@ -40,13 +40,16 @@ The bounded first route is:
 
 ## Dry-run-first landing order
 
-This owner-repo landing stays preview-first:
+This owner-repo landing stays projection-first:
 
 1. define the contract and quest anchors
 2. land a read-only vertical slice
-3. verify route-first projection, inspector posture, and localhost bind
+3. verify route-first projection sync, inspector posture, and localhost bind
 4. keep curation-profile launch narrow even when unrelated machine-fit overlays exist
 5. only then consider validator-gated patch preview and apply
+
+The current landed slice has completed step `3` for route-scoped Neo4j sync.
+Writeback remains intentionally deferred.
 
 Do not jump straight to canonical writeback from a staging bundle.
 

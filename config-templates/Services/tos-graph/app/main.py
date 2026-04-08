@@ -13,16 +13,17 @@ from .models import (
     RouteListResponse,
     RouteTreeResponse,
 )
-from .neo4j_store import describe_neo4j_store
-from .projector import PreviewProjector
+from .neo4j_store import Neo4jProjectionStore, describe_neo4j_store
+from .projector import RouteProjector
 from .tos_reader import ToSReader, ToSReaderError
 from .ui import render_index
 
 
 settings = load_settings()
 reader = ToSReader(settings.tos_root, settings.route_default)
-neo4j_status = describe_neo4j_store(settings.neo4j_uri, settings.neo4j_user)
-projector = PreviewProjector(reader, neo4j_status)
+neo4j_status = describe_neo4j_store(settings)
+neo4j_store = Neo4jProjectionStore(settings, neo4j_status)
+projector = RouteProjector(reader, neo4j_status, neo4j_store)
 
 app = FastAPI(title="tos-graph", version="0.1.0")
 
@@ -44,6 +45,9 @@ def health() -> HealthResponse:
         route_default=settings.route_default,
         write_enabled=settings.write_enabled,
         projection_mode=settings.projection_mode,
+        neo4j_configured=neo4j_status.configured,
+        neo4j_ready=neo4j_status.ready,
+        neo4j_note=neo4j_status.note,
         tos_root=settings.tos_root.as_posix(),
         tos_root_exists=settings.tos_root.exists(),
     )
@@ -89,6 +93,6 @@ def edge_detail(edge_id: str) -> dict[str, Any]:
 @app.post("/api/project/sync", response_model=ProjectSyncResponse)
 def project_sync(route: str | None = None) -> ProjectSyncResponse:
     try:
-        return ProjectSyncResponse(**projector.sync_route_preview(route))
+        return ProjectSyncResponse(**projector.sync_route(route))
     except ToSReaderError as exc:
         raise _handle_reader_error(exc) from exc
