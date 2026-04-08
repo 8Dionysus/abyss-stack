@@ -50,6 +50,18 @@ It reads a mirrored `aoa-agents` contract seam, an `aoa-routing advisory seam`, 
 It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` and filesystem-first eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/`.
 `route-api` remains advisory-only in this shape, but when this profile is layered onto `agentic`, `langchain-api` may consume it through `POST /run/federated`.
 
+### `curation`
+
+A preview-first ToS graph helper surface:
+- `10-storage.yml`
+- `52-tos-graph.yml`
+
+This profile keeps the route helper on top of the storage substrate so `neo4j`
+is available without silently widening the rest of the runtime.
+The current slice stays read-first: it loads canonical ToS files from
+`AOA_TOS_ROOT`, exposes a localhost-only helper on `5410`, and keeps writeback
+deferred.
+
 ### `tools`
 
 Optional helper surfaces:
@@ -154,6 +166,22 @@ aoa-up --profile agentic --profile federation
 ```
 
 If you want the live advisory consumer as well, enable `AOA_FEDERATED_RUN_ENABLED=true` for `langchain-api` before starting the combined profile.
+
+Bring up the preview-first ToS graph helper:
+
+```bash
+aoa-profile-modules --profile curation --paths
+aoa-profile-endpoints --profile curation
+aoa-up --profile curation
+```
+
+Or layer it onto the current core substrate:
+
+```bash
+aoa-profile-modules --profile core --profile curation --paths
+aoa-profile-endpoints --profile core --profile curation
+aoa-up --profile core --profile curation
+```
 
 Bring up an agent runtime plus tools and observability:
 

@@ -16,6 +16,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/dashboards" \
   "${AOA_STACK_ROOT}/Configs/tts" \
   "${AOA_STACK_ROOT}/Configs/ollama" \
+  "${AOA_STACK_ROOT}/Configs/tos-graph" \
   "${AOA_STACK_ROOT}/Secrets/Configs" \
   "${AOA_STACK_ROOT}/Services" \
   "${AOA_STACK_ROOT}/Services/litellm" \
@@ -35,6 +36,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Logs/memo-exports/records" \
   "${AOA_STACK_ROOT}/Logs/rpg/latest" \
   "${AOA_STACK_ROOT}/Logs/rpg/records" \
+  "${AOA_STACK_ROOT}/Logs/tos-graph" \
   "${AOA_STACK_ROOT}/Logs/returns" \
   "${AOA_STACK_ROOT}/Logs/tts" \
   "${AOA_STACK_ROOT}/.codex-home"

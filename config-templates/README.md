@@ -23,12 +23,14 @@ scripts/aoa-bootstrap-configs
 - `Configs/monitoring/`
 - `Configs/tts/`
 - `Configs/ollama/`
+- `Configs/tos-graph/`
 - `Services/docs-api/`
 - `Services/aoa-browser/`
 - `Services/langchain-api/`
 - `Services/litellm/`
 - `Services/qwen3-tts-api/`
 - `Services/route-api/`
+- `Services/tos-graph/`
 - `Services/tts_router/`
 
 These `Services/*` entries are source-managed build contexts for lightweight

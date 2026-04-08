@@ -1,0 +1,53 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0008
+title: Land a route-first ToS graph curation surface without turning Neo4j into source truth
+summary: Establish the runtime-owned contract, quest anchor, and staged rollout path for a localhost ToS graph helper while keeping Tree-of-Sophia canonical and validator-gated.
+repo: abyss-stack
+owner_surface: runtime/tos-graph-curation
+theme_ref: ''
+milestone_ref: ''
+kind: rollout
+state: captured
+band: frontier
+difficulty: d3_seam
+risk: r2_contract
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: conductor
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 2
+  ambiguity: 2
+  boundary: 3
+  verification: 3
+parent: null
+depends_on: []
+activation:
+  mode: manual
+  note: open when the route-first ToS graph helper is ready for a real owner-repo rollout in abyss-stack
+anchor_ref:
+  artifact: tos_graph_curation
+  ref: docs/TOS_GRAPH_CURATION.md
+  note: the helper stays runtime-owned, route-first, localhost-only, and subordinate to Tree-of-Sophia canonical truth
+handoff_role: runtime-maintainer
+evidence:
+  - route-first helper posture is explicit before implementation widens
+  - Neo4j remains projection-only and not canonical truth
+  - Tree-of-Sophia validator gating stays explicit for any later write path
+  - mirrored tos-source surfaces are not treated as canonical edit inputs
+harvest:
+  target: none
+opened_at: '2026-04-08'
+touched_at: '2026-04-08'
+tags:
+  - tos
+  - graph
+  - neo4j
+  - runtime
+  - curation
+notes: >
+  Keep the first landing contract-only and preview-first.
+  Do not enable live writeback, widen host exposure, or let the helper absorb ToS authored meaning in this pass.
+public_safe: true

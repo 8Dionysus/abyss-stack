@@ -22,6 +22,7 @@ Do not use it for:
 - `ABYSS-STACK-Q-0005` — land the first runtime and frontend service contracts for the AoA RPG layer without absorbing upstream meaning
 - `ABYSS-STACK-Q-0006` — materialize filesystem-first RPG runtime collections and derived bundles without widening route or quest authority
 - `ABYSS-STACK-Q-0007` — unify the runtime diagnostic spine with session-level diagnosis and repair handoff without widening repair authority
+- `ABYSS-STACK-Q-0008` — land a route-first ToS graph curation surface without turning Neo4j into source truth
 
 ## Near
 - `ABYSS-STACK-Q-0004` — capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift

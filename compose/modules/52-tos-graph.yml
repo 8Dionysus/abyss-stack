@@ -1,0 +1,27 @@
+services:
+  tos-graph:
+    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/tos-graph"
+    container_name: tos-graph
+    env_file:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/tos-graph.env"
+    environment:
+      TOS_GRAPH_CONFIG_PATH: /app/config/config.yaml
+      TOS_GRAPH_TOS_ROOT: /workspace/Tree-of-Sophia
+      TOS_GRAPH_LOG_ROOT: /app/logs
+      TOS_GRAPH_WRITE_ENABLED: "${TOS_GRAPH_WRITE_ENABLED:-false}"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/tos-graph/config.yaml:/app/config/config.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/tos-graph:/app/logs:Z"
+      - "${AOA_TOS_ROOT:-/srv/Tree-of-Sophia}:/workspace/Tree-of-Sophia:ro,Z"
+    depends_on:
+      neo4j:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${AOA_TOS_GRAPH_HOST_PORT:-5410}:5410"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5410/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped

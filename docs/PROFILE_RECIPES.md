@@ -194,6 +194,35 @@ scripts/aoa-wait --profile federation
 scripts/aoa-smoke --profile federation
 ```
 
+## `curation`
+
+### What it is for
+
+A preview-first route helper for Tree of Sophia graph curation.
+This slice uses the storage substrate so `neo4j` is available, but it keeps the
+helper itself read-first and localhost-only.
+
+### Host-facing endpoints
+
+- `postgres` -> `127.0.0.1:5432`
+- `redis` -> `127.0.0.1:6379`
+- `qdrant` -> `http://127.0.0.1:6333/`
+- `neo4j` -> `http://127.0.0.1:7474/`
+- `tos-graph` -> `http://127.0.0.1:5410/health`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile curation
+scripts/aoa-render-services --profile curation
+scripts/aoa-up --profile curation
+scripts/aoa-wait --profile curation
+scripts/aoa-smoke --profile curation
+```
+
+Before launch, ensure `AOA_TOS_ROOT` points at the real `Tree-of-Sophia`
+checkout and `Secrets/Configs/tos-graph.env` exists in the deployed runtime.
+
 ## `tools`
 
 ### What it is for

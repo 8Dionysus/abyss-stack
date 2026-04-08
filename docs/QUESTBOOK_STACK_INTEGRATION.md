@@ -21,6 +21,7 @@ Use stable anchors such as:
 - `docs/PRESETS.md`
 - `docs/PROFILE_RECIPES.md`
 - `docs/RPG_RUNTIME_FRONTEND_POSTURE.md`
+- `docs/TOS_GRAPH_CURATION.md`
 - `docs/RENDER_TRUTH.md`
 - `docs/FIRST_RUN.md`
 - `docs/DOCTOR.md`

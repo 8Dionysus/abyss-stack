@@ -117,6 +117,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
     ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
     ROOT / "docs" / "DIAGNOSTIC_SPINE.md",
+    ROOT / "docs" / "TOS_GRAPH_CURATION.md",
     ROOT / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
     ROOT / "docs" / "RPG_RUNTIME_BUILDERS.md",
     ROOT / "docs" / "RPG_ROUTE_API_SEAM.md",
@@ -156,10 +157,14 @@ REQUIRED_FILES = {
     ROOT / "compose" / "modules" / "32-llamacpp-inference.yml",
     ROOT / "compose" / "modules" / "43-federation-router.yml",
     ROOT / "compose" / "modules" / "44-llamacpp-agent-sidecar.yml",
+    ROOT / "compose" / "modules" / "52-tos-graph.yml",
+    ROOT / "compose" / "profiles" / "curation.txt",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml",
     ROOT / "config-templates" / "Configs" / "agent-api" / "governed-canary-catalog.json",
+    ROOT / "config-templates" / "Configs" / "tos-graph" / "README.md",
+    ROOT / "config-templates" / "Configs" / "tos-graph" / "config.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-agents.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-memo.yaml",
@@ -175,6 +180,14 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "route-api" / "Dockerfile",
     ROOT / "config-templates" / "Services" / "route-api" / "requirements.txt",
     ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "requirements.txt",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "config.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "main.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "models.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "neo4j_store.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "projector.py",
+    ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "tos_reader.py",
     ROOT / "schemas" / "runtime-benchmark.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-policy.schema.json",
     ROOT / "schemas" / "runtime-governed-execution-request.schema.json",
@@ -290,6 +303,7 @@ QUEST_IDS = (
     "ABYSS-STACK-Q-0005",
     "ABYSS-STACK-Q-0006",
     "ABYSS-STACK-Q-0007",
+    "ABYSS-STACK-Q-0008",
 )
 QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
@@ -350,6 +364,7 @@ MODULE_REQUIREMENTS = {
     "40-llm-gateway.yml": {"30-local-inference.yml"},
     "41-agent-api.yml": {"32-llamacpp-inference.yml"},
     "42-agent-api-intel.yml": {"41-agent-api.yml", "31-intel-inference.yml"},
+    "52-tos-graph.yml": {"10-storage.yml"},
 }
 
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".zip", ".pyc"}

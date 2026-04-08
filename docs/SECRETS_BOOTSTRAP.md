@@ -65,6 +65,23 @@ printf '%s\n' 'CHANGE_ME_REAL_VALUE' > /srv/abyss-stack/Secrets/Configs/ovms_api
 chmod 600 /srv/abyss-stack/Secrets/Configs/ovms_api_key.txt
 ```
 
+### 5. ToS graph helper env
+
+Real location:
+- `/srv/abyss-stack/Secrets/Configs/tos-graph.env`
+
+Bootstrap from example:
+
+```bash
+cp env/tos-graph.env.example /srv/abyss-stack/Secrets/Configs/tos-graph.env
+chmod 600 /srv/abyss-stack/Secrets/Configs/tos-graph.env
+```
+
+Related stack-level defaults that usually belong in `/srv/abyss-stack/Configs/stack.env`:
+- `AOA_TOS_ROOT=/srv/Tree-of-Sophia`
+- `AOA_TOS_GRAPH_HOST_PORT=5410`
+- `TOS_GRAPH_WRITE_ENABLED=false`
+
 ## Minimum expectation
 
 Before trying to run the full Intel-aware or agentic surface, ensure that these paths exist in real form.

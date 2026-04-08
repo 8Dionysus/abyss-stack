@@ -84,6 +84,10 @@ if has_module "43-federation-router.yml"; then
   aoa_probe_http "route-api tos" "http://127.0.0.1:5402/kag/tos-export" || failures=$((failures + 1))
 fi
 
+if has_module "52-tos-graph.yml"; then
+  aoa_probe_http "tos-graph" "http://127.0.0.1:5410/health" || failures=$((failures + 1))
+fi
+
 if has_module "50-speech.yml"; then
   aoa_probe_http "qwen-tts" "http://127.0.0.1:5101/health" || failures=$((failures + 1))
   aoa_probe_http "tts-router" "http://127.0.0.1:5201/health" || failures=$((failures + 1))

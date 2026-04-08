@@ -83,6 +83,13 @@ This file maps the first migrated runtime modules to their intended services.
 - `docs-api` — internal docs helper surface
 - `aoa-browser` — internal browser automation helper
 
+## `52-tos-graph.yml`
+
+- `tos-graph` — preview-first route helper for Tree of Sophia graph curation on `5410`
+- reads canonical ToS source files from the mounted `AOA_TOS_ROOT`
+- keeps Neo4j in projection-only posture and does not treat mirrored `tos-source` advisory surfaces as canonical edit input
+- current first slice exposes health and route/tree/graph inspection APIs while writeback remains deferred
+
 ## `60-monitoring.yml`
 
 - `prometheus` — metrics collection
@@ -105,6 +112,7 @@ Expected localhost-only services include:
 - langchain-api
 - langchain-api-llamacpp
 - route-api
+- tos-graph
 - qwen-tts
 - tts-router
 - prometheus

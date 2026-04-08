@@ -288,6 +288,15 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "tos-source tiny entry route schema" "${AOA_STACK_ROOT}/Knowledge/federation/tos-source/schemas/tos-tiny-entry-route.schema.json"
 fi
 
+if ((selection_metadata_ready)) && has_module "52-tos-graph.yml"; then
+  aoa_note "selected runtime includes 52-tos-graph.yml; checking preview-first ToS graph helper surfaces"
+  check_dir "${AOA_STACK_ROOT}/Logs/tos-graph"
+  check_warn_file "tos-graph env" "${AOA_STACK_ROOT}/Secrets/Configs/tos-graph.env"
+  check_warn_file "tos-graph config" "${AOA_STACK_ROOT}/Configs/tos-graph/config.yaml"
+  check_warn_file "tos-graph Dockerfile" "${AOA_STACK_ROOT}/Services/tos-graph/Dockerfile"
+  check_warn_file "tos-graph main app" "${AOA_STACK_ROOT}/Services/tos-graph/app/main.py"
+fi
+
 if ((errors > 0)); then
   aoa_die "layout check failed with ${errors} hard errors"
 fi

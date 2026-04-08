@@ -1,0 +1,17 @@
+service:
+  name: tos-graph
+  port: 5410
+
+source:
+  route_default: friedrich-nietzsche/thus-spoke-zarathustra/prologue-1
+  tree_root: tree
+  relation_root: tree/relations
+  registry_root: tree/registries
+
+projection:
+  mode: preview_only
+  neo4j_shadow: true
+
+ui:
+  mode: api_plus_minimal_html
+  route_first: true

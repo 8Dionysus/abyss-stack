@@ -15,6 +15,7 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `modules/44-llamacpp-agent-sidecar.yml`
 - `modules/50-speech.yml`
 - `modules/51-browser-tools.yml`
+- `modules/52-tos-graph.yml`
 - `modules/60-monitoring.yml`
 
 `41-agent-api.yml` may consume a public-safe return policy file from `Configs/agent-api/return-policy.yaml`.
@@ -24,6 +25,7 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `profiles/core.txt`
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
+- `profiles/curation.txt`
 - `profiles/tools.txt`
 - `profiles/observability.txt`
 
