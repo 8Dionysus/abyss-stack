@@ -54,13 +54,29 @@ scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llam
 `vulkan-lab` is a dedicated image-seam packet, not just a device flag. It
 swaps `llama-cpp` to `ghcr.io/ggml-org/llama.cpp:server-vulkan` for that run.
 
+Before screening a new donor, open or create its entry in
+[MODEL_CARDS](MODEL_CARDS.md) and keep the donor explicit in the packet.
+
+Model-card-first Intel text screening:
+
+```bash
+scripts/aoa-sync-configs
+export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
+export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
+podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
+scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
+scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
+```
+
 For the first explicit non-`llama.cpp` Intel text lane, use the standalone OVMS sidecar lab packet instead of rewriting the canonical profile:
 
 ```bash
 scripts/aoa-sync-configs
-podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-phi35-mini-int4-gpu-lab.yml up -d
+export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
+export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
+podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
-scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Phi-3.5-mini-instruct-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-phi35-mini-int4-gpu-lab"
+scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
 ```
 
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full operator contract.

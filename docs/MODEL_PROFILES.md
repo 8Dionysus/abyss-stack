@@ -7,6 +7,8 @@ This document defines class-based model profiles for `abyss-stack`.
 It does not name one true vendor or one permanent model brand.
 It defines the infra-facing profile classes the stack should be able to host.
 
+For family- or variant-specific operating notes, use [MODEL_CARDS](MODEL_CARDS.md).
+
 ## Core rule
 
 `abyss-stack` owns runtime profile posture, not agent-layer tier meaning.
@@ -88,6 +90,14 @@ Each runtime profile should be able to name:
 - `storage_tier`
 - `serving_path`
 - `quantization_or_runtime_variant`
+
+## Relationship to model cards
+
+Keep the split explicit:
+
+- `MODEL_PROFILES` says what class of runtime posture a lane belongs to
+- `MODEL_CARDS` says which concrete family or variant currently fits that lane
+- promotion still belongs to machine-fit, pilot, and benchmark surfaces
 
 ## Storage posture
 

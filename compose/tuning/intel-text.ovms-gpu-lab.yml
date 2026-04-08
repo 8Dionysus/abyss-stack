@@ -9,10 +9,10 @@ services:
     devices:
       - /dev/dri:/dev/dri
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/ovms-text-phi35-mini-int4:/models:U,Z"
+      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/ovms-text-lab:/models:U,Z"
     command:
       - --source_model
-      - "${AOA_OVMS_TEXT_SOURCE_MODEL:-OpenVINO/Phi-3.5-mini-instruct-int4-ov}"
+      - "${AOA_OVMS_TEXT_SOURCE_MODEL:?set AOA_OVMS_TEXT_SOURCE_MODEL from MODEL_CARDS.md}"
       - --model_repository_path
       - /models
       - --rest_port
@@ -46,7 +46,7 @@ services:
     environment:
       LC_BASE_URL: "http://ovms-intel-text:8000/v3"
       LC_API_KEY: "${AOA_OVMS_TEXT_API_KEY:-EMPTY}"
-      LC_MODEL: "${AOA_OVMS_TEXT_MODEL_NAME:-OpenVINO/Phi-3.5-mini-instruct-int4-ov}"
+      LC_MODEL: "${AOA_OVMS_TEXT_MODEL_NAME:?set AOA_OVMS_TEXT_MODEL_NAME from MODEL_CARDS.md}"
       LC_TIMEOUT_S: 300
       LC_OLLAMA_NATIVE_CHAT: "false"
       LC_OPENAI_LITERAL_COMPLETIONS: "true"
