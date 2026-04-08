@@ -38,6 +38,7 @@ The agentic surface plus the current reviewed Intel-oriented serving seam throug
 
 In the current promoted posture, this routes embeddings to OVMS while keeping the canonical chat path on `llama.cpp`.
 That does not freeze the broader Intel-serving family to embeddings-only forever; wider OVMS, OpenVINO, or OpenVINO GenAI model lanes stay additive and separately reviewed.
+The canonical `langchain-api` path now keeps its text target behind a generic runtime-chat seam, so additive Intel text lanes can be configured explicitly without changing what this profile promotes by default.
 
 ### `federation`
 

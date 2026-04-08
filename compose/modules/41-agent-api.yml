@@ -5,9 +5,10 @@ services:
     env_file:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
-      LC_BASE_URL: http://llama-cpp:8080/v1
-      LC_API_KEY: EMPTY
-      LC_MODEL: "${AOA_LLAMACPP_MODEL_ALIAS:-qwen3.5:9b}"
+      AOA_RUNTIME_CHAT_BASE_URL: "${AOA_RUNTIME_CHAT_BASE_URL:-http://llama-cpp:8080/v1}"
+      AOA_RUNTIME_CHAT_API_KEY: "${AOA_RUNTIME_CHAT_API_KEY:-EMPTY}"
+      AOA_RUNTIME_CHAT_MODEL: "${AOA_RUNTIME_CHAT_MODEL:-qwen3.5:9b}"
+      AOA_LLAMACPP_MODEL_ALIAS: "${AOA_LLAMACPP_MODEL_ALIAS:-qwen3.5:9b}"
       LC_TIMEOUT_S: 300
       LC_OLLAMA_THINK: "false"
       LC_OLLAMA_NATIVE_CHAT: "${LC_OLLAMA_NATIVE_CHAT:-false}"

@@ -35,6 +35,7 @@ This file maps the first migrated runtime modules to their intended services.
 ## `41-agent-api.yml`
 
 - `langchain-api` — canonical agent-facing runtime API on `5403`
+- resolves its chat target through a generic runtime-chat seam, with the reviewed default still pointing at `llama.cpp`
 - default embeddings path — disabled unless an explicit embeddings backend is layered in
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
@@ -46,6 +47,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 - `langchain-api` overlay — switches the current reviewed embeddings path to OVMS
 - adds explicit OVMS runtime dependency for Intel-aware profiles
+- does not silently promote an Intel-served text lane, but it can support one when the generic runtime-chat seam is explicitly repointed and separately reviewed
 
 ## `44-llamacpp-agent-sidecar.yml`
 

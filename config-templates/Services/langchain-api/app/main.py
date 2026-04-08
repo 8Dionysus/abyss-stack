@@ -22,9 +22,18 @@ app = FastAPI()
 THINK_TAG_PREFIX_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 LITERAL_REPLY_PROMPT_RE = re.compile(r"^Reply exactly with:\s*(.+?)\s*$", re.DOTALL)
 
-BASE_URL = os.getenv("LC_BASE_URL", "http://llama-cpp:8080/v1").rstrip("/")
-API_KEY = os.getenv("LC_API_KEY", "EMPTY")
-MODEL = os.getenv("LC_MODEL", "qwen3.5:9b")
+BASE_URL = os.getenv(
+    "LC_BASE_URL",
+    os.getenv("AOA_RUNTIME_CHAT_BASE_URL", "http://llama-cpp:8080/v1"),
+).rstrip("/")
+API_KEY = os.getenv("LC_API_KEY", os.getenv("AOA_RUNTIME_CHAT_API_KEY", "EMPTY"))
+MODEL = os.getenv(
+    "LC_MODEL",
+    os.getenv(
+        "AOA_RUNTIME_CHAT_MODEL",
+        os.getenv("AOA_LLAMACPP_MODEL_ALIAS", "qwen3.5:9b"),
+    ),
+)
 TIMEOUT = float(os.getenv("LC_TIMEOUT_S", "60"))
 OLLAMA_THINK = os.getenv("LC_OLLAMA_THINK", "false").strip().lower() in {"1", "true", "yes", "on"}
 OLLAMA_NATIVE_CHAT = os.getenv("LC_OLLAMA_NATIVE_CHAT", "true").strip().lower() in {

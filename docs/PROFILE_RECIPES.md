@@ -114,6 +114,7 @@ The Intel-aware agent runtime.
 This profile adds OVMS and applies the Intel overlay for the canonical agent API.
 In the current reviewed posture, embeddings move to OVMS while the canonical chat path stays on `llama.cpp`.
 Broader Intel-serving lanes remain additive and separately reviewed rather than silently promoted through this profile.
+If you are screening an explicit Intel-served text lane, point `langchain-api` at it through `LC_BASE_URL`, `LC_API_KEY`, and `LC_MODEL` in the secret `langchain-api.env` file rather than rewriting the profile itself.
 
 ### Host-facing endpoints
 
