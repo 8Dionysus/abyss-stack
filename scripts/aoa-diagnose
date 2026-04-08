@@ -98,8 +98,10 @@ fi
 aoa_resolve_modules
 
 export AOA_DIAG_RESOLVED_PRESETS="${AOA_STACK_PRESET}"
-export AOA_DIAG_RESOLVED_PROFILES="$(aoa_join_csv "${AOA_PROFILE_NAMES[@]}")"
-export AOA_DIAG_RESOLVED_MODULES="$(aoa_join_csv "${AOA_PROFILE_MODULE_NAMES[@]}")"
+AOA_DIAG_RESOLVED_PROFILES="$(aoa_join_csv "${AOA_PROFILE_NAMES[@]}")"
+AOA_DIAG_RESOLVED_MODULES="$(aoa_join_csv "${AOA_PROFILE_MODULE_NAMES[@]}")"
+export AOA_DIAG_RESOLVED_PROFILES
+export AOA_DIAG_RESOLVED_MODULES
 
 backend_args=(
   --truth-goal "$truth_goal"
