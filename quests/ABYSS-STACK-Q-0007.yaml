@@ -1,0 +1,59 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0007
+title: Unify runtime self-diagnosis spine with session-level diagnosis handoff without widening repair authority
+summary: Add a runtime-owned diagnostic spine that resolves target posture, normalizes runtime evidence into a diagnostic session artifact, and hands off to reviewed session diagnosis, repair, progression, or quest follow-through without silently mutating.
+repo: abyss-stack
+owner_surface: diagnostics/diagnostic-spine
+theme_ref: ''
+milestone_ref: ''
+kind: doctrine
+state: captured
+band: frontier
+difficulty: d3_seam
+risk: r2_contract
+control_mode: human_codex_copilot
+delegate_tier: planner
+fallback_tier: conductor
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: true
+complexity_basis:
+  scope: 3
+  ambiguity: 2
+  boundary: 3
+  verification: 3
+parent: null
+depends_on:
+  - ABYSS-STACK-Q-0002
+  - ABYSS-STACK-Q-0003
+  - ABYSS-STACK-Q-0006
+activation:
+  mode: manual
+  note: open when runtime-body self-diagnosis needs a stable session artifact and honest handoff to self-repair or quest harvest
+anchor_ref:
+  artifact: diagnostic_spine
+  ref: docs/DIAGNOSTIC_SPINE.md
+  note: runtime diagnosis stays a read model with handoff posture and must not grant mutation authority
+handoff_role: runtime-maintainer
+evidence:
+  - diagnostic target contract exists and resolves selectors into required checks and truth goal
+  - diagnostic session artifacts land under Logs/diagnostics/latest and records with public-safe posture
+  - drift taxonomy names closure, render-truth, posture, evidence, and governability gaps without collapsing them
+  - exit classes route honestly toward retest, governed repair, or manual regrounding
+  - reviewed session diagnosis and repair packets remain cited handoffs rather than absorbed canon
+harvest:
+  target: skill
+  trigger_count: 3
+  note: if the same diagnostic spine is used repeatedly as a bounded operator workflow, consider a thin local skill overlay sourced from aoa-skills
+opened_at: '2026-04-07'
+touched_at: '2026-04-07'
+tags:
+  - diagnostics
+  - self-diagnosis
+  - runtime
+  - repair-handoff
+  - rpg-reflection
+notes: >
+  Keep the landing contract-only in this pass.
+  Do not add free self-repair, global scoreboards, or new runtime quest authority in this pass.
+public_safe: true

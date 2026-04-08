@@ -44,7 +44,9 @@ PARITY_IGNORED_SUFFIXES = {".pyc"}
 
 REQUIRED_SCRIPTS = {
     "_aoa_governed_execution.py",
+    "_aoa_diagnose.py",
     "_aoa_status_autonomy.py",
+    "aoa-diagnose",
     "aoa-governed-run",
     "aoa-doctor",
     "aoa-host-facts",
@@ -114,6 +116,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
     ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
     ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
+    ROOT / "docs" / "DIAGNOSTIC_SPINE.md",
     ROOT / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
     ROOT / "docs" / "RPG_RUNTIME_BUILDERS.md",
     ROOT / "docs" / "RPG_ROUTE_API_SEAM.md",
@@ -181,6 +184,12 @@ REQUIRED_FILES = {
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
+    ROOT / "schemas" / "diagnostic_target.schema.json",
+    ROOT / "schemas" / "diagnostic_session.schema.json",
+    ROOT / "schemas" / "diagnosis_companion.schema.json",
+    ROOT / "schemas" / "diagnostic_anchor_ref.schema.json",
+    ROOT / "schemas" / "repair_handoff.schema.json",
+    ROOT / "schemas" / "reviewed_diagnosis_ref.schema.json",
     ROOT / "schemas" / "runtime-gateway-cache-status.schema.json",
     ROOT / "schemas" / "runtime-usage-snapshot.schema.json",
     ROOT / "schemas" / "agent_build_snapshot_collection.schema.json",
@@ -193,6 +202,12 @@ REQUIRED_FILES = {
     ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
+    ROOT / "examples" / "diagnostic_target.min.example.json",
+    ROOT / "examples" / "diagnostic_session.min.example.json",
+    ROOT / "examples" / "diagnosis_companion.min.example.json",
+    ROOT / "examples" / "diagnostic_anchor_ref.min.example.json",
+    ROOT / "examples" / "repair_handoff.min.example.json",
+    ROOT / "examples" / "reviewed_diagnosis_ref.min.example.json",
     ROOT / "examples" / "runtime_gateway_cache_status.gateway-local.example.json",
     ROOT / "examples" / "runtime_usage_snapshot.workhorse-local.example.json",
     ROOT / "generated" / "rpg" / "agent_build_snapshots.json",
@@ -202,7 +217,10 @@ REQUIRED_FILES = {
     ROOT / "tests" / "test_governed_execution.py",
     ROOT / "tests" / "test_validate_stack_required_files.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
+    ROOT / "tests" / "test_validate_stack_diagnostic_spine.py",
     ROOT / "tests" / "test_validate_stack_runtime_hygiene.py",
+    ROOT / "tests" / "test_diagnostic_spine_contracts.py",
+    ROOT / "tests" / "test_aoa_diagnose.py",
     ROOT / "tests" / "test_rpg_runtime_projection.py",
 }
 
@@ -230,8 +248,16 @@ RPG_RUNTIME_COLLECTIONS_PATH = Path("docs") / "RPG_RUNTIME_COLLECTIONS.md"
 RPG_RUNTIME_BUILDERS_PATH = Path("docs") / "RPG_RUNTIME_BUILDERS.md"
 RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
 RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
+DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
+DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
+DIAGNOSTIC_TARGET_SCHEMA_PATH = Path("schemas") / "diagnostic_target.schema.json"
+DIAGNOSTIC_SESSION_SCHEMA_PATH = Path("schemas") / "diagnostic_session.schema.json"
+DIAGNOSIS_COMPANION_SCHEMA_PATH = Path("schemas") / "diagnosis_companion.schema.json"
+DIAGNOSTIC_ANCHOR_REF_SCHEMA_PATH = Path("schemas") / "diagnostic_anchor_ref.schema.json"
+REPAIR_HANDOFF_SCHEMA_PATH = Path("schemas") / "repair_handoff.schema.json"
+REVIEWED_DIAGNOSIS_REF_SCHEMA_PATH = Path("schemas") / "reviewed_diagnosis_ref.schema.json"
 AGENT_BUILD_SNAPSHOT_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot.schema.json"
 REPUTATION_LEDGER_SCHEMA_PATH = Path("schemas") / "reputation_ledger.schema.json"
 QUEST_RUN_RESULT_SCHEMA_PATH = Path("schemas") / "quest_run_result.schema.json"
@@ -242,6 +268,12 @@ QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = Path("schemas") / "quest_run_result_co
 FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle_collection.schema.json"
 QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
+DIAGNOSTIC_TARGET_EXAMPLE_PATH = Path("examples") / "diagnostic_target.min.example.json"
+DIAGNOSTIC_SESSION_EXAMPLE_PATH = Path("examples") / "diagnostic_session.min.example.json"
+DIAGNOSIS_COMPANION_EXAMPLE_PATH = Path("examples") / "diagnosis_companion.min.example.json"
+DIAGNOSTIC_ANCHOR_REF_EXAMPLE_PATH = Path("examples") / "diagnostic_anchor_ref.min.example.json"
+REPAIR_HANDOFF_EXAMPLE_PATH = Path("examples") / "repair_handoff.min.example.json"
+REVIEWED_DIAGNOSIS_REF_EXAMPLE_PATH = Path("examples") / "reviewed_diagnosis_ref.min.example.json"
 AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = Path("examples") / "agent_build_snapshot.example.json"
 REPUTATION_LEDGER_EXAMPLE_PATH = Path("examples") / "reputation_ledger.example.json"
 QUEST_RUN_RESULT_EXAMPLE_PATH = Path("examples") / "quest_run_result.example.json"
@@ -257,6 +289,7 @@ QUEST_IDS = (
     "ABYSS-STACK-Q-0004",
     "ABYSS-STACK-Q-0005",
     "ABYSS-STACK-Q-0006",
+    "ABYSS-STACK-Q-0007",
 )
 QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
@@ -804,6 +837,23 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if not isinstance(notes, str) or "live /rpg/* endpoints" not in notes or "quest mutation" not in notes:
                 errors.append(
                     "ABYSS-STACK-Q-0006 notes must keep the no-live-endpoints and no-quest-mutation guardrails"
+                )
+        elif quest_id == "ABYSS-STACK-Q-0007":
+            if quest_payload.get("kind") != "doctrine":
+                errors.append("ABYSS-STACK-Q-0007 kind must stay doctrine")
+            anchor_ref = quest_payload.get("anchor_ref")
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/DIAGNOSTIC_SPINE.md":
+                errors.append(
+                    "ABYSS-STACK-Q-0007 must stay anchored to docs/DIAGNOSTIC_SPINE.md"
+                )
+            note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
+            if not isinstance(note, str) or "read model" not in note or "mutation authority" not in note:
+                errors.append(
+                    "ABYSS-STACK-Q-0007 anchor note must mention read model and mutation authority"
+                )
+            if not isinstance(notes, str) or "free self-repair" not in notes or "runtime quest authority" not in notes:
+                errors.append(
+                    "ABYSS-STACK-Q-0007 notes must keep the no-free-self-repair and no-runtime-quest-authority guardrails"
                 )
 
         try:
@@ -1765,6 +1815,360 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
                 )
 
 
+def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
+    def read_required_text(relative_path: Path) -> str:
+        try:
+            return (ROOT / relative_path).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            errors.append(f"missing required file: {relative_path.as_posix()}")
+            return ""
+
+    def read_required_json(relative_path: Path) -> dict[str, object] | None:
+        try:
+            payload = json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            errors.append(f"missing required file: {relative_path.as_posix()}")
+            return None
+        except json.JSONDecodeError as exc:
+            errors.append(f"{relative_path.as_posix()} must contain valid JSON: {exc}")
+            return None
+        if not isinstance(payload, dict):
+            errors.append(f"{relative_path.as_posix()} must contain a top-level JSON object")
+            return None
+        return payload
+
+    readme = read_required_text(Path("README.md"))
+    for snippet in (
+        "docs/DIAGNOSTIC_SPINE.md",
+        "schemas/diagnostic_target.schema.json",
+        "schemas/diagnostic_session.schema.json",
+        "schemas/diagnosis_companion.schema.json",
+        "schemas/diagnostic_anchor_ref.schema.json",
+        "schemas/repair_handoff.schema.json",
+        "schemas/reviewed_diagnosis_ref.schema.json",
+        "examples/diagnostic_target.min.example.json",
+        "examples/diagnostic_session.min.example.json",
+        "examples/diagnosis_companion.min.example.json",
+        "examples/diagnostic_anchor_ref.min.example.json",
+        "examples/repair_handoff.min.example.json",
+        "examples/reviewed_diagnosis_ref.min.example.json",
+        "quests/ABYSS-STACK-Q-0007.yaml",
+        "scripts/aoa-diagnose",
+    ):
+        if snippet not in readme:
+            errors.append(f"README.md must mention `{snippet}`")
+
+    spine_doc = read_required_text(DIAGNOSTIC_SPINE_PATH)
+    for snippet in (
+        "The goal is not a louder doctor.",
+        "The diagnostic spine is a read model with memory.",
+        "what path is being diagnosed",
+        "`diagnostic_target_v1`",
+        "`diagnostic_session_v1`",
+        "`diagnosis_companion_v1`",
+        "`diagnostic_anchor_ref_v1`",
+        "`repair_handoff_v1`",
+        "`reviewed_diagnosis_ref_v1`",
+        "Skill canon remains in `aoa-skills`.",
+        ".agents/skills/abyss-self-diagnostic-spine",
+        "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest",
+        "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest --write-last-good-ref",
+        "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest --write-reviewed-diagnosis-ref",
+        "scripts/aoa-diagnose --preset intel-full --with-reviewed-diagnosis-ref /path/to/reviewed-diagnosis.packet.json --write-latest",
+        "A strong diagnostic spine gives the system self-location before self-assertion.",
+    ):
+        if snippet not in spine_doc:
+            errors.append(f"{DIAGNOSTIC_SPINE_PATH.as_posix()} must mention `{snippet}`")
+
+    runbook_doc = read_required_text(Path("docs") / "RUNBOOK.md")
+    for snippet in (
+        "Logs/diagnostics/latest/",
+        "diagnostic_session_v1",
+        "aoa-diagnose",
+        "diagnostic_target.json",
+        "diagnosis_companion.json",
+        "last_good.ref.json",
+        "repair_handoff.json",
+        "reviewed_diagnosis.ref.json",
+    ):
+        if snippet not in runbook_doc:
+            errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")
+
+    target_schema = read_required_json(DIAGNOSTIC_TARGET_SCHEMA_PATH)
+    if target_schema and target_schema.get("title") != "abyss-stack diagnostic_target_v1":
+        errors.append("diagnostic_target.schema.json must describe abyss-stack diagnostic_target_v1")
+    if target_schema:
+        target_required = target_schema.get("required")
+        if not isinstance(target_required, list):
+            errors.append("diagnostic_target.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "preset",
+                "profiles",
+                "truth_goal",
+                "required_checks",
+                "drift_watch",
+                "public_safe",
+            ):
+                if field not in target_required:
+                    errors.append(f"diagnostic_target.schema.json must require `{field}`")
+
+    session_schema = read_required_json(DIAGNOSTIC_SESSION_SCHEMA_PATH)
+    if session_schema and session_schema.get("title") != "abyss-stack diagnostic_session_v1":
+        errors.append("diagnostic_session.schema.json must describe abyss-stack diagnostic_session_v1")
+    if session_schema:
+        session_required = session_schema.get("required")
+        if not isinstance(session_required, list):
+            errors.append("diagnostic_session.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "target",
+                "axes",
+                "truth_status",
+                "drifts",
+                "exit_class",
+                "public_safe",
+            ):
+                if field not in session_required:
+                    errors.append(f"diagnostic_session.schema.json must require `{field}`")
+
+    diagnosis_companion_schema = read_required_json(DIAGNOSIS_COMPANION_SCHEMA_PATH)
+    if diagnosis_companion_schema and diagnosis_companion_schema.get("title") != "abyss-stack diagnosis_companion_v1":
+        errors.append("diagnosis_companion.schema.json must describe abyss-stack diagnosis_companion_v1")
+    if diagnosis_companion_schema:
+        diagnosis_required = diagnosis_companion_schema.get("required")
+        if not isinstance(diagnosis_required, list):
+            errors.append("diagnosis_companion.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "artifact_kind",
+                "diagnostic_session_ref",
+                "diagnostic_session_id",
+                "target",
+                "review_status",
+                "summary",
+                "diagnoses",
+                "public_safe",
+            ):
+                if field not in diagnosis_required:
+                    errors.append(f"diagnosis_companion.schema.json must require `{field}`")
+
+    anchor_ref_schema = read_required_json(DIAGNOSTIC_ANCHOR_REF_SCHEMA_PATH)
+    if anchor_ref_schema and anchor_ref_schema.get("title") != "abyss-stack diagnostic_anchor_ref_v1":
+        errors.append("diagnostic_anchor_ref.schema.json must describe abyss-stack diagnostic_anchor_ref_v1")
+    if anchor_ref_schema:
+        anchor_required = anchor_ref_schema.get("required")
+        if not isinstance(anchor_required, list):
+            errors.append("diagnostic_anchor_ref.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "artifact_kind",
+                "anchor_class",
+                "target",
+                "diagnostic_session_id",
+                "diagnostic_session_path",
+                "diagnostic_target_path",
+                "truth_status",
+                "public_safe",
+            ):
+                if field not in anchor_required:
+                    errors.append(f"diagnostic_anchor_ref.schema.json must require `{field}`")
+
+    repair_handoff_schema = read_required_json(REPAIR_HANDOFF_SCHEMA_PATH)
+    if repair_handoff_schema and repair_handoff_schema.get("title") != "abyss-stack repair_handoff_v1":
+        errors.append("repair_handoff.schema.json must describe abyss-stack repair_handoff_v1")
+    if repair_handoff_schema:
+        handoff_required = repair_handoff_schema.get("required")
+        if not isinstance(handoff_required, list):
+            errors.append("repair_handoff.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "artifact_kind",
+                "diagnostic_session_ref",
+                "diagnostic_session_id",
+                "target",
+                "target_skill",
+                "target_owner_repo",
+                "handoff_readiness",
+                "checkpoint_posture",
+                "validation_refs",
+                "stop_conditions",
+                "escalation_routes",
+                "public_safe",
+            ):
+                if field not in handoff_required:
+                    errors.append(f"repair_handoff.schema.json must require `{field}`")
+
+    reviewed_diagnosis_ref_schema = read_required_json(REVIEWED_DIAGNOSIS_REF_SCHEMA_PATH)
+    if (
+        reviewed_diagnosis_ref_schema
+        and reviewed_diagnosis_ref_schema.get("title") != "abyss-stack reviewed_diagnosis_ref_v1"
+    ):
+        errors.append("reviewed_diagnosis_ref.schema.json must describe abyss-stack reviewed_diagnosis_ref_v1")
+    if reviewed_diagnosis_ref_schema:
+        review_required = reviewed_diagnosis_ref_schema.get("required")
+        if not isinstance(review_required, list):
+            errors.append("reviewed_diagnosis_ref.schema.json must declare a required field list")
+        else:
+            for field in (
+                "schema_version",
+                "artifact_kind",
+                "reviewed_at",
+                "reviewer",
+                "source_diagnosis_companion_ref",
+                "diagnostic_session_ref",
+                "diagnostic_session_id",
+                "target",
+                "skill_name",
+                "result_kind",
+                "review_verdict",
+                "summary",
+                "diagnosis_types",
+                "symptom_refs",
+                "probable_cause_hypotheses",
+                "confidence_band",
+                "owner_hints",
+                "public_safe",
+            ):
+                if field not in review_required:
+                    errors.append(f"reviewed_diagnosis_ref.schema.json must require `{field}`")
+
+    target_example = read_required_json(DIAGNOSTIC_TARGET_EXAMPLE_PATH)
+    if target_example:
+        if target_example.get("schema_version") != "diagnostic_target_v1":
+            errors.append("diagnostic target example must use schema_version diagnostic_target_v1")
+        if target_example.get("truth_goal") not in {"deployed", "trial_proven", "live_available"}:
+            errors.append("diagnostic target example must use a supported truth_goal")
+        required_checks = target_example.get("required_checks")
+        if not isinstance(required_checks, list) or not required_checks:
+            errors.append("diagnostic target example must include required_checks")
+        drift_watch = target_example.get("drift_watch")
+        if not isinstance(drift_watch, list) or not drift_watch:
+            errors.append("diagnostic target example must include drift_watch")
+        if target_example.get("public_safe") is not True:
+            errors.append("diagnostic target example must be public_safe")
+
+    session_example = read_required_json(DIAGNOSTIC_SESSION_EXAMPLE_PATH)
+    if session_example:
+        if session_example.get("schema_version") != "diagnostic_session_v1":
+            errors.append("diagnostic session example must use schema_version diagnostic_session_v1")
+        if session_example.get("repo") != "abyss-stack":
+            errors.append("diagnostic session example must set repo to abyss-stack")
+        truth_status = session_example.get("truth_status")
+        if not isinstance(truth_status, dict):
+            errors.append("diagnostic session example must include truth_status")
+        else:
+            for field in ("source_authored", "deployed", "trial_proven", "live_available"):
+                if not isinstance(truth_status.get(field), bool):
+                    errors.append(f"diagnostic session example truth_status.{field} must be boolean")
+        axes = session_example.get("axes")
+        if not isinstance(axes, dict):
+            errors.append("diagnostic session example must include axes")
+        else:
+            for field in (
+                "readiness",
+                "posture",
+                "render_truth",
+                "runtime_health",
+                "closure",
+                "evidence",
+                "governability",
+            ):
+                if axes.get(field) not in {"pass", "warn", "fail", "skipped", "unknown"}:
+                    errors.append(f"diagnostic session example axes.{field} must use a supported verdict")
+        if session_example.get("exit_class") not in {
+            "ready_to_start",
+            "running_as_intended",
+            "running_but_unproven",
+            "trial_proven_not_live",
+            "live_but_drifted",
+            "repairable_under_governance",
+            "manual_reground_required",
+        }:
+            errors.append("diagnostic session example must use a supported exit_class")
+        next_moves = session_example.get("next_moves")
+        if not isinstance(next_moves, list) or not next_moves:
+            errors.append("diagnostic session example must include next_moves")
+        if session_example.get("public_safe") is not True:
+            errors.append("diagnostic session example must be public_safe")
+
+    diagnosis_companion_example = read_required_json(DIAGNOSIS_COMPANION_EXAMPLE_PATH)
+    if diagnosis_companion_example:
+        if diagnosis_companion_example.get("schema_version") != "diagnosis_companion_v1":
+            errors.append("diagnosis companion example must use schema_version diagnosis_companion_v1")
+        if diagnosis_companion_example.get("review_status") not in {
+            "not_needed",
+            "candidate_review_required",
+            "reviewed_ref_supplied",
+        }:
+            errors.append("diagnosis companion example must use a supported review_status")
+        diagnoses = diagnosis_companion_example.get("diagnoses")
+        if not isinstance(diagnoses, list):
+            errors.append("diagnosis companion example must include diagnoses")
+        if diagnosis_companion_example.get("public_safe") is not True:
+            errors.append("diagnosis companion example must be public_safe")
+
+    anchor_ref_example = read_required_json(DIAGNOSTIC_ANCHOR_REF_EXAMPLE_PATH)
+    if anchor_ref_example:
+        if anchor_ref_example.get("schema_version") != "diagnostic_anchor_ref_v1":
+            errors.append("diagnostic anchor ref example must use schema_version diagnostic_anchor_ref_v1")
+        if anchor_ref_example.get("anchor_class") != "last_good":
+            errors.append("diagnostic anchor ref example must use anchor_class last_good")
+        if anchor_ref_example.get("repo") != "abyss-stack":
+            errors.append("diagnostic anchor ref example must set repo to abyss-stack")
+        if anchor_ref_example.get("public_safe") is not True:
+            errors.append("diagnostic anchor ref example must be public_safe")
+
+    repair_handoff_example = read_required_json(REPAIR_HANDOFF_EXAMPLE_PATH)
+    if repair_handoff_example:
+        if repair_handoff_example.get("schema_version") != "repair_handoff_v1":
+            errors.append("repair handoff example must use schema_version repair_handoff_v1")
+        if repair_handoff_example.get("target_skill") != "aoa-session-self-repair":
+            errors.append("repair handoff example must target aoa-session-self-repair")
+        if repair_handoff_example.get("target_owner_repo") != "aoa-skills":
+            errors.append("repair handoff example must set target_owner_repo to aoa-skills")
+        if repair_handoff_example.get("handoff_readiness") not in {
+            "not_needed",
+            "review_required",
+            "ready_for_review",
+            "blocked",
+        }:
+            errors.append("repair handoff example must use a supported handoff_readiness")
+        if repair_handoff_example.get("public_safe") is not True:
+            errors.append("repair handoff example must be public_safe")
+
+    reviewed_diagnosis_ref_example = read_required_json(REVIEWED_DIAGNOSIS_REF_EXAMPLE_PATH)
+    if reviewed_diagnosis_ref_example:
+        if reviewed_diagnosis_ref_example.get("schema_version") != "reviewed_diagnosis_ref_v1":
+            errors.append("reviewed diagnosis ref example must use schema_version reviewed_diagnosis_ref_v1")
+        if reviewed_diagnosis_ref_example.get("review_verdict") not in {
+            "ready_for_repair_handoff",
+            "retest_before_repair",
+            "not_repair_fit",
+        }:
+            errors.append("reviewed diagnosis ref example must use a supported review_verdict")
+        if reviewed_diagnosis_ref_example.get("skill_name") != "aoa-session-self-diagnose":
+            errors.append("reviewed diagnosis ref example must set skill_name to aoa-session-self-diagnose")
+        if reviewed_diagnosis_ref_example.get("public_safe") is not True:
+            errors.append("reviewed diagnosis ref example must be public_safe")
+
+    local_skill_root = ROOT / DIAGNOSTIC_SPINE_SKILL_PATH
+    local_skill_md = local_skill_root / "SKILL.md"
+    if not local_skill_root.is_dir():
+        errors.append(
+            f"{DIAGNOSTIC_SPINE_SKILL_PATH.as_posix()} must be installed as a local overlay surface"
+        )
+    elif not local_skill_md.is_file():
+        errors.append(
+            f"{DIAGNOSTIC_SPINE_SKILL_PATH.as_posix()} must contain SKILL.md"
+        )
+
+
 def validate_federation_landing(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/federation/" not in templates_readme:
@@ -2060,6 +2464,7 @@ def main() -> int:
     validate_kag_runtime_seam(errors)
     validate_return_runtime_contract(errors)
     validate_runtime_hygiene_contracts(errors)
+    validate_diagnostic_spine_contracts(errors)
     validate_federation_landing(errors)
     if args.parity_check:
         validate_deployed_parity(errors, Path(args.deployed_configs_root))

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/diagnostic_anchor_ref_v1.schema.json",
+  "title": "abyss-stack diagnostic_anchor_ref_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "anchor_class",
+    "id",
+    "repo",
+    "captured_at",
+    "target",
+    "diagnostic_session_id",
+    "diagnostic_session_path",
+    "diagnostic_target_path",
+    "exit_class",
+    "truth_status",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "diagnostic_anchor_ref_v1"
+    },
+    "artifact_kind": {
+      "const": "aoa.diagnostic.anchor-ref"
+    },
+    "anchor_class": {
+      "const": "last_good"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preset",
+        "profiles",
+        "truth_goal"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "truth_goal": {
+          "type": "string",
+          "enum": [
+            "deployed",
+            "trial_proven",
+            "live_available"
+          ]
+        }
+      }
+    },
+    "diagnostic_session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic_session_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic_target_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exit_class": {
+      "type": "string",
+      "enum": [
+        "ready_to_start",
+        "running_as_intended",
+        "running_but_unproven",
+        "trial_proven_not_live",
+        "live_but_drifted",
+        "repairable_under_governance",
+        "manual_reground_required"
+      ]
+    },
+    "truth_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_authored",
+        "deployed",
+        "trial_proven",
+        "live_available"
+      ],
+      "properties": {
+        "source_authored": {
+          "type": "boolean"
+        },
+        "deployed": {
+          "type": "boolean"
+        },
+        "trial_proven": {
+          "type": "boolean"
+        },
+        "live_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  }
+}

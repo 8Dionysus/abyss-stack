@@ -29,7 +29,7 @@ jobs:
         run: python scripts/validate_stack.py
 
       - name: Python syntax check
-        run: python -m py_compile scripts/validate_stack.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index scripts/aoa-rpg-runtime-projection
+        run: python -m py_compile scripts/validate_stack.py scripts/_aoa_diagnose.py scripts/_aoa_status_autonomy.py scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/aoa-host-facts scripts/aoa-local-ai-trials scripts/aoa-langgraph-pilot scripts/aoa-w5-pilot scripts/aoa-w6-pilot scripts/aoa-llamacpp-pilot scripts/aoa-runtime-bench-index scripts/aoa-rpg-runtime-projection
 
       - name: Run Python test suite
         run: python -m pytest -q
@@ -38,6 +38,7 @@ jobs:
         run: |
           shellcheck \
             scripts/aoa-lib.sh \
+            scripts/aoa-diagnose \
             scripts/aoa-doctor \
             scripts/aoa-install-layout \
             scripts/aoa-sync-federation-surfaces \

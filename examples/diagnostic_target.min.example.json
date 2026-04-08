@@ -1,0 +1,41 @@
+{
+  "schema_version": "diagnostic_target_v1",
+  "id": "intel-full-live",
+  "preset": "intel-full",
+  "profiles": [
+    "core",
+    "agentic",
+    "intel",
+    "federation"
+  ],
+  "truth_goal": "live_available",
+  "required_checks": [
+    "doctor",
+    "machine_fit",
+    "render_truth",
+    "smoke_with_internal",
+    "autonomy"
+  ],
+  "expected_services": [
+    "route-api",
+    "langchain-api",
+    "langgraph-api"
+  ],
+  "expected_internal_probes": [
+    "with_internal"
+  ],
+  "drift_watch": [
+    "host_posture_drift",
+    "render_truth_drift",
+    "closure_drift",
+    "evidence_gap",
+    "policy_gate_block"
+  ],
+  "fallback_candidates": [
+    "agent-full",
+    "ollama-control-path"
+  ],
+  "runtime_root": "/srv/abyss-stack",
+  "notes": "Example only. A real target should be resolved from the current selectors and repo posture.",
+  "public_safe": true
+}

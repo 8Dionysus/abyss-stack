@@ -1,0 +1,40 @@
+{
+  "schema_version": "diagnosis_companion_v1",
+  "artifact_kind": "aoa.diagnostic.diagnosis-companion",
+  "id": "diagnosis-diag-2026-04-07-intel-full-live",
+  "repo": "abyss-stack",
+  "captured_at": "2026-04-07T12:08:00Z",
+  "diagnostic_session_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/diagnostic_session.json",
+  "diagnostic_session_id": "diag-2026-04-07-intel-full-live",
+  "target": {
+    "preset": "intel-full",
+    "profiles": [
+      "intel",
+      "tools",
+      "observability"
+    ],
+    "truth_goal": "live_available"
+  },
+  "review_status": "candidate_review_required",
+  "summary": "The runtime is live but drifted, so the next honest move is to review this diagnosis companion before any REPAIR_PACKET is authored.",
+  "diagnoses": [
+    {
+      "drift_type": "noise_envelope",
+      "symptom": "Doctor reported a bounded readiness warning because the host is currently noisy for latency-sensitive trials.",
+      "probable_causes": [
+        "host loadavg remains elevated for the current machine shape"
+      ],
+      "repair_shape": "Wait for the envelope to settle or reduce competing local load before retrying the same diagnostic target.",
+      "owner_hint": "abyss-stack/runtime-envelope",
+      "confidence": "medium",
+      "evidence_refs": [
+        "command:bash /srv/abyss-stack/Configs/scripts/aoa-doctor"
+      ]
+    }
+  ],
+  "unknowns": [
+    "A reviewed diagnosis companion has not yet been supplied back into aoa-diagnose."
+  ],
+  "suggested_next_skill": "aoa-session-self-diagnose",
+  "public_safe": true
+}

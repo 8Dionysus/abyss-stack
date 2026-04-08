@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/diagnosis_companion_v1.schema.json",
+  "title": "abyss-stack diagnosis_companion_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "id",
+    "repo",
+    "captured_at",
+    "diagnostic_session_ref",
+    "diagnostic_session_id",
+    "target",
+    "review_status",
+    "summary",
+    "diagnoses",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "diagnosis_companion_v1"
+    },
+    "artifact_kind": {
+      "const": "aoa.diagnostic.diagnosis-companion"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "diagnostic_session_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic_session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preset",
+        "profiles",
+        "truth_goal"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "truth_goal": {
+          "type": "string",
+          "enum": [
+            "deployed",
+            "trial_proven",
+            "live_available"
+          ]
+        }
+      }
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "not_needed",
+        "candidate_review_required",
+        "reviewed_ref_supplied"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnoses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnosisItem"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reviewed_diagnosis_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "suggested_next_skill": {
+      "type": "string",
+      "enum": [
+        "aoa-session-self-diagnose",
+        "aoa-session-self-repair",
+        "aoa-quest-harvest"
+      ]
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "diagnosisItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "drift_type",
+        "symptom",
+        "probable_causes",
+        "repair_shape",
+        "owner_hint",
+        "confidence"
+      ],
+      "properties": {
+        "drift_type": {
+          "type": "string",
+          "enum": [
+            "selector_drift",
+            "source_deploy_drift",
+            "host_posture_drift",
+            "adaptation_staleness",
+            "render_truth_drift",
+            "runtime_health_drift",
+            "closure_drift",
+            "truth_gap",
+            "noise_envelope",
+            "policy_gate_block",
+            "evidence_gap",
+            "boundary_confusion"
+          ]
+        },
+        "symptom": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probable_causes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "repair_shape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_hint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

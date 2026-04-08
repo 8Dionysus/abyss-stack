@@ -1,0 +1,88 @@
+{
+  "schema_version": "diagnostic_session_v1",
+  "id": "diag-2026-04-07-intel-full-example",
+  "repo": "abyss-stack",
+  "captured_at": "2026-04-07T12:00:00Z",
+  "runtime_root": "/srv/abyss-stack",
+  "target": {
+    "preset": "intel-full",
+    "profiles": [
+      "core",
+      "agentic",
+      "intel",
+      "federation"
+    ],
+    "truth_goal": "live_available"
+  },
+  "axes": {
+    "readiness": "pass",
+    "posture": "warn",
+    "render_truth": "pass",
+    "runtime_health": "pass",
+    "closure": "warn",
+    "evidence": "pass",
+    "governability": "pass"
+  },
+  "truth_status": {
+    "source_authored": true,
+    "deployed": false,
+    "trial_proven": true,
+    "live_available": false
+  },
+  "drifts": [
+    {
+      "kind": "source_deploy_drift",
+      "severity": "medium",
+      "summary": "The source checkout contains the latest diagnostic and runtime contract surfaces, but the deployed Configs mirror is still catching up.",
+      "probable_causes": [
+        "Source/deployed sync has not been replayed after the latest contract landing.",
+        "Parity checks still see bounded Configs drift on sync-managed docs or scripts."
+      ],
+      "owner_hint": "abyss-stack/config-sync",
+      "evidence_refs": [
+        "python:scripts/validate_stack.py --parity-check",
+        "docs/TRUTH_SURFACES.md"
+      ]
+    }
+  ],
+  "strong_refs": {
+    "machine_fit": [
+      "Logs/machine-fit/latest/latest.private.json"
+    ],
+    "render_truth": [
+      "Logs/render-truth/latest/render_truth.summary.json"
+    ],
+    "autonomy": [
+      "Logs/autonomy/latest/result.summary.json"
+    ],
+    "session_packets": [
+      "artifacts/reviewed-session.harvest.json"
+    ]
+  },
+  "unknowns": [
+    "No fresh last-good comparison was available for this target fingerprint."
+  ],
+  "exit_class": "repairable_under_governance",
+  "next_moves": [
+    {
+      "class": "retest",
+      "summary": "Re-run parity and autonomy after the Configs mirror catches up with the source-authored contract surfaces.",
+      "command": "python scripts/validate_stack.py --parity-check",
+      "owner_repo": "abyss-stack",
+      "requires_approval": false
+    },
+    {
+      "class": "quest_followup",
+      "summary": "Keep the diagnostic spine follow-through explicit as a quest while the same gap is being planted and verified.",
+      "owner_repo": "abyss-stack",
+      "requires_approval": false
+    },
+    {
+      "class": "repair_packet_candidate",
+      "summary": "Only after reviewed diagnosis, emit a bounded repair packet instead of mutating directly.",
+      "owner_repo": "aoa-skills",
+      "requires_approval": true
+    }
+  ],
+  "public_safe": true
+}
