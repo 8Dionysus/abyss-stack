@@ -19,7 +19,7 @@ Then branch by need:
 
 - **Windows host and WSL bridge**: [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
 - **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
-- **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/MODEL_CARDS](docs/MODEL_CARDS.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
+- **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/RUNTIME_WINNER_PROMOTION_LOOP](docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/MODEL_CARDS](docs/MODEL_CARDS.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
 - **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [docs/VIA_NEGATIVA_CHECKLIST](docs/VIA_NEGATIVA_CHECKLIST.md)
@@ -114,6 +114,10 @@ Current contract surfaces are `docs/DIAGNOSTIC_SPINE.md`,
 `quests/ABYSS-STACK-Q-0007.yaml`.
 The repo-local Codex adapter surface for this pass is
 `.agents/skills/abyss-self-diagnostic-spine`, sourced from `aoa-skills`.
+The repo-local bounded `abyss-*` overlay skill surface also includes
+`.agents/skills/abyss-safe-infra-change` and
+`.agents/skills/abyss-sanitized-share`, both sourced from `aoa-skills` and
+kept distinct from the wider shared `aoa-*` install set.
 The current read-only runtime seam is `scripts/aoa-diagnose`, backed by
 `scripts/_aoa_diagnose.py`. It can now emit `diagnosis_companion.json` and
 `repair_handoff.json` on `--write-latest`, write an explicit

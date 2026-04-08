@@ -54,6 +54,11 @@ scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llam
 `vulkan-lab` is a dedicated image-seam packet, not just a device flag. It
 swaps `llama-cpp` to `ghcr.io/ggml-org/llama.cpp:server-vulkan` for that run.
 
+When one of those challenger packets looks strong enough to replace the current
+live winner, move to
+[RUNTIME_WINNER_PROMOTION_LOOP](RUNTIME_WINNER_PROMOTION_LOOP.md) rather than
+promoting directly from the pilot output.
+
 Before screening a new donor, open or create its entry in
 [MODEL_CARDS](MODEL_CARDS.md) and keep the donor explicit in the packet.
 
