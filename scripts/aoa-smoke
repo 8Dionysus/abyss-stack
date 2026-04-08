@@ -84,6 +84,10 @@ if has_module "43-federation-router.yml"; then
   aoa_probe_http "route-api tos" "http://127.0.0.1:5402/kag/tos-export" || failures=$((failures + 1))
 fi
 
+if has_module "43-federation-router.yml" && { has_module "41-agent-api.yml" || has_module "44-llamacpp-agent-sidecar.yml"; }; then
+  "${SCRIPT_DIR}/aoa-federated-check" || failures=$((failures + 1))
+fi
+
 if has_module "52-tos-graph.yml"; then
   aoa_probe_http "tos-graph" "http://127.0.0.1:5410/health" || failures=$((failures + 1))
 fi

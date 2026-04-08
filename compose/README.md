@@ -25,6 +25,7 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `profiles/core.txt`
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
+- `profiles/federation.txt`
 - `profiles/curation.txt`
 - `profiles/tools.txt`
 - `profiles/observability.txt`
@@ -33,9 +34,11 @@ A profile is only a list of module filenames in activation order.
 
 ## Presets
 
+- `presets/agent-federation.txt`
 - `presets/agent-tools.txt`
 - `presets/agent-observability.txt`
 - `presets/agent-full.txt`
+- `presets/intel-federation.txt`
 - `presets/intel-tools.txt`
 - `presets/intel-observability.txt`
 - `presets/intel-full.txt`

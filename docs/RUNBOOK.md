@@ -138,11 +138,34 @@ curl -X POST http://127.0.0.1:5403/run/federated \
 
 curl -X POST http://127.0.0.1:5403/run/federated \
   -H 'content-type: application/json' \
-  -d '{"user_text":"Use this memo card if it helps","memo":{"family":"router","mode":"semantic","id":"claim-1"}}'
+  -d '{"user_text":"Use this memo card if it helps","memo":{"family":"router","mode":"semantic","id":"AOA-M-0001"}}'
+
+curl -X POST http://127.0.0.1:5403/run/federated \
+  -H 'content-type: application/json' \
+  -d '{"user_text":"Use the Zarathustra retrieval surface as advisory context only","kag":{"inspect_id":"AOA-K-0011"}}'
+
+curl -X POST http://127.0.0.1:5403/run/federated \
+  -H 'content-type: application/json' \
+  -d '{"user_text":"Stay source-first and use a local search retrieval hint only if it helps","kag":{"query_mode":"local_search"}}'
 ```
 
 Expect `503` when `AOA_FEDERATED_RUN_ENABLED` is off or `route-api` is not currently reachable.
 Expect `409` when a playbook filter matches more than one playbook and the runtime refuses to guess.
+Expect the normal answer plus a redacted `advisory_trace`; this path still does
+not promote `aoa-kag`, `aoa-memo`, `aoa-playbooks`, `aoa-routing`, or mirrored
+`tos-source` surfaces into runtime authority.
+
+For a named opt-in startup bundle around this seam:
+
+```bash
+aoa-preset-profiles --preset agent-federation --paths
+aoa-profile-endpoints --preset agent-federation
+aoa-federated-check
+aoa-federated-check --require-enabled
+aoa-federated-check --require-enabled --playbook-id AOA-P-0008
+aoa-federated-check --require-enabled --inspect-id AOA-K-0011
+aoa-federated-check --require-enabled --memo-id AOA-M-0001
+```
 
 For planned gateway cache-status inspection when the artifact exists locally:
 

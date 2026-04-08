@@ -22,9 +22,11 @@ observability
 
 ## Current presets
 
+- `agent-federation`
 - `agent-tools`
 - `agent-observability`
 - `agent-full`
+- `intel-federation`
 - `intel-tools`
 - `intel-observability`
 - `intel-full`
@@ -37,4 +39,12 @@ aoa-profile-modules --preset agent-full --paths
 aoa-profile-endpoints --preset agent-full
 aoa-up --preset agent-full
 aoa-smoke --with-internal --preset agent-full
+```
+
+For the opt-in advisory federation seam:
+
+```bash
+aoa-preset-profiles --preset agent-federation --paths
+aoa-profile-endpoints --preset agent-federation
+aoa-up --preset agent-federation
 ```

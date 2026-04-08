@@ -60,6 +60,7 @@ REQUIRED_SCRIPTS = {
     "aoa-runtime-bench-index",
     "aoa-rpg-runtime-projection",
     "aoa-qwen-check",
+    "aoa-federated-check",
     "aoa-qwen-run",
     "aoa-qwen-bench",
     "aoa-export-memo-candidate",
@@ -144,9 +145,11 @@ REQUIRED_FILES = {
     ROOT / "docs" / "platform-adaptations" / "schema.v1.json",
     ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example",
     ROOT / "compose" / "presets" / "README.md",
+    ROOT / "compose" / "presets" / "agent-federation.txt",
     ROOT / "compose" / "presets" / "agent-tools.txt",
     ROOT / "compose" / "presets" / "agent-observability.txt",
     ROOT / "compose" / "presets" / "agent-full.txt",
+    ROOT / "compose" / "presets" / "intel-federation.txt",
     ROOT / "compose" / "presets" / "intel-tools.txt",
     ROOT / "compose" / "presets" / "intel-observability.txt",
     ROOT / "compose" / "presets" / "intel-full.txt",
@@ -967,6 +970,11 @@ def validate_profiles(errors: list[str]) -> None:
     if 'AOA_FEDERATED_RUN_ENABLED: "true"' not in sidecar_module:
         errors.append(
             'compose/modules/44-llamacpp-agent-sidecar.yml must enable AOA_FEDERATED_RUN_ENABLED for governed advisory runs'
+        )
+    agent_api_module = (MODULE_DIR / "41-agent-api.yml").read_text(encoding="utf-8")
+    if "AOA_FEDERATED_RUN_ENABLED:" in agent_api_module:
+        errors.append(
+            "compose/modules/41-agent-api.yml must not override AOA_FEDERATED_RUN_ENABLED so the runtime secret can control the gate"
         )
 
 
@@ -2296,6 +2304,24 @@ def validate_federation_landing(errors: list[str]) -> None:
     profile_recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "route-api" not in profile_recipes_doc:
         errors.append("docs/PROFILE_RECIPES.md must mention route-api")
+    if "aoa-federated-check" not in profile_recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must mention aoa-federated-check for the federated advisory seam")
+    if "--playbook-id AOA-P-0008" not in profile_recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
+    if "--inspect-id AOA-K-0011" not in profile_recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
+    if "--memo-id AOA-M-0001" not in profile_recipes_doc:
+        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
+
+    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    if "aoa-federated-check" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-federated-check for the live federated advisory seam")
+    if "--playbook-id AOA-P-0008" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
+    if "--inspect-id AOA-K-0011" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
+    if "--memo-id AOA-M-0001" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
 
 
 def validate_memo_runtime_seam(errors: list[str]) -> None:

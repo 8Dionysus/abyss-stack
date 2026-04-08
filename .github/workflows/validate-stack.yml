@@ -86,6 +86,8 @@ jobs:
           scripts/aoa-doctor --preset agent-full
           scripts/aoa-doctor --preset intel-full
           scripts/aoa-preset-profiles --preset agent-full --paths
+          scripts/aoa-preset-profiles --preset agent-federation --paths
+          scripts/aoa-preset-profiles --preset intel-federation --paths
           scripts/aoa-profile-modules --profile core --paths
           scripts/aoa-profile-endpoints --profile core
           scripts/aoa-profile-modules --profile agentic --paths
@@ -98,14 +100,20 @@ jobs:
           scripts/aoa-profile-endpoints --profile agentic,tools,observability
           scripts/aoa-profile-modules --preset agent-full --paths
           scripts/aoa-profile-endpoints --preset agent-full
+          scripts/aoa-profile-modules --preset agent-federation --paths
+          scripts/aoa-profile-endpoints --preset agent-federation
           scripts/aoa-profile-modules --preset intel-full --paths
           scripts/aoa-profile-endpoints --preset intel-full
+          scripts/aoa-profile-modules --preset intel-federation --paths
+          scripts/aoa-profile-endpoints --preset intel-federation
           scripts/aoa-render-services --profile core
           scripts/aoa-render-services --profile agentic
           scripts/aoa-render-services --profile intel
           scripts/aoa-render-services --profile agentic,tools,observability
           scripts/aoa-render-services --preset agent-full
+          scripts/aoa-render-services --preset agent-federation
           scripts/aoa-render-services --preset intel-full
+          scripts/aoa-render-services --preset intel-federation
           scripts/aoa-render-config --profile core >/dev/null
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
@@ -118,7 +126,9 @@ jobs:
           scripts/aoa-render-config --profile intel >/dev/null
           scripts/aoa-render-config --profile agentic,tools,observability >/dev/null
           scripts/aoa-render-config --preset agent-full >/dev/null
+          scripts/aoa-render-config --preset agent-federation >/dev/null
           scripts/aoa-render-config --preset intel-full >/dev/null
+          scripts/aoa-render-config --preset intel-federation >/dev/null
           scripts/aoa-render-config --profile agentic,tools,observability --write "$RUNNER_TEMP/abyss-combined.rendered.yml"
           test -s "$RUNNER_TEMP/abyss-combined.rendered.yml"
 

@@ -365,6 +365,28 @@ scripts/aoa-profile-endpoints --profile agentic --profile federation
 scripts/aoa-render-services --profile agentic --profile federation
 scripts/aoa-up --profile agentic --profile federation
 scripts/aoa-smoke --profile agentic --profile federation
+scripts/aoa-federated-check
+```
+
+Preset form:
+
+```bash
+aoa-preset-profiles --preset agent-federation --paths
+aoa-up --preset agent-federation
+aoa-smoke --preset agent-federation
+aoa-federated-check
+```
+
+If you want the live federated advisory consumer path, set
+`AOA_FEDERATED_RUN_ENABLED=true` in the runtime-secret
+`Secrets/Configs/langchain-api.env` file before startup.
+When that gate is intentionally on, prove the live advisory boundary explicitly:
+
+```bash
+scripts/aoa-federated-check --require-enabled
+scripts/aoa-federated-check --require-enabled --playbook-id AOA-P-0008
+scripts/aoa-federated-check --require-enabled --inspect-id AOA-K-0011
+scripts/aoa-federated-check --require-enabled --memo-id AOA-M-0001
 ```
 
 ### `intel + federation`
@@ -391,6 +413,28 @@ scripts/aoa-profile-endpoints --profile intel --profile federation
 scripts/aoa-render-services --profile intel --profile federation
 scripts/aoa-up --profile intel --profile federation
 scripts/aoa-smoke --profile intel --profile federation
+scripts/aoa-federated-check
+```
+
+Preset form:
+
+```bash
+aoa-preset-profiles --preset intel-federation --paths
+aoa-up --preset intel-federation
+aoa-smoke --preset intel-federation
+aoa-federated-check
+```
+
+If you want the live federated advisory consumer path, set
+`AOA_FEDERATED_RUN_ENABLED=true` in the runtime-secret
+`Secrets/Configs/langchain-api.env` file before startup.
+When that gate is intentionally on, prove the live advisory boundary explicitly:
+
+```bash
+scripts/aoa-federated-check --require-enabled
+scripts/aoa-federated-check --require-enabled --playbook-id AOA-P-0008
+scripts/aoa-federated-check --require-enabled --inspect-id AOA-K-0011
+scripts/aoa-federated-check --require-enabled --memo-id AOA-M-0001
 ```
 
 ### `intel + tools + observability`
