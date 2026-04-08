@@ -16,8 +16,8 @@ services:
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns-llamacpp}"
       AOA_FEDERATED_RUN_ENABLED: "true"
       EMBEDDINGS_PROVIDER: ovms
-      OVMS_EMBEDDINGS_URL: http://host.containers.internal:8200/v3/embeddings
-      OVMS_EMBEDDINGS_MODEL: qwen3-embed-0.6b-int8-ov
+      OVMS_EMBEDDINGS_URL: "${AOA_OVMS_EMBEDDINGS_URL:-http://host.containers.internal:8200/v3/embeddings}"
+      OVMS_EMBEDDINGS_MODEL: "${AOA_OVMS_EMBEDDINGS_MODEL:-qwen3-embed-0.6b-int8-ov}"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns-llamacpp:/app/logs/returns-llamacpp:Z"

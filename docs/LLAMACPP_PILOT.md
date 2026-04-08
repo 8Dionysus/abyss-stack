@@ -85,6 +85,14 @@ scripts/aoa-status --autonomy
 scripts/aoa-llamacpp-pilot down
 ```
 
+Candidate Intel 285H overlays may be applied directly to the sidecar lane:
+
+```bash
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.cpu-safe.yml
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.cpu-balanced.yml --overlay compose/tuning/llamacpp.intel-285h.server-cache.yml
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
+```
+
 ### `doctor`
 
 - syncs source-managed configs into the runtime mirror unless `--skip-sync` is used
@@ -145,6 +153,11 @@ The pilot accepts the upstream `llama-server` posture through environment variab
 - `AOA_LLAMACPP_CTX_SIZE`
 - `AOA_LLAMACPP_THREADS`
 - `AOA_LLAMACPP_N_GPU_LAYERS`
+- `AOA_LLAMACPP_CACHE_TYPE_K`
+- `AOA_LLAMACPP_CACHE_TYPE_V`
+- `AOA_LLAMACPP_CACHE_REUSE`
+- `AOA_LLAMACPP_FLASH_ATTN`
+- `AOA_LLAMACPP_OP_OFFLOAD`
 - `AOA_LLAMACPP_JINJA`
 - `AOA_LLAMACPP_REASONING_FORMAT`
 
@@ -152,13 +165,18 @@ Default posture is conservative:
 - official `ghcr.io/ggml-org/llama.cpp:server-openvino`
 - CPU-safe sidecar defaults before any acceleration attempt:
   - `AOA_LLAMACPP_DEVICE=none`
-  - `AOA_LLAMACPP_NO_OP_OFFLOAD=1`
+  - `AOA_LLAMACPP_OP_OFFLOAD=0`
   - `AOA_LLAMACPP_THREADS=4`
   - `AOA_LLAMACPP_THREADS_BATCH=4`
   - `AOA_LLAMACPP_THREADS_HTTP=2`
   - `AOA_LLAMACPP_CTX_SIZE=4096`
   - `AOA_LLAMACPP_BATCH_SIZE=512`
   - `AOA_LLAMACPP_UBATCH_SIZE=128`
+  - `AOA_LLAMACPP_CACHE_TYPE_K=f16`
+  - `AOA_LLAMACPP_CACHE_TYPE_V=f16`
+  - `AOA_LLAMACPP_MMAP=1`
+  - `AOA_LLAMACPP_MLOCK=0`
+  - `AOA_LLAMACPP_KV_OFFLOAD=1`
   - `AOA_LLAMACPP_REASONING=off`
   - `AOA_LLAMACPP_THINK=none`
   - `AOA_LLAMACPP_CPUS=4.0`
@@ -166,6 +184,16 @@ Default posture is conservative:
 - localhost-only exposure
 - separate sidecar `langchain-api`
 - OVMS embeddings remain in place for the Intel pilot path
+
+The current Intel 285H candidate overlay family is additive rather than promoted:
+- `compose/tuning/llamacpp.intel-285h.cpu-safe.yml` for `q8_0/q8_0` CPU-safe screening
+- `compose/tuning/llamacpp.intel-285h.cpu-balanced.yml` for `q4_0/q4_0` CPU-balanced screening
+- `compose/tuning/llamacpp.intel-285h.server-cache.yml` for 8K context and cache reuse screening
+- `compose/tuning/llamacpp.intel-285h.kv-iq4nl-lab.yml` for explicit `iq4_nl` cache trials
+- `compose/tuning/llamacpp.intel-285h.vulkan-lab.yml` for first-pass Vulkan validation on this host
+
+Use `--overlay` on `aoa-llamacpp-pilot` when you want those settings on the explicit pilot lane.
+Do not silently fold them into the canonical runtime until the measured packet says one belongs there.
 
 The pilot now brings services up in two stages:
 - `llama-cpp`

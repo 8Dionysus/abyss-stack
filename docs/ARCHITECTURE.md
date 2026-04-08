@@ -24,8 +24,9 @@ Workflow coordination and pipeline surfaces:
 
 Local and accelerator-aware model serving:
 - llama.cpp as the canonical local GGUF-serving path for bounded local-worker flows
-- OVMS as the current Intel/OpenVINO-oriented serving path for embeddings
-- a future OpenVINO GenAI migration as a separate stack change, not part of the current promoted path
+- OVMS as the current reviewed Intel/OpenVINO-oriented serving seam, currently exercised for embeddings in the promoted Intel presets
+- broader Intel serving lanes across OVMS, OpenVINO, and future OpenVINO GenAI may host other model classes through separate reviewed profile, machine-fit, or rollout changes
+- a future OpenVINO GenAI migration or promotion of a non-llama.cpp Intel-served text lane is a separate stack change, not part of the current promoted path
 
 ### 4. Gateway and agent API layer
 

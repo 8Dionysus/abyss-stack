@@ -115,7 +115,9 @@ scripts/aoa-qwen-check --case exact-reply
 
 ### Intel-aware runtime
 
-This adds OVMS plus the Intel overlay module for the agent API:
+This adds OVMS plus the Intel overlay module for the agent API.
+In the current reviewed posture, OVMS is used for the explicit embeddings lane while text stays on canonical `llama.cpp`.
+Broader Intel-serving experiments should stay in benchmark, machine-fit, or rollout lanes until separately reviewed:
 
 ```bash
 scripts/aoa-profile-modules --profile intel --paths
@@ -158,6 +160,7 @@ scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
 That pilot re-verifies the bounded `llama.cpp` launch path, starts the explicit pilot sidecar when needed, exposes `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`. If the first locally resolved model candidate is rejected by `llama.cpp` on this machine, the pilot falls back to a locally cached curated `bartowski` candidate when one is already present.
+Use the same bounded lane for additive Intel 285H host-profile checks such as Gemma 4, Vulkan-first validation, or KV-cache candidate screening instead of treating those as instant defaults.
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full contract.
 
 ## Compose optional layers manually

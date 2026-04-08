@@ -28,13 +28,16 @@ Its new `POST /run/federated` path stays opt-in and only becomes useful when the
 
 ### `intel`
 
-The agentic surface plus Intel-oriented embeddings through OVMS:
+The agentic surface plus the current reviewed Intel-oriented serving seam through OVMS:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 - `31-intel-inference.yml`
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
+
+In the current promoted posture, this routes embeddings to OVMS while keeping the canonical chat path on `llama.cpp`.
+That does not freeze the broader Intel-serving family to embeddings-only forever; wider OVMS, OpenVINO, or OpenVINO GenAI model lanes stay additive and separately reviewed.
 
 ### `federation`
 

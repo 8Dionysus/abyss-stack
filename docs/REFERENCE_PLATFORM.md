@@ -85,3 +85,4 @@ This repository is intentionally aligned with:
 - rootless Podman rather than Docker
 - a local AI stack rooted under `/srv/abyss-stack`
 - an Intel-aware branch of the inference surface
+- a current reviewed `llama.cpp`-first text default on the Intel Core Ultra 9 285H host, with broader Intel-serving lanes governed through machine-fit and reviewed rollout

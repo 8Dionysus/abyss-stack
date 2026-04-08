@@ -26,7 +26,11 @@ Canonical runtime posture:
   - `AOA_LLAMACPP_THREADS=4`
   - `AOA_LLAMACPP_BATCH_SIZE=512`
   - `AOA_LLAMACPP_CTX_SIZE=4096`
+  - `AOA_LLAMACPP_CACHE_TYPE_K=f16`
+  - `AOA_LLAMACPP_CACHE_TYPE_V=f16`
 - orchestration: `LangGraph` for `W5`, `W6`, and the current bounded local-worker posture
+
+Explicit Intel 285H candidate overlays live under `compose/tuning/` and stay pilot-only until measured runtime packets promote one of them.
 
 Durable program roots now in use:
 - `qwen-local-pilot-v1`

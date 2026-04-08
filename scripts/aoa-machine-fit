@@ -419,11 +419,11 @@ def main() -> int:
     current_overlays = parse_overlays(os.environ.get("AOA_EXTRA_COMPOSE_FILES", ""))
     if drm_nodes["dev_dri_present"] and ai_devices:
         validated_acceleration_posture = (
-            "OVMS embeddings on Intel GPU when explicitly layered; Qwen chat on the canonical llama.cpp path; Intel NPU is visible but not yet part of the validated canonical path."
+            "The current reviewed default keeps the canonical llama.cpp text lane on conservative settings. OVMS is the reviewed Intel serving seam currently used for embeddings when explicitly layered, while broader OVMS, OpenVINO, and OpenVINO GenAI lanes may host other model classes only after separate review. Intel NPU is visible but not yet part of the validated canonical path."
         )
     elif drm_nodes["dev_dri_present"]:
         validated_acceleration_posture = (
-            "Intel GPU is available for OVMS-side acceleration when explicitly layered; Qwen chat prefers the canonical llama.cpp path."
+            "Intel GPU is available for reviewed OVMS and OpenVINO serving experiments when explicitly layered; the canonical text lane still prefers llama.cpp until a separate review promotes something else."
         )
     else:
         validated_acceleration_posture = (
@@ -437,7 +437,12 @@ def main() -> int:
     if preferred_preset == "intel-full":
         validated_settings = {
             "AOA_LLAMACPP_DEVICE": "none",
-            "AOA_LLAMACPP_NO_OP_OFFLOAD": "1",
+            "AOA_LLAMACPP_OP_OFFLOAD": "0",
+            "AOA_LLAMACPP_MMAP": "1",
+            "AOA_LLAMACPP_MLOCK": "0",
+            "AOA_LLAMACPP_KV_OFFLOAD": "1",
+            "AOA_LLAMACPP_CACHE_TYPE_K": "f16",
+            "AOA_LLAMACPP_CACHE_TYPE_V": "f16",
             "AOA_LLAMACPP_THREADS": "4",
             "AOA_LLAMACPP_THREADS_BATCH": "4",
             "AOA_LLAMACPP_THREADS_HTTP": "2",
@@ -540,7 +545,7 @@ def main() -> int:
 
     summary_parts = [
         f"Preferred preset is {preferred_preset}.",
-        "Qwen chat should stay on the canonical llama.cpp path, with OVMS retained as the reviewed Intel embeddings seam when explicitly layered.",
+        "Canonical text should stay on the reviewed llama.cpp path, with OVMS retained as the reviewed Intel serving seam in promoted presets and currently exercised for embeddings while broader Intel-served model lanes stay additive until separately reviewed.",
     ]
     if freshness_state == "up-to-date":
         summary_parts.append("Relevant host packages are current in the configured Fedora repositories.")
@@ -630,7 +635,7 @@ def main() -> int:
                 "kernel update",
                 "linux-firmware update",
                 "mesa or Intel runtime update",
-                "llama.cpp, OVMS embeddings, or langchain-api runtime change",
+                "llama.cpp, OVMS/OpenVINO serving, or langchain-api runtime change",
                 "host load envelope change before latency-sensitive trials",
             ],
         },
