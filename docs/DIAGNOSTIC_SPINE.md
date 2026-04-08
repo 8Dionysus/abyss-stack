@@ -20,6 +20,9 @@ The goal is a clearer answer to four questions:
 
 The diagnostic spine is a read model with memory.
 
+The compact owner-owned entry capsule for this family is
+`generated/diagnostic_surface_catalog.min.json`.
+
 It may:
 - resolve selectors into a concrete diagnostic target
 - gather runtime-body signals
@@ -247,6 +250,14 @@ The seam stays read-only:
 - it may refresh `last_good.ref.json` only through the explicit `--write-last-good-ref` flag when the current pass is green for its truth goal
 - it may write `reviewed_diagnosis.ref.json` only through the explicit `--write-reviewed-diagnosis-ref` flag when the current pass is drifted enough to justify diagnosis review
 - it still does not mutate repair state
+
+The compact owner-owned capsule for low-context routing should keep the
+diagnostic family legible without replacing these source-owned schema and
+example surfaces:
+
+```text
+generated/diagnostic_surface_catalog.min.json
+```
 
 ## Handoff posture
 

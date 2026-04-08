@@ -99,6 +99,7 @@ follow-through, schema/example surfaces, and a bounded artifact writer without
 changing live services, deployment behavior, or the readiness-only posture of
 `aoa-doctor`.
 Current contract surfaces are `docs/DIAGNOSTIC_SPINE.md`,
+`generated/diagnostic_surface_catalog.min.json`,
 `schemas/diagnostic_target.schema.json`,
 `schemas/diagnostic_session.schema.json`,
 `schemas/diagnosis_companion.schema.json`,
@@ -128,8 +129,10 @@ accept explicit `--with-reviewed-diagnosis-ref` inputs, and refresh
 To verify the current promoted path, use this order:
 
 1. `python scripts/validate_stack.py`
-2. `python scripts/validate_stack.py --parity-check`
-3. `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
-4. `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
-5. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
-6. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`
+2. `python scripts/build_diagnostic_surface_catalog.py --check`
+3. `python scripts/validate_diagnostic_surface_catalog.py`
+4. `python scripts/validate_stack.py --parity-check`
+5. `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
+6. `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
+7. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
+8. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`

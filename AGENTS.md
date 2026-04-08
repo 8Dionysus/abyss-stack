@@ -138,6 +138,7 @@ For repository audits and GitHub review, read `AUDIT.md` after the core docs and
 - if paths, ports, host posture, recurrence posture, or seam behavior change, re-read the relevant governing docs before finishing
 - if runtime-side seams changed, confirm they still point back to the correct owner repos instead of absorbing their doctrine
 - use the narrowest dry-run or public-safe validation available for the changed scripts, modules, or docs
+- if the diagnostic spine changed, also run `python scripts/build_diagnostic_surface_catalog.py --check` and `python scripts/validate_diagnostic_surface_catalog.py`
 
 ## Review guidelines
 

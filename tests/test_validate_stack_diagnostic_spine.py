@@ -22,6 +22,7 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
             Path("README.md"),
             Path("docs") / "DIAGNOSTIC_SPINE.md",
             Path("docs") / "RUNBOOK.md",
+            Path("generated") / "diagnostic_surface_catalog.min.json",
             Path("schemas") / "diagnostic_target.schema.json",
             Path("schemas") / "diagnostic_session.schema.json",
             Path("schemas") / "diagnosis_companion.schema.json",
@@ -63,6 +64,15 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(any("docs/DIAGNOSTIC_SPINE.md" in error for error in errors))
+
+    def test_missing_diagnostic_surface_catalog_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            (repo_root / "generated" / "diagnostic_surface_catalog.min.json").unlink()
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(any("generated/diagnostic_surface_catalog.min.json" in error for error in errors))
 
     def test_session_example_exit_class_drift_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

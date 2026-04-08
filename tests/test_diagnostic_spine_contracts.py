@@ -54,6 +54,7 @@ class DiagnosticSpineContractTests(unittest.TestCase):
 
         for fragment in [
             "docs/DIAGNOSTIC_SPINE.md",
+            "generated/diagnostic_surface_catalog.min.json",
             "schemas/diagnostic_target.schema.json",
             "schemas/diagnostic_session.schema.json",
             "schemas/diagnosis_companion.schema.json",
@@ -97,5 +98,24 @@ class DiagnosticSpineContractTests(unittest.TestCase):
         self.assertIn("`diagnostic_anchor_ref_v1`", spine_doc)
         self.assertIn("`repair_handoff_v1`", spine_doc)
         self.assertIn("`reviewed_diagnosis_ref_v1`", spine_doc)
+        self.assertIn("`generated/diagnostic_surface_catalog.min.json`", spine_doc)
         self.assertIn(".agents/skills/abyss-self-diagnostic-spine", spine_doc)
         self.assertIn("A strong diagnostic spine gives the system self-location before self-assertion.", spine_doc)
+
+    def test_generated_diagnostic_surface_catalog_stays_aligned(self) -> None:
+        payload = load_json("generated/diagnostic_surface_catalog.min.json")
+
+        self.assertEqual(payload["schema_version"], "abyss_stack_diagnostic_surface_catalog_v1")
+        self.assertEqual(payload["owner_repo"], "abyss-stack")
+        self.assertEqual(payload["surface_kind"], "runtime_surface")
+        self.assertEqual(payload["authority_ref"], "docs/DIAGNOSTIC_SPINE.md")
+        self.assertEqual(
+            [entry["name"] for entry in payload["surfaces"]],
+            [
+                "diagnostic_target",
+                "diagnostic_session",
+                "diagnosis_companion",
+                "reviewed_diagnosis_ref",
+                "repair_handoff",
+            ],
+        )

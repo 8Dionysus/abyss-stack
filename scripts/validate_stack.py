@@ -225,6 +225,7 @@ REQUIRED_FILES = {
     ROOT / "examples" / "diagnostic_anchor_ref.min.example.json",
     ROOT / "examples" / "repair_handoff.min.example.json",
     ROOT / "examples" / "reviewed_diagnosis_ref.min.example.json",
+    ROOT / "generated" / "diagnostic_surface_catalog.min.json",
     ROOT / "examples" / "runtime_gateway_cache_status.gateway-local.example.json",
     ROOT / "examples" / "runtime_usage_snapshot.workhorse-local.example.json",
     ROOT / "generated" / "rpg" / "agent_build_snapshots.json",
@@ -266,6 +267,7 @@ RPG_RUNTIME_BUILDERS_PATH = Path("docs") / "RPG_RUNTIME_BUILDERS.md"
 RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
 RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
 DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
+DIAGNOSTIC_SURFACE_CATALOG_PATH = Path("generated") / "diagnostic_surface_catalog.min.json"
 DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
 ABYSS_SAFE_INFRA_SKILL_PATH = Path(".agents") / "skills" / "abyss-safe-infra-change"
 ABYSS_SANITIZED_SHARE_SKILL_PATH = Path(".agents") / "skills" / "abyss-sanitized-share"
@@ -305,6 +307,13 @@ GENERATED_AGENT_BUILD_SNAPSHOTS_PATH = Path("generated") / "rpg" / "agent_build_
 GENERATED_REPUTATION_LEDGERS_PATH = Path("generated") / "rpg" / "reputation_ledgers.json"
 GENERATED_QUEST_RUN_RESULTS_PATH = Path("generated") / "rpg" / "quest_run_results.json"
 GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH = Path("generated") / "rpg" / "frontend_projection_bundles.json"
+DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES = (
+    "diagnostic_target",
+    "diagnostic_session",
+    "diagnosis_companion",
+    "reviewed_diagnosis_ref",
+    "repair_handoff",
+)
 QUEST_IDS = (
     "ABYSS-STACK-Q-0001",
     "ABYSS-STACK-Q-0002",
@@ -1870,6 +1879,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
     readme = read_required_text(Path("README.md"))
     for snippet in (
         "docs/DIAGNOSTIC_SPINE.md",
+        "generated/diagnostic_surface_catalog.min.json",
         "schemas/diagnostic_target.schema.json",
         "schemas/diagnostic_session.schema.json",
         "schemas/diagnosis_companion.schema.json",
@@ -1892,6 +1902,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
     for snippet in (
         "The goal is not a louder doctor.",
         "The diagnostic spine is a read model with memory.",
+        "`generated/diagnostic_surface_catalog.min.json`",
         "what path is being diagnosed",
         "`diagnostic_target_v1`",
         "`diagnostic_session_v1`",
@@ -2186,6 +2197,59 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
             errors.append("reviewed diagnosis ref example must set skill_name to aoa-session-self-diagnose")
         if reviewed_diagnosis_ref_example.get("public_safe") is not True:
             errors.append("reviewed diagnosis ref example must be public_safe")
+
+    diagnostic_surface_catalog = read_required_json(DIAGNOSTIC_SURFACE_CATALOG_PATH)
+    if diagnostic_surface_catalog:
+        if diagnostic_surface_catalog.get("schema_version") != "abyss_stack_diagnostic_surface_catalog_v1":
+            errors.append(
+                "generated/diagnostic_surface_catalog.min.json must use schema_version abyss_stack_diagnostic_surface_catalog_v1"
+            )
+        if diagnostic_surface_catalog.get("owner_repo") != "abyss-stack":
+            errors.append("generated/diagnostic_surface_catalog.min.json must set owner_repo to abyss-stack")
+        if diagnostic_surface_catalog.get("surface_kind") != "runtime_surface":
+            errors.append("generated/diagnostic_surface_catalog.min.json must stay runtime_surface")
+        if diagnostic_surface_catalog.get("authority_ref") != "docs/DIAGNOSTIC_SPINE.md":
+            errors.append("generated/diagnostic_surface_catalog.min.json must point authority_ref to docs/DIAGNOSTIC_SPINE.md")
+
+        surfaces = diagnostic_surface_catalog.get("surfaces")
+        if not isinstance(surfaces, list) or len(surfaces) != len(DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES):
+            errors.append("generated/diagnostic_surface_catalog.min.json must publish exactly five diagnostic surfaces")
+        else:
+            surface_names = []
+            for index, entry in enumerate(surfaces):
+                if not isinstance(entry, dict):
+                    errors.append(f"generated/diagnostic_surface_catalog.min.json surface {index} must be an object")
+                    continue
+                for field in ("name", "schema_ref", "example_ref", "primary_question"):
+                    value = entry.get(field)
+                    if not isinstance(value, str) or not value.strip():
+                        errors.append(
+                            f"generated/diagnostic_surface_catalog.min.json surface {index} must include non-empty {field}"
+                        )
+                name = entry.get("name")
+                schema_ref = entry.get("schema_ref")
+                example_ref = entry.get("example_ref")
+                if isinstance(name, str):
+                    surface_names.append(name)
+                if isinstance(schema_ref, str) and not (ROOT / schema_ref).exists():
+                    errors.append(f"generated/diagnostic_surface_catalog.min.json schema_ref is missing: {schema_ref}")
+                if isinstance(example_ref, str) and not (ROOT / example_ref).exists():
+                    errors.append(f"generated/diagnostic_surface_catalog.min.json example_ref is missing: {example_ref}")
+            if tuple(surface_names) != DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES:
+                errors.append("generated/diagnostic_surface_catalog.min.json surface order must stay aligned with the diagnostic spine")
+
+        validation_refs = diagnostic_surface_catalog.get("validation_refs")
+        expected_validation_refs = [
+            "scripts/validate_stack.py",
+            "tests/test_validate_stack_diagnostic_spine.py",
+            "tests/test_diagnostic_spine_contracts.py",
+        ]
+        if validation_refs != expected_validation_refs:
+            errors.append("generated/diagnostic_surface_catalog.min.json validation_refs must stay aligned with the repo-local diagnostic checks")
+        elif isinstance(validation_refs, list):
+            for ref in validation_refs:
+                if not isinstance(ref, str) or not (ROOT / ref).exists():
+                    errors.append(f"generated/diagnostic_surface_catalog.min.json validation_ref is missing: {ref}")
 
     for skill_path, description in (
         (DIAGNOSTIC_SPINE_SKILL_PATH, "local overlay surface"),
