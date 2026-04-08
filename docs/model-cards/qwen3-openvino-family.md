@@ -29,8 +29,10 @@
 
 ## Preferred First Variants
 
-- `OpenVINO/Qwen3-8B-int4-ov` for the first GPU packet
-- `OpenVINO/Qwen3-4B-int4-ov` for a lighter GPU packet
+- `OpenVINO/Qwen3-4B-int4-ov` for the current low-latency control-plane GPU
+  candidate
+- `OpenVINO/Qwen3-8B-int4-ov` for a heavier GPU follow-up packet once the `4B`
+  lane is understood
 - `OpenVINO/Qwen3-8B-int4-cw-ov` for a distinct NPU lab lane
 
 ## Deprioritized Variants
@@ -48,10 +50,21 @@
 - official OVMS posture for `Qwen3` is not the bare generic harness; it needs
   `tool_parser=hermes3`, `reasoning_parser=qwen3`, and client-side
   `chat_template_kwargs.enable_thinking=false`
-- with those official settings layered in, `OpenVINO/Qwen3-8B-int4-ov` now
-  passes `exact-reply` and `repo-routing` on the isolated `5404` lane
-- without those settings, the same donor fell into reasoning-style output and
-  broke the bounded exact and routing contracts
+- with those official settings layered in, both `OpenVINO/Qwen3-4B-int4-ov` and
+  `OpenVINO/Qwen3-8B-int4-ov` now pass the current extended four-case packet on
+  the isolated `5404` lane
+- `OpenVINO/Qwen3-4B-int4-ov` is the current measured family winner for
+  latency-sensitive control-plane work on this host
+- `OpenVINO/Qwen3-8B-int4-ov` remains the heavier family candidate, but its
+  richer-answer advantage is still only a hypothesis; the present short richer
+  probes do not yet prove it
+- without the official `Qwen3` settings, the same donors fell into
+  reasoning-style output and broke the bounded exact and routing contracts
+
+## Variant Cards
+
+- [qwen3-4b-int4-ov](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-4b-int4-ov.md)
+- [qwen3-8b-int4-ov](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-8b-int4-ov.md)
 
 ## Candidate Lanes
 
@@ -63,33 +76,43 @@
 - [MODEL_CARDS](/home/dionysus/src/abyss-stack/docs/MODEL_CARDS.md)
 - [PROFILE_RECIPES](/home/dionysus/src/abyss-stack/docs/PROFILE_RECIPES.md)
 - [SERVICE_CATALOG](/home/dionysus/src/abyss-stack/docs/SERVICE_CATALOG.md)
+- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
 - `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
+- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T155804Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab-extended`
 
 ## Next Test
 
-Run the first GPU packet with explicit environment selection:
+Run the current low-latency GPU packet with explicit environment selection:
 
 ```bash
-export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
-export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
+export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-4B-int4-ov
+export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-4B-int4-ov
 podman compose \
   -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
   -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
   up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
-scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
+scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-4B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-4b-int4-gpu-lab"
 ```
 
-If that lane looks promising, compare it against `OpenVINO/Qwen3-4B-int4-ov`
-before touching promotion surfaces.
+After the first packet, move to a bounded richer-answer packet instead of
+assuming the larger donor is already justified.
 
 Current bounded result on the Intel 285H lab lane:
 
-- `exact-reply mean_s`: `0.382`
-- `repo-routing mean_s`: `1.418`
-- `overall mean_s`: `0.9`
-- `all_passed`: `true`
+- `Qwen3-4B-int4-ov exact-reply mean_s`: `0.260`
+- `Qwen3-4B-int4-ov repo-routing mean_s`: `1.416`
+- `Qwen3-4B-int4-ov repo-choice mean_s`: `0.262`
+- `Qwen3-4B-int4-ov json-decision mean_s`: `0.523`
+- `Qwen3-4B-int4-ov overall mean_s`: `0.615`
+- `Qwen3-8B-int4-ov exact-reply mean_s`: `0.551`
+- `Qwen3-8B-int4-ov repo-routing mean_s`: `2.066`
+- `Qwen3-8B-int4-ov repo-choice mean_s`: `0.457`
+- `Qwen3-8B-int4-ov json-decision mean_s`: `1.001`
+- `Qwen3-8B-int4-ov overall mean_s`: `1.019`
+- both `all_passed`: `true`
 
-This makes `Qwen3-8B-int4-ov` the first Intel-served text challenger in this
-stack that clears both bounded contracts under its own official OVMS settings.
-It is still a `candidate`, not a promoted default.
+This makes `Qwen3-4B-int4-ov` the current Intel-served `Qwen3` winner for
+latency-sensitive bounded control work on this host.
+`Qwen3-8B-int4-ov` remains a valid family candidate, but not yet a measured
+winner.

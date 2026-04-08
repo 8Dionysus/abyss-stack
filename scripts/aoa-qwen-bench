@@ -142,7 +142,7 @@ backend_label = os.environ.get("AOA_QWEN_BENCH_BACKEND_LABEL", "langchain-api-ll
 model_label = os.environ.get("AOA_QWEN_BENCH_MODEL_LABEL", "qwen3.5:9b")
 runtime_variant = os.environ.get("AOA_QWEN_BENCH_RUNTIME_VARIANT", "Q4_K_M via llama.cpp sidecar")
 target_label = os.environ.get("AOA_QWEN_BENCH_TARGET_LABEL", "workhorse-local-qwen3.5-9b-llamacpp")
-cases = ["exact-reply", "repo-routing"]
+cases = ["exact-reply", "repo-routing", "repo-choice", "json-decision"]
 warmup_runs_per_case = 1
 
 
@@ -286,6 +286,8 @@ manifest = {
         "token_budgeting": {
             "exact-reply": 8,
             "repo-routing": 120,
+            "repo-choice": 8,
+            "json-decision": 32,
         },
     },
     "metrics": {
@@ -324,7 +326,7 @@ notes = [
     "# Qwen Runtime Notes",
     "",
     "- Bench path: `langchain-api /run`.",
-    "- Fixture family: `exact-reply` and `repo-routing`.",
+    "- Fixture family: `exact-reply`, `repo-routing`, `repo-choice`, and `json-decision`.",
     "- One uncounted warmup run is executed per case before measured repeats.",
     "- This is runtime-local evidence for `abyss-stack`, not a portable proof verdict.",
     f"- Serving backend label: `{backend_label}`.",

@@ -15,6 +15,11 @@ ROUTING_EXPECTED = {
     "task2": "abyss-stack",
     "task3": "Tree-of-Sophia",
 }
+REPO_CHOICE_EXPECTED = "aoa-evals"
+JSON_DECISION_EXPECTED = {
+    "verdict": "candidate",
+    "repo": "abyss-stack",
+}
 
 
 def build_prompt(case: str) -> tuple[str, int]:
@@ -32,6 +37,14 @@ task2 = the runtime body the system runs on.
 task3 = the source-first knowledge world for philosophy and world thought.
 """
         return prompt, 120
+
+    if case == "repo-choice":
+        prompt = "Return one exact repo name only. Allowed answers: aoa-evals, abyss-stack, Tree-of-Sophia. portable proof surfaces for bounded claims."
+        return prompt, 8
+
+    if case == "json-decision":
+        prompt = 'Return compact JSON {"verdict":"...","repo":"..."}. Use exact tokens only. verdict = candidate. repo = abyss-stack.'
+        return prompt, 32
 
     raise ValueError(f"unsupported case: {case}")
 
@@ -86,6 +99,15 @@ def run_check(url: str, case: str, timeout_s: float, temperature: float, max_tok
         validation["expected"] = ROUTING_EXPECTED
         validation["observed"] = parsed
         ok = parsed == ROUTING_EXPECTED
+    elif case == "repo-choice":
+        validation["expected"] = REPO_CHOICE_EXPECTED
+        validation["observed"] = answer
+        ok = answer == REPO_CHOICE_EXPECTED
+    elif case == "json-decision":
+        parsed = json.loads(extract_json_block(answer))
+        validation["expected"] = JSON_DECISION_EXPECTED
+        validation["observed"] = parsed
+        ok = parsed == JSON_DECISION_EXPECTED
 
     return {
         "ok": ok,
@@ -106,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--case",
-        choices=["exact-reply", "repo-routing"],
+        choices=["exact-reply", "repo-routing", "repo-choice", "json-decision"],
         required=True,
     )
     parser.add_argument("--url", default="http://127.0.0.1:5403/run")
