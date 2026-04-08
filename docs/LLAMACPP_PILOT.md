@@ -93,6 +93,11 @@ scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llam
 scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
 ```
 
+The Vulkan lab overlay is self-contained for the sidecar lane: it swaps the
+`llama.cpp` image to the official `ghcr.io/ggml-org/llama.cpp:server-vulkan`
+build instead of trying to force `Vulkan0` through the default
+`server-openvino` seam.
+
 ### `doctor`
 
 - syncs source-managed configs into the runtime mirror unless `--skip-sync` is used
@@ -190,7 +195,7 @@ The current Intel 285H candidate overlay family is additive rather than promoted
 - `compose/tuning/llamacpp.intel-285h.cpu-balanced.yml` for `q4_0/q4_0` CPU-balanced screening
 - `compose/tuning/llamacpp.intel-285h.server-cache.yml` for 8K context and cache reuse screening
 - `compose/tuning/llamacpp.intel-285h.kv-iq4nl-lab.yml` for explicit `iq4_nl` cache trials
-- `compose/tuning/llamacpp.intel-285h.vulkan-lab.yml` for first-pass Vulkan validation on this host
+- `compose/tuning/llamacpp.intel-285h.vulkan-lab.yml` for first-pass Vulkan validation on this host through the dedicated `server-vulkan` image seam
 
 Use `--overlay` on `aoa-llamacpp-pilot` when you want those settings on the explicit pilot lane.
 Do not silently fold them into the canonical runtime until the measured packet says one belongs there.

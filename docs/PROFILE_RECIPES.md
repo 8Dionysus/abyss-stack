@@ -51,6 +51,9 @@ scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llam
 scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
 ```
 
+`vulkan-lab` is a dedicated image-seam packet, not just a device flag. It
+swaps `llama-cpp` to `ghcr.io/ggml-org/llama.cpp:server-vulkan` for that run.
+
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full operator contract.
 
 ## `core`

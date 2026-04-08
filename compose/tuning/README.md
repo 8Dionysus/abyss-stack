@@ -63,7 +63,7 @@ They are intentionally additive:
 - `cpu-balanced` keeps CPU-first serving with `q4_0/q4_0` KV-cache settings
 - `server-cache` extends a candidate lane with 8K context and prompt-cache reuse screening
 - `kv-iq4nl-lab` is a lab-only cache-quant overlay to stack onto another candidate lane
-- `vulkan-lab` is the first GPU validation lane and maps `/dev/dri` explicitly
+- `vulkan-lab` is the first GPU validation lane, maps `/dev/dri` explicitly, and swaps `llama-cpp` to the official `ghcr.io/ggml-org/llama.cpp:server-vulkan` image seam for that packet
 
 Example on Linux:
 

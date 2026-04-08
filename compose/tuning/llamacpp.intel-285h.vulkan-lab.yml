@@ -1,8 +1,11 @@
 # Lab-only Vulkan-first overlay for the Intel Core Ultra 9 285H host class.
 # This is the first GPU validation lane for the current Intel iGPU posture, not
-# a reviewed default.
+# a reviewed default. It must switch away from the default server-openvino
+# image seam because Vulkan device selection is exposed by the dedicated
+# server-vulkan build on this host.
 services:
   llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
     labels:
       aoa.tuning.overlay: "llamacpp.intel-285h.vulkan-lab"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
