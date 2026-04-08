@@ -121,6 +121,27 @@ A strong machine-fit record captures:
 - whether the current host envelope is quiet enough for latency-sensitive work
 - what to re-test when the machine drifts
 
+## Host-profile rollout note
+
+Machine-fit is where host-profile candidates become legible, not where they become silently promoted.
+
+For the current Intel Core Ultra 9 285H family:
+- keep `llama.cpp` as the current reviewed text-serving default
+- treat `Gemma 4 E2B/E4B` and `Qwen3.5 4B/9B` as additive host-fit candidate lanes whose promotion depends on measured runtime packets rather than model-card marketing
+- treat Vulkan as the first candidate GPU validation lane for additive host-profile work
+- treat broader OVMS, OpenVINO, and OpenVINO GenAI serving lanes as additive and separately reviewed rather than as embeddings-only forever or as automatic replacements for `llama.cpp`
+- keep SYCL, OpenVINO GPU/NPU, and TurboQuant in explicit benchmark or lab posture until a reviewed promotion decision moves them into validated settings or overlays
+
+The current source-owned candidate overlay family for that host class is:
+- `compose/tuning/llamacpp.intel-285h.cpu-safe.yml`
+- `compose/tuning/llamacpp.intel-285h.cpu-balanced.yml`
+- `compose/tuning/llamacpp.intel-285h.server-cache.yml`
+- `compose/tuning/llamacpp.intel-285h.kv-iq4nl-lab.yml`
+- `compose/tuning/llamacpp.intel-285h.vulkan-lab.yml`
+
+Use those overlays for bounded runtime packets and pilot work.
+Do not auto-promote them into machine-fit `recommended_overlays` until the runtime packet says which lane actually survived on this host.
+
 ## Suggested commands
 
 Public-safe review:
@@ -148,4 +169,5 @@ Only a reviewed promotion decision should move a candidate path into the validat
 
 The current reviewed posture is:
 - `llama.cpp` as the canonical bounded local-worker path on `5403`
-- the Intel embeddings path still on OVMS, with any OpenVINO GenAI migration handled as a separate reviewed change
+- the current reviewed Intel serving seam in promoted presets routes embeddings through OVMS, while broader OVMS, OpenVINO, and OpenVINO GenAI lanes remain additive and reviewed separately from the canonical `llama.cpp` text path
+- the reviewed default keeps full-precision KV cache on the canonical lane, while `q8_0`, `q4_0`, and `iq4_nl` live in explicit Intel 285H candidate overlays until a measured promotion decision says otherwise

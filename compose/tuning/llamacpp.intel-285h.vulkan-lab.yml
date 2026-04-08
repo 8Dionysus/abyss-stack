@@ -1,0 +1,32 @@
+# Lab-only Vulkan-first overlay for the Intel Core Ultra 9 285H host class.
+# This is the first GPU validation lane for the current Intel iGPU posture, not
+# a reviewed default.
+services:
+  llama-cpp:
+    labels:
+      aoa.tuning.overlay: "llamacpp.intel-285h.vulkan-lab"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "lab"
+    devices:
+      - /dev/dri:/dev/dri
+    cpus: "8.0"
+    mem_limit: "16g"
+    mem_reservation: "12g"
+    environment:
+      LLAMA_ARG_CTX_SIZE: "4096"
+      LLAMA_ARG_THREADS: "8"
+      LLAMA_ARG_THREADS_BATCH: "8"
+      LLAMA_ARG_THREADS_HTTP: "2"
+      LLAMA_ARG_BATCH_SIZE: "256"
+      LLAMA_ARG_UBATCH_SIZE: "128"
+      LLAMA_ARG_CACHE_TYPE_K: "q4_0"
+      LLAMA_ARG_CACHE_TYPE_V: "q4_0"
+      LLAMA_ARG_KV_OFFLOAD: "1"
+      LLAMA_ARG_DEVICE: "Vulkan0"
+      LLAMA_ARG_N_GPU_LAYERS: "99"
+      LLAMA_ARG_FLASH_ATTN: "auto"
+      LLAMA_ARG_FIT: "on"
+      LLAMA_ARG_FIT_TARGET: "1024"
+      LLAMA_ARG_FIT_CTX: "4096"
+      LLAMA_ARG_OP_OFFLOAD: "1"
+

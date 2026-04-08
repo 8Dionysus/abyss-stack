@@ -1,0 +1,13 @@
+# Lab-only KV-cache quantization overlay for the Intel Core Ultra 9 285H host
+# class. Stack this onto another candidate overlay when you want an explicit
+# iq4_nl comparison packet without changing the base host-fit contract.
+services:
+  llama-cpp:
+    labels:
+      aoa.tuning.overlay: "llamacpp.intel-285h.kv-iq4nl-lab"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "lab"
+    environment:
+      LLAMA_ARG_CACHE_TYPE_K: "iq4_nl"
+      LLAMA_ARG_CACHE_TYPE_V: "iq4_nl"
+

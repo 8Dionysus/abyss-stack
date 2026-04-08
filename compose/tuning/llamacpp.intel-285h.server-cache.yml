@@ -1,0 +1,18 @@
+# Candidate server-cache posture for the Intel Core Ultra 9 285H host class.
+# Stack this on top of a CPU-safe or CPU-balanced overlay when screening prompt
+# cache reuse and longer-context serving behavior.
+services:
+  llama-cpp:
+    labels:
+      aoa.tuning.overlay: "llamacpp.intel-285h.server-cache"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    environment:
+      LLAMA_ARG_CTX_SIZE: "8192"
+      LLAMA_ARG_CACHE_TYPE_K: "q4_0"
+      LLAMA_ARG_CACHE_TYPE_V: "q4_0"
+      LLAMA_ARG_CACHE_RAM: "4096"
+      LLAMA_ARG_CACHE_REUSE: "256"
+      LLAMA_ARG_KV_UNIFIED: "1"
+      LLAMA_ARG_ENDPOINT_SLOTS: "1"
+

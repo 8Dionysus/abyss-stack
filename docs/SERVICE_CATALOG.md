@@ -15,17 +15,18 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `30-local-inference.yml`
 
-- `ollama` — retained local control and rollback serving surface for Qwen chat and fallback embeddings
+- `ollama` — retained local control and rollback serving surface for the current Qwen fallback lane and fallback embeddings
 
 ## `31-intel-inference.yml`
 
-- `ovms` — current Intel and OpenVINO oriented model serving surface for embeddings
-- any migration from OVMS/OpenVINO serving to OpenVINO GenAI is a separate reviewed stack change
+- `ovms` — current reviewed Intel and OpenVINO oriented serving surface in promoted presets; the current landed use is embeddings
+- OVMS, OpenVINO, and future OpenVINO GenAI lanes may host other model classes through separate reviewed profile, preset, machine-fit, or rollout changes
+- any migration from OVMS/OpenVINO serving to OpenVINO GenAI, or promotion of a non-embedding Intel-served lane, is a separate reviewed stack change
 
 ## `32-llamacpp-inference.yml`
 
 - `llama-cpp` — canonical OpenAI-compatible GGUF serving surface for bounded local-worker flows
-- reuses a resolved local GGUF model file and backs the canonical local Qwen worker path
+- reuses a resolved local GGUF model file and backs the canonical local text worker path; the current reviewed default alias remains Qwen, but the model choice is host-fit and env-overridable
 
 ## `40-llm-gateway.yml`
 
@@ -43,13 +44,13 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `42-agent-api-intel.yml`
 
-- `langchain-api` overlay — switches embeddings path to OVMS
+- `langchain-api` overlay — switches the current reviewed embeddings path to OVMS
 - adds explicit OVMS runtime dependency for Intel-aware profiles
 
 ## `44-llamacpp-agent-sidecar.yml`
 
 - `langchain-api-llamacpp` — bounded alternate `llama.cpp` API surface used for explicit benchmark and promotion work
-- keeps embeddings on OVMS for the current Intel-aware posture
+- keeps the current reviewed OVMS embeddings lane in place for the Intel-aware posture while leaving broader Intel-serving work to separate reviewed changes
 - keeps `POST /run/federated` enabled on the sidecar path so governed execution can consume advisory playbook and memo seams while remaining fail-closed
 - joins the shared `abyss_default` runtime network so the advisory `route-api` remains reachable by service name even though the sidecar runs in its own compose project
 

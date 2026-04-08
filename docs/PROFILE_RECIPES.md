@@ -40,6 +40,16 @@ scripts/aoa-llamacpp-pilot run --preset intel-full
 ```
 
 That lane is separate from the canonical profile-driven runtime and exists only for explicit benchmark or promotion work.
+Use the same explicit lane for additive Intel 285H host-profile work such as Gemma 4 screening, Vulkan-first validation, or KV-cache candidate checks.
+Keep those runs as benchmark or promotion artifacts until machine-fit and reviewed runtime docs say otherwise.
+
+Common Intel 285H candidate examples:
+
+```bash
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.cpu-safe.yml
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.cpu-balanced.yml --overlay compose/tuning/llamacpp.intel-285h.server-cache.yml
+scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
+```
 
 Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full operator contract.
 
@@ -98,7 +108,9 @@ scripts/aoa-qwen-bench --profile agentic
 ### What it is for
 
 The Intel-aware agent runtime.
-This profile adds OVMS and applies the Intel overlay for the canonical agent API, switching embeddings to OVMS while keeping the chat path on `llama.cpp`.
+This profile adds OVMS and applies the Intel overlay for the canonical agent API.
+In the current reviewed posture, embeddings move to OVMS while the canonical chat path stays on `llama.cpp`.
+Broader Intel-serving lanes remain additive and separately reviewed rather than silently promoted through this profile.
 
 ### Host-facing endpoints
 

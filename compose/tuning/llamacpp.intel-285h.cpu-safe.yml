@@ -1,0 +1,27 @@
+# Candidate CPU-safe tuning for the Intel Core Ultra 9 285H host class.
+# Keep this explicit and benchmark-gated rather than treating it as a reviewed
+# default for every runtime path.
+services:
+  llama-cpp:
+    labels:
+      aoa.tuning.overlay: "llamacpp.intel-285h.cpu-safe"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    cpus: "12.0"
+    mem_limit: "14g"
+    mem_reservation: "10g"
+    environment:
+      LLAMA_ARG_CTX_SIZE: "4096"
+      LLAMA_ARG_THREADS: "12"
+      LLAMA_ARG_THREADS_BATCH: "12"
+      LLAMA_ARG_THREADS_HTTP: "2"
+      LLAMA_ARG_BATCH_SIZE: "384"
+      LLAMA_ARG_UBATCH_SIZE: "128"
+      LLAMA_ARG_CACHE_TYPE_K: "q8_0"
+      LLAMA_ARG_CACHE_TYPE_V: "q8_0"
+      LLAMA_ARG_MMAP: "1"
+      LLAMA_ARG_MLOCK: "0"
+      LLAMA_ARG_KV_OFFLOAD: "1"
+      LLAMA_ARG_DEVICE: "none"
+      LLAMA_ARG_OP_OFFLOAD: "0"
+

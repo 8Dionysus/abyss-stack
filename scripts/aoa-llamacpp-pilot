@@ -41,6 +41,8 @@ SIDECAR_FILE_SPECS = (
     "compose/modules/32-llamacpp-inference.yml",
     "compose/modules/44-llamacpp-agent-sidecar.yml",
 )
+ACTIVE_SIDECAR_OVERLAY_SPECS: tuple[str, ...] = ()
+ACTIVE_SIDECAR_OVERLAY_PATHS: tuple[Path, ...] = ()
 FEDERATION_LAYERS = (
     "aoa-agents",
     "aoa-routing",
@@ -127,6 +129,48 @@ def base_env() -> dict[str, str]:
     return env
 
 
+def normalize_overlay_specs(raw_specs: list[str] | None) -> list[str]:
+    specs: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_specs or []:
+        for part in str(raw).split(","):
+            spec = part.strip()
+            if not spec or spec in seen:
+                continue
+            seen.add(spec)
+            specs.append(spec)
+    return specs
+
+
+def resolve_overlay_path(spec: str) -> Path:
+    candidate = Path(spec).expanduser()
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+        if not resolved.exists():
+            raise SystemExit(f"error: overlay does not exist: {spec} -> {resolved}")
+        return resolved
+
+    search_roots = (CONFIGS_ROOT, SOURCE_ROOT)
+    attempted: list[str] = []
+    for root in search_roots:
+        resolved = (root / spec).resolve()
+        attempted.append(str(resolved))
+        if resolved.exists():
+            return resolved
+
+    raise SystemExit(f"error: overlay does not exist: {spec}; tried {attempted}")
+
+
+def configure_sidecar_overlays(raw_specs: list[str] | None) -> None:
+    global ACTIVE_SIDECAR_OVERLAY_SPECS
+    global ACTIVE_SIDECAR_OVERLAY_PATHS
+
+    specs = tuple(normalize_overlay_specs(raw_specs))
+    paths = tuple(resolve_overlay_path(spec) for spec in specs)
+    ACTIVE_SIDECAR_OVERLAY_SPECS = specs
+    ACTIVE_SIDECAR_OVERLAY_PATHS = paths
+
+
 def sidecar_env(model_host_path: Path) -> dict[str, str]:
     env = base_env()
     env["AOA_LLAMACPP_MODEL_HOST_PATH"] = str(model_host_path)
@@ -137,6 +181,8 @@ def sidecar_compose_cmd(*args: str) -> list[str]:
     cmd = ["podman", "compose", "-p", SIDECAR_PROJECT]
     for spec in SIDECAR_FILE_SPECS:
         cmd.extend(["-f", str(CONFIGS_ROOT / spec)])
+    for overlay in ACTIVE_SIDECAR_OVERLAY_PATHS:
+        cmd.extend(["-f", str(overlay)])
     cmd.extend(args)
     return cmd
 
@@ -692,6 +738,7 @@ def maybe_delta(candidate: float | None, baseline: float | None) -> float | None
 def build_report(
     *,
     preset: str,
+    overlay_specs: tuple[str, ...],
     model_info: dict[str, Any],
     baseline: dict[str, Any],
     candidate: dict[str, Any],
@@ -705,6 +752,7 @@ def build_report(
         "## Summary",
         f"- preset: `{preset}`",
         f"- model reuse: `{model_info['reuse_strategy']}`",
+        f"- sidecar overlays: `{', '.join(overlay_specs) if overlay_specs else 'none'}`",
         f"- baseline run: `{baseline['run_dir']}`",
         f"- candidate run: `{candidate['run_dir']}`",
         f"- recommendation: `{comparison['recommendation']}`",
@@ -725,7 +773,8 @@ def build_report(
             "",
             "## Boundary",
             "- This pilot compares serving/runtime posture, not reasoning quality canon.",
-            "- The validated canonical path remains Ollama-backed until a measured promotion decision is made.",
+            "- The reviewed canonical local-worker path remains the promoted llama.cpp lane on `5403`.",
+            "- Fresh Ollama baseline runs are retained here only as historical comparison ballast and challenger lineage.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -733,6 +782,7 @@ def build_report(
 
 def screening_report(
     *,
+    overlay_specs: tuple[str, ...],
     baseline: dict[str, Any],
     screenings: list[dict[str, Any]],
     winner: dict[str, Any] | None,
@@ -742,6 +792,7 @@ def screening_report(
         f"# {PROMOTION_ID}",
         "",
         "## Summary",
+        f"- sidecar overlays: `{', '.join(overlay_specs) if overlay_specs else 'none'}`",
         f"- baseline run: `{baseline['run_dir']}`",
         f"- winner: `{winner['quant']}`" if winner else "- winner: `none`",
         "",
@@ -809,6 +860,7 @@ def write_comparison_run(
         "pilot_id": PILOT_ID,
         "captured_at": utc_now(),
         "preset": preset,
+        "sidecar_overlays": list(ACTIVE_SIDECAR_OVERLAY_SPECS),
         "baseline_run_ref": baseline["run_dir"],
         "candidate_run_ref": candidate["run_dir"],
         "baseline_backend": baseline["manifest"]["system_under_test"]["backend"],
@@ -831,6 +883,7 @@ def write_comparison_run(
             "pilot_id": PILOT_ID,
             "captured_at": utc_now(),
             "preset": preset,
+            "sidecar_overlays": list(ACTIVE_SIDECAR_OVERLAY_SPECS),
             "model_info_ref": "model-resolution.json",
             "baseline_run_ref": baseline["run_dir"],
             "candidate_run_ref": candidate["run_dir"],
@@ -841,6 +894,7 @@ def write_comparison_run(
         run_root / "report.md",
         build_report(
             preset=preset,
+            overlay_specs=ACTIVE_SIDECAR_OVERLAY_SPECS,
             model_info=model_info,
             baseline=baseline,
             candidate=candidate,
@@ -887,6 +941,7 @@ def write_screening_artifacts(
     payload = {
         "promotion_id": PROMOTION_ID,
         "captured_at": utc_now(),
+        "sidecar_overlays": list(ACTIVE_SIDECAR_OVERLAY_SPECS),
         "baseline_run_ref": baseline["run_dir"],
         "baseline_smokes": baseline.get("smokes"),
         "winner_quant": winner["quant"] if winner else None,
@@ -907,6 +962,7 @@ def write_screening_artifacts(
     write_text(
         run_root / "report.md",
         screening_report(
+            overlay_specs=ACTIVE_SIDECAR_OVERLAY_SPECS,
             baseline=baseline,
             screenings=screenings,
             winner=winner,
@@ -1114,6 +1170,7 @@ def doctor_command(args: argparse.Namespace) -> int:
     payload = {
         "pilot_id": PILOT_ID,
         "preset": args.preset,
+        "sidecar_overlays": list(ACTIVE_SIDECAR_OVERLAY_SPECS),
         "model_info": model_info,
         "candidate_models": candidate_model_info(),
         "base_health": wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=2.0),
@@ -1146,6 +1203,7 @@ def up_command(args: argparse.Namespace) -> int:
     payload = {
         "pilot_id": PILOT_ID,
         "preset": args.preset,
+        "sidecar_overlays": list(ACTIVE_SIDECAR_OVERLAY_SPECS),
         "model_info": model_info,
         "model_attempts": attempts,
         "llama_cpp": llama_ready,
@@ -1332,7 +1390,7 @@ def down_command(_: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run a bounded llama.cpp sidecar pilot next to the canonical Ollama path."
+        description="Run a bounded llama.cpp sidecar pilot and explicit candidate tuning lane with a retained Ollama comparison baseline."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1342,6 +1400,12 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--timeout", type=float, default=90.0)
         sub.add_argument("--wait-timeout", type=float, default=180.0)
         sub.add_argument("--model-host-path", default=None)
+        sub.add_argument(
+            "--overlay",
+            action="append",
+            default=[],
+            help="Extra compose overlay to layer onto the llama.cpp sidecar only. Relative paths resolve inside AOA_CONFIGS_ROOT.",
+        )
         sub.add_argument("--skip-sync", action="store_true")
 
     doctor = subparsers.add_parser("doctor", help="Resolve the reusable GGUF model and confirm the base preset posture.")
@@ -1383,6 +1447,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    configure_sidecar_overlays(getattr(args, "overlay", []))
     try:
         return int(args.func(args))
     except subprocess.CalledProcessError as exc:
