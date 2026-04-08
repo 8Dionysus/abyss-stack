@@ -10,4 +10,3 @@ services:
     environment:
       LLAMA_ARG_CACHE_TYPE_K: "iq4_nl"
       LLAMA_ARG_CACHE_TYPE_V: "iq4_nl"
-

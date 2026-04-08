@@ -15,4 +15,3 @@ services:
       LLAMA_ARG_CACHE_REUSE: "256"
       LLAMA_ARG_KV_UNIFIED: "1"
       LLAMA_ARG_ENDPOINT_SLOTS: "1"
-
