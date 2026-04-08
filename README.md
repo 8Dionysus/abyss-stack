@@ -21,7 +21,7 @@ Then branch by need:
 - **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), and [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md)
+- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
 
 ## What this repository is for
 
@@ -92,9 +92,39 @@ Current contract surfaces are `docs/ANTIFRAGILITY_RUNTIME.md`,
 `examples/service_degradation_receipt.example.json`, and
 `examples/repair_safe_closeout_receipt.example.json`.
 
+Diagnostic spine groundwork now includes a read-only `aoa-diagnose` seam in
+this repository. It adds a runtime-owned diagnostic read model, tracked quest
+follow-through, schema/example surfaces, and a bounded artifact writer without
+changing live services, deployment behavior, or the readiness-only posture of
+`aoa-doctor`.
+Current contract surfaces are `docs/DIAGNOSTIC_SPINE.md`,
+`schemas/diagnostic_target.schema.json`,
+`schemas/diagnostic_session.schema.json`,
+`schemas/diagnosis_companion.schema.json`,
+`schemas/diagnostic_anchor_ref.schema.json`,
+`schemas/repair_handoff.schema.json`,
+`schemas/reviewed_diagnosis_ref.schema.json`,
+`examples/diagnostic_target.min.example.json`,
+`examples/diagnostic_session.min.example.json`,
+`examples/diagnosis_companion.min.example.json`,
+`examples/diagnostic_anchor_ref.min.example.json`,
+`examples/repair_handoff.min.example.json`,
+`examples/reviewed_diagnosis_ref.min.example.json`, and
+`quests/ABYSS-STACK-Q-0007.yaml`.
+The repo-local Codex adapter surface for this pass is
+`.agents/skills/abyss-self-diagnostic-spine`, sourced from `aoa-skills`.
+The current read-only runtime seam is `scripts/aoa-diagnose`, backed by
+`scripts/_aoa_diagnose.py`. It can now emit `diagnosis_companion.json` and
+`repair_handoff.json` on `--write-latest`, write an explicit
+`reviewed_diagnosis.ref.json` bridge on `--write-reviewed-diagnosis-ref`,
+accept explicit `--with-reviewed-diagnosis-ref` inputs, and refresh
+`last_good.ref.json` only through the explicit `--write-last-good-ref` flag.
+
 To verify the current promoted path, use this order:
 
 1. `python scripts/validate_stack.py`
 2. `python scripts/validate_stack.py --parity-check`
 3. `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
 4. `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
+5. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
+6. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`

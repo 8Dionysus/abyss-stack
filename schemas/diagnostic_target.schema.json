@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/diagnostic_target_v1.schema.json",
+  "title": "abyss-stack diagnostic_target_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preset",
+    "profiles",
+    "truth_goal",
+    "required_checks",
+    "drift_watch",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "diagnostic_target_v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "truth_goal": {
+      "type": "string",
+      "enum": [
+        "deployed",
+        "trial_proven",
+        "live_available"
+      ]
+    },
+    "required_checks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "expected_services": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "expected_internal_probes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "drift_watch": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "selector_drift",
+          "source_deploy_drift",
+          "host_posture_drift",
+          "adaptation_staleness",
+          "render_truth_drift",
+          "runtime_health_drift",
+          "closure_drift",
+          "truth_gap",
+          "noise_envelope",
+          "policy_gate_block",
+          "evidence_gap",
+          "boundary_confusion"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "fallback_candidates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "runtime_root": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  }
+}

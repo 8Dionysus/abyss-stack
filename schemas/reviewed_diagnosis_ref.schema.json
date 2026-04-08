@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/reviewed_diagnosis_ref_v1.schema.json",
+  "title": "abyss-stack reviewed_diagnosis_ref_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "id",
+    "repo",
+    "reviewed_at",
+    "reviewer",
+    "source_diagnosis_companion_ref",
+    "diagnostic_session_ref",
+    "diagnostic_session_id",
+    "target",
+    "skill_name",
+    "result_kind",
+    "review_verdict",
+    "summary",
+    "diagnosis_types",
+    "symptom_refs",
+    "probable_cause_hypotheses",
+    "confidence_band",
+    "owner_hints",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "reviewed_diagnosis_ref_v1"
+    },
+    "artifact_kind": {
+      "const": "aoa.diagnostic.reviewed-diagnosis-ref"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_diagnosis_companion_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic_session_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic_session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preset",
+        "profiles",
+        "truth_goal"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "truth_goal": {
+          "type": "string",
+          "enum": [
+            "deployed",
+            "trial_proven",
+            "live_available"
+          ]
+        }
+      }
+    },
+    "skill_name": {
+      "const": "aoa-session-self-diagnose"
+    },
+    "result_kind": {
+      "const": "diagnosis_packet_review"
+    },
+    "review_verdict": {
+      "type": "string",
+      "enum": [
+        "ready_for_repair_handoff",
+        "retest_before_repair",
+        "not_repair_fit"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnosis_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "symptom_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "probable_cause_hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "confidence_band": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "owner_hints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "repair_handoff_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  }
+}

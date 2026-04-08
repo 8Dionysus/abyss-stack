@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://8dionysus.github.io/schemas/diagnostic_session_v1.schema.json",
+  "title": "abyss-stack diagnostic_session_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "repo",
+    "captured_at",
+    "target",
+    "axes",
+    "truth_status",
+    "drifts",
+    "exit_class",
+    "public_safe"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "diagnostic_session_v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_root": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preset",
+        "profiles",
+        "truth_goal"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "truth_goal": {
+          "type": "string",
+          "enum": [
+            "deployed",
+            "trial_proven",
+            "live_available"
+          ]
+        }
+      }
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readiness",
+        "posture",
+        "render_truth",
+        "runtime_health",
+        "closure",
+        "evidence",
+        "governability"
+      ],
+      "properties": {
+        "readiness": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "posture": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "render_truth": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "runtime_health": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "closure": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "evidence": {
+          "$ref": "#/$defs/axisVerdict"
+        },
+        "governability": {
+          "$ref": "#/$defs/axisVerdict"
+        }
+      }
+    },
+    "truth_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_authored",
+        "deployed",
+        "trial_proven",
+        "live_available"
+      ],
+      "properties": {
+        "source_authored": {
+          "type": "boolean"
+        },
+        "deployed": {
+          "type": "boolean"
+        },
+        "trial_proven": {
+          "type": "boolean"
+        },
+        "live_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "drifts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/driftItem"
+      }
+    },
+    "strong_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "machine_fit": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platform_adaptation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "render_truth": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "smoke": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "autonomy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comparison_anchor": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "session_packets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagnosis_packets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exit_class": {
+      "type": "string",
+      "enum": [
+        "ready_to_start",
+        "running_as_intended",
+        "running_but_unproven",
+        "trial_proven_not_live",
+        "live_but_drifted",
+        "repairable_under_governance",
+        "manual_reground_required"
+      ]
+    },
+    "next_moves": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nextMoveItem"
+      }
+    },
+    "public_safe": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "axisVerdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "warn",
+        "fail",
+        "skipped",
+        "unknown"
+      ]
+    },
+    "driftItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "severity",
+        "summary"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "selector_drift",
+            "source_deploy_drift",
+            "host_posture_drift",
+            "adaptation_staleness",
+            "render_truth_drift",
+            "runtime_health_drift",
+            "closure_drift",
+            "truth_gap",
+            "noise_envelope",
+            "policy_gate_block",
+            "evidence_gap",
+            "boundary_confusion"
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probable_causes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "owner_hint": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "nextMoveItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "summary"
+      ],
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": [
+            "retest",
+            "governed_repair",
+            "repair_packet_candidate",
+            "quest_followup",
+            "progression_lift_candidate",
+            "manual_reground",
+            "no_action"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string"
+        },
+        "owner_repo": {
+          "type": "string"
+        },
+        "requires_approval": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

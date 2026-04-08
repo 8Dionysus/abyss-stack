@@ -36,6 +36,10 @@ aoa-check-layout
 aoa-host-facts --mode public
 aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 aoa-platform-adaptation --mode private --title "Short seam title" --summary "One bounded summary" --issue-class performance
+aoa-diagnose --preset intel-full --truth-goal live_available
+aoa-diagnose --preset intel-full --truth-goal live_available --write-latest
+aoa-diagnose --preset intel-full --truth-goal live_available --write-latest --write-last-good-ref
+aoa-diagnose --preset intel-full --with-reviewed-diagnosis-ref /tmp/reviewed-diagnosis.packet.json --write-latest
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
@@ -157,6 +161,31 @@ jq . "${AOA_STACK_ROOT}/Logs/runtime-usage/latest/workhorse-local.snapshot.json"
 
 Read `policy_mode`, `degrade_state`, `strict_stop`, `baseline_cost_estimate`, `savings_estimate`, and `reset_at` there.
 Its absence is not a failure in this wave because the contract lands before live aggregation.
+
+For planned diagnostic spine inspection when the artifact exists locally:
+
+```bash
+jq . <(scripts/aoa-diagnose --preset intel-full --truth-goal live_available)
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnostic_target.json"
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnostic_session.json"
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnosis_companion.json"
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/repair_handoff.json"
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/reviewed_diagnosis.ref.json"
+jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/last_good.ref.json"
+```
+
+Read `target`, `axes`, `truth_status`, `drifts`, `exit_class`, and `next_moves` there.
+Treat that file as the runtime copy of `diagnostic_session_v1`.
+`aoa-diagnose --write-latest` also refreshes `diagnostic_target.json`,
+`diagnostic_session.json`, `diagnosis_companion.json`, `repair_handoff.json`,
+`reviewed_diagnosis.ref.json`, and the corresponding record copy under
+`Logs/diagnostics/records/`.
+Use `--write-last-good-ref` only when you want to promote the current green
+pass into `last_good.ref.json` explicitly.
+Use `--write-reviewed-diagnosis-ref` when you want the runtime seam to record
+an explicit review bridge over the current `diagnosis_companion.json`.
+Use `--with-reviewed-diagnosis-ref` when a reviewed diagnosis packet already
+exists and the repair handoff should stop blocking on that prerequisite.
 
 For KAG and `Tree-of-Sophia` handoff inspection through the localhost federation seam:
 

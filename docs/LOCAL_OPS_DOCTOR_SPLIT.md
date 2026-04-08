@@ -22,7 +22,7 @@ It does not become an operator control plane.
 
 ## Future local ops readout owns
 
-The future local ops layer is only documented in this wave as a bounded local ops status surface.
+The post-start local ops layer now begins with the bounded local ops status surface exposed through the read-only `aoa-diagnose` seam.
 
 Its checklist should stay narrow:
 
@@ -30,16 +30,19 @@ Its checklist should stay narrow:
 - log presence
 - basic config health
 - local floor availability
+- diagnostic-session normalization for one selected runtime target
 
-That future readout may summarize runtime-local status after startup.
+That readout may summarize runtime-local status after startup.
 It does not replace `aoa-doctor`.
 It does not absorb `aoa-host-facts` or `aoa-machine-fit`.
+It does not grant repair authority.
 
 ## What this wave does not do
 
 This wave does not add new `aoa-doctor` exit semantics.
 This wave does not add operator UI.
 This wave does not add usage accounting to `aoa-doctor`.
+This wave does not let `aoa-diagnose` mutate runtime, quest, or repair state.
 
 ## One-line rule
 

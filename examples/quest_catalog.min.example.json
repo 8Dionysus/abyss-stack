@@ -88,5 +88,20 @@
     "owner_surface": "runtime/rpg-runtime-projection",
     "source_path": "quests/ABYSS-STACK-Q-0006.yaml",
     "public_safe": true
+  },
+  {
+    "id": "ABYSS-STACK-Q-0007",
+    "title": "Unify runtime self-diagnosis spine with session-level diagnosis handoff without widening repair authority",
+    "repo": "abyss-stack",
+    "theme_ref": "",
+    "milestone_ref": "",
+    "state": "captured",
+    "band": "frontier",
+    "kind": "doctrine",
+    "difficulty": "d3_seam",
+    "risk": "r2_contract",
+    "owner_surface": "diagnostics/diagnostic-spine",
+    "source_path": "quests/ABYSS-STACK-Q-0007.yaml",
+    "public_safe": true
   }
 ]

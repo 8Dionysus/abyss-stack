@@ -1,0 +1,72 @@
+{
+  "schema_version": "repair_handoff_v1",
+  "artifact_kind": "aoa.diagnostic.repair-handoff",
+  "id": "repair-handoff-diag-2026-04-07-intel-full-live",
+  "repo": "abyss-stack",
+  "captured_at": "2026-04-07T12:10:00Z",
+  "diagnostic_session_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/diagnostic_session.json",
+  "diagnostic_session_id": "diag-2026-04-07-intel-full-live",
+  "diagnosis_companion_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/diagnosis_companion.json",
+  "comparison_anchor_ref": "Logs/diagnostics/latest/last_good.ref.json",
+  "reviewed_session_refs": [
+    "artifacts/reviewed-session.diagnosis.json"
+  ],
+  "reviewed_diagnosis_refs": [
+    "artifacts/reviewed-diagnosis.packet.json"
+  ],
+  "target": {
+    "preset": "intel-full",
+    "profiles": [
+      "intel",
+      "tools",
+      "observability"
+    ],
+    "truth_goal": "live_available"
+  },
+  "target_skill": "aoa-session-self-repair",
+  "target_owner_repo": "aoa-skills",
+  "handoff_readiness": "ready_for_review",
+  "summary": "A reviewed diagnosis ref is available, so repair can move forward as an explicit reviewable handoff instead of a silent mutation.",
+  "trigger_drifts": [
+    {
+      "kind": "source_deploy_drift",
+      "severity": "medium",
+      "summary": "Source/deployed parity drift is present for the current runtime surface."
+    }
+  ],
+  "checkpoint_posture": {
+    "policy_fit": "Keep repair in aoa-session-self-repair; aoa-diagnose remains descriptive and does not grant mutation authority.",
+    "approval_gate": "Require the standard mutation gate before any code, repo-config, or runtime change.",
+    "rollback_marker": "Use last_good.ref.json when available, or record a fresh green anchor before mutating.",
+    "health_check": "Re-run scripts/aoa-diagnose for the same selector shape after the bounded repair attempt.",
+    "iteration_limit": "One bounded repair unit before reassessment.",
+    "improvement_log_stub": "Record target owner surface, chosen diff shape, approval outcome, and verification refs in the eventual REPAIR_PACKET."
+  },
+  "validation_refs": [
+    "command:bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available",
+    "command:bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json"
+  ],
+  "stop_conditions": [
+    "Stop if the route widens beyond one bounded repair unit.",
+    "Stop if role-law changes become necessary.",
+    "Stop if proof-law changes become necessary."
+  ],
+  "escalation_routes": [
+    {
+      "condition": "The repair widens into a scenario rollout.",
+      "owner_repo": "aoa-playbooks",
+      "note": "Escalate scenario-scale rollout work instead of faking one repair packet."
+    },
+    {
+      "condition": "The repair changes role law or orchestration posture.",
+      "owner_repo": "aoa-agents",
+      "note": "Route role-law changes to aoa-agents."
+    },
+    {
+      "condition": "The repair changes proof or evaluation law.",
+      "owner_repo": "aoa-evals",
+      "note": "Route proof-law changes to aoa-evals."
+    }
+  ],
+  "public_safe": true
+}

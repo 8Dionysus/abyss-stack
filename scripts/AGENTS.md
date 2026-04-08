@@ -18,6 +18,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 12. `docs/REFERENCE_PLATFORM.md`
 13. `docs/REFERENCE_PLATFORM_SPEC.md`
 14. `docs/MACHINE_FIT_POLICY.md`
+15. `docs/DIAGNOSTIC_SPINE.md`
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.
@@ -26,6 +27,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
 - `scripts/aoa-host-facts` owns durable machine-readable host-facts capture. Keep it stdlib-only and secret-safe.
 - `scripts/aoa-machine-fit` owns the durable bounded record of what the current machine should prefer right now. Keep it stdlib-only and secret-safe.
+- `scripts/aoa-diagnose` owns the read-only runtime diagnostic spine collector, runtime-owned diagnosis companions, explicit `last_good` anchor promotion, explicit `reviewed_diagnosis_ref` bridge writing, and runtime-owned repair handoff artifacts. Keep it stdlib-only and citation-friendly.
 - `scripts/aoa-qwen-run` is the generic bounded prompt runner for `langchain-api /run`. Keep it stdlib-only and local-only.
 
 ## Shell script rules
@@ -60,8 +62,8 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
-python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-machine-fit scripts/aoa-qwen-run
-shellcheck scripts/aoa-lib.sh scripts/<touched-script>
+python -m py_compile scripts/validate_stack.py scripts/_aoa_diagnose.py scripts/aoa-host-facts scripts/aoa-machine-fit scripts/aoa-qwen-run
+shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
 bash -n scripts/<touched-script>
 scripts/aoa-host-facts --mode public
 scripts/aoa-machine-fit --mode public

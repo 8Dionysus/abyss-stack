@@ -261,6 +261,22 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             any("ABYSS-STACK-Q-0006 must stay anchored to docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
         )
 
+    def test_diagnostic_spine_anchor_drift_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml",
+                (repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml")
+                .read_text(encoding="utf-8")
+                .replace("ref: docs/DIAGNOSTIC_SPINE.md", "ref: docs/RPG_RUNTIME_COLLECTIONS.md"),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(
+            any("ABYSS-STACK-Q-0007 must stay anchored to docs/DIAGNOSTIC_SPINE.md" in error for error in errors)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,28 @@
+{
+  "schema_version": "diagnostic_anchor_ref_v1",
+  "artifact_kind": "aoa.diagnostic.anchor-ref",
+  "anchor_class": "last_good",
+  "id": "diag-anchor-2026-04-07-intel-full-live",
+  "repo": "abyss-stack",
+  "captured_at": "2026-04-07T12:05:00Z",
+  "target": {
+    "preset": "intel-full",
+    "profiles": [
+      "intel",
+      "tools",
+      "observability"
+    ],
+    "truth_goal": "live_available"
+  },
+  "diagnostic_session_id": "diag-2026-04-07-intel-full-live",
+  "diagnostic_session_path": "../records/diag-2026-04-07-intel-full-live/diagnostic_session.json",
+  "diagnostic_target_path": "../records/diag-2026-04-07-intel-full-live/diagnostic_target.json",
+  "exit_class": "running_as_intended",
+  "truth_status": {
+    "source_authored": true,
+    "deployed": true,
+    "trial_proven": true,
+    "live_available": true
+  },
+  "public_safe": true
+}

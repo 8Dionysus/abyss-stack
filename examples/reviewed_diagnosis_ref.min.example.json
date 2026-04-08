@@ -1,0 +1,42 @@
+{
+  "schema_version": "reviewed_diagnosis_ref_v1",
+  "artifact_kind": "aoa.diagnostic.reviewed-diagnosis-ref",
+  "id": "reviewed-diagnosis-diag-2026-04-07-intel-full-live",
+  "repo": "abyss-stack",
+  "reviewed_at": "2026-04-07T12:12:00Z",
+  "reviewer": "codex",
+  "source_diagnosis_companion_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/diagnosis_companion.json",
+  "diagnostic_session_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/diagnostic_session.json",
+  "diagnostic_session_id": "diag-2026-04-07-intel-full-live",
+  "target": {
+    "preset": "intel-full",
+    "profiles": [
+      "intel",
+      "tools",
+      "observability"
+    ],
+    "truth_goal": "live_available"
+  },
+  "skill_name": "aoa-session-self-diagnose",
+  "result_kind": "diagnosis_packet_review",
+  "review_verdict": "retest_before_repair",
+  "summary": "The diagnosis is sound enough to review, but the current noise-envelope drift should be retested before any REPAIR_PACKET is treated as ready.",
+  "diagnosis_types": [
+    "noise_envelope"
+  ],
+  "symptom_refs": [
+    "Doctor reported a bounded readiness warning because the host is noisy for latency-sensitive trials."
+  ],
+  "probable_cause_hypotheses": [
+    "host loadavg remains elevated for the current machine shape"
+  ],
+  "confidence_band": "medium",
+  "owner_hints": [
+    "abyss-stack/runtime-envelope"
+  ],
+  "repair_handoff_ref": "Logs/diagnostics/records/diag-2026-04-07-intel-full-live/repair_handoff.json",
+  "unknowns": [
+    "The route still needs a quieter runtime envelope before repair planning becomes the strongest next move."
+  ],
+  "public_safe": true
+}
