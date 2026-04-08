@@ -264,6 +264,8 @@ RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
 RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
 DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
 DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
+ABYSS_SAFE_INFRA_SKILL_PATH = Path(".agents") / "skills" / "abyss-safe-infra-change"
+ABYSS_SANITIZED_SHARE_SKILL_PATH = Path(".agents") / "skills" / "abyss-sanitized-share"
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
 DIAGNOSTIC_TARGET_SCHEMA_PATH = Path("schemas") / "diagnostic_target.schema.json"
@@ -2173,16 +2175,17 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         if reviewed_diagnosis_ref_example.get("public_safe") is not True:
             errors.append("reviewed diagnosis ref example must be public_safe")
 
-    local_skill_root = ROOT / DIAGNOSTIC_SPINE_SKILL_PATH
-    local_skill_md = local_skill_root / "SKILL.md"
-    if not local_skill_root.is_dir():
-        errors.append(
-            f"{DIAGNOSTIC_SPINE_SKILL_PATH.as_posix()} must be installed as a local overlay surface"
-        )
-    elif not local_skill_md.is_file():
-        errors.append(
-            f"{DIAGNOSTIC_SPINE_SKILL_PATH.as_posix()} must contain SKILL.md"
-        )
+    for skill_path, description in (
+        (DIAGNOSTIC_SPINE_SKILL_PATH, "local overlay surface"),
+        (ABYSS_SAFE_INFRA_SKILL_PATH, "repo-local abyss overlay skill surface"),
+        (ABYSS_SANITIZED_SHARE_SKILL_PATH, "repo-local abyss overlay skill surface"),
+    ):
+        local_skill_root = ROOT / skill_path
+        local_skill_md = local_skill_root / "SKILL.md"
+        if not local_skill_root.is_dir():
+            errors.append(f"{skill_path.as_posix()} must be installed as a {description}")
+        elif not local_skill_md.is_file():
+            errors.append(f"{skill_path.as_posix()} must contain SKILL.md")
 
 
 def validate_federation_landing(errors: list[str]) -> None:
