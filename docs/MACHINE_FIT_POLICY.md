@@ -171,3 +171,5 @@ The current reviewed posture is:
 - `llama.cpp` as the canonical bounded local-worker path on `5403`
 - the current reviewed Intel serving seam in promoted presets routes embeddings through OVMS, while broader OVMS, OpenVINO, and OpenVINO GenAI lanes remain additive and reviewed separately from the canonical `llama.cpp` text path
 - the reviewed default keeps full-precision KV cache on the canonical lane, while `q8_0`, `q4_0`, and `iq4_nl` live in explicit Intel 285H candidate overlays until a measured promotion decision says otherwise
+- on the current Intel 285H reference host, the latest reviewed packet after the `llama.cpp` tuning-argument seam repair keeps `compose/tuning/llamacpp.intel-285h.cpu-safe.yml` as the winner for the canonical live lane
+- `compose/tuning/llamacpp.intel-285h.vulkan-lab.yml` is now a working `server-vulkan` lab seam on that host, but it remains non-promoted until a reviewed packet shows a clear advantage over the current CPU-safe winner

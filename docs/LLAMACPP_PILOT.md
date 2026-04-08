@@ -200,6 +200,9 @@ The current Intel 285H candidate overlay family is additive rather than promoted
 Use `--overlay` on `aoa-llamacpp-pilot` when you want those settings on the explicit pilot lane.
 Do not silently fold them into the canonical runtime until the measured packet says one belongs there.
 
+As of the latest reviewed Intel 285H packet, `cpu-safe` remains the promoted live winner after the `llama.cpp` tuning-argument seam repair.
+`vulkan-lab` is now a functioning lab lane with a best-known throughput posture of `N_PARALLEL=4`, `BATCH=2048`, and `UBATCH=512`, but it stays parked until a reviewed packet shows a clear promotion case.
+
 The pilot now brings services up in two stages:
 - `llama-cpp`
 - health check
