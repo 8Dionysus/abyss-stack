@@ -1,0 +1,32 @@
+services:
+  ovms-intel-text:
+    command:
+      - --source_model
+      - "${AOA_OVMS_TEXT_SOURCE_MODEL:?set AOA_OVMS_TEXT_SOURCE_MODEL from MODEL_CARDS.md}"
+      - --model_repository_path
+      - /models
+      - --rest_port
+      - "8000"
+      - --port
+      - "9000"
+      - --task
+      - text_generation
+      - --tool_parser
+      - "${AOA_OVMS_TEXT_TOOL_PARSER:-hermes3}"
+      - --reasoning_parser
+      - "${AOA_OVMS_TEXT_REASONING_PARSER:-qwen3}"
+      - --target_device
+      - "${AOA_OVMS_TEXT_TARGET_DEVICE:-GPU}"
+      - --max_num_seqs
+      - "${AOA_OVMS_TEXT_MAX_NUM_SEQS:-1}"
+      - --max_num_batched_tokens
+      - "${AOA_OVMS_TEXT_MAX_BATCHED_TOKENS:-512}"
+      - --cache_size
+      - "${AOA_OVMS_TEXT_CACHE_SIZE_GB:-2}"
+      - --log_level
+      - INFO
+
+  langchain-api-intel-text:
+    environment:
+      LC_OPENAI_LITERAL_COMPLETIONS: "false"
+      LC_OPENAI_CHAT_TEMPLATE_ENABLE_THINKING: "false"

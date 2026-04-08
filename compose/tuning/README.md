@@ -56,6 +56,7 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 - `llamacpp.intel-285h.kv-iq4nl-lab.yml`
 - `llamacpp.intel-285h.vulkan-lab.yml`
 - `intel-text.ovms-gpu-lab.yml`
+- `intel-text.ovms-qwen3-settings.yml`
 
 These overlays land the current Fedora Intel seed as runnable, explicit host-fit candidates for the `Intel Core Ultra 9 285H` class.
 They are intentionally additive:
@@ -66,6 +67,7 @@ They are intentionally additive:
 - `kv-iq4nl-lab` is a lab-only cache-quant overlay to stack onto another candidate lane
 - `vulkan-lab` is the first GPU validation lane, maps `/dev/dri` explicitly, swaps `llama-cpp` to the official `ghcr.io/ggml-org/llama.cpp:server-vulkan` image seam for that packet, and carries the current best-known lab posture for this host
 - `intel-text.ovms-gpu-lab` is a standalone OVMS text-generation sidecar harness for explicit model-card-driven Intel text screening, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
+- `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
 
 Example on Linux:
 
@@ -97,7 +99,10 @@ Standalone Intel text lab example:
 scripts/aoa-sync-configs
 export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
 export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
-podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
+podman compose \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
+  up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
 scripts/aoa-qwen-bench --profile intel \
   --url http://127.0.0.1:5404/run \
@@ -110,6 +115,8 @@ scripts/aoa-qwen-bench --profile intel \
 This harness is intentionally donor-agnostic.
 Set `AOA_OVMS_TEXT_SOURCE_MODEL` and `AOA_OVMS_TEXT_MODEL_NAME` from a reviewed
 model card before bringing it up.
+When the donor is `Qwen3`, layer `intel-text.ovms-qwen3-settings.yml` on top so
+the official OVMS parser and no-thinking settings are not lost.
 
 ## Machine-fit overlays
 

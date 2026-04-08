@@ -45,18 +45,25 @@
 - the reason is operational fit, not doctrine: the current Intel-serving path
   needs good OpenVINO, OVMS, and GenAI compatibility more than vague family
   prestige
-- exact-reply, compact JSON routing, and bounded repo-selection behavior still
-  need to be rechecked on each concrete donor and quantization
+- official OVMS posture for `Qwen3` is not the bare generic harness; it needs
+  `tool_parser=hermes3`, `reasoning_parser=qwen3`, and client-side
+  `chat_template_kwargs.enable_thinking=false`
+- with those official settings layered in, `OpenVINO/Qwen3-8B-int4-ov` now
+  passes `exact-reply` and `repo-routing` on the isolated `5404` lane
+- without those settings, the same donor fell into reasoning-style output and
+  broke the bounded exact and routing contracts
 
 ## Candidate Lanes
 
 - `compose/tuning/intel-text.ovms-gpu-lab.yml`
+- `compose/tuning/intel-text.ovms-qwen3-settings.yml`
 
 ## Evidence Surfaces
 
 - [MODEL_CARDS](/home/dionysus/src/abyss-stack/docs/MODEL_CARDS.md)
 - [PROFILE_RECIPES](/home/dionysus/src/abyss-stack/docs/PROFILE_RECIPES.md)
 - [SERVICE_CATALOG](/home/dionysus/src/abyss-stack/docs/SERVICE_CATALOG.md)
+- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
 
 ## Next Test
 
@@ -65,10 +72,24 @@ Run the first GPU packet with explicit environment selection:
 ```bash
 export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
 export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
-podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
+podman compose \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
+  up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
 scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
 ```
 
 If that lane looks promising, compare it against `OpenVINO/Qwen3-4B-int4-ov`
 before touching promotion surfaces.
+
+Current bounded result on the Intel 285H lab lane:
+
+- `exact-reply mean_s`: `0.382`
+- `repo-routing mean_s`: `1.418`
+- `overall mean_s`: `0.9`
+- `all_passed`: `true`
+
+This makes `Qwen3-8B-int4-ov` the first Intel-served text challenger in this
+stack that clears both bounded contracts under its own official OVMS settings.
+It is still a `candidate`, not a promoted default.

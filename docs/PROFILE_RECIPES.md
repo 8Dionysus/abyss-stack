@@ -63,7 +63,10 @@ Model-card-first Intel text screening:
 scripts/aoa-sync-configs
 export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
 export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
-podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
+podman compose \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
+  up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
 scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
 ```
@@ -74,7 +77,10 @@ For the first explicit non-`llama.cpp` Intel text lane, use the standalone OVMS 
 scripts/aoa-sync-configs
 export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-8B-int4-ov
 export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-8B-int4-ov
-podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml up -d
+podman compose \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
+  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
+  up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
 scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
 ```

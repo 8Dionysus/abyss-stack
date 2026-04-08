@@ -42,6 +42,10 @@ OLLAMA_NATIVE_CHAT = os.getenv("LC_OLLAMA_NATIVE_CHAT", "true").strip().lower() 
     "yes",
     "on",
 }
+OPENAI_CHAT_TEMPLATE_ENABLE_THINKING_RAW = os.getenv(
+    "LC_OPENAI_CHAT_TEMPLATE_ENABLE_THINKING",
+    "",
+).strip().lower()
 OPENAI_LITERAL_COMPLETIONS = os.getenv(
     "LC_OPENAI_LITERAL_COMPLETIONS",
     "false",
@@ -116,6 +120,21 @@ SUMMARY_KEYS = (
     "stronger_source_route",
     "salience",
     "priority",
+)
+
+
+def _optional_env_bool(raw: str) -> bool | None:
+    if not raw:
+        return None
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+OPENAI_CHAT_TEMPLATE_ENABLE_THINKING = _optional_env_bool(
+    OPENAI_CHAT_TEMPLATE_ENABLE_THINKING_RAW
 )
 
 
@@ -450,6 +469,8 @@ def _normalize_answer_text(content: Any) -> str:
 def _literal_reply_target(req: RunReq) -> str | None:
     if not OPENAI_LITERAL_COMPLETIONS:
         return None
+    if OPENAI_CHAT_TEMPLATE_ENABLE_THINKING is not None:
+        return None
     if float(req.temperature) != 0.0:
         return None
     if int(req.max_tokens) > 16:
@@ -533,8 +554,13 @@ def _invoke_run_backend(req: RunReq) -> dict[str, Any]:
         "temperature": float(req.temperature),
         "max_tokens": int(req.max_tokens),
     }
+    extra_body: dict[str, Any] = {}
+    if OPENAI_CHAT_TEMPLATE_ENABLE_THINKING is not None:
+        extra_body["chat_template_kwargs"] = {
+            "enable_thinking": OPENAI_CHAT_TEMPLATE_ENABLE_THINKING
+        }
     if "litellm" in BASE_URL or "ollama" in BASE_URL:
-        extra_body: dict[str, Any] = {"think": OLLAMA_THINK}
+        extra_body["think"] = OLLAMA_THINK
         ollama_options: dict[str, Any] = {}
         num_thread = _optional_int(OLLAMA_NUM_THREAD)
         num_batch = _optional_int(OLLAMA_NUM_BATCH)
@@ -547,6 +573,7 @@ def _invoke_run_backend(req: RunReq) -> dict[str, Any]:
             ollama_options["num_ctx"] = num_ctx
         if ollama_options:
             extra_body["options"] = ollama_options
+    if extra_body:
         llm_kwargs["extra_body"] = extra_body
 
     llm = ChatOpenAI(**llm_kwargs)
