@@ -55,6 +55,7 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 - `llamacpp.intel-285h.server-cache.yml`
 - `llamacpp.intel-285h.kv-iq4nl-lab.yml`
 - `llamacpp.intel-285h.vulkan-lab.yml`
+- `intel-text.ovms-phi35-mini-int4-gpu-lab.yml`
 
 These overlays land the current Fedora Intel seed as runnable, explicit host-fit candidates for the `Intel Core Ultra 9 285H` class.
 They are intentionally additive:
@@ -64,6 +65,7 @@ They are intentionally additive:
 - `server-cache` extends a candidate lane with 8K context and prompt-cache reuse screening
 - `kv-iq4nl-lab` is a lab-only cache-quant overlay to stack onto another candidate lane
 - `vulkan-lab` is the first GPU validation lane, maps `/dev/dri` explicitly, swaps `llama-cpp` to the official `ghcr.io/ggml-org/llama.cpp:server-vulkan` image seam for that packet, and carries the current best-known lab posture for this host
+- `intel-text.ovms-phi35-mini-int4-gpu-lab` is a standalone OVMS text-generation sidecar lane that pulls `OpenVINO/Phi-3.5-mini-instruct-int4-ov` into a dedicated model repo, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
 
 Example on Linux:
 
@@ -88,6 +90,20 @@ scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llam
 
 Keep these overlays in explicit benchmark or pilot use until machine-fit and reviewed runtime docs promote one of them.
 At the moment, that promotion still belongs to `cpu-safe`; `vulkan-lab` is working but remains a lab-only candidate.
+
+Standalone Intel text lab example:
+
+```bash
+scripts/aoa-sync-configs
+podman compose -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-phi35-mini-int4-gpu-lab.yml up -d
+scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
+scripts/aoa-qwen-bench --profile intel \
+  --url http://127.0.0.1:5404/run \
+  --backend-label "langchain-api-intel-text -> ovms-openai" \
+  --model-label "OpenVINO/Phi-3.5-mini-instruct-int4-ov" \
+  --runtime-variant "OVMS text-generation sidecar on GPU" \
+  --target-label "intel-text-phi35-mini-int4-gpu-lab"
+```
 
 ## Machine-fit overlays
 

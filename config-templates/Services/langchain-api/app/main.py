@@ -260,7 +260,7 @@ def _http_auth_headers() -> dict[str, str] | None:
 def _llamacpp_completion_url() -> str:
     if BASE_URL.endswith("/v1"):
         return f"{BASE_URL[:-3]}/completion"
-    return f"{BASE_URL}/completion"
+    return ""
 
 
 def _route_api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -465,24 +465,26 @@ def _literal_reply_target(req: RunReq) -> str | None:
 
 def _openai_completion(req: RunReq) -> dict[str, Any]:
     text = ""
-    try:
-        native_payload = {
-            "model": MODEL,
-            "prompt": req.user_text,
-            "temperature": float(req.temperature),
-            "n_predict": int(req.max_tokens),
-        }
-        native_data = _http_post_json(
-            _llamacpp_completion_url(),
-            native_payload,
-            TIMEOUT,
-            headers=_http_auth_headers(),
-        )
-        native_text = native_data.get("content")
-        if isinstance(native_text, str):
-            text = native_text
-    except RuntimeError:
-        text = ""
+    native_completion_url = _llamacpp_completion_url()
+    if native_completion_url:
+        try:
+            native_payload = {
+                "model": MODEL,
+                "prompt": req.user_text,
+                "temperature": float(req.temperature),
+                "n_predict": int(req.max_tokens),
+            }
+            native_data = _http_post_json(
+                native_completion_url,
+                native_payload,
+                TIMEOUT,
+                headers=_http_auth_headers(),
+            )
+            native_text = native_data.get("content")
+            if isinstance(native_text, str):
+                text = native_text
+        except RuntimeError:
+            text = ""
 
     if not text:
         payload = {
