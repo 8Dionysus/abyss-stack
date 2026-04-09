@@ -161,8 +161,11 @@ A strong promotion pass leaves:
 ## Current host example
 
 On the current Intel Core Ultra 9 285H reference host, the reviewed live winner
-after the `llama.cpp` tuning-argument seam repair is
-`compose/tuning/llamacpp.intel-285h.cpu-safe.yml`.
+after the `llama.cpp` tuning-argument seam repair remains the
+`compose/tuning/llamacpp.intel-285h.cpu-safe.yml` tuning packet, but hosts that
+do not expose `avx512f` should keep
+`compose/tuning/llamacpp.runtime-fallback.yml` in front of that winner until
+the active `server-openvino` seam survives a live re-check without `SIGILL`.
 
 That winner replaced an older fallback overlay only after:
 
