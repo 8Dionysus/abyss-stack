@@ -82,6 +82,23 @@ def parse_lscpu() -> dict[str, str]:
     return data
 
 
+def cpu_flags_set(lscpu_data: dict[str, str]) -> set[str]:
+    raw_flags = lscpu_data.get("Flags", "")
+    return {flag.strip().lower() for flag in raw_flags.split() if flag.strip()}
+
+
+def merge_unique_strings(*groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for item in group:
+            if item in seen:
+                continue
+            seen.add(item)
+            merged.append(item)
+    return merged
+
+
 def int_or_none(value: str | None) -> int | None:
     if value is None or value == "":
         return None
@@ -402,6 +419,7 @@ def main() -> int:
     loaded_modules = read_loaded_modules()
     display_devices, ai_devices = parse_pci_devices()
     group_membership = parse_group_membership()
+    cpu_flags = cpu_flags_set(lscpu)
 
     cpu_model = lscpu.get("Model name")
     logical_cpus = int_or_none(lscpu.get("CPU(s)"))
@@ -417,6 +435,9 @@ def main() -> int:
     preferred_preset = "intel-full" if drm_nodes["dev_dri_present"] else "agent-full"
     preferred_profiles = load_profile_names(preferred_preset)
     current_overlays = parse_overlays(os.environ.get("AOA_EXTRA_COMPOSE_FILES", ""))
+    requires_llamacpp_runtime_fallback = (
+        preferred_preset == "intel-full" and "avx512f" not in cpu_flags
+    )
     if drm_nodes["dev_dri_present"] and ai_devices:
         validated_acceleration_posture = (
             "The current reviewed default keeps the canonical llama.cpp text lane on conservative settings. OVMS is the reviewed Intel serving seam currently used for embeddings when explicitly layered, while broader OVMS, OpenVINO, and OpenVINO GenAI lanes may host other model classes only after separate review. Intel NPU is visible but not yet part of the validated canonical path."
@@ -434,6 +455,7 @@ def main() -> int:
     adaptation_record = read_json(latest_adaptation)
     validated_settings: dict[str, str] = {}
     recommended_overlays: list[str] = []
+    safety_overlays: list[str] = []
     if preferred_preset == "intel-full":
         validated_settings = {
             "AOA_LLAMACPP_DEVICE": "none",
@@ -452,6 +474,8 @@ def main() -> int:
             "AOA_LLAMACPP_REASONING": "off",
             "AOA_LLAMACPP_THINK": "none",
         }
+    if requires_llamacpp_runtime_fallback:
+        safety_overlays.append("compose/tuning/llamacpp.runtime-fallback.yml")
     if adaptation_record:
         adaptation_hardware_class = (
             adaptation_record.get("platform_scope", {}).get("hardware_class")
@@ -492,6 +516,7 @@ def main() -> int:
                 for value in raw_overlays
                 if value is not None and str(value).strip()
             ]
+    recommended_overlays = merge_unique_strings(safety_overlays, recommended_overlays)
 
     host_facts_ref = args.host_facts_ref
     if host_facts_ref is None:
@@ -534,6 +559,10 @@ def main() -> int:
         envelope_notes.append(
             "Intel AI accelerator PCI device is present but /dev/accel is not exposed on the host."
         )
+    if requires_llamacpp_runtime_fallback:
+        envelope_notes.append(
+            "CPU flags do not include avx512f; machine-fit should auto-apply compose/tuning/llamacpp.runtime-fallback.yml so llama.cpp stays on the generic server image instead of the crashing server-openvino seam."
+        )
 
     status = "qualified"
     if not drm_nodes["dev_dri_present"] and preferred_preset == "intel-full":
@@ -557,6 +586,10 @@ def main() -> int:
         summary_parts.append("Current host load is noisy for latency-sensitive trials.")
     if recommended_overlays:
         summary_parts.append("A bounded compose overlay is recommended for this host fit.")
+    if requires_llamacpp_runtime_fallback:
+        summary_parts.append(
+            "This host should keep llama.cpp on the generic server image until a reviewed Intel-specific image seam survives live re-check without SIGILL."
+        )
 
     record = {
         "artifact_kind": "aoa.machine-fit",

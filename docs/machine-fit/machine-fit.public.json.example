@@ -145,7 +145,10 @@
       "AOA_LLAMACPP_REASONING": "off",
       "AOA_LLAMACPP_THINK": "none"
     },
-    "recommended_overlays": [],
+    "recommended_overlays": [
+      "compose/tuning/llamacpp.runtime-fallback.yml",
+      "compose/tuning/llamacpp.intel-285h.cpu-safe.yml"
+    ],
     "current_overlays": [],
     "host_facts_ref": "repo:docs/reference-platform/reference-host.public.json.example",
     "platform_adaptation_ref": "repo:docs/platform-adaptations/platform-adaptation.public.json.example"
@@ -156,11 +159,13 @@
     "loadavg_15m": 1.08,
     "available_memory_bytes": 15232413696,
     "latency_trial_ready": true,
-    "notes": []
+    "notes": [
+      "CPU flags do not include avx512f; machine-fit should auto-apply compose/tuning/llamacpp.runtime-fallback.yml so llama.cpp stays on the generic server image instead of the crashing server-openvino seam."
+    ]
   },
   "fit_verdict": {
     "status": "qualified",
-    "summary": "Preferred preset is intel-full. Canonical text should stay on the reviewed llama.cpp path, with OVMS retained as the reviewed Intel serving seam in promoted presets and currently exercised for embeddings while broader Intel-served model lanes stay additive until separately reviewed. Relevant host packages are current in the configured Fedora repositories.",
+    "summary": "Preferred preset is intel-full. Canonical text should stay on the reviewed llama.cpp path, with OVMS retained as the reviewed Intel serving seam in promoted presets and currently exercised for embeddings while broader Intel-served model lanes stay additive until separately reviewed. Relevant host packages are current in the configured Fedora repositories. A bounded compose overlay is recommended for this host fit. This host should keep llama.cpp on the generic server image until a reviewed Intel-specific image seam survives live re-check without SIGILL.",
     "next_actions": [
       "Run scripts/aoa-doctor --preset intel-full before launch.",
       "Refresh host facts when the host or kernel changes.",
