@@ -9,6 +9,20 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [0.2.0] - 2026-04-10
 
+### Summary
+
+- this release adds diagnostic-spine contracts, source-rooted mirror canaries, federated advisory seams, winner-promotion loops, and new OVMS/chat/ToS-graph runtime lanes
+- llama.cpp fallback and tuning posture are hardened while runtime docs and AGENTS guidance are aligned around parity, support boundaries, and bounded advisory ownership
+- `abyss-stack` remains source-authored on the runtime layer, with deployed state becoming live only after sync into the `Configs` mirror
+
+### Validation
+
+- `python scripts/release_check.py`
+
+### Notes
+
+- detailed runtime substrate, generated-surface, operator-surface, and parity-check coverage for this release remains enumerated below under `Added`, `Changed`, and `Included in this release`
+
 ### Added
 
 - diagnostic-spine runtime seam, diagnostic surface-catalog capsule,
