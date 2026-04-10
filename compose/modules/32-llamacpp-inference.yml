@@ -37,6 +37,7 @@ services:
       LLAMA_ARG_JINJA: "${AOA_LLAMACPP_JINJA:-1}"
       LLAMA_ARG_REASONING: "${AOA_LLAMACPP_REASONING:-off}"
       LLAMA_ARG_THINK: "${AOA_LLAMACPP_THINK:-none}"
+      # Legacy AOA_LLAMACPP_NO_OP_OFFLOAD is inverted and bridged in scripts/aoa-lib.sh.
       LLAMA_ARG_OP_OFFLOAD: "${AOA_LLAMACPP_OP_OFFLOAD:-0}"
       LLAMA_ARG_NO_WARMUP: "${AOA_LLAMACPP_NO_WARMUP:-1}"
     volumes:
