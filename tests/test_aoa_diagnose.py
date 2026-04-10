@@ -924,12 +924,94 @@ class AoADiagnoseTests(unittest.TestCase):
         self.assertEqual(handoff["handoff_readiness"], "blocked")
         self.assertEqual(handoff["blocked_by"], ["reviewed_diagnosis_requires_retest"])
 
-    def test_reviewed_diagnosis_ref_makes_repair_handoff_ready_for_review(self) -> None:
+    def test_invalid_reviewed_diagnosis_ref_keeps_repair_handoff_in_review_required(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             stack_root = Path(tmpdir) / "stack"
             configs_root = stack_root / "Configs"
             reviewed_diagnosis = stack_root / "artifacts" / "reviewed-diagnosis.packet.json"
             write_json(reviewed_diagnosis, {"schema_version": "reviewed-diagnosis-fixture"})
+            write_json(
+                stack_root / "Logs" / "host-facts" / "latest.private.json",
+                {"artifact_kind": "aoa.host-facts", "captured_at": "2026-04-07T00:00:00Z"},
+            )
+            write_json(
+                stack_root / "Logs" / "machine-fit" / "latest" / "latest.private.json",
+                {"artifact_kind": "aoa.machine-fit", "captured_at": "2026-04-07T00:00:00Z"},
+            )
+            write_json(
+                stack_root / "Logs" / "platform-adaptations" / "latest" / "latest.private.json",
+                {"artifact_kind": "aoa.platform-adaptation", "captured_at": "2026-04-07T00:00:00Z"},
+            )
+            autonomy = self.green_autonomy()
+            autonomy["status"] = "degraded"
+            autonomy["payload"]["overall_status"] = "degraded"
+            autonomy["truth_status"]["live_available"] = False
+            autonomy["degradation_reasons"] = ["trial_live_gap:W6"]
+
+            with patch.object(self.module, "STACK_ROOT", stack_root), patch.object(
+                self.module,
+                "CONFIGS_ROOT",
+                configs_root,
+            ), patch.object(
+                self.module,
+                "collect_doctor_check",
+                return_value=self.green_doctor(),
+            ), patch.object(
+                self.module,
+                "collect_render_services_check",
+                return_value=self.green_render(),
+            ), patch.object(
+                self.module,
+                "collect_autonomy_check",
+                return_value=autonomy,
+            ):
+                bundle = self.module.collect_diagnostic_bundle(
+                    self.make_args(diagnosis_refs=[str(reviewed_diagnosis)]),
+                    selector_context=self.selector_context(),
+                )
+                handoff = self.module.repair_handoff_for(bundle)
+
+        self.session_validator.validate(bundle["session"])
+        self.handoff_validator.validate(handoff)
+        self.assertEqual(bundle["session"]["strong_refs"]["diagnosis_packets"], [str(reviewed_diagnosis)])
+        self.assertEqual(handoff["handoff_readiness"], "review_required")
+        self.assertEqual(handoff["blocked_by"], ["valid_reviewed_diagnosis_required"])
+        self.assertEqual(handoff["reviewed_diagnosis_refs"], [str(reviewed_diagnosis)])
+
+    def test_reviewed_diagnosis_ref_makes_repair_handoff_ready_for_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "stack"
+            configs_root = stack_root / "Configs"
+            reviewed_diagnosis = stack_root / "artifacts" / "reviewed-diagnosis.ref.json"
+            write_json(
+                reviewed_diagnosis,
+                {
+                    "schema_version": "reviewed_diagnosis_ref_v1",
+                    "artifact_kind": "aoa.diagnostic.reviewed-diagnosis-ref",
+                    "id": "reviewed-diag-ready",
+                    "repo": "abyss-stack",
+                    "reviewed_at": "2026-04-07T12:12:00Z",
+                    "reviewer": "codex",
+                    "source_diagnosis_companion_ref": "Logs/diagnostics/records/diag-fixture/diagnosis_companion.json",
+                    "diagnostic_session_ref": "Logs/diagnostics/records/diag-fixture/diagnostic_session.json",
+                    "diagnostic_session_id": "diag-fixture",
+                    "target": {
+                        "preset": "intel-full",
+                        "profiles": ["intel", "tools", "observability"],
+                        "truth_goal": "live_available",
+                    },
+                    "skill_name": "aoa-session-self-diagnose",
+                    "result_kind": "diagnosis_packet_review",
+                    "review_verdict": "ready_for_repair_handoff",
+                    "summary": "Repair handoff is ready for review.",
+                    "diagnosis_types": ["trial_live_gap"],
+                    "symptom_refs": ["langchain-api is degraded"],
+                    "probable_cause_hypotheses": ["runtime lane needs a bounded repair pass"],
+                    "confidence_band": "medium",
+                    "owner_hints": ["abyss-stack/runtime-envelope"],
+                    "public_safe": True,
+                },
+            )
             write_json(
                 stack_root / "Logs" / "host-facts" / "latest.private.json",
                 {"artifact_kind": "aoa.host-facts", "captured_at": "2026-04-07T00:00:00Z"},

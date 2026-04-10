@@ -1391,11 +1391,11 @@ def repair_handoff_for(bundle: dict[str, Any]) -> dict[str, Any]:
         summary = "The current diagnostic pass is green, so no repair handoff is needed for this target shape."
         blocked_by: list[str] = []
     elif reviewed_diagnosis_refs and not reviewed_ref_payloads:
-        handoff_readiness = "ready_for_review"
+        handoff_readiness = "review_required"
         summary = (
-            "A reviewed diagnosis ref is available, so repair can move forward as an explicit reviewable handoff instead of a silent mutation."
+            "Reviewed diagnosis refs were supplied, but none resolved to valid reviewed_diagnosis_ref_v1 artifacts, so repair still requires an explicit reviewed diagnosis before handoff."
         )
-        blocked_by = []
+        blocked_by = ["valid_reviewed_diagnosis_required"]
     elif reviewed_ref_payloads:
         if "ready_for_repair_handoff" in reviewed_verdicts:
             handoff_readiness = "ready_for_review"
