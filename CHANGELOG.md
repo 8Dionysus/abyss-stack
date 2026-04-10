@@ -7,6 +7,27 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-10
+
+### Added
+
+- diagnostic-spine runtime seam, diagnostic surface-catalog capsule,
+  reviewed-diagnosis bridge refs, and repair-handoff companion alignment
+- source-rooted mirror canary plus parity-aware deployment verification for
+  the deployed `Configs` mirror
+- federated advisory seam presets and live checks, overlay skill installs,
+  runtime winner-promotion loop, and checkpoint closeout bridge install in the
+  repo skill surface
+- Intel OVMS text-lab lane, Qwen3/OVMS model cards, route-first ToS-graph UI,
+  preview-only curation slice, and a generic runtime chat seam
+
+### Changed
+
+- added llama.cpp runtime fallback for AVX512-less hosts and hardened
+  llama.cpp env compatibility and tuning seams
+- aligned runtime docs and AGENTS guidance with current support posture, via
+  negativa runtime checks, and bounded advisory/runtime ownership
+
 ## [0.1.0] - 2026-04-01
 
 First public baseline release of `abyss-stack` as the infrastructure substrate for the AoA / ToS ecosystem.
