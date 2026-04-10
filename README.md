@@ -2,6 +2,8 @@
 
 `abyss-stack` is the infrastructure substrate of the AoA and ToS ecosystem. It is **Fedora-first** in deployment posture while remaining **Windows-usable** for source work, path mapping, and hybrid workflows. It owns runtime, deployment, storage layout, lifecycle, security, reference-platform posture, and infrastructure glue. It does not own the authored meaning of the specialized AoA layers or ToS.
 
+> Current release: `v0.2.0`. See [CHANGELOG](CHANGELOG.md) for release notes.
+
 ## Start here
 
 Read in this order:
