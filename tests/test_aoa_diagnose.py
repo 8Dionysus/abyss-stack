@@ -969,11 +969,15 @@ class AoADiagnoseTests(unittest.TestCase):
                     self.make_args(diagnosis_refs=[str(reviewed_diagnosis)]),
                     selector_context=self.selector_context(),
                 )
+                companion = self.module.diagnosis_companion_for(bundle)
                 handoff = self.module.repair_handoff_for(bundle)
 
         self.session_validator.validate(bundle["session"])
+        self.companion_validator.validate(companion)
         self.handoff_validator.validate(handoff)
         self.assertEqual(bundle["session"]["strong_refs"]["diagnosis_packets"], [str(reviewed_diagnosis)])
+        self.assertEqual(companion["review_status"], "reviewed_ref_supplied")
+        self.assertEqual(companion["suggested_next_skill"], "aoa-session-self-diagnose")
         self.assertEqual(handoff["handoff_readiness"], "review_required")
         self.assertEqual(handoff["blocked_by"], ["valid_reviewed_diagnosis_required"])
         self.assertEqual(handoff["reviewed_diagnosis_refs"], [str(reviewed_diagnosis)])

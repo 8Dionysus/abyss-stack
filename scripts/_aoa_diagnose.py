@@ -1312,12 +1312,16 @@ def diagnosis_companion_for(bundle: dict[str, Any]) -> dict[str, Any]:
             "Reviewed diagnosis refs were supplied for this target, so this companion stays as a runtime-local bridge rather "
             "than the sole diagnosis input."
         )
-        verdicts = {
-            str(payload.get("review_verdict"))
+        reviewed_ref_payloads = [
+            payload
             for payload in diagnosis_ref_payloads
             if payload.get("schema_version") == "reviewed_diagnosis_ref_v1"
+        ]
+        verdicts = {
+            str(payload.get("review_verdict"))
+            for payload in reviewed_ref_payloads
         }
-        if not diagnosis_ref_payloads or "ready_for_repair_handoff" in verdicts:
+        if reviewed_ref_payloads and "ready_for_repair_handoff" in verdicts:
             suggested_next_skill = "aoa-session-self-repair"
         else:
             suggested_next_skill = "aoa-session-self-diagnose"
