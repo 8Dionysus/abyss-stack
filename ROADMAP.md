@@ -19,6 +19,60 @@ Phases 0 through 6 have already been landed as source and runtime seams:
   `generated/diagnostic_surface_catalog.min.json`, still weaker than repair
   authority and live-service mutation
 
+### Current release contour
+
+The live `v0.2.0` contour is runtime-substrate hardening, not a new source of
+AoA or ToS meaning. Its current checked surface is:
+
+- source/deployed split and parity posture:
+  `README.md`, `CHARTER.md`, `BOUNDARIES.md`, `docs/PATHS.md`,
+  `docs/DEPLOYMENT.md`, `scripts/aoa-sync-configs`,
+  `scripts/validate_stack.py`, and `scripts/release_check.py`
+- diagnostic spine and repair-safe handoff contracts:
+  `docs/DIAGNOSTIC_SPINE.md`,
+  `generated/diagnostic_surface_catalog.min.json`,
+  `schemas/diagnostic_target.schema.json`,
+  `schemas/diagnostic_session.schema.json`,
+  `schemas/diagnosis_companion.schema.json`,
+  `schemas/reviewed_diagnosis_ref.schema.json`,
+  `schemas/repair_handoff.schema.json`,
+  `examples/diagnostic_target.min.example.json`,
+  `examples/diagnostic_session.min.example.json`,
+  `examples/diagnosis_companion.min.example.json`,
+  `examples/reviewed_diagnosis_ref.min.example.json`,
+  `examples/repair_handoff.min.example.json`,
+  `scripts/aoa-diagnose`, `scripts/_aoa_diagnose.py`,
+  `scripts/build_diagnostic_surface_catalog.py`,
+  `scripts/validate_diagnostic_surface_catalog.py`,
+  `tests/test_validate_stack_diagnostic_spine.py`, and
+  `tests/test_diagnostic_spine_contracts.py`
+- antifragility contract-only runtime receipts:
+  `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/REPAIR_SAFE_CLOSEOUT.md`,
+  `schemas/service_degradation_receipt_v1.json`,
+  `schemas/repair_safe_closeout_receipt_v1.json`,
+  `examples/service_degradation_receipt.example.json`, and
+  `examples/repair_safe_closeout_receipt.example.json`
+- promoted local-worker and Intel serving posture:
+  `docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `docs/LLAMACPP_PILOT.md`,
+  `docs/MACHINE_FIT_POLICY.md`,
+  `compose/tuning/llamacpp.runtime-fallback.yml`,
+  `compose/tuning/llamacpp.intel-285h.cpu-safe.yml`,
+  `compose/tuning/intel-text.ovms-qwen3-settings.yml`,
+  `docs/model-cards/qwen3-openvino-family.md`, and
+  `scripts/aoa-llamacpp-pilot`
+- bounded federation, runtime-chat, and ToS graph curation seams:
+  `docs/MEMO_RUNTIME_SEAM.md`, `docs/EVAL_RUNTIME_SEAM.md`,
+  `docs/PLAYBOOK_RUNTIME_SEAM.md`, `docs/KAG_RUNTIME_SEAM.md`,
+  `docs/SERVICE_CATALOG.md`, `docs/PROFILES.md`,
+  `docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
+  `compose/modules/52-tos-graph.yml`, `compose/profiles/curation.txt`, and
+  `config-templates/Services/tos-graph/app/main.py`
+
+This contour keeps the source checkout `~/src/abyss-stack` separate from the
+deployed `/srv/abyss-stack/Configs` mirror. It names runtime contracts,
+advisory seams, and validation paths without claiming live service mutation or
+meaning-layer authority.
+
 The main remaining work is live runtime-loop consumption, operational cutover choices, platform hardening, and keeping deployed/runtime truth aligned with source-authored posture.
 
 Those landings should be read carefully:
