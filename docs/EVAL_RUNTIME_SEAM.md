@@ -5,7 +5,8 @@ This document describes the runtime-facing `aoa-evals` landing inside `abyss-sta
 It is intentionally bounded:
 - read-only eval selection and inspection via `/evals/*`
 - filesystem-first private export candidates under `Logs/eval-exports/`
-- no verdict loop
+- one targeted runtime sidecar proof for the Phase Alpha memo contradiction lane
+- no general verdict loop
 - no judge runtime
 - no promotion or publication back into `aoa-evals`
 
@@ -62,6 +63,9 @@ Phase 4 adds two private runtime export wrappers:
 - `aoa-export-runtime-evidence-selection`
 - `aoa-export-artifact-hook-candidate`
 
+The Phase Alpha memo contradiction lane also has one bounded sidecar runner:
+- `aoa-run-memo-contradiction-integrity`
+
 These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-evals` contract references, and write private runtime-owned wrapper artifacts under:
 
 - `${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection/`
@@ -70,6 +74,7 @@ These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-
 
 The outputs are not `aoa-evals` objects.
 They are bounded runtime candidates waiting for later review or export.
+The memo contradiction sidecar is narrower: it reads log-backed Phase Alpha evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
 
 Example usage:
 
@@ -81,13 +86,19 @@ aoa-export-runtime-evidence-selection \
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write
+
+aoa-run-memo-contradiction-integrity \
+  --memo-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo" \
+  --evals-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
 ```
 
 ## What this phase intentionally does not do
 
 This seam does not:
 - run local evals
+- run general local evals
 - calculate verdicts
+- calculate general verdicts
 - choose promotion outcomes
 - publish into `aoa-evals`
 - alter `langchain-api` request or response behavior

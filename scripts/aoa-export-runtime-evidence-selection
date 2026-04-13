@@ -61,6 +61,9 @@ def main() -> int:
     phase_alpha_memo_contradiction_gap_example_path = (
         evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
     )
+    phase_alpha_memo_contradiction_rerun_example_path = (
+        evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+    )
 
     input_path = Path(args.input_file).resolve()
     candidate_payload = read_json(input_path)
@@ -92,6 +95,9 @@ def main() -> int:
         "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json": [
             phase_alpha_memo_contradiction_gap_example_path,
         ],
+        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json": [
+            phase_alpha_memo_contradiction_rerun_example_path,
+        ],
     }
     if isinstance(source_example_ref, str) and source_example_ref in example_contract_refs:
         ref_paths.extend(f"local:{path}" for path in example_contract_refs[source_example_ref])
@@ -105,8 +111,12 @@ def main() -> int:
     elif (
         any(ref == "candidate:aoa-memo-contradiction-integrity" for ref in candidate_eval_refs)
         or selection_id == "phase-alpha-memo-contradiction-gap-v1"
+        or selection_id == "phase-alpha-memo-contradiction-rerun-v1"
     ):
-        ref_paths.append(f"local:{phase_alpha_memo_contradiction_gap_example_path}")
+        if selection_id == "phase-alpha-memo-contradiction-rerun-v1":
+            ref_paths.append(f"local:{phase_alpha_memo_contradiction_rerun_example_path}")
+        else:
+            ref_paths.append(f"local:{phase_alpha_memo_contradiction_gap_example_path}")
     else:
         ref_paths.append(f"local:{workhorse_example_path}")
 

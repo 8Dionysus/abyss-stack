@@ -198,6 +198,9 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                         "phase-alpha-memo-contradiction-gap": {
                             "selection_id": "phase-alpha-memo-contradiction-gap-v1"
                         },
+                        "phase-alpha-memo-contradiction-rerun": {
+                            "selection_id": "phase-alpha-memo-contradiction-rerun-v1"
+                        },
                     },
                     "hook_templates": {"restartable-inquiry-loop": {}},
                 },
@@ -380,6 +383,21 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-gap-v1")
         self.assertIn(
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+            payload["source_files"],
+        )
+
+    def test_phase_alpha_memo_contradiction_rerun_runtime_evidence_template_resolves_source_files(self) -> None:
+        store = self.make_store()
+
+        payload = self.module.resolve_runtime_evidence_template(
+            store,
+            "phase-alpha-memo-contradiction-rerun",
+        )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-rerun-v1")
+        self.assertIn(
+            "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
             payload["source_files"],
         )
 
