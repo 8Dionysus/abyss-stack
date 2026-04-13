@@ -99,6 +99,10 @@ aoa-export-runtime-evidence-selection \
   --input-file /tmp/runtime-evidence-selection.json \
   --write
 
+aoa-run-memo-contradiction-integrity \
+  --memo-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo" \
+  --evals-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
+
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write

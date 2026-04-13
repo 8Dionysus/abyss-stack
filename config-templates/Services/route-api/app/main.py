@@ -216,6 +216,9 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
             "phase-alpha-memo-contradiction-gap": load_json(
                 mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
             ),
+            "phase-alpha-memo-contradiction-rerun": load_json(
+                mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+            ),
         },
         "hook_templates": {
             "self-agent-checkpoint-rollout": load_json(
@@ -1438,6 +1441,7 @@ def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> di
         "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
         "phase-alpha-memo-recall-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
         "phase-alpha-memo-contradiction-gap": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+        "phase-alpha-memo-contradiction-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
     }[template_name]
     return {
         "ok": True,
@@ -1751,6 +1755,7 @@ class RuntimeEvidenceTemplateRequest(BaseModel):
         "return-anchor-integrity",
         "phase-alpha-memo-recall-rerun",
         "phase-alpha-memo-contradiction-gap",
+        "phase-alpha-memo-contradiction-rerun",
     ]
 
 

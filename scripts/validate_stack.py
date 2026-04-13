@@ -66,6 +66,7 @@ REQUIRED_SCRIPTS = {
     "aoa-export-memo-candidate",
     "aoa-export-runtime-evidence-selection",
     "aoa-export-artifact-hook-candidate",
+    "aoa-run-memo-contradiction-integrity",
     "aoa-install-layout",
     "aoa-sync-configs",
     "aoa-sync-federation-surfaces",
@@ -254,6 +255,7 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
         "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
         "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
         "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
     },
     Path("config-templates") / "Configs" / "federation" / "aoa-playbooks.yaml": {
         "generated/playbook_review_packet_contracts.min.json",
@@ -2428,6 +2430,8 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         errors.append("docs/RUNBOOK.md must mention aoa-export-runtime-evidence-selection")
     if "aoa-export-artifact-hook-candidate" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-export-artifact-hook-candidate")
+    if "aoa-run-memo-contradiction-integrity" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-run-memo-contradiction-integrity")
 
     seam_doc = (ROOT / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
@@ -2435,6 +2439,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "/evals/",
         "aoa-export-runtime-evidence-selection",
         "aoa-export-artifact-hook-candidate",
+        "aoa-run-memo-contradiction-integrity",
         "Logs/eval-exports/",
     ):
         if snippet not in seam_doc:

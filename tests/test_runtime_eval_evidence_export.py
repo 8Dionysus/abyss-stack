@@ -82,6 +82,23 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 
+    def test_memo_contradiction_rerun_candidate_eval_ref_uses_rerun_contract_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "abyss-stack"
+            payload = {
+                "surface_type": "runtime_evidence_selection",
+                "selection_id": "phase-alpha-memo-contradiction-rerun-v1",
+                "candidate_eval_refs": ["candidate:aoa-memo-contradiction-integrity"],
+            }
+
+            artifact = self.run_export(stack_root, payload)
+
+        refs = artifact["aoa_evals_contract_refs"]
+        self.assertTrue(
+            any("runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json" in ref for ref in refs)
+        )
+        self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
+
 
 if __name__ == "__main__":
     unittest.main()

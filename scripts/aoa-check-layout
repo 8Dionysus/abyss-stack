@@ -218,6 +218,7 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_file "aoa-evals return evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.return-anchor-integrity.example.json"
   check_file "aoa-evals phase alpha memo recall evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
   check_file "aoa-evals phase alpha memo contradiction gap evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
+  check_file "aoa-evals phase alpha memo contradiction rerun evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
   check_warn_file "aoa-evals self-agent hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
   check_warn_file "aoa-evals model-tier hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
   check_warn_file "aoa-evals restartable hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
