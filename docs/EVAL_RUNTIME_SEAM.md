@@ -25,7 +25,8 @@ The current allowlist includes:
 - selected docs such as `TRACE_EVAL_BRIDGE.md` and `RUNTIME_BENCH_PROMOTION_GUIDE.md`
 - generated eval catalog, capsules, sections, and comparison spine surfaces
 - public-safe example payloads for runtime evidence selection, including the
-  workhorse, return-anchor, and Phase Alpha memo recall rerun evidence templates
+  workhorse, return-anchor, Phase Alpha memo recall rerun, and Phase Alpha memo
+  contradiction gap evidence templates
 - the public-safe schemas that define those payloads
 
 `abyss-stack` treats this mirror as a read-only contract surface.
