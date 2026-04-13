@@ -51,17 +51,18 @@ Keep these living facts explicit while you work:
 Before changing runtime surfaces, read in this order:
 
 1. `README.md`
-2. `CHARTER.md`
-3. `BOUNDARIES.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/SERVICE_CATALOG.md`
-6. `docs/PROFILES.md` and `docs/PRESETS.md`
-7. `docs/PATHS.md`
-8. `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, and `docs/SECURITY.md`
-9. `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/MACHINE_FIT_POLICY.md`, and `docs/PLATFORM_ADAPTATION_POLICY.md` when host posture or machine-fit policy is in scope
-10. `docs/BRANCH_POLICY.md` and `docs/RECURRENCE_RUNTIME_POLICY.md` when recurrence or long-horizon runtime posture is touched
-11. `docs/MEMO_RUNTIME_SEAM.md`, `docs/EVAL_RUNTIME_SEAM.md`, `docs/PLAYBOOK_RUNTIME_SEAM.md`, `docs/KAG_RUNTIME_SEAM.md`, `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/REPAIR_SAFE_CLOSEOUT.md`, and `docs/DIAGNOSTIC_SPINE.md` when those seams are in scope
-12. `docs/VIA_NEGATIVA_CHECKLIST.md` for destructive, boundary-sensitive, or ambiguity-heavy changes
+2. `ROADMAP.md`
+3. `CHARTER.md`
+4. `BOUNDARIES.md`
+5. `docs/ARCHITECTURE.md`
+6. `docs/SERVICE_CATALOG.md`
+7. `docs/PROFILES.md` and `docs/PRESETS.md`
+8. `docs/PATHS.md`
+9. `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, and `docs/SECURITY.md`
+10. `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/MACHINE_FIT_POLICY.md`, and `docs/PLATFORM_ADAPTATION_POLICY.md` when host posture or machine-fit policy is in scope
+11. `docs/BRANCH_POLICY.md` and `docs/RECURRENCE_RUNTIME_POLICY.md` when recurrence or long-horizon runtime posture is touched
+12. `docs/MEMO_RUNTIME_SEAM.md`, `docs/EVAL_RUNTIME_SEAM.md`, `docs/PLAYBOOK_RUNTIME_SEAM.md`, `docs/KAG_RUNTIME_SEAM.md`, `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/REPAIR_SAFE_CLOSEOUT.md`, and `docs/DIAGNOSTIC_SPINE.md` when those seams are in scope
+13. `docs/VIA_NEGATIVA_CHECKLIST.md` for destructive, boundary-sensitive, or ambiguity-heavy changes
 
 If a nearer `AGENTS.md` exists for the directory you are editing, follow that file first.
 
