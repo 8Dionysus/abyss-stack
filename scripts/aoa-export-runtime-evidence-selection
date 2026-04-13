@@ -55,6 +55,9 @@ def main() -> int:
     recurrence_path = evals_root / "docs" / "RECURRENCE_PROOF_PROGRAM.md"
     workhorse_example_path = evals_root / "examples" / "runtime_evidence_selection.workhorse-local.example.json"
     return_example_path = evals_root / "examples" / "runtime_evidence_selection.return-anchor-integrity.example.json"
+    phase_alpha_memo_example_path = (
+        evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
+    )
 
     input_path = Path(args.input_file).resolve()
     candidate_payload = read_json(input_path)
@@ -73,8 +76,26 @@ def main() -> int:
 
     candidate_eval_refs = candidate_payload.get("candidate_eval_refs", [])
     ref_paths = [f"local:{schema_path}", f"local:{bench_guide_path}"]
-    if any(ref == "candidate:aoa-return-anchor-integrity" for ref in candidate_eval_refs):
+    source_example_ref = candidate_payload.get("source_example_ref")
+    example_contract_refs = {
+        "examples/runtime_evidence_selection.workhorse-local.example.json": [workhorse_example_path],
+        "examples/runtime_evidence_selection.return-anchor-integrity.example.json": [
+            recurrence_path,
+            return_example_path,
+        ],
+        "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json": [
+            phase_alpha_memo_example_path,
+        ],
+    }
+    if isinstance(source_example_ref, str) and source_example_ref in example_contract_refs:
+        ref_paths.extend(f"local:{path}" for path in example_contract_refs[source_example_ref])
+    elif any(ref == "candidate:aoa-return-anchor-integrity" for ref in candidate_eval_refs):
         ref_paths.extend([f"local:{recurrence_path}", f"local:{return_example_path}"])
+    elif (
+        any(ref == "candidate:aoa-memo-recall-integrity" for ref in candidate_eval_refs)
+        or selection_id == "phase-alpha-memo-recall-rerun-v1"
+    ):
+        ref_paths.append(f"local:{phase_alpha_memo_example_path}")
     else:
         ref_paths.append(f"local:{workhorse_example_path}")
 

@@ -252,6 +252,7 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
         "generated/runtime_candidate_intake.min.json",
         "examples/runtime_evidence_selection.workhorse-local.example.json",
         "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+        "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
     },
     Path("config-templates") / "Configs" / "federation" / "aoa-playbooks.yaml": {
         "generated/playbook_review_packet_contracts.min.json",

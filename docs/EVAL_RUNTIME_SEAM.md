@@ -24,7 +24,8 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals
 The current allowlist includes:
 - selected docs such as `TRACE_EVAL_BRIDGE.md` and `RUNTIME_BENCH_PROMOTION_GUIDE.md`
 - generated eval catalog, capsules, sections, and comparison spine surfaces
-- public-safe example payloads for runtime evidence selection and artifact hooks
+- public-safe example payloads for runtime evidence selection, including the
+  workhorse, return-anchor, and Phase Alpha memo recall rerun evidence templates
 - the public-safe schemas that define those payloads
 
 `abyss-stack` treats this mirror as a read-only contract surface.
