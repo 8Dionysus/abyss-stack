@@ -10,6 +10,14 @@ Phases 0 through 6 have already been landed as source and runtime seams:
 - Intel-aware and Windows-usable hardening
 - `aoa-agents`, `aoa-routing`, `aoa-memo`, `aoa-evals`, `aoa-playbooks`, and `aoa-kag` advisory/read-export landings
 - `Tree-of-Sophia` source-owned handoff companion landing
+- bounded promoted local-worker posture through `langchain-api` on `5403`
+  backed by `llama.cpp`, with `LangGraph` as the adopted execution layer for
+  bounded long-horizon and autonomy-focused local-worker flows
+- antifragility wave two as contract-only runtime doctrine and receipt
+  surfaces, without mutating live services or deployment behavior
+- read-only diagnostic spine groundwork through `scripts/aoa-diagnose` and
+  `generated/diagnostic_surface_catalog.min.json`, still weaker than repair
+  authority and live-service mutation
 
 The main remaining work is live runtime-loop consumption, operational cutover choices, platform hardening, and keeping deployed/runtime truth aligned with source-authored posture.
 
