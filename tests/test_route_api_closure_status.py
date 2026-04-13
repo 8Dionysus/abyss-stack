@@ -190,7 +190,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                             }
                         ],
                     },
-                    "runtime_evidence_templates": {"workhorse-local": {}},
+                    "runtime_evidence_templates": {
+                        "workhorse-local": {},
+                        "phase-alpha-memo-recall-rerun": {
+                            "selection_id": "phase-alpha-memo-recall-rerun-v1"
+                        },
+                    },
                     "hook_templates": {"restartable-inquiry-loop": {}},
                 },
             ),
@@ -344,6 +349,21 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         closure = payload["layers_status"]["aoa-playbooks"]["closure_status"]
         self.assertFalse(closure["consumer_ready"])
         self.assertIn("playbook registry missing entries", closure["reasons"])
+
+    def test_phase_alpha_memo_recall_runtime_evidence_template_resolves_source_files(self) -> None:
+        store = self.make_store()
+
+        payload = self.module.resolve_runtime_evidence_template(
+            store,
+            "phase-alpha-memo-recall-rerun",
+        )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-recall-rerun-v1")
+        self.assertIn(
+            "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+            payload["source_files"],
+        )
 
     def test_kag_structured_reads_stay_mirror_backed(self) -> None:
         store = self.make_store()

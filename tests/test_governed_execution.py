@@ -672,6 +672,7 @@ class GovernedExecutionTests(unittest.TestCase):
             "docs/RECURRENCE_PROOF_PROGRAM.md",
             "examples/runtime_evidence_selection.workhorse-local.example.json",
             "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+            "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
             "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
         ):
             path = stack_root / "Knowledge" / "federation" / "aoa-evals" / rel_path

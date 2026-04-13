@@ -210,6 +210,9 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
             "return-anchor-integrity": load_json(
                 mirror_root / "examples/runtime_evidence_selection.return-anchor-integrity.example.json"
             ),
+            "phase-alpha-memo-recall-rerun": load_json(
+                mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
+            ),
         },
         "hook_templates": {
             "self-agent-checkpoint-rollout": load_json(
@@ -1430,6 +1433,7 @@ def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> di
     rel_path = {
         "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
         "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+        "phase-alpha-memo-recall-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
     }[template_name]
     return {
         "ok": True,
@@ -1738,7 +1742,7 @@ class EvalComparisonRequest(BaseModel):
 
 
 class RuntimeEvidenceTemplateRequest(BaseModel):
-    name: Literal["workhorse-local", "return-anchor-integrity"]
+    name: Literal["workhorse-local", "return-anchor-integrity", "phase-alpha-memo-recall-rerun"]
 
 
 class HookTemplateRequest(BaseModel):
