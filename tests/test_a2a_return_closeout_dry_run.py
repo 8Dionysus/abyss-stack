@@ -84,6 +84,28 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
                 "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
                 artifact["contract_refs"],
             )
+            self.assertIn(
+                "repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json",
+                artifact["contract_refs"],
+            )
+
+    def test_adapter_accepts_full_sdk_e2e_fixture_wrapper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "abyss-stack"
+            payload = {
+                "fixture_id": "wave5-a2a-summon-return-checkpoint-e2e",
+                "dry_run": True,
+                "live_automation": False,
+                "reviewed_closeout_request": reviewed_closeout_payload(),
+            }
+            result = self.run_adapter(stack_root, payload)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            artifact = json.loads(result.stdout)
+
+            self.assertEqual(artifact["request_kind"], "a2a_wave5_closeout_request")
+            self.assertEqual(artifact["candidate_payload"]["closeout_id"], "closeout-example-child")
+            self.assertTrue(artifact["runtime_receipt_candidate"]["dry_run"])
+            self.assertFalse(artifact["runtime_receipt_candidate"]["live_automation"])
 
     def test_adapter_write_is_private_and_still_dry_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

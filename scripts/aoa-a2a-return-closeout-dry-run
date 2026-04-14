@@ -17,6 +17,7 @@ PLAYBOOK_REF = "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBO
 EVAL_HOOK_REF = "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json"
 MEMO_WRITEBACK_REF = "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md"
 SDK_REVIEWED_CLOSEOUT_REF = "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json"
+SDK_E2E_FIXTURE_REF = "repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json"
 SDK_DOC_REF = "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md"
 
 
@@ -48,6 +49,15 @@ def ensure_mapping(payload: Any, name: str) -> dict[str, Any]:
 def ensure_reviewed(payload: dict[str, Any]) -> None:
     if payload.get("reviewed") is not True:
         raise SystemExit("error: closeout payload must set reviewed=true for this dry-run adapter")
+
+
+def extract_reviewed_closeout_request(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("request_kind") == "a2a_wave5_closeout_request":
+        return payload
+    nested = payload.get("reviewed_closeout_request")
+    if isinstance(nested, dict):
+        return nested
+    return payload
 
 
 def default_title(closeout_id: str) -> str:
@@ -109,6 +119,8 @@ def build_memo_export_candidates(payload: dict[str, Any]) -> list[dict[str, Any]
 
 
 def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    source_payload = payload
+    payload = extract_reviewed_closeout_request(payload)
     ensure_reviewed(payload)
     request_kind = payload.get("request_kind")
     if request_kind != "a2a_wave5_closeout_request":
@@ -130,7 +142,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
     )
     record_id = args.record_id or f"{timestamp}__a2a-return-closeout__{slugify(closeout_id)}"
 
-    rendered_input = json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    rendered_input = json.dumps(source_payload, sort_keys=True, ensure_ascii=True).encode("utf-8")
     child_task_id = a2a_child.get("child_task_id")
     execution_surface = a2a_child.get("execution_surface")
 
@@ -177,6 +189,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
         "contract_refs": [
             SDK_DOC_REF,
             SDK_REVIEWED_CLOSEOUT_REF,
+            SDK_E2E_FIXTURE_REF,
             PLAYBOOK_REF,
             EVAL_HOOK_REF,
             MEMO_WRITEBACK_REF,
