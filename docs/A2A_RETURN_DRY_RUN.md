@@ -38,6 +38,11 @@ The adapter expects the SDK-shaped reviewed closeout request:
 
 The source contract lives in `aoa-sdk`, not in this repository.
 
+The adapter may also accept the full SDK E2E fixture at
+`/srv/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`; in that
+case it reads the nested `reviewed_closeout_request` and still emits only the
+same private dry-run wrapper.
+
 ## Output Boundary
 
 The output is a runtime receipt candidate.
@@ -64,11 +69,19 @@ scripts/aoa-a2a-return-closeout-dry-run \
   --input-file /srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json
 ```
 
+The full-fixture form is also accepted:
+
+```bash
+scripts/aoa-a2a-return-closeout-dry-run \
+  --input-file /srv/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json
+```
+
 Use `--write` only when a private runtime-local candidate file is wanted.
 
 ## Owner Refs
 
 - `repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md`
+- `repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`
 - `repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md`
 - `repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json`
 - `repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md`
