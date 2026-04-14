@@ -16,7 +16,7 @@ When something feels wrong, use this order:
 10. check health endpoints
 11. check logs
 12. inspect memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` when recurrence, checkpoint, or review artifacts may need bounded export toward `aoa-memo`
-13. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` when runtime evidence selections or artifact hooks may need bounded export toward `aoa-evals`
+13. inspect eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/` and A2A return dry-run candidates under `${AOA_STACK_ROOT}/Logs/a2a-return-closeouts/` when runtime evidence selections, artifact hooks, or reviewed child-return closeouts may need bounded export toward `aoa-evals`
 14. inspect `route-api` playbook advisory surfaces when activation, failure posture, or composition seams may explain the current route
 15. inspect governed-run `artifacts/review_packet_manifest.json` and `artifacts/review_packet_audit.json` when a bounded mutation run should have produced memo or eval review candidates
 16. inspect `route-api` KAG and `Tree-of-Sophia` handoff advisory surfaces when retrieval, regrounding, or source-authority seams may explain the current route
@@ -43,6 +43,7 @@ aoa-diagnose --preset intel-full --with-reviewed-diagnosis-ref /tmp/reviewed-dia
 aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/checkpoint-export.json --write
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
+aoa-a2a-return-closeout-dry-run --input-file /tmp/reviewed-closeout-request.json --write
 python scripts/aoa-rpg-runtime-projection --check
 scripts/aoa-governed-run audit <run-id>
 scripts/aoa-governed-run replay-review-packets <run-id>
@@ -105,6 +106,10 @@ aoa-run-memo-contradiction-integrity \
 
 aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
+  --write
+
+aoa-a2a-return-closeout-dry-run \
+  --input-file /tmp/reviewed-closeout-request.json \
   --write
 ```
 

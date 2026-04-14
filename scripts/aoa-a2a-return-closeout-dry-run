@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+SCRIPT_NAME = "scripts/aoa-a2a-return-closeout-dry-run"
+PLAYBOOK_REF = "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md"
+EVAL_HOOK_REF = "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json"
+MEMO_WRITEBACK_REF = "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md"
+SDK_REVIEWED_CLOSEOUT_REF = "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json"
+SDK_DOC_REF = "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md"
+
+
+def slugify(text: str) -> str:
+    lowered = text.strip().lower()
+    lowered = re.sub(r"[^a-z0-9]+", "-", lowered)
+    lowered = lowered.strip("-")
+    return lowered or "candidate"
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SystemExit(f"error: file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"error: invalid json in {path}: {exc}") from exc
+    if not isinstance(loaded, dict):
+        raise SystemExit(f"error: expected a JSON object in {path}")
+    return loaded
+
+
+def ensure_mapping(payload: Any, name: str) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise SystemExit(f"error: {name} must be a JSON object")
+    return payload
+
+
+def ensure_reviewed(payload: dict[str, Any]) -> None:
+    if payload.get("reviewed") is not True:
+        raise SystemExit("error: closeout payload must set reviewed=true for this dry-run adapter")
+
+
+def default_title(closeout_id: str) -> str:
+    return f"A2A return closeout dry-run {closeout_id}"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Assemble a private dry-run A2A return closeout receipt candidate from an aoa-sdk reviewed closeout request."
+    )
+    parser.add_argument("--input-file", required=True)
+    parser.add_argument("--record-id")
+    parser.add_argument("--title")
+    parser.add_argument("--summary")
+    parser.add_argument("--write", action="store_true")
+    return parser
+
+
+def first_publisher(payload: dict[str, Any]) -> str:
+    batches = payload.get("batches")
+    if isinstance(batches, list):
+        for item in batches:
+            if isinstance(item, dict) and isinstance(item.get("publisher"), str):
+                return item["publisher"]
+    return "abyss-stack.runtime-wave-closeouts"
+
+
+def build_memo_export_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = [
+        {
+            "runtime_surface": "transition_record",
+            "target_kind": "decision",
+            "source_artifacts": ["summon_decision", "return_plan", "checkpoint_bridge_plan"],
+            "review_required": True,
+        },
+        {
+            "runtime_surface": "review_trace",
+            "target_kind": "audit_event",
+            "source_artifacts": ["child_task_result", "runtime_closeout_dry_run_receipt"],
+            "review_required": False,
+        },
+        {
+            "runtime_surface": "checkpoint_export",
+            "target_kind": "state_capsule",
+            "source_artifacts": ["checkpoint_bridge_plan"],
+            "review_required": False,
+        },
+    ]
+    if isinstance(payload.get("memo_export_plan"), dict):
+        candidates.append(
+            {
+                "runtime_surface": "memo_export_plan",
+                "target_kind": "reviewed_candidate",
+                "source_artifacts": ["memo_export_plan"],
+                "review_required": True,
+            }
+        )
+    return candidates
+
+
+def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    ensure_reviewed(payload)
+    request_kind = payload.get("request_kind")
+    if request_kind != "a2a_wave5_closeout_request":
+        raise SystemExit("error: closeout payload must use request_kind a2a_wave5_closeout_request")
+
+    closeout_id = payload.get("closeout_id")
+    if not isinstance(closeout_id, str) or not closeout_id:
+        raise SystemExit("error: closeout payload must include closeout_id")
+
+    a2a_child = ensure_mapping(payload.get("a2a_child"), "a2a_child")
+    return_plan = ensure_mapping(payload.get("return_plan"), "return_plan")
+    checkpoint_bridge_plan = ensure_mapping(payload.get("checkpoint_bridge_plan"), "checkpoint_bridge_plan")
+
+    captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    title = args.title or default_title(closeout_id)
+    summary = args.summary or (
+        "Private dry-run A2A return closeout receipt candidate assembled from a reviewed aoa-sdk payload."
+    )
+    record_id = args.record_id or f"{timestamp}__a2a-return-closeout__{slugify(closeout_id)}"
+
+    rendered_input = json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    child_task_id = a2a_child.get("child_task_id")
+    execution_surface = a2a_child.get("execution_surface")
+
+    return {
+        "artifact_kind": "aoa.runtime-a2a-return-closeout-dry-run",
+        "schema_version": "1",
+        "capture_mode": "private",
+        "dry_run": True,
+        "live_automation": False,
+        "exported_at": captured_at,
+        "exported_by": SCRIPT_NAME,
+        "record_id": record_id,
+        "title": title,
+        "summary": summary,
+        "closeout_id": closeout_id,
+        "session_ref": payload.get("session_ref"),
+        "request_kind": request_kind,
+        "source_input_ref": f"local:{input_path}",
+        "source_input_sha256": hashlib.sha256(rendered_input).hexdigest(),
+        "reviewed": True,
+        "reviewed_artifact_path": payload.get("reviewed_artifact_path"),
+        "a2a_child": a2a_child,
+        "return_plan": return_plan,
+        "checkpoint_bridge_plan": checkpoint_bridge_plan,
+        "runtime_receipt_candidate": {
+            "artifact_kind": "runtime_wave_closeout_receipt",
+            "publisher": first_publisher(payload),
+            "dry_run": True,
+            "live_automation": False,
+            "child_task_id": child_task_id,
+            "execution_surface": execution_surface,
+            "return_reentry_mode": return_plan.get("reentry_mode"),
+            "return_anchor_artifact": return_plan.get("anchor_artifact"),
+            "checkpoint_bridge_steps": checkpoint_bridge_plan.get("execution_order", []),
+        },
+        "memo_export_candidates": build_memo_export_candidates(payload),
+        "eval_export_candidates": [
+            {
+                "hook_id": "aoa-p-0031-a2a-summon-return-checkpoint-hook",
+                "template_ref": EVAL_HOOK_REF,
+                "review_required": True,
+            }
+        ],
+        "contract_refs": [
+            SDK_DOC_REF,
+            SDK_REVIEWED_CLOSEOUT_REF,
+            PLAYBOOK_REF,
+            EVAL_HOOK_REF,
+            MEMO_WRITEBACK_REF,
+            "repo:abyss-stack/docs/A2A_RETURN_DRY_RUN.md",
+        ],
+        "boundary_notes": [
+            "dry-run adapter assembly only",
+            "no live child execution",
+            "no memo canon promotion",
+            "no eval verdict execution",
+            "no runtime publication without later review",
+        ],
+        "candidate_payload": payload,
+    }
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+    input_path = Path(args.input_file).resolve()
+    payload = read_json(input_path)
+    artifact = build_artifact(input_path, payload, args)
+
+    rendered = json.dumps(artifact, indent=2, ensure_ascii=True) + "\n"
+    if args.write:
+        closeout_id = artifact["closeout_id"]
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+        latest_path = stack_root / "Logs" / "a2a-return-closeouts" / "latest" / f"{closeout_id}.private.json"
+        archive_dir = stack_root / "Logs" / "a2a-return-closeouts" / "records" / (
+            f"{timestamp}__a2a-return-closeout__{closeout_id}"
+        )
+        archive_path = archive_dir / "candidate.private.json"
+        latest_path.parent.mkdir(parents=True, exist_ok=True)
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        latest_path.write_text(rendered, encoding="utf-8")
+        archive_path.write_text(rendered, encoding="utf-8")
+
+    sys.stdout.write(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
