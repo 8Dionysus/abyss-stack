@@ -5,6 +5,7 @@ This document describes the runtime-facing `aoa-evals` landing inside `abyss-sta
 It is intentionally bounded:
 - read-only eval selection and inspection via `/evals/*`
 - filesystem-first private export candidates under `Logs/eval-exports/`
+- filesystem-first private A2A return dry-run candidates under `Logs/a2a-return-closeouts/`
 - one targeted runtime sidecar proof for the Phase Alpha memo contradiction lane
 - no general verdict loop
 - no judge runtime
@@ -63,6 +64,9 @@ Phase 4 adds two private runtime export wrappers:
 - `aoa-export-runtime-evidence-selection`
 - `aoa-export-artifact-hook-candidate`
 
+The Wave 5 A2A return lane adds one private dry-run closeout wrapper:
+- `aoa-a2a-return-closeout-dry-run`
+
 The Phase Alpha memo contradiction lane also has one bounded sidecar runner:
 - `aoa-run-memo-contradiction-integrity`
 
@@ -71,10 +75,14 @@ These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-
 - `${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection/`
 - `${AOA_STACK_ROOT}/Logs/eval-exports/latest/artifact-hook/`
 - `${AOA_STACK_ROOT}/Logs/eval-exports/records/`
+- `${AOA_STACK_ROOT}/Logs/a2a-return-closeouts/`
 
 The outputs are not `aoa-evals` objects.
 They are bounded runtime candidates waiting for later review or export.
 The memo contradiction sidecar is narrower: it reads log-backed Phase Alpha evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
+The A2A return dry-run wrapper is similarly narrow: it reads a reviewed `aoa-sdk`
+`a2a_wave5_closeout_request`, keeps `dry_run=true` and `live_automation=false`,
+and assembles only a runtime receipt candidate plus memo/eval handoff hints.
 
 Example usage:
 
@@ -87,6 +95,10 @@ aoa-export-artifact-hook-candidate \
   --input-file /tmp/artifact-hook.json \
   --write
 
+aoa-a2a-return-closeout-dry-run \
+  --input-file /srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json \
+  --write
+
 aoa-run-memo-contradiction-integrity \
   --memo-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo" \
   --evals-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
@@ -97,6 +109,7 @@ aoa-run-memo-contradiction-integrity \
 This seam does not:
 - run local evals
 - run general local evals
+- execute A2A child routes
 - calculate verdicts
 - calculate general verdicts
 - choose promotion outcomes

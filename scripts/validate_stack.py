@@ -66,6 +66,7 @@ REQUIRED_SCRIPTS = {
     "aoa-export-memo-candidate",
     "aoa-export-runtime-evidence-selection",
     "aoa-export-artifact-hook-candidate",
+    "aoa-a2a-return-closeout-dry-run",
     "aoa-run-memo-contradiction-integrity",
     "aoa-install-layout",
     "aoa-sync-configs",
@@ -116,6 +117,7 @@ REQUIRED_FILES = {
     ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
     ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
+    ROOT / "docs" / "A2A_RETURN_DRY_RUN.md",
     ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
     ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
     ROOT / "docs" / "DIAGNOSTIC_SPINE.md",
@@ -200,6 +202,7 @@ REQUIRED_FILES = {
     ROOT / "schemas" / "runtime-memo-export-candidate.schema.json",
     ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
     ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
+    ROOT / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
     ROOT / "schemas" / "diagnostic_target.schema.json",
@@ -218,6 +221,7 @@ REQUIRED_FILES = {
     ROOT / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json",
     ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
     ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
+    ROOT / "examples" / "runtime_a2a_return_closeout_dry_run.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
     ROOT / "examples" / "diagnostic_target.min.example.json",
@@ -241,6 +245,7 @@ REQUIRED_FILES = {
     ROOT / "tests" / "test_diagnostic_spine_contracts.py",
     ROOT / "tests" / "test_aoa_diagnose.py",
     ROOT / "tests" / "test_rpg_runtime_projection.py",
+    ROOT / "tests" / "test_a2a_return_closeout_dry_run.py",
 }
 
 FEDERATION_REQUIRED_RUNTIME_INPUTS = {
@@ -2432,6 +2437,8 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         errors.append("docs/RUNBOOK.md must mention aoa-export-artifact-hook-candidate")
     if "aoa-run-memo-contradiction-integrity" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-run-memo-contradiction-integrity")
+    if "aoa-a2a-return-closeout-dry-run" not in runbook_doc:
+        errors.append("docs/RUNBOOK.md must mention aoa-a2a-return-closeout-dry-run")
 
     seam_doc = (ROOT / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
@@ -2439,8 +2446,10 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "/evals/",
         "aoa-export-runtime-evidence-selection",
         "aoa-export-artifact-hook-candidate",
+        "aoa-a2a-return-closeout-dry-run",
         "aoa-run-memo-contradiction-integrity",
         "Logs/eval-exports/",
+        "Logs/a2a-return-closeouts/",
     ):
         if snippet not in seam_doc:
             errors.append(f"docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
@@ -2482,6 +2491,41 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         errors.append("runtime artifact hook example must use artifact_kind aoa.runtime-artifact-hook-candidate")
     if hook_example.get("exported_by") != "scripts/aoa-export-artifact-hook-candidate":
         errors.append("runtime artifact hook example must use exported_by scripts/aoa-export-artifact-hook-candidate")
+
+    a2a_doc = (ROOT / "docs" / "A2A_RETURN_DRY_RUN.md").read_text(encoding="utf-8")
+    for snippet in (
+        "aoa-a2a-return-closeout-dry-run",
+        "a2a_wave5_closeout_request",
+        "dry_run",
+        "live_automation",
+        "Logs/a2a-return-closeouts/",
+    ):
+        if snippet not in a2a_doc:
+            errors.append(f"docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
+
+    a2a_schema = json.loads(
+        (ROOT / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json").read_text(encoding="utf-8")
+    )
+    if a2a_schema.get("title") != "abyss-stack runtime A2A return closeout dry-run":
+        errors.append(
+            "runtime-a2a-return-closeout-dry-run.schema.json must describe abyss-stack runtime A2A return closeout dry-run"
+        )
+
+    a2a_example = json.loads(
+        (ROOT / "examples" / "runtime_a2a_return_closeout_dry_run.example.json").read_text(encoding="utf-8")
+    )
+    if a2a_example.get("artifact_kind") != "aoa.runtime-a2a-return-closeout-dry-run":
+        errors.append(
+            "runtime A2A return closeout dry-run example must use artifact_kind aoa.runtime-a2a-return-closeout-dry-run"
+        )
+    if a2a_example.get("exported_by") != "scripts/aoa-a2a-return-closeout-dry-run":
+        errors.append(
+            "runtime A2A return closeout dry-run example must use exported_by scripts/aoa-a2a-return-closeout-dry-run"
+        )
+    if a2a_example.get("dry_run") is not True:
+        errors.append("runtime A2A return closeout dry-run example must set dry_run true")
+    if a2a_example.get("live_automation") is not False:
+        errors.append("runtime A2A return closeout dry-run example must set live_automation false")
 
 
 def validate_playbook_runtime_seam(errors: list[str]) -> None:

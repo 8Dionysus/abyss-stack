@@ -1,0 +1,127 @@
+{
+  "artifact_kind": "aoa.runtime-a2a-return-closeout-dry-run",
+  "schema_version": "1",
+  "capture_mode": "private",
+  "dry_run": true,
+  "live_automation": false,
+  "exported_at": "2026-04-13T00:00:00Z",
+  "exported_by": "scripts/aoa-a2a-return-closeout-dry-run",
+  "record_id": "20260413T000000Z__a2a-return-closeout__closeout-example-child",
+  "title": "A2A return closeout dry-run closeout-example-child",
+  "summary": "Private dry-run A2A return closeout receipt candidate assembled from a reviewed aoa-sdk payload.",
+  "closeout_id": "closeout-example-child",
+  "session_ref": "session:example",
+  "request_kind": "a2a_wave5_closeout_request",
+  "source_input_ref": "local:/srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
+  "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "reviewed": true,
+  "reviewed_artifact_path": "/srv/notes/reviewed_session_artifact.md",
+  "a2a_child": {
+    "execution_surface": "codex_local",
+    "child_task_id": "task-child-1",
+    "selected_agent_id": "reviewer"
+  },
+  "return_plan": {
+    "decision": "return",
+    "anchor_artifact": "bounded_plan",
+    "reentry_mode": "checkpoint_relaunch"
+  },
+  "checkpoint_bridge_plan": {
+    "execution_order": [
+      "aoa-session-donor-harvest",
+      "aoa-session-progression-lift",
+      "aoa-quest-harvest"
+    ]
+  },
+  "runtime_receipt_candidate": {
+    "artifact_kind": "runtime_wave_closeout_receipt",
+    "publisher": "abyss-stack.runtime-wave-closeouts",
+    "dry_run": true,
+    "live_automation": false,
+    "child_task_id": "task-child-1",
+    "execution_surface": "codex_local",
+    "return_reentry_mode": "checkpoint_relaunch",
+    "return_anchor_artifact": "bounded_plan",
+    "checkpoint_bridge_steps": [
+      "aoa-session-donor-harvest",
+      "aoa-session-progression-lift",
+      "aoa-quest-harvest"
+    ]
+  },
+  "memo_export_candidates": [
+    {
+      "runtime_surface": "transition_record",
+      "target_kind": "decision",
+      "source_artifacts": [
+        "summon_decision",
+        "return_plan",
+        "checkpoint_bridge_plan"
+      ],
+      "review_required": true
+    },
+    {
+      "runtime_surface": "review_trace",
+      "target_kind": "audit_event",
+      "source_artifacts": [
+        "child_task_result",
+        "runtime_closeout_dry_run_receipt"
+      ],
+      "review_required": false
+    },
+    {
+      "runtime_surface": "checkpoint_export",
+      "target_kind": "state_capsule",
+      "source_artifacts": [
+        "checkpoint_bridge_plan"
+      ],
+      "review_required": false
+    }
+  ],
+  "eval_export_candidates": [
+    {
+      "hook_id": "aoa-p-0031-a2a-summon-return-checkpoint-hook",
+      "template_ref": "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
+      "review_required": true
+    }
+  ],
+  "contract_refs": [
+    "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md",
+    "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
+    "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md",
+    "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
+    "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md",
+    "repo:abyss-stack/docs/A2A_RETURN_DRY_RUN.md"
+  ],
+  "boundary_notes": [
+    "dry-run adapter assembly only",
+    "no live child execution",
+    "no memo canon promotion",
+    "no eval verdict execution",
+    "no runtime publication without later review"
+  ],
+  "candidate_payload": {
+    "schema_version": 1,
+    "request_kind": "a2a_wave5_closeout_request",
+    "closeout_id": "closeout-example-child",
+    "session_ref": "session:example",
+    "reviewed": true,
+    "reviewed_artifact_path": "/srv/notes/reviewed_session_artifact.md",
+    "a2a_child": {
+      "execution_surface": "codex_local",
+      "child_task_id": "task-child-1",
+      "selected_agent_id": "reviewer"
+    },
+    "return_plan": {
+      "decision": "return",
+      "anchor_artifact": "bounded_plan",
+      "reentry_mode": "checkpoint_relaunch"
+    },
+    "checkpoint_bridge_plan": {
+      "execution_order": [
+        "aoa-session-donor-harvest",
+        "aoa-session-progression-lift",
+        "aoa-quest-harvest"
+      ]
+    }
+  }
+}
