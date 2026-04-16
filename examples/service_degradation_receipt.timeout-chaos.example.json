@@ -1,0 +1,39 @@
+{
+  "schema_version": "service_degradation_receipt_v1",
+  "receipt_id": "runtime:degrade:route-api:2026-04-13T12:10:00Z:timeout-chaos",
+  "timestamp_utc": "2026-04-13T12:10:00Z",
+  "repo": "abyss-stack",
+  "surface": "runtime-service",
+  "service": "route-api",
+  "profile": "autonomy",
+  "incident_class": "timeout_chaos",
+  "severity": "medium",
+  "mode_before": "full-service",
+  "mode_after": "degraded-manual-review",
+  "degraded": true,
+  "containment": {
+    "kind": "service",
+    "value": "route-api",
+    "notes": "Request handling stayed bounded to the route-api lane and preserved an explicit degraded continuation."
+  },
+  "unsafe_repair_blocked": true,
+  "operator_visible": true,
+  "evidence_refs": [
+    "python scripts/validate_stack.py#timeout-chaos-example",
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#timeout-chaos-example",
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest#timeout-chaos-example"
+  ],
+  "host_facts_refs": [
+    "generated/host_facts.current.json#machine:fedora-workstation"
+  ],
+  "machine_fit_refs": [
+    "generated/machine_fit.current.json#profile:autonomy"
+  ],
+  "suggested_next_checks": [
+    "python scripts/validate_stack.py --parity-check",
+    "confirm timeout containment did not widen beyond route-api",
+    "prepare a bounded runtime evidence-selection candidate instead of a verdict"
+  ],
+  "notes": "Wave-1 timeout chaos example. Do not fan out restarts to unrelated services.",
+  "supersedes": []
+}

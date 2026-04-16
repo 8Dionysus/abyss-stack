@@ -22,8 +22,28 @@ class AntifragilityContractTests(unittest.TestCase):
                 "examples/service_degradation_receipt.example.json",
             ),
             (
+                "schemas/service_degradation_receipt_v1.json",
+                "examples/service_degradation_receipt.timeout-chaos.example.json",
+            ),
+            (
+                "schemas/service_degradation_receipt_v1.json",
+                "examples/service_degradation_receipt.honest-degradation.example.json",
+            ),
+            (
+                "schemas/service_degradation_receipt_v1.json",
+                "examples/service_degradation_receipt.retrieval-outage-honesty.example.json",
+            ),
+            (
                 "schemas/repair_safe_closeout_receipt_v1.json",
                 "examples/repair_safe_closeout_receipt.example.json",
+            ),
+            (
+                "schemas/repair_safe_closeout_receipt_v1.json",
+                "examples/repair_safe_closeout_receipt.timeout-chaos.example.json",
+            ),
+            (
+                "schemas/repair_safe_closeout_receipt_v1.json",
+                "examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json",
             ),
         ]
 
@@ -60,11 +80,17 @@ class AntifragilityContractTests(unittest.TestCase):
 
         for fragment in [
             "docs/ANTIFRAGILITY_RUNTIME.md",
+            "docs/RUNTIME_CHAOS_WAVE1.md",
             "docs/REPAIR_SAFE_CLOSEOUT.md",
             "schemas/service_degradation_receipt_v1.json",
             "schemas/repair_safe_closeout_receipt_v1.json",
             "examples/service_degradation_receipt.example.json",
+            "examples/service_degradation_receipt.timeout-chaos.example.json",
+            "examples/service_degradation_receipt.honest-degradation.example.json",
+            "examples/service_degradation_receipt.retrieval-outage-honesty.example.json",
             "examples/repair_safe_closeout_receipt.example.json",
+            "examples/repair_safe_closeout_receipt.timeout-chaos.example.json",
+            "examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json",
         ]:
             self.assertIn(fragment, readme)
 

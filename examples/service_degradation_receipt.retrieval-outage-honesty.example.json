@@ -1,0 +1,39 @@
+{
+  "schema_version": "service_degradation_receipt_v1",
+  "receipt_id": "runtime:degrade:route-api:2026-04-13T12:55:00Z:retrieval-outage-honesty",
+  "timestamp_utc": "2026-04-13T12:55:00Z",
+  "repo": "abyss-stack",
+  "surface": "runtime-service",
+  "service": "route-api",
+  "profile": "autonomy",
+  "incident_class": "derived_projection_unavailable",
+  "severity": "high",
+  "mode_before": "derived-surface-assisted",
+  "mode_after": "source-first-hold",
+  "degraded": true,
+  "containment": {
+    "kind": "surface",
+    "value": "route-api:source-first-only",
+    "notes": "Derived retrieval-bearing continuation was held rather than faked. Source-owned inspection remained available."
+  },
+  "unsafe_repair_blocked": true,
+  "operator_visible": true,
+  "evidence_refs": [
+    "python scripts/validate_stack.py#retrieval-outage-honesty-example",
+    "python scripts/validate_stack.py --parity-check#retrieval-outage-honesty-example",
+    "repo:abyss-stack/docs/EVAL_RUNTIME_SEAM.md#mirror-and-export-only"
+  ],
+  "host_facts_refs": [
+    "generated/host_facts.current.json#machine:fedora-workstation"
+  ],
+  "machine_fit_refs": [
+    "generated/machine_fit.current.json#profile:autonomy"
+  ],
+  "suggested_next_checks": [
+    "emit or update the paired aoa-kag projection-health receipt",
+    "route through a playbook stress lane or explicit hold",
+    "prepare a bounded artifact-hook candidate instead of a runtime verdict"
+  ],
+  "notes": "Wave-1 retrieval outage honesty example before ATM10-Agent joins the route.",
+  "supersedes": []
+}
