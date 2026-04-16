@@ -14,7 +14,8 @@ Phases 0 through 6 have already been landed as source and runtime seams:
   backed by `llama.cpp`, with `LangGraph` as the adopted execution layer for
   bounded long-horizon and autonomy-focused local-worker flows
 - antifragility wave two as contract-only runtime doctrine and receipt
-  surfaces, without mutating live services or deployment behavior
+  surfaces, now including bounded wave-one chaos example families, without
+  mutating live services or deployment behavior
 - read-only diagnostic spine groundwork through `scripts/aoa-diagnose` and
   `generated/diagnostic_surface_catalog.min.json`, still weaker than repair
   authority and live-service mutation
@@ -47,11 +48,17 @@ AoA or ToS meaning. Its current checked surface is:
   `tests/test_validate_stack_diagnostic_spine.py`, and
   `tests/test_diagnostic_spine_contracts.py`
 - antifragility contract-only runtime receipts:
-  `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/REPAIR_SAFE_CLOSEOUT.md`,
+  `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/RUNTIME_CHAOS_WAVE1.md`,
+  `docs/REPAIR_SAFE_CLOSEOUT.md`,
   `schemas/service_degradation_receipt_v1.json`,
   `schemas/repair_safe_closeout_receipt_v1.json`,
-  `examples/service_degradation_receipt.example.json`, and
-  `examples/repair_safe_closeout_receipt.example.json`
+  `examples/service_degradation_receipt.example.json`,
+  `examples/service_degradation_receipt.timeout-chaos.example.json`,
+  `examples/service_degradation_receipt.honest-degradation.example.json`,
+  `examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
+  `examples/repair_safe_closeout_receipt.example.json`,
+  `examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
+  `examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
 - promoted local-worker and Intel serving posture:
   `docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `docs/LLAMACPP_PILOT.md`,
   `docs/MACHINE_FIT_POLICY.md`,

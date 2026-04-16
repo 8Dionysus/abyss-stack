@@ -31,6 +31,18 @@ Together they should answer:
 - what unsafe repair remained blocked
 - what reviewed closeout happened afterward
 
+## Wave-1 example families
+
+The first bounded chaos wave uses the current contracts through named example
+families:
+
+- `examples/service_degradation_receipt.timeout-chaos.example.json`
+- `examples/service_degradation_receipt.honest-degradation.example.json`
+- `examples/service_degradation_receipt.retrieval-outage-honesty.example.json`
+
+Use those examples to exercise timeout, honest degradation, and retrieval
+outage posture without widening runtime behavior or introducing a live harness.
+
 ## Evidence posture
 
 Good evidence sources include:
@@ -55,3 +67,4 @@ A runtime stress event must not become an excuse to edit the deployed mirror as 
 - no widening beyond the bounded degraded surface
 - no repair story without evidence refs
 - no path confusion between source and deployed runtime roots
+- no runtime-side verdict logic

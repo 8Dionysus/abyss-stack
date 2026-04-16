@@ -23,7 +23,7 @@ Then branch by need:
 - **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/RUNTIME_WINNER_PROMOTION_LOOP](docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/MODEL_CARDS](docs/MODEL_CARDS.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
+- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/RUNTIME_CHAOS_WAVE1](docs/RUNTIME_CHAOS_WAVE1.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [docs/VIA_NEGATIVA_CHECKLIST](docs/VIA_NEGATIVA_CHECKLIST.md)
 
 ## What this repository is for
@@ -89,11 +89,18 @@ runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
 Current contract surfaces are `docs/ANTIFRAGILITY_RUNTIME.md`,
+`docs/RUNTIME_CHAOS_WAVE1.md`,
 `docs/REPAIR_SAFE_CLOSEOUT.md`,
 `schemas/service_degradation_receipt_v1.json`,
 `schemas/repair_safe_closeout_receipt_v1.json`,
 `examples/service_degradation_receipt.example.json`, and
 `examples/repair_safe_closeout_receipt.example.json`.
+Wave-1 family examples also now include
+`examples/service_degradation_receipt.timeout-chaos.example.json`,
+`examples/service_degradation_receipt.honest-degradation.example.json`,
+`examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
+`examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
+`examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`.
 
 Diagnostic spine groundwork now includes a read-only `aoa-diagnose` seam in
 this repository. It adds a runtime-owned diagnostic read model, tracked quest

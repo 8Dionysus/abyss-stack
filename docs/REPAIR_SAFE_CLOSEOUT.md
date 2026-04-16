@@ -24,6 +24,16 @@ A useful repair-safe closeout receipt includes:
 - an explicit flag that mutation widening remained blocked
 - evidence refs for what was checked after repair or no-action review
 
+## Wave-1 closeout examples
+
+The first bounded chaos wave now includes named closeout examples for:
+
+- `examples/repair_safe_closeout_receipt.timeout-chaos.example.json`
+- `examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
+
+Those examples keep closeout bounded to the owner-local runtime lane and do not
+authorize broader recovery or verdict logic.
+
 ## Relationship to the SDK
 
 A reviewed closeout receipt can later feed `aoa-sdk` closeout manifests.

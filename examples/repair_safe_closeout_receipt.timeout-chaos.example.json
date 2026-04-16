@@ -1,0 +1,43 @@
+{
+  "schema_version": "repair_safe_closeout_receipt_v1",
+  "receipt_id": "runtime:closeout:route-api:2026-04-13T12:40:00Z:timeout-chaos",
+  "timestamp_utc": "2026-04-13T12:40:00Z",
+  "repo": "abyss-stack",
+  "closeout_scope": {
+    "kind": "service",
+    "value": "route-api",
+    "notes": "Reviewed closeout stayed bounded to the route-api timeout-chaos lane."
+  },
+  "source_receipt_refs": [
+    "abyss-stack:service_degradation_receipt_v1#runtime:degrade:route-api:2026-04-13T12:10:00Z:timeout-chaos"
+  ],
+  "reviewed": true,
+  "actions_taken": [
+    {
+      "kind": "restart_service",
+      "target": "route-api",
+      "safe": true,
+      "note": "Reviewed restart after bounded diagnosis and parity check."
+    }
+  ],
+  "actions_deferred": [
+    "global autonomy profile restart",
+    "any hidden restart fan-out across unrelated services"
+  ],
+  "restart_performed": true,
+  "rollback_ready": true,
+  "mutation_widening_blocked": true,
+  "evidence_refs": [
+    "python scripts/validate_stack.py --parity-check#timeout-chaos-closeout-example",
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#timeout-chaos-closeout-example"
+  ],
+  "emitted_to": [
+    "${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection/",
+    "${AOA_STACK_ROOT}/Logs/eval-exports/latest/artifact-hook/"
+  ],
+  "next_checks": [
+    "confirm the route-api lane remains healthy for the next bounded workload",
+    "keep the exported evidence weaker than any later eval verdict"
+  ],
+  "notes": "Reviewed timeout-chaos closeout. Repair stayed bounded and did not reopen wider action lanes."
+}

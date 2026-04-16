@@ -1,0 +1,39 @@
+{
+  "schema_version": "service_degradation_receipt_v1",
+  "receipt_id": "runtime:degrade:route-api:2026-04-13T12:30:00Z:honest-degradation",
+  "timestamp_utc": "2026-04-13T12:30:00Z",
+  "repo": "abyss-stack",
+  "surface": "runtime-service",
+  "service": "route-api",
+  "profile": "autonomy",
+  "incident_class": "honest_degradation_chaos",
+  "severity": "high",
+  "mode_before": "full-service",
+  "mode_after": "degraded-source-first",
+  "degraded": true,
+  "containment": {
+    "kind": "surface",
+    "value": "route-api:read-only-and-source-first",
+    "notes": "Broader mutation lanes remained blocked while operator-visible read and inspect paths stayed available."
+  },
+  "unsafe_repair_blocked": true,
+  "operator_visible": true,
+  "evidence_refs": [
+    "python scripts/validate_stack.py#honest-degradation-example",
+    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#honest-degradation-example",
+    "repo:abyss-stack/docs/EVAL_RUNTIME_SEAM.md#bounded-export-only"
+  ],
+  "host_facts_refs": [
+    "generated/host_facts.current.json#machine:fedora-workstation"
+  ],
+  "machine_fit_refs": [
+    "generated/machine_fit.current.json#profile:autonomy"
+  ],
+  "suggested_next_checks": [
+    "prepare a playbook stress lane or explicit hold",
+    "keep route hints source-first until re-entry is reviewed",
+    "avoid turning degraded availability into a success verdict"
+  ],
+  "notes": "Wave-1 honest degradation example. The system must say that it is degraded, not imply normal operation.",
+  "supersedes": []
+}
