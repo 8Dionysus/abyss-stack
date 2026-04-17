@@ -18,6 +18,7 @@ The current doctor pass looks at things like:
 - whether the optional vault path appears mounted
 - whether the stack root is the canonical `/srv/abyss-stack`
 - whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
+- whether the selected runtime enables a federated advisory consumer without also selecting the localhost federation seam
 - whether a current machine-fit record is missing for the deployed runtime root
 - whether the current host envelope looks noisy for latency-sensitive work
 
@@ -34,6 +35,7 @@ For example:
 - `aoa-doctor --preset agent-full` will not treat missing `/dev/dri` as relevant
 - `aoa-doctor --preset intel-full` will warn if `/dev/dri` is missing
 - `aoa-doctor --preset agent-full` will remind you that internal-only layers are selected and should be checked after startup
+- `aoa-doctor --profile agentic` will warn if `AOA_FEDERATED_RUN_ENABLED=true` is requested without also selecting `--profile federation`
 
 ## Relationship to host-facts capture
 
