@@ -40,6 +40,73 @@ doctor_fail() {
   errors=$((errors + 1))
 }
 
+doctor_flag_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+doctor_env_file_value() {
+  local key="$1"
+  local env_file="$2"
+  local raw_line line trimmed value
+
+  [[ -f "$env_file" ]] || return 1
+
+  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+    line="${raw_line%%#*}"
+    trimmed="$(aoa_trim "$line")"
+    [[ -n "$trimmed" ]] || continue
+    [[ "$trimmed" == "${key}="* ]] || continue
+
+    value="${trimmed#*=}"
+    value="$(aoa_trim "$value")"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    printf '%s' "$value"
+    return 0
+  done < "$env_file"
+
+  return 1
+}
+
+doctor_federated_consumer_reason() {
+  local env_file="${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
+  local value
+
+  if has_module "44-llamacpp-agent-sidecar.yml"; then
+    printf '%s' "selected runtime includes 44-llamacpp-agent-sidecar.yml, which hard-enables AOA_FEDERATED_RUN_ENABLED=true"
+    return 0
+  fi
+
+  if ! has_module "41-agent-api.yml"; then
+    return 1
+  fi
+
+  if [[ -n "${AOA_FEDERATED_RUN_ENABLED+x}" ]]; then
+    if doctor_flag_truthy "${AOA_FEDERATED_RUN_ENABLED}"; then
+      printf '%s' "the current shell environment enables AOA_FEDERATED_RUN_ENABLED=true"
+      return 0
+    fi
+    return 1
+  fi
+
+  if value="$(doctor_env_file_value "AOA_FEDERATED_RUN_ENABLED" "$env_file")"; then
+    if doctor_flag_truthy "$value"; then
+      printf '%s' "the langchain-api runtime secret enables AOA_FEDERATED_RUN_ENABLED=true"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 check_required_cmd() {
   local name="$1"
   if command -v "$name" >/dev/null 2>&1; then
@@ -115,6 +182,11 @@ fi
 
 if has_module "51-browser-tools.yml" || has_module "60-monitoring.yml"; then
   doctor_ok "internal-only services selected; use aoa-smoke --with-internal after startup"
+fi
+
+federated_consumer_reason=""
+if ! has_module "43-federation-router.yml" && federated_consumer_reason="$(doctor_federated_consumer_reason)"; then
+  doctor_warn "federated advisory consumer is enabled but the federation profile is not selected; ${federated_consumer_reason}. Add --profile federation or use agent-federation/intel-federation before startup, or disable AOA_FEDERATED_RUN_ENABLED"
 fi
 
 machine_fit_path="${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
