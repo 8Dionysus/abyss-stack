@@ -1,4 +1,4 @@
-name: Release Audit
+name: Repo Validation
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   release_audit:
-    name: Release Audit
+    name: Repo Validation
     runs-on: ubuntu-latest
 
     steps:
