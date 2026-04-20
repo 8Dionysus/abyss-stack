@@ -1,28 +1,39 @@
-## What Changed
-<!-- 1-3 short bullets. Keep it concrete; do not restate the whole diff. -->
-- ...
-
-## Why
-<!-- State the reason for the change, bug, gap, or opportunity. -->
-- ...
-
-## Validation
-<!-- List only checks that actually ran. If none, say Not run. -->
-- ...
-
-## Boundary / Direction Impact
-<!-- Optional.
-Use this section only when the change shifts a boundary, owner-fit, route, contract, provenance posture, proof semantics, runtime posture, or recurring composition logic.
-Allowed short answers:
-- None.
-- No boundary shift.
-- Exposed a new owner-fit: ...
-- Tightens/loosens the boundary between ... and ...
-- Changes the route from ... to ...
-Note runtime behavior changes, deploy posture, operator blast radius, local-vs-remote boundary shifts, or action-surface risk.
+## PLAN
+<!--
+- restate the task
+- list touched or inspected surfaces
+- name the main risk: exposure, secrets, composition, paths, bootstrap, or lifecycle
 -->
 - ...
 
-## Risk / Follow-ups
-<!-- Note remaining risk, deliberate non-goals, or next follow-up work. -->
+## DIFF
+<!--
+- say what changed
+- say whether runtime posture changed or only docs/metadata changed
+-->
+- ...
+
+## VERIFY
+<!--
+- `python scripts/validate_stack.py` status
+- render/profile/preset/bootstrap checks actually run
+- `shellcheck` commands actually run
+- what was not run
+-->
+- ...
+
+## REPORT
+<!--
+- current runtime contract after the change
+- whether port exposure, secrets mapping, path mapping, or profile composition changed
+- operator follow-up still needed
+-->
+- ...
+
+## RESIDUAL RISK
+<!--
+- unverified presets or profiles
+- host assumptions not exercised
+- bootstrap or lifecycle paths not tested
+-->
 - ...
