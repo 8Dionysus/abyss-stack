@@ -7,6 +7,37 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-19
+
+### Summary
+
+- this patch adds chaos-wave runtime recovery, memo contradiction sidecars,
+  and A2A return dry-run adapters across the runtime layer
+- federated-consumer warnings, release parity CI, and roadmap/current-direction
+  docs are tightened around the current runtime contour
+- `abyss-stack` remains the source-owned runtime layer, with deployed truth
+  still landing through the `Configs` mirror
+
+### Added
+
+- chaos wave 1 runtime recovery surfaces, an A2A return closeout dry-run
+  adapter, and memo contradiction runtime-sidecar coverage
+
+### Changed
+
+- federated-consumer warning posture, recall/contradiction bridge wiring,
+  release parity CI safety, and CI/protection surfaces are aligned with the
+  current runtime release line
+
+### Validation
+
+- `python scripts/release_check.py`
+
+### Notes
+
+- this patch extends bounded runtime recovery and advisory posture without
+  claiming live deployment mutation from the source repository alone
+
 ## [0.2.0] - 2026-04-10
 
 ### Summary
