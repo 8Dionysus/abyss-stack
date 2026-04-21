@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "count": {
+      "type": "integer"
+    },
+    "digest": {
+      "type": "string"
+    },
+    "kernels": {
+      "type": "array"
+    },
+    "registry_id": {
+      "type": "string"
+    },
+    "wave": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "registry_id",
+    "wave",
+    "count",
+    "kernels",
+    "digest"
+  ],
+  "title": "Agon Duel Runtime Kernel Registry",
+  "type": "object"
+}

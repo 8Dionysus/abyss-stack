@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "event_log_requirements": {
+      "type": "array"
+    },
+    "id": {
+      "type": "string"
+    },
+    "service_activation": {
+      "type": "boolean"
+    },
+    "state_machine": {
+      "type": "object"
+    },
+    "status": {
+      "type": "string"
+    },
+    "stop_lines": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "status",
+    "service_activation",
+    "state_machine",
+    "event_log_requirements",
+    "stop_lines"
+  ],
+  "title": "Agon Duel Runtime Kernel",
+  "type": "object"
+}

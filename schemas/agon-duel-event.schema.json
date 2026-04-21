@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "actor": {
+      "type": "string"
+    },
+    "event_hash": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "prev_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "state_after": {
+      "type": "string"
+    },
+    "state_before": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "event_type",
+    "state_before",
+    "state_after",
+    "actor",
+    "prev_hash",
+    "event_hash",
+    "payload"
+  ],
+  "title": "Agon Duel Event",
+  "type": "object"
+}
