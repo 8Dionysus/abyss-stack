@@ -1,0 +1,187 @@
+{
+  "events": [
+    {
+      "event_hash": "420b27f300d4b8d354f4a8c5c7f4415c7f795acf52836e90791f9ebd71756ea6",
+      "event_type": "trial_run_draft_created",
+      "payload": {
+        "playbook_id": "AOA-P-0033",
+        "trial_id": "agon.trial.mechanical.broken_trace.v0"
+      },
+      "prev_hash": "GENESIS",
+      "seq": 1,
+      "state": "draft_created"
+    },
+    {
+      "event_hash": "a71823089519a31e7f83fef64d8dd2a2f3ca41347901aa2e73688a9617fe8a90",
+      "event_type": "charter_bound",
+      "payload": {
+        "gate_trigger": "broken_trace_or_trace_gap",
+        "session_model_id": "agon.session.broken_trace_trial"
+      },
+      "prev_hash": "420b27f300d4b8d354f4a8c5c7f4415c7f795acf52836e90791f9ebd71756ea6",
+      "seq": 2,
+      "state": "charter_bound"
+    },
+    {
+      "event_hash": "f7b324987f30b824303cffee145cbea3744b57e05243c3a1d6f07619b0472540",
+      "event_type": "seats_bound",
+      "payload": {
+        "assistant_contestant_allowed": false,
+        "assistant_support": [
+          "coder.assistant:notary",
+          "evaluator.assistant:steward"
+        ],
+        "contestants": [
+          "architect:tracer",
+          "reviewer:verifier"
+        ]
+      },
+      "prev_hash": "a71823089519a31e7f83fef64d8dd2a2f3ca41347901aa2e73688a9617fe8a90",
+      "seq": 3,
+      "state": "seats_bound"
+    },
+    {
+      "event_hash": "782794ead1813eb1ba2a9f38a93169f35e5e9d13f6cb3ecc65b397f1aed18c38",
+      "event_type": "commit_phase_open",
+      "payload": {},
+      "prev_hash": "f7b324987f30b824303cffee145cbea3744b57e05243c3a1d6f07619b0472540",
+      "seq": 4,
+      "state": "commit_phase_open"
+    },
+    {
+      "event_hash": "76893e10227ebf35d82222565c36c183accca66faacf83962a97b057e73e67ca",
+      "event_type": "contestant_commit_submitted",
+      "payload": {
+        "contestant": "architect:tracer",
+        "packet_type": "agon.sealed_commit"
+      },
+      "prev_hash": "782794ead1813eb1ba2a9f38a93169f35e5e9d13f6cb3ecc65b397f1aed18c38",
+      "seq": 5,
+      "state": "commit_phase_open"
+    },
+    {
+      "event_hash": "6c75c66a0ab7c75c7ee37fff8d2725ec42a394ea83b39cd54655cb7b9b301447",
+      "event_type": "contestant_commit_submitted",
+      "payload": {
+        "contestant": "reviewer:verifier",
+        "packet_type": "agon.sealed_commit"
+      },
+      "prev_hash": "76893e10227ebf35d82222565c36c183accca66faacf83962a97b057e73e67ca",
+      "seq": 6,
+      "state": "commit_phase_open"
+    },
+    {
+      "event_hash": "fded0e55d29debaa6e29216a4c72fe3805374d4f8d2149373297f102ca2d306e",
+      "event_type": "commit_phase_closed",
+      "payload": {
+        "commit_count": 2
+      },
+      "prev_hash": "6c75c66a0ab7c75c7ee37fff8d2725ec42a394ea83b39cd54655cb7b9b301447",
+      "seq": 7,
+      "state": "commit_phase_closed"
+    },
+    {
+      "event_hash": "6a8985313d634c0fa4baeeda9aeaa5a7fd41d281fdd052fe7bcde5cb2bb9452d",
+      "event_type": "reveal_phase_closed",
+      "payload": {
+        "commit_before_reveal": true,
+        "reveal_count": 2
+      },
+      "prev_hash": "fded0e55d29debaa6e29216a4c72fe3805374d4f8d2149373297f102ca2d306e",
+      "seq": 8,
+      "state": "reveal_phase_closed"
+    },
+    {
+      "event_hash": "9b2e35f7516cbebd432aa4f610c6587fb3a5fbc9b0b86662e067684e2a0fb292",
+      "event_type": "engagement_open",
+      "payload": {
+        "allowed_lawful_moves": [
+          "probe_trace",
+          "deny_trace_closure",
+          "request_witness",
+          "defer_with_cost"
+        ]
+      },
+      "prev_hash": "6a8985313d634c0fa4baeeda9aeaa5a7fd41d281fdd052fe7bcde5cb2bb9452d",
+      "seq": 9,
+      "state": "engagement_open"
+    },
+    {
+      "event_hash": "69503b02443544739e0b64cd8452da5708b2ee4213d35eab8d8b73c4c7b80d76",
+      "event_type": "trial_signal_injected",
+      "payload": {
+        "gate_trigger": "broken_trace_or_trace_gap",
+        "pressure": "broken_trace"
+      },
+      "prev_hash": "9b2e35f7516cbebd432aa4f610c6587fb3a5fbc9b0b86662e067684e2a0fb292",
+      "seq": 10,
+      "state": "engagement_open"
+    },
+    {
+      "event_hash": "91a8d2cc766c801a5910134128dca15778f0a394a35f7f1999f7f88111c02876",
+      "event_type": "lawful_move_declared",
+      "payload": {
+        "move": "probe_trace"
+      },
+      "prev_hash": "69503b02443544739e0b64cd8452da5708b2ee4213d35eab8d8b73c4c7b80d76",
+      "seq": 11,
+      "state": "engagement_open"
+    },
+    {
+      "event_hash": "a07a6c374c236b9d7a0857151bdbd242247bed6277fa6525e9e5b648fae3ea3a",
+      "event_type": "revision_statement_submitted",
+      "payload": {
+        "candidate_only": true,
+        "packet_type": "agon.revision_statement"
+      },
+      "prev_hash": "91a8d2cc766c801a5910134128dca15778f0a394a35f7f1999f7f88111c02876",
+      "seq": 12,
+      "state": "revision_window_closed"
+    },
+    {
+      "event_hash": "9952ba9fdedeeeb976271b12b95832900a2ac4f01e9456b7a38d1eb329d4934c",
+      "event_type": "adjudication_requested",
+      "payload": {
+        "live_verdict": false,
+        "packet_type": "agon.adjudication_request"
+      },
+      "prev_hash": "a07a6c374c236b9d7a0857151bdbd242247bed6277fa6525e9e5b648fae3ea3a",
+      "seq": 13,
+      "state": "adjudication_requested"
+    },
+    {
+      "event_hash": "1784f9eb8cd2d88bc0f48a47ef32d513bb55014a7242017026d4d483893adbc9",
+      "event_type": "trial_outcome_candidate_recorded",
+      "payload": {
+        "candidate_outputs": [
+          "verdict_draft_candidate",
+          "scar_request_candidate",
+          "trial_chronicle_candidate"
+        ],
+        "terminal_candidate": "failed_honorably"
+      },
+      "prev_hash": "9952ba9fdedeeeb976271b12b95832900a2ac4f01e9456b7a38d1eb329d4934c",
+      "seq": 14,
+      "state": "closeout_candidate"
+    },
+    {
+      "event_hash": "7199a8dd033149053abbf8c314d2a53dad40d687df2733dfdb6ebeb1451dd929",
+      "event_type": "closeout_candidate",
+      "payload": {
+        "closure_granted": false,
+        "durable_scar_written": false,
+        "rank_mutated": false
+      },
+      "prev_hash": "1784f9eb8cd2d88bc0f48a47ef32d513bb55014a7242017026d4d483893adbc9",
+      "seq": 15,
+      "state": "closeout_candidate"
+    }
+  ],
+  "final_state": "closeout_candidate",
+  "kernel_id": "abyss.runtime.agon.mechanical_duel_kernel.v0",
+  "live_protocol": false,
+  "log_id": "log.agon.run.mechanical.broken_trace.dry_run.v0",
+  "run_id": "agon.run.mechanical.broken_trace.dry_run.v0",
+  "runtime_effect": "local_dry_run_candidate_only",
+  "trial_id": "agon.trial.mechanical.broken_trace.v0"
+}
