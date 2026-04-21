@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "registry_id": {
+      "type": "string"
+    },
+    "wave": {
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
