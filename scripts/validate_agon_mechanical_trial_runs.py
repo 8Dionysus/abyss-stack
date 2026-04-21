@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import json, pathlib, sys
+import hashlib, json, pathlib, sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / 'config' / 'agon_mechanical_trial_runs.seed.json'
 OUT = ROOT / 'generated' / 'agon_mechanical_trial_run_registry.min.json'
@@ -9,6 +9,19 @@ EXPECTED_COUNT = 7
 def fail(msg):
     print(msg, file=sys.stderr)
     return 1
+
+def digest_obj(obj):
+    return hashlib.sha256(json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+def expected_registry(data, runs):
+    return {
+        'registry_id': data.get('registry_id', 'agon.mechanical_trial_run.registry.v0'),
+        'wave': data.get('wave', 'XIII'),
+        'runtime_posture': data.get('runtime_posture', 'candidate_only'),
+        'count': len(runs),
+        'runs': runs,
+        'digest': digest_obj(runs),
+    }
 
 def validate_log(path):
     data = json.loads(path.read_text(encoding='utf-8'))
@@ -24,8 +37,17 @@ def validate_log(path):
             return f'non-monotonic seq in {path}'
         if ev.get('prev_hash') != prev:
             return f'broken hash chain in {path} at seq {expected_seq}'
-        prev = ev.get('event_hash')
+        event_hash = ev.get('event_hash')
+        clone = dict(ev)
+        clone.pop('event_hash', None)
+        if digest_obj(clone) != event_hash:
+            return f'event_hash mismatch in {path} at seq {expected_seq}'
+        prev = event_hash
         seen.append(ev.get('event_type'))
+    if 'commit_phase_closed' not in seen:
+        return 'missing commit_phase_closed event'
+    if 'reveal_phase_closed' not in seen:
+        return 'missing reveal_phase_closed event'
     if seen.index('commit_phase_closed') > seen.index('reveal_phase_closed'):
         return 'reveal occurred before commit phase closure'
     if 'adjudication_requested' in seen and any(ev.get('payload', {}).get('live_verdict') for ev in events):
@@ -59,10 +81,11 @@ def main():
         err = validate_log(p)
         if err:
             return fail(f'{rid}: {err}')
-    if OUT.exists():
-        reg = json.loads(OUT.read_text(encoding='utf-8'))
-        if reg.get('count') != len(runs):
-            return fail('generated count mismatch')
+    if not OUT.exists():
+        return fail(f'missing generated registry {OUT}')
+    reg = json.loads(OUT.read_text(encoding='utf-8'))
+    if reg != expected_registry(data, runs):
+        return fail('generated registry does not match source rebuild')
     print(json.dumps({'ok': True, 'runs': len(runs)}, sort_keys=True))
     return 0
 if __name__ == '__main__': raise SystemExit(main())
