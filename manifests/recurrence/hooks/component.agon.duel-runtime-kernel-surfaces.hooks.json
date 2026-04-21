@@ -1,0 +1,17 @@
+{
+  "component_id": "component:agon:duel-runtime-kernel-surfaces",
+  "forbidden_actions": [
+    "start_daemon",
+    "open_network_listener",
+    "issue_verdict",
+    "write_scar",
+    "mutate_rank"
+  ],
+  "hook_binding_set_id": "hooks:component:agon:duel-runtime-kernel-surfaces",
+  "producers": [
+    "registry_diff",
+    "event_log_validation",
+    "hash_chain_validation",
+    "stop_line_check"
+  ]
+}
