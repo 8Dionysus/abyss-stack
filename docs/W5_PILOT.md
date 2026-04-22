@@ -38,6 +38,15 @@ Defaults:
 - runtime truth: `${AOA_STACK_ROOT}/Logs/local-ai-trials/w5-langgraph-llamacpp-v1/`
 - mirror: `/srv/Dionysus/reports/local-ai-trials/w5-langgraph-llamacpp-v1/`
 
+## Storage/runtime seam note
+
+W5 stores pilot records only.
+
+- the runtime truth directory is for bounded pilot evidence, not for service authority
+- the mirror path is for reviewable copies of the same pilot records, not for runtime activation
+- this seam does not add worker services, deployment control, certification, or governance power to `abyss-stack`
+- the pilot record layer stays below the runtime body and above nothing except review
+
 ## Scenario Catalog
 
 Materialize exactly these `8` scenarios in this order:
