@@ -25,7 +25,7 @@ Storage for adoption records and runtime activation.
 
 ## Outputs
 
-- adoption_runtime_storage_plan
+- adoption_runtime_record
 
 ## Stop lines
 

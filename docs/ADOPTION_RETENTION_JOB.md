@@ -25,7 +25,7 @@ Retention job for adopted patterns.
 
 ## Outputs
 
-- adoption_retention_job
+- adoption_retention_job_record
 
 ## Stop lines
 

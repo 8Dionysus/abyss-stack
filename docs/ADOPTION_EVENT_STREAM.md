@@ -25,7 +25,7 @@ Runtime event stream for adoption.
 
 ## Outputs
 
-- adoption_event_stream
+- adoption_event_stream_record
 
 ## Stop lines
 

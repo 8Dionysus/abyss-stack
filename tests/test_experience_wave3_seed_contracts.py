@@ -75,17 +75,17 @@ def wrong_type_value(value: object) -> object:
     return "not-null"
 
 
-def payload_schema_properties(schema: dict[str, object]) -> dict[str, object]:
+def schema_properties(schema: dict[str, object]) -> dict[str, object]:
     properties = schema.get("properties")
-    if not isinstance(properties, dict):
-        return {}
-    payload = properties.get("payload")
+    return properties if isinstance(properties, dict) else {}
+
+
+def payload_schema_properties(schema: dict[str, object]) -> dict[str, object]:
+    payload = schema_properties(schema).get("payload")
     if not isinstance(payload, dict):
         return {}
     payload_properties = payload.get("properties")
-    if not isinstance(payload_properties, dict):
-        return {}
-    return payload_properties
+    return payload_properties if isinstance(payload_properties, dict) else {}
 
 
 def array_field_targets(example: dict[str, object]) -> list[tuple[str, str]]:
@@ -229,20 +229,31 @@ class ExperienceWave3SeedContractTests(unittest.TestCase):
                     self.assert_invalid(schema, mutated, f"{stem} empty {section}.{key} item")
         self.assertGreater(exercised, 0, "no wave3 array fields were exercised")
 
-    def test_experience_wave3_schemas_reject_payload_enum_escape_values(self) -> None:
+    def test_experience_wave3_schemas_reject_enum_escape_values(self) -> None:
+        exercised = 0
         for stem in WAVE3_STEMS:
             schema, example = load_contract(stem)
+            for key, prop in schema_properties(schema).items():
+                if not isinstance(prop, dict) or "enum" not in prop or key not in example:
+                    continue
+                exercised += 1
+                with self.subTest(stem=stem, section="top", key=key):
+                    mutated = copy.deepcopy(example)
+                    mutated[key] = ENUM_ESCAPE_VALUE
+                    self.assert_invalid(schema, mutated, f"{stem} enum escape {key}")
             payload = example.get("payload")
             if not isinstance(payload, dict):
                 continue
             for key, prop in payload_schema_properties(schema).items():
                 if not isinstance(prop, dict) or "enum" not in prop or key not in payload:
                     continue
-                with self.subTest(stem=stem, key=key):
+                exercised += 1
+                with self.subTest(stem=stem, section="payload", key=key):
                     mutated = copy.deepcopy(example)
                     self.assertIsInstance(mutated["payload"], dict)
                     mutated["payload"][key] = ENUM_ESCAPE_VALUE
-                    self.assert_invalid(schema, mutated, f"{stem} enum escape {key}")
+                    self.assert_invalid(schema, mutated, f"{stem} enum escape payload.{key}")
+        self.assertGreater(exercised, 0, "no wave3 enum fields were exercised")
 
 
 if __name__ == "__main__":

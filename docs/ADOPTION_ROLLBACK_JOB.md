@@ -25,7 +25,7 @@ Rollback worker plan.
 
 ## Outputs
 
-- adoption_rollback_job
+- adoption_rollback_job_record
 
 ## Stop lines
 

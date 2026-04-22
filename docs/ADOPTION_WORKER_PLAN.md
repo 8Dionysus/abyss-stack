@@ -25,7 +25,7 @@ Workers for shadow runs and activation.
 
 ## Outputs
 
-- adoption_worker_plan
+- adoption_worker_job
 
 ## Stop lines
 
