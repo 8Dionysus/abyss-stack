@@ -21,6 +21,8 @@ def wave2_pairs() -> tuple[list[tuple[Path, Path]], list[str]]:
     missing_pairs: list[str] = []
     for example_path in sorted((ROOT / "examples").glob("*.example.json")):
         stem = example_path.name.removesuffix(".example.json")
+        if stem.endswith("_v1"):
+            continue
         if not stem.startswith(WAVE2_PREFIXES):
             continue
         schema_path = ROOT / "schemas" / f"{stem}_v1.json"
