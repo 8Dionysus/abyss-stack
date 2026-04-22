@@ -50,17 +50,15 @@ owner-local signals -> cross-repo recurrence -> federation pattern candidate -> 
 - retention required for durable adoption
 - authority check required
 
-## Invariants
+## Owner Governance Reference
 
-- no new aoa-experience repo; federation harvest is a center-owned program with owner-local landings
-- no direct Tree-of-Sophia write from arena, deployment, Codex, assistants, or federation harvest
-- cross-repo pattern promotion requires source-owner evidence and bounded eval verdicts
-- aoa-stats summarizes recurrence; it does not judge meaning or certify patterns
-- aoa-memo stores bounded lessons and lineage memories; it does not become proof
-- aoa-kag receives derived candidates only after evidence, retention, and owner consent gates
-- assistant adoption of shared patterns remains release/version based, never hidden self-rewrite
-- agonic adoption of shared patterns remains scar/retention based, never assistant-service laundering
-- Codex may collect and propose cross-repo harvest; Codex may not approve federation harvest or promote to KAG
+Federation governance is owned by Agents-of-Abyss and owner-local adoption repos. This runtime surface consumes those upstream gates; it does not define federation authority.
+
+## Runtime Invariants
+
+- runtime records carry evidence refs, owner routes, and authority gates required by the schemas
+- runtime jobs remain reviewable artifacts and do not approve harvest, KAG promotion, ToS intake, or owner adoption
+- runtime workers do not perform direct Tree-of-Sophia writes or hidden live activation
 
 ## Notes
 

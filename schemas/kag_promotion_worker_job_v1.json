@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://aoa.local/schemas/kag_promotion_worker_job_v1.json",
+  "$id": "https://aoa.local/abyss-stack/schemas/kag_promotion_worker_job_v1.json",
   "title": "kag_promotion_worker_job_v1",
   "type": "object",
   "required": [
