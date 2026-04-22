@@ -96,19 +96,24 @@
           "type": "string"
         },
         "requires_owner_consent": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "rollback_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "retention_cycles": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "retention_probe": {
           "type": "string"
         },
         "held_threshold": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }

@@ -96,19 +96,23 @@
           "type": "string"
         },
         "requires_owner_consent": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "rollback_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         },
         "retention_cycles": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "rollback_path": {
           "type": "string"
         },
         "drill_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         }
       }
     }

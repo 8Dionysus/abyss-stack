@@ -70,7 +70,8 @@
           "type": "string"
         },
         "requires_eval_verdict": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": true
         }
       }
     }

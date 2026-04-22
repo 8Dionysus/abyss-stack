@@ -70,7 +70,8 @@
           "type": "string"
         },
         "direct_write_allowed": {
-          "type": "boolean"
+          "type": "boolean",
+          "const": false
         }
       }
     }
