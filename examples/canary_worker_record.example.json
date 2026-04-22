@@ -1,0 +1,7 @@
+{
+  "worker_id": "canary.worker.001",
+  "release_id": "assistant.notary.1.1.0",
+  "ring_id": "ring_0_internal",
+  "probe_count": 3,
+  "status": "completed"
+}

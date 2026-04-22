@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "watchtower_job_record",
+  "type": "object",
+  "description": "watchtower_job_record schema for AoA experience deployment watchtower v0.5.",
+  "required": [
+    "job_id",
+    "release_id",
+    "job_type",
+    "status",
+    "last_run_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string"
+    },
+    "release_id": {
+      "type": "string"
+    },
+    "job_type": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "last_run_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

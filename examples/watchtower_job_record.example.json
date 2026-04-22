@@ -1,0 +1,7 @@
+{
+  "job_id": "watch.job.001",
+  "release_id": "assistant.notary.1.1.0",
+  "job_type": "canary_probe_worker",
+  "status": "running",
+  "last_run_at": "2026-04-22T00:00:00Z"
+}

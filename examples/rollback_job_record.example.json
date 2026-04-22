@@ -1,0 +1,7 @@
+{
+  "job_id": "rollback.job.001",
+  "release_id": "assistant.notary.1.1.0",
+  "restored_version": "1.0.3",
+  "status": "completed",
+  "authority_ref": "operator.approval.001"
+}
