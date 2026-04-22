@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://aoa.local/schemas/pattern_registry_storage_record_v1.json",
+  "$id": "https://aoa.local/abyss-stack/schemas/pattern_registry_storage_record_v1.json",
   "title": "pattern_registry_storage_record_v1",
   "type": "object",
   "required": [
