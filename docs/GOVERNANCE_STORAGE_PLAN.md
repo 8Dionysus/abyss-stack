@@ -27,7 +27,7 @@ v0.8 adds a polis-governance contour around the experience mechanic. Earlier see
 
 - abyss-stack receives only bounded governance surfaces.
 - Policy precedent may inform local decisions but not force local adoption.
-- Role doctrine and interpretive authority live in Agents-of-Abyss and Tree-of-Sophia; this storage plan only defines persistence and audit behavior.
+- Role doctrine and interpretive authority live in [Agents-of-Abyss](https://github.com/8Dionysus/Agents-of-Abyss/blob/main/docs/EXPERIENCE_WAVE4_POLIS_CONSTITUTION.md) and [Tree-of-Sophia](https://github.com/8Dionysus/Tree-of-Sophia/blob/main/docs/NO_DIRECT_POLIS_GOVERNANCE_WRITE.md); this storage plan only defines persistence and audit behavior.
 
 ## Runtime contract
 
