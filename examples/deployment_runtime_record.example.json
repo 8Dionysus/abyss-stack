@@ -1,0 +1,10 @@
+{
+  "record_id": "runtime.deploy.001",
+  "release_id": "assistant.notary.1.1.0",
+  "storage_state": "watching",
+  "rings": [
+    {
+      "ring_id": "ring_0_internal"
+    }
+  ]
+}
