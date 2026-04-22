@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "kind": "federation_harvest_worker_job",
+  "id": "federation_harvest_worker_job.example",
+  "status": "candidate",
+  "summary": "Example federation_harvest_worker_job object for v0.6 federation harvest seed.",
+  "owner_repo": "abyss-stack",
+  "evidence_refs": [
+    "receipt://v0.6/federation_harvest_worker_job/example"
+  ],
+  "payload": {
+    "job_type": "scheduled_harvest",
+    "cadence": "weekly"
+  }
+}

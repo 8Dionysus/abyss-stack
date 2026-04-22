@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.local/schemas/federation_harvest_storage_record_v1.json",
+  "title": "federation_harvest_storage_record_v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "id",
+    "status",
+    "summary",
+    "evidence_refs",
+    "payload",
+    "owner_repo"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "kind": {
+      "type": "string",
+      "const": "federation_harvest_storage_record"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "captured",
+        "candidate",
+        "review",
+        "approved",
+        "blocked",
+        "rejected",
+        "promoted",
+        "active",
+        "retired",
+        "scheduled",
+        "passed",
+        "failed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner_repo": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "retention"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "record_type": {
+          "type": "string"
+        },
+        "retention": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

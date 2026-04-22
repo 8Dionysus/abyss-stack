@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.local/abyss-stack/schemas/adoption_event_stream_record_v1.json",
+  "title": "adoption_event_stream_record v1",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "kind",
+    "version",
+    "status",
+    "summary",
+    "refs",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_id": {
+      "type": "string",
+      "const": "adoption_event_stream_record_v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "adoption_event_stream_record"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "proposed",
+        "approved",
+        "blocked",
+        "passed",
+        "failed",
+        "active",
+        "retired",
+        "shadow",
+        "quarantined"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 4
+    },
+    "refs": {
+      "type": "object",
+      "required": [
+        "source",
+        "owner",
+        "related"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "wave",
+        "repo",
+        "pattern_ref",
+        "owner_surface",
+        "requires_owner_consent",
+        "rollback_required",
+        "retention_cycles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "wave": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "pattern_ref": {
+          "type": "string"
+        },
+        "owner_surface": {
+          "type": "string"
+        },
+        "requires_owner_consent": {
+          "type": "boolean"
+        },
+        "rollback_required": {
+          "type": "boolean"
+        },
+        "retention_cycles": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "kind": "kag_promotion_worker_job",
+  "id": "kag_promotion_worker_job.example",
+  "status": "candidate",
+  "summary": "Example kag_promotion_worker_job object for v0.6 federation harvest seed.",
+  "owner_repo": "abyss-stack",
+  "evidence_refs": [
+    "receipt://v0.6/kag_promotion_worker_job/example"
+  ],
+  "payload": {
+    "job_type": "kag_promotion",
+    "requires_eval_verdict": true
+  }
+}
