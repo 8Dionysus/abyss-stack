@@ -10,6 +10,7 @@
   ],
   "payload": {
     "job_type": "kag_promotion",
-    "requires_eval_verdict": true
+    "requires_eval_verdict": true,
+    "authority_required": true
   }
 }

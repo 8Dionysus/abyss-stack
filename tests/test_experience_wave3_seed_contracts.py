@@ -88,6 +88,28 @@ def payload_schema_properties(schema: dict[str, object]) -> dict[str, object]:
     return payload_properties if isinstance(payload_properties, dict) else {}
 
 
+def required_payload_fields(schema: dict[str, object]) -> list[str]:
+    payload = schema_properties(schema).get("payload")
+    if not isinstance(payload, dict):
+        return []
+    required = payload.get("required")
+    if not isinstance(required, list):
+        return []
+    return [field for field in required if isinstance(field, str)]
+
+
+def const_escape_value(value: object) -> object:
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value + 1
+    if isinstance(value, float):
+        return value + 1.0
+    if isinstance(value, str):
+        return f"{value}{ENUM_ESCAPE_VALUE}"
+    return ENUM_ESCAPE_VALUE
+
+
 def array_field_targets(example: dict[str, object]) -> list[tuple[str, str]]:
     targets: list[tuple[str, str]] = []
     for key, value in example.items():
@@ -186,6 +208,24 @@ class ExperienceWave3SeedContractTests(unittest.TestCase):
                     mutated["payload"][key] = not value
                     self.assert_invalid(schema, mutated, f"{stem} inverted {key}")
 
+    def test_experience_wave3_schemas_reject_missing_required_payload_fields(self) -> None:
+        exercised = 0
+        for stem in WAVE3_STEMS:
+            schema, example = load_contract(stem)
+            payload = example.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            for key in required_payload_fields(schema):
+                if key not in payload:
+                    continue
+                exercised += 1
+                with self.subTest(stem=stem, key=key):
+                    mutated = copy.deepcopy(example)
+                    self.assertIsInstance(mutated["payload"], dict)
+                    del mutated["payload"][key]
+                    self.assert_invalid(schema, mutated, f"{stem} missing required payload.{key}")
+        self.assertGreater(exercised, 0, "no required wave3 payload fields were exercised")
+
     def test_experience_wave3_schemas_reject_invalid_numeric_ranges(self) -> None:
         for stem in WAVE3_STEMS:
             schema, example = load_contract(stem)
@@ -254,6 +294,32 @@ class ExperienceWave3SeedContractTests(unittest.TestCase):
                     mutated["payload"][key] = ENUM_ESCAPE_VALUE
                     self.assert_invalid(schema, mutated, f"{stem} enum escape payload.{key}")
         self.assertGreater(exercised, 0, "no wave3 enum fields were exercised")
+
+    def test_experience_wave3_schemas_reject_const_escape_values(self) -> None:
+        exercised = 0
+        for stem in WAVE3_STEMS:
+            schema, example = load_contract(stem)
+            for key, prop in schema_properties(schema).items():
+                if not isinstance(prop, dict) or "const" not in prop or key not in example:
+                    continue
+                exercised += 1
+                with self.subTest(stem=stem, section="top", key=key):
+                    mutated = copy.deepcopy(example)
+                    mutated[key] = const_escape_value(example[key])
+                    self.assert_invalid(schema, mutated, f"{stem} const escape {key}")
+            payload = example.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            for key, prop in payload_schema_properties(schema).items():
+                if not isinstance(prop, dict) or "const" not in prop or key not in payload:
+                    continue
+                exercised += 1
+                with self.subTest(stem=stem, section="payload", key=key):
+                    mutated = copy.deepcopy(example)
+                    self.assertIsInstance(mutated["payload"], dict)
+                    mutated["payload"][key] = const_escape_value(payload[key])
+                    self.assert_invalid(schema, mutated, f"{stem} const escape payload.{key}")
+        self.assertGreater(exercised, 0, "no wave3 const fields were exercised")
 
 
 if __name__ == "__main__":

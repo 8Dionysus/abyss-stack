@@ -64,7 +64,8 @@
       "type": "object",
       "required": [
         "job_type",
-        "cadence"
+        "cadence",
+        "authority_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -73,6 +74,10 @@
         },
         "cadence": {
           "type": "string"
+        },
+        "authority_required": {
+          "type": "boolean",
+          "const": true
         }
       }
     }

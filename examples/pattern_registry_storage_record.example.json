@@ -10,6 +10,7 @@
   ],
   "payload": {
     "record_type": "shared_pattern",
-    "lineage_indexed": true
+    "lineage_indexed": true,
+    "authority_required": true
   }
 }

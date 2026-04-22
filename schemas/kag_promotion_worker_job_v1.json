@@ -64,7 +64,8 @@
       "type": "object",
       "required": [
         "job_type",
-        "requires_eval_verdict"
+        "requires_eval_verdict",
+        "authority_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -72,6 +73,10 @@
           "type": "string"
         },
         "requires_eval_verdict": {
+          "type": "boolean",
+          "const": true
+        },
+        "authority_required": {
           "type": "boolean",
           "const": true
         }

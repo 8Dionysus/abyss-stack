@@ -10,6 +10,7 @@
   ],
   "payload": {
     "record_type": "harvest_run",
-    "retention": "P180D"
+    "retention": "P180D",
+    "authority_required": true
   }
 }

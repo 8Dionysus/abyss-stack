@@ -10,6 +10,7 @@
   ],
   "payload": {
     "job_type": "tos_dossier_prepare",
-    "direct_write_allowed": false
+    "direct_write_allowed": false,
+    "authority_required": true
   }
 }

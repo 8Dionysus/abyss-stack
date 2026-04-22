@@ -64,7 +64,8 @@
       "type": "object",
       "required": [
         "job_type",
-        "direct_write_allowed"
+        "direct_write_allowed",
+        "authority_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -74,6 +75,10 @@
         "direct_write_allowed": {
           "type": "boolean",
           "const": false
+        },
+        "authority_required": {
+          "type": "boolean",
+          "const": true
         }
       }
     }

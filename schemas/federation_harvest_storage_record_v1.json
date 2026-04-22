@@ -64,7 +64,8 @@
       "type": "object",
       "required": [
         "record_type",
-        "retention"
+        "retention",
+        "authority_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -73,6 +74,10 @@
         },
         "retention": {
           "type": "string"
+        },
+        "authority_required": {
+          "type": "boolean",
+          "const": true
         }
       }
     }

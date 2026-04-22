@@ -64,7 +64,8 @@
       "type": "object",
       "required": [
         "record_type",
-        "lineage_indexed"
+        "lineage_indexed",
+        "authority_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -72,6 +73,10 @@
           "type": "string"
         },
         "lineage_indexed": {
+          "type": "boolean",
+          "const": true
+        },
+        "authority_required": {
           "type": "boolean",
           "const": true
         }
