@@ -27,13 +27,11 @@ v0.8 adds a polis-governance contour around the experience mechanic. Earlier see
 
 - abyss-stack receives only bounded governance surfaces.
 - Policy precedent may inform local decisions but not force local adoption.
+- Role doctrine and interpretive authority live in Agents-of-Abyss and Tree-of-Sophia; this service only defines queue and expiry behavior.
 
-## Invariants
+## Runtime contract
 
-- Codex may collect evidence and propose packets, but may not vote, certify, veto, amend charters, or submit direct Tree-of-Sophia writes.
-- Assistant agents may request review, but may not self-recharter, self-promote, or convert service revision into agonic scar authority.
-- Agonic agents may contest, appeal and receive scars, but may not launder scars through assistant release paths.
-- Councils produce reviewable decisions, not hidden doctrine.
-- Vetoes and emergency stay orders require explicit authority and expiry.
-- Governance precedents may be harvested, but owner-local adoption still requires consent.
-- Tree-of-Sophia intake remains dossier-bound and never direct runtime governance write.
+- Accept bounded governance packets that cite evidence and decision refs.
+- Validate authority, owner consent, and expiry before queue action.
+- Apply, hold, reject, or escalate according to owner law.
+- Emit an audit receipt for every handled route.

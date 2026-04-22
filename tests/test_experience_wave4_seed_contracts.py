@@ -274,6 +274,19 @@ class ExperienceWave4SeedContractTests(unittest.TestCase):
                         self.assert_invalid(schema, mutated, f"{stem} empty string array item at {path}")
         self.assertGreater(exercised, 0, "no wave4 array fields were exercised")
 
+    def test_experience_wave4_schemas_reject_empty_decision_refs(self) -> None:
+        exercised = 0
+        for stem, schema_file in WAVE4_CONTRACTS:
+            schema, example = load_contract(stem, schema_file)
+            if "decision_refs" not in example:
+                continue
+            exercised += 1
+            with self.subTest(stem=stem, path="decision_refs"):
+                mutated = copy.deepcopy(example)
+                mutated["decision_refs"] = []
+                self.assert_invalid(schema, mutated, f"{stem} empty decision_refs should be rejected")
+        self.assertGreater(exercised, 0, "no wave4 decision_refs fields were exercised")
+
     def test_experience_wave4_schemas_reject_const_escapes(self) -> None:
         exercised = 0
         for stem, schema_file in WAVE4_CONTRACTS:
