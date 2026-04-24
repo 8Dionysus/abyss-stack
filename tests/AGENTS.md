@@ -1,0 +1,26 @@
+# AGENTS.md
+
+Local guidance for `tests/` in `abyss-stack`. Read the root `AGENTS.md` first.
+This directory is the runtime validation gate for infrastructure contracts.
+
+## Scope
+
+Tests here protect compose rendering, public-safe templates, env examples, host/readiness helpers, diagnostic surfaces, runtime receipts, and repair-safe closeout behavior.
+They should prove the source checkout contract without requiring a live deployed host.
+
+## Local contract
+
+- Keep tests deterministic and public-safe.
+- Prefer fixtures, temp directories, stub inputs, and loopback assumptions over live services.
+- Do not depend on no live host state, private `/srv/abyss-stack` captures, real secrets, local model downloads, or workstation-specific paths.
+- When schemas, generated catalogs, config templates, or runtime helper scripts change, add the nearest targeted regression test.
+- Keep destructive behavior behind dry-run or explicit fake fixtures.
+
+## Validate
+
+Use targeted tests first, then broaden only when needed:
+
+```bash
+python -m pytest
+python scripts/validate_stack.py
+```
