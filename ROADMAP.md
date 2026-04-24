@@ -22,7 +22,7 @@ Phases 0 through 6 have already been landed as source and runtime seams:
 
 ### Current release contour
 
-The live `v0.2.1` contour is runtime-substrate hardening, not a new source of
+The live `v0.2.2` contour is runtime-substrate hardening, not a new source of
 AoA or ToS meaning. Its current checked surface is:
 
 - source/deployed split and parity posture:

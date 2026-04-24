@@ -21,9 +21,9 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     changelog = read_text("CHANGELOG.md")
     payload = load_json("generated/diagnostic_surface_catalog.min.json")
 
-    assert "> Current release: `v0.2.1`" in readme
-    assert "## [0.2.1] - 2026-04-19" in changelog
-    assert "`v0.2.1`" in roadmap
+    assert "> Current release: `v0.2.2`" in readme
+    assert "## [0.2.2] - 2026-04-23" in changelog
+    assert "`v0.2.2`" in roadmap
     assert "Current release contour" in roadmap
     assert "runtime-substrate hardening" in roadmap
     assert "without claiming live service mutation" in roadmap

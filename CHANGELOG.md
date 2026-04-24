@@ -7,6 +7,46 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-23
+
+### Summary
+
+- this patch lands Agon duel-kernel runtime records, event-log models,
+  mechanical-trial run registries, and hash-chain quest surfaces while keeping
+  those records bounded to runtime-owned infrastructure truth
+- Experience watchtower, certification/deployment storage, federation harvest,
+  adoption worker, retention, rollback, KAG promotion, pattern registry, and
+  assistant release-lifecycle stack contracts are added for the current release
+  line
+- `abyss-stack` remains the source-authored runtime layer; deployed state
+  still becomes live only through the configured runtime mirror and operator
+  process
+
+### Added
+
+- Agon Wave XII duel runtime kernel surfaces, duel event logs, stop-lines,
+  registry generation, and source/deployed recurrence manifests
+- Agon Wave XIII mechanical-trial runtime records, event-log examples,
+  trial-run registries, and runtime stop-lines
+- Experience watchtower runtime records plus wave3 federation/adoption worker
+  plans, runtime storage plans, canary probes, rollback jobs, KAG promotion
+  jobs, and pattern-registry service records
+
+### Changed
+
+- runtime review follow-up drift, event-log schema checks, mechanical-trial
+  contract checks, W5 pilot record posture, federation runtime review
+  contracts, and source/deployed parity expectations were tightened
+
+### Validation
+
+- `python scripts/release_check.py`
+
+### Notes
+
+- this patch updates source-owned runtime contracts and public-safe docs only;
+  it does not claim live deployment mutation from the source checkout
+
 ## [0.2.1] - 2026-04-19
 
 ### Summary
