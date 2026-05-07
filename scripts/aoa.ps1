@@ -108,7 +108,7 @@ Usage:
 
 Optional PowerShell parameters:
   -Distro <name>       Use a specific WSL distro instead of the default one.
-  -RuntimeRoot <path>  Linux runtime root. Default: /srv/abyss-stack
+  -RuntimeRoot <path>  Linux runtime root. Default: /srv/AbyssOS/abyss-stack
   -VaultRoot <path>    Linux vault root. Default: /abyss when not overridden.
   -Overlay <path[]>    Extra compose files. Relative paths are resolved inside AOA_CONFIGS_ROOT.
 
@@ -125,7 +125,7 @@ if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 if (-not $RuntimeRoot) {
-    $RuntimeRoot = "/srv/abyss-stack"
+    $RuntimeRoot = "/srv/AbyssOS/abyss-stack"
 }
 
 $configRoot = "$RuntimeRoot/Configs"

@@ -16,7 +16,7 @@ The current doctor pass looks at things like:
 - whether `systemctl --user` appears usable
 - whether `/dev/dri` exists when the selected preset or profile includes Intel-aware inference
 - whether the optional vault path appears mounted
-- whether the stack root is the canonical `/srv/abyss-stack`
+- whether the stack root is the canonical `/srv/AbyssOS/abyss-stack`
 - whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
 - whether the selected runtime enables a federated advisory consumer without also selecting the localhost federation seam
 - whether a current machine-fit record is missing for the deployed runtime root

@@ -1,9 +1,9 @@
 services:
   langchain-api-llamacpp:
-    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/langchain-api"
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/langchain-api"
     container_name: langchain-api-llamacpp
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
       LC_BASE_URL: http://llama-cpp:8080/v1
       LC_API_KEY: EMPTY
@@ -19,8 +19,8 @@ services:
       OVMS_EMBEDDINGS_URL: "${AOA_OVMS_EMBEDDINGS_URL:-http://host.containers.internal:8200/v3/embeddings}"
       OVMS_EMBEDDINGS_MODEL: "${AOA_OVMS_EMBEDDINGS_MODEL:-qwen3-embed-0.6b-int8-ov}"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns-llamacpp:/app/logs/returns-llamacpp:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/returns-llamacpp:/app/logs/returns-llamacpp:Z"
     ports:
       - "127.0.0.1:${AOA_LLAMACPP_LANGCHAIN_HOST_PORT:-5403}:5401"
     healthcheck:

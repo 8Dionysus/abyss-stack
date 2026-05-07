@@ -1,0 +1,61 @@
+# Governed Execution Mechanic
+
+## Mechanic card
+
+Governed execution is the mechanic for bounded local-worker runs that can use
+runtime tools while preserving review, gates, return policy, and owner handoff.
+
+### Trigger
+
+Use this package when changing `aoa-governed-run`, autonomy status, return
+policy, candidate export, review packets, or local-worker execution records.
+
+### abyss-stack owns
+
+- runtime-side governed-run wrapper behavior
+- local autonomy gate reporting
+- return policy config shape
+- candidate export plumbing
+- runtime evidence refs for local-worker activity
+
+### Stronger owner split
+
+`aoa-skills`, `aoa-memo`, `aoa-evals`, `aoa-playbooks`, and owner repositories
+own workflow, memory, proof, and playbook meaning. Runtime exports candidates
+and receipts; owners decide acceptance.
+
+### Inputs
+
+Operator intent, runtime policy, advisory mirrors, local model worker outputs,
+validation commands, and review packet destinations.
+
+### Outputs
+
+Governed run records, autonomy status JSON, memo or artifact candidates, and
+bounded return packets.
+
+### Must not claim
+
+- autonomous authority
+- owner acceptance
+- proof verdict
+- memory truth
+- review completion from export alone
+
+### Validation
+
+Run the commands in [AGENTS.md](AGENTS.md).
+
+### Next route
+
+Use [diagnostic-spine](../diagnostic-spine/README.md) for truth-goal status,
+[runtime-repair](../runtime-repair/README.md) for repair-safe closeout, and
+[federation-seams](../federation-seams/README.md) for advisory owner inputs.
+
+## Active route
+
+Current source surfaces stay in `docs/GOVERNED_EXECUTION.md`,
+`scripts/_aoa_governed_execution.py`, `scripts/_aoa_status_autonomy.py`,
+`scripts/aoa-governed-run`, `scripts/aoa-status`, config templates, examples,
+schemas, and tests.
+

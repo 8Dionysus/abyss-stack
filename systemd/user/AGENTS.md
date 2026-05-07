@@ -12,7 +12,7 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 
 ## Directory contract
 - Units here are user units, not system-wide units.
-- They target the deployed runtime tree under `${AOA_CONFIGS_ROOT}` and the canonical runtime root `/srv/abyss-stack`, not the source checkout.
+- They target the deployed runtime tree under `${AOA_CONFIGS_ROOT}` and the canonical runtime root `/srv/AbyssOS/abyss-stack`, not the source checkout.
 - The current contract file is `systemd/user/podman-compose-abyss.service`.
 - Lifecycle stays rooted in deployed `Configs/scripts/aoa-up` and `Configs/scripts/aoa-down`.
 

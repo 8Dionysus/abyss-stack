@@ -17,7 +17,7 @@ from typing import Any
 SCRIPT_PATH = Path(__file__).resolve()
 SCRIPT_DIR = SCRIPT_PATH.parent
 SOURCE_ROOT = SCRIPT_DIR.parent
-STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 PILOT_ID = "llamacpp-sidecar-pilot-v1"
 PILOT_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "comparisons" / PILOT_ID

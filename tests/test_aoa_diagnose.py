@@ -650,7 +650,7 @@ class AoADiagnoseTests(unittest.TestCase):
                                 "summary": "host load remains noisy for latency-sensitive trials",
                                 "probable_causes": ["loadavg still elevated"],
                                 "owner_hint": "abyss-stack/runtime-envelope",
-                                "evidence_refs": ["command:bash /srv/abyss-stack/Configs/scripts/aoa-doctor"],
+                                "evidence_refs": ["command:bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-doctor"],
                             }
                         ],
                         "exit_class": "live_but_drifted",
@@ -738,7 +738,7 @@ class AoADiagnoseTests(unittest.TestCase):
                                 "summary": "host load remains noisy for latency-sensitive trials",
                                 "probable_causes": ["loadavg still elevated"],
                                 "owner_hint": "abyss-stack/runtime-envelope",
-                                "evidence_refs": ["command:bash /srv/abyss-stack/Configs/scripts/aoa-doctor"],
+                                "evidence_refs": ["command:bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-doctor"],
                             }
                         ],
                         "unknowns": ["No reviewed diagnosis refs were supplied for this diagnostic pass."],

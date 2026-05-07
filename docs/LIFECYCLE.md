@@ -89,7 +89,7 @@ Expected pattern:
 Until wrappers are installed into the live runtime path, the intended manual shape is:
 
 ```bash
-cd /srv/abyss-stack/Configs
+cd /srv/AbyssOS/abyss-stack/Configs
 podman compose \
   -f compose/modules/10-storage.yml \
   -f compose/modules/20-orchestration.yml \
@@ -108,7 +108,7 @@ Its expected deployed location is:
 - `~/.config/systemd/user/podman-compose-abyss.service`
 
 It assumes the deployed runtime tree exists under:
-- `/srv/abyss-stack/Configs`
+- `/srv/AbyssOS/abyss-stack/Configs`
 
 ## Path note
 
@@ -123,7 +123,7 @@ Truth progression must stay explicit:
 - `live_available`
 
 Do not collapse those states into one word such as "landed".
-A source-authored change becomes deployed only after `aoa-sync-configs` updates `/srv/abyss-stack/Configs`.
+A source-authored change becomes deployed only after `aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`.
 Use `python scripts/validate_stack.py --parity-check` when repo-managed surfaces should match the deployed Configs mirror.
 
 ## Profile rule

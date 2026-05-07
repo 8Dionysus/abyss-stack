@@ -76,7 +76,7 @@ AoA or ToS meaning. Its current checked surface is:
   `config-templates/Services/tos-graph/app/main.py`
 
 This contour keeps the source checkout `~/src/abyss-stack` separate from the
-deployed `/srv/abyss-stack/Configs` mirror. It names runtime contracts,
+deployed `/srv/AbyssOS/abyss-stack/Configs` mirror. It names runtime contracts,
 advisory seams, and validation paths without claiming live service mutation or
 meaning-layer authority.
 
@@ -110,7 +110,7 @@ Those landings should be read carefully:
 - add backup and restore helpers
 - add validation for compose coherence
 - reduce environment-specific assumptions where possible
-- enforce the new `/srv/abyss-stack` canonical runtime root
+- enforce the new `/srv/AbyssOS/abyss-stack` canonical runtime root
 - make the Fedora-first and Windows-usable path model explicit
 - make deployment from source checkout to runtime tree explicit and repeatable
 

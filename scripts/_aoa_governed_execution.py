@@ -19,7 +19,7 @@ from typing import Any, Callable
 
 SCRIPT_PATH = Path(__file__).resolve()
 SCRIPT_ROOT = SCRIPT_PATH.parents[1]
-STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 ROUTE_API_BASE_URL = os.environ.get("AOA_ROUTE_API_BASE_URL", "http://127.0.0.1:5402").rstrip("/")
 LANGCHAIN_API_BASE_URL = os.environ.get("AOA_LANGCHAIN_API_BASE_URL", "http://127.0.0.1:5403").rstrip("/")

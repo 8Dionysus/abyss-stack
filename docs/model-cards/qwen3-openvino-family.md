@@ -76,9 +76,9 @@
 - [MODEL_CARDS](/home/dionysus/src/abyss-stack/docs/MODEL_CARDS.md)
 - [PROFILE_RECIPES](/home/dionysus/src/abyss-stack/docs/PROFILE_RECIPES.md)
 - [SERVICE_CATALOG](/home/dionysus/src/abyss-stack/docs/SERVICE_CATALOG.md)
-- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
-- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
-- `/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T155804Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab-extended`
+- `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
+- `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
+- `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T155804Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab-extended`
 
 ## Next Test
 
@@ -88,8 +88,8 @@ Run the current low-latency GPU packet with explicit environment selection:
 export AOA_OVMS_TEXT_SOURCE_MODEL=OpenVINO/Qwen3-4B-int4-ov
 export AOA_OVMS_TEXT_MODEL_NAME=OpenVINO/Qwen3-4B-int4-ov
 podman compose \
-  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
-  -f /srv/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
+  -f /srv/AbyssOS/abyss-stack/Configs/compose/tuning/intel-text.ovms-gpu-lab.yml \
+  -f /srv/AbyssOS/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
   up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
 scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-4B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-4b-int4-gpu-lab"

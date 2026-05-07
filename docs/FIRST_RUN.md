@@ -7,7 +7,7 @@ This guide is the shortest careful path from a source checkout to a running loca
 - you are operating in the Fedora-first runtime model
 - `podman` is available
 - `rsync` is available
-- the runtime root should be `/srv/abyss-stack`
+- the runtime root should be `/srv/AbyssOS/abyss-stack`
 
 If you are starting from Windows, read [WINDOWS_SETUP](WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
 
@@ -16,8 +16,8 @@ If you are starting from Windows, read [WINDOWS_SETUP](WINDOWS_SETUP.md) and use
 From the source checkout:
 
 ```bash
-export AOA_STACK_ROOT=/srv/abyss-stack
-export AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
+export AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack
+export AOA_CONFIGS_ROOT=/srv/AbyssOS/abyss-stack/Configs
 
 scripts/aoa-doctor
 scripts/aoa-first-run --strict

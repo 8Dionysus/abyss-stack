@@ -12,7 +12,7 @@ import sys
 from typing import Any
 
 
-STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 HOME_SOURCE_ROOT = Path.home() / "src" / "abyss-stack"
 SCRIPT_PATH = Path(__file__).resolve()

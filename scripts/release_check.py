@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DEPLOYED_CONFIGS_ROOT = Path("/srv/abyss-stack/Configs")
+DEFAULT_DEPLOYED_CONFIGS_ROOT = Path("/srv/AbyssOS/abyss-stack/Configs")
 
 COMMANDS = [
     ("validate stack", [sys.executable, "scripts/validate_stack.py"]),

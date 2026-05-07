@@ -451,14 +451,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the bounded Phase Alpha memo contradiction integrity sidecar proof."
     )
-    parser.add_argument("--stack-root", default=os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+    parser.add_argument("--stack-root", default=os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
     parser.add_argument(
         "--memo-root",
-        default=os.environ.get("AOA_MEMO_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack") + "/Knowledge/federation/aoa-memo",
+        default=os.environ.get("AOA_MEMO_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack") + "/Knowledge/federation/aoa-memo",
     )
     parser.add_argument(
         "--evals-root",
-        default=os.environ.get("AOA_EVALS_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack") + "/Knowledge/federation/aoa-evals",
+        default=os.environ.get("AOA_EVALS_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack") + "/Knowledge/federation/aoa-evals",
     )
     parser.add_argument("--output-file")
     return parser

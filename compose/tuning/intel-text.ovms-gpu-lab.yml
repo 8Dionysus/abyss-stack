@@ -9,7 +9,7 @@ services:
     devices:
       - /dev/dri:/dev/dri
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/ovms-text-lab:/models:U,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/ovms-text-lab:/models:U,Z"
     command:
       - --source_model
       - "${AOA_OVMS_TEXT_SOURCE_MODEL:?set AOA_OVMS_TEXT_SOURCE_MODEL from MODEL_CARDS.md}"
@@ -39,10 +39,10 @@ services:
       start_period: 20s
 
   langchain-api-intel-text:
-    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/langchain-api"
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/langchain-api"
     container_name: langchain-api-intel-text
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
       LC_BASE_URL: "http://ovms-intel-text:8000/v3"
       LC_API_KEY: "${AOA_OVMS_TEXT_API_KEY:-EMPTY}"
@@ -56,8 +56,8 @@ services:
       ovms-intel-text:
         condition: service_healthy
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns-intel-text:/app/logs/returns-intel-text:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/returns-intel-text:/app/logs/returns-intel-text:Z"
     ports:
       - "127.0.0.1:${AOA_INTEL_TEXT_LANGCHAIN_HOST_PORT:-5404}:5401"
     healthcheck:

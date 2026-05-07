@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [string]$Distro = $env:AOA_WSL_DISTRO,
-    [string]$RuntimeRoot = "/srv/abyss-stack"
+    [string]$RuntimeRoot = "/srv/AbyssOS/abyss-stack"
 )
 
 Set-StrictMode -Version Latest

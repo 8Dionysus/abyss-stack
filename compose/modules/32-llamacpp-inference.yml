@@ -41,6 +41,6 @@ services:
       LLAMA_ARG_OP_OFFLOAD: "${AOA_LLAMACPP_OP_OFFLOAD:-0}"
       LLAMA_ARG_NO_WARMUP: "${AOA_LLAMACPP_NO_WARMUP:-1}"
     volumes:
-      - "${AOA_LLAMACPP_MODEL_HOST_PATH:-/srv/abyss-stack/Logs/llamacpp/models/bartowski/Qwen_Qwen3.5-9B-Q4_K_M.gguf}:/models/qwen3.5-9b.gguf:ro,Z"
+      - "${AOA_LLAMACPP_MODEL_HOST_PATH:-/srv/AbyssOS/abyss-stack/Logs/llamacpp/models/bartowski/Qwen_Qwen3.5-9B-Q4_K_M.gguf}:/models/qwen3.5-9b.gguf:ro,Z"
     ports:
       - "127.0.0.1:${AOA_LLAMACPP_HOST_PORT:-11435}:8080"

@@ -9,10 +9,10 @@ services:
     devices:
       - /dev/dri:/dev/dri
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/ovms-api.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/ovms-api.env"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/ovms:/models:Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/ovms_api_key.txt:/run/secrets/ovms_api_key:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/ovms:/models:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/ovms_api_key.txt:/run/secrets/ovms_api_key:ro,Z"
     command:
       - --config_path
       - /models/config.json

@@ -28,7 +28,7 @@
   "rollback_ready": true,
   "mutation_widening_blocked": true,
   "evidence_refs": [
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:39:45Z",
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:39:45Z",
     "python scripts/validate_stack.py --parity-check#2026-04-07T13:39:10Z"
   ],
   "emitted_to": [

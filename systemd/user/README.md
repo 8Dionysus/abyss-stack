@@ -24,4 +24,4 @@ systemctl --user enable --now podman-compose-abyss.service
 ## Assumption
 
 The unit expects the deployed runtime tree to exist under:
-- `/srv/abyss-stack/Configs`
+- `/srv/AbyssOS/abyss-stack/Configs`

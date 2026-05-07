@@ -49,14 +49,14 @@ Good evidence sources include:
 
 - `python scripts/validate_stack.py`
 - `python scripts/validate_stack.py --parity-check`
-- `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
-- `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
+- `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
+- `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
 - bounded host-facts or machine-fit artifacts when relevant
 
 ## Boundary reminder
 
 `~/src/abyss-stack` is the source checkout.
-`/srv/abyss-stack` is the deployed runtime mirror.
+`/srv/AbyssOS/abyss-stack` is the deployed runtime mirror.
 
 A runtime stress event must not become an excuse to edit the deployed mirror as if it were the source repository.
 

@@ -1,0 +1,10 @@
+# Narrow ownership map for governance-critical runtime surfaces.
+/.agents/ @8Dionysus
+/.github/ @8Dionysus
+/compose/ @8Dionysus
+/config-templates/ @8Dionysus
+/docs/ @8Dionysus
+/env/ @8Dionysus
+/mechanics/ @8Dionysus
+/scripts/ @8Dionysus
+/systemd/ @8Dionysus

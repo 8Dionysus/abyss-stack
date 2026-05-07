@@ -12,8 +12,8 @@
 ## Secret posture
 
 Expected live pattern:
-- runtime configs under `/srv/abyss-stack/Configs`
-- secrets under `/srv/abyss-stack/Secrets`
+- runtime configs under `/srv/AbyssOS/abyss-stack/Configs`
+- secrets under `/srv/AbyssOS/abyss-stack/Secrets`
 - example env files in `env/`
 - real env files never committed
 
@@ -23,7 +23,7 @@ Expected live pattern:
 - publishing raw inspect output that may contain env values
 - treating secret paths as normal source files
 - widening network exposure casually
-- committing private host-facts captures from `/srv/abyss-stack/Logs/host-facts/`
+- committing private host-facts captures from `/srv/AbyssOS/abyss-stack/Logs/host-facts/`
 
 ## Safe defaults
 

@@ -46,4 +46,4 @@ templates for:
 
 `aoa-browser` is now source-managed here as a lightweight browser-helper build
 context. The Playwright browser payload under
-`/srv/abyss-stack/Services/aoa-browser/ms-playwright/` remains runtime-only.
+`/srv/AbyssOS/abyss-stack/Services/aoa-browser/ms-playwright/` remains runtime-only.

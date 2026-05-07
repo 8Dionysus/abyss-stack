@@ -136,7 +136,7 @@ else
   doctor_warn "platform ${uname_s}; Fedora-first runtime expects Linux"
 fi
 
-if [[ "${AOA_STACK_ROOT}" == "/srv/abyss-stack" ]]; then
+if [[ "${AOA_STACK_ROOT}" == "/srv/AbyssOS/abyss-stack" ]]; then
   doctor_ok "canonical stack root ${AOA_STACK_ROOT}"
 else
   doctor_warn "non-canonical stack root ${AOA_STACK_ROOT}"

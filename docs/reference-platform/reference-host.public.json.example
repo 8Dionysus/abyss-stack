@@ -44,7 +44,7 @@
         "available_bytes": 999922073600
       },
       {
-        "query_path": "/srv/abyss-stack",
+        "query_path": "/srv/AbyssOS/abyss-stack",
         "resolved_path": "/",
         "mount_target": "/",
         "mounted": true,
@@ -72,8 +72,8 @@
     "selinux_mode": "enforcing"
   },
   "paths": {
-    "stack_root": "/srv/abyss-stack",
-    "configs_root": "/srv/abyss-stack/Configs",
+    "stack_root": "/srv/AbyssOS/abyss-stack",
+    "configs_root": "/srv/AbyssOS/abyss-stack/Configs",
     "vault_root": "/abyss",
     "stack_root_is_canonical": true,
     "stack_root_exists": true,

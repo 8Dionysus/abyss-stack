@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
     captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
 

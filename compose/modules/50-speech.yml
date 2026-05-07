@@ -1,6 +1,6 @@
 services:
   qwen-tts:
-    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/qwen3-tts-api"
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/qwen3-tts-api"
     container_name: qwen-tts
     environment:
       HF_HOME: /models/hf
@@ -20,9 +20,9 @@ services:
       HF_DATASETS_OFFLINE: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/hf/local:/models/hf/local:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/tts:/out:z,U"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/voices:/voices:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/hf/local:/models/hf/local:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/tts:/out:z,U"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/voices:/voices:ro,Z"
     ports:
       - "127.0.0.1:5101:5001"
     healthcheck:
@@ -34,20 +34,20 @@ services:
     restart: unless-stopped
 
   tts-router:
-    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/tts_router"
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/tts_router"
     container_name: tts-router
     ports:
       - "127.0.0.1:5201:5201"
     environment:
       VOICE_CFG: /cfg/voices.yaml
-      TTS_HOST_LOG_DIR: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/tts"
+      TTS_HOST_LOG_DIR: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/tts"
       TTS_BACKEND_URL: http://qwen-tts:5001/custom
       TTS_LOG_DIR: /logs
       VOICE_STORE: /voices
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/tts:/cfg:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/tts:/logs:z,U"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Models/voices:/voices:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/tts:/cfg:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/tts:/logs:z,U"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Models/voices:/voices:ro,Z"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5201/health', timeout=2).read()"]

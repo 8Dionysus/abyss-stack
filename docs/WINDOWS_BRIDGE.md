@@ -39,7 +39,7 @@ Windows-host tooling must not become a second compose authority.
 
 Linux still owns:
 
-- the canonical runtime root at `/srv/abyss-stack`
+- the canonical runtime root at `/srv/AbyssOS/abyss-stack`
 - rootless Podman lifecycle
 - systemd user-unit posture
 - the actual composed runtime

@@ -24,7 +24,7 @@
     "short_strategy": "anchor_plus_local_plan",
     "long_strategy": "drop_then_reselect",
     "memory_access_refs": [
-      "local:/srv/abyss-stack/Logs/checkpoints/route-2026-03-26-pass-02/checkpoint-pack.json"
+      "local:/srv/AbyssOS/abyss-stack/Logs/checkpoints/route-2026-03-26-pass-02/checkpoint-pack.json"
     ]
   },
   "reentry": {
@@ -34,11 +34,11 @@
     "outcome": "reentered"
   },
   "evidence": {
-    "policy_ref": "local:/srv/abyss-stack/Configs/agent-api/return-policy.yaml",
-    "rendered_services_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-services.txt",
-    "rendered_config_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-config.redacted.yml",
-    "runtime_log_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/langchain-api.log",
-    "return_bundle_ref": "local:/srv/abyss-stack/Logs/returns/2026-03-26/return-001/event.json"
+    "policy_ref": "local:/srv/AbyssOS/abyss-stack/Configs/agent-api/return-policy.yaml",
+    "rendered_services_ref": "local:/srv/AbyssOS/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-services.txt",
+    "rendered_config_ref": "local:/srv/AbyssOS/abyss-stack/Logs/returns/2026-03-26/return-001/rendered-config.redacted.yml",
+    "runtime_log_ref": "local:/srv/AbyssOS/abyss-stack/Logs/returns/2026-03-26/return-001/langchain-api.log",
+    "return_bundle_ref": "local:/srv/AbyssOS/abyss-stack/Logs/returns/2026-03-26/return-001/event.json"
   },
   "boundary": {
     "supports_runtime_claims_only": true,

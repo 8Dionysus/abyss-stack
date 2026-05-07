@@ -7,7 +7,7 @@ This document fixes the language for source, deployment, trial, and live-runtime
 Use it whenever a report, summary, or operator note could blur the line between:
 
 - what exists in the canonical source checkout
-- what is actually deployed under `/srv/abyss-stack`
+- what is actually deployed under `/srv/AbyssOS/abyss-stack`
 - what a trial packet proved
 - what is operator-visible right now
 
@@ -18,7 +18,7 @@ Every promoted runtime claim should be read through these four fields:
 - `source_authored`
   The surface exists in the canonical source checkout, usually `~/src/abyss-stack` or the configured `${AOA_SOURCE_ROOT}`.
 - `deployed`
-  The same operator-facing surface exists in the deployed runtime tree at `/srv/abyss-stack`, usually under `/srv/abyss-stack/Configs/`.
+  The same operator-facing surface exists in the deployed runtime tree at `/srv/AbyssOS/abyss-stack`, usually under `/srv/AbyssOS/abyss-stack/Configs/`.
 - `trial_proven`
   A bounded trial packet recorded a passing result for the claim under the relevant runner contract.
 - `live_available`
@@ -29,7 +29,7 @@ Every promoted runtime claim should be read through these four fields:
 trial_proven is not a synonym for production readiness.
 
 - A source-authored change is not live just because it landed in the checkout.
-- A deployed surface is not trial-proven just because it exists under `/srv/abyss-stack`.
+- A deployed surface is not trial-proven just because it exists under `/srv/AbyssOS/abyss-stack`.
 - `trial_proven` is not a synonym for production readiness.
 - `trial_proven` is not a synonym for `live_available`.
 - `live_available` must be proved through the deployed operator path or a live endpoint, not by calling source-only helpers.
@@ -79,7 +79,7 @@ Use these steps before promoting a runtime-control claim:
 
 ```bash
 python scripts/validate_stack.py --parity-check
-python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60
-bash /srv/abyss-stack/Configs/scripts/aoa-sync-federation-surfaces --check --json --layer aoa-routing
+python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60
+bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-sync-federation-surfaces --check --json --layer aoa-routing
 scripts/aoa-status --autonomy --json
 ```

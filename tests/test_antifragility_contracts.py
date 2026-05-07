@@ -95,5 +95,5 @@ class AntifragilityContractTests(unittest.TestCase):
             self.assertIn(fragment, readme)
 
         self.assertIn("`~/src/abyss-stack` is the source checkout.", runtime_doc)
-        self.assertIn("`/srv/abyss-stack` is the deployed runtime mirror.", runtime_doc)
-        self.assertIn("Do not patch `/srv/abyss-stack` and pretend the system learned.", closeout_doc)
+        self.assertIn("`/srv/AbyssOS/abyss-stack` is the deployed runtime mirror.", runtime_doc)
+        self.assertIn("Do not patch `/srv/AbyssOS/abyss-stack` and pretend the system learned.", closeout_doc)

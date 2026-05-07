@@ -68,7 +68,7 @@ class ValidateStackParityTests(unittest.TestCase):
             "parse_args",
             return_value=argparse.Namespace(
                 parity_check=True,
-                deployed_configs_root="/srv/abyss-stack/Configs",
+                deployed_configs_root="/srv/AbyssOS/abyss-stack/Configs",
             ),
         ):
             exit_code = validate_stack.main()

@@ -11,11 +11,12 @@ Read in this order:
 1. [CHARTER](CHARTER.md)
 2. [BOUNDARIES](BOUNDARIES.md)
 3. [docs/ARCHITECTURE](docs/ARCHITECTURE.md)
-4. [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md)
-5. [docs/PROFILES](docs/PROFILES.md) and [docs/PRESETS](docs/PRESETS.md)
-6. [docs/PATHS](docs/PATHS.md)
-7. [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [docs/RUNBOOK](docs/RUNBOOK.md), and [docs/SECURITY](docs/SECURITY.md)
-8. [ROADMAP](ROADMAP.md)
+4. [mechanics/README](mechanics/README.md)
+5. [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md)
+6. [docs/PROFILES](docs/PROFILES.md) and [docs/PRESETS](docs/PRESETS.md)
+7. [docs/PATHS](docs/PATHS.md)
+8. [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [docs/RUNBOOK](docs/RUNBOOK.md), and [docs/SECURITY](docs/SECURITY.md)
+9. [ROADMAP](ROADMAP.md)
 
 Then branch by need:
 
@@ -25,6 +26,7 @@ Then branch by need:
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
 - **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/RUNTIME_CHAOS_WAVE1](docs/RUNTIME_CHAOS_WAVE1.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [docs/VIA_NEGATIVA_CHECKLIST](docs/VIA_NEGATIVA_CHECKLIST.md)
+- **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 
 ## What this repository is for
 
@@ -58,11 +60,11 @@ This repository should not absorb:
 ## Quick path rule
 
 - source checkout: `~/src/abyss-stack` by default, or `${AOA_SOURCE_ROOT}` if intentionally relocated
-- deployed runtime root: `/srv/abyss-stack`
-- deployed config tree: `/srv/abyss-stack/Configs`
-- do not edit `/srv/abyss-stack` as if it were the source repository
+- deployed runtime root: `/srv/AbyssOS/abyss-stack`
+- deployed config tree: `/srv/AbyssOS/abyss-stack/Configs`
+- do not edit `/srv/AbyssOS/abyss-stack` as if it were the source repository
 
-The deployed runtime mirror under `/srv/abyss-stack/Configs` is intentionally narrower than the source checkout.
+The deployed runtime mirror under `/srv/AbyssOS/abyss-stack/Configs` is intentionally narrower than the source checkout.
 
 ## Quick route table
 
@@ -141,7 +143,7 @@ To verify the current promoted path, use this order:
 2. `python scripts/build_diagnostic_surface_catalog.py --check`
 3. `python scripts/validate_diagnostic_surface_catalog.py`
 4. `python scripts/validate_stack.py --parity-check`
-5. `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
-6. `bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
-7. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
-8. `bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`
+5. `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
+6. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
+7. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
+8. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`

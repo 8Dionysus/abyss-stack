@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+DEFAULT_STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 
 GENERATED_COLLECTIONS = (
     ("agent_build_snapshots.json", "builds", "agent_build_snapshot_collection_v1", "agent_build_snapshot_v1"),

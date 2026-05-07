@@ -43,7 +43,7 @@ It should remain owner-local first.
 ## Path hygiene
 
 If a repair changes source-owned configuration, make that change in the source checkout.
-Do not patch `/srv/abyss-stack` and pretend the system learned.
+Do not patch `/srv/AbyssOS/abyss-stack` and pretend the system learned.
 
 ## Healthy outcome
 

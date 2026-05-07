@@ -70,7 +70,7 @@ Also apply the nearest nested `AGENTS.md` when working in subdirectories such as
 
 ### Canonical path mapping
 
-- `/srv/abyss-stack` runtime root
+- `/srv/AbyssOS/abyss-stack` runtime root
 - `Configs/` and `Secrets/` layout
 - mapping between public-safe examples and live runtime files
 - Windows source checkout paths versus Linux runtime paths
@@ -163,7 +163,7 @@ Use these severity rules for Codex GitHub review and local `/review`.
 ### Treat as P1
 
 - env examples drifting away from actual runtime consumers
-- path mapping drift away from `/srv/abyss-stack`, `Configs`, or `Secrets`
+- path mapping drift away from `/srv/AbyssOS/abyss-stack`, `Configs`, or `Secrets`
 - profile/preset/module changes without matching render/introspection verification
 - hidden breaking changes in doctor/bootstrap/first-run helpers
 - runtime substrate starting to author meaning that belongs in AoA or ToS

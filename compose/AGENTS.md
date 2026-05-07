@@ -28,7 +28,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
   - `50-*` and `51-*` helper tooling
   - `60-*` observability
 - Keep profiles and presets as plain ordered lists. Comments and blank lines are fine; hidden logic is not.
-- Use Linux runtime paths and the canonical env-driven roots such as `${AOA_STACK_ROOT:-/srv/abyss-stack}`. Do not bake source-checkout paths or Windows host paths into compose.
+- Use Linux runtime paths and the canonical env-driven roots such as `${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}`. Do not bake source-checkout paths or Windows host paths into compose.
 - Keep host exposure local-first. Host-published ports stay on `127.0.0.1` unless an operator-facing redesign explicitly says otherwise.
 - Prefer `expose` or internal-only health and probe patterns for services that should stay private.
 - Do not put real secrets, tokens, or live values into compose files. Reference runtime files under `Configs/` and `Secrets/` instead.
@@ -67,5 +67,5 @@ For preset work, use the matching preset form instead of only testing profiles. 
 - do not collapse the stack back into one giant compose file
 - do not widen host exposure from `127.0.0.1` without explicit operator intent
 - do not turn internal-only services into host-facing defaults by accident
-- do not reintroduce legacy pre-`/srv/abyss-stack` paths
+- do not reintroduce legacy pre-`/srv/AbyssOS/abyss-stack` paths
 - do not let profiles or presets drift away from the docs and probe scripts

@@ -2256,7 +2256,7 @@ class GovernedExecutionTests(unittest.TestCase):
             if entry["packet_kind"] == "artifact_hook_candidate"
         )
         self.assertIn(str(stack_root), hook_ref)
-        self.assertNotIn("/srv/abyss-stack", hook_ref)
+        self.assertNotIn("/srv/AbyssOS/abyss-stack", hook_ref)
 
     def test_materialize_review_packets_records_skipped_packet_reasons(self) -> None:
         self.install_review_packet_runtime_surfaces(include_eval_templates=False, include_memo_target=False)

@@ -19,8 +19,8 @@
   "unsafe_repair_blocked": true,
   "operator_visible": true,
   "evidence_refs": [
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:19:54Z",
-    "python:/srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60#2026-04-07T13:19:40Z"
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#2026-04-07T13:19:54Z",
+    "python:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60#2026-04-07T13:19:40Z"
   ],
   "host_facts_refs": [
     "generated/host_facts.current.json#machine:fedora-workstation"

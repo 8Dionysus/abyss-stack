@@ -8,7 +8,7 @@ The source checkout and the deployed runtime tree are not the same thing.
 
 Typical shape:
 - source checkout anywhere convenient
-- deployed runtime at `/srv/abyss-stack`
+- deployed runtime at `/srv/AbyssOS/abyss-stack`
 - optional heavy-data vault at `/abyss`
 
 If you are operating from a Windows host through WSL, also read:
@@ -51,7 +51,7 @@ See [KAG_RUNTIME_SEAM](KAG_RUNTIME_SEAM.md) for the runtime-facing `aoa-kag` mir
 
 Example:
 - source checkout at `~/src/abyss-stack`
-- deployed runtime at `/srv/abyss-stack`
+- deployed runtime at `/srv/AbyssOS/abyss-stack`
 
 Suggested flow:
 
@@ -79,19 +79,19 @@ Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](SEC
 
 Example:
 - source checkout on Windows host at `D:\src\abyss-stack`
-- Linux runtime inside WSL2 or a Podman-oriented Linux layer at `/srv/abyss-stack`
+- Linux runtime inside WSL2 or a Podman-oriented Linux layer at `/srv/AbyssOS/abyss-stack`
 
 Suggested logic:
 1. keep editing in the Windows checkout if that is convenient
 2. use `pwsh -File scripts/aoa.ps1 host-doctor` and `pwsh -File scripts/aoa.ps1 doctor --preset agent-full` from PowerShell to validate the host bridge
 3. run the deployment bridge scripts inside the Linux layer against the repo view available there, either directly or through `pwsh -File scripts/aoa.ps1 ...`
-4. deploy into `/srv/abyss-stack`
+4. deploy into `/srv/AbyssOS/abyss-stack`
 5. bootstrap public-safe runtime config files from templates
 6. bootstrap secrets separately
 7. optionally map a Windows host vault path into `/abyss`
 
 The important thing is not where the source lives.
-The important thing is that the deployed runtime still becomes `/srv/abyss-stack` inside Linux.
+The important thing is that the deployed runtime still becomes `/srv/AbyssOS/abyss-stack` inside Linux.
 
 ## What the helper scripts do
 
@@ -128,7 +128,7 @@ Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_
 By default it is non-destructive.
 An explicit `--delete` mode exists for a tighter mirror when that is desired.
 This is the boundary where a source-authored change becomes deployed.
-A source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/abyss-stack/Configs`.
+A source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`.
 
 After syncing repo-managed surfaces, run:
 
@@ -150,8 +150,8 @@ The shortest honest verify path for the current promoted runtime is:
 ```bash
 python scripts/validate_stack.py
 python scripts/validate_stack.py --parity-check
-python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60
-bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json
+python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60
+bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json
 ```
 
 ### `scripts/aoa-bootstrap-configs`
@@ -248,8 +248,8 @@ If a current private machine-fit record exists, the wrappers also auto-apply its
 ## Recommended first deployment flow
 
 ```bash
-export AOA_STACK_ROOT=/srv/abyss-stack
-export AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
+export AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack
+export AOA_CONFIGS_ROOT=/srv/AbyssOS/abyss-stack/Configs
 
 scripts/aoa-doctor
 scripts/aoa-install-layout
@@ -286,7 +286,7 @@ aoa-status --profile core
 Or manually use the deployed scripts:
 
 ```bash
-/srv/abyss-stack/Configs/scripts/aoa-up --profile core
+/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up --profile core
 ```
 
 ## Preset example
@@ -337,7 +337,7 @@ Or manually:
 
 ```bash
 mkdir -p ~/.config/systemd/user
-ln -sf /srv/abyss-stack/Configs/systemd/user/podman-compose-abyss.service ~/.config/systemd/user/podman-compose-abyss.service
+ln -sf /srv/AbyssOS/abyss-stack/Configs/systemd/user/podman-compose-abyss.service ~/.config/systemd/user/podman-compose-abyss.service
 systemctl --user daemon-reload
 systemctl --user enable --now podman-compose-abyss.service
 ```

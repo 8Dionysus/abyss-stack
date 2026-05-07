@@ -2,17 +2,17 @@
 
 ## Canonical roots
 
-- `/srv/abyss-stack` — active deployed runtime root
+- `/srv/AbyssOS/abyss-stack` — active deployed runtime root
 - `/abyss` — optional mounted vault for heavy data
 
 See also: [PATHS](PATHS.md) for the distinction between source checkout paths and deployed runtime paths.
 
 ## Active runtime tree
 
-Expected live structure under `/srv/abyss-stack`:
+Expected live structure under `/srv/AbyssOS/abyss-stack`:
 
 ```text
-/srv/abyss-stack/
+/srv/AbyssOS/abyss-stack/
   Configs/
   Secrets/
   Services/
@@ -68,12 +68,12 @@ Current intentional seam:
 ## Secret rule
 
 Never commit or publish real runtime material from:
-- `/srv/abyss-stack/Secrets`
+- `/srv/AbyssOS/abyss-stack/Secrets`
 - live `stack.env`
 - any secret-bearing mounted file used by services
-- private host-facts captures under `/srv/abyss-stack/Logs/host-facts/`
-- diagnostic spine artifacts under `/srv/abyss-stack/Logs/diagnostics/`
-- private memo export candidates under `/srv/abyss-stack/Logs/memo-exports/`
-- private eval export candidates under `/srv/abyss-stack/Logs/eval-exports/`
-- public-safe RPG runtime copies under `/srv/abyss-stack/Logs/rpg/`
-- private platform-adaptation captures under `/srv/abyss-stack/Logs/platform-adaptations/`
+- private host-facts captures under `/srv/AbyssOS/abyss-stack/Logs/host-facts/`
+- diagnostic spine artifacts under `/srv/AbyssOS/abyss-stack/Logs/diagnostics/`
+- private memo export candidates under `/srv/AbyssOS/abyss-stack/Logs/memo-exports/`
+- private eval export candidates under `/srv/AbyssOS/abyss-stack/Logs/eval-exports/`
+- public-safe RPG runtime copies under `/srv/AbyssOS/abyss-stack/Logs/rpg/`
+- private platform-adaptation captures under `/srv/AbyssOS/abyss-stack/Logs/platform-adaptations/`

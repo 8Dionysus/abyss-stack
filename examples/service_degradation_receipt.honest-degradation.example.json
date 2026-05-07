@@ -20,7 +20,7 @@
   "operator_visible": true,
   "evidence_refs": [
     "python scripts/validate_stack.py#honest-degradation-example",
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#honest-degradation-example",
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#honest-degradation-example",
     "repo:abyss-stack/docs/EVAL_RUNTIME_SEAM.md#bounded-export-only"
   ],
   "host_facts_refs": [

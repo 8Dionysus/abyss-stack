@@ -20,6 +20,7 @@ RUNTIME_CONFIGS_MIRROR_MODE = (
 
 LEGACY_PATH = "/srv/abyss"
 LEGACY_PATTERN = re.compile(r"/srv/abyss(?!-)")
+STALE_STACK_ROOT = "/srv/" + "abyss-stack"
 LEGACY_ALLOWED = {
     ROOT / "docs" / "MIGRATION_FROM_OLD.md",
     ROOT / "scripts" / "validate_stack.py",
@@ -29,6 +30,7 @@ SYNC_MANAGED_ITEMS = (
     "compose",
     "config-templates",
     "docs",
+    "mechanics",
     "scripts",
     "systemd",
     "env",
@@ -37,6 +39,68 @@ SYNC_MANAGED_ITEMS = (
     "BOUNDARIES.md",
     "ROADMAP.md",
     "AGENTS.md",
+)
+
+MECHANIC_PACKAGES = (
+    "runtime-lifecycle",
+    "config-projection",
+    "machine-fit",
+    "inference-pilots",
+    "agon-runtime",
+    "experience-runtime",
+    "federation-seams",
+    "governed-execution",
+    "diagnostic-spine",
+    "runtime-repair",
+)
+MECHANIC_PACKAGE_REQUIRED_FILES = (
+    "AGENTS.md",
+    "README.md",
+    "DIRECTION.md",
+    "PARTS.md",
+    "ROADMAP.md",
+    "LANDING_LOG.md",
+    "docs/README.md",
+)
+LEGACY_MECHANIC_PACKAGES = (
+    "agon-runtime",
+    "experience-runtime",
+)
+LEGACY_MECHANIC_REQUIRED_FILES = (
+    "PROVENANCE.md",
+    "legacy/AGENTS.md",
+    "legacy/README.md",
+    "legacy/INDEX.md",
+    "legacy/DISTILLATION_LOG.md",
+    "legacy/raw/README.md",
+    "legacy/artifacts/README.md",
+)
+LEGACY_MECHANIC_ARTIFACT_DIRS = {
+    "agon-runtime": (
+        "legacy/artifacts/config",
+        "legacy/artifacts/generated",
+        "legacy/artifacts/examples",
+        "legacy/artifacts/scripts",
+        "legacy/artifacts/tests",
+        "legacy/artifacts/schemas",
+        "legacy/artifacts/manifests/recurrence",
+    ),
+    "experience-runtime": (
+        "legacy/artifacts/examples",
+        "legacy/artifacts/schemas",
+        "legacy/artifacts/tests",
+    ),
+}
+MECHANIC_CARD_HEADINGS = (
+    "## Mechanic card",
+    "### Trigger",
+    "### abyss-stack owns",
+    "### Stronger owner split",
+    "### Inputs",
+    "### Outputs",
+    "### Must not claim",
+    "### Validation",
+    "### Next route",
 )
 
 PARITY_IGNORED_PARTS = {".git", "__pycache__"}
@@ -100,6 +164,10 @@ REQUIRED_FILES = {
     ROOT / "systemd" / "user" / "AGENTS.md",
     ROOT / "scripts" / "AGENTS.md",
     ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
+    ROOT / "docs" / "MECHANICS.md",
+    ROOT / "mechanics" / "README.md",
+    ROOT / "mechanics" / "AGENTS.md",
+    ROOT / "mechanics" / "ARTIFACT_TOPOLOGY.md",
     ROOT / "docs" / "GOVERNED_EXECUTION.md",
     ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "docs" / "DOCTOR.md",
@@ -347,7 +415,7 @@ QUESTBOOK_INTEGRATION_REQUIRED_TOKENS = (
     "specialized AoA repositories still own their own doctrine and public meaning",
     "high-risk routes should default toward stronger control modes and human gates",
     "reviewable and source-owned",
-    "do not replace the deployed mirror under `/srv/abyss-stack`",
+    "do not replace the deployed mirror under `/srv/AbyssOS/abyss-stack`",
 )
 QUESTBOOK_INTEGRATION_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
 QUEST_SCHEMA_REQUIRED_FIELDS = (
@@ -1020,6 +1088,10 @@ def validate_paths(errors: list[str]) -> None:
             errors.append(
                 f"legacy path '{LEGACY_PATH}' found in {path.relative_to(ROOT)}"
             )
+        if STALE_STACK_ROOT in text:
+            errors.append(
+                f"stale stack root '{STALE_STACK_ROOT}' found in {path.relative_to(ROOT)}"
+            )
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if "Fedora-first" not in readme:
@@ -1090,7 +1162,7 @@ def validate_paths(errors: list[str]) -> None:
         "live_available",
         "~/src/abyss-stack",
         "AOA_SOURCE_ROOT",
-        "/srv/abyss-stack",
+        "/srv/AbyssOS/abyss-stack",
         "trial_proven is not a synonym for production readiness",
         "aoa-llamacpp-pilot verify",
         "aoa-sync-federation-surfaces --check --json",
@@ -1158,8 +1230,8 @@ def validate_paths(errors: list[str]) -> None:
             errors.append(f"docs/W6_PILOT.md must mention `{required_snippet}`")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
-    if "/srv/abyss-stack" not in paths_doc:
-        errors.append("docs/PATHS.md must mention /srv/abyss-stack")
+    if "/srv/AbyssOS/abyss-stack" not in paths_doc:
+        errors.append("docs/PATHS.md must mention /srv/AbyssOS/abyss-stack")
     if "WSL2" not in paths_doc:
         errors.append(
             "docs/PATHS.md should mention WSL2 in the Windows-usable model"
@@ -1181,7 +1253,7 @@ def validate_paths(errors: list[str]) -> None:
 
     deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     for required_snippet in (
-        "source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/abyss-stack/Configs`",
+        "source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`",
         "python scripts/validate_stack.py --parity-check",
         "aoa-status --autonomy",
         "governed-execution-policy.yaml",
@@ -1407,6 +1479,46 @@ def validate_paths(errors: list[str]) -> None:
                 errors.append("governed canary catalog must include abyss-stack and aoa-routing canaries")
 
 
+def validate_mechanics_topology(errors: list[str]) -> None:
+    mechanics_root = ROOT / "mechanics"
+    for path in (
+        mechanics_root / "AGENTS.md",
+        mechanics_root / "README.md",
+        mechanics_root / "ARTIFACT_TOPOLOGY.md",
+        ROOT / "docs" / "MECHANICS.md",
+    ):
+        if not path.is_file():
+            errors.append(f"mechanics topology root is missing {path.relative_to(ROOT)}")
+
+    atlas_text = read_text_or_none(mechanics_root / "README.md") or ""
+    for package in MECHANIC_PACKAGES:
+        if f"]({package}/README.md)" not in atlas_text:
+            errors.append(f"mechanics atlas must route to {package}/README.md")
+
+        package_root = mechanics_root / package
+        for required_file in MECHANIC_PACKAGE_REQUIRED_FILES:
+            path = package_root / required_file
+            if not path.is_file():
+                errors.append(f"mechanics package {package} is missing {required_file}")
+
+        readme_text = read_text_or_none(package_root / "README.md") or ""
+        for heading in MECHANIC_CARD_HEADINGS:
+            if heading not in readme_text:
+                errors.append(
+                    f"mechanics package {package} README.md must include `{heading}`"
+                )
+
+        if package in LEGACY_MECHANIC_PACKAGES:
+            for required_file in LEGACY_MECHANIC_REQUIRED_FILES:
+                path = package_root / required_file
+                if not path.is_file():
+                    errors.append(f"mechanics legacy package {package} is missing {required_file}")
+            for required_dir in LEGACY_MECHANIC_ARTIFACT_DIRS.get(package, ()):
+                path = package_root / required_dir
+                if not path.is_dir():
+                    errors.append(f"mechanics legacy package {package} is missing {required_dir}")
+
+
 def validate_scripts(errors: list[str]) -> None:
     script_names = {path.name for path in (ROOT / "scripts").iterdir() if path.is_file()}
     missing = sorted(REQUIRED_SCRIPTS - script_names)
@@ -1565,7 +1677,7 @@ def validate_branch_policy(errors: list[str]) -> None:
         "`main` is the only long-lived branch",
         "Delete the topic branch locally and on `origin`.",
         "If a branch was effectively landed by squash, cherry-pick, or a rewritten equivalent, do not merge it again.",
-        "/srv/abyss-stack",
+        "/srv/AbyssOS/abyss-stack",
         "~/src/abyss-stack",
         "AOA_SOURCE_ROOT",
     ]
@@ -2580,8 +2692,8 @@ def validate_runtime_configs_mirror(errors: list[str]) -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if "Source checkout shape" not in readme:
         errors.append("runtime Configs mirror README must clarify that the repository tree is the source checkout shape")
-    if "/srv/abyss-stack/Configs" not in readme:
-        errors.append("runtime Configs mirror README must mention /srv/abyss-stack/Configs")
+    if "/srv/AbyssOS/abyss-stack/Configs" not in readme:
+        errors.append("runtime Configs mirror README must mention /srv/AbyssOS/abyss-stack/Configs")
 
     agents_doc = (ROOT / "scripts" / "AGENTS.md").read_text(encoding="utf-8")
     if "source checkout only" not in agents_doc:
@@ -2619,7 +2731,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--deployed-configs-root",
-        default="/srv/abyss-stack/Configs",
+        default="/srv/AbyssOS/abyss-stack/Configs",
         help="Path to the deployed Configs mirror used by --parity-check.",
     )
     return parser.parse_args()
@@ -2647,6 +2759,7 @@ def main() -> int:
     validate_profiles(errors)
     validate_presets(errors)
     validate_paths(errors)
+    validate_mechanics_topology(errors)
     validate_scripts(errors)
     validate_required_files(errors)
     validate_federation_required_files(errors)

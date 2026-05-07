@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AOA_STACK_ROOT="${AOA_STACK_ROOT:-/srv/abyss-stack}"
+AOA_STACK_ROOT="${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
 AOA_CONFIGS_ROOT="${AOA_CONFIGS_ROOT:-${AOA_STACK_ROOT}/Configs}"
 AOA_VAULT_ROOT="${AOA_VAULT_ROOT:-/abyss}"
 AOA_AGENTS_ROOT="${AOA_AGENTS_ROOT:-/srv/aoa-agents}"

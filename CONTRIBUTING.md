@@ -21,7 +21,7 @@ Bad contributions:
 Please make sure:
 - the change is minimal and reversible
 - public-safe templates stay separate from live secret-bearing runtime files
-- `/srv/abyss-stack` remains the canonical deployed runtime root unless the change explicitly redesigns it
+- `/srv/AbyssOS/abyss-stack` remains the canonical deployed runtime root unless the change explicitly redesigns it
 - host exposure, storage paths, and rollback risks are made explicit when they change
 - examples and docs stay sanitized and portable
 
