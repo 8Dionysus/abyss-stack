@@ -1,0 +1,89 @@
+# AGENTS.md
+
+## Applies to
+
+This card applies to `mechanics/` and every nested path under it until a nearer
+`AGENTS.md` narrows the lane.
+
+## Read before editing
+
+Read the repository root `AGENTS.md`, `mechanics/README.md`, this file, and the
+nearest package `README.md` before changing this tree.
+
+## Role
+
+`mechanics/` is the source-owned runtime mechanics tree for abyss-stack.
+It names how runtime moves are shaped, checked, handed off, and kept bounded.
+
+It is not a live runtime directory, not a replacement for `docs/`, and not a
+place for AoA, ToS, skill, memo, eval, playbook, routing, KAG, or stats
+authority. Those owners remain stronger than this repository.
+
+## Root file split
+
+- `mechanics/AGENTS.md` owns mechanics-tree editing law and validation posture.
+- `mechanics/README.md` owns the runtime mechanics atlas and package compass.
+- `mechanics/ARTIFACT_TOPOLOGY.md` owns placement rules for future movement
+  between root technical districts and mechanic package homes.
+
+Root files should stay route-shaped. If a detail belongs to one mechanic, put
+it in that package's `README.md`, `DIRECTION.md`, `PARTS.md`, `ROADMAP.md`,
+`LANDING_LOG.md`, `docs/`, or a future part-local surface.
+
+## Package law
+
+Every first-wave package contains:
+
+- `AGENTS.md`
+- `README.md`
+- `DIRECTION.md`
+- `PARTS.md`
+- `ROADMAP.md`
+- `LANDING_LOG.md`
+- `docs/README.md`
+
+The package `README.md` is the mechanic card. It should answer when to use the
+mechanic, what abyss-stack owns, which stronger owners remain outside it, what
+may enter, what may leave, what must not be claimed, how to validate, and where
+to route next.
+
+`DIRECTION.md` owns current contour. `PARTS.md` owns the active source-surface
+map. `ROADMAP.md` owns future movement. `LANDING_LOG.md` records checked
+topology landings. `docs/` holds package-owned detail when a later wave moves or
+adds deeper material.
+
+## Boundaries
+
+- Keep source checkout, deployed `Configs` mirror, live runtime state, and
+  machine facts distinct.
+- Keep public-safe contracts separate from private host captures and secrets.
+- Keep runtime seams subordinate to owner repositories.
+- Do not claim live service availability from source-only documents.
+- Do not move a root technical district into a package without updating
+  validators and deployment sync expectations in the same change.
+
+## Editing posture
+
+1. Name the package being touched.
+2. Keep the root atlas short and package cards specific.
+3. Update the package `PARTS.md` when source surfaces move.
+4. Update `mechanics/ARTIFACT_TOPOLOGY.md` when placement rules change.
+5. Add a decision note when topology, owner split, validator authority, or
+   deployment expectations change durably.
+
+## Validation
+
+For mechanics-only route work, run:
+
+```bash
+python scripts/validate_nested_agents.py
+python scripts/validate_stack.py
+```
+
+For release-bound or runtime-facing movement, add the narrow checks named by the
+touched package and the root `AGENTS.md`.
+
+## Closeout
+
+Report changed packages, whether documents were only routed or actually moved,
+checks run, checks skipped, remaining parity risk, and the next owner route.

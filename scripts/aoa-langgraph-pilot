@@ -32,7 +32,7 @@ DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
 LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
-STACK_ROOT = Path("/srv/abyss-stack")
+STACK_ROOT = Path("/srv/AbyssOS/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
@@ -300,7 +300,7 @@ def mirror_readme() -> str:
     return (
         f"# {PROGRAM_ID}\n\n"
         "This folder mirrors human+AI-readable LangGraph sidecar pilot reports.\n\n"
-        "Machine-readable runtime truth stays local under `/srv/abyss-stack/Logs/local-ai-trials/`.\n"
+        "Machine-readable runtime truth stays local under `/srv/AbyssOS/abyss-stack/Logs/local-ai-trials/`.\n"
     )
 
 

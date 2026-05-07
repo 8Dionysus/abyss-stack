@@ -16,7 +16,7 @@
       "retry_policy": "no-retry-on-measured-runs",
       "streaming_enabled": true
     },
-    "invocation_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/invocation.txt"
+    "invocation_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/invocation.txt"
   },
   "system_under_test": {
     "target_kind": "local-model",
@@ -29,10 +29,10 @@
   "runtime_selection": {
     "selection_type": "preset",
     "selection_name": "agent-observability",
-    "rendered_services_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-services.txt",
-    "rendered_config_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-config.redacted.yml",
-    "smoke_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/smoke.json",
-    "internal_probe_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/internal.json"
+    "rendered_services_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-services.txt",
+    "rendered_config_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/render/rendered-config.redacted.yml",
+    "smoke_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/smoke.json",
+    "internal_probe_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/probes/internal.json"
   },
   "environment": {
     "os": "Fedora Linux",
@@ -76,14 +76,14 @@
     "metric_notes": "Warmup runs excluded from p50 and p95 summary. Measured runs used one stable prompt family and no retries."
   },
   "evidence": {
-    "summary_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/summary.json",
-    "notes_ref": "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/notes.md",
+    "summary_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/summary.json",
+    "notes_ref": "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/notes.md",
     "raw_artifact_refs": [
       "local:/abyss/runtime-benchmarks/raw/2026-03-24/workhorse-local-q4/latency-samples.csv",
       "local:/abyss/runtime-benchmarks/raw/2026-03-24/workhorse-local-q4/device-samples.jsonl"
     ],
     "plot_refs": [
-      "local:/srv/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/plots/latency-distribution.png"
+      "local:/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-03-24T154200Z__latency-single-turn__workhorse-local-q4/plots/latency-distribution.png"
     ]
   },
   "comparison_tags": [

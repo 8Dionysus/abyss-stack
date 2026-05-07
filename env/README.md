@@ -19,7 +19,7 @@ This directory stores public-safe env examples only.
 ## Canonical deployed default
 
 Unless explicitly overridden, `AOA_STACK_ROOT` should resolve to:
-- `/srv/abyss-stack`
+- `/srv/AbyssOS/abyss-stack`
 
 ## See also
 

@@ -39,12 +39,12 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 
 ## Runtime contract rules
 - Keep the canonical defaults from `aoa-lib.sh`:
-  - `AOA_STACK_ROOT=/srv/abyss-stack`
+  - `AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack`
   - `AOA_CONFIGS_ROOT=${AOA_STACK_ROOT}/Configs`
   - `AOA_VAULT_ROOT=/abyss`
   - default profile `core`
 - Keep the distinction between source checkout and deployed runtime explicit. Bridge with `aoa-sync-configs` and `aoa-bootstrap-configs`; do not blur them.
-- Do not reintroduce legacy pre-`/srv/abyss-stack` paths. `validate_stack.py` intentionally guards against that drift.
+- Do not reintroduce legacy pre-`/srv/AbyssOS/abyss-stack` paths. `validate_stack.py` intentionally guards against that drift.
 
 ## Cross-file duties
 - If you change layout or bootstrap expectations, update `aoa-install-layout`, `aoa-sync-configs`, `aoa-bootstrap-configs`, `aoa-check-layout`, and the relevant docs as one change.

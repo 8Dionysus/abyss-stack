@@ -17,7 +17,7 @@ The new repository keeps the useful body and removes monolith relapse.
 ## Canonical root shift
 
 The old stack revolved around `/srv/abyss`.
-The new stack now uses `/srv/abyss-stack` as the canonical deployed runtime root.
+The new stack now uses `/srv/AbyssOS/abyss-stack` as the canonical deployed runtime root.
 
 ## What has already been migrated
 
@@ -37,7 +37,7 @@ The new stack now uses `/srv/abyss-stack` as the canonical deployed runtime root
 
 - rootless and localhost-first posture
 - Intel-aware inference branch
-- `/srv/abyss-stack` as the new absolute runtime layout root
+- `/srv/AbyssOS/abyss-stack` as the new absolute runtime layout root
 - optional heavy-data mount assumptions
 
 ## What changes
@@ -53,7 +53,7 @@ The new stack now uses `/srv/abyss-stack` as the canonical deployed runtime root
 - profile-driven activation
 - infra-only ownership boundaries
 - sibling AoA repositories stay authoritative for authored meaning
-- canonical runtime root is `/srv/abyss-stack`
+- canonical runtime root is `/srv/AbyssOS/abyss-stack`
 
 ## Mapping sketch
 

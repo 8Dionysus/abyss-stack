@@ -401,7 +401,7 @@ def build_paths(stack_root: str, configs_root: str, vault_root: str) -> dict[str
         "stack_root": stack_root,
         "configs_root": configs_root,
         "vault_root": vault_root,
-        "stack_root_is_canonical": stack_root == "/srv/abyss-stack",
+        "stack_root_is_canonical": stack_root == "/srv/AbyssOS/abyss-stack",
         "stack_root_exists": Path(stack_root).exists(),
         "configs_root_exists": Path(configs_root).exists(),
         "vault_root_exists": Path(vault_root).exists(),
@@ -461,7 +461,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
 
-    stack_root = os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack")
+    stack_root = os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack")
     configs_root = os.environ.get("AOA_CONFIGS_ROOT", f"{stack_root}/Configs")
     vault_root = os.environ.get("AOA_VAULT_ROOT", "/abyss")
 

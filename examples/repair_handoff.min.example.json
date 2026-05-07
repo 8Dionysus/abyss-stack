@@ -43,8 +43,8 @@
     "improvement_log_stub": "Record target owner surface, chosen diff shape, approval outcome, and verification refs in the eventual REPAIR_PACKET."
   },
   "validation_refs": [
-    "command:bash /srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available",
-    "command:bash /srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json"
+    "command:bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available",
+    "command:bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json"
   ],
   "stop_conditions": [
     "Stop if the route widens beyond one bounded repair unit.",

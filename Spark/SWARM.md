@@ -84,7 +84,7 @@ Make the smallest reversible change.
 Rules:
 - prefer profile-aware module edits over all-stack rewrites
 - preserve Fedora-first deployment posture
-- preserve `/srv/abyss-stack` as canonical deployed runtime root unless explicitly redesigned
+- preserve `/srv/AbyssOS/abyss-stack` as canonical deployed runtime root unless explicitly redesigned
 - never create committed secret-bearing runtime files
 ```
 

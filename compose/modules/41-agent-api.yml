@@ -1,9 +1,9 @@
 services:
   langchain-api:
-    build: "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/langchain-api"
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/langchain-api"
     container_name: langchain-api
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Secrets/Configs/langchain-api.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Secrets/Configs/langchain-api.env"
     environment:
       AOA_RUNTIME_CHAT_BASE_URL: "${AOA_RUNTIME_CHAT_BASE_URL:-http://llama-cpp:8080/v1}"
       AOA_RUNTIME_CHAT_API_KEY: "${AOA_RUNTIME_CHAT_API_KEY:-EMPTY}"
@@ -27,8 +27,8 @@ services:
       OLLAMA_EMBEDDINGS_FALLBACK_URL: http://ollama:11434/api/embeddings
       OLLAMA_EMBEDDINGS_MODEL: nomic-embed-text
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Logs/returns:/app/logs/returns:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/returns:/app/logs/returns:Z"
     depends_on:
       llama-cpp:
         condition: service_started

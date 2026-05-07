@@ -5,7 +5,7 @@
 - Fedora 43
 - rootless Podman
 - systemd user units
-- `/srv/abyss-stack` as the canonical runtime root
+- `/srv/AbyssOS/abyss-stack` as the canonical runtime root
 - `/abyss` as an optional mounted vault for heavy data
 
 ## This file versus host facts
@@ -45,7 +45,7 @@ Windows is supported as a source and workflow environment, not as the canonical 
 Recommended Windows shape:
 - source checkout on Windows host wherever convenient
 - runtime deployment inside WSL2 or a Linux-oriented Podman machine
-- canonical runtime root inside that Linux layer remains `/srv/abyss-stack`
+- canonical runtime root inside that Linux layer remains `/srv/AbyssOS/abyss-stack`
 - optional host vault path may be mapped into the Linux runtime as `/abyss`
 
 ## Why this matters
@@ -83,6 +83,6 @@ Once the normative posture is satisfied, the next step is to fit the runtime to 
 
 This repository is intentionally aligned with:
 - rootless Podman rather than Docker
-- a local AI stack rooted under `/srv/abyss-stack`
+- a local AI stack rooted under `/srv/AbyssOS/abyss-stack`
 - an Intel-aware branch of the inference surface
 - a current reviewed `llama.cpp`-first text default on the Intel Core Ultra 9 285H host, with broader Intel-serving lanes governed through machine-fit and reviewed rollout

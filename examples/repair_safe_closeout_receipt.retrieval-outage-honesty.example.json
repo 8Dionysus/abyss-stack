@@ -29,8 +29,8 @@
   "mutation_widening_blocked": true,
   "evidence_refs": [
     "python scripts/validate_stack.py --parity-check#retrieval-outage-closeout-example",
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#retrieval-outage-closeout-example",
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good#retrieval-outage-closeout-example"
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#retrieval-outage-closeout-example",
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good#retrieval-outage-closeout-example"
   ],
   "emitted_to": [
     "${AOA_STACK_ROOT}/Logs/eval-exports/latest/artifact-hook/"

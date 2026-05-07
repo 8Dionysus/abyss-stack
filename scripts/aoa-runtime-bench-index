@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 DEFAULT_WRITE_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks"
 
 

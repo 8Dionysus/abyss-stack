@@ -208,7 +208,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
 
 def main() -> int:
     args = build_parser().parse_args()
-    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
     input_path = Path(args.input_file).resolve()
     payload = read_json(input_path)
     artifact = build_artifact(input_path, payload, args)

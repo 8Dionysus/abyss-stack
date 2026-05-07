@@ -2,12 +2,12 @@ services:
   neo4j:
     image: docker.io/library/neo4j@sha256:0e5d68ed655a64fe57296cc8e1b928f48456462dbf2c46d50a25c47b93ea938b
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/stack.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     ports:
       - "127.0.0.1:7474:7474"
       - "127.0.0.1:7687:7687"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/neo4j:/data:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/neo4j:/data:Z"
     restart: unless-stopped
 
   qdrant:
@@ -15,17 +15,17 @@ services:
     ports:
       - "127.0.0.1:6333:6333"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/qdrant:/qdrant/storage:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/qdrant:/qdrant/storage:Z"
     restart: unless-stopped
 
   postgres:
     image: docker.io/library/postgres@sha256:d4c3314b2dd74ff23cd6cd07e4d7e737cb6ef791c22a7cbd744cfbfb4815df72
     env_file:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Configs/stack.env"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/postgres:/var/lib/postgresql/data:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/postgres:/var/lib/postgresql/data:Z"
     restart: unless-stopped
 
   redis:
@@ -33,6 +33,6 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
-      - "${AOA_STACK_ROOT:-/srv/abyss-stack}/Services/redis:/data:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/redis:/data:Z"
     command: ["redis-server", "--appendonly", "yes"]
     restart: unless-stopped

@@ -73,7 +73,7 @@
   ],
   "logging": {
     "emit_return_events": true,
-    "log_root": "local:/srv/abyss-stack/Logs/returns",
+    "log_root": "local:/srv/AbyssOS/abyss-stack/Logs/returns",
     "redact_runtime_values": true,
     "render_truth_ref_required": true
   },

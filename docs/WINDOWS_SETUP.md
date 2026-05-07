@@ -6,7 +6,7 @@ This is the least-friction Windows route for the current `abyss-stack`.
 
 - keep the source checkout wherever Windows editing is convenient
 - run the runtime inside WSL2
-- keep the canonical runtime root inside Linux as `/srv/abyss-stack`
+- keep the canonical runtime root inside Linux as `/srv/AbyssOS/abyss-stack`
 
 ## Before you start
 

@@ -6,13 +6,13 @@ After=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-Environment=AOA_STACK_ROOT=/srv/abyss-stack
-Environment=AOA_CONFIGS_ROOT=/srv/abyss-stack/Configs
+Environment=AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack
+Environment=AOA_CONFIGS_ROOT=/srv/AbyssOS/abyss-stack/Configs
 Environment=AOA_STACK_PROFILE=core
 Environment=AOA_COMPOSE_PROJECT_NAME=abyss
-ExecStart=/srv/abyss-stack/Configs/scripts/aoa-up
-ExecStop=/srv/abyss-stack/Configs/scripts/aoa-down
-ExecReload=/srv/abyss-stack/Configs/scripts/aoa-up
+ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up
+ExecStop=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-down
+ExecReload=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up
 TimeoutStopSec=120
 
 [Install]

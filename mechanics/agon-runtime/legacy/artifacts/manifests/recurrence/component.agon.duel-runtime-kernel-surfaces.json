@@ -1,0 +1,16 @@
+{
+  "authority": "observe_only",
+  "component_id": "component:agon:duel-runtime-kernel-surfaces",
+  "owner_repo": "abyss-stack",
+  "recurrence_watch": [
+    "event_log_drift",
+    "hash_chain_drift",
+    "service_activation_leak",
+    "assistant_boundary_drift"
+  ],
+  "surface_refs": [
+    "mechanics/agon-runtime/legacy/artifacts/generated/agon_duel_runtime_kernel_registry.min.json",
+    "mechanics/agon-runtime/legacy/artifacts/examples/agon_mechanical_duel_event_log.example.json",
+    "mechanics/agon-runtime/legacy/raw/AGON_DUEL_RUNTIME_KERNEL.md"
+  ]
+}

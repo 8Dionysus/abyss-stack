@@ -17,7 +17,7 @@
     "max_worktree_repairs": 1,
     "auto_rollback_on_post_apply_failure": true,
     "break_glass_requires_reason": true,
-    "log_root": "local:/srv/abyss-stack/Logs/governed-runs",
+    "log_root": "local:/srv/AbyssOS/abyss-stack/Logs/governed-runs",
     "promotion_criteria": {
       "canary_proven": {
         "minimum_successful_runs": 2,

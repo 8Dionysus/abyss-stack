@@ -35,7 +35,7 @@
     "agent-full",
     "ollama-control-path"
   ],
-  "runtime_root": "/srv/abyss-stack",
+  "runtime_root": "/srv/AbyssOS/abyss-stack",
   "notes": "Example only. A real target should be resolved from the current selectors and repo posture.",
   "public_safe": true
 }

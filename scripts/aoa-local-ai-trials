@@ -22,7 +22,7 @@ PROGRAM_ID = DEFAULT_PROGRAM_ID
 MODEL = "qwen3.5:9b"
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
-STACK_ROOT = Path("/srv/abyss-stack")
+STACK_ROOT = Path("/srv/AbyssOS/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
 DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
@@ -577,14 +577,14 @@ def infer_case_truth_status(
         or runtime_path.startswith("route-api")
         or "langchain-api" in runtime_path
         or "route-api" in runtime_path
-        or any(ref.startswith("/srv/abyss-stack/") for ref in source_refs)
+        or any(ref.startswith("/srv/AbyssOS/abyss-stack/") for ref in source_refs)
     )
     trial_proven = status == "pass"
     live_available = trial_proven and targets_deployed_runtime
 
     notes = [
         "source_authored tracks the canonical trial contract in the source-owned runner.",
-        "deployed tracks whether this case targets an operator-visible surface under /srv/abyss-stack.",
+        "deployed tracks whether this case targets an operator-visible surface under /srv/AbyssOS/abyss-stack.",
     ]
     if trial_proven:
         notes.append("trial_proven is backed by a passing case packet.")
@@ -625,7 +625,7 @@ def program_wave_truth_status(*, gate_result: str) -> dict[str, Any]:
     live_available = trial_proven and deployed_runner
     notes = [
         "Wave-level source_authored refers to the canonical aoa-local-ai-trials contract.",
-        "Wave-level deployed refers to the operator-visible runner under /srv/abyss-stack/Configs/scripts/aoa-local-ai-trials.",
+        "Wave-level deployed refers to the operator-visible runner under /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-local-ai-trials.",
     ]
     if trial_proven:
         notes.append("trial_proven is backed by a passing wave gate.")

@@ -7,6 +7,21 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Added
+
+- first-wave `mechanics/` topology with runtime lifecycle, config projection,
+  machine fit, inference pilots, federation seams, governed execution,
+  diagnostic spine, and runtime repair package cards
+- second-wave `mechanics/agon-runtime` and `mechanics/experience-runtime`
+  legacy containment packages with provenance and legacy indexes
+
+### Changed
+
+- top-level route docs now point runtime-move work through the mechanics atlas
+  before entering package-specific docs, scripts, schemas, or config surfaces
+- noisy Agon and experience seed artifacts moved out of flat root districts
+  into package-local legacy homes with validators and tests following the move
+
 ## [0.2.2] - 2026-04-23
 
 ### Summary
@@ -155,4 +170,4 @@ This changelog entry uses the release-prep merge date.
 
 ### Notes
 
-- this release establishes the source-authored baseline for the runtime layer; deployed runtime state still becomes live only after sync into `/srv/abyss-stack/Configs`
+- this release establishes the source-authored baseline for the runtime layer; deployed runtime state still becomes live only after sync into `/srv/AbyssOS/abyss-stack/Configs`

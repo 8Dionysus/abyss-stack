@@ -29,7 +29,7 @@
   "mutation_widening_blocked": true,
   "evidence_refs": [
     "python scripts/validate_stack.py --parity-check#timeout-chaos-closeout-example",
-    "bash:/srv/abyss-stack/Configs/scripts/aoa-status --autonomy --json#timeout-chaos-closeout-example"
+    "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#timeout-chaos-closeout-example"
   ],
   "emitted_to": [
     "${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection/",

@@ -173,5 +173,5 @@ If the gate passes, the next action is:
 
 That sentence still needs truth-status interpretation:
 
-- W6 can be `trial_proven` before the same control surfaces are deployed into `/srv/abyss-stack/Configs`
+- W6 can be `trial_proven` before the same control surfaces are deployed into `/srv/AbyssOS/abyss-stack/Configs`
 - W6 is not `live_available` for a given control feature until the deployed operator path exposes it

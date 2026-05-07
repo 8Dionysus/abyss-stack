@@ -29,14 +29,14 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | layer | default path |
 |---|---|
 | default `abyss-stack` source checkout | `~/src/abyss-stack` |
-| deployed runtime root | `/srv/abyss-stack` |
-| configs | `/srv/abyss-stack/Configs` |
-| secrets | `/srv/abyss-stack/Secrets` |
-| services | `/srv/abyss-stack/Services` |
-| models | `/srv/abyss-stack/Models` |
-| knowledge | `/srv/abyss-stack/Knowledge` |
-| logs | `/srv/abyss-stack/Logs` |
-| codex home | `/srv/abyss-stack/.codex-home` |
+| deployed runtime root | `/srv/AbyssOS/abyss-stack` |
+| configs | `/srv/AbyssOS/abyss-stack/Configs` |
+| secrets | `/srv/AbyssOS/abyss-stack/Secrets` |
+| services | `/srv/AbyssOS/abyss-stack/Services` |
+| models | `/srv/AbyssOS/abyss-stack/Models` |
+| knowledge | `/srv/AbyssOS/abyss-stack/Knowledge` |
+| logs | `/srv/AbyssOS/abyss-stack/Logs` |
+| codex home | `/srv/AbyssOS/abyss-stack/.codex-home` |
 | optional vault | `/abyss` |
 | optional `aoa-agents` source root | `/srv/aoa-agents` |
 | optional `aoa-routing` source root | `/srv/aoa-routing` |
@@ -48,6 +48,8 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 
 The source checkout path is a Fedora-first default, not a universal host constant.
 If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path.
+
+The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](decisions/2026-05-07-runtime-root-under-abyssos.md).
 
 ## Windows-usable path model
 
@@ -64,7 +66,7 @@ Do **not** treat the current compose surface as a native Windows-first runtime.
 Instead:
 - keep the source checkout on Windows wherever convenient
 - deploy the runtime inside WSL2 or a Linux-oriented Podman machine
-- inside that Linux layer, keep the runtime root canonical as `/srv/abyss-stack`
+- inside that Linux layer, keep the runtime root canonical as `/srv/AbyssOS/abyss-stack`
 
 ### Recommended vault model on Windows
 

@@ -12,7 +12,7 @@ import urllib.request
 from typing import Any
 
 
-STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/abyss-stack"))
+STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 HOME_SOURCE_ROOT = Path.home() / "src" / "abyss-stack"
 ROUTE_API_BASE_URL = os.environ.get("AOA_ROUTE_API_BASE_URL", "http://127.0.0.1:5402")
@@ -480,7 +480,7 @@ def control_truth_status(
     )
     notes = [
         "control_plane source_authored tracks whether the canonical source checkout is discoverable for parity checks.",
-        "control_plane deployed tracks whether the deployed operator scripts are present under /srv/abyss-stack/Configs/scripts.",
+        "control_plane deployed tracks whether the deployed operator scripts are present under /srv/AbyssOS/abyss-stack/Configs/scripts.",
         "control_plane trial_proven requires both W5 and W6 to remain trial_proven.",
         "control_plane live_available requires parity, promoted runtime verify, and W5/W6 live availability.",
     ]
@@ -515,7 +515,7 @@ def recommended_action(
     if "source_runtime_drift" in degradation_reasons or "source_root_unresolved" in degradation_reasons:
         return "Resolve the canonical source checkout, then rerun `python scripts/validate_stack.py --parity-check` and resync the deployed Configs mirror."
     if "llamacpp_verify_failed" in degradation_reasons:
-        return "Repair the promoted llama.cpp lane first. Rerun `python /srv/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60` before trusting autonomy readiness."
+        return "Repair the promoted llama.cpp lane first. Rerun `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60` before trusting autonomy readiness."
     if "route_api_health_failed" in degradation_reasons or "route_api_surface_status_invalid" in degradation_reasons:
         return "Restore route-api health and closure reporting, then rerun `aoa-status --autonomy --json`."
     return "Inspect the degraded layers and wave truth gaps, then rerun the deployed federation checks and W5/W6 summary refresh."

@@ -28,7 +28,7 @@
       "owner_hint": "abyss-stack/runtime-envelope",
       "confidence": "medium",
       "evidence_refs": [
-        "command:bash /srv/abyss-stack/Configs/scripts/aoa-doctor"
+        "command:bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-doctor"
       ]
     }
   ],

@@ -3,7 +3,7 @@
   "id": "diag-2026-04-07-intel-full-example",
   "repo": "abyss-stack",
   "captured_at": "2026-04-07T12:00:00Z",
-  "runtime_root": "/srv/abyss-stack",
+  "runtime_root": "/srv/AbyssOS/abyss-stack",
   "target": {
     "preset": "intel-full",
     "profiles": [

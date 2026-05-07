@@ -12,7 +12,7 @@ They should prove the source checkout contract without requiring a live deployed
 
 - Keep tests deterministic and public-safe.
 - Prefer fixtures, temp directories, stub inputs, and loopback assumptions over live services.
-- Do not depend on no live host state, private `/srv/abyss-stack` captures, real secrets, local model downloads, or workstation-specific paths.
+- Do not depend on no live host state, private `/srv/AbyssOS/abyss-stack` captures, real secrets, local model downloads, or workstation-specific paths.
 - When schemas, generated catalogs, config templates, or runtime helper scripts change, add the nearest targeted regression test.
 - Keep destructive behavior behind dry-run or explicit fake fixtures.
 

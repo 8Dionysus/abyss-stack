@@ -11,7 +11,7 @@ This directory contains public-safe env examples only. It does not contain live 
 
 ## Directory contract
 - Files here are examples and must stay public-safe.
-- Real secret-bearing files belong under `/srv/abyss-stack/Secrets/Configs`, except `stack.env`, which is expected at `/srv/abyss-stack/Configs/stack.env` and is recommended to be a symlink to `/srv/abyss-stack/Secrets/Configs/stack.env`.
+- Real secret-bearing files belong under `/srv/AbyssOS/abyss-stack/Secrets/Configs`, except `stack.env`, which is expected at `/srv/AbyssOS/abyss-stack/Configs/stack.env` and is recommended to be a symlink to `/srv/AbyssOS/abyss-stack/Secrets/Configs/stack.env`.
 - Keep the filename mapping stable:
   - `env/stack.env.example` -> `${AOA_STACK_ROOT}/Configs/stack.env`
   - `env/langchain-api.env.example` -> `${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env`
@@ -44,4 +44,4 @@ If the example set changed, re-read `docs/SECRETS_BOOTSTRAP.md` and confirm the 
 - do not commit live `.env` files
 - do not place real secrets in comments, examples, screenshots, or logs
 - do not create example files that have no runtime consumer
-- do not drift away from the canonical `/srv/abyss-stack` and `Secrets/Configs` mapping
+- do not drift away from the canonical `/srv/AbyssOS/abyss-stack` and `Secrets/Configs` mapping

@@ -86,7 +86,7 @@ machine-readable result locally as:
 The same closeout step also publishes one owner-local runtime receipt to the
 canonical stats intake log:
 
-- `/srv/abyss-stack/.aoa/live_receipts/runtime-wave-closeouts.jsonl`
+- `/srv/AbyssOS/abyss-stack/.aoa/live_receipts/runtime-wave-closeouts.jsonl`
 
 Each closeout submit result also gets a sibling artifact for direct inspection:
 

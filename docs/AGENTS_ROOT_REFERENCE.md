@@ -57,7 +57,7 @@ Keep these living facts explicit while you work:
 
 - deployment is Fedora-first while source work remains Windows-usable through the bridge posture
 - the source checkout is `~/src/abyss-stack` by default, or `${AOA_SOURCE_ROOT}` if intentionally relocated
-- the deployed runtime root is `/srv/abyss-stack`
+- the deployed runtime root is `/srv/AbyssOS/abyss-stack`
 - federation seams remain opt-in, bounded, and explicit rather than magical defaults
 - runtime may support continuity, recurrence, diagnostics, and repair-safe closeout, but that does not make it the owner of agent meaning, memo truth, or playbook authority
 
@@ -113,7 +113,7 @@ For repository audits and GitHub review, read `AUDIT.md` after the core docs and
 - do not perform destructive data actions without an explicit rollback path
 - do not silently merge runtime and meaning layers back together
 - do not confuse a Windows source checkout path with the Linux runtime root
-- do not confuse `~/src/abyss-stack` or `${AOA_SOURCE_ROOT}` with `/srv/abyss-stack`
+- do not confuse `~/src/abyss-stack` or `${AOA_SOURCE_ROOT}` with `/srv/AbyssOS/abyss-stack`
 - do not convert public-safe config templates into committed secret-bearing runtime files
 - do not publish rendered config output that may contain secret-bearing values
 - do not commit private host-facts captures from live machines
@@ -128,7 +128,7 @@ For repository audits and GitHub review, read `AUDIT.md` after the core docs and
 - prefer placeholder or skeletal files over pretending unfinished services are complete
 - prefer clarity and explicit boundaries over magical automation
 - prefer dry-run, repair-safe, and public-safe validation over hand-wavy confidence
-- preserve `/srv/abyss-stack` as the canonical deployed runtime root unless explicitly redesigned
+- preserve `/srv/AbyssOS/abyss-stack` as the canonical deployed runtime root unless explicitly redesigned
 - preserve the split between normative platform docs, public-safe host facts, and private host facts
 - treat current-machine fit as a first-class runtime concern before latency-sensitive or accelerator-sensitive work
 - keep federation seams opt-in, explicit, and reversible
@@ -167,7 +167,7 @@ For GitHub review in this repository, treat the following as P0:
 Treat the following as P1:
 
 - env examples drifting away from actual runtime consumers
-- path mapping drift away from `/srv/abyss-stack`, `Configs`, or `Secrets`
+- path mapping drift away from `/srv/AbyssOS/abyss-stack`, `Configs`, or `Secrets`
 - profile, preset, or module changes without matching render or introspection verification
 - hidden breaking changes in doctor, bootstrap, or first-run helpers
 - runtime substrate starting to author meaning that belongs in AoA or ToS

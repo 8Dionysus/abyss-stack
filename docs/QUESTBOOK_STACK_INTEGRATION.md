@@ -62,4 +62,4 @@ Its allowed verdicts are:
 - `promote to memo surface`
 
 The example files under `examples/` stay reviewable and source-owned.
-They do not become live runtime inputs, and they do not replace the deployed mirror under `/srv/abyss-stack`.
+They do not become live runtime inputs, and they do not replace the deployed mirror under `/srv/AbyssOS/abyss-stack`.
