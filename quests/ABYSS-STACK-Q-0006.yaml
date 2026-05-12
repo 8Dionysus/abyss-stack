@@ -31,7 +31,7 @@ activation:
   note: open when the runtime body needs committed transport collections and live latest/records copies
 anchor_ref:
   artifact: rpg_runtime_collections
-  ref: docs/RPG_RUNTIME_COLLECTIONS.md
+  ref: mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md
   note: runtime collections stay read models and must not widen route or quest authority
 handoff_role: runtime-maintainer
 evidence:

@@ -22,12 +22,12 @@ def write_text(path: Path, content: str) -> None:
 class ValidateStackRuntimeHygieneTests(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
-            Path("docs") / "GATEWAY_CACHE_POLICY.md",
-            Path("docs") / "USAGE_BUDGET_POLICY.md",
-            Path("docs") / "LOCAL_OPS_DOCTOR_SPLIT.md",
+            Path("mechanics") / "runtime-lifecycle" / "docs" / "GATEWAY_CACHE_POLICY.md",
+            Path("mechanics") / "runtime-lifecycle" / "docs" / "USAGE_BUDGET_POLICY.md",
+            Path("mechanics") / "diagnostic-spine" / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md",
             Path("docs") / "SERVICE_CATALOG.md",
             Path("docs") / "RUNBOOK.md",
-            Path("docs") / "DOCTOR.md",
+            Path("mechanics") / "diagnostic-spine" / "docs" / "DOCTOR.md",
             RUNTIME_LIFECYCLE_SCHEMA_ROOT / "runtime-gateway-cache-status.schema.json",
             RUNTIME_LIFECYCLE_SCHEMA_ROOT / "runtime-usage-snapshot.schema.json",
             RUNTIME_LIFECYCLE_EXAMPLE_ROOT / "runtime_gateway_cache_status.gateway-local.example.json",
@@ -67,7 +67,7 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
     def test_git_mirror_hygiene_allows_public_docs_examples_and_fixtures(self) -> None:
         allowed_paths = (
             "env/stack.env.example",
-            "docs/SECRETS_BOOTSTRAP.md",
+            "mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md",
             "mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json.example",
             "mechanics/runtime-lifecycle/parts/status-readouts/schemas/runtime-usage-snapshot.schema.json",
             "mechanics/runtime-lifecycle/parts/status-readouts/examples/runtime_usage_snapshot.workhorse-local.example.json",
@@ -93,10 +93,16 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
-            (repo_root / "docs" / "GATEWAY_CACHE_POLICY.md").unlink()
+            (
+                repo_root
+                / "mechanics"
+                / "runtime-lifecycle"
+                / "docs"
+                / "GATEWAY_CACHE_POLICY.md"
+            ).unlink()
             errors = self.validate_surface(repo_root)
 
-        self.assertTrue(any("docs/GATEWAY_CACHE_POLICY.md" in error for error in errors))
+        self.assertTrue(any("mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md" in error for error in errors))
 
     def test_gateway_schema_surface_type_drift_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -172,15 +178,15 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "docs" / "DOCTOR.md",
-                (repo_root / "docs" / "DOCTOR.md")
+                repo_root / "mechanics" / "diagnostic-spine" / "docs" / "DOCTOR.md",
+                (repo_root / "mechanics" / "diagnostic-spine" / "docs" / "DOCTOR.md")
                 .read_text(encoding="utf-8")
-                .replace("docs/LOCAL_OPS_DOCTOR_SPLIT.md", "docs/LOCAL_OPS_SPLIT.md"),
+                .replace("mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md", "docs/LOCAL_OPS_SPLIT.md"),
             )
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("docs/DOCTOR.md must mention `docs/LOCAL_OPS_DOCTOR_SPLIT.md`" == error for error in errors)
+            any("mechanics/diagnostic-spine/docs/DOCTOR.md must mention `mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md`" == error for error in errors)
         )
 
 

@@ -8,8 +8,8 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 2. `compose/presets/README.md`
 3. `docs/PRESETS.md`
 4. `docs/PROFILE_RECIPES.md`
-5. `docs/RENDER_TRUTH.md`
-6. `docs/INTERNAL_PROBES.md`
+5. `mechanics/config-projection/docs/RENDER_TRUTH.md`
+6. `mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md`
 7. `docs/PATHS.md`
 
 ## Directory contract
@@ -41,7 +41,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
   - `docs/PROFILE_RECIPES.md`
 - If a module adds or changes internal-only surfaces, update:
   - `scripts/aoa-internal-probes`
-  - `docs/INTERNAL_PROBES.md`
+  - `mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md`
 - If a module needs new runtime config files, update `config-templates/`, `scripts/aoa-check-layout`, and the relevant docs.
 - If a module needs new runtime directories or mounts, update `scripts/aoa-install-layout` and the relevant docs.
 - If `41-agent-api.yml` or a successor runtime service gains a return-policy mount or return-log path, update `config-templates/`, `scripts/aoa-check-layout`, `scripts/aoa-install-layout`, and the relevant docs together.

@@ -28,8 +28,8 @@ activation:
   mode: immediate
 anchor_ref:
   artifact: render-truth
-  ref: docs/RENDER_TRUTH.md
-  note: pair with docs/FIRST_RUN.md and docs/DOCTOR.md before risky writes
+  ref: mechanics/config-projection/docs/RENDER_TRUTH.md
+  note: pair with docs/FIRST_RUN.md and mechanics/diagnostic-spine/docs/DOCTOR.md before risky writes
 handoff_role: infra-maintainer
 evidence:
   - risky infra routes name render-truth and doctor gates

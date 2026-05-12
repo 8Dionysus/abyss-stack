@@ -2,7 +2,7 @@
 
 This package descends from the flat Agon runtime artifacts that previously
 lived across root `docs/`, `config/`, `generated/`, `examples/`, `schemas/`,
-`scripts/`, `tests/`, and `manifests/`.
+`scripts/`, `tests/`, `quests/`, and `manifests/`.
 
 The AOA pattern being mirrored is:
 
@@ -24,4 +24,3 @@ that it cannot mutate live authority.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what has and
   has not been distilled out of legacy.
 - `legacy/artifacts/scripts/` remains runnable for narrow validation.
-

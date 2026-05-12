@@ -18,7 +18,7 @@ It does not become an operator control plane.
 - pre-start host and runtime readiness
 - profile-aware warnings and failures
 - bootstrap and layout checks
-- the current exit semantics documented in `docs/DOCTOR.md`
+- the current exit semantics documented in `mechanics/diagnostic-spine/docs/DOCTOR.md`
 
 ## Future local ops readout owns
 

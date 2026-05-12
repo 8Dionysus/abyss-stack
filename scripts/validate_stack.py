@@ -247,48 +247,84 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "AGENTS.md",
     ROOT / "systemd" / "user" / "AGENTS.md",
     ROOT / "scripts" / "AGENTS.md",
-    ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
+    ROOT / "docs" / "AGENTS.md",
+    ROOT / ".agents" / "skills" / "AGENTS.md",
+    ROOT / "mechanics" / "governed-execution" / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
     ROOT / "docs" / "MECHANICS.md",
     ROOT / "mechanics" / "README.md",
     ROOT / "mechanics" / "AGENTS.md",
     ROOT / "mechanics" / "ARTIFACT_TOPOLOGY.md",
-    ROOT / "docs" / "GOVERNED_EXECUTION.md",
+    ROOT / "mechanics" / "governed-execution" / "docs" / "GOVERNED_EXECUTION.md",
     ROOT / "docs" / "FIRST_RUN.md",
-    ROOT / "docs" / "DOCTOR.md",
+    ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DOCTOR.md",
     ROOT / "docs" / "PRESETS.md",
     ROOT / "docs" / "PROFILE_RECIPES.md",
-    ROOT / "docs" / "RENDER_TRUTH.md",
-    ROOT / "docs" / "RUNTIME_BENCH_POLICY.md",
-    ROOT / "docs" / "LOCAL_AI_TRIALS.md",
-    ROOT / "docs" / "TRUTH_SURFACES.md",
-    ROOT / "docs" / "LANGGRAPH_PILOT.md",
-    ROOT / "docs" / "LLAMACPP_PILOT.md",
+    ROOT / "mechanics" / "config-projection" / "docs" / "RENDER_TRUTH.md",
+    ROOT / "mechanics" / "inference-pilots" / "docs" / "RUNTIME_BENCH_POLICY.md",
+    ROOT / "mechanics" / "inference-pilots" / "docs" / "LOCAL_AI_TRIALS.md",
+    ROOT / "mechanics" / "diagnostic-spine" / "docs" / "TRUTH_SURFACES.md",
+    ROOT / "mechanics" / "inference-pilots" / "docs" / "LANGGRAPH_PILOT.md",
+    ROOT / "mechanics" / "inference-pilots" / "docs" / "LLAMACPP_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md",
-    ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
-    ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
-    ROOT / "docs" / "EVAL_RUNTIME_SEAM.md",
-    ROOT / "docs" / "A2A_RETURN_DRY_RUN.md",
-    ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
-    ROOT / "docs" / "KAG_RUNTIME_SEAM.md",
-    ROOT / "docs" / "DIAGNOSTIC_SPINE.md",
-    ROOT / "docs" / "TOS_GRAPH_CURATION.md",
-    ROOT / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
-    ROOT / "docs" / "RPG_RUNTIME_BUILDERS.md",
-    ROOT / "docs" / "RPG_ROUTE_API_SEAM.md",
-    ROOT / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
-    ROOT / "docs" / "GATEWAY_CACHE_POLICY.md",
-    ROOT / "docs" / "USAGE_BUDGET_POLICY.md",
-    ROOT / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md",
-    ROOT / "docs" / "INTERNAL_PROBES.md",
-    ROOT / "docs" / "REFERENCE_PLATFORM.md",
-    ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md",
-    ROOT / "docs" / "MACHINE_FIT_POLICY.md",
-    ROOT / "docs" / "SECRETS_BOOTSTRAP.md",
-    ROOT / "docs" / "WINDOWS_BRIDGE.md",
-    ROOT / "docs" / "WINDOWS_SETUP.md",
-    ROOT / "docs" / "WINDOWS_PERFORMANCE.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "MEMO_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "EVAL_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "runtime-repair" / "docs" / "A2A_RETURN_DRY_RUN.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "KAG_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DIAGNOSTIC_SPINE.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "TOS_GRAPH_CURATION.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_RUNTIME_BUILDERS.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_ROUTE_API_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
+    ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "GATEWAY_CACHE_POLICY.md",
+    ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "USAGE_BUDGET_POLICY.md",
+    ROOT / "mechanics" / "diagnostic-spine" / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md",
+    ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "INTERNAL_PROBES.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM_SPEC.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_FIT_POLICY.md",
+    ROOT / "mechanics" / "config-projection" / "docs" / "SECRETS_BOOTSTRAP.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_BRIDGE.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_SETUP.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_PERFORMANCE.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "inference-tuning" / "docs" / "MODEL_CARDS.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "inference-tuning" / "docs" / "MODEL_PROFILES.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "inference-tuning"
+    / "docs"
+    / "model-cards"
+    / "qwen3-openvino-family.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "inference-tuning"
+    / "docs"
+    / "model-cards"
+    / "qwen3-4b-int4-ov.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "inference-tuning"
+    / "docs"
+    / "model-cards"
+    / "qwen3-8b-int4-ov.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "inference-tuning"
+    / "docs"
+    / "model-cards"
+    / "qwen3.5-9b-gguf-llamacpp.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "README.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "schemas" / "schema.v1.json",
     ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "examples" / "reference-host.public.json.example",
@@ -360,8 +396,20 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "schemas" / "runtime-artifact-hook-candidate.schema.json",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json",
-    ROOT / "schemas" / "runtime-return-policy.schema.json",
-    ROOT / "schemas" / "runtime-return-event.schema.json",
+    ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "return-policy"
+    / "schemas"
+    / "runtime-return-policy.schema.json",
+    ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "return-policy"
+    / "schemas"
+    / "runtime-return-event.schema.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_target.schema.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_session.schema.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnosis_companion.schema.json",
@@ -383,8 +431,20 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "examples" / "runtime_a2a_return_closeout_dry_run.example.json",
-    ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
-    ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
+    ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "return-policy"
+    / "examples"
+    / "runtime_return_policy.agentic-local.example.json",
+    ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "return-policy"
+    / "examples"
+    / "runtime_return_event.workhorse-local.example.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnostic_target.min.example.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnostic_session.min.example.json",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnosis_companion.min.example.json",
@@ -404,17 +464,30 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "frontend_projection_bundles.json",
     ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "tests" / "test_governed_execution.py",
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "tests" / "test_runtime_eval_evidence_export.py",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "autonomy-status" / "tests" / "test_aoa_status_autonomy.py",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "tests" / "test_aoa_local_ai_trials.py",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "llamacpp-pilot" / "tests" / "test_aoa_llamacpp_pilot.py",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "qwen-routes" / "tests" / "test_aoa_qwen_check.py",
     ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "tests" / "test_machine_bridge_contracts.py",
     ROOT / "tests" / "test_validate_stack_required_files.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "doctor-readiness" / "tests" / "test_aoa_doctor.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_validate_stack_diagnostic_spine.py",
     ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "tests" / "test_runtime_hygiene.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_diagnostic_spine_contracts.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_aoa_diagnose.py",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_aoa_federated_check.py",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_langchain_api_federated.py",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_route_api_closure_status.py",
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "tests" / "test_rpg_runtime_projection.py",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "tests" / "test_a2a_return_closeout_dry_run.py",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "memo-contradiction-sidecar" / "tests" / "test_memo_contradiction_integrity_runner.py",
+    ROOT / "quests" / "AGENTS.md",
+    ROOT / "quests" / "README.md",
+    ROOT / "quests" / "schemas" / "quest.schema.json",
+    ROOT / "quests" / "schemas" / "quest_dispatch.schema.json",
+    ROOT / "quests" / "examples" / "quest_catalog.min.example.json",
+    ROOT / "quests" / "examples" / "quest_dispatch.min.example.json",
 }
 
 FEDERATION_REQUIRED_RUNTIME_INPUTS = {
@@ -439,12 +512,14 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
 
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
-RPG_RUNTIME_FRONTEND_POSTURE_PATH = Path("docs") / "RPG_RUNTIME_FRONTEND_POSTURE.md"
-RPG_RUNTIME_COLLECTIONS_PATH = Path("docs") / "RPG_RUNTIME_COLLECTIONS.md"
-RPG_RUNTIME_BUILDERS_PATH = Path("docs") / "RPG_RUNTIME_BUILDERS.md"
-RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
-RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
-DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
+FEDERATION_SEAMS_DOC_ROOT = Path("mechanics") / "federation-seams" / "docs"
+RPG_RUNTIME_FRONTEND_POSTURE_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_FRONTEND_POSTURE.md"
+RPG_RUNTIME_COLLECTIONS_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_COLLECTIONS.md"
+RPG_RUNTIME_BUILDERS_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_BUILDERS.md"
+RPG_ROUTE_API_SEAM_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_ROUTE_API_SEAM.md"
+RPG_FRONTEND_PROJECTION_SEAM_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_FRONTEND_PROJECTION_SEAM.md"
+DIAGNOSTIC_SPINE_DOC_ROOT = Path("mechanics") / "diagnostic-spine" / "docs"
+DIAGNOSTIC_SPINE_PATH = DIAGNOSTIC_SPINE_DOC_ROOT / "DIAGNOSTIC_SPINE.md"
 DIAGNOSTIC_SURFACE_ROOT = Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces"
 DIAGNOSTIC_SURFACE_SCHEMA_ROOT = DIAGNOSTIC_SURFACE_ROOT / "schemas"
 DIAGNOSTIC_SURFACE_EXAMPLE_ROOT = DIAGNOSTIC_SURFACE_ROOT / "examples"
@@ -458,8 +533,9 @@ OVERLAY_SKILL_INSTALL_TARGETS = {
     ABYSS_SAFE_INFRA_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-safe-infra-change",
     ABYSS_SANITIZED_SHARE_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-sanitized-share",
 }
-QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
-QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
+QUEST_SURFACE_ROOT = Path("quests")
+QUEST_SCHEMA_PATH = QUEST_SURFACE_ROOT / "schemas" / "quest.schema.json"
+QUEST_DISPATCH_SCHEMA_PATH = QUEST_SURFACE_ROOT / "schemas" / "quest_dispatch.schema.json"
 DIAGNOSTIC_TARGET_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_target.schema.json"
 DIAGNOSTIC_SESSION_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_session.schema.json"
 DIAGNOSIS_COMPANION_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnosis_companion.schema.json"
@@ -478,8 +554,13 @@ AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "agent_b
 REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "reputation_ledger_collection.schema.json"
 QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "quest_run_result_collection.schema.json"
 FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "frontend_projection_bundle_collection.schema.json"
-QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
-QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
+QUEST_CATALOG_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_catalog.min.example.json"
+QUEST_DISPATCH_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_dispatch.min.example.json"
+RETURN_POLICY_SURFACE_ROOT = Path("mechanics") / "governed-execution" / "parts" / "return-policy"
+RETURN_POLICY_SCHEMA_ROOT = RETURN_POLICY_SURFACE_ROOT / "schemas"
+RETURN_POLICY_EXAMPLE_ROOT = RETURN_POLICY_SURFACE_ROOT / "examples"
+RUNTIME_RETURN_POLICY_SCHEMA_PATH = RETURN_POLICY_SCHEMA_ROOT / "runtime-return-policy.schema.json"
+RUNTIME_RETURN_EVENT_SCHEMA_PATH = RETURN_POLICY_SCHEMA_ROOT / "runtime-return-event.schema.json"
 DIAGNOSTIC_TARGET_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnostic_target.min.example.json"
 DIAGNOSTIC_SESSION_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnostic_session.min.example.json"
 DIAGNOSIS_COMPANION_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnosis_companion.min.example.json"
@@ -530,7 +611,7 @@ QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
     "render-truth, doctor, first-run, and runtime guardrail follow-through",
     "source-owned meaning from AoA layer repos",
-    "examples/quest_catalog.min.example.json",
+    "quests/examples/quest_catalog.min.example.json",
     "not generated state, deployed runtime state, or runtime authority",
 )
 QUESTBOOK_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
@@ -618,6 +699,7 @@ GIT_MIRROR_HEAVY_SUFFIXES = (
 GIT_MIRROR_FIXTURE_PREFIXES = (
     "docs/",
     "examples/",
+    "quests/",
     "schemas/",
     "tests/",
     "mechanics/",
@@ -1142,18 +1224,18 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if quest_payload.get("risk") != "r3_side_effect":
                 errors.append("ABYSS-STACK-Q-0003 risk must stay r3_side_effect")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RENDER_TRUTH.md":
-                errors.append("ABYSS-STACK-Q-0003 must stay anchored to docs/RENDER_TRUTH.md")
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/config-projection/docs/RENDER_TRUTH.md":
+                errors.append("ABYSS-STACK-Q-0003 must stay anchored to mechanics/config-projection/docs/RENDER_TRUTH.md")
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
-            if not isinstance(note, str) or "docs/FIRST_RUN.md" not in note or "docs/DOCTOR.md" not in note:
-                errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/FIRST_RUN.md and docs/DOCTOR.md")
+            if not isinstance(note, str) or "docs/FIRST_RUN.md" not in note or "mechanics/diagnostic-spine/docs/DOCTOR.md" not in note:
+                errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/FIRST_RUN.md and mechanics/diagnostic-spine/docs/DOCTOR.md")
         elif quest_id == "ABYSS-STACK-Q-0005":
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0005 kind must stay doctrine")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RPG_RUNTIME_FRONTEND_POSTURE.md":
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md":
                 errors.append(
-                    "ABYSS-STACK-Q-0005 must stay anchored to docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
+                    "ABYSS-STACK-Q-0005 must stay anchored to mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
                 )
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "shadow authority layer" not in note:
@@ -1168,9 +1250,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0006 kind must stay doctrine")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/RPG_RUNTIME_COLLECTIONS.md":
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md":
                 errors.append(
-                    "ABYSS-STACK-Q-0006 must stay anchored to docs/RPG_RUNTIME_COLLECTIONS.md"
+                    "ABYSS-STACK-Q-0006 must stay anchored to mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md"
                 )
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "read models" not in note or "route or quest authority" not in note:
@@ -1185,9 +1267,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0007 kind must stay doctrine")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "docs/DIAGNOSTIC_SPINE.md":
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md":
                 errors.append(
-                    "ABYSS-STACK-Q-0007 must stay anchored to docs/DIAGNOSTIC_SPINE.md"
+                    "ABYSS-STACK-Q-0007 must stay anchored to mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md"
                 )
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "read model" not in note or "mutation authority" not in note:
@@ -1220,7 +1302,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
         errors.append(f"{QUEST_CATALOG_EXAMPLE_PATH.as_posix()} must contain valid JSON: {exc}")
         catalog_payload = None
     if catalog_payload is not None and catalog_payload != expected_catalog:
-        errors.append("examples/quest_catalog.min.example.json must stay aligned with quests/*.yaml")
+        errors.append(
+            f"{QUEST_CATALOG_EXAMPLE_PATH.as_posix()} must stay aligned with quests/*.yaml"
+        )
 
     try:
         dispatch_payload = json.loads((ROOT / QUEST_DISPATCH_EXAMPLE_PATH).read_text(encoding="utf-8"))
@@ -1230,7 +1314,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
         errors.append(f"{QUEST_DISPATCH_EXAMPLE_PATH.as_posix()} must contain valid JSON: {exc}")
         dispatch_payload = None
     if dispatch_payload is not None and dispatch_payload != expected_dispatch:
-        errors.append("examples/quest_dispatch.min.example.json must stay aligned with quests/*.yaml")
+        errors.append(
+            f"{QUEST_DISPATCH_EXAMPLE_PATH.as_posix()} must stay aligned with quests/*.yaml"
+        )
 
 
 def iter_sync_managed_files() -> list[Path]:
@@ -1316,9 +1402,9 @@ def validate_profiles(errors: list[str]) -> None:
     if "n8n-task-runners" not in service_catalog_doc:
         errors.append("docs/SERVICE_CATALOG.md must mention n8n-task-runners")
 
-    secrets_doc = (ROOT / "docs" / "SECRETS_BOOTSTRAP.md").read_text(encoding="utf-8")
+    secrets_doc = (ROOT / "mechanics" / "config-projection" / "docs" / "SECRETS_BOOTSTRAP.md").read_text(encoding="utf-8")
     if "N8N_RUNNERS_AUTH_TOKEN" not in secrets_doc or "n8n-task-runners" not in secrets_doc:
-        errors.append("docs/SECRETS_BOOTSTRAP.md must describe the n8n runner shared token")
+        errors.append("mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md must describe the n8n runner shared token")
 
 
 def validate_presets(errors: list[str]) -> None:
@@ -1355,28 +1441,28 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must state Fedora-first posture")
     if "Windows-usable" not in readme:
         errors.append("README.md must state Windows-usable posture")
-    if "docs/RECURRENCE_RUNTIME_POLICY.md" not in readme:
-        errors.append("README.md must route readers to docs/RECURRENCE_RUNTIME_POLICY.md")
-    if "docs/REFERENCE_PLATFORM.md" not in readme:
-        errors.append("README.md must route readers to docs/REFERENCE_PLATFORM.md")
-    if "docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
-        errors.append("README.md must route readers to docs/REFERENCE_PLATFORM_SPEC.md")
-    if "docs/MACHINE_FIT_POLICY.md" not in readme:
-        errors.append("README.md must route readers to docs/MACHINE_FIT_POLICY.md")
-    if "docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
-        errors.append("README.md must route readers to docs/PLATFORM_ADAPTATION_POLICY.md")
+    if "mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md" not in readme:
+        errors.append("README.md must route readers to mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md")
+    if "mechanics/machine-fit/docs/REFERENCE_PLATFORM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/docs/REFERENCE_PLATFORM.md")
+    if "mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md")
+    if "mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md")
+    if "mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md")
     if "docs/BRANCH_POLICY.md" not in readme:
         errors.append("README.md must route readers to docs/BRANCH_POLICY.md")
-    if "docs/MEMO_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to docs/MEMO_RUNTIME_SEAM.md")
-    if "docs/EVAL_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to docs/EVAL_RUNTIME_SEAM.md")
-    if "docs/PLAYBOOK_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to docs/PLAYBOOK_RUNTIME_SEAM.md")
-    if "docs/KAG_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to docs/KAG_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md")
 
-    local_ai_trials = (ROOT / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
+    local_ai_trials = (ROOT / "mechanics" / "inference-pilots" / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
         "GOVERNED_EXECUTION.md",
@@ -1408,10 +1494,10 @@ def validate_paths(errors: list[str]) -> None:
     ):
         if required_snippet not in local_ai_trials:
             errors.append(
-                f"docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
+                f"mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
             )
 
-    truth_doc = (ROOT / "docs" / "TRUTH_SURFACES.md").read_text(encoding="utf-8")
+    truth_doc = (ROOT / "mechanics" / "diagnostic-spine" / "docs" / "TRUTH_SURFACES.md").read_text(encoding="utf-8")
     for required_snippet in (
         "source_authored",
         "deployed",
@@ -1427,10 +1513,10 @@ def validate_paths(errors: list[str]) -> None:
     ):
         if required_snippet not in truth_doc:
             errors.append(
-                f"docs/TRUTH_SURFACES.md must mention `{required_snippet}`"
+                f"mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md must mention `{required_snippet}`"
             )
 
-    governed_doc = (ROOT / "docs" / "GOVERNED_EXECUTION.md").read_text(encoding="utf-8")
+    governed_doc = (ROOT / "mechanics" / "governed-execution" / "docs" / "GOVERNED_EXECUTION.md").read_text(encoding="utf-8")
     for required_snippet in (
         "aoa-governed-run prepare-request",
         "aoa-governed-run prepare-canary",
@@ -1451,7 +1537,7 @@ def validate_paths(errors: list[str]) -> None:
         "Configs/agent-api/governed-canary-catalog.json",
     ):
         if required_snippet not in governed_doc:
-            errors.append(f"docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
+            errors.append(f"mechanics/governed-execution/docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
 
     w5_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md"
     w5_doc = w5_doc_path.read_text(encoding="utf-8")
@@ -1621,7 +1707,7 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in lifecycle_doc:
             errors.append(f"docs/LIFECYCLE.md must mention `{required_snippet}`")
 
-    playbook_runtime_doc = (ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    playbook_runtime_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for required_snippet in (
         "aoa-governed-run",
         "governed-execution-policy.yaml",
@@ -1629,16 +1715,16 @@ def validate_paths(errors: list[str]) -> None:
         "runtime permission semantics still live in `abyss-stack`",
     ):
         if required_snippet not in playbook_runtime_doc:
-            errors.append(f"docs/PLAYBOOK_RUNTIME_SEAM.md must mention `{required_snippet}`")
+            errors.append(f"mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md must mention `{required_snippet}`")
 
-    recurrence_doc = (ROOT / "docs" / "RECURRENCE_RUNTIME_POLICY.md").read_text(encoding="utf-8")
+    recurrence_doc = (ROOT / "mechanics" / "governed-execution" / "docs" / "RECURRENCE_RUNTIME_POLICY.md").read_text(encoding="utf-8")
     for required_snippet in (
         "governed-execution-policy.yaml",
         "runtime execution permissions only",
         "langchain-api /run/federated",
     ):
         if required_snippet not in recurrence_doc:
-            errors.append(f"docs/RECURRENCE_RUNTIME_POLICY.md must mention `{required_snippet}`")
+            errors.append(f"mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md must mention `{required_snippet}`")
 
     try:
         governed_policy = load_structured_object(
@@ -1840,23 +1926,23 @@ def validate_federation_required_files(errors: list[str]) -> None:
 
 
 def validate_reference_platform(errors: list[str]) -> None:
-    reference_platform = (ROOT / "docs" / "REFERENCE_PLATFORM.md").read_text(
+    reference_platform = (ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM.md").read_text(
         encoding="utf-8"
     )
     if "aoa-host-facts" not in reference_platform:
-        errors.append("docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
+        errors.append("mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
     if "mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md" not in reference_platform:
-        errors.append("docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md")
+        errors.append("mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md")
     if "REFERENCE_PLATFORM_SPEC.md" not in reference_platform:
         errors.append(
-            "docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
+            "mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
         )
 
-    doctor_doc = (ROOT / "docs" / "DOCTOR.md").read_text(encoding="utf-8")
+    doctor_doc = (ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DOCTOR.md").read_text(encoding="utf-8")
     if "aoa-host-facts" not in doctor_doc:
-        errors.append("docs/DOCTOR.md must mention aoa-host-facts")
+        errors.append("mechanics/diagnostic-spine/docs/DOCTOR.md must mention aoa-host-facts")
     if "aoa-machine-bridge" not in doctor_doc:
-        errors.append("docs/DOCTOR.md must mention aoa-machine-bridge")
+        errors.append("mechanics/diagnostic-spine/docs/DOCTOR.md must mention aoa-machine-bridge")
 
     first_run_doc = (ROOT / "docs" / "FIRST_RUN.md").read_text(encoding="utf-8")
     if "reference-host.public.json" not in first_run_doc:
@@ -1864,12 +1950,12 @@ def validate_reference_platform(errors: list[str]) -> None:
             "docs/FIRST_RUN.md must mention reference-host.public.json capture"
         )
 
-    spec_doc = (ROOT / "docs" / "REFERENCE_PLATFORM_SPEC.md").read_text(
+    spec_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM_SPEC.md").read_text(
         encoding="utf-8"
     )
     if "latest.private.json" not in spec_doc:
         errors.append(
-            "docs/REFERENCE_PLATFORM_SPEC.md must define the local private capture path"
+            "mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md must define the local private capture path"
         )
 
     schema = json.loads(
@@ -1974,19 +2060,19 @@ def validate_platform_adaptations(errors: list[str]) -> None:
     if "aoa-platform-adaptation" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-platform-adaptation")
 
-    windows_perf_doc = (ROOT / "docs" / "WINDOWS_PERFORMANCE.md").read_text(encoding="utf-8")
+    windows_perf_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_PERFORMANCE.md").read_text(encoding="utf-8")
     if "aoa-platform-adaptation" not in windows_perf_doc:
-        errors.append("docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
+        errors.append("mechanics/machine-fit/docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
 
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Logs/platform-adaptations/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/platform-adaptations/")
 
-    policy_doc = (ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md").read_text(encoding="utf-8")
+    policy_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "PLATFORM_ADAPTATION_POLICY.md").read_text(encoding="utf-8")
     if "aoa-host-facts" not in policy_doc:
-        errors.append("docs/PLATFORM_ADAPTATION_POLICY.md must mention aoa-host-facts")
+        errors.append("mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md must mention aoa-host-facts")
     if "runtime benchmarks" not in policy_doc and "runtime benchmark" not in policy_doc:
-        errors.append("docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
+        errors.append("mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
 
     schema = json.loads(
         (
@@ -2055,26 +2141,22 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
     if "Configs/agent-api/return-policy.yaml" not in first_run_doc:
         errors.append("docs/FIRST_RUN.md must mention Configs/agent-api/return-policy.yaml")
 
-    render_truth_doc = (ROOT / "docs" / "RENDER_TRUTH.md").read_text(encoding="utf-8")
+    render_truth_doc = (ROOT / "mechanics" / "config-projection" / "docs" / "RENDER_TRUTH.md").read_text(encoding="utf-8")
     if "return-policy" not in render_truth_doc:
-        errors.append("docs/RENDER_TRUTH.md should mention return-policy mounts when the wrapper is enabled")
+        errors.append("mechanics/config-projection/docs/RENDER_TRUTH.md should mention return-policy mounts when the wrapper is enabled")
     if "aoa-status --autonomy" not in render_truth_doc:
-        errors.append("docs/RENDER_TRUTH.md must mention aoa-status --autonomy")
+        errors.append("mechanics/config-projection/docs/RENDER_TRUTH.md must mention aoa-status --autonomy")
     if "/surface-status" not in render_truth_doc:
-        errors.append("docs/RENDER_TRUTH.md must mention /surface-status")
+        errors.append("mechanics/config-projection/docs/RENDER_TRUTH.md must mention /surface-status")
 
-    policy_schema = json.loads(
-        (ROOT / "schemas" / "runtime-return-policy.schema.json").read_text(encoding="utf-8")
-    )
+    policy_schema = json.loads((ROOT / RUNTIME_RETURN_POLICY_SCHEMA_PATH).read_text(encoding="utf-8"))
     if policy_schema.get("title") != "abyss-stack runtime return policy":
         errors.append("runtime-return-policy.schema.json must describe abyss-stack runtime return policy")
     policy_surface_type = policy_schema.get("properties", {}).get("surface_type", {})
     if policy_surface_type.get("const") != "runtime_return_policy":
         errors.append("runtime-return-policy.schema.json must pin surface_type.const to runtime_return_policy")
 
-    event_schema = json.loads(
-        (ROOT / "schemas" / "runtime-return-event.schema.json").read_text(encoding="utf-8")
-    )
+    event_schema = json.loads((ROOT / RUNTIME_RETURN_EVENT_SCHEMA_PATH).read_text(encoding="utf-8"))
     if event_schema.get("title") != "abyss-stack runtime return event":
         errors.append("runtime-return-event.schema.json must describe abyss-stack runtime return event")
     event_surface_type = event_schema.get("properties", {}).get("surface_type", {})
@@ -2104,7 +2186,9 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
             return None
         return payload
 
-    cache_doc = read_required_text(Path("docs") / "GATEWAY_CACHE_POLICY.md")
+    cache_doc = read_required_text(
+        Path("mechanics") / "runtime-lifecycle" / "docs" / "GATEWAY_CACHE_POLICY.md"
+    )
     for snippet in (
         "request deduplication",
         "inflight replay",
@@ -2120,9 +2204,11 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "`runtime_gateway_cache_status_v1`",
     ):
         if snippet not in cache_doc:
-            errors.append(f"docs/GATEWAY_CACHE_POLICY.md must mention `{snippet}`")
+            errors.append(f"mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md must mention `{snippet}`")
 
-    usage_doc = read_required_text(Path("docs") / "USAGE_BUDGET_POLICY.md")
+    usage_doc = read_required_text(
+        Path("mechanics") / "runtime-lifecycle" / "docs" / "USAGE_BUDGET_POLICY.md"
+    )
     for snippet in (
         "per-request",
         "session",
@@ -2139,9 +2225,11 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "`runtime_usage_snapshot_v1`",
     ):
         if snippet not in usage_doc:
-            errors.append(f"docs/USAGE_BUDGET_POLICY.md must mention `{snippet}`")
+            errors.append(f"mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md must mention `{snippet}`")
 
-    doctor_split_doc = read_required_text(Path("docs") / "LOCAL_OPS_DOCTOR_SPLIT.md")
+    doctor_split_doc = read_required_text(
+        Path("mechanics") / "diagnostic-spine" / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md"
+    )
     for snippet in (
         "`aoa-doctor` remains readiness-only.",
         "gateway reachability",
@@ -2153,13 +2241,13 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "This wave does not add new `aoa-doctor` exit semantics.",
     ):
         if snippet not in doctor_split_doc:
-            errors.append(f"docs/LOCAL_OPS_DOCTOR_SPLIT.md must mention `{snippet}`")
+            errors.append(f"mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md must mention `{snippet}`")
 
     service_catalog_doc = read_required_text(Path("docs") / "SERVICE_CATALOG.md")
     for snippet in (
-        "docs/GATEWAY_CACHE_POLICY.md",
-        "docs/USAGE_BUDGET_POLICY.md",
-        "docs/LOCAL_OPS_DOCTOR_SPLIT.md",
+        "mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md",
+        "mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md",
+        "mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md",
         "does not add new HTTP endpoints in this wave",
         "bounded runtime artifact",
     ):
@@ -2177,14 +2265,16 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         if snippet not in runbook_doc:
             errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")
 
-    doctor_doc = read_required_text(Path("docs") / "DOCTOR.md")
+    doctor_doc = read_required_text(
+        Path("mechanics") / "diagnostic-spine" / "docs" / "DOCTOR.md"
+    )
     for snippet in (
-        "docs/LOCAL_OPS_DOCTOR_SPLIT.md",
+        "mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md",
         "readiness-only",
         "usage monitor",
     ):
         if snippet not in doctor_doc:
-            errors.append(f"docs/DOCTOR.md must mention `{snippet}`")
+            errors.append(f"mechanics/diagnostic-spine/docs/DOCTOR.md must mention `{snippet}`")
 
     cache_schema = read_required_json(RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH)
     if cache_schema and cache_schema.get("title") != "abyss-stack runtime gateway cache status":
@@ -2351,7 +2441,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
 
     readme = read_required_text(Path("README.md"))
     for snippet in (
-        "docs/DIAGNOSTIC_SPINE.md",
+        "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
@@ -2681,8 +2771,8 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
             errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must set owner_repo to abyss-stack")
         if diagnostic_surface_catalog.get("surface_kind") != "runtime_surface":
             errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must stay runtime_surface")
-        if diagnostic_surface_catalog.get("authority_ref") != "docs/DIAGNOSTIC_SPINE.md":
-            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must point authority_ref to docs/DIAGNOSTIC_SPINE.md")
+        if diagnostic_surface_catalog.get("authority_ref") != "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md":
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must point authority_ref to mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md")
 
         surfaces = diagnostic_surface_catalog.get("surfaces")
         if not isinstance(surfaces, list) or len(surfaces) != len(DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES):
@@ -2866,7 +2956,7 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
     if "aoa-export-memo-candidate" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-export-memo-candidate")
 
-    seam_doc = (ROOT / "docs" / "MEMO_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "MEMO_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
         "aoa-memo",
         "/memo/",
@@ -2874,7 +2964,7 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
         "Logs/memo-exports/",
     ):
         if snippet not in seam_doc:
-            errors.append(f"docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
 
     schema = json.loads(
         (
@@ -2918,7 +3008,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
     if "aoa-a2a-return-closeout-dry-run" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-a2a-return-closeout-dry-run")
 
-    seam_doc = (ROOT / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
         "aoa-evals",
         "/evals/",
@@ -2930,7 +3020,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "Logs/a2a-return-closeouts/",
     ):
         if snippet not in seam_doc:
-            errors.append(f"docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
 
     evidence_schema = json.loads(
         (
@@ -2998,7 +3088,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
     if hook_example.get("exported_by") != "scripts/aoa-export-artifact-hook-candidate":
         errors.append("runtime artifact hook example must use exported_by scripts/aoa-export-artifact-hook-candidate")
 
-    a2a_doc = (ROOT / "docs" / "A2A_RETURN_DRY_RUN.md").read_text(encoding="utf-8")
+    a2a_doc = (ROOT / "mechanics" / "runtime-repair" / "docs" / "A2A_RETURN_DRY_RUN.md").read_text(encoding="utf-8")
     for snippet in (
         "aoa-a2a-return-closeout-dry-run",
         "a2a_wave5_closeout_request",
@@ -3007,7 +3097,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "Logs/a2a-return-closeouts/",
     ):
         if snippet not in a2a_doc:
-            errors.append(f"docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
+            errors.append(f"mechanics/runtime-repair/docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
 
     a2a_schema = json.loads(
         (
@@ -3055,7 +3145,7 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
     if "playbooks/activation" not in runbook_doc and "/playbooks/" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention playbook advisory seam inspection")
 
-    seam_doc = (ROOT / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
         "aoa-playbooks",
         "/playbooks/",
@@ -3064,7 +3154,7 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
         "aoa-sync-federation-surfaces --layer aoa-playbooks",
     ):
         if snippet not in seam_doc:
-            errors.append(f"docs/PLAYBOOK_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md must mention {snippet}")
 
 
 def validate_kag_runtime_seam(errors: list[str]) -> None:
@@ -3072,7 +3162,7 @@ def validate_kag_runtime_seam(errors: list[str]) -> None:
     if "/kag/" not in runbook_doc and "kag/registry" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention KAG advisory seam inspection")
 
-    seam_doc = (ROOT / "docs" / "KAG_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "KAG_RUNTIME_SEAM.md").read_text(encoding="utf-8")
     for snippet in (
         "aoa-kag",
         "tos-source",
@@ -3083,7 +3173,7 @@ def validate_kag_runtime_seam(errors: list[str]) -> None:
         "aoa-sync-federation-surfaces --layer tos-source",
     ):
         if snippet not in seam_doc:
-            errors.append(f"docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
 
 
 def validate_runtime_configs_mirror(errors: list[str]) -> None:

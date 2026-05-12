@@ -6,7 +6,18 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
 MODULE_PATH = REPO_ROOT / "scripts" / "aoa-llamacpp-pilot"
 
 

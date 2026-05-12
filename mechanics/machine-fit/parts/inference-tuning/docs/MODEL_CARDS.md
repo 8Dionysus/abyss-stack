@@ -81,10 +81,10 @@ Do not let a donor-specific overlay quietly choose the model on your behalf.
 
 ## Current cards
 
-- [qwen3.5-9b-gguf-llamacpp](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3.5-9b-gguf-llamacpp.md)
-- [qwen3-openvino-family](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-openvino-family.md)
-- [qwen3-4b-int4-ov](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-4b-int4-ov.md)
-- [qwen3-8b-int4-ov](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-8b-int4-ov.md)
+- [qwen3.5-9b-gguf-llamacpp](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3.5-9b-gguf-llamacpp.md)
+- [qwen3-openvino-family](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md)
+- [qwen3-4b-int4-ov](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-4b-int4-ov.md)
+- [qwen3-8b-int4-ov](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-8b-int4-ov.md)
 
 ## Relationship to existing docs
 

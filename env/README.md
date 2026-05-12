@@ -23,4 +23,4 @@ Unless explicitly overridden, `AOA_STACK_ROOT` should resolve to:
 
 ## See also
 
-- `docs/SECRETS_BOOTSTRAP.md`
+- `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md`

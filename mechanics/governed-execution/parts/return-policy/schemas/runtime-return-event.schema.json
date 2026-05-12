@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/schemas/runtime-return-event.schema.json",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/return-policy/schemas/runtime-return-event.schema.json",
   "title": "abyss-stack runtime return event",
   "type": "object",
   "additionalProperties": false,

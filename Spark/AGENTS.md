@@ -1,4 +1,6 @@
-# Spark lane for abyss-stack
+# AGENTS.md
+
+Spark lane for `abyss-stack`.
 
 This file governs work on files under the `Spark/` subtree.
 

@@ -13,6 +13,12 @@ Old root docs now live in `legacy/raw/`:
 - `docs/AGON_WAVE13_RUNTIME_LANDING.md`
 - `docs/AGON_WAVE13_RUNTIME_STOP_LINES.md`
 
+Old root quest stubs now live in `legacy/raw/quests/`:
+
+- `quests/ABS-Q-AGON-0001-duel-runtime-kernel.md`
+- `quests/ABS-Q-AGON-0002-event-log-hash-chain.md`
+- `quests/ABS-Q-AGON-0003-mechanical-trial-runs.md`
+
 ## Artifacts
 
 Old root artifacts now live under `legacy/artifacts/`:
@@ -30,4 +36,3 @@ Old root artifacts now live under `legacy/artifacts/`:
 
 Start at `../README.md`. Use these legacy files only when you need lineage,
 drift checks, or runnable dry-run proof.
-

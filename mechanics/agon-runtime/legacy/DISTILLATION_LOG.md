@@ -11,8 +11,8 @@ Still legacy:
 - seed config files
 - generated registry capsules
 - event-log examples and contract schemas
+- old `ABS-Q-AGON-*` quest stubs
 - old script and test names
 
 Future distillation should create quieter active names only when the runtime
 contract is clear and validation has moved with it.
-

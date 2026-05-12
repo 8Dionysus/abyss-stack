@@ -8,8 +8,8 @@ The active repair route stays in this package and the standing docs:
 - `README.md`
 - `DIRECTION.md`
 - `PARTS.md`
-- `docs/ANTIFRAGILITY_RUNTIME.md`
-- `docs/REPAIR_SAFE_CLOSEOUT.md`
+- `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`
+- `mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`
 
 Old wave and `_v1` artifacts now live in package-local `legacy`.
 

@@ -108,7 +108,7 @@
         "stage_label": "architecture fixed before service bloom",
         "anchor_refs": [
           "Agents-of-Abyss/docs/RPG_ARCHITECTURE_RFC.md",
-          "abyss-stack/docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
+          "abyss-stack/mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
         ],
         "recommended_build_refs": [
           "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/examples/agent_build_snapshot.example.json"

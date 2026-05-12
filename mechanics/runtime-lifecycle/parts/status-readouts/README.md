@@ -6,9 +6,9 @@ status readouts.
 ## Status Readouts
 
 - `schemas/runtime-gateway-cache-status.schema.json` defines the cache-lane
-  status artifact described by `docs/GATEWAY_CACHE_POLICY.md`.
+  status artifact described by `mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md`.
 - `schemas/runtime-usage-snapshot.schema.json` defines the usage-pressure
-  status artifact described by `docs/USAGE_BUDGET_POLICY.md`.
+  status artifact described by `mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md`.
 - `examples/` carries public-safe sample payloads used by
   `scripts/validate_stack.py` and package-local tests.
 

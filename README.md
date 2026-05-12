@@ -20,12 +20,12 @@ Read in this order:
 
 Then branch by need:
 
-- **Windows host and WSL bridge**: [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
-- **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
-- **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/RUNTIME_WINNER_PROMOTION_LOOP](docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/MODEL_CARDS](docs/MODEL_CARDS.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
-- **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
-- **runtime-side via negativa posture**: [docs/VIA_NEGATIVA_CHECKLIST](docs/VIA_NEGATIVA_CHECKLIST.md)
+- **Windows host and WSL bridge**: [Windows bridge](mechanics/machine-fit/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/docs/WINDOWS_PERFORMANCE.md)
+- **host posture and machine facts**: [reference platform](mechanics/machine-fit/docs/REFERENCE_PLATFORM.md), [reference platform spec](mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md), [machine fit policy](mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md), [platform adaptation policy](mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md)
+- **runtime benchmark and local-model posture**: [runtime bench policy](mechanics/inference-pilots/docs/RUNTIME_BENCH_POLICY.md), [winner promotion loop](mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [llama.cpp pilot](mechanics/inference-pilots/docs/LLAMACPP_PILOT.md), [local AI trials](mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md), [model profiles](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_PROFILES.md), [model cards](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md), [context budget policy](mechanics/governed-execution/docs/CONTEXT_BUDGET_POLICY.md)
+- **branch and recurrence posture**: [branch policy](docs/BRANCH_POLICY.md), [recurrence runtime policy](mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md)
+- **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [repair-safe closeout](mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md)
+- **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 
 ## What this repository is for
@@ -102,9 +102,9 @@ Antifragility wave two stays contract-only in this repository. It adds
 runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
-Current contract surfaces are `docs/ANTIFRAGILITY_RUNTIME.md`,
+Current contract surfaces are `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`,
 `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
-`docs/REPAIR_SAFE_CLOSEOUT.md`,
+`mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`,
 `mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
 `mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
 `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`, and
@@ -121,7 +121,7 @@ this repository. It adds a runtime-owned diagnostic read model, tracked quest
 follow-through, schema/example surfaces, and a bounded artifact writer without
 changing live services, deployment behavior, or the readiness-only posture of
 `aoa-doctor`.
-Current contract surfaces are `docs/DIAGNOSTIC_SPINE.md`,
+Current contract surfaces are `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`,

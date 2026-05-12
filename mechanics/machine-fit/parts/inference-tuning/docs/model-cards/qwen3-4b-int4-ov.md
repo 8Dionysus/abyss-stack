@@ -53,7 +53,7 @@
 
 ## Evidence Surfaces
 
-- [qwen3-openvino-family](/home/dionysus/src/abyss-stack/docs/model-cards/qwen3-openvino-family.md)
+- [qwen3-openvino-family](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md)
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
 
 ## Next Test

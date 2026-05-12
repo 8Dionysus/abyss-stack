@@ -57,7 +57,7 @@ The two surfaces complement each other and should not absorb each other's job.
 It is not a usage monitor and it is not the future cache-status console.
 
 If a later local ops status surface exists, treat it as post-start runtime readout rather than as a replacement for the doctor pass.
-See `docs/LOCAL_OPS_DOCTOR_SPLIT.md` for the bounded split.
+See `mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md` for the bounded split.
 The current read-only diagnostic readout is `scripts/aoa-diagnose`; it emits
 `diagnostic_session_v1` after startup without changing `aoa-doctor` exit
 semantics.
