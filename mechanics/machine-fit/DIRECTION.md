@@ -7,8 +7,8 @@ Short term:
 
 - keep host facts public/private split explicit
 - keep fit records advisory unless runtime checks confirm the path
-- prepare a future read-only bridge to `/srv/abyss-machine` without mutating it
+- keep the read-only `aoa-machine-bridge` route aligned with `abyss-machine`
+  without mutating `/srv/abyss-machine`
 
-Next movement should define the exact bridge contract before any code reads
-machine-side state automatically.
-
+Next movement should consume the bridge from runtime diagnosis and launch
+planning before adding any automatic stack-side policy action.

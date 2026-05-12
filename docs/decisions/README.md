@@ -9,3 +9,4 @@ Use these notes to understand why a contract exists. Keep operational evidence, 
 - [2026-05-07 Runtime Root Under AbyssOS](2026-05-07-runtime-root-under-abyssos.md)
 - [2026-05-07 Runtime Mechanics Topology](2026-05-07-runtime-mechanics-topology.md)
 - [2026-05-07 Mechanics Legacy Artifact Containment](2026-05-07-mechanics-legacy-artifact-containment.md)
+- [2026-05-12 Machine Bridge Under Machine Fit](2026-05-12-machine-bridge-under-machine-fit.md)

@@ -20,6 +20,7 @@ The current doctor pass looks at things like:
 - whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
 - whether the selected runtime enables a federated advisory consumer without also selecting the localhost federation seam
 - whether a current machine-fit record is missing for the deployed runtime root
+- whether `abyss-machine` is available, its stack bridge validates, and a current stack-side machine-bridge record exists
 - whether the current host envelope looks noisy for latency-sensitive work
 
 ## Preset-aware and profile-aware behavior
@@ -42,6 +43,9 @@ For example:
 Use `aoa-doctor` to decide whether a selected runtime is ready to start.
 
 Use `scripts/aoa-host-facts` to capture durable machine-readable host facts.
+
+Use `scripts/aoa-machine-bridge` to capture the read-only `abyss-machine`
+handoff into the stack runtime log tree.
 
 Use `scripts/aoa-machine-fit` to capture the bounded current-machine runtime posture after host facts exist.
 
@@ -89,6 +93,7 @@ Durable host-facts capture:
 ```bash
 scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
@@ -128,6 +133,7 @@ For a generic full bundle:
 scripts/aoa-doctor --preset agent-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
+scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset agent-full
 ```
@@ -138,6 +144,7 @@ For an Intel-aware full bundle:
 scripts/aoa-doctor --preset intel-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
+scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset intel-full
 ```

@@ -21,10 +21,10 @@ Read in this order:
 Then branch by need:
 
 - **Windows host and WSL bridge**: [docs/WINDOWS_BRIDGE](docs/WINDOWS_BRIDGE.md), [docs/WINDOWS_SETUP](docs/WINDOWS_SETUP.md), [docs/WINDOWS_PERFORMANCE](docs/WINDOWS_PERFORMANCE.md)
-- **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
+- **host posture and machine facts**: [docs/REFERENCE_PLATFORM](docs/REFERENCE_PLATFORM.md), [docs/REFERENCE_PLATFORM_SPEC](docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/docs/MACHINE_BRIDGE.md), [docs/MACHINE_FIT_POLICY](docs/MACHINE_FIT_POLICY.md), [docs/PLATFORM_ADAPTATION_POLICY](docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [docs/RUNTIME_BENCH_POLICY](docs/RUNTIME_BENCH_POLICY.md), [docs/RUNTIME_WINNER_PROMOTION_LOOP](docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [docs/LLAMACPP_PILOT](docs/LLAMACPP_PILOT.md), [docs/LOCAL_AI_TRIALS](docs/LOCAL_AI_TRIALS.md), [docs/MODEL_PROFILES](docs/MODEL_PROFILES.md), [docs/MODEL_CARDS](docs/MODEL_CARDS.md), [docs/CONTEXT_BUDGET_POLICY](docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [docs/RECURRENCE_RUNTIME_POLICY](docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [docs/RUNTIME_CHAOS_WAVE1](docs/RUNTIME_CHAOS_WAVE1.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
+- **runtime-side AoA seams**: [docs/MEMO_RUNTIME_SEAM](docs/MEMO_RUNTIME_SEAM.md), [docs/EVAL_RUNTIME_SEAM](docs/EVAL_RUNTIME_SEAM.md), [docs/PLAYBOOK_RUNTIME_SEAM](docs/PLAYBOOK_RUNTIME_SEAM.md), [docs/KAG_RUNTIME_SEAM](docs/KAG_RUNTIME_SEAM.md), [docs/ANTIFRAGILITY_RUNTIME](docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [docs/REPAIR_SAFE_CLOSEOUT](docs/REPAIR_SAFE_CLOSEOUT.md), and [docs/DIAGNOSTIC_SPINE](docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [docs/VIA_NEGATIVA_CHECKLIST](docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 
@@ -39,6 +39,7 @@ This repository is the right home for:
 - versioned helper-service build contexts
 - security, runbook, backup, and restore posture
 - normative host posture and machine-readable host-facts contracts
+- read-only `abyss-machine` bridge consumption and runtime-local route indexing
 - current-machine fit policy and bounded machine-local tuning guidance
 - platform-adaptation policy and public-safe/private tuning record contracts
 - infrastructure helper services that support AoA and ToS
@@ -65,6 +66,13 @@ This repository should not absorb:
 - do not edit `/srv/AbyssOS/abyss-stack` as if it were the source repository
 
 The deployed runtime mirror under `/srv/AbyssOS/abyss-stack/Configs` is intentionally narrower than the source checkout.
+Source checkout shape is authoritative in `~/src/abyss-stack`; `/srv/AbyssOS/abyss-stack/Configs` is a deployed runtime mirror for running and inspecting the stack.
+The GitHub mirror is source-only: it should carry the docs, templates, schemas,
+examples, tests, workflows, and scripts needed to create a runtime, but not live
+`Secrets/`, `Logs/`, `Models/`, `stack.env`, rendered config, local databases,
+model files, or private captures. Runtime state is created from the checkout
+through `scripts/aoa-install-layout`, `scripts/aoa-sync-configs`, and
+`scripts/aoa-bootstrap-configs`.
 
 ## Quick route table
 
@@ -82,27 +90,31 @@ The deployed runtime mirror under `/srv/AbyssOS/abyss-stack/Configs` is intentio
 
 ## Current posture
 
-`abyss-stack` currently exposes a deployed multi-service runtime substrate with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
+`abyss-stack` currently exposes a deployed multi-service runtime substrate with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, stack-side `abyss-machine` bridge capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
 The current bounded promoted local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain opt-in, bounded, and explicit: they can enrich runtime behavior when the `federation` profile is active, but they do not replace source-owned meaning and they should not be read as blanket proof of full federated control-plane coherence.
+The preserved W5/W6 pilot contracts now live under
+`mechanics/inference-pilots/legacy/raw/`; operator entry uses
+`scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
+rather than keeping wave names as root command topology.
 
 Antifragility wave two stays contract-only in this repository. It adds
 runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
 Current contract surfaces are `docs/ANTIFRAGILITY_RUNTIME.md`,
-`docs/RUNTIME_CHAOS_WAVE1.md`,
+`mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
 `docs/REPAIR_SAFE_CLOSEOUT.md`,
-`schemas/service_degradation_receipt_v1.json`,
-`schemas/repair_safe_closeout_receipt_v1.json`,
-`examples/service_degradation_receipt.example.json`, and
-`examples/repair_safe_closeout_receipt.example.json`.
+`mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
+`mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
+`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`, and
+`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.example.json`.
 Wave-1 family examples also now include
-`examples/service_degradation_receipt.timeout-chaos.example.json`,
-`examples/service_degradation_receipt.honest-degradation.example.json`,
-`examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
-`examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
-`examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`.
+`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`,
+`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`,
+`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
+`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
+`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`.
 
 Diagnostic spine groundwork now includes a read-only `aoa-diagnose` seam in
 this repository. It adds a runtime-owned diagnostic read model, tracked quest
@@ -143,7 +155,8 @@ To verify the current promoted path, use this order:
 2. `python scripts/build_diagnostic_surface_catalog.py --check`
 3. `python scripts/validate_diagnostic_surface_catalog.py`
 4. `python scripts/validate_stack.py --parity-check`
-5. `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
-6. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
-7. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
-8. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`
+5. `python scripts/aoa-machine-bridge --check`
+6. `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60`
+7. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json`
+8. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest`
+9. `bash /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-diagnose --preset intel-full --truth-goal live_available --against last-good`

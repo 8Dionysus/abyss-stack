@@ -17,13 +17,13 @@ not trash and not the new active route.
 
 | Artifact kind | Current default | Future package home when clearly local |
 |---|---|---|
-| operator docs | `docs/` | `mechanics/<package>/docs/` for distilled active docs, or `mechanics/<package>/legacy/raw/` for old raw docs |
+| operator docs | `docs/` | `mechanics/<package>/docs/` for package-owned active docs, or `mechanics/<package>/legacy/raw/` for old raw docs |
 | runtime scripts | `scripts/` | `mechanics/<package>/legacy/artifacts/scripts/` while old names remain legacy |
-| schemas | `schemas/` | `mechanics/<package>/legacy/artifacts/schemas/` when the family is contained |
-| examples | `examples/` | `mechanics/<package>/legacy/artifacts/examples/` with validator updates |
+| schemas | `schemas/` | `mechanics/<package>/docs/<contract>/` for active package-local contracts, or `mechanics/<package>/legacy/artifacts/schemas/` when the family is contained |
+| examples | `examples/` | `mechanics/<package>/docs/<contract>/` for active package-local public examples, or `mechanics/<package>/legacy/artifacts/examples/` with validator updates |
 | generated capsules | `generated/` | `mechanics/<package>/legacy/artifacts/generated/` when the source builder moves too |
 | config templates | `config-templates/` | package-local config only when bootstrap and sync know the new path |
-| tests | `tests/` | `mechanics/<package>/legacy/artifacts/tests/` while old test names remain legacy |
+| tests | `tests/` | `mechanics/<package>/tests/` for active package-local contract tests, or `mechanics/<package>/legacy/artifacts/tests/` while old test names remain legacy |
 | deployed mirror content | `/srv/AbyssOS/abyss-stack/Configs` | never by hand; source sync owns deployed copies |
 
 ## Movement contract

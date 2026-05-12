@@ -15,7 +15,10 @@ Validation:
 
 ```bash
 python scripts/validate_stack.py
-bash -n scripts/aoa-llamacpp-pilot scripts/aoa-qwen-run scripts/aoa-qwen-bench scripts/aoa-local-ai-trials
+bash -n scripts/aoa-llamacpp-pilot scripts/aoa-qwen-run scripts/aoa-qwen-bench scripts/aoa-local-ai-trials scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
+python -m py_compile mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w6-pilot
 ```
 
 Agon dry-run kernels now route through `mechanics/agon-runtime/`.
+Preserved W5/W6 pilot surfaces route through `mechanics/inference-pilots/legacy/`
+and `PROVENANCE.md`.

@@ -14,7 +14,7 @@ W6 is:
 W6 is not:
 
 - a new public HTTP API
-- a replacement for `aoa-local-ai-trials`, `aoa-langgraph-pilot`, or `aoa-w5-pilot`
+- a replacement for `aoa-local-ai-trials`, `aoa-langgraph-pilot`, or the preserved W5 pilot
 - an unbounded autonomy claim
 - a license to collapse `trial_proven` into `live_available`
 
@@ -23,11 +23,11 @@ W6 is not:
 Use:
 
 ```bash
-scripts/aoa-w6-pilot materialize
-scripts/aoa-w6-pilot run-scenario <scenario-id> --until milestone|done
-scripts/aoa-w6-pilot resume-scenario <scenario-id>
-scripts/aoa-w6-pilot status --all
-scripts/aoa-w6-pilot status <scenario-id>
+scripts/aoa-bounded-autonomy-pilot materialize
+scripts/aoa-bounded-autonomy-pilot run-scenario <scenario-id> --until milestone|done
+scripts/aoa-bounded-autonomy-pilot resume-scenario <scenario-id>
+scripts/aoa-bounded-autonomy-pilot status --all
+scripts/aoa-bounded-autonomy-pilot status <scenario-id>
 scripts/aoa-status --autonomy
 ```
 
@@ -111,7 +111,7 @@ Wave-level outputs:
 - `W6-autonomy-index.md`
 - `W6_SUMMARY.md`
 
-Each summary should also carry truth-status language from [TRUTH_SURFACES](TRUTH_SURFACES.md):
+Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../docs/TRUTH_SURFACES.md):
 
 - `source_authored`
 - `deployed`

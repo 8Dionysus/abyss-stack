@@ -54,5 +54,6 @@ reviewable local-worker path.
 ## Active route
 
 Current source surfaces stay in `docs/`, `scripts/`, `compose/tuning/`,
-`docs/model-cards/`, `examples/`, and `generated/`.
-
+`docs/model-cards/`, `examples/`, and `generated/`. Preserved W5/W6 wave
+surfaces now stay under `legacy/` with quiet root bridge commands for operator
+compatibility.

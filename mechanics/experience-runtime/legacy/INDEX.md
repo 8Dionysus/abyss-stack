@@ -9,6 +9,8 @@ Old root docs now live in `legacy/raw/`:
 - installation, first release, rollback, and operator console docs
 - office mesh, office release train, handoff graph, and service mesh docs
 - experience certification and deployment storage plans
+- assistant release lifecycle, canary probe, constitution storage,
+  rollback execution, and stay-order enforcement docs
 
 ## Artifacts
 
@@ -23,4 +25,3 @@ Old root artifacts now live under `legacy/artifacts/`:
 
 Start at `../README.md`. Use these legacy files for lineage and validation, not
 as the first active runtime route.
-

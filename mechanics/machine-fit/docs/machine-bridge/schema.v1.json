@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aoa.invalid/abyss-stack/machine-bridge/schema.v1.json",
+  "title": "AoA Machine Bridge Record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "artifact_kind",
+    "schema_version",
+    "capture_mode",
+    "captured_at",
+    "captured_by",
+    "bridge_id",
+    "status",
+    "summary",
+    "contract",
+    "topology",
+    "artifact_index",
+    "command_catalog",
+    "host_bridge",
+    "live_evidence",
+    "execution",
+    "warnings",
+    "non_claims"
+  ],
+  "properties": {
+    "artifact_kind": {
+      "const": "aoa.machine-bridge"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "capture_mode": {
+      "enum": [
+        "public",
+        "private"
+      ]
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "captured_by": {
+      "const": "scripts/aoa-machine-bridge"
+    },
+    "bridge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "warning",
+        "unavailable"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "abyss_machine_available",
+        "stack_bridge_export_ok",
+        "stack_bridge_validate_ok",
+        "warnings",
+        "artifact_classes"
+      ],
+      "properties": {
+        "abyss_machine_available": {
+          "type": "boolean"
+        },
+        "stack_bridge_export_ok": {
+          "type": "boolean"
+        },
+        "stack_bridge_validate_ok": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifact_classes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "machine_owner",
+        "stack_owner",
+        "dependency_direction",
+        "stack_side_mutates_machine",
+        "host_layer_mutates_stack",
+        "read_only_by_default",
+        "private_runtime_artifact"
+      ],
+      "properties": {
+        "machine_owner": {
+          "const": "abyss-machine"
+        },
+        "stack_owner": {
+          "const": "abyss-stack"
+        },
+        "dependency_direction": {
+          "type": "string"
+        },
+        "stack_side_mutates_machine": {
+          "const": false
+        },
+        "host_layer_mutates_stack": {
+          "const": false
+        },
+        "read_only_by_default": {
+          "const": true
+        },
+        "private_runtime_artifact": {
+          "type": "boolean"
+        }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "artifact_index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classes",
+        "refs"
+      ],
+      "properties": {
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "class",
+              "name",
+              "path_class"
+            ],
+            "properties": {
+              "class": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "path_class": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "truth_level": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "command_catalog": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "host_bridge": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "live_evidence": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

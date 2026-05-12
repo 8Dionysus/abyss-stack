@@ -48,20 +48,24 @@ AoA or ToS meaning. Its current checked surface is:
   `tests/test_validate_stack_diagnostic_spine.py`, and
   `tests/test_diagnostic_spine_contracts.py`
 - antifragility contract-only runtime receipts:
-  `docs/ANTIFRAGILITY_RUNTIME.md`, `docs/RUNTIME_CHAOS_WAVE1.md`,
+  `docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
   `docs/REPAIR_SAFE_CLOSEOUT.md`,
-  `schemas/service_degradation_receipt_v1.json`,
-  `schemas/repair_safe_closeout_receipt_v1.json`,
-  `examples/service_degradation_receipt.example.json`,
-  `examples/service_degradation_receipt.timeout-chaos.example.json`,
-  `examples/service_degradation_receipt.honest-degradation.example.json`,
-  `examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
-  `examples/repair_safe_closeout_receipt.example.json`,
-  `examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
-  `examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
+  `mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
+  `mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.example.json`,
+  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
+  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
 - promoted local-worker and Intel serving posture:
   `docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `docs/LLAMACPP_PILOT.md`,
   `docs/MACHINE_FIT_POLICY.md`,
+  `mechanics/inference-pilots/legacy/raw/W5_PILOT.md`,
+  `mechanics/inference-pilots/legacy/raw/W6_PILOT.md`,
+  `scripts/aoa-long-horizon-pilot`,
+  `scripts/aoa-bounded-autonomy-pilot`,
   `compose/tuning/llamacpp.runtime-fallback.yml`,
   `compose/tuning/llamacpp.intel-285h.cpu-safe.yml`,
   `compose/tuning/intel-text.ovms-qwen3-settings.yml`,
@@ -119,6 +123,7 @@ Those landings should be read carefully:
 - clarify local versus hybrid execution paths
 - refine Intel and OVMS posture
 - define clean bridges to sibling AoA repositories
+- consume the read-only `abyss-machine` bridge through stack-local `Logs/machine-bridge/` records before adding automatic policy action
 
 ## Phase 4: mature substrate
 

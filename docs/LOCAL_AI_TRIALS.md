@@ -176,13 +176,13 @@ That sidecar surface established the now-adopted execution posture:
 The next bounded scenario layer lives beside the earlier waves:
 
 ```bash
-scripts/aoa-w5-pilot materialize
-scripts/aoa-w5-pilot run-scenario <scenario-id> --until milestone
-scripts/aoa-w5-pilot resume-scenario <scenario-id>
-scripts/aoa-w5-pilot status --all
+scripts/aoa-long-horizon-pilot materialize
+scripts/aoa-long-horizon-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-long-horizon-pilot resume-scenario <scenario-id>
+scripts/aoa-long-horizon-pilot status --all
 ```
 
-Use [W5_PILOT](W5_PILOT.md) for the full W5 contract.
+Use [W5_PILOT](../mechanics/inference-pilots/legacy/raw/W5_PILOT.md) for the preserved W5 contract.
 
 The W5 runner:
 
@@ -201,13 +201,13 @@ The W5 runner:
 The autonomy-focused layer lives beside W5 and keeps the same promoted substrate:
 
 ```bash
-scripts/aoa-w6-pilot materialize
-scripts/aoa-w6-pilot run-scenario <scenario-id> --until milestone
-scripts/aoa-w6-pilot resume-scenario <scenario-id>
-scripts/aoa-w6-pilot status --all
+scripts/aoa-bounded-autonomy-pilot materialize
+scripts/aoa-bounded-autonomy-pilot run-scenario <scenario-id> --until milestone
+scripts/aoa-bounded-autonomy-pilot resume-scenario <scenario-id>
+scripts/aoa-bounded-autonomy-pilot status --all
 ```
 
-Use [W6_PILOT](W6_PILOT.md) for the full W6 contract.
+Use [W6_PILOT](../mechanics/inference-pilots/legacy/raw/W6_PILOT.md) for the preserved W6 contract.
 
 The W6 runner:
 
