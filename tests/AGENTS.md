@@ -5,7 +5,10 @@ This directory is the runtime validation gate for infrastructure contracts.
 
 ## Scope
 
-Tests here protect compose rendering, public-safe templates, env examples, host/readiness helpers, diagnostic surfaces, runtime receipts, and repair-safe closeout behavior.
+Tests here protect compose rendering, public-safe templates, env examples,
+host/readiness helpers, root integration behavior, runtime receipts, and
+repair-safe closeout behavior. Package-owned mechanics tests can live under the
+owning `mechanics/<name>/parts/<part>/tests/` directory.
 They should prove the source checkout contract without requiring a live deployed host.
 
 ## Local contract

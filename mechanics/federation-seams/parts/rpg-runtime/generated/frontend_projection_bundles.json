@@ -1,0 +1,159 @@
+{
+  "schema_version": "frontend_projection_bundle_collection_v1",
+  "bundles": [
+    {
+      "schema_version": "frontend_projection_bundle_v1",
+      "bundle_id": "frontend.bundle.2026-04-01T18:30:00Z",
+      "generated_at": "2026-04-01T18:30:00Z",
+      "vocabulary_overlay_ref": "Agents-of-Abyss/generated/dual_vocabulary_overlay.json",
+      "source_refs": {
+        "build_snapshots": [
+          "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/agent_build_snapshots.json#build.AOA-A-0002.codex.2026-04-01T18:00:00Z"
+        ],
+        "reputation_ledgers": [
+          "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/reputation_ledgers.json#ledger.agent.AOA-A-0002.2026-04-01"
+        ],
+        "quest_run_results": [
+          "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/quest_run_results.json#QRR-2026-04-01-0001"
+        ],
+        "quest_board_refs": [
+          "aoa-routing/generated/rpg_navigation.min.example.json#nav.AOA-P-0011.safe-change-pair"
+        ],
+        "campaign_refs": [
+          "aoa-playbooks/examples/questline_outline.example.yaml#AOA-PB-CAMP-0001"
+        ]
+      },
+      "views": {
+        "agent_sheet_cards": [
+          {
+            "agent_id": "AOA-A-0002",
+            "build_snapshot_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/agent_build_snapshots.json#build.AOA-A-0002.codex.2026-04-01T18:00:00Z",
+            "display_name": "Coder",
+            "class_archetype": "coder",
+            "rank": "specialist",
+            "primary_axes": [
+              {
+                "axis": "execution_reliability",
+                "value": 58
+              },
+              {
+                "axis": "change_legibility",
+                "value": 51
+              },
+              {
+                "axis": "boundary_integrity",
+                "value": 42
+              }
+            ],
+            "resources": [
+              {
+                "resource": "integrity_budget",
+                "current": 92,
+                "max": 100
+              },
+              {
+                "resource": "focus_budget",
+                "current": 61,
+                "max": 100
+              },
+              {
+                "resource": "deep_budget",
+                "current": 24,
+                "max": 40
+              }
+            ],
+            "equipped_ability_ids": [
+              "ability.aoa-change-protocol",
+              "ability.aoa-safe-infra-change"
+            ],
+            "passive_feat_ids": [
+              "feat.AOA-T-0001",
+              "feat.AOA-T-0013"
+            ],
+            "artifact_ids": [],
+            "reputation_panel_refs": [
+              "panel.rep.AOA-A-0002"
+            ],
+            "active_quest_refs": [
+              "AOA-Q-0008"
+            ]
+          }
+        ],
+        "quest_board_cards": [
+          {
+            "quest_ref": "AOA-Q-0008",
+            "title": "Define the RPG runtime/projection wave for the first body-facing AoA slice",
+            "owner_repo": "Agents-of-Abyss",
+            "state": "triaged",
+            "band": "frontier",
+            "difficulty": "d4_architecture",
+            "risk": "r2_contract",
+            "recommended_agents": [
+              "AOA-A-0001",
+              "AOA-A-0002",
+              "AOA-A-0004"
+            ],
+            "reward_hints": [
+              "live runtime collections",
+              "frontend-ready derived bundle"
+            ],
+            "penalty_hints": [
+              "no direct quest-state writes",
+              "no secret reward engine"
+            ],
+            "source_ref": "Agents-of-Abyss/quests/AOA-Q-0008.yaml"
+          }
+        ],
+        "campaign_lane_cards": [
+          {
+            "campaign_ref": "campaign.rpg.runtime-projection-wave",
+            "title": "RPG Runtime Projection Wave",
+            "status": "seed",
+            "stage_label": "collections before services",
+            "anchor_refs": [
+              "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
+              "abyss-stack/docs/RPG_RUNTIME_COLLECTIONS.md",
+              "abyss-stack/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
+            ],
+            "recommended_build_refs": [
+              "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/agent_build_snapshots.json#build.AOA-A-0002.codex.2026-04-01T18:00:00Z"
+            ],
+            "source_ref": "Dionysus/seed_rpg_runtime_projection_pack.md#rpg-runtime-projection-wave"
+          }
+        ],
+        "progression_timeline_entries": [
+          {
+            "entry_id": "timeline.2026-04-01.rank-clarified",
+            "agent_ref": "AOA-A-0002",
+            "event_kind": "unlock",
+            "summary": "Filesystem-first runtime collections were materialized without turning projection bundles into authority.",
+            "source_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/quest_run_results.json#QRR-2026-04-01-0001",
+            "occurred_at": "2026-04-01T18:15:00Z"
+          }
+        ],
+        "artifact_case_cards": [],
+        "reputation_panels": [
+          {
+            "panel_id": "panel.rep.AOA-A-0002",
+            "subject_ref": "AOA-A-0002",
+            "ledger_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/reputation_ledgers.json#ledger.agent.AOA-A-0002.2026-04-01",
+            "highlighted_slices": [
+              {
+                "axis": "proof_trust",
+                "standing": 72,
+                "label": "trusted"
+              },
+              {
+                "axis": "boundary_trust",
+                "standing": 68,
+                "label": "steady"
+              }
+            ]
+          }
+        ]
+      },
+      "notes": "Generated transport bundle for the body-facing RPG slice. UI labels may theme the payload, but canonical keys and source refs stay visible.",
+      "public_safe": true
+    }
+  ]
+}

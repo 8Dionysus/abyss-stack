@@ -97,7 +97,7 @@ scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
-Keep `docs/reference-platform/reference-host.public.json` for later canonical-host refreshes, not routine local captures.
+Keep `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json` for later canonical-host refreshes, not routine local captures.
 
 ## Windows host bridge
 

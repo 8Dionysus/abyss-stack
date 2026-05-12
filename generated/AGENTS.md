@@ -5,7 +5,11 @@ Generated artifacts are lower authority than their sources.
 
 ## Scope
 
-This directory carries compact machine-readable outputs such as `diagnostic_surface_catalog.min.json`, runtime kernel registries, and RPG-side generated projections.
+This directory carries compact machine-readable outputs such as runtime kernel
+registries. Diagnostic spine generated output now lives under
+`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/`, including
+`diagnostic_surface_catalog.min.json`. RPG runtime read-model outputs now live
+under `mechanics/federation-seams/parts/rpg-runtime/generated/`.
 They help agents and tools read the runtime quickly, but they are not the place to author new runtime doctrine.
 
 ## Local contract
@@ -18,7 +22,11 @@ They help agents and tools read the runtime quickly, but they are not the place 
 ## Change rules
 
 If a generated artifact changes without a source or builder change, explain why it is legitimate. Otherwise treat it as drift.
-For diagnostic surfaces, `diagnostic_surface_catalog.min.json` is checked by the diagnostic catalog builder and validator.
+For diagnostic surfaces, the package-local catalog is checked by the diagnostic
+catalog builder and validator.
+For RPG runtime projections, the package-local generated outputs are checked by
+`scripts/aoa-rpg-runtime-projection --generated-only --check` in source-only
+workflows.
 
 ## Validate
 
@@ -27,5 +35,6 @@ Common gates:
 ```bash
 python scripts/build_diagnostic_surface_catalog.py --check
 python scripts/validate_diagnostic_surface_catalog.py
+python scripts/aoa-rpg-runtime-projection --generated-only --check
 python scripts/validate_stack.py
 ```

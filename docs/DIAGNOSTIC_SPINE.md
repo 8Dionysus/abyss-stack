@@ -21,7 +21,7 @@ The goal is a clearer answer to four questions:
 The diagnostic spine is a read model with memory.
 
 The compact owner-owned entry capsule for this family is
-`generated/diagnostic_surface_catalog.min.json`.
+`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`.
 
 It may:
 - resolve selectors into a concrete diagnostic target
@@ -256,7 +256,7 @@ diagnostic family legible without replacing these source-owned schema and
 example surfaces:
 
 ```text
-generated/diagnostic_surface_catalog.min.json
+mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json
 ```
 
 ## Handoff posture

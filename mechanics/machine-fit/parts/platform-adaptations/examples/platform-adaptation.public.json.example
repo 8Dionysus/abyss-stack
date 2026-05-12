@@ -1,0 +1,91 @@
+{
+  "artifact_kind": "aoa.platform-adaptation",
+  "schema_version": "1",
+  "capture_mode": "public",
+  "captured_at": "2026-03-27T21:10:00Z",
+  "captured_by": "scripts/aoa-platform-adaptation",
+  "record_id": "2026-03-27T211000Z__performance__core-ultra-ollama-chat",
+  "title": "Core Ultra hybrid CPU Ollama chat path",
+  "summary": "A default local chat path on a hybrid Intel CPU showed minute-scale latency for a one-word reply. A native Ollama chat route with bounded thread and batch tuning restored expected local latency.",
+  "issue_class": "performance",
+  "target_surfaces": [
+    "langchain-api:/run",
+    "litellm:/v1/chat/completions",
+    "ollama:/api/chat"
+  ],
+  "platform_scope": {
+    "os_family": "linux",
+    "runtime_class": "rootless-podman",
+    "hardware_class": "intel-hybrid-cpu",
+    "portability_tags": [
+      "linux-local-runtime",
+      "windows-wsl-retest"
+    ]
+  },
+  "symptom": {
+    "signal": "Warm local /run stayed around 45 to 60 seconds for a one-word reply.",
+    "risk": "Routine local chat traffic looked broken even when the model was healthy."
+  },
+  "diagnosis": {
+    "hypothesis": "The default Ollama CPU profile overused mixed P and E cores, and the proxy route did not preserve the tuning knobs needed to correct that path.",
+    "confirmed_by": [
+      "Direct Ollama measurements showed prompt-eval dominating total latency.",
+      "A tuned native Ollama path dropped single-turn latency into the low single-digit seconds and warm repeats to around one second."
+    ]
+  },
+  "adaptation": {
+    "actions": [
+      "Keep the model warm with a bounded keep-alive.",
+      "Use a native Ollama chat route for local chat traffic.",
+      "Pin a bounded thread and batch profile for this host class.",
+      "Align startup warmup with the same tuned profile."
+    ],
+    "overlays": [],
+    "settings": {
+      "OLLAMA_KEEP_ALIVE": "30m",
+      "LC_OLLAMA_NATIVE_CHAT": "true",
+      "LC_OLLAMA_NUM_THREAD": "6",
+      "LC_OLLAMA_NUM_BATCH": "32"
+    },
+    "route_change": "langchain-api /run bypasses LiteLLM for the local Ollama chat path while embeddings continue through their existing provider contracts."
+  },
+  "impact": {
+    "before": {
+      "run_elapsed_s": 56.347
+    },
+    "after": {
+      "run_elapsed_s": 0.988
+    },
+    "improvement_summary": "Warm local /run dropped from about a minute to about a second."
+  },
+  "host_facts_ref": "repo:mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json",
+  "evidence_refs": [
+    "repo:docs/PLATFORM_ADAPTATION_POLICY.md",
+    "local:${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+  ],
+  "portability": {
+    "applies_when": [
+      "Local Ollama chat remains CPU-bound on a hybrid Intel host.",
+      "The same machine is re-used under a Windows plus WSL deployment."
+    ],
+    "retest_on": [
+      "Ollama runtime version changes",
+      "A switch to GPU or OpenVINO chat serving",
+      "A Windows plus WSL deployment on the same laptop"
+    ],
+    "windows_bridge_notes": "Keep hot runtime data in WSL ext4 and re-check the tuned thread and batch profile before assuming parity."
+  },
+  "tags": [
+    "ollama",
+    "hybrid-cpu",
+    "latency",
+    "local-chat"
+  ],
+  "non_claims": [
+    "This does not prove model quality.",
+    "This does not rank models across hosts."
+  ],
+  "redaction": {
+    "redacted_fields": []
+  }
+}

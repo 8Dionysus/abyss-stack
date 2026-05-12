@@ -1,7 +1,9 @@
 # Inference Pilots Docs
 
-Package-owned inference pilot detail can land here in later waves.
+Package-owned inference pilot prose detail lives here.
 
-For now, use the active source surfaces named in
-[PARTS.md](../PARTS.md).
+Active runtime benchmark schemas, examples, and focused tests live under
+`../parts/local-trials/`.
 
+Operator-facing narrative remains in root `docs/` surfaces such as
+`docs/RUNTIME_BENCH_POLICY.md` and `docs/LOCAL_AI_TRIALS.md`.

@@ -28,7 +28,7 @@ authority. Those owners remain stronger than this repository.
 
 Root files should stay route-shaped. If a detail belongs to one mechanic, put
 it in that package's `README.md`, `DIRECTION.md`, `PARTS.md`, `ROADMAP.md`,
-`LANDING_LOG.md`, `docs/`, or a future part-local surface.
+`LANDING_LOG.md`, `parts/`, `docs/`, or a future part-local surface.
 
 ## Package law
 
@@ -40,6 +40,7 @@ Every first-wave package contains:
 - `PARTS.md`
 - `ROADMAP.md`
 - `LANDING_LOG.md`
+- `parts/README.md`
 - `docs/README.md`
 
 The package `README.md` is the mechanic card. It should answer when to use the
@@ -48,9 +49,11 @@ may enter, what may leave, what must not be claimed, how to validate, and where
 to route next.
 
 `DIRECTION.md` owns current contour. `PARTS.md` owns the active source-surface
-map. `ROADMAP.md` owns future movement. `LANDING_LOG.md` records checked
-topology landings. `docs/` holds package-owned detail when a later wave moves or
-adds deeper material.
+map. `parts/README.md` owns the package-local part index, and each
+`parts/<part>/README.md` owns the route for that part. `ROADMAP.md` owns future
+movement. `LANDING_LOG.md` records checked topology landings. `docs/` holds
+package-owned prose detail when it is not a machine-readable contract, example,
+generated capsule, or focused part-local test.
 
 ## Boundaries
 
@@ -61,14 +64,19 @@ adds deeper material.
 - Do not claim live service availability from source-only documents.
 - Do not move a root technical district into a package without updating
   validators and deployment sync expectations in the same change.
+- Put active package-local schemas, examples, generated capsules, and focused
+  tests under `parts/<part>/`, not loose package `docs/surfaces`, `generated`,
+  or `tests` directories.
 
 ## Editing posture
 
 1. Name the package being touched.
 2. Keep the root atlas short and package cards specific.
 3. Update the package `PARTS.md` when source surfaces move.
-4. Update `mechanics/ARTIFACT_TOPOLOGY.md` when placement rules change.
-5. Add a decision note when topology, owner split, validator authority, or
+4. Update `parts/README.md` and the relevant `parts/<part>/README.md` when a
+   part route changes.
+5. Update `mechanics/ARTIFACT_TOPOLOGY.md` when placement rules change.
+6. Add a decision note when topology, owner split, validator authority, or
    deployment expectations change durably.
 
 ## Validation

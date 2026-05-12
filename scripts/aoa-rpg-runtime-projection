@@ -11,6 +11,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
+RPG_SURFACE_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime"
+RPG_SCHEMA_ROOT = RPG_SURFACE_ROOT / "schemas"
+RPG_EXAMPLE_ROOT = RPG_SURFACE_ROOT / "examples"
+RPG_GENERATED_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "generated"
+RPG_GENERATED_REF_ROOT = "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated"
 
 GENERATED_COLLECTIONS = (
     ("agent_build_snapshots.json", "builds", "agent_build_snapshot_collection_v1", "agent_build_snapshot_v1"),
@@ -51,14 +56,14 @@ def require_jsonschema():
 
 
 def build_collections(repo_root: Path) -> dict[str, dict]:
-    build = copy.deepcopy(read_json(repo_root / "examples" / "agent_build_snapshot.example.json"))
-    ledger = copy.deepcopy(read_json(repo_root / "examples" / "reputation_ledger.example.json"))
-    run = copy.deepcopy(read_json(repo_root / "examples" / "quest_run_result.example.json"))
-    bundle = copy.deepcopy(read_json(repo_root / "examples" / "frontend_projection_bundle.example.json"))
+    build = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "agent_build_snapshot.example.json"))
+    ledger = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "reputation_ledger.example.json"))
+    run = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "quest_run_result.example.json"))
+    bundle = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "frontend_projection_bundle.example.json"))
 
-    build_ref = fragment_ref("abyss-stack/generated/rpg/agent_build_snapshots.json", build["snapshot_id"])
-    ledger_ref = fragment_ref("abyss-stack/generated/rpg/reputation_ledgers.json", ledger["ledger_id"])
-    run_ref = fragment_ref("abyss-stack/generated/rpg/quest_run_results.json", run["run_id"])
+    build_ref = fragment_ref(f"{RPG_GENERATED_REF_ROOT}/agent_build_snapshots.json", build["snapshot_id"])
+    ledger_ref = fragment_ref(f"{RPG_GENERATED_REF_ROOT}/reputation_ledgers.json", ledger["ledger_id"])
+    run_ref = fragment_ref(f"{RPG_GENERATED_REF_ROOT}/quest_run_results.json", run["run_id"])
 
     build["reputation_refs"] = [ledger_ref]
     build["notes"] = (
@@ -214,14 +219,14 @@ def validate_collection(repo_root: Path, filename: str, array_key: str, collecti
         "quest_run_results.json": "quest_run_result_collection.schema.json",
         "frontend_projection_bundles.json": "frontend_projection_bundle_collection.schema.json",
     }[filename]
-    collection_schema = read_json(repo_root / "schemas" / collection_schema_name)
+    collection_schema = read_json(repo_root / RPG_SCHEMA_ROOT / collection_schema_name)
     item_schema_name = {
         "builds": "agent_build_snapshot.schema.json",
         "ledgers": "reputation_ledger.schema.json",
         "runs": "quest_run_result.schema.json",
         "bundles": "frontend_projection_bundle.schema.json",
     }[array_key]
-    item_schema = read_json(repo_root / "schemas" / item_schema_name)
+    item_schema = read_json(repo_root / RPG_SCHEMA_ROOT / item_schema_name)
 
     jsonschema.validate(payload, collection_schema)
     if payload.get("schema_version") != collection_version:
@@ -247,7 +252,7 @@ def validate_all(repo_root: Path, collections: dict[str, dict]) -> None:
 
 
 def write_generated(repo_root: Path, collections: dict[str, dict]) -> None:
-    generated_root = repo_root / "generated" / "rpg"
+    generated_root = repo_root / RPG_GENERATED_ROOT
     for filename, *_ in GENERATED_COLLECTIONS:
         write_json(generated_root / filename, collections[filename])
 
@@ -265,7 +270,7 @@ def materialize_runtime(stack_root: Path, collections: dict[str, dict], *, write
             write_json(record_path, collections[filename])
 
 
-def check_parity(repo_root: Path, stack_root: Path) -> None:
+def check_parity(repo_root: Path, stack_root: Path, *, check_runtime: bool) -> None:
     expected = build_collections(repo_root)
     validate_all(repo_root, expected)
     latest_root = stack_root / "Logs" / "rpg" / "latest"
@@ -273,10 +278,14 @@ def check_parity(repo_root: Path, stack_root: Path) -> None:
         filename: latest_root / filename
         for filename, *_ in GENERATED_COLLECTIONS
     }
-    runtime_files_present = {
-        filename: path.exists()
-        for filename, path in latest_paths.items()
-    }
+    runtime_files_present = (
+        {
+            filename: path.exists()
+            for filename, path in latest_paths.items()
+        }
+        if check_runtime
+        else {filename: False for filename, *_ in GENERATED_COLLECTIONS}
+    )
     if any(runtime_files_present.values()) and not all(runtime_files_present.values()):
         missing = ", ".join(
             filename
@@ -286,7 +295,7 @@ def check_parity(repo_root: Path, stack_root: Path) -> None:
         raise SystemExit(f"error: Logs/rpg/latest is partially populated; missing: {missing}")
 
     for filename, array_key, collection_version, item_version in GENERATED_COLLECTIONS:
-        generated_payload = read_json(repo_root / "generated" / "rpg" / filename)
+        generated_payload = read_json(repo_root / RPG_GENERATED_ROOT / filename)
         validate_collection(
             repo_root,
             filename,
@@ -296,7 +305,7 @@ def check_parity(repo_root: Path, stack_root: Path) -> None:
             generated_payload,
         )
         if generated_payload != expected[filename]:
-            raise SystemExit(f"error: generated/rpg/{filename} is out of sync with builder output")
+            raise SystemExit(f"error: {RPG_GENERATED_ROOT.as_posix()}/{filename} is out of sync with builder output")
 
         if not runtime_files_present[filename]:
             continue
@@ -311,7 +320,7 @@ def check_parity(repo_root: Path, stack_root: Path) -> None:
             latest_payload,
         )
         if latest_payload != generated_payload:
-            raise SystemExit(f"error: Logs/rpg/latest/{filename} must match generated/rpg/{filename}")
+            raise SystemExit(f"error: Logs/rpg/latest/{filename} must match {RPG_GENERATED_ROOT.as_posix()}/{filename}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -332,7 +341,7 @@ def main() -> int:
     stack_root = Path(args.stack_root).resolve()
 
     if args.check:
-        check_parity(repo_root, stack_root)
+        check_parity(repo_root, stack_root, check_runtime=not args.generated_only)
         print("[ok] validated RPG runtime projection parity")
         return 0
 

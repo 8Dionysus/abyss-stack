@@ -63,7 +63,7 @@ scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-f
 
 Review the public artifact before commit.
 Do not commit the private artifact.
-Only refresh `docs/reference-platform/reference-host.public.json` when you are intentionally updating the reviewed canonical Linux reference host snapshot.
+Only refresh `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json` when you are intentionally updating the reviewed canonical Linux reference host snapshot.
 Refresh the private machine-fit record when kernel, firmware, container runtime, or validated local tuning changes.
 
 ## Inspect the profile before launch

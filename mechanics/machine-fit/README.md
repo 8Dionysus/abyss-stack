@@ -54,6 +54,8 @@ profiles and [inference-pilots](../inference-pilots/README.md) for model trials.
 
 ## Active route
 
-Current source surfaces stay in `docs/reference-platform/`, `docs/machine-fit/`,
-`docs/platform-adaptations/`, matching scripts, and package-local machine bridge
-detail under `mechanics/machine-fit/docs/`.
+Current source surfaces stay in `mechanics/machine-fit/parts/host-facts/`,
+`mechanics/machine-fit/parts/fit-record/`,
+`mechanics/machine-fit/parts/platform-adaptations/`,
+`mechanics/machine-fit/parts/machine-bridge/`, matching scripts, and the
+route-only part index under `mechanics/machine-fit/parts/`.

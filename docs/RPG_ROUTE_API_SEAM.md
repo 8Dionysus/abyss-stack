@@ -20,7 +20,7 @@ It does not write upstream repos.
 Preferred read order:
 
 1. `${AOA_STACK_ROOT}/Logs/rpg/latest/*.json`
-2. source-managed `generated/rpg/*.json` when running in source or dry-run mode
+2. source-managed `mechanics/federation-seams/parts/rpg-runtime/generated/*.json` when running in source or dry-run mode
 
 ## Raw read surfaces
 

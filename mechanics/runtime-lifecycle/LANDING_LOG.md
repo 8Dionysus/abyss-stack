@@ -8,3 +8,11 @@ up/down, smoke, logs, and systemd lifecycle surfaces.
 Validation route: `python scripts/validate_nested_agents.py` and
 `python scripts/validate_stack.py`.
 
+## 2026-05-12 - Runtime status readout landing
+
+Moved gateway cache status and usage snapshot schemas, examples, and validation
+tests into the runtime-lifecycle package. Root policy and runbook docs stayed
+root-facing because they remain operator orientation surfaces.
+
+Validation route: package-local pytest, `python scripts/validate_stack.py`, and
+`python scripts/validate_nested_agents.py`.

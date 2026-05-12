@@ -23,7 +23,7 @@ When something feels wrong, use this order:
 17. inspect `POST /run/federated` plus its `advisory_trace` when the live runtime may be consuming playbook or memo seams incorrectly
 18. decide whether to fix forward or roll back
 19. inspect the latest return events under `${AOA_STACK_ROOT}/Logs/returns/` when the route appears to be looping, widening context, or silently re-entering
-20. inspect `${AOA_STACK_ROOT}/Logs/rpg/latest/` and `${AOA_STACK_ROOT}/Logs/rpg/records/` when the body-facing RPG transport looks stale, uncited, or out of parity with committed `generated/rpg/`
+20. inspect `${AOA_STACK_ROOT}/Logs/rpg/latest/` and `${AOA_STACK_ROOT}/Logs/rpg/records/` when the body-facing RPG transport looks stale, uncited, or out of parity with committed `mechanics/federation-seams/parts/rpg-runtime/generated/`
 21. inspect `${AOA_STACK_ROOT}/Logs/runtime-gateway/cache-status/latest/` when a local `runtime_gateway_cache_status` artifact exists and the question is dedup, inflight replay, or `no-cache` bypass posture
 22. inspect `${AOA_STACK_ROOT}/Logs/runtime-usage/latest/` when a local `runtime_usage_snapshot` exists and the question is degrade posture, strict stop, or reset-window pressure
 

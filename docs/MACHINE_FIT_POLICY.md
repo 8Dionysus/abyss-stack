@@ -54,8 +54,8 @@ When a current private machine-fit record exists, the lifecycle wrappers may aut
 
 ## Artifact surfaces
 
-- `docs/machine-fit/schema.v1.json` defines the public contract
-- `docs/machine-fit/machine-fit.public.json.example` shows the intended public-safe shape
+- `mechanics/machine-fit/parts/fit-record/schemas/schema.v1.json` defines the public contract
+- `mechanics/machine-fit/parts/fit-record/examples/machine-fit.public.json.example` shows the intended public-safe shape
 - `${AOA_STACK_ROOT}/Logs/machine-fit/` is the local capture root
 
 ## Capture modes

@@ -10,9 +10,9 @@ The machine-fit layer then decides what that host should currently prefer.
 
 ## Artifact surfaces
 
-- `docs/reference-platform/schema.v1.json` defines the v1 public contract.
-- `docs/reference-platform/reference-host.public.json.example` shows the intended public-safe shape while the repository is still on scaffold-only host facts.
-- `docs/reference-platform/reference-host.public.json` is the future commit-safe snapshot for the chosen canonical Linux reference host and should not be added until that host is selected and reviewed.
+- `mechanics/machine-fit/parts/host-facts/schemas/schema.v1.json` defines the v1 public contract.
+- `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json.example` shows the intended public-safe shape while the repository is still on scaffold-only host facts.
+- `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json` is the future commit-safe snapshot for the chosen canonical Linux reference host and should not be added until that host is selected and reviewed.
 - `${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json` is the local fuller snapshot and must not be committed.
 
 ## Capture modes

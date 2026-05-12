@@ -13,7 +13,7 @@
 This file is normative. It names the intended operating posture.
 
 Observed machine facts belong to the machine-readable host-facts layer described in [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md).
-The stack-side route into the host control plane belongs to [machine-fit/MACHINE_BRIDGE](../mechanics/machine-fit/docs/MACHINE_BRIDGE.md).
+The stack-side route into the host control plane belongs to [machine-fit/MACHINE_BRIDGE](../mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md).
 The current-host runtime choice belongs to [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md).
 
 Recommended local review flow:
@@ -25,7 +25,7 @@ scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
-The repository may carry a reviewed canonical public snapshot at `docs/reference-platform/reference-host.public.json`.
+The repository may carry a reviewed canonical public snapshot at `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json`.
 Refresh that file intentionally when you are updating the chosen canonical Linux reference host, not during routine local captures.
 
 `aoa-doctor` stays focused on readiness. It is not the durable inventory surface.
