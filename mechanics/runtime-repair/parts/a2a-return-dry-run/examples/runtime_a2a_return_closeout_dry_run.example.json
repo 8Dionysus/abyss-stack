@@ -91,7 +91,7 @@
     "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md",
     "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
     "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md",
-    "repo:abyss-stack/docs/A2A_RETURN_DRY_RUN.md"
+    "repo:abyss-stack/mechanics/runtime-repair/docs/A2A_RETURN_DRY_RUN.md"
   ],
   "boundary_notes": [
     "dry-run adapter assembly only",

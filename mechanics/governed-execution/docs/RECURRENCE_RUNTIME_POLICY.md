@@ -265,7 +265,7 @@ It only makes `abyss-stack` own the runtime discipline of anchor-based re-entry.
 
 The smallest real landing is:
 
-1. add `docs/RECURRENCE_RUNTIME_POLICY.md`
+1. add `mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md`
 2. add a public-safe return policy template under `config-templates/Configs/agent-api/`
 3. mount that file into the agent-facing runtime service
 4. write `runtime_return_event` artifacts under `Logs/returns/`

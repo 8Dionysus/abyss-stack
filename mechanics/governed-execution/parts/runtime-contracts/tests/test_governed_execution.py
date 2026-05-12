@@ -779,8 +779,8 @@ class GovernedExecutionTests(unittest.TestCase):
             text,
             char_limit=240,
             focus_terms=self.module.focus_terms_from_goal(
-                "Clarify repo-scope expansion gate wording in docs/GOVERNED_EXECUTION.md",
-                target_file="docs/GOVERNED_EXECUTION.md",
+                "Clarify repo-scope expansion gate wording in mechanics/governed-execution/docs/GOVERNED_EXECUTION.md",
+                target_file="mechanics/governed-execution/docs/GOVERNED_EXECUTION.md",
             ),
         )
         self.assertIn("repo-scope expansion gate", excerpt)
@@ -788,9 +788,9 @@ class GovernedExecutionTests(unittest.TestCase):
 
     def test_build_edit_spec_prompt_uses_bounded_excerpt(self) -> None:
         prompt = self.module.build_edit_spec_prompt(
-            request={"goal": "Clarify repo-scope expansion gate wording in docs/GOVERNED_EXECUTION.md"},
+            request={"goal": "Clarify repo-scope expansion gate wording in mechanics/governed-execution/docs/GOVERNED_EXECUTION.md"},
             playbook_id="AOA-P-0011",
-            target_file="docs/GOVERNED_EXECUTION.md",
+            target_file="mechanics/governed-execution/docs/GOVERNED_EXECUTION.md",
             target_text=("padding\n" * 500) + "repo-scope expansion gate remains evidence only\n" + ("tail\n" * 500),
             failure_context=[],
         )
@@ -1088,7 +1088,7 @@ class GovernedExecutionTests(unittest.TestCase):
     def test_narrow_candidate_files_uses_goal_path_hints(self) -> None:
         narrowed = self.module.narrow_candidate_files(
             [
-                "docs/TRUTH_SURFACES.md",
+                "mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md",
                 "scripts/_aoa_governed_execution.py",
                 "scripts/aoa-governed-run",
                 "mechanics/governed-execution/parts/runtime-contracts/tests/test_governed_execution.py",

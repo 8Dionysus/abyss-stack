@@ -15,4 +15,4 @@ This part owns the machine-readable public host-facts layer for `abyss-stack`.
 - once selected, refresh `reference-host.public.json` intentionally rather than treating it as a routine local capture
 - do not store private host captures here
 - private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
-- when the schema changes, update `docs/REFERENCE_PLATFORM_SPEC.md`, `scripts/aoa-host-facts`, validation, and workflow coverage in the same change
+- when the schema changes, update `mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md`, `scripts/aoa-host-facts`, validation, and workflow coverage in the same change

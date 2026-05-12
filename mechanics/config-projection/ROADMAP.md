@@ -8,7 +8,7 @@
 
 ## Next wave candidates
 
-- audit `docs/SECRETS_BOOTSTRAP.md` for package-local detail
+- audit `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md` for package-local detail
 - add package-specific examples only after validators know their location
 - decide whether render-truth docs stay root-facing or split
 

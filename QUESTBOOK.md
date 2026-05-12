@@ -52,9 +52,9 @@ Allowed verdicts:
 ## Backing files
 
 - `quests/*.yaml`
-- `schemas/quest.schema.json`
-- `schemas/quest_dispatch.schema.json`
-- `examples/quest_catalog.min.example.json`
-- `examples/quest_dispatch.min.example.json`
+- `quests/schemas/quest.schema.json`
+- `quests/schemas/quest_dispatch.schema.json`
+- `quests/examples/quest_catalog.min.example.json`
+- `quests/examples/quest_dispatch.min.example.json`
 
-The files under `examples/*.example.json` are reviewable examples. They are not generated state, deployed runtime state, or runtime authority.
+The files under `quests/examples/*.example.json` are reviewable examples. They are not generated state, deployed runtime state, or runtime authority.

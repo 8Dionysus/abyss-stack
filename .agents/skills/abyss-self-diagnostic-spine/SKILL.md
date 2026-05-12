@@ -30,15 +30,15 @@ In `abyss-stack`, the diagnostic spine stays:
 - separate from mutation authority
 
 Primary local surfaces:
-- `docs/DIAGNOSTIC_SPINE.md`
+- `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`
 - `scripts/aoa-diagnose`
 - `scripts/_aoa_diagnose.py`
-- `schemas/diagnostic_target.schema.json`
-- `schemas/diagnostic_session.schema.json`
-- `schemas/diagnosis_companion.schema.json`
-- `schemas/diagnostic_anchor_ref.schema.json`
-- `schemas/repair_handoff.schema.json`
-- `schemas/reviewed_diagnosis_ref.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json`
 
 ## Local rules
 

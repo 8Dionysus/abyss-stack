@@ -112,8 +112,8 @@
             "stage_label": "collections before services",
             "anchor_refs": [
               "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
-              "abyss-stack/docs/RPG_RUNTIME_COLLECTIONS.md",
-              "abyss-stack/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
+              "abyss-stack/mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md",
+              "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
             ],
             "recommended_build_refs": [
               "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/agent_build_snapshots.json#build.AOA-A-0002.codex.2026-04-01T18:00:00Z"

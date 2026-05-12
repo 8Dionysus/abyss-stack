@@ -14,8 +14,8 @@
 - `docs/SERVICE_CATALOG.md`
 - `docs/PROFILES.md`
 - `docs/PROFILE_RECIPES.md`
-- `docs/RENDER_TRUTH.md`
-- `docs/DOCTOR.md`
+- `mechanics/config-projection/docs/RENDER_TRUTH.md`
+- `mechanics/diagnostic-spine/docs/DOCTOR.md`
 - `docs/FIRST_RUN.md`
 - `docs/SECURITY.md`
 
@@ -93,9 +93,9 @@ Rules:
 Use only commands/helpers documented in the repo for the touched surface.
 Before running anything, list the exact helper(s) you found in:
 - docs/PROFILE_RECIPES.md
-- docs/RENDER_TRUTH.md
+- mechanics/config-projection/docs/RENDER_TRUTH.md
 - docs/FIRST_RUN.md
-- docs/DOCTOR.md
+- mechanics/diagnostic-spine/docs/DOCTOR.md
 - docs/RUNBOOK.md
 
 Then run only those applicable commands and report:
@@ -121,9 +121,9 @@ Check:
 ```bash
 # Use only the exact helper commands documented for the touched surface in:
 # docs/PROFILE_RECIPES.md
-# docs/RENDER_TRUTH.md
+# mechanics/config-projection/docs/RENDER_TRUTH.md
 # docs/FIRST_RUN.md
-# docs/DOCTOR.md
+# mechanics/diagnostic-spine/docs/DOCTOR.md
 # docs/RUNBOOK.md
 ```
 

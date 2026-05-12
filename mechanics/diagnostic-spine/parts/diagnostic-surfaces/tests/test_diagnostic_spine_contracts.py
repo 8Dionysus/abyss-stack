@@ -50,10 +50,10 @@ class DiagnosticSpineContractTests(unittest.TestCase):
     def test_readme_and_runbook_reference_diagnostic_spine_surfaces(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         runbook = (REPO_ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
-        spine_doc = (REPO_ROOT / "docs" / "DIAGNOSTIC_SPINE.md").read_text(encoding="utf-8")
+        spine_doc = (REPO_ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DIAGNOSTIC_SPINE.md").read_text(encoding="utf-8")
 
         for fragment in [
-            "docs/DIAGNOSTIC_SPINE.md",
+            "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
@@ -108,7 +108,7 @@ class DiagnosticSpineContractTests(unittest.TestCase):
         self.assertEqual(payload["schema_version"], "abyss_stack_diagnostic_surface_catalog_v1")
         self.assertEqual(payload["owner_repo"], "abyss-stack")
         self.assertEqual(payload["surface_kind"], "runtime_surface")
-        self.assertEqual(payload["authority_ref"], "docs/DIAGNOSTIC_SPINE.md")
+        self.assertEqual(payload["authority_ref"], "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md")
         self.assertEqual(
             [entry["name"] for entry in payload["surfaces"]],
             [

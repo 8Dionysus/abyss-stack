@@ -1,7 +1,7 @@
 # Logs And Status
 
-Routes `scripts/aoa-logs`, `scripts/aoa-status`, `docs/RENDER_TRUTH.md`,
-`docs/GATEWAY_CACHE_POLICY.md`, and `docs/USAGE_BUDGET_POLICY.md`.
+Routes `scripts/aoa-logs`, `scripts/aoa-status`, `mechanics/config-projection/docs/RENDER_TRUTH.md`,
+`mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md`, and `mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md`.
 
 This part owns runtime readout posture; machine-readable contracts live in
 `parts/status-readouts/`.

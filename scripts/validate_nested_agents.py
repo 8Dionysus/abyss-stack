@@ -37,6 +37,18 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'CHANGE_ME',
         'python scripts/validate_stack.py',
     ),
+    'docs/AGENTS.md': (
+        'repo-wide operator and source-checkout documentation',
+        'Mechanic-owned runtime doctrine',
+        'docs/decisions',
+        'python scripts/validate_nested_agents.py',
+    ),
+    '.agents/skills/AGENTS.md': (
+        'repo-local skill install and overlay surface',
+        'aoa-skills',
+        'local overlays thin',
+        'python scripts/validate_nested_agents.py',
+    ),
     'scripts/AGENTS.md': (
         'runtime bridge, bootstrap helpers',
         'scripts/validate_stack.py',
@@ -51,18 +63,24 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'systemd-analyze --user verify',
         'do not point units at the source checkout',
     ),
-    'schemas/AGENTS.md': (
-        'runtime-owned machine-readable contracts',
-        'schema changes are contract changes',
-        '$schema',
-        'diagnostic_surface_catalog.min.json',
-        'python scripts/validate_stack.py',
+    '.github/AGENTS.md': (
+        'GitHub platform surface',
+        'GitHub automation public-safe',
+        'Repo Validation',
+        'root route card',
     ),
-    'generated/AGENTS.md': (
-        'Generated artifacts are lower authority than their sources',
-        'do not hand-edit generated JSON',
-        'diagnostic_surface_catalog.min.json',
-        'python scripts/build_diagnostic_surface_catalog.py --check',
+    'Spark/AGENTS.md': (
+        'fast-loop lane',
+        'one bounded patch per loop',
+        'narrowest relevant validation',
+        'secret-bearing material stayed out of committed surfaces',
+    ),
+    'quests/AGENTS.md': (
+        'questbook district',
+        'quests/*.yaml',
+        'quests/schemas',
+        'quests/examples',
+        'python scripts/validate_stack.py',
     ),
     'mechanics/AGENTS.md': (
         'runtime mechanics tree',
@@ -162,7 +180,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'python -m pytest',
     ),
 }
-ADVISORY_AGENT_DIRS: tuple[str, ...] = ('.agents/skills', 'config', 'docs', 'examples', 'manifests/recurrence', 'quests')
+ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
 

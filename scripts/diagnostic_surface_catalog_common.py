@@ -22,7 +22,7 @@ SURFACE_PAYLOAD = {
     "schema_version": "abyss_stack_diagnostic_surface_catalog_v1",
     "owner_repo": "abyss-stack",
     "surface_kind": "runtime_surface",
-    "authority_ref": "docs/DIAGNOSTIC_SPINE.md",
+    "authority_ref": "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md",
 }
 
 SURFACE_SPECS = (

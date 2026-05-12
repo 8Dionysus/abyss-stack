@@ -517,7 +517,7 @@ def stack_sync_json_case() -> dict[str, Any]:
         "source_refs": [
             absolute(SOURCE_CHECKOUT_ROOT / "scripts" / "aoa-sync-federation-surfaces"),
             absolute(SOURCE_CHECKOUT_ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml"),
-            absolute(SOURCE_CHECKOUT_ROOT / "docs" / "LOCAL_AI_TRIALS.md"),
+            absolute(SOURCE_CHECKOUT_ROOT / "mechanics" / "inference-pilots" / "docs" / "LOCAL_AI_TRIALS.md"),
         ],
         "observed_actions": [],
         "execution_mode": "implementation_patch",
@@ -588,7 +588,7 @@ def llamacpp_verify_case() -> dict[str, Any]:
         "allowed_tools": ["langchain-api:/run", "local-shell", "local-files:read-write", "repo-validator"],
         "source_refs": [
             absolute(SOURCE_CHECKOUT_ROOT / "scripts" / "aoa-llamacpp-pilot"),
-            absolute(SOURCE_CHECKOUT_ROOT / "docs" / "LLAMACPP_PILOT.md"),
+            absolute(SOURCE_CHECKOUT_ROOT / "mechanics" / "inference-pilots" / "docs" / "LLAMACPP_PILOT.md"),
             absolute(
                 SOURCE_CHECKOUT_ROOT
                 / "mechanics"

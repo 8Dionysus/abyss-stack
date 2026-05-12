@@ -54,7 +54,7 @@ Use [diagnostic-spine](../diagnostic-spine/README.md) for truth-goal status,
 
 ## Active route
 
-Current source surfaces stay in `docs/GOVERNED_EXECUTION.md`,
+Current source surfaces stay in `mechanics/governed-execution/docs/GOVERNED_EXECUTION.md`,
 `scripts/_aoa_governed_execution.py`, `scripts/_aoa_status_autonomy.py`,
 `scripts/aoa-governed-run`, `scripts/aoa-status`, config templates, and
 package-local parts under `mechanics/governed-execution/parts/`.

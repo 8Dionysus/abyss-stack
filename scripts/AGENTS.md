@@ -7,18 +7,18 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 1. `scripts/aoa-lib.sh`
 2. `.github/workflows/validate-stack.yml` in the source checkout only; the runtime `Configs/` mirror does not include `.github/`
 3. `docs/FIRST_RUN.md`
-4. `docs/DOCTOR.md`
+4. `mechanics/diagnostic-spine/docs/DOCTOR.md`
 5. `docs/DEPLOYMENT.md`
 6. `docs/PRESETS.md`
 7. `docs/PROFILE_RECIPES.md`
-8. `docs/RENDER_TRUTH.md`
-9. `docs/INTERNAL_PROBES.md`
-10. `docs/RECURRENCE_RUNTIME_POLICY.md`
+8. `mechanics/config-projection/docs/RENDER_TRUTH.md`
+9. `mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md`
+10. `mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md`
 11. `docs/PATHS.md`
-12. `docs/REFERENCE_PLATFORM.md`
-13. `docs/REFERENCE_PLATFORM_SPEC.md`
-14. `docs/MACHINE_FIT_POLICY.md`
-15. `docs/DIAGNOSTIC_SPINE.md`
+12. `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`
+13. `mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md`
+14. `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`
+15. `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.
@@ -58,9 +58,9 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - `.github/workflows/validate-stack.yml`
   - the relevant docs in `docs/`
 - If you introduce or remove required runtime files, update both `aoa-check-layout` and `validate_stack.py`.
-- If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `mechanics/machine-fit/parts/host-facts/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change host-facts shape or capture destinations, update `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md`, `mechanics/machine-fit/parts/host-facts/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 - If you change machine-bridge shape or capture destinations, update `mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md`, `mechanics/machine-fit/parts/machine-bridge/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
-- If you change machine-fit shape or capture destinations, update `docs/MACHINE_FIT_POLICY.md`, `mechanics/machine-fit/parts/fit-record/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change machine-fit shape or capture destinations, update `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`, `mechanics/machine-fit/parts/fit-record/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 - If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
 ## Verify

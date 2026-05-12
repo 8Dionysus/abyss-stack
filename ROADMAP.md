@@ -30,7 +30,7 @@ AoA or ToS meaning. Its current checked surface is:
   `docs/DEPLOYMENT.md`, `scripts/aoa-sync-configs`,
   `scripts/validate_stack.py`, and `scripts/release_check.py`
 - diagnostic spine and repair-safe handoff contracts:
-  `docs/DIAGNOSTIC_SPINE.md`,
+  `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`,
@@ -48,8 +48,8 @@ AoA or ToS meaning. Its current checked surface is:
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py`, and
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py`
 - antifragility contract-only runtime receipts:
-  `docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
-  `docs/REPAIR_SAFE_CLOSEOUT.md`,
+  `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
+  `mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`,
   `mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
   `mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
   `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`,
@@ -60,8 +60,8 @@ AoA or ToS meaning. Its current checked surface is:
   `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
   `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
 - promoted local-worker and Intel serving posture:
-  `docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `docs/LLAMACPP_PILOT.md`,
-  `docs/MACHINE_FIT_POLICY.md`,
+  `mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `mechanics/inference-pilots/docs/LLAMACPP_PILOT.md`,
+  `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`,
   `mechanics/inference-pilots/legacy/raw/W5_PILOT.md`,
   `mechanics/inference-pilots/legacy/raw/W6_PILOT.md`,
   `scripts/aoa-long-horizon-pilot`,
@@ -69,13 +69,13 @@ AoA or ToS meaning. Its current checked surface is:
   `compose/tuning/llamacpp.runtime-fallback.yml`,
   `compose/tuning/llamacpp.intel-285h.cpu-safe.yml`,
   `compose/tuning/intel-text.ovms-qwen3-settings.yml`,
-  `docs/model-cards/qwen3-openvino-family.md`, and
+  `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md`, and
   `scripts/aoa-llamacpp-pilot`
 - bounded federation, runtime-chat, and ToS graph curation seams:
-  `docs/MEMO_RUNTIME_SEAM.md`, `docs/EVAL_RUNTIME_SEAM.md`,
-  `docs/PLAYBOOK_RUNTIME_SEAM.md`, `docs/KAG_RUNTIME_SEAM.md`,
+  `mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md`,
+  `mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md`,
   `docs/SERVICE_CATALOG.md`, `docs/PROFILES.md`,
-  `docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
+  `mechanics/federation-seams/docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
   `compose/modules/52-tos-graph.yml`, `compose/profiles/curation.txt`, and
   `config-templates/Services/tos-graph/app/main.py`
 

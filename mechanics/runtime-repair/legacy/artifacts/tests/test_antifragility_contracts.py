@@ -93,13 +93,13 @@ class AntifragilityContractTests(unittest.TestCase):
 
     def test_runtime_antifragility_docs_keep_source_vs_runtime_boundary(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        runtime_doc = (REPO_ROOT / "docs" / "ANTIFRAGILITY_RUNTIME.md").read_text(encoding="utf-8")
-        closeout_doc = (REPO_ROOT / "docs" / "REPAIR_SAFE_CLOSEOUT.md").read_text(encoding="utf-8")
+        runtime_doc = (REPO_ROOT / "mechanics" / "runtime-repair" / "docs" / "ANTIFRAGILITY_RUNTIME.md").read_text(encoding="utf-8")
+        closeout_doc = (REPO_ROOT / "mechanics" / "runtime-repair" / "docs" / "REPAIR_SAFE_CLOSEOUT.md").read_text(encoding="utf-8")
 
         for fragment in [
-            "docs/ANTIFRAGILITY_RUNTIME.md",
+            "mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md",
             "mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md",
-            "docs/REPAIR_SAFE_CLOSEOUT.md",
+            "mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md",
             "mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json",
             "mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json",
             "mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json",

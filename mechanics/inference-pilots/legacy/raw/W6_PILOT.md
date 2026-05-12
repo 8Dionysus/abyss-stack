@@ -111,7 +111,7 @@ Wave-level outputs:
 - `W6-autonomy-index.md`
 - `W6_SUMMARY.md`
 
-Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../docs/TRUTH_SURFACES.md):
+Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md):
 
 - `source_authored`
 - `deployed`

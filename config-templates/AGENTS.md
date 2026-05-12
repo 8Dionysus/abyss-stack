@@ -7,8 +7,8 @@ This directory stores public-safe runtime config templates that are bootstrapped
 1. `config-templates/README.md`
 2. `docs/DEPLOYMENT.md`
 3. `docs/STORAGE_LAYOUT.md`
-4. `docs/SECRETS_BOOTSTRAP.md`
-5. `docs/RENDER_TRUTH.md`
+4. `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md`
+5. `mechanics/config-projection/docs/RENDER_TRUTH.md`
 
 ## Directory contract
 - `Configs/` mirrors `${AOA_STACK_ROOT}/Configs`.

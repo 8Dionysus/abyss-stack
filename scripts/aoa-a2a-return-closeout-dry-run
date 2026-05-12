@@ -193,7 +193,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
             PLAYBOOK_REF,
             EVAL_HOOK_REF,
             MEMO_WRITEBACK_REF,
-            "repo:abyss-stack/docs/A2A_RETURN_DRY_RUN.md",
+            "repo:abyss-stack/mechanics/runtime-repair/docs/A2A_RETURN_DRY_RUN.md",
         ],
         "boundary_notes": [
             "dry-run adapter assembly only",
