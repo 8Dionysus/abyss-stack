@@ -12,6 +12,7 @@ This file maps the first migrated runtime modules to their intended services.
 ## `20-orchestration.yml`
 
 - `n8n` — workflow orchestration
+- `n8n-task-runners` — external n8n JavaScript/Python task runner sidecar, version-matched to n8n and connected through the internal broker on `5679`
 
 ## `30-local-inference.yml`
 

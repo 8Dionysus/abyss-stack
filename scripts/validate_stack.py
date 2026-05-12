@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 from typing import Any, Sequence
 
@@ -65,6 +66,8 @@ MECHANIC_PACKAGE_REQUIRED_FILES = (
 LEGACY_MECHANIC_PACKAGES = (
     "agon-runtime",
     "experience-runtime",
+    "inference-pilots",
+    "runtime-repair",
 )
 LEGACY_MECHANIC_REQUIRED_FILES = (
     "PROVENANCE.md",
@@ -86,6 +89,14 @@ LEGACY_MECHANIC_ARTIFACT_DIRS = {
         "legacy/artifacts/manifests/recurrence",
     ),
     "experience-runtime": (
+        "legacy/artifacts/examples",
+        "legacy/artifacts/schemas",
+        "legacy/artifacts/tests",
+    ),
+    "inference-pilots": (
+        "legacy/artifacts/scripts",
+    ),
+    "runtime-repair": (
         "legacy/artifacts/examples",
         "legacy/artifacts/schemas",
         "legacy/artifacts/tests",
@@ -114,12 +125,13 @@ REQUIRED_SCRIPTS = {
     "aoa-governed-run",
     "aoa-doctor",
     "aoa-host-facts",
+    "aoa-machine-bridge",
     "aoa-machine-fit",
     "aoa-platform-adaptation",
     "aoa-local-ai-trials",
     "aoa-langgraph-pilot",
-    "aoa-w5-pilot",
-    "aoa-w6-pilot",
+    "aoa-long-horizon-pilot",
+    "aoa-bounded-autonomy-pilot",
     "aoa-llamacpp-pilot",
     "aoa-runtime-bench-index",
     "aoa-rpg-runtime-projection",
@@ -179,8 +191,8 @@ REQUIRED_FILES = {
     ROOT / "docs" / "TRUTH_SURFACES.md",
     ROOT / "docs" / "LANGGRAPH_PILOT.md",
     ROOT / "docs" / "LLAMACPP_PILOT.md",
-    ROOT / "docs" / "W5_PILOT.md",
-    ROOT / "docs" / "W6_PILOT.md",
+    ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md",
+    ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md",
     ROOT / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
     ROOT / "docs" / "MEMO_RUNTIME_SEAM.md",
@@ -208,6 +220,10 @@ REQUIRED_FILES = {
     ROOT / "docs" / "reference-platform" / "README.md",
     ROOT / "docs" / "reference-platform" / "schema.v1.json",
     ROOT / "docs" / "reference-platform" / "reference-host.public.json.example",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_BRIDGE.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "schema.v1.json",
+    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "machine-bridge.public.json.example",
     ROOT / "docs" / "machine-fit" / "README.md",
     ROOT / "docs" / "machine-fit" / "schema.v1.json",
     ROOT / "docs" / "machine-fit" / "machine-fit.public.json.example",
@@ -464,6 +480,40 @@ MODULE_REQUIREMENTS = {
 }
 
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".zip", ".pyc"}
+GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS = {"Secrets", "Logs", "Models"}
+GIT_MIRROR_CACHE_PARTS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".cache",
+    "node_modules",
+}
+GIT_MIRROR_LIVE_ENV_NAMES = {"stack.env", ".env"}
+GIT_MIRROR_PRIVATE_SUFFIXES = (".private.json", ".private.yaml", ".private.yml")
+GIT_MIRROR_RENDERED_SUFFIXES = (".rendered.yml", ".rendered.yaml")
+GIT_MIRROR_DATABASE_SUFFIXES = (".db", ".sqlite", ".sqlite3")
+GIT_MIRROR_HEAVY_SUFFIXES = (
+    ".gguf",
+    ".safetensors",
+    ".pt",
+    ".pth",
+    ".onnx",
+    ".ckpt",
+    ".zip",
+    ".tar",
+    ".tar.gz",
+    ".tgz",
+    ".zst",
+)
+GIT_MIRROR_FIXTURE_PREFIXES = (
+    "docs/",
+    "examples/",
+    "schemas/",
+    "tests/",
+    "mechanics/",
+    "config-templates/",
+)
 
 
 def iter_text_files() -> list[Path]:
@@ -487,6 +537,79 @@ def read_text_or_none(path: Path) -> str | None:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         return None
+
+
+def is_public_fixture_like_tracked_path(relative_path: str) -> bool:
+    name = relative_path.rsplit("/", 1)[-1]
+    if not relative_path.startswith(GIT_MIRROR_FIXTURE_PREFIXES):
+        return False
+    return (
+        name.endswith(".example")
+        or ".example." in name
+        or name.endswith(".example.json")
+        or name.endswith(".json.example")
+        or name.endswith(".env.example")
+        or ".public." in name
+        or relative_path.startswith(("docs/", "schemas/", "tests/"))
+    )
+
+
+def tracked_file_git_mirror_hygiene_issue(relative_path: str) -> str | None:
+    normalized = relative_path.replace("\\", "/").strip("/")
+    if not normalized:
+        return None
+
+    parts = normalized.split("/")
+    name = parts[-1]
+    lower_name = name.lower()
+    lower_path = normalized.lower()
+    fixture_like = is_public_fixture_like_tracked_path(normalized)
+
+    if parts[0] in GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS:
+        return f"live runtime directory `{parts[0]}/`"
+    if any(part in GIT_MIRROR_CACHE_PARTS for part in parts):
+        return "local cache or dependency directory"
+    if name in GIT_MIRROR_LIVE_ENV_NAMES:
+        return "live env file"
+    if lower_name.endswith(".env") and not lower_name.endswith(".env.example"):
+        return "live env file"
+    if lower_path.endswith(GIT_MIRROR_RENDERED_SUFFIXES):
+        return "rendered compose/config output"
+    if lower_path.endswith(GIT_MIRROR_DATABASE_SUFFIXES):
+        return "database artifact"
+    if lower_path.endswith(GIT_MIRROR_HEAVY_SUFFIXES):
+        return "heavy archive or model artifact"
+    if lower_path.endswith(GIT_MIRROR_PRIVATE_SUFFIXES) and not fixture_like:
+        return "private capture artifact"
+    return None
+
+
+def iter_tracked_git_files() -> list[str]:
+    if not (ROOT / ".git").exists():
+        return []
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return []
+    if result.returncode != 0:
+        return []
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def validate_git_mirror_hygiene(errors: list[str]) -> None:
+    for relative_path in iter_tracked_git_files():
+        issue = tracked_file_git_mirror_hygiene_issue(relative_path)
+        if issue:
+            errors.append(
+                "tracked file is not GitHub mirror safe: "
+                f"{relative_path} ({issue})"
+            )
 
 
 def load_names(file_path: Path) -> list[str]:
@@ -1063,6 +1186,31 @@ def validate_profiles(errors: list[str]) -> None:
             "compose/modules/41-agent-api.yml must not override AOA_FEDERATED_RUN_ENABLED so the runtime secret can control the gate"
         )
 
+    orchestration_module = (MODULE_DIR / "20-orchestration.yml").read_text(encoding="utf-8")
+    for snippet in (
+        "n8n-task-runners:",
+        "docker.io/n8nio/runners@sha256:",
+        "N8N_RUNNERS_ENABLED",
+        "N8N_RUNNERS_MODE: external",
+        "N8N_RUNNERS_BROKER_LISTEN_ADDRESS: 0.0.0.0",
+        "N8N_NATIVE_PYTHON_RUNNER",
+        "N8N_RUNNERS_TASK_BROKER_URI: http://n8n:5679",
+    ):
+        if snippet not in orchestration_module:
+            errors.append(f"compose/modules/20-orchestration.yml must include n8n external runner setting: {snippet}")
+
+    stack_env_example = (ROOT / "env" / "stack.env.example").read_text(encoding="utf-8")
+    if "N8N_RUNNERS_AUTH_TOKEN=CHANGE_ME_LONG_RANDOM_SHARED_SECRET" not in stack_env_example:
+        errors.append("env/stack.env.example must include N8N_RUNNERS_AUTH_TOKEN placeholder for external n8n runners")
+
+    service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    if "n8n-task-runners" not in service_catalog_doc:
+        errors.append("docs/SERVICE_CATALOG.md must mention n8n-task-runners")
+
+    secrets_doc = (ROOT / "docs" / "SECRETS_BOOTSTRAP.md").read_text(encoding="utf-8")
+    if "N8N_RUNNERS_AUTH_TOKEN" not in secrets_doc or "n8n-task-runners" not in secrets_doc:
+        errors.append("docs/SECRETS_BOOTSTRAP.md must describe the n8n runner shared token")
+
 
 def validate_presets(errors: list[str]) -> None:
     for preset in sorted(PRESET_DIR.glob("*.txt")):
@@ -1131,7 +1279,7 @@ def validate_paths(errors: list[str]) -> None:
         "scripts/aoa-governed-run run --request-file",
         "scripts/aoa-governed-run resume",
         "status --all --explain",
-        "scripts/aoa-w5-pilot materialize",
+        "scripts/aoa-long-horizon-pilot materialize",
         "run-scenario <scenario-id> --until milestone",
         "resume-scenario <scenario-id>",
         "implementation_patch",
@@ -1196,11 +1344,12 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in governed_doc:
             errors.append(f"docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
 
-    w5_doc = (ROOT / "docs" / "W5_PILOT.md").read_text(encoding="utf-8")
+    w5_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md"
+    w5_doc = w5_doc_path.read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
         "http://127.0.0.1:5403/run",
-        "scripts/aoa-w5-pilot materialize",
+        "scripts/aoa-long-horizon-pilot materialize",
         "run-scenario <scenario-id> --until milestone|done",
         "resume-scenario <scenario-id>",
         "status --all",
@@ -1214,12 +1363,17 @@ def validate_paths(errors: list[str]) -> None:
         "aoa-status --autonomy",
     ):
         if required_snippet not in w5_doc:
-            errors.append(f"docs/W5_PILOT.md must mention `{required_snippet}`")
+            errors.append(f"{w5_doc_path.relative_to(ROOT)} must mention `{required_snippet}`")
 
-    w6_doc = (ROOT / "docs" / "W6_PILOT.md").read_text(encoding="utf-8")
+    w6_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md"
+    w6_doc = w6_doc_path.read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
         "http://127.0.0.1:5403/run",
+        "scripts/aoa-bounded-autonomy-pilot materialize",
+        "run-scenario <scenario-id> --until milestone|done",
+        "resume-scenario <scenario-id>",
+        "status --all",
         "stack-sync-federation-json-check-report",
         "llamacpp-pilot-verify-command",
         "trial_proven",
@@ -1227,7 +1381,7 @@ def validate_paths(errors: list[str]) -> None:
         "aoa-status --autonomy",
     ):
         if required_snippet not in w6_doc:
-            errors.append(f"docs/W6_PILOT.md must mention `{required_snippet}`")
+            errors.append(f"{w6_doc_path.relative_to(ROOT)} must mention `{required_snippet}`")
 
     paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/AbyssOS/abyss-stack" not in paths_doc:
@@ -1570,6 +1724,8 @@ def validate_reference_platform(errors: list[str]) -> None:
     )
     if "aoa-host-facts" not in reference_platform:
         errors.append("docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
+    if "mechanics/machine-fit/docs/MACHINE_BRIDGE.md" not in reference_platform:
+        errors.append("docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/docs/MACHINE_BRIDGE.md")
     if "REFERENCE_PLATFORM_SPEC.md" not in reference_platform:
         errors.append(
             "docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
@@ -1578,6 +1734,8 @@ def validate_reference_platform(errors: list[str]) -> None:
     doctor_doc = (ROOT / "docs" / "DOCTOR.md").read_text(encoding="utf-8")
     if "aoa-host-facts" not in doctor_doc:
         errors.append("docs/DOCTOR.md must mention aoa-host-facts")
+    if "aoa-machine-bridge" not in doctor_doc:
+        errors.append("docs/DOCTOR.md must mention aoa-machine-bridge")
 
     first_run_doc = (ROOT / "docs" / "FIRST_RUN.md").read_text(encoding="utf-8")
     if "reference-host.public.json" not in first_run_doc:
@@ -1621,6 +1779,59 @@ def validate_reference_platform(errors: list[str]) -> None:
         errors.append(
             "reference-host.public.json.example must use captured_by scripts/aoa-host-facts"
         )
+
+
+def validate_machine_bridge(errors: list[str]) -> None:
+    machine_bridge_doc_path = ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_BRIDGE.md"
+    machine_bridge_schema_path = ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "schema.v1.json"
+    machine_bridge_example_path = (
+        ROOT
+        / "mechanics"
+        / "machine-fit"
+        / "docs"
+        / "machine-bridge"
+        / "machine-bridge.public.json.example"
+    )
+    bridge_doc = machine_bridge_doc_path.read_text(encoding="utf-8")
+    for fragment in (
+        "scripts/aoa-machine-bridge --write-latest",
+        "abyss-machine stack-bridge export --json",
+        "Logs/machine-bridge/",
+        "read-only",
+    ):
+        if fragment not in bridge_doc:
+            errors.append(f"{machine_bridge_doc_path.relative_to(ROOT)} must mention {fragment}")
+
+    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    if "Logs/machine-bridge/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/machine-bridge/")
+
+    paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
+    if "Logs/machine-bridge" not in paths_doc:
+        errors.append("docs/PATHS.md must mention Logs/machine-bridge")
+
+    script_doc = (ROOT / "scripts" / "AGENTS.md").read_text(encoding="utf-8")
+    if "aoa-machine-bridge" not in script_doc:
+        errors.append("scripts/AGENTS.md must mention aoa-machine-bridge")
+
+    mechanic_parts = (ROOT / "mechanics" / "machine-fit" / "PARTS.md").read_text(encoding="utf-8")
+    if "Machine bridge" not in mechanic_parts or "mechanics/machine-fit/docs/MACHINE_BRIDGE.md" not in mechanic_parts:
+        errors.append("mechanics/machine-fit/PARTS.md must route Machine bridge surfaces")
+
+    schema = json.loads(machine_bridge_schema_path.read_text(encoding="utf-8"))
+    if schema.get("title") != "AoA Machine Bridge Record":
+        errors.append(f"{machine_bridge_schema_path.relative_to(ROOT)} must describe AoA Machine Bridge Record")
+
+    example = json.loads(machine_bridge_example_path.read_text(encoding="utf-8"))
+    if example.get("artifact_kind") != "aoa.machine-bridge":
+        errors.append("machine-bridge public example must use artifact_kind aoa.machine-bridge")
+    if example.get("capture_mode") != "public":
+        errors.append("machine-bridge public example must use capture_mode public")
+    if example.get("captured_by") != "scripts/aoa-machine-bridge":
+        errors.append("machine-bridge public example must use captured_by scripts/aoa-machine-bridge")
+    contract = example.get("contract") if isinstance(example.get("contract"), dict) else {}
+    if contract.get("stack_side_mutates_machine") is not False:
+        errors.append("machine-bridge public example must keep stack_side_mutates_machine false")
 
 
 def validate_platform_adaptations(errors: list[str]) -> None:
@@ -2758,6 +2969,7 @@ def main() -> int:
 
     validate_profiles(errors)
     validate_presets(errors)
+    validate_git_mirror_hygiene(errors)
     validate_paths(errors)
     validate_mechanics_topology(errors)
     validate_scripts(errors)
@@ -2765,6 +2977,7 @@ def main() -> int:
     validate_federation_required_files(errors)
     validate_questbook_surface(errors)
     validate_reference_platform(errors)
+    validate_machine_bridge(errors)
     validate_platform_adaptations(errors)
     validate_branch_policy(errors)
     validate_memo_runtime_seam(errors)

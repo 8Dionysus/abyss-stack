@@ -13,6 +13,7 @@
 This file is normative. It names the intended operating posture.
 
 Observed machine facts belong to the machine-readable host-facts layer described in [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md).
+The stack-side route into the host control plane belongs to [machine-fit/MACHINE_BRIDGE](../mechanics/machine-fit/docs/MACHINE_BRIDGE.md).
 The current-host runtime choice belongs to [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md).
 
 Recommended local review flow:
@@ -20,6 +21,7 @@ Recommended local review flow:
 ```bash
 scripts/aoa-host-facts --mode public --write /tmp/reference-host.public.review.json
 scripts/aoa-host-facts --mode private --write "${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
+scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 ```
 
@@ -27,6 +29,7 @@ The repository may carry a reviewed canonical public snapshot at `docs/reference
 Refresh that file intentionally when you are updating the chosen canonical Linux reference host, not during routine local captures.
 
 `aoa-doctor` stays focused on readiness. It is not the durable inventory surface.
+`aoa-machine-bridge` is the read-only stack-side index of `abyss-machine` routes and evidence refs.
 `aoa-machine-fit` is the bounded surface that says what this concrete machine should currently prefer.
 
 ## Fedora-first means

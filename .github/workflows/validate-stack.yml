@@ -46,6 +46,8 @@ jobs:
             scripts/aoa-profile-modules \
             scripts/aoa-profile-endpoints \
             scripts/aoa-internal-probes \
+            scripts/aoa-long-horizon-pilot \
+            scripts/aoa-bounded-autonomy-pilot \
             scripts/aoa-render-services \
             scripts/aoa-render-config \
             scripts/aoa-up \

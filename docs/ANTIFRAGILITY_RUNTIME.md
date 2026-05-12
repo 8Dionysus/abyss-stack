@@ -36,9 +36,9 @@ Together they should answer:
 The first bounded chaos wave uses the current contracts through named example
 families:
 
-- `examples/service_degradation_receipt.timeout-chaos.example.json`
-- `examples/service_degradation_receipt.honest-degradation.example.json`
-- `examples/service_degradation_receipt.retrieval-outage-honesty.example.json`
+- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`
+- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`
+- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`
 
 Use those examples to exercise timeout, honest degradation, and retrieval
 outage posture without widening runtime behavior or introducing a live harness.

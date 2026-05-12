@@ -14,13 +14,24 @@ Tracking starts with the community-docs baseline for this repository.
   diagnostic spine, and runtime repair package cards
 - second-wave `mechanics/agon-runtime` and `mechanics/experience-runtime`
   legacy containment packages with provenance and legacy indexes
+- legacy containment bridges for `mechanics/runtime-repair` and
+  `mechanics/inference-pilots`, including quiet W5/W6 pilot bridge commands
+- stack-side `abyss-machine` bridge capture via `scripts/aoa-machine-bridge`,
+  with `Logs/machine-bridge/` latest/history/index routes and package-local
+  contract docs
 
 ### Changed
 
 - top-level route docs now point runtime-move work through the mechanics atlas
   before entering package-specific docs, scripts, schemas, or config surfaces
-- noisy Agon and experience seed artifacts moved out of flat root districts
-  into package-local legacy homes with validators and tests following the move
+- noisy Agon and experience seed artifacts, including late-found experience
+  job/worker/storage-plan docs, moved out of flat root districts into
+  package-local legacy homes with validators and tests following the move
+- runtime repair chaos-wave receipts and W5/W6 pilot wave files moved out of
+  flat root districts into package-local legacy homes with route bridges
+- GitHub mirror hygiene now keeps the repository source/install-only by
+  ignoring obvious local runtime artifacts and failing validation on tracked
+  live/private/heavy files while preserving public examples and fixtures
 
 ## [0.2.2] - 2026-04-23
 

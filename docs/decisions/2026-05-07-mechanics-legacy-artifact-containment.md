@@ -12,10 +12,13 @@ seed, phase, and raw version scaffolding across `docs/`, `config/`,
 `generated/`, `examples/`, `schemas/`, `scripts/`, `tests/`, and recurrence
 manifests.
 
-Two families were ready to move as bounded units:
+Four families were ready to move as bounded units:
 
 - Agon dry-run runtime kernels and mechanical trial artifacts.
-- Experience seed-derived runtime contracts, examples, and wave tests.
+- Experience seed-derived runtime contracts, job/worker/storage docs, examples,
+  and wave tests.
+- Runtime repair chaos-wave and `_v1` receipt artifacts.
+- Inference W5/W6 pilot wave docs and runner scripts.
 
 The sibling `Agents-of-Abyss` refactor showed the useful pattern: active
 mechanic package route first, detailed old material under package-local
@@ -34,22 +37,26 @@ as the current route.
 
 Use option 3.
 
-`abyss-stack` now contains `mechanics/agon-runtime` and
-`mechanics/experience-runtime`. Old noisy file names are preserved under
-package-local `legacy/raw` or `legacy/artifacts`, while active package cards,
-`PROVENANCE.md`, `legacy/INDEX.md`, and `legacy/DISTILLATION_LOG.md` explain the
-route.
+`abyss-stack` now contains legacy-bearing mechanics packages for
+`agon-runtime`, `experience-runtime`, `inference-pilots`, and `runtime-repair`.
+Old noisy file names are preserved under package-local `legacy/raw` or
+`legacy/artifacts`, while active package cards, `PROVENANCE.md`,
+`legacy/INDEX.md`, and `legacy/DISTILLATION_LOG.md` explain the route.
 
 ## Rationale
 
 This removes flat topology without pretending that old wave and seed names are
 clean active contracts. It also keeps runnable artifacts testable: Agon builders
-and validators moved with their config/generated/example/test surfaces, and
-experience contract tests now read package-local schemas and examples.
+and validators moved with their config/generated/example/test surfaces,
+experience contract tests now read package-local schemas and examples, and
+runtime repair receipt tests now read package-local receipt schemas and
+examples, and W5/W6 pilot runners now execute through quieter root bridge
+commands.
 
 The choice preserves stronger-owner boundaries. `Agents-of-Abyss` still owns
 Agon and experience meaning; `Tree-of-Sophia` still owns authored meaning and
-write stop-lines. `abyss-stack` owns only the runtime-side containment and
+write stop-lines; operator action and affected owner repositories still own
+actual repair. `abyss-stack` owns only the runtime-side containment and
 validation shape.
 
 ## Consequences
@@ -60,4 +67,3 @@ validation shape.
 - Legacy files remain reviewable but are not the first active source route.
 - A later distillation pass can promote quiet active names out of `legacy` only
   when one runtime service, storage path, or validator clearly owns the surface.
-

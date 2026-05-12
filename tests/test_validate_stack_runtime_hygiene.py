@@ -41,6 +41,46 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
             validate_stack.validate_runtime_hygiene_contracts(errors)
         return errors
 
+    def test_git_mirror_hygiene_blocks_live_private_and_heavy_paths(self) -> None:
+        blocked_paths = (
+            "Secrets/Configs/stack.env",
+            "Logs/machine-fit/latest/latest.private.json",
+            "Models/qwen3.gguf",
+            "stack.env",
+            "compose/abyss.rendered.yml",
+            "runtime/state.sqlite",
+            "local/build.tar.gz",
+            "cache/model.safetensors",
+        )
+
+        for relative_path in blocked_paths:
+            with self.subTest(relative_path=relative_path):
+                self.assertIsNotNone(
+                    validate_stack.tracked_file_git_mirror_hygiene_issue(
+                        relative_path
+                    )
+                )
+
+    def test_git_mirror_hygiene_allows_public_docs_examples_and_fixtures(self) -> None:
+        allowed_paths = (
+            "env/stack.env.example",
+            "docs/SECRETS_BOOTSTRAP.md",
+            "docs/reference-platform/reference-host.public.json.example",
+            "schemas/runtime-usage-snapshot.schema.json",
+            "examples/runtime_usage_snapshot.workhorse-local.example.json",
+            "tests/fixtures/latest.private.json",
+            "mechanics/machine-fit/docs/machine-bridge/machine-bridge.public.json.example",
+            "config-templates/Services/tos-graph/app/models.py",
+        )
+
+        for relative_path in allowed_paths:
+            with self.subTest(relative_path=relative_path):
+                self.assertIsNone(
+                    validate_stack.tracked_file_git_mirror_hygiene_issue(
+                        relative_path
+                    )
+                )
+
     def test_current_repo_runtime_hygiene_contracts_pass(self) -> None:
         errors: list[str] = []
         validate_stack.validate_runtime_hygiene_contracts(errors)

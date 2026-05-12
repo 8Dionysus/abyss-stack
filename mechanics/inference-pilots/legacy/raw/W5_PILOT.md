@@ -23,11 +23,11 @@ W5 is not:
 Use:
 
 ```bash
-scripts/aoa-w5-pilot materialize
-scripts/aoa-w5-pilot run-scenario <scenario-id> --until milestone|done
-scripts/aoa-w5-pilot resume-scenario <scenario-id>
-scripts/aoa-w5-pilot status --all
-scripts/aoa-w5-pilot status <scenario-id>
+scripts/aoa-long-horizon-pilot materialize
+scripts/aoa-long-horizon-pilot run-scenario <scenario-id> --until milestone|done
+scripts/aoa-long-horizon-pilot resume-scenario <scenario-id>
+scripts/aoa-long-horizon-pilot status --all
+scripts/aoa-long-horizon-pilot status <scenario-id>
 scripts/aoa-status --autonomy
 ```
 
@@ -116,7 +116,7 @@ Wave-level outputs:
 - `W5-long-horizon-index.md`
 - `W5_SUMMARY.md`
 
-Each summary should also carry truth-status language from [TRUTH_SURFACES](TRUTH_SURFACES.md):
+Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../docs/TRUTH_SURFACES.md):
 
 - `source_authored`
 - `deployed`

@@ -5,7 +5,11 @@ This directory owns runtime-owned machine-readable contracts for the runtime sub
 
 ## Scope
 
-Schemas here define public, reviewable contracts for runtime receipts, storage records, diagnostic artifacts, governed-execution requests, repair-safe closeout, recurrence support, and other infrastructure-side surfaces.
+Schemas here define public, reviewable contracts for root runtime surfaces:
+storage records, diagnostic artifacts, governed-execution requests, recurrence
+support, and other infrastructure-side surfaces. Runtime repair receipt schemas
+that still carry old `_v1` names now route through
+`mechanics/runtime-repair/legacy/artifacts/schemas/`.
 They may describe how the runtime carries, stores, or proves something, but they do not make `abyss-stack` the source of truth for skill, playbook, memo, eval, role, or ToS meaning.
 
 ## Local contract
@@ -29,5 +33,5 @@ Use the narrowest checks that cover the changed contract. Common gates:
 python scripts/validate_stack.py
 python scripts/build_diagnostic_surface_catalog.py --check
 python scripts/validate_diagnostic_surface_catalog.py
-python -m pytest tests/test_antifragility_contracts.py tests/test_diagnostic_spine_contracts.py
+python -m pytest mechanics/runtime-repair/legacy/artifacts/tests/test_antifragility_contracts.py tests/test_diagnostic_spine_contracts.py
 ```

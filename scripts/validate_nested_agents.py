@@ -84,7 +84,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     ),
     'mechanics/machine-fit/AGENTS.md': (
         'machine-fit',
-        'future read-only machine bridge',
+        'read-only machine bridge',
         'aoa-host-facts',
         'Do not mutate /srv/abyss-machine',
     ),
@@ -92,7 +92,14 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'inference-pilots',
         'bounded local inference pilots',
         'aoa-llamacpp-pilot',
+        'aoa-long-horizon-pilot',
         'mechanics/agon-runtime',
+    ),
+    'mechanics/inference-pilots/legacy/AGENTS.md': (
+        'old W5/W6 pilot docs',
+        'legacy/raw',
+        'legacy/artifacts/scripts',
+        'aoa-bounded-autonomy-pilot',
     ),
     'mechanics/agon-runtime/AGENTS.md': (
         'agon-runtime',
@@ -141,6 +148,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'degradation receipts',
         'repair-safe closeout',
         'Do not perform repair',
+    ),
+    'mechanics/runtime-repair/legacy/AGENTS.md': (
+        'runtime repair wave',
+        '_v1',
+        'legacy/artifacts',
+        'python -m pytest',
     ),
     'tests/AGENTS.md': (
         'runtime validation gate',

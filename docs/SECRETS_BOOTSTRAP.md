@@ -29,6 +29,10 @@ ln -sfn /srv/AbyssOS/abyss-stack/Secrets/Configs/stack.env /srv/AbyssOS/abyss-st
 chmod 600 /srv/AbyssOS/abyss-stack/Secrets/Configs/stack.env
 ```
 
+`N8N_RUNNERS_AUTH_TOKEN` must be a long random shared secret. It is consumed by
+the n8n main container and the `n8n-task-runners` sidecar; do not commit the
+live value.
+
 ### 2. LangChain API env
 
 Real location:

@@ -26,6 +26,8 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Knowledge/federation" \
   "${AOA_STACK_ROOT}/Knowledge/n8n-docs" \
   "${AOA_STACK_ROOT}/Logs" \
+  "${AOA_STACK_ROOT}/Logs/machine-bridge/latest" \
+  "${AOA_STACK_ROOT}/Logs/machine-bridge/records" \
   "${AOA_STACK_ROOT}/Logs/eval-exports/latest/runtime-evidence-selection" \
   "${AOA_STACK_ROOT}/Logs/eval-exports/latest/artifact-hook" \
   "${AOA_STACK_ROOT}/Logs/eval-exports/records" \

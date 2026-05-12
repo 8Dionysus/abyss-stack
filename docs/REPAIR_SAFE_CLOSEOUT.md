@@ -28,8 +28,8 @@ A useful repair-safe closeout receipt includes:
 
 The first bounded chaos wave now includes named closeout examples for:
 
-- `examples/repair_safe_closeout_receipt.timeout-chaos.example.json`
-- `examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
+- `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`
+- `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
 
 Those examples keep closeout bounded to the owner-local runtime lane and do not
 authorize broader recovery or verdict logic.

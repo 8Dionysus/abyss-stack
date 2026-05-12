@@ -7,7 +7,6 @@
 | Return policy | `config-templates/Configs/agent-api/return-policy.yaml`, `docs/GOVERNED_EXECUTION.md` |
 | Candidate exports | `scripts/aoa-export-memo-candidate`, `scripts/aoa-export-artifact-hook-candidate`, `scripts/aoa-export-runtime-evidence-selection` |
 | Review tests | `tests/test_governed_execution.py` |
-| Local worker path | `docs/LANGGRAPH_PILOT.md`, `docs/W5_PILOT.md`, `docs/W6_PILOT.md` |
+| Local worker path | `docs/LANGGRAPH_PILOT.md`, `mechanics/inference-pilots/legacy/raw/W5_PILOT.md`, `mechanics/inference-pilots/legacy/raw/W6_PILOT.md` |
 
 Do not move these parts until import paths and tests follow.
-

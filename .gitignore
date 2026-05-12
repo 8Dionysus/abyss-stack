@@ -1,3 +1,43 @@
+# Python and local test caches
 __pycache__/
-*.pyc
-abyss-stack-host-facts-patch.zip
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local runtime state. The GitHub mirror is source/install material only.
+/Secrets/
+/Logs/
+/Models/
+/stack.env
+/Configs/stack.env
+*.env
+!env/*.env.example
+!config-templates/**/*.env.example
+
+# Private captures and locally rendered config output
+*.private.json
+*.private.yaml
+*.private.yml
+*.rendered.yml
+*.rendered.yaml
+
+# Local database/cache artifacts
+*.db
+*.sqlite
+*.sqlite3
+
+# Heavy model/build/archive artifacts
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.zst

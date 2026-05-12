@@ -1,0 +1,144 @@
+{
+  "artifact_kind": "aoa.machine-bridge",
+  "schema_version": "1",
+  "capture_mode": "public",
+  "captured_at": "2026-05-11T00:00:00Z",
+  "captured_by": "scripts/aoa-machine-bridge",
+  "bridge_id": "2026-05-11T000000Z__machine-bridge",
+  "status": "ready",
+  "summary": {
+    "abyss_machine_available": true,
+    "stack_bridge_export_ok": true,
+    "stack_bridge_validate_ok": true,
+    "warnings": 0,
+    "artifact_classes": [
+      "ai",
+      "machine",
+      "memory",
+      "processes",
+      "resource",
+      "storage"
+    ]
+  },
+  "contract": {
+    "machine_owner": "abyss-machine",
+    "stack_owner": "abyss-stack",
+    "dependency_direction": "abyss-stack may consume abyss-machine; abyss-machine must not import or mutate abyss-stack",
+    "stack_side_mutates_machine": false,
+    "host_layer_mutates_stack": false,
+    "read_only_by_default": true,
+    "private_runtime_artifact": false
+  },
+  "topology": {
+    "source_to_runtime": {
+      "source_checkout": null,
+      "deployed_runtime_root": null,
+      "deployed_configs_root": null,
+      "rule": "source-authored changes become live only through the deployment bridge; runtime logs are local evidence"
+    },
+    "machine_to_stack": {
+      "host_owner": "abyss-machine",
+      "stack_consumer": "abyss-stack",
+      "direction": "abyss-stack consumes abyss-machine; abyss-machine does not import or mutate abyss-stack",
+      "latest_stack_record": null,
+      "history_glob": null,
+      "index": null
+    },
+    "runtime_log_tree": {
+      "machine_bridge": "Logs/machine-bridge/",
+      "host_facts": "Logs/host-facts/",
+      "machine_fit": "Logs/machine-fit/",
+      "diagnostics": "Logs/diagnostics/",
+      "platform_adaptations": "Logs/platform-adaptations/",
+      "runtime_benchmarks": "Logs/runtime-benchmarks/"
+    }
+  },
+  "artifact_index": {
+    "classes": [
+      "ai",
+      "machine",
+      "memory",
+      "processes",
+      "resource",
+      "storage"
+    ],
+    "refs": [
+      {
+        "class": "processes",
+        "name": "containers",
+        "path": null,
+        "path_class": "abyss-machine-state",
+        "schema": "abyss_machine_process_container_health_v1",
+        "truth_level": "latest_container_evidence"
+      },
+      {
+        "class": "ai",
+        "name": "llm_registry",
+        "path": null,
+        "path_class": "abyss-machine-state",
+        "schema": "abyss_machine_ai_llm_registry_v1",
+        "truth_level": "host_profile_evidence"
+      }
+    ]
+  },
+  "command_catalog": {
+    "stack_bridge_commands": {
+      "export": "abyss-machine stack-bridge export --json",
+      "validate": "abyss-machine stack-bridge validate --json"
+    },
+    "first_commands": [
+      "abyss-machine stack-bridge --json",
+      "abyss-machine stack-bridge validate --json"
+    ],
+    "required_stack_side_commands": [
+      "scripts/aoa-machine-bridge --write-latest",
+      "scripts/aoa-doctor --preset intel-full",
+      "scripts/aoa-machine-fit --mode private --write ${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
+    ]
+  },
+  "host_bridge": {
+    "abyss_machine_binary": null,
+    "bridge_schema": "abyss_machine_bridge_v1",
+    "bridge_version": "0.8.41",
+    "bridge_command_count": 175,
+    "stack_bridge_summary": {
+      "layers": 9,
+      "refs": 49,
+      "required_missing": 0,
+      "schema_mismatches": 0
+    }
+  },
+  "live_evidence": {
+    "process_containers": {
+      "schema": "abyss_machine_process_container_health_v1",
+      "ok": true,
+      "summary": {
+        "status": "ok",
+        "containers": 16,
+        "running": 16,
+        "attention": 0
+      }
+    }
+  },
+  "execution": {
+    "stack_bridge_export": {
+      "ok": true,
+      "returncode": 0,
+      "command": "abyss-machine stack-bridge export --json",
+      "schema": "abyss_machine_stack_bridge_v1",
+      "generated_at": "2026-05-11T00:00:00Z",
+      "error": null
+    }
+  },
+  "warnings": [],
+  "non_claims": [
+    "This stack-side bridge does not own or change Abyss Machine.",
+    "This stack-side bridge does not start, stop, migrate, throttle, or re-affinitize services or processes.",
+    "This stack-side bridge records routing evidence; it does not prove model quality, service correctness, or promotion readiness by itself."
+  ],
+  "redaction": {
+    "local_paths_redacted": true,
+    "raw_host_payloads_omitted": true,
+    "env_and_create_commands_excluded": true
+  }
+}

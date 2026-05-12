@@ -36,6 +36,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | models | `/srv/AbyssOS/abyss-stack/Models` |
 | knowledge | `/srv/AbyssOS/abyss-stack/Knowledge` |
 | logs | `/srv/AbyssOS/abyss-stack/Logs` |
+| stack-side machine bridge logs | `/srv/AbyssOS/abyss-stack/Logs/machine-bridge` |
 | codex home | `/srv/AbyssOS/abyss-stack/.codex-home` |
 | optional vault | `/abyss` |
 | optional `aoa-agents` source root | `/srv/aoa-agents` |

@@ -8,7 +8,7 @@
 
 ## Next wave candidates
 
-- draft a machine bridge contract
+- consume the package-local machine bridge contract from runtime diagnosis and
+  launch planning
 - map Podman storage and model cache facts without owning them
 - decide which machine-fit docs should become package detail
-

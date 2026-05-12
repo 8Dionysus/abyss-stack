@@ -196,6 +196,23 @@ else
   doctor_warn "machine-fit record missing; run ${AOA_CONFIGS_ROOT}/scripts/aoa-machine-fit after bootstrap"
 fi
 
+machine_bridge_path="${AOA_STACK_ROOT}/Logs/machine-bridge/latest/latest.private.json"
+if command -v abyss-machine >/dev/null 2>&1; then
+  if bridge_payload="$(abyss-machine stack-bridge validate --json 2>/dev/null)" \
+    && python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)' <<<"${bridge_payload}"; then
+    doctor_ok "abyss-machine stack bridge validates"
+  else
+    doctor_warn "abyss-machine stack bridge did not validate; run abyss-machine stack-bridge validate --json"
+  fi
+  if [[ -f "${machine_bridge_path}" ]]; then
+    doctor_ok "machine-bridge record ${machine_bridge_path}"
+  else
+    doctor_warn "machine-bridge record missing; run ${AOA_CONFIGS_ROOT}/scripts/aoa-machine-bridge --write-latest"
+  fi
+else
+  doctor_warn "abyss-machine command not found; stack-side machine bridge is unavailable on this host"
+fi
+
 if [[ -r /proc/loadavg ]]; then
   load_1m="$(awk '{print $1}' /proc/loadavg 2>/dev/null || true)"
   cpu_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"

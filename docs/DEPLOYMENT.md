@@ -11,6 +11,13 @@ Typical shape:
 - deployed runtime at `/srv/AbyssOS/abyss-stack`
 - optional heavy-data vault at `/abyss`
 
+A GitHub checkout of this repository is a source/install mirror, not a backup of
+live runtime state. It should contain portable source material and public-safe
+templates only. Real `Secrets/`, `Logs/`, `Models/`, live `stack.env`, rendered
+compose output, local databases, model binaries, and private captures are
+created outside git through `scripts/aoa-install-layout`,
+`scripts/aoa-sync-configs`, and `scripts/aoa-bootstrap-configs`.
+
 If you are operating from a Windows host through WSL, also read:
 - [WINDOWS_BRIDGE](WINDOWS_BRIDGE.md)
 - [WINDOWS_SETUP](WINDOWS_SETUP.md)

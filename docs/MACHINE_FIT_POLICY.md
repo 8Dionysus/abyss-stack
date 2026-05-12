@@ -44,6 +44,7 @@ Do not use this layer for:
 ## Relationship to other artifacts
 
 - `aoa-host-facts` records what the machine is
+- `aoa-machine-bridge` records the read-only route from the stack runtime to `abyss-machine` evidence and launch gates
 - `aoa-machine-fit` records what runtime posture the machine should currently prefer
 - `aoa-platform-adaptation` records what specific seam bent and what bounded change helped
 - runtime benchmarks record measured behavior on the intended path
@@ -152,11 +153,13 @@ Public-safe review:
 
 ```bash
 scripts/aoa-machine-fit --mode public --write /tmp/machine-fit.public.review.json
+scripts/aoa-machine-bridge --mode public --write /tmp/machine-bridge.public.review.json
 ```
 
 Local private capture:
 
 ```bash
+scripts/aoa-machine-bridge --write-latest
 scripts/aoa-machine-fit \
   --mode private \
   --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"

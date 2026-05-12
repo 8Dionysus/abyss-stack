@@ -26,9 +26,13 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
 - `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
 - `scripts/aoa-host-facts` owns durable machine-readable host-facts capture. Keep it stdlib-only and secret-safe.
+- `scripts/aoa-machine-bridge` owns the stack-side read-only consumer record for `abyss-machine`. Keep it stdlib-only, secret-safe, and non-mutating toward the host.
 - `scripts/aoa-machine-fit` owns the durable bounded record of what the current machine should prefer right now. Keep it stdlib-only and secret-safe.
 - `scripts/aoa-diagnose` owns the read-only runtime diagnostic spine collector, runtime-owned diagnosis companions, explicit `last_good` anchor promotion, explicit `reviewed_diagnosis_ref` bridge writing, and runtime-owned repair handoff artifacts. Keep it stdlib-only and citation-friendly.
 - `scripts/aoa-qwen-run` is the generic bounded prompt runner for `langchain-api /run`. Keep it stdlib-only and local-only.
+- `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
+  are quiet operator bridges into package-local preserved W5/W6 pilot runners.
+  Keep the bridge names stable unless the package route changes too.
 
 ## Shell script rules
 - Use `#!/usr/bin/env bash` and `set -euo pipefail`.
@@ -55,6 +59,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - the relevant docs in `docs/`
 - If you introduce or remove required runtime files, update both `aoa-check-layout` and `validate_stack.py`.
 - If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/reference-platform/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change machine-bridge shape or capture destinations, update `mechanics/machine-fit/docs/MACHINE_BRIDGE.md`, `mechanics/machine-fit/docs/machine-bridge/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 - If you change machine-fit shape or capture destinations, update `docs/MACHINE_FIT_POLICY.md`, `docs/machine-fit/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 - If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
@@ -62,10 +67,11 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
-python -m py_compile scripts/validate_stack.py scripts/_aoa_diagnose.py scripts/aoa-host-facts scripts/aoa-machine-fit scripts/aoa-qwen-run
+python -m py_compile scripts/validate_stack.py scripts/_aoa_diagnose.py scripts/aoa-host-facts scripts/aoa-machine-bridge scripts/aoa-machine-fit scripts/aoa-qwen-run
 shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
 bash -n scripts/<touched-script>
 scripts/aoa-host-facts --mode public
+scripts/aoa-machine-bridge --mode public --write /tmp/machine-bridge.public.review.json
 scripts/aoa-machine-fit --mode public
 ```
 
