@@ -58,9 +58,9 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - `.github/workflows/validate-stack.yml`
   - the relevant docs in `docs/`
 - If you introduce or remove required runtime files, update both `aoa-check-layout` and `validate_stack.py`.
-- If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `docs/reference-platform/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
-- If you change machine-bridge shape or capture destinations, update `mechanics/machine-fit/docs/MACHINE_BRIDGE.md`, `mechanics/machine-fit/docs/machine-bridge/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
-- If you change machine-fit shape or capture destinations, update `docs/MACHINE_FIT_POLICY.md`, `docs/machine-fit/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change host-facts shape or capture destinations, update `docs/REFERENCE_PLATFORM.md`, `docs/REFERENCE_PLATFORM_SPEC.md`, `mechanics/machine-fit/parts/host-facts/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change machine-bridge shape or capture destinations, update `mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md`, `mechanics/machine-fit/parts/machine-bridge/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
+- If you change machine-fit shape or capture destinations, update `docs/MACHINE_FIT_POLICY.md`, `mechanics/machine-fit/parts/fit-record/`, `scripts/validate_stack.py`, and `.github/workflows/validate-stack.yml` in the same change.
 - If the runtime wrapper consumes a return-policy file or writes return-event bundles, keep those contracts explicit in docs, layout checks, and render-truth guidance.
 
 ## Verify

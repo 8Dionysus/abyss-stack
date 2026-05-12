@@ -17,7 +17,7 @@ Phases 0 through 6 have already been landed as source and runtime seams:
   surfaces, now including bounded wave-one chaos example families, without
   mutating live services or deployment behavior
 - read-only diagnostic spine groundwork through `scripts/aoa-diagnose` and
-  `generated/diagnostic_surface_catalog.min.json`, still weaker than repair
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`, still weaker than repair
   authority and live-service mutation
 
 ### Current release contour
@@ -31,22 +31,22 @@ AoA or ToS meaning. Its current checked surface is:
   `scripts/validate_stack.py`, and `scripts/release_check.py`
 - diagnostic spine and repair-safe handoff contracts:
   `docs/DIAGNOSTIC_SPINE.md`,
-  `generated/diagnostic_surface_catalog.min.json`,
-  `schemas/diagnostic_target.schema.json`,
-  `schemas/diagnostic_session.schema.json`,
-  `schemas/diagnosis_companion.schema.json`,
-  `schemas/reviewed_diagnosis_ref.schema.json`,
-  `schemas/repair_handoff.schema.json`,
-  `examples/diagnostic_target.min.example.json`,
-  `examples/diagnostic_session.min.example.json`,
-  `examples/diagnosis_companion.min.example.json`,
-  `examples/reviewed_diagnosis_ref.min.example.json`,
-  `examples/repair_handoff.min.example.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json`,
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json`,
   `scripts/aoa-diagnose`, `scripts/_aoa_diagnose.py`,
   `scripts/build_diagnostic_surface_catalog.py`,
   `scripts/validate_diagnostic_surface_catalog.py`,
-  `tests/test_validate_stack_diagnostic_spine.py`, and
-  `tests/test_diagnostic_spine_contracts.py`
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py`, and
+  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py`
 - antifragility contract-only runtime receipts:
   `docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
   `docs/REPAIR_SAFE_CLOSEOUT.md`,

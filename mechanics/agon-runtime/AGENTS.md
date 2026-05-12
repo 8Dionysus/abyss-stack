@@ -6,7 +6,7 @@ This package owns the runtime-side Agon dry-run kernel and trial artifact route
 inside `abyss-stack`.
 
 Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, and `PROVENANCE.md` before editing.
+`PARTS.md`, `parts/README.md`, and `PROVENANCE.md` before editing.
 
 Legacy files under `legacy/` preserve old flat wave and seed surfaces. They are
 provenance and runnable local artifacts, not a new source of AoA doctrine.
@@ -30,4 +30,3 @@ python mechanics/agon-runtime/legacy/artifacts/scripts/simulate_agon_mechanical_
 python -m pytest mechanics/agon-runtime/legacy/artifacts/tests
 python scripts/validate_stack.py
 ```
-

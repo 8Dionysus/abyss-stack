@@ -523,8 +523,8 @@ def main() -> int:
         host_facts_ref = (
             default_ref(args.mode, "Logs/host-facts/latest.private.json")
             if args.mode == "private"
-            else public_ref("docs/reference-platform/reference-host.public.json")
-            or public_ref("docs/reference-platform/reference-host.public.json.example")
+            else public_ref("mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json")
+            or public_ref("mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json.example")
         )
 
     platform_adaptation_ref = args.platform_adaptation_ref
@@ -532,7 +532,7 @@ def main() -> int:
         platform_adaptation_ref = (
             default_ref(args.mode, "Logs/platform-adaptations/latest/latest.private.json")
             if args.mode == "private"
-            else public_ref("docs/platform-adaptations/platform-adaptation.public.json.example")
+            else public_ref("mechanics/machine-fit/parts/platform-adaptations/examples/platform-adaptation.public.json.example")
         )
 
     envelope_notes: list[str] = []

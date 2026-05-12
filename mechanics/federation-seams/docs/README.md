@@ -1,7 +1,8 @@
 # Federation Seams Docs
 
-Package-owned federation seam detail can land here in later waves.
+Package-owned federation seam detail lives here when it is more specific than
+the root route docs.
 
-For now, use the active source surfaces named in
-[PARTS.md](../PARTS.md).
-
+Active RPG runtime read-model schemas, examples, generated collections, and
+focused tests live under `../parts/rpg-runtime/`. Root `docs/RPG_*.md` still
+carry the human-facing posture and builder notes named in [PARTS.md](../PARTS.md).

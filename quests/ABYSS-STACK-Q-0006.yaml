@@ -35,7 +35,7 @@ anchor_ref:
   note: runtime collections stay read models and must not widen route or quest authority
 handoff_role: runtime-maintainer
 evidence:
-  - committed generated transport files exist under generated/rpg/
+  - committed generated transport files exist under mechanics/federation-seams/parts/rpg-runtime/generated/
   - live runtime copies exist under Logs/rpg/latest/
   - parity checks reject drift between committed and live copies
   - frontend bundles remain derived and cited

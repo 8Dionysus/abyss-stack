@@ -15,5 +15,5 @@ and focused contract test into the machine-fit package while keeping
 `scripts/aoa-machine-bridge` as the root operator command.
 
 Validation route: `python scripts/validate_stack.py`,
-`python -m pytest mechanics/machine-fit/tests/test_machine_bridge_contracts.py`,
+`python -m pytest mechanics/machine-fit/parts/machine-bridge/tests/test_machine_bridge_contracts.py`,
 and package syntax checks.

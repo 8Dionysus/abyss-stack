@@ -33,7 +33,8 @@ host facts, and deployment sync status.
 ### Outputs
 
 Dry-run commands, validated lifecycle routes, service start/stop wrappers, and
-operator-facing runbook guidance.
+operator-facing runbook guidance. Package-local status readout contracts may
+also describe source-safe runtime log artifacts without claiming they are live.
 
 ### Must not claim
 
@@ -56,5 +57,6 @@ checks.
 ## Active route
 
 Current source surfaces stay in `docs/`, `scripts/`, `compose/`, and
-`systemd/user/`. This package is the first-wave route home.
-
+`systemd/user/`. Runtime cache/usage readout schemas and examples live in
+`mechanics/runtime-lifecycle/parts/status-readouts/`, with regression coverage in
+`mechanics/runtime-lifecycle/parts/status-readouts/tests/`.

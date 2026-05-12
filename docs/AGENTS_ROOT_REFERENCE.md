@@ -142,7 +142,7 @@ For repository audits and GitHub review, read `AUDIT.md` after the core docs and
 - `scripts/aoa-doctor` answers readiness, not durable inventory
 - `scripts/aoa-host-facts` captures durable host facts
 - `scripts/aoa-machine-fit` captures the bounded current-machine runtime posture
-- public-safe artifacts may live under `docs/reference-platform/`
+- public-safe artifacts may live under `mechanics/machine-fit/parts/host-facts/`
 - private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
 - private machine-fit captures belong under `${AOA_STACK_ROOT}/Logs/machine-fit/`
 

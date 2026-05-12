@@ -34,7 +34,7 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
 
 ## Meaning of the main directories
 
-- `generated/rpg/` — source-managed public-safe RPG transport collections for SDK loading, review, and runtime parity checks
+- `mechanics/federation-seams/parts/rpg-runtime/generated/` — source-managed public-safe RPG transport collections for SDK loading, review, and runtime parity checks
 - `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, config templates, and runtime config files bootstrapped from those templates
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
 - `Services/` — persistent state for databases and runtime services, plus source-seeded build contexts and service-local inputs for lightweight helper services such as `langchain-api`, `litellm`, `docs-api`, `route-api`, `tos-graph`, `qwen3-tts-api`, and `tts_router`

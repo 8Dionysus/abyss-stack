@@ -32,9 +32,9 @@ Use option 3.
 runtime mirrors and operators expect commands in `scripts/`. The bridge
 contract and proof surfaces live under:
 
-- `mechanics/machine-fit/docs/MACHINE_BRIDGE.md`
-- `mechanics/machine-fit/docs/machine-bridge/`
-- `mechanics/machine-fit/tests/test_machine_bridge_contracts.py`
+- `mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md`
+- `mechanics/machine-fit/parts/machine-bridge/`
+- `mechanics/machine-fit/parts/machine-bridge/tests/test_machine_bridge_contracts.py`
 
 ## Rationale
 
@@ -48,7 +48,8 @@ operator entrypoint.
 
 ## Consequences
 
-- Future machine-bridge contract changes start in `mechanics/machine-fit/docs/`.
+- Future machine-bridge contract changes start in
+  `mechanics/machine-fit/parts/machine-bridge/`.
 - `scripts/validate_stack.py` validates the package-local schema and example.
 - `abyss-machine` remains the stronger owner of host control-plane truth.
 - `abyss-stack` records runtime-local bridge evidence but does not mutate the

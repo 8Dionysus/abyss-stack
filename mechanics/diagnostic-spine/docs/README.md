@@ -1,7 +1,8 @@
 # Diagnostic Spine Docs
 
-Package-owned diagnostic spine detail can land here in later waves.
+Package-owned diagnostic spine prose detail lives here.
 
-For now, use the active source surfaces named in
-[PARTS.md](../PARTS.md).
+Active diagnostic schemas, examples, generated catalog, and focused tests live
+under `../parts/diagnostic-surfaces/`.
 
+Use [PARTS.md](../PARTS.md) for the full active surface map.

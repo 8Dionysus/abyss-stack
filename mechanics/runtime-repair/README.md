@@ -55,6 +55,7 @@ export, and owner repositories for actual remediation.
 
 ## Active route
 
-Current source surfaces stay in antifragility docs, A2A docs, schemas,
-examples, scripts, and tests.
-
+Current source surfaces stay in antifragility docs, A2A docs, package-local
+surfaces under `mechanics/runtime-repair/parts/a2a-return-dry-run/`, package tests under
+`mechanics/runtime-repair/parts/`, legacy receipt artifacts, and root operator
+scripts.

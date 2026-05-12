@@ -250,9 +250,9 @@ This surface is not:
 - a substitute for human review
 
 ## Hook surface
-Use `../schemas/runtime-benchmark.schema.json` as the machine-readable manifest contract.
+Use `../mechanics/inference-pilots/parts/local-trials/schemas/runtime-benchmark.schema.json` as the machine-readable manifest contract.
 
-Use `../examples/runtime_benchmark.workhorse-local.example.json` as the first bounded example.
+Use `../mechanics/inference-pilots/parts/local-trials/examples/runtime_benchmark.workhorse-local.example.json` as the first bounded example.
 
 ## Boundary to preserve
 `abyss-stack` may measure the body's behavior.

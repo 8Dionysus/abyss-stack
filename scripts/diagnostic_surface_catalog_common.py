@@ -8,7 +8,15 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DIAGNOSTIC_SURFACE_CATALOG_PATH = REPO_ROOT / "generated" / "diagnostic_surface_catalog.min.json"
+DIAGNOSTIC_SURFACE_CATALOG_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "diagnostic-spine"
+    / "parts"
+    / "diagnostic-surfaces"
+    / "generated"
+    / "diagnostic_surface_catalog.min.json"
+)
 
 SURFACE_PAYLOAD = {
     "schema_version": "abyss_stack_diagnostic_surface_catalog_v1",
@@ -20,40 +28,40 @@ SURFACE_PAYLOAD = {
 SURFACE_SPECS = (
     {
         "name": "diagnostic_target",
-        "schema_ref": "schemas/diagnostic_target.schema.json",
-        "example_ref": "examples/diagnostic_target.min.example.json",
+        "schema_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
+        "example_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
         "primary_question": "What exact runtime target is being diagnosed before any judgment?",
     },
     {
         "name": "diagnostic_session",
-        "schema_ref": "schemas/diagnostic_session.schema.json",
-        "example_ref": "examples/diagnostic_session.min.example.json",
+        "schema_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
+        "example_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
         "primary_question": "What normalized runtime diagnosis was actually observed on this pass?",
     },
     {
         "name": "diagnosis_companion",
-        "schema_ref": "schemas/diagnosis_companion.schema.json",
-        "example_ref": "examples/diagnosis_companion.min.example.json",
+        "schema_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
+        "example_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
         "primary_question": "How should symptom, probable cause, and owner hints stay review-shaped before repair?",
     },
     {
         "name": "reviewed_diagnosis_ref",
-        "schema_ref": "schemas/reviewed_diagnosis_ref.schema.json",
-        "example_ref": "examples/reviewed_diagnosis_ref.min.example.json",
+        "schema_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
+        "example_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
         "primary_question": "Has the current runtime-local diagnosis been reviewed enough to support repair handoff?",
     },
     {
         "name": "repair_handoff",
-        "schema_ref": "schemas/repair_handoff.schema.json",
-        "example_ref": "examples/repair_handoff.min.example.json",
+        "schema_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
+        "example_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
         "primary_question": "What bounded repair handoff is ready, blocked, or still review-only after diagnosis?",
     },
 )
 
 VALIDATION_REFS = [
     "scripts/validate_stack.py",
-    "tests/test_validate_stack_diagnostic_spine.py",
-    "tests/test_diagnostic_spine_contracts.py",
+    "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",
+    "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
 ]
 
 

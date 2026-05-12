@@ -14,7 +14,7 @@ from diagnostic_surface_catalog_common import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build abyss-stack generated/diagnostic_surface_catalog.min.json."
+        description="Build abyss-stack mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json."
     )
     parser.add_argument(
         "--check",
@@ -31,11 +31,11 @@ def main() -> int:
     if args.check:
         current = DIAGNOSTIC_SURFACE_CATALOG_PATH.read_text(encoding="utf-8")
         if current != rendered:
-            raise SystemExit("generated/diagnostic_surface_catalog.min.json is out of date")
-        print("[ok] verified generated/diagnostic_surface_catalog.min.json")
+            raise SystemExit("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json is out of date")
+        print("[ok] verified mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json")
         return 0
     DIAGNOSTIC_SURFACE_CATALOG_PATH.write_text(rendered, encoding="utf-8")
-    print("[ok] wrote generated/diagnostic_surface_catalog.min.json")
+    print("[ok] wrote mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json")
     return 0
 
 

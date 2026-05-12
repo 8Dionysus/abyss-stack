@@ -19,7 +19,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     roadmap = read_text("ROADMAP.md")
     readme = read_text("README.md")
     changelog = read_text("CHANGELOG.md")
-    payload = load_json("generated/diagnostic_surface_catalog.min.json")
+    payload = load_json("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json")
 
     assert "> Current release: `v0.2.2`" in readme
     assert "## [0.2.2] - 2026-04-23" in changelog
@@ -35,7 +35,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "antifragility wave two" in roadmap
     assert "diagnostic spine" in roadmap
     assert "`scripts/aoa-diagnose`" in roadmap
-    assert "`generated/diagnostic_surface_catalog.min.json`" in roadmap
+    assert "`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`" in roadmap
 
     current_release_surfaces = [
         "README.md",
@@ -47,23 +47,23 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
         "scripts/validate_stack.py",
         "scripts/release_check.py",
         "docs/DIAGNOSTIC_SPINE.md",
-        "generated/diagnostic_surface_catalog.min.json",
-        "schemas/diagnostic_target.schema.json",
-        "schemas/diagnostic_session.schema.json",
-        "schemas/diagnosis_companion.schema.json",
-        "schemas/reviewed_diagnosis_ref.schema.json",
-        "schemas/repair_handoff.schema.json",
-        "examples/diagnostic_target.min.example.json",
-        "examples/diagnostic_session.min.example.json",
-        "examples/diagnosis_companion.min.example.json",
-        "examples/reviewed_diagnosis_ref.min.example.json",
-        "examples/repair_handoff.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
         "scripts/aoa-diagnose",
         "scripts/_aoa_diagnose.py",
         "scripts/build_diagnostic_surface_catalog.py",
         "scripts/validate_diagnostic_surface_catalog.py",
-        "tests/test_validate_stack_diagnostic_spine.py",
-        "tests/test_diagnostic_spine_contracts.py",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
         "docs/ANTIFRAGILITY_RUNTIME.md",
         "mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md",
         "docs/REPAIR_SAFE_CLOSEOUT.md",

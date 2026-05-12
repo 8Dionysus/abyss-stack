@@ -17,7 +17,7 @@ It does not own the upstream meanings the collections cite.
 The source repository keeps public-safe generated transport files under:
 
 ```text
-generated/rpg/
+mechanics/federation-seams/parts/rpg-runtime/generated/
   agent_build_snapshots.json
   reputation_ledgers.json
   quest_run_results.json
@@ -49,7 +49,7 @@ ${AOA_STACK_ROOT}/Logs/rpg/records/
 ```
 
 The runtime may prefer the live `Logs/rpg/latest/` copies.
-Source-managed `generated/rpg/` files remain the public-safe transport and validation shape.
+Source-managed `mechanics/federation-seams/parts/rpg-runtime/generated/` files remain the public-safe transport and validation shape.
 
 ## The four collections
 

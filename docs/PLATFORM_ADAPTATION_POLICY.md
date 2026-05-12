@@ -35,8 +35,8 @@ Do not use this surface for:
 This is the missing middle layer.
 
 ## Artifact surfaces
-- `docs/platform-adaptations/schema.v1.json` defines the public contract
-- `docs/platform-adaptations/platform-adaptation.public.json.example` shows the intended public-safe shape
+- `mechanics/machine-fit/parts/platform-adaptations/schemas/schema.v1.json` defines the public contract
+- `mechanics/machine-fit/parts/platform-adaptations/examples/platform-adaptation.public.json.example` shows the intended public-safe shape
 - `${AOA_STACK_ROOT}/Logs/platform-adaptations/` is the local capture root
 
 ## Capture modes

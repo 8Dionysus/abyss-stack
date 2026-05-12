@@ -77,7 +77,7 @@ After each refresh pass:
 ## Storage step
 
 The honest posture in this wave is filesystem-first:
-- source-managed transport under `generated/rpg/`
+- source-managed transport under `mechanics/federation-seams/parts/rpg-runtime/generated/`
 - live runtime materialization under `Logs/rpg/latest/`
 - historical records under `Logs/rpg/records/`
 

@@ -61,8 +61,80 @@ MECHANIC_PACKAGE_REQUIRED_FILES = (
     "PARTS.md",
     "ROADMAP.md",
     "LANDING_LOG.md",
+    "parts/README.md",
     "docs/README.md",
 )
+MECHANIC_PACKAGE_PARTS = {
+    "agon-runtime": ("active-route", "legacy-runtime-kernels"),
+    "config-projection": (
+        "public-templates",
+        "env-examples",
+        "bootstrap",
+        "sync",
+        "rendering",
+        "deployment-paths",
+    ),
+    "diagnostic-spine": (
+        "doctor-readiness",
+        "diagnose-wrapper",
+        "truth-surfaces",
+        "diagnostic-surfaces",
+    ),
+    "experience-runtime": ("active-route", "legacy-experience-records"),
+    "federation-seams": (
+        "sync-wrapper",
+        "federation-checks",
+        "memo-seam",
+        "eval-seam",
+        "playbook-seam",
+        "kag-seam",
+        "tos-graph",
+        "rpg-runtime",
+    ),
+    "governed-execution": (
+        "governed-runner",
+        "autonomy-status",
+        "return-policy",
+        "runtime-contracts",
+        "candidate-exports",
+        "local-worker-path",
+    ),
+    "inference-pilots": (
+        "llamacpp-pilot",
+        "qwen-routes",
+        "langgraph-pilot",
+        "local-trials",
+        "promotion-loop",
+        "preserved-wave-surfaces",
+        "quiet-bridge-commands",
+        "agon-dry-run-handoff",
+    ),
+    "machine-fit": (
+        "reference-platform",
+        "host-facts",
+        "machine-bridge",
+        "fit-record",
+        "platform-adaptations",
+        "inference-tuning",
+    ),
+    "runtime-lifecycle": (
+        "layout-install",
+        "config-sync-boundary",
+        "start-stop",
+        "wait-smoke",
+        "logs-status",
+        "status-readouts",
+        "user-unit",
+    ),
+    "runtime-repair": (
+        "degradation-receipts",
+        "repair-safe-closeout",
+        "runtime-chaos",
+        "antifragility-posture",
+        "a2a-return-dry-run",
+        "memo-contradiction-sidecar",
+    ),
+}
 LEGACY_MECHANIC_PACKAGES = (
     "agon-runtime",
     "experience-runtime",
@@ -217,20 +289,21 @@ REQUIRED_FILES = {
     ROOT / "docs" / "WINDOWS_BRIDGE.md",
     ROOT / "docs" / "WINDOWS_SETUP.md",
     ROOT / "docs" / "WINDOWS_PERFORMANCE.md",
-    ROOT / "docs" / "reference-platform" / "README.md",
-    ROOT / "docs" / "reference-platform" / "schema.v1.json",
-    ROOT / "docs" / "reference-platform" / "reference-host.public.json.example",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_BRIDGE.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "README.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "schema.v1.json",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "machine-bridge.public.json.example",
-    ROOT / "docs" / "machine-fit" / "README.md",
-    ROOT / "docs" / "machine-fit" / "schema.v1.json",
-    ROOT / "docs" / "machine-fit" / "machine-fit.public.json.example",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "schemas" / "schema.v1.json",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "examples" / "reference-host.public.json.example",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "host-facts" / "examples" / "reference-host.public.json",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "docs" / "MACHINE_BRIDGE.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "schemas" / "schema.v1.json",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "examples" / "machine-bridge.public.json.example",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "schemas" / "schema.v1.json",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "examples" / "machine-fit.public.json.example",
     ROOT / "scripts" / "requirements-langgraph-pilot.txt",
-    ROOT / "docs" / "platform-adaptations" / "README.md",
-    ROOT / "docs" / "platform-adaptations" / "schema.v1.json",
-    ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "schemas" / "schema.v1.json",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "examples" / "platform-adaptation.public.json.example",
     ROOT / "compose" / "presets" / "README.md",
     ROOT / "compose" / "presets" / "agent-federation.txt",
     ROOT / "compose" / "presets" / "agent-tools.txt",
@@ -279,57 +352,69 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "projector.py",
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "tos_reader.py",
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "ui.py",
-    ROOT / "schemas" / "runtime-benchmark.schema.json",
-    ROOT / "schemas" / "runtime-governed-execution-policy.schema.json",
-    ROOT / "schemas" / "runtime-governed-execution-request.schema.json",
-    ROOT / "schemas" / "runtime-governed-execution-canary-catalog.schema.json",
-    ROOT / "schemas" / "runtime-memo-export-candidate.schema.json",
-    ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
-    ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json",
-    ROOT / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "schemas" / "runtime-benchmark.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "schemas" / "runtime-governed-execution-policy.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "schemas" / "runtime-governed-execution-request.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "schemas" / "runtime-governed-execution-canary-catalog.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "schemas" / "runtime-memo-export-candidate.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "schemas" / "runtime-artifact-hook-candidate.schema.json",
+    ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json",
     ROOT / "schemas" / "runtime-return-policy.schema.json",
     ROOT / "schemas" / "runtime-return-event.schema.json",
-    ROOT / "schemas" / "diagnostic_target.schema.json",
-    ROOT / "schemas" / "diagnostic_session.schema.json",
-    ROOT / "schemas" / "diagnosis_companion.schema.json",
-    ROOT / "schemas" / "diagnostic_anchor_ref.schema.json",
-    ROOT / "schemas" / "repair_handoff.schema.json",
-    ROOT / "schemas" / "reviewed_diagnosis_ref.schema.json",
-    ROOT / "schemas" / "runtime-gateway-cache-status.schema.json",
-    ROOT / "schemas" / "runtime-usage-snapshot.schema.json",
-    ROOT / "schemas" / "agent_build_snapshot_collection.schema.json",
-    ROOT / "schemas" / "reputation_ledger_collection.schema.json",
-    ROOT / "schemas" / "quest_run_result_collection.schema.json",
-    ROOT / "schemas" / "frontend_projection_bundle_collection.schema.json",
-    ROOT / "examples" / "runtime_benchmark.workhorse-local.example.json",
-    ROOT / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json",
-    ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
-    ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
-    ROOT / "examples" / "runtime_a2a_return_closeout_dry_run.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_target.schema.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_session.schema.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnosis_companion.schema.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_anchor_ref.schema.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "repair_handoff.schema.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "reviewed_diagnosis_ref.schema.json",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "schemas" / "runtime-gateway-cache-status.schema.json",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "schemas" / "runtime-usage-snapshot.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "agent_build_snapshot.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "reputation_ledger.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "quest_run_result.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "frontend_projection_bundle.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "agent_build_snapshot_collection.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "reputation_ledger_collection.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "quest_run_result_collection.schema.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "schemas" / "frontend_projection_bundle_collection.schema.json",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "examples" / "runtime_benchmark.workhorse-local.example.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
+    ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "examples" / "runtime_a2a_return_closeout_dry_run.example.json",
     ROOT / "examples" / "runtime_return_policy.agentic-local.example.json",
     ROOT / "examples" / "runtime_return_event.workhorse-local.example.json",
-    ROOT / "examples" / "diagnostic_target.min.example.json",
-    ROOT / "examples" / "diagnostic_session.min.example.json",
-    ROOT / "examples" / "diagnosis_companion.min.example.json",
-    ROOT / "examples" / "diagnostic_anchor_ref.min.example.json",
-    ROOT / "examples" / "repair_handoff.min.example.json",
-    ROOT / "examples" / "reviewed_diagnosis_ref.min.example.json",
-    ROOT / "generated" / "diagnostic_surface_catalog.min.json",
-    ROOT / "examples" / "runtime_gateway_cache_status.gateway-local.example.json",
-    ROOT / "examples" / "runtime_usage_snapshot.workhorse-local.example.json",
-    ROOT / "generated" / "rpg" / "agent_build_snapshots.json",
-    ROOT / "generated" / "rpg" / "reputation_ledgers.json",
-    ROOT / "generated" / "rpg" / "quest_run_results.json",
-    ROOT / "generated" / "rpg" / "frontend_projection_bundles.json",
-    ROOT / "tests" / "test_governed_execution.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnostic_target.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnostic_session.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnosis_companion.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "diagnostic_anchor_ref.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "repair_handoff.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "examples" / "reviewed_diagnosis_ref.min.example.json",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "generated" / "diagnostic_surface_catalog.min.json",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "examples" / "runtime_gateway_cache_status.gateway-local.example.json",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "examples" / "runtime_usage_snapshot.workhorse-local.example.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "examples" / "agent_build_snapshot.example.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "examples" / "reputation_ledger.example.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "examples" / "quest_run_result.example.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "examples" / "frontend_projection_bundle.example.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "agent_build_snapshots.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "reputation_ledgers.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "quest_run_results.json",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "frontend_projection_bundles.json",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "tests" / "test_governed_execution.py",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "tests" / "test_runtime_eval_evidence_export.py",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "tests" / "test_aoa_local_ai_trials.py",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "tests" / "test_machine_bridge_contracts.py",
     ROOT / "tests" / "test_validate_stack_required_files.py",
     ROOT / "tests" / "test_validate_stack_questbook.py",
-    ROOT / "tests" / "test_validate_stack_diagnostic_spine.py",
-    ROOT / "tests" / "test_validate_stack_runtime_hygiene.py",
-    ROOT / "tests" / "test_diagnostic_spine_contracts.py",
-    ROOT / "tests" / "test_aoa_diagnose.py",
-    ROOT / "tests" / "test_rpg_runtime_projection.py",
-    ROOT / "tests" / "test_a2a_return_closeout_dry_run.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_validate_stack_diagnostic_spine.py",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "tests" / "test_runtime_hygiene.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_diagnostic_spine_contracts.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_aoa_diagnose.py",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "tests" / "test_rpg_runtime_projection.py",
+    ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "tests" / "test_a2a_return_closeout_dry_run.py",
+    ROOT / "mechanics" / "runtime-repair" / "parts" / "memo-contradiction-sidecar" / "tests" / "test_memo_contradiction_integrity_runner.py",
 }
 
 FEDERATION_REQUIRED_RUNTIME_INPUTS = {
@@ -360,7 +445,12 @@ RPG_RUNTIME_BUILDERS_PATH = Path("docs") / "RPG_RUNTIME_BUILDERS.md"
 RPG_ROUTE_API_SEAM_PATH = Path("docs") / "RPG_ROUTE_API_SEAM.md"
 RPG_FRONTEND_PROJECTION_SEAM_PATH = Path("docs") / "RPG_FRONTEND_PROJECTION_SEAM.md"
 DIAGNOSTIC_SPINE_PATH = Path("docs") / "DIAGNOSTIC_SPINE.md"
-DIAGNOSTIC_SURFACE_CATALOG_PATH = Path("generated") / "diagnostic_surface_catalog.min.json"
+DIAGNOSTIC_SURFACE_ROOT = Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces"
+DIAGNOSTIC_SURFACE_SCHEMA_ROOT = DIAGNOSTIC_SURFACE_ROOT / "schemas"
+DIAGNOSTIC_SURFACE_EXAMPLE_ROOT = DIAGNOSTIC_SURFACE_ROOT / "examples"
+DIAGNOSTIC_SURFACE_CATALOG_PATH = (
+    Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "generated" / "diagnostic_surface_catalog.min.json"
+)
 DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
 ABYSS_SAFE_INFRA_SKILL_PATH = Path(".agents") / "skills" / "abyss-safe-infra-change"
 ABYSS_SANITIZED_SHARE_SKILL_PATH = Path(".agents") / "skills" / "abyss-sanitized-share"
@@ -370,36 +460,55 @@ OVERLAY_SKILL_INSTALL_TARGETS = {
 }
 QUEST_SCHEMA_PATH = Path("schemas") / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = Path("schemas") / "quest_dispatch.schema.json"
-DIAGNOSTIC_TARGET_SCHEMA_PATH = Path("schemas") / "diagnostic_target.schema.json"
-DIAGNOSTIC_SESSION_SCHEMA_PATH = Path("schemas") / "diagnostic_session.schema.json"
-DIAGNOSIS_COMPANION_SCHEMA_PATH = Path("schemas") / "diagnosis_companion.schema.json"
-DIAGNOSTIC_ANCHOR_REF_SCHEMA_PATH = Path("schemas") / "diagnostic_anchor_ref.schema.json"
-REPAIR_HANDOFF_SCHEMA_PATH = Path("schemas") / "repair_handoff.schema.json"
-REVIEWED_DIAGNOSIS_REF_SCHEMA_PATH = Path("schemas") / "reviewed_diagnosis_ref.schema.json"
-AGENT_BUILD_SNAPSHOT_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot.schema.json"
-REPUTATION_LEDGER_SCHEMA_PATH = Path("schemas") / "reputation_ledger.schema.json"
-QUEST_RUN_RESULT_SCHEMA_PATH = Path("schemas") / "quest_run_result.schema.json"
-FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle.schema.json"
-AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH = Path("schemas") / "agent_build_snapshot_collection.schema.json"
-REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH = Path("schemas") / "reputation_ledger_collection.schema.json"
-QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = Path("schemas") / "quest_run_result_collection.schema.json"
-FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = Path("schemas") / "frontend_projection_bundle_collection.schema.json"
+DIAGNOSTIC_TARGET_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_target.schema.json"
+DIAGNOSTIC_SESSION_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_session.schema.json"
+DIAGNOSIS_COMPANION_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnosis_companion.schema.json"
+DIAGNOSTIC_ANCHOR_REF_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_anchor_ref.schema.json"
+REPAIR_HANDOFF_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "repair_handoff.schema.json"
+REVIEWED_DIAGNOSIS_REF_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "reviewed_diagnosis_ref.schema.json"
+RPG_RUNTIME_SURFACE_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime"
+RPG_RUNTIME_SCHEMA_ROOT = RPG_RUNTIME_SURFACE_ROOT / "schemas"
+RPG_RUNTIME_EXAMPLE_ROOT = RPG_RUNTIME_SURFACE_ROOT / "examples"
+RPG_RUNTIME_GENERATED_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "generated"
+AGENT_BUILD_SNAPSHOT_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "agent_build_snapshot.schema.json"
+REPUTATION_LEDGER_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "reputation_ledger.schema.json"
+QUEST_RUN_RESULT_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "quest_run_result.schema.json"
+FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "frontend_projection_bundle.schema.json"
+AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "agent_build_snapshot_collection.schema.json"
+REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "reputation_ledger_collection.schema.json"
+QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "quest_run_result_collection.schema.json"
+FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "frontend_projection_bundle_collection.schema.json"
 QUEST_CATALOG_EXAMPLE_PATH = Path("examples") / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = Path("examples") / "quest_dispatch.min.example.json"
-DIAGNOSTIC_TARGET_EXAMPLE_PATH = Path("examples") / "diagnostic_target.min.example.json"
-DIAGNOSTIC_SESSION_EXAMPLE_PATH = Path("examples") / "diagnostic_session.min.example.json"
-DIAGNOSIS_COMPANION_EXAMPLE_PATH = Path("examples") / "diagnosis_companion.min.example.json"
-DIAGNOSTIC_ANCHOR_REF_EXAMPLE_PATH = Path("examples") / "diagnostic_anchor_ref.min.example.json"
-REPAIR_HANDOFF_EXAMPLE_PATH = Path("examples") / "repair_handoff.min.example.json"
-REVIEWED_DIAGNOSIS_REF_EXAMPLE_PATH = Path("examples") / "reviewed_diagnosis_ref.min.example.json"
-AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = Path("examples") / "agent_build_snapshot.example.json"
-REPUTATION_LEDGER_EXAMPLE_PATH = Path("examples") / "reputation_ledger.example.json"
-QUEST_RUN_RESULT_EXAMPLE_PATH = Path("examples") / "quest_run_result.example.json"
-FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH = Path("examples") / "frontend_projection_bundle.example.json"
-GENERATED_AGENT_BUILD_SNAPSHOTS_PATH = Path("generated") / "rpg" / "agent_build_snapshots.json"
-GENERATED_REPUTATION_LEDGERS_PATH = Path("generated") / "rpg" / "reputation_ledgers.json"
-GENERATED_QUEST_RUN_RESULTS_PATH = Path("generated") / "rpg" / "quest_run_results.json"
-GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH = Path("generated") / "rpg" / "frontend_projection_bundles.json"
+DIAGNOSTIC_TARGET_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnostic_target.min.example.json"
+DIAGNOSTIC_SESSION_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnostic_session.min.example.json"
+DIAGNOSIS_COMPANION_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnosis_companion.min.example.json"
+DIAGNOSTIC_ANCHOR_REF_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "diagnostic_anchor_ref.min.example.json"
+REPAIR_HANDOFF_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "repair_handoff.min.example.json"
+REVIEWED_DIAGNOSIS_REF_EXAMPLE_PATH = DIAGNOSTIC_SURFACE_EXAMPLE_ROOT / "reviewed_diagnosis_ref.min.example.json"
+RUNTIME_LIFECYCLE_SURFACE_ROOT = Path("mechanics") / "runtime-lifecycle" / "parts" / "status-readouts"
+RUNTIME_LIFECYCLE_SCHEMA_ROOT = RUNTIME_LIFECYCLE_SURFACE_ROOT / "schemas"
+RUNTIME_LIFECYCLE_EXAMPLE_ROOT = RUNTIME_LIFECYCLE_SURFACE_ROOT / "examples"
+RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH = (
+    RUNTIME_LIFECYCLE_SCHEMA_ROOT / "runtime-gateway-cache-status.schema.json"
+)
+RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH = (
+    RUNTIME_LIFECYCLE_SCHEMA_ROOT / "runtime-usage-snapshot.schema.json"
+)
+RUNTIME_GATEWAY_CACHE_STATUS_EXAMPLE_PATH = (
+    RUNTIME_LIFECYCLE_EXAMPLE_ROOT / "runtime_gateway_cache_status.gateway-local.example.json"
+)
+RUNTIME_USAGE_SNAPSHOT_EXAMPLE_PATH = (
+    RUNTIME_LIFECYCLE_EXAMPLE_ROOT / "runtime_usage_snapshot.workhorse-local.example.json"
+)
+AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "agent_build_snapshot.example.json"
+REPUTATION_LEDGER_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "reputation_ledger.example.json"
+QUEST_RUN_RESULT_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "quest_run_result.example.json"
+FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "frontend_projection_bundle.example.json"
+GENERATED_AGENT_BUILD_SNAPSHOTS_PATH = RPG_RUNTIME_GENERATED_ROOT / "agent_build_snapshots.json"
+GENERATED_REPUTATION_LEDGERS_PATH = RPG_RUNTIME_GENERATED_ROOT / "reputation_ledgers.json"
+GENERATED_QUEST_RUN_RESULTS_PATH = RPG_RUNTIME_GENERATED_ROOT / "quest_run_results.json"
+GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH = RPG_RUNTIME_GENERATED_ROOT / "frontend_projection_bundles.json"
 DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES = (
     "diagnostic_target",
     "diagnostic_session",
@@ -991,7 +1100,7 @@ def validate_questbook_surface(errors: list[str]) -> None:
             first_bundle = items[0]
             if first_bundle.get("vocabulary_overlay_ref") != "Agents-of-Abyss/generated/dual_vocabulary_overlay.json":
                 errors.append(
-                    "generated/rpg/frontend_projection_bundles.json must reference Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
+                    "mechanics/federation-seams/parts/rpg-runtime/generated/frontend_projection_bundles.json must reference Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
                 )
 
     expected_catalog = []
@@ -1498,8 +1607,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
     if "Logs/rpg/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/rpg/")
-    if "generated/rpg/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention generated/rpg/")
+    if "mechanics/federation-seams/parts/rpg-runtime/generated/" not in storage_doc:
+        errors.append("docs/STORAGE_LAYOUT.md must mention mechanics/federation-seams/parts/rpg-runtime/generated/")
 
     lifecycle_doc = (ROOT / "docs" / "LIFECYCLE.md").read_text(encoding="utf-8")
     for required_snippet in (
@@ -1655,6 +1764,18 @@ def validate_mechanics_topology(errors: list[str]) -> None:
             if not path.is_file():
                 errors.append(f"mechanics package {package} is missing {required_file}")
 
+        parts_readme = read_text_or_none(package_root / "parts" / "README.md") or ""
+        for part in MECHANIC_PACKAGE_PARTS.get(package, ()):
+            part_readme = package_root / "parts" / part / "README.md"
+            if not part_readme.is_file():
+                errors.append(
+                    f"mechanics package {package} is missing parts/{part}/README.md"
+                )
+            if f"]({part}/README.md)" not in parts_readme:
+                errors.append(
+                    f"mechanics package {package} parts/README.md must route to parts/{part}/README.md"
+                )
+
         readme_text = read_text_or_none(package_root / "README.md") or ""
         for heading in MECHANIC_CARD_HEADINGS:
             if heading not in readme_text:
@@ -1724,8 +1845,8 @@ def validate_reference_platform(errors: list[str]) -> None:
     )
     if "aoa-host-facts" not in reference_platform:
         errors.append("docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
-    if "mechanics/machine-fit/docs/MACHINE_BRIDGE.md" not in reference_platform:
-        errors.append("docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/docs/MACHINE_BRIDGE.md")
+    if "mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md" not in reference_platform:
+        errors.append("docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md")
     if "REFERENCE_PLATFORM_SPEC.md" not in reference_platform:
         errors.append(
             "docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
@@ -1752,9 +1873,15 @@ def validate_reference_platform(errors: list[str]) -> None:
         )
 
     schema = json.loads(
-        (ROOT / "docs" / "reference-platform" / "schema.v1.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "machine-fit"
+            / "parts"
+            / "host-facts"
+            / "schemas"
+            / "schema.v1.json"
+        ).read_text(encoding="utf-8")
     )
     if schema.get("title") != "AoA Host Facts":
         errors.append("schema.v1.json must describe AoA Host Facts")
@@ -1762,8 +1889,11 @@ def validate_reference_platform(errors: list[str]) -> None:
     example = json.loads(
         (
             ROOT
-            / "docs"
-            / "reference-platform"
+            / "mechanics"
+            / "machine-fit"
+            / "parts"
+            / "host-facts"
+            / "examples"
             / "reference-host.public.json.example"
         ).read_text(encoding="utf-8")
     )
@@ -1782,14 +1912,15 @@ def validate_reference_platform(errors: list[str]) -> None:
 
 
 def validate_machine_bridge(errors: list[str]) -> None:
-    machine_bridge_doc_path = ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_BRIDGE.md"
-    machine_bridge_schema_path = ROOT / "mechanics" / "machine-fit" / "docs" / "machine-bridge" / "schema.v1.json"
+    machine_bridge_doc_path = ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "docs" / "MACHINE_BRIDGE.md"
+    machine_bridge_schema_path = ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "schemas" / "schema.v1.json"
     machine_bridge_example_path = (
         ROOT
         / "mechanics"
         / "machine-fit"
-        / "docs"
+        / "parts"
         / "machine-bridge"
+        / "examples"
         / "machine-bridge.public.json.example"
     )
     bridge_doc = machine_bridge_doc_path.read_text(encoding="utf-8")
@@ -1815,7 +1946,7 @@ def validate_machine_bridge(errors: list[str]) -> None:
         errors.append("scripts/AGENTS.md must mention aoa-machine-bridge")
 
     mechanic_parts = (ROOT / "mechanics" / "machine-fit" / "PARTS.md").read_text(encoding="utf-8")
-    if "Machine bridge" not in mechanic_parts or "mechanics/machine-fit/docs/MACHINE_BRIDGE.md" not in mechanic_parts:
+    if "Machine bridge" not in mechanic_parts or "parts/machine-bridge/" not in mechanic_parts:
         errors.append("mechanics/machine-fit/PARTS.md must route Machine bridge surfaces")
 
     schema = json.loads(machine_bridge_schema_path.read_text(encoding="utf-8"))
@@ -1858,17 +1989,29 @@ def validate_platform_adaptations(errors: list[str]) -> None:
         errors.append("docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
 
     schema = json.loads(
-        (ROOT / "docs" / "platform-adaptations" / "schema.v1.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "machine-fit"
+            / "parts"
+            / "platform-adaptations"
+            / "schemas"
+            / "schema.v1.json"
+        ).read_text(encoding="utf-8")
     )
     if schema.get("title") != "AoA Platform Adaptation Record":
-        errors.append("platform-adaptations/schema.v1.json must describe AoA Platform Adaptation Record")
+        errors.append("machine-fit platform-adaptations schema.v1.json must describe AoA Platform Adaptation Record")
 
     example = json.loads(
-        (ROOT / "docs" / "platform-adaptations" / "platform-adaptation.public.json.example").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "machine-fit"
+            / "parts"
+            / "platform-adaptations"
+            / "examples"
+            / "platform-adaptation.public.json.example"
+        ).read_text(encoding="utf-8")
     )
     if example.get("artifact_kind") != "aoa.platform-adaptation":
         errors.append("platform-adaptation.public.json.example must use artifact_kind aoa.platform-adaptation")
@@ -2043,15 +2186,15 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         if snippet not in doctor_doc:
             errors.append(f"docs/DOCTOR.md must mention `{snippet}`")
 
-    cache_schema = read_required_json(Path("schemas") / "runtime-gateway-cache-status.schema.json")
+    cache_schema = read_required_json(RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH)
     if cache_schema and cache_schema.get("title") != "abyss-stack runtime gateway cache status":
         errors.append(
-            "runtime-gateway-cache-status.schema.json must describe abyss-stack runtime gateway cache status"
+            f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must describe abyss-stack runtime gateway cache status"
         )
     if cache_schema:
         cache_required = cache_schema.get("required")
         if not isinstance(cache_required, list):
-            errors.append("runtime-gateway-cache-status.schema.json must declare a required field list")
+            errors.append(f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must declare a required field list")
         else:
             for field in (
                 "cache_key_strategy",
@@ -2064,7 +2207,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
             ):
                 if field not in cache_required:
                     errors.append(
-                        f"runtime-gateway-cache-status.schema.json must require `{field}`"
+                        f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must require `{field}`"
                     )
         cache_properties = cache_schema.get("properties")
         cache_surface_type = (
@@ -2074,18 +2217,18 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         )
         if not isinstance(cache_surface_type, dict) or cache_surface_type.get("const") != "runtime_gateway_cache_status":
             errors.append(
-                "runtime-gateway-cache-status.schema.json must pin surface_type.const to runtime_gateway_cache_status"
+                f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must pin surface_type.const to runtime_gateway_cache_status"
             )
 
-    usage_schema = read_required_json(Path("schemas") / "runtime-usage-snapshot.schema.json")
+    usage_schema = read_required_json(RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH)
     if usage_schema and usage_schema.get("title") != "abyss-stack runtime usage snapshot":
         errors.append(
-            "runtime-usage-snapshot.schema.json must describe abyss-stack runtime usage snapshot"
+            f"{RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH.as_posix()} must describe abyss-stack runtime usage snapshot"
         )
     if usage_schema:
         usage_required = usage_schema.get("required")
         if not isinstance(usage_required, list):
-            errors.append("runtime-usage-snapshot.schema.json must declare a required field list")
+            errors.append(f"{RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH.as_posix()} must declare a required field list")
         else:
             for field in (
                 "request_window",
@@ -2100,7 +2243,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
                 "reset_at",
             ):
                 if field not in usage_required:
-                    errors.append(f"runtime-usage-snapshot.schema.json must require `{field}`")
+                    errors.append(f"{RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH.as_posix()} must require `{field}`")
         usage_properties = usage_schema.get("properties")
         usage_surface_type = (
             usage_properties.get("surface_type", {})
@@ -2109,12 +2252,10 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         )
         if not isinstance(usage_surface_type, dict) or usage_surface_type.get("const") != "runtime_usage_snapshot":
             errors.append(
-                "runtime-usage-snapshot.schema.json must pin surface_type.const to runtime_usage_snapshot"
+                f"{RUNTIME_USAGE_SNAPSHOT_SCHEMA_PATH.as_posix()} must pin surface_type.const to runtime_usage_snapshot"
             )
 
-    cache_example = read_required_json(
-        Path("examples") / "runtime_gateway_cache_status.gateway-local.example.json"
-    )
+    cache_example = read_required_json(RUNTIME_GATEWAY_CACHE_STATUS_EXAMPLE_PATH)
     if cache_example:
         if cache_example.get("surface_type") != "runtime_gateway_cache_status":
             errors.append(
@@ -2150,7 +2291,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
                     "runtime gateway cache status example must show Cache-Control: no-cache bypass"
                 )
 
-    usage_example_path = Path("examples") / "runtime_usage_snapshot.workhorse-local.example.json"
+    usage_example_path = RUNTIME_USAGE_SNAPSHOT_EXAMPLE_PATH
     usage_example_text = read_required_text(usage_example_path)
     usage_example = read_required_json(usage_example_path)
     if usage_example:
@@ -2211,19 +2352,19 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
     readme = read_required_text(Path("README.md"))
     for snippet in (
         "docs/DIAGNOSTIC_SPINE.md",
-        "generated/diagnostic_surface_catalog.min.json",
-        "schemas/diagnostic_target.schema.json",
-        "schemas/diagnostic_session.schema.json",
-        "schemas/diagnosis_companion.schema.json",
-        "schemas/diagnostic_anchor_ref.schema.json",
-        "schemas/repair_handoff.schema.json",
-        "schemas/reviewed_diagnosis_ref.schema.json",
-        "examples/diagnostic_target.min.example.json",
-        "examples/diagnostic_session.min.example.json",
-        "examples/diagnosis_companion.min.example.json",
-        "examples/diagnostic_anchor_ref.min.example.json",
-        "examples/repair_handoff.min.example.json",
-        "examples/reviewed_diagnosis_ref.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
         "quests/ABYSS-STACK-Q-0007.yaml",
         "scripts/aoa-diagnose",
     ):
@@ -2234,7 +2375,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
     for snippet in (
         "The goal is not a louder doctor.",
         "The diagnostic spine is a read model with memory.",
-        "`generated/diagnostic_surface_catalog.min.json`",
+        "`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`",
         "what path is being diagnosed",
         "`diagnostic_target_v1`",
         "`diagnostic_session_v1`",
@@ -2534,29 +2675,29 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
     if diagnostic_surface_catalog:
         if diagnostic_surface_catalog.get("schema_version") != "abyss_stack_diagnostic_surface_catalog_v1":
             errors.append(
-                "generated/diagnostic_surface_catalog.min.json must use schema_version abyss_stack_diagnostic_surface_catalog_v1"
+                "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must use schema_version abyss_stack_diagnostic_surface_catalog_v1"
             )
         if diagnostic_surface_catalog.get("owner_repo") != "abyss-stack":
-            errors.append("generated/diagnostic_surface_catalog.min.json must set owner_repo to abyss-stack")
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must set owner_repo to abyss-stack")
         if diagnostic_surface_catalog.get("surface_kind") != "runtime_surface":
-            errors.append("generated/diagnostic_surface_catalog.min.json must stay runtime_surface")
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must stay runtime_surface")
         if diagnostic_surface_catalog.get("authority_ref") != "docs/DIAGNOSTIC_SPINE.md":
-            errors.append("generated/diagnostic_surface_catalog.min.json must point authority_ref to docs/DIAGNOSTIC_SPINE.md")
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must point authority_ref to docs/DIAGNOSTIC_SPINE.md")
 
         surfaces = diagnostic_surface_catalog.get("surfaces")
         if not isinstance(surfaces, list) or len(surfaces) != len(DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES):
-            errors.append("generated/diagnostic_surface_catalog.min.json must publish exactly five diagnostic surfaces")
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json must publish exactly five diagnostic surfaces")
         else:
             surface_names = []
             for index, entry in enumerate(surfaces):
                 if not isinstance(entry, dict):
-                    errors.append(f"generated/diagnostic_surface_catalog.min.json surface {index} must be an object")
+                    errors.append(f"mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json surface {index} must be an object")
                     continue
                 for field in ("name", "schema_ref", "example_ref", "primary_question"):
                     value = entry.get(field)
                     if not isinstance(value, str) or not value.strip():
                         errors.append(
-                            f"generated/diagnostic_surface_catalog.min.json surface {index} must include non-empty {field}"
+                            f"mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json surface {index} must include non-empty {field}"
                         )
                 name = entry.get("name")
                 schema_ref = entry.get("schema_ref")
@@ -2564,24 +2705,24 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
                 if isinstance(name, str):
                     surface_names.append(name)
                 if isinstance(schema_ref, str) and not (ROOT / schema_ref).exists():
-                    errors.append(f"generated/diagnostic_surface_catalog.min.json schema_ref is missing: {schema_ref}")
+                    errors.append(f"mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json schema_ref is missing: {schema_ref}")
                 if isinstance(example_ref, str) and not (ROOT / example_ref).exists():
-                    errors.append(f"generated/diagnostic_surface_catalog.min.json example_ref is missing: {example_ref}")
+                    errors.append(f"mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json example_ref is missing: {example_ref}")
             if tuple(surface_names) != DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES:
-                errors.append("generated/diagnostic_surface_catalog.min.json surface order must stay aligned with the diagnostic spine")
+                errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json surface order must stay aligned with the diagnostic spine")
 
         validation_refs = diagnostic_surface_catalog.get("validation_refs")
         expected_validation_refs = [
             "scripts/validate_stack.py",
-            "tests/test_validate_stack_diagnostic_spine.py",
-            "tests/test_diagnostic_spine_contracts.py",
+            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",
+            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
         ]
         if validation_refs != expected_validation_refs:
-            errors.append("generated/diagnostic_surface_catalog.min.json validation_refs must stay aligned with the repo-local diagnostic checks")
+            errors.append("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json validation_refs must stay aligned with the repo-local diagnostic checks")
         elif isinstance(validation_refs, list):
             for ref in validation_refs:
                 if not isinstance(ref, str) or not (ROOT / ref).exists():
-                    errors.append(f"generated/diagnostic_surface_catalog.min.json validation_ref is missing: {ref}")
+                    errors.append(f"mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json validation_ref is missing: {ref}")
 
     for skill_path, description in (
         (DIAGNOSTIC_SPINE_SKILL_PATH, "local overlay surface"),
@@ -2736,15 +2877,29 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
             errors.append(f"docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
 
     schema = json.loads(
-        (ROOT / "schemas" / "runtime-memo-export-candidate.schema.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "schemas"
+            / "runtime-memo-export-candidate.schema.json"
+        ).read_text(encoding="utf-8")
     )
     if schema.get("title") != "abyss-stack runtime memo export candidate":
         errors.append("runtime-memo-export-candidate.schema.json must describe abyss-stack runtime memo export candidate")
 
     example = json.loads(
-        (ROOT / "examples" / "runtime_memo_export_candidate.checkpoint_export.example.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "examples"
+            / "runtime_memo_export_candidate.checkpoint_export.example.json"
+        ).read_text(encoding="utf-8")
     )
     if example.get("artifact_kind") != "aoa.runtime-memo-export-candidate":
         errors.append("runtime memo export example must use artifact_kind aoa.runtime-memo-export-candidate")
@@ -2778,7 +2933,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
             errors.append(f"docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
 
     evidence_schema = json.loads(
-        (ROOT / "schemas" / "runtime-eval-evidence-selection-candidate.schema.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "schemas"
+            / "runtime-eval-evidence-selection-candidate.schema.json"
+        ).read_text(encoding="utf-8")
     )
     if evidence_schema.get("title") != "abyss-stack runtime eval evidence selection candidate":
         errors.append(
@@ -2786,9 +2949,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         )
 
     evidence_example = json.loads(
-        (ROOT / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "examples"
+            / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json"
+        ).read_text(encoding="utf-8")
     )
     if evidence_example.get("artifact_kind") != "aoa.runtime-eval-evidence-selection-candidate":
         errors.append(
@@ -2800,15 +2969,29 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         )
 
     hook_schema = json.loads(
-        (ROOT / "schemas" / "runtime-artifact-hook-candidate.schema.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "schemas"
+            / "runtime-artifact-hook-candidate.schema.json"
+        ).read_text(encoding="utf-8")
     )
     if hook_schema.get("title") != "abyss-stack runtime artifact hook candidate":
         errors.append("runtime-artifact-hook-candidate.schema.json must describe abyss-stack runtime artifact hook candidate")
 
     hook_example = json.loads(
-        (ROOT / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            ROOT
+            / "mechanics"
+            / "governed-execution"
+            / "parts"
+            / "candidate-exports"
+            / "examples"
+            / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json"
+        ).read_text(encoding="utf-8")
     )
     if hook_example.get("artifact_kind") != "aoa.runtime-artifact-hook-candidate":
         errors.append("runtime artifact hook example must use artifact_kind aoa.runtime-artifact-hook-candidate")
@@ -2827,7 +3010,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
             errors.append(f"docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
 
     a2a_schema = json.loads(
-        (ROOT / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "mechanics"
+            / "runtime-repair"
+            / "parts"
+            / "a2a-return-dry-run"
+            / "schemas"
+            / "runtime-a2a-return-closeout-dry-run.schema.json"
+        ).read_text(encoding="utf-8")
     )
     if a2a_schema.get("title") != "abyss-stack runtime A2A return closeout dry-run":
         errors.append(
@@ -2835,7 +3026,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         )
 
     a2a_example = json.loads(
-        (ROOT / "examples" / "runtime_a2a_return_closeout_dry_run.example.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "mechanics"
+            / "runtime-repair"
+            / "parts"
+            / "a2a-return-dry-run"
+            / "examples"
+            / "runtime_a2a_return_closeout_dry_run.example.json"
+        ).read_text(encoding="utf-8")
     )
     if a2a_example.get("artifact_kind") != "aoa.runtime-a2a-return-closeout-dry-run":
         errors.append(
