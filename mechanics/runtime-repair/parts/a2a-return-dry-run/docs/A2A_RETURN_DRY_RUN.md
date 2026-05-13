@@ -39,7 +39,7 @@ The adapter expects the SDK-shaped reviewed closeout request:
 The source contract lives in `aoa-sdk`, not in this repository.
 
 The adapter may also accept the full SDK E2E fixture at
-`/srv/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`; in that
+`/srv/AbyssOS/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`; in that
 case it reads the nested `reviewed_closeout_request` and still emits only the
 same private dry-run wrapper.
 
@@ -66,14 +66,14 @@ It must not claim:
 
 ```bash
 scripts/aoa-a2a-return-closeout-dry-run \
-  --input-file /srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json
+  --input-file /srv/AbyssOS/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json
 ```
 
 The full-fixture form is also accepted:
 
 ```bash
 scripts/aoa-a2a-return-closeout-dry-run \
-  --input-file /srv/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json
+  --input-file /srv/AbyssOS/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json
 ```
 
 Use `--write` only when a private runtime-local candidate file is wanted.

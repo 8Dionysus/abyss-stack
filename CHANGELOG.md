@@ -83,6 +83,9 @@ Tracking starts with the community-docs baseline for this repository.
   validator guard against old wave-shaped prose returning
 - autonomy status now routes preserved `W5`/`W6` artifact names through
   long-horizon and bounded-autonomy index constants
+- active workspace sibling defaults and repo-local skill symlinks now route
+  through `/srv/AbyssOS/<repo>`, with validation blocking stale active
+  `/srv/<repo>` sibling roots outside legacy archives
 
 ## [0.2.2] - 2026-04-23
 

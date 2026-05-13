@@ -96,7 +96,7 @@ aoa-export-artifact-hook-candidate \
   --write
 
 aoa-a2a-return-closeout-dry-run \
-  --input-file /srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json \
+  --input-file /srv/AbyssOS/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json \
   --write
 
 aoa-run-memo-contradiction-integrity \
