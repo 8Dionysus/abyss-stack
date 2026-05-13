@@ -2,18 +2,22 @@
 
 ## 2026-05-07 - Initial package landing
 
-Created the diagnostic spine package as a route home for readiness checks,
-truth-goal status, diagnostic artifacts, anchors, and repair handoff candidates.
+Created the diagnostic-spine package as the route home for doctor readiness,
+diagnostic read models, truth-goal status, generated diagnostic catalogs, and
+repair handoff candidates.
 
 Validation route: `python scripts/validate_nested_agents.py` and
 `python scripts/validate_stack.py`.
 
-## 2026-05-13 - Part-local docs topology
+## 2026-05-13 - Part-local diagnostic surfaces
 
-Moved diagnostic spine authority, doctor-readiness, local-ops split, and truth
-surface docs into their owning parts. Rebuilt the diagnostic surface catalog so
-its authority ref follows the active diagnostic spine doc.
+Moved active diagnostic docs, schemas, examples, generated catalog, and focused
+tests under owning parts while keeping root wrappers stable.
 
-Validation route: `python scripts/validate_stack.py`,
-`python scripts/build_diagnostic_surface_catalog.py --check`, and
-`python scripts/validate_diagnostic_surface_catalog.py`.
+Validation route: diagnostic catalog check/validate, focused pytest, and
+`python scripts/validate_stack.py`.
+
+## 2026-05-13 - Package card completion
+
+Added package-local `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and this
+landing log to make diagnostic ownership and repair stop-lines explicit.

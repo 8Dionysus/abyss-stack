@@ -1,16 +1,23 @@
 # Runtime Lifecycle Roadmap
 
-## Initial landing
+## Current route
 
-- create this package as the route home
-- keep root operator docs in root `docs/` and part-specific docs under owning
-  lifecycle parts
-- make future lifecycle movement reviewable
-- land optional cache/usage status readout schemas, examples, and tests under
-  the package
+- keep lifecycle commands as root wrappers with part-local implementations
+- keep root `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, and `docs/RUNBOOK.md`
+  as repo-wide operator routes
+- keep status readout schemas, examples, and tests under `parts/status-readouts`
+- keep systemd user-unit material explicit and opt-in
 
 ## Next candidates
 
-- decide whether `docs/RUNBOOK.md` stays root-facing or splits into package detail
-- map profile and preset docs against compose ownership
-- add a lifecycle-specific validator only if root `validate_stack.py` becomes too broad
+- audit root lifecycle docs for authority versus route-card detail
+- add focused wrapper tests if lifecycle shell helpers grow beyond routing and
+  environment assembly
+- split logs/status readout contracts further only when new source-safe
+  runtime artifacts appear
+
+## Stop-lines
+
+- do not start, stop, enable, or mutate live services from source docs
+- do not widen host exposure without explicit operator intent
+- do not treat source-only validation as live service health

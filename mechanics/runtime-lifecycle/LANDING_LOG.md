@@ -2,34 +2,24 @@
 
 ## 2026-05-07 - Initial package landing
 
-Created the runtime lifecycle package as a route home for deployment, layout,
-up/down, smoke, logs, and systemd lifecycle surfaces.
+Created the runtime-lifecycle package as the route home for install, layout,
+start, stop, wait, smoke, logs, status, warmup, systemd user units, and
+operator runbook flow.
 
 Validation route: `python scripts/validate_nested_agents.py` and
 `python scripts/validate_stack.py`.
 
-## 2026-05-12 - Runtime status readout landing
+## 2026-05-13 - Wrapper/backend topology
 
-Moved gateway cache status and usage snapshot schemas, examples, and validation
-tests into the runtime-lifecycle package. Root policy and runbook docs stayed
-root-facing because they remain operator orientation surfaces.
+Kept stable root command wrappers while moving lifecycle implementation bodies
+into package parts for layout, first-run, start/stop, wait/smoke, logs/status,
+and user-unit helpers.
 
-Validation route: package-local pytest, `python scripts/validate_stack.py`, and
-`python scripts/validate_nested_agents.py`.
+Validation route: shell syntax checks, status-readout tests, systemd user-unit
+verification where available, and `python scripts/validate_stack.py`.
 
-## 2026-05-13 - Part-local docs topology
+## 2026-05-13 - Package card completion
 
-Moved cache, usage, and internal-probe docs into the status-readouts and
-wait-smoke parts. Root runbook and deployment docs remain repo-wide operator
-entrypoints.
-
-Validation route: `python scripts/validate_stack.py`.
-
-## 2026-05-13 - Federation layout compatibility labels
-
-Kept layout checks on clean local labels while moving the old upstream
-`aoa-evals` and `aoa-playbooks` filenames into explicit compatibility
-variables documented through the federation compatibility table.
-
-Validation route: shell parse checks, `python scripts/validate_stack.py`, and
-`python scripts/validate_nested_agents.py`.
+Added package-local `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and this
+landing log so lifecycle changes keep source/runtime and operator-action
+boundaries explicit.

@@ -1,13 +1,20 @@
 # Runtime Lifecycle Direction
 
-The current contour is route-first and dry-run-friendly.
+This package keeps stack lifecycle explicit, operator-driven, and recoverable.
 
-Short term:
+Current posture:
 
-- keep `aoa-up`, `aoa-down`, `aoa-wait`, `aoa-smoke`, and `aoa-logs` discoverable from `scripts/`
-- keep `systemd/user/podman-compose-abyss.service` pointed at deployed `Configs`
-- keep docs explicit that source sync and live service state are different
-- keep cache/usage status readout contracts package-local and optional
+- keep install, layout, first-run, start/stop, warmup, wait/smoke, logs/status,
+  status readouts, and user-unit routes separated by part
+- keep stable root commands as wrappers
+- keep service activation and unit enablement as explicit operator actions
+- keep source checkout, deployed runtime root, and live runtime state distinct
 
-Next movement should be a careful map of which lifecycle docs should move under
-this package and which should remain root operator docs.
+Near direction:
+
+- keep lifecycle docs aligned with source-only GitHub bootstrap
+- keep layout checks aware of compatibility bridges without naming old routes
+  as active topology
+- add focused tests when status readouts or lifecycle wrappers gain new logic
+- route host-fit questions to machine-fit and config material to
+  config-projection

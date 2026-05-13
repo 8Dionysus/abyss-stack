@@ -86,7 +86,7 @@ Tracking starts with the community-docs baseline for this repository.
   validator guard against archived stage prose returning
 - federation seams now keep upstream eval and playbook compatibility names in
   `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md` while active route
-  docs use clean local aliases
+  docs use clean local route names
 - autonomy status now routes preserved long-horizon and bounded-autonomy
   artifact names through explicit index constants
 - active workspace sibling defaults and repo-local skill symlinks now route
@@ -109,6 +109,9 @@ Tracking starts with the community-docs baseline for this repository.
   `parts/local-trials/trial_compatibility_bridge.py`, and the LangGraph
   dependency manifest lives in `parts/langgraph-pilot/requirements.txt`
   instead of the root command-wrapper directory
+- all mechanics packages now carry the full package-card layer
+  `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and `LANDING_LOG.md`, with
+  `validate_stack.py` enforcing the shared card spine
 
 ## [0.2.2] - 2026-04-23
 

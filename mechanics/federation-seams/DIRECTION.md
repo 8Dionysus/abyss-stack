@@ -1,14 +1,22 @@
 # Federation Seams Direction
 
-The current contour is opt-in, advisory, and owner-subordinate.
+This package keeps sibling-owner consumption optional, explicit, and
+subordinate to the repositories that own the meaning.
 
-Short term:
+Current posture:
 
-- keep each mirrored layer named explicitly
-- keep profile activation separate from source sync
-- keep route-api and advisory health checks optional unless the profile requires them
-- keep RPG runtime read models package-local while root questbook surfaces remain
-  a mixed repository contract
+- keep sync wrappers and federation checks package-local
+- keep route-api and advisory mirrors consuming public-safe owner surfaces
+  without becoming the owner of those surfaces
+- keep upstream compatibility IDs behind explicit compatibility bridges
+- keep RPG and ToS graph runtime projections as runtime read models, not source
+  doctrine
 
-Next movement should map seam docs into package-local groups only after
-validator paths and owner-boundary language are updated.
+Near direction:
+
+- keep owner-boundary docs aligned across memo, eval, playbook, KAG, ToS, and
+  RPG seams
+- keep generated RPG runtime collections rebuilt from source
+- make federation profile activation visible before runtime consumption widens
+- route stronger owner changes to the relevant sibling repository instead of
+  copying authority here

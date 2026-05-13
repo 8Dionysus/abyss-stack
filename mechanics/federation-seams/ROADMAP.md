@@ -1,15 +1,24 @@
 # Federation Seams Roadmap
 
-## Initial landing
+## Current route
 
-- create this package as the route home
-- keep current seam docs in root `docs/`
-- make owner split visible before future movement
-- land RPG runtime read-model schemas, examples, generated outputs, and script
-  tests under the package while keeping root questbook surfaces in place
+- keep sibling-owner seams optional and profile-visible
+- keep compatibility names isolated behind explicit bridge config and legacy
+  inventory
+- keep generated RPG runtime collections source-rebuilt and checked
+- keep route-api consumption subordinate to owner repositories
 
 ## Next candidates
 
-- split seam docs into owner-family package detail
-- add a package-local seam index
-- align route-api and RPG runtime docs under one federation-facing map
+- add a seam summary matrix if owner routes become hard to scan from `PARTS.md`
+- split route-api specific federation checks if the service grows more
+  independent from sync checks
+- add stronger contract tests for owner mirror inputs only when a downstream
+  runtime consumer requires them
+
+## Stop-lines
+
+- do not copy sibling doctrine into this repository as source truth
+- do not make federation mandatory without profile, preset, config, and
+  validation movement
+- do not let upstream compatibility IDs become active local names again
