@@ -7,5 +7,6 @@ names carry old wave, seed, and phase scaffolding. They are retained so the
 runtime history stays reviewable, but the active route is now the package card
 one level up.
 
-Use [INDEX.md](INDEX.md) to map old locations to current locations.
-
+Use [INDEX.md](INDEX.md) to map old locations to current locations. Use
+[ARCHIVE_CLASSIFICATION.md](ARCHIVE_CLASSIFICATION.md) to decide whether a
+preserved source is archive-only or ready for active distillation.

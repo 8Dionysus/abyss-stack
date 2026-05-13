@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -19,6 +20,7 @@ MODULE_PATH = (
     / "local-trials"
     / "aoa_local_ai_trials.py"
 )
+LOCAL_TRIALS_DIR = MODULE_PATH.parent
 
 
 def load_module():
@@ -30,7 +32,30 @@ def load_module():
     return module
 
 
+def load_adapter():
+    if str(LOCAL_TRIALS_DIR) not in sys.path:
+        sys.path.insert(0, str(LOCAL_TRIALS_DIR))
+    import legacy_trial_adapter
+
+    return legacy_trial_adapter
+
+
 class AoALocalAiTrialsTests(unittest.TestCase):
+    def test_legacy_trial_adapter_exposes_role_level_gate_routes(self) -> None:
+        adapter = load_adapter()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_root = Path(tmpdir)
+
+            self.assertEqual("runtime compatibility gate", adapter.RUNTIME_GATE.role)
+            self.assertEqual(["run-wave", "W0"], adapter.runtime_gate_run_command())
+            self.assertEqual("W0-runtime-index.json", adapter.RUNTIME_GATE.index_name)
+            self.assertEqual("edit fixture compatibility gate", adapter.EDIT_GATE.role)
+            self.assertEqual(
+                log_root / "waves" / "W4" / "case-1" / "artifacts" / "approval.status.json",
+                adapter.edit_gate_approval_path(log_root, "case-1"),
+            )
+            self.assertEqual({"W4": []}, adapter.edit_gate_catalog_payload([]))
+
     def test_run_command_timeout_decodes_bytes(self) -> None:
         module = load_module()
         timeout = subprocess.TimeoutExpired(

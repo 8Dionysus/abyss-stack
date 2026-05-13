@@ -26,6 +26,12 @@ def find_repo_root(start: Path) -> Path:
 
 SOURCE_ROOT = find_repo_root(SCRIPT_PATH.parent)
 SCRIPT_DIR = SOURCE_ROOT / "scripts"
+LOCAL_TRIALS_PART = SOURCE_ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials"
+if str(LOCAL_TRIALS_PART) not in sys.path:
+    sys.path.insert(0, str(LOCAL_TRIALS_PART))
+
+import legacy_trial_adapter as TRIAL_ADAPTER  # noqa: E402
+
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 PILOT_ID = "llamacpp-sidecar-pilot-v1"
@@ -67,10 +73,10 @@ LLAMACPP_HEALTH_URL = "http://127.0.0.1:11435/health"
 LLAMACPP_HEALTH_FALLBACK_URL = "http://127.0.0.1:11435/v1/health"
 CANDIDATE_HEALTH_URL = "http://127.0.0.1:5403/health"
 CANDIDATE_RUN_URL = "http://127.0.0.1:5403/run"
-LEGACY_RUNTIME_GATE_ID = "W0"
-LEGACY_EDIT_GATE_ID = "W4"
-LEGACY_RUNTIME_GATE_INDEX_NAME = f"{LEGACY_RUNTIME_GATE_ID}-runtime-index.json"
-LEGACY_EDIT_GATE_INDEX_NAME = f"{LEGACY_EDIT_GATE_ID}-langgraph-sidecar-index.json"
+RUNTIME_GATE_WIRE_ID = TRIAL_ADAPTER.RUNTIME_GATE.wire_id
+EDIT_GATE_WIRE_ID = TRIAL_ADAPTER.EDIT_GATE.wire_id
+RUNTIME_GATE_INDEX_NAME = TRIAL_ADAPTER.RUNTIME_GATE.index_name
+EDIT_GATE_INDEX_NAME = TRIAL_ADAPTER.EDIT_GATE.index_name
 LLAMACPP_RUNTIME_GATE_PROGRAM_ID = "qwen-llamacpp-pilot-v1"
 LLAMACPP_EDIT_GATE_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
 LLAMACPP_EDIT_GATE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / "langgraph-sidecar-llamacpp-promotion-gate"
@@ -1049,7 +1055,7 @@ def candidate_screening(
 
 
 def auto_approve_fixture(log_root: Path, *, case_id: str) -> Path:
-    approval_path = log_root / "waves" / LEGACY_EDIT_GATE_ID / case_id / "artifacts" / "approval.status.json"
+    approval_path = TRIAL_ADAPTER.edit_gate_approval_path(log_root, case_id)
     payload = json.loads(approval_path.read_text(encoding="utf-8"))
     payload["status"] = "approved"
     payload["approved"] = True
@@ -1079,8 +1085,7 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
                 CANDIDATE_RUN_URL,
                 "--program-id",
                 LLAMACPP_RUNTIME_GATE_PROGRAM_ID,
-                "run-wave",
-                LEGACY_RUNTIME_GATE_ID,
+                *TRIAL_ADAPTER.runtime_gate_run_command(),
             ],
             env=base_env(),
             check=True,
@@ -1091,7 +1096,7 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
                 / "Logs"
                 / "local-ai-trials"
                 / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
-                / LEGACY_RUNTIME_GATE_INDEX_NAME
+                / RUNTIME_GATE_INDEX_NAME
             ).read_text(encoding="utf-8")
         )
 
@@ -1153,7 +1158,7 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
             check=True,
         )
         w4_index = json.loads(
-            (fixture_log_root / LEGACY_EDIT_GATE_INDEX_NAME).read_text(encoding="utf-8")
+            (fixture_log_root / EDIT_GATE_INDEX_NAME).read_text(encoding="utf-8")
         )
     finally:
         stop_sidecars()
@@ -1175,20 +1180,20 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
             / "Logs"
             / "local-ai-trials"
             / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
-            / LEGACY_RUNTIME_GATE_INDEX_NAME
+            / RUNTIME_GATE_INDEX_NAME
         ),
         "edit_fixture_gate_result": w4_index.get("gate_result"),
-        "edit_fixture_gate_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / LEGACY_EDIT_GATE_INDEX_NAME),
+        "edit_fixture_gate_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / EDIT_GATE_INDEX_NAME),
         "w0_gate_result": w0_index.get("gate_result"),
         "w0_index_ref": str(
             STACK_ROOT
             / "Logs"
             / "local-ai-trials"
             / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
-            / LEGACY_RUNTIME_GATE_INDEX_NAME
+            / RUNTIME_GATE_INDEX_NAME
         ),
         "w4_gate_result": w4_index.get("gate_result"),
-        "w4_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / LEGACY_EDIT_GATE_INDEX_NAME),
+        "w4_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / EDIT_GATE_INDEX_NAME),
         "baseline_after_teardown": bool(baseline_after_teardown.get("ready")),
         "baseline_recheck_payload": baseline_after_teardown,
         "recommendation": recommendation,

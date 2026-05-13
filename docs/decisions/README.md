@@ -17,3 +17,4 @@ Use these notes to understand why a contract exists. Keep operational evidence, 
 - [2026-05-13 Root Residual Topology Cleanup](2026-05-13-root-residual-topology-cleanup.md)
 - [2026-05-13 Workspace Sibling Roots Under AbyssOS](2026-05-13-workspace-sibling-roots-under-abyssos.md)
 - [2026-05-13 Legacy-Heavy Runtime Package Distillation](2026-05-13-legacy-heavy-runtime-package-distillation.md)
+- [2026-05-13 Quest And Compatibility Topology](2026-05-13-quest-and-compatibility-topology.md)

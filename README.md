@@ -139,7 +139,7 @@ Current contract surfaces are `mechanics/diagnostic-spine/parts/diagnostic-surfa
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json`, and
-`quests/ABYSS-STACK-Q-0007.yaml`.
+`quests/diagnostics/captured/ABYSS-STACK-Q-0007.yaml`.
 The repo-local Codex adapter surface for this pass is
 `.agents/skills/abyss-self-diagnostic-spine`, sourced from `aoa-skills`.
 The repo-local bounded `abyss-*` overlay skill surface also includes

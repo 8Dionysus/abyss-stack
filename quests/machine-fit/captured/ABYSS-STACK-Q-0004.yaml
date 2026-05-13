@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0004
 title: Capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift
 summary: Use quests to make platform adaptation obligations visible and reviewable over time.
 repo: abyss-stack
+lane: machine-fit
 owner_surface: platform-adaptation
 theme_ref: ''
 milestone_ref: ''

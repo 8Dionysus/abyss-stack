@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0003
 title: Require render-truth, doctor, and first-run guardrails before risky infra mutations are delegated
 summary: Create explicit preconditions for risky infra work before any delegation or automation grows around it.
 repo: abyss-stack
+lane: stack
 owner_surface: guardrails/runtime-validation
 theme_ref: ''
 milestone_ref: ''

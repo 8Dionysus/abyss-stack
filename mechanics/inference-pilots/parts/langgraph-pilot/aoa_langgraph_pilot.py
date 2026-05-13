@@ -8,6 +8,7 @@ import importlib.util
 import json
 import shutil
 import subprocess
+import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,9 +27,6 @@ except ImportError as exc:  # pragma: no cover - guarded by runtime usage
 DEFAULT_PROGRAM_ID = "langgraph-sidecar-pilot-v1"
 FIXTURE_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
 PROGRAM_ID = DEFAULT_PROGRAM_ID
-LEGACY_EDIT_GATE_ID = "W4"
-LEGACY_EDIT_GATE_INDEX_NAME = f"{LEGACY_EDIT_GATE_ID}-langgraph-sidecar-index"
-LEGACY_EDIT_GATE_CLOSEOUT_NAME = f"{LEGACY_EDIT_GATE_ID}-closeout.json"
 MODEL = "qwen3.5:9b"
 DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
 LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
@@ -41,6 +39,15 @@ def find_repo_root(start: Path) -> Path:
 
 
 SOURCE_ROOT = find_repo_root(Path(__file__).resolve().parent)
+LOCAL_TRIALS_PART = SOURCE_ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials"
+if str(LOCAL_TRIALS_PART) not in sys.path:
+    sys.path.insert(0, str(LOCAL_TRIALS_PART))
+
+import legacy_trial_adapter as TRIAL_ADAPTER  # noqa: E402
+
+EDIT_GATE_WIRE_ID = TRIAL_ADAPTER.EDIT_GATE.wire_id
+EDIT_GATE_INDEX_NAME = TRIAL_ADAPTER.EDIT_GATE_INDEX_STEM
+EDIT_GATE_CLOSEOUT_NAME = TRIAL_ADAPTER.EDIT_GATE.closeout_name or ""
 STACK_ROOT = Path("/srv/AbyssOS/abyss-stack")
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
@@ -49,7 +56,7 @@ MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 BASELINE_PROGRAM_ID = "qwen-local-pilot-v1"
 BASELINE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / BASELINE_PROGRAM_ID
 COMPARISON_MEMO_NAME = "LANGGRAPH_COMPARISON.md"
-PILOT_INDEX_NAME = LEGACY_EDIT_GATE_INDEX_NAME
+PILOT_INDEX_NAME = EDIT_GATE_INDEX_NAME
 
 DEFAULT_DOCS_CASE_ID = "8dionysus-profile-routing-clarity"
 GENERATED_CASE_ID = "aoa-routing-generated-surface-refresh"
@@ -128,7 +135,7 @@ def fixture_repo_root(log_root: Path) -> Path:
 
 def fixture_case_from_template(log_root: Path) -> dict[str, Any]:
     catalog = ORIGINAL_TRIALS_BUILD_CATALOG()
-    template = next(case for case in catalog[LEGACY_EDIT_GATE_ID] if case["case_id"] == DEFAULT_DOCS_CASE_ID)
+    template = next(case for case in TRIAL_ADAPTER.edit_gate_catalog(catalog) if case["case_id"] == DEFAULT_DOCS_CASE_ID)
     item = copy.deepcopy(template)
     repo_root = fixture_repo_root(log_root)
     readme = repo_root / "README.md"
@@ -160,7 +167,7 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
             raise RuntimeError("fixture program requires a log_root to build its disposable repo case")
         return [fixture_case_from_template(log_root)]
     selected = []
-    for case in catalog[LEGACY_EDIT_GATE_ID]:
+    for case in TRIAL_ADAPTER.edit_gate_catalog(catalog):
         if case["case_id"] not in {DEFAULT_DOCS_CASE_ID, GENERATED_CASE_ID}:
             continue
         item = copy.deepcopy(case)
@@ -174,7 +181,7 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
 
 
 def pilot_catalog(log_root: Path | None = None) -> dict[str, list[dict[str, Any]]]:
-    return {LEGACY_EDIT_GATE_ID: available_cases(log_root)}
+    return TRIAL_ADAPTER.edit_gate_catalog_payload(available_cases(log_root))
 
 
 def run_git(repo_root: Path, *args: str) -> None:
@@ -276,7 +283,7 @@ def ensure_fixture_repo(log_root: Path) -> Path:
 
 
 def case_root(log_root: Path, case_id: str) -> Path:
-    return TRIALS.case_dir(log_root, LEGACY_EDIT_GATE_ID, case_id)
+    return TRIAL_ADAPTER.edit_gate_case_dir(log_root, case_id)
 
 
 def state_path(log_root: Path, case_id: str) -> Path:
@@ -365,12 +372,12 @@ def comparison_memo(log_root: Path) -> str:
 
 
 def render_index_md(index_payload: dict[str, Any]) -> str:
-    return TRIALS.render_wave_index_md(index_payload)
+    return TRIAL_ADAPTER.render_edit_gate_index_md(index_payload)
 
 
-# The preserved local-trials backend still exposes W4-named attributes as its
-# compatibility API. Active LangGraph wording routes those names through the
-# edit-gate constants above instead of treating them as current topology.
+# The preserved local-trials backend still exposes archived compatibility schema
+# details. Active LangGraph code routes those details through the edit-gate
+# adapter instead of treating them as current topology.
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -489,7 +496,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
                 "case_spec": str(case_root(log_root, case["case_id"]) / "case.spec.json"),
                 "summary": case["title"],
                 **(
-                    {"report_md": str(mirror_root / TRIALS.case_report_name(LEGACY_EDIT_GATE_ID, case["case_id"]))}
+                    {"report_md": str(mirror_root / TRIAL_ADAPTER.edit_gate_case_report_name(case["case_id"]))}
                     if (case_root(log_root, case["case_id"]) / "report.md").exists()
                     else {}
                 ),
@@ -519,15 +526,15 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
         next_action = "Resume the paused docs case or execute the remaining generated case to complete the comparison."
 
     return {
-        "artifact_kind": "aoa.local-ai-trial.wave-index",
-        "program_id": PROGRAM_ID,
-        "wave_id": LEGACY_EDIT_GATE_ID,
-        "wave_title": "LangGraph Sidecar Pilot",
-        "wave_summary": (
-            "Bounded disposable edit-gate fixture used as a backend promotion gate."
-            if is_fixture_program()
-            else "Bounded comparison pilot for a graph-shaped bounded-edit execution layer."
+        **TRIAL_ADAPTER.edit_gate_index_fields(
+            title="LangGraph Sidecar Pilot",
+            summary=(
+                "Bounded disposable edit-gate fixture used as a backend promotion gate."
+                if is_fixture_program()
+                else "Bounded comparison pilot for a graph-shaped bounded-edit execution layer."
+            ),
         ),
+        "program_id": PROGRAM_ID,
         "case_count": len(cases),
         "status_counts": {
             "pass": pass_count,
@@ -571,7 +578,7 @@ def materialize(log_root: Path, mirror_root: Path) -> None:
         "case.spec.schema.json": TRIALS.CASE_SCHEMA,
         "run.manifest.schema.json": TRIALS.RUN_MANIFEST_SCHEMA,
         "result.summary.schema.json": TRIALS.RESULT_SUMMARY_SCHEMA,
-        "wave-index.schema.json": TRIALS.WAVE_INDEX_SCHEMA,
+        TRIAL_ADAPTER.WIRE_INDEX_SCHEMA_NAME: TRIAL_ADAPTER.WIRE_INDEX_SCHEMA,
     }
     for name, payload in contracts.items():
         write_json(log_root / "contracts" / name, payload)
@@ -584,7 +591,7 @@ def materialize(log_root: Path, mirror_root: Path) -> None:
 
 
 def ensure_baseline_edit_gate_closeout() -> None:
-    closeout_path = BASELINE_LOG_ROOT / LEGACY_EDIT_GATE_CLOSEOUT_NAME
+    closeout_path = BASELINE_LOG_ROOT / EDIT_GATE_CLOSEOUT_NAME
     if not closeout_path.exists():
         raise RuntimeError(f"missing preserved edit-gate closeout artifact: {closeout_path}")
     payload = load_json(closeout_path)
@@ -619,7 +626,7 @@ def write_interrupt(log_root: Path, state: PilotState, *, reason: str) -> None:
     payload = {
         "artifact_kind": "aoa.local-ai-trial.langgraph-interrupt",
         "program_id": PROGRAM_ID,
-        "wave_id": LEGACY_EDIT_GATE_ID,
+        **TRIAL_ADAPTER.edit_gate_wire_id_entry(),
         "case_id": state["case_id"],
         "paused_at": utc_now(),
         "reason": reason,
@@ -635,7 +642,7 @@ def write_rejected_terminal(case: dict[str, Any], *, log_root: Path, mirror_root
     run_manifest = {
         "artifact_kind": "aoa.local-ai-trial.run-manifest",
         "program_id": PROGRAM_ID,
-        "wave_id": LEGACY_EDIT_GATE_ID,
+        **TRIAL_ADAPTER.edit_gate_wire_id_entry(),
         "case_id": case["case_id"],
         "executed_at": utc_now(),
         "runtime_selection": case["runtime_selection"],
@@ -792,7 +799,7 @@ def build_graph(log_root: Path, mirror_root: Path):
                 {
                     "case_id": case_id,
                     "checked_at": utc_now(),
-                    "baseline_closeout": str(BASELINE_LOG_ROOT / LEGACY_EDIT_GATE_CLOSEOUT_NAME),
+                    "baseline_closeout": str(BASELINE_LOG_ROOT / EDIT_GATE_CLOSEOUT_NAME),
                     "doctor_preset": "intel-full",
                     "langchain_health": TRIALS.langchain_endpoint("/health"),
                     "status": "pass",
@@ -828,7 +835,7 @@ def build_graph(log_root: Path, mirror_root: Path):
                 run_manifest = {
                     "artifact_kind": "aoa.local-ai-trial.run-manifest",
                     "program_id": PROGRAM_ID,
-                    "wave_id": LEGACY_EDIT_GATE_ID,
+                    **TRIAL_ADAPTER.edit_gate_wire_id_entry(),
                     "case_id": case_id,
                     "executed_at": utc_now(),
                     "runtime_selection": case["runtime_selection"],
@@ -1109,7 +1116,7 @@ def build_graph(log_root: Path, mirror_root: Path):
         interrupt_payload = {
             "artifact_kind": "aoa.local-ai-trial.langgraph-interrupt",
             "program_id": PROGRAM_ID,
-            "wave_id": LEGACY_EDIT_GATE_ID,
+            **TRIAL_ADAPTER.edit_gate_wire_id_entry(),
             "case_id": state["case_id"],
             "paused_at": utc_now(),
             "reason": "approval_pending",

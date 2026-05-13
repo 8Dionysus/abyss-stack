@@ -93,7 +93,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     ),
     'quests/AGENTS.md': (
         'questbook district',
-        'quests/*.yaml',
+        'quests/<lane>/<state>',
         'quests/schemas',
         'quests/examples',
         'python scripts/validate_stack.py',

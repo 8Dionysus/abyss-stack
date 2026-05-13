@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0006
 title: Materialize filesystem-first RPG runtime collections and derived bundles without widening route or quest authority
 summary: Land the body-facing RPG collection wrappers, committed transport files, and runtime latest/records copies while keeping route and frontend seams read-only.
 repo: abyss-stack
+lane: rpg-runtime
 owner_surface: runtime/rpg-runtime-projection
 theme_ref: ''
 milestone_ref: ''

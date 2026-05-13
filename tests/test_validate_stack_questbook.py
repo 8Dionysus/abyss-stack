@@ -58,7 +58,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             )
 
         for quest_id in validate_stack.QUEST_IDS:
-            relative_path = Path("quests") / f"{quest_id}.yaml"
+            relative_path = validate_stack.quest_source_path(quest_id)
             write_text(
                 repo_root / relative_path,
                 (REPO_ROOT / relative_path).read_text(encoding="utf-8"),
@@ -91,7 +91,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
-            (repo_root / "quests" / "ABYSS-STACK-Q-0003.yaml").unlink()
+            (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003")).unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(any("ABYSS-STACK-Q-0003.yaml" in error for error in errors))
@@ -101,8 +101,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0002.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0002.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"))
                 .read_text(encoding="utf-8")
                 .replace("repo: abyss-stack", "repo: aoa-kag"),
             )
@@ -110,13 +110,41 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
 
         self.assertTrue(any("repo must equal 'abyss-stack'" in error for error in errors))
 
+    def test_wrong_lane_value_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"))
+                .read_text(encoding="utf-8")
+                .replace("lane: profiles", "lane: stack"),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(any("ABYSS-STACK-Q-0002 lane must equal 'profiles'" in error for error in errors))
+
+    def test_flat_quest_alias_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            write_text(
+                repo_root / "quests" / "ABYSS-STACK-Q-0002.yaml",
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002")).read_text(
+                    encoding="utf-8"
+                ),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(any("root quest alias" in error for error in errors))
+
     def test_id_filename_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0004.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0004.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0004"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0004"))
                 .read_text(encoding="utf-8")
                 .replace("id: ABYSS-STACK-Q-0004", "id: ABYSS-STACK-Q-9999"),
             )
@@ -129,8 +157,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0001.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0001.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0001"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0001"))
                 .read_text(encoding="utf-8")
                 .replace("public_safe: true", "public_safe: false"),
             )
@@ -157,8 +185,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0003.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0003.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003"))
                 .read_text(encoding="utf-8")
                 .replace("control_mode: human_gate", "control_mode: codex_supervised"),
             )
@@ -270,8 +298,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0006"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0006"))
                 .read_text(encoding="utf-8")
                 .replace("ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_ROUTE_API_SEAM.md"),
             )
@@ -286,8 +314,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml",
-                (repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml")
+                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0007"),
+                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0007"))
                 .read_text(encoding="utf-8")
                 .replace("ref: mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"),
             )

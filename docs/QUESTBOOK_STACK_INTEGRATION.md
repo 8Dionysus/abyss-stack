@@ -9,6 +9,8 @@ This note shows how `QUESTBOOK.md` fits into `abyss-stack` without confusing inf
 - `abyss-stack` owns runtime, deployment, lifecycle, security, storage, and platform posture
 - specialized AoA repositories still own their own doctrine and public meaning
 - `QUESTBOOK.md` tracks deferred infra obligations that survive the current bounded diff
+- backing quest records live in `quests/<lane>/<state>/` so placement names the
+  owner route before the lifecycle posture
 - high-risk routes should default toward stronger control modes and human gates
 
 ## Good anchors in this repo

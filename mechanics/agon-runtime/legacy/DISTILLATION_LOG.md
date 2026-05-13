@@ -36,3 +36,7 @@ Still legacy:
 - old quest stubs
 
 `legacy/artifacts/` is no longer a runnable home.
+
+Added `legacy/ARCHIVE_CLASSIFICATION.md` to make the remaining archive-only
+verdict explicit: old raw docs and `ABS-Q-AGON-*` quest stubs are provenance,
+not active stack quest source or runtime law.

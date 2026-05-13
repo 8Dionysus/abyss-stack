@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0001
 title: Land repo-local questbook surface with infra-specific human-gate defaults
 summary: Create the repo-local tracked obligation layer and make high-risk infra posture visible from the start.
 repo: abyss-stack
+lane: stack
 owner_surface: questbook/public-surface
 theme_ref: ''
 milestone_ref: ''
