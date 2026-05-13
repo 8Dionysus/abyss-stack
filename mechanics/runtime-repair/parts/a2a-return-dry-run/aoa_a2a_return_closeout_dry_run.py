@@ -13,14 +13,41 @@ from typing import Any
 
 
 SCRIPT_NAME = "scripts/aoa-a2a-return-closeout-dry-run"
-LOCAL_REQUEST_FAMILY = "a2a-return-closeout"
-UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = "a2a_wave5_closeout_request"
+BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
+RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH = Path("Configs/federation/upstream-compatibility-bridge.json")
 PLAYBOOK_REF = "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md"
 EVAL_HOOK_REF = "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json"
 MEMO_WRITEBACK_REF = "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md"
 SDK_REVIEWED_CLOSEOUT_REF = "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json"
 SDK_E2E_FIXTURE_REF = "repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json"
-SDK_DOC_REF = "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md"
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+def load_bridge_config() -> dict[str, Any]:
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
+    runtime_path = stack_root / RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH
+    source_path = find_repo_root(Path(__file__).resolve().parent) / BRIDGE_CONFIG_RELATIVE_PATH
+    for path in (runtime_path, source_path):
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    raise SystemExit(f"error: missing upstream compatibility bridge config: expected {runtime_path} or {source_path}")
+
+
+A2A_COMPATIBILITY = load_bridge_config()["a2a_return_closeout"]
+LOCAL_REQUEST_FAMILY = str(A2A_COMPATIBILITY["local_request_family"])
+LOCAL_REQUEST_KIND = str(A2A_COMPATIBILITY["local_request_kind"])
+UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = str(A2A_COMPATIBILITY["upstream_request_kind"])
+SDK_DOC_REF = str(A2A_COMPATIBILITY["upstream_doc_ref"])
 
 
 def slugify(text: str) -> str:
@@ -164,7 +191,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
         "closeout_id": closeout_id,
         "session_ref": payload.get("session_ref"),
         "request_family": LOCAL_REQUEST_FAMILY,
-        "request_kind": request_kind,
+        "request_kind": LOCAL_REQUEST_KIND,
         "upstream_request_kind": UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND,
         "source_input_ref": f"local:{input_path}",
         "source_input_sha256": hashlib.sha256(rendered_input).hexdigest(),

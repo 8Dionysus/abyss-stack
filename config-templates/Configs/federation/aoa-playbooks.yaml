@@ -18,7 +18,6 @@ required_files:
   - generated/playbook_handoff_contracts.json
   - generated/playbook_failure_catalog.json
   - generated/playbook_subagent_recipes.json
-  - generated/playbook_automation_seeds.json
   - generated/playbook_composition_manifest.json
   - schemas/playbook-registry.schema.json
   - schemas/playbook-activation-surface.schema.json

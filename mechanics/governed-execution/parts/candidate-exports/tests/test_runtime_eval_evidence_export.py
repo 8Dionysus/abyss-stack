@@ -10,6 +10,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-export-runtime-evidence-selection"
+BRIDGE_CONFIG = json.loads(
+    (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
+        encoding="utf-8"
+    )
+)["runtime_evidence_templates"]
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -44,7 +49,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
 
         refs = artifact["aoa_evals_contract_refs"]
         self.assertTrue(
-            any("runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json" in ref for ref in refs)
+            any(BRIDGE_CONFIG["memo-recall-rerun"]["upstream_source_ref"] in ref for ref in refs)
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 
@@ -61,7 +66,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
 
         refs = artifact["aoa_evals_contract_refs"]
         self.assertTrue(
-            any("runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json" in ref for ref in refs)
+            any(BRIDGE_CONFIG["memo-recall-rerun"]["upstream_source_ref"] in ref for ref in refs)
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 
@@ -78,7 +83,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
 
         refs = artifact["aoa_evals_contract_refs"]
         self.assertTrue(
-            any("runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json" in ref for ref in refs)
+            any(BRIDGE_CONFIG["memo-contradiction-gap"]["upstream_source_ref"] in ref for ref in refs)
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 
@@ -95,7 +100,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
 
         refs = artifact["aoa_evals_contract_refs"]
         self.assertTrue(
-            any("runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json" in ref for ref in refs)
+            any(BRIDGE_CONFIG["memo-contradiction-rerun"]["upstream_source_ref"] in ref for ref in refs)
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 

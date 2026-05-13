@@ -36,7 +36,7 @@ ROUTING_REF = "aoa-routing/generated/rpg_navigation.min.example.json#nav.AOA-P-0
 CAMPAIGN_REF = "aoa-playbooks/examples/questline_outline.example.yaml#AOA-PB-CAMP-0001"
 CHRONICLE_REF = "aoa-memo/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
 OVERLAY_REF = "Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
-DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF = "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md"
+BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
 
 
 def read_json(path: Path) -> dict:
@@ -44,6 +44,14 @@ def read_json(path: Path) -> dict:
     if not isinstance(payload, dict):
         raise SystemExit(f"error: expected JSON object in {path}")
     return payload
+
+
+def owner_prep_pack_ref(repo_root: Path) -> str:
+    for path in (repo_root / BRIDGE_CONFIG_RELATIVE_PATH, ROOT / BRIDGE_CONFIG_RELATIVE_PATH):
+        if path.exists():
+            bridge = read_json(path)
+            return str(bridge["rpg_runtime_projection"]["owner_prep_pack_ref"])
+    raise SystemExit("error: missing upstream compatibility bridge config")
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -64,6 +72,7 @@ def require_jsonschema():
 
 
 def build_collections(repo_root: Path) -> dict[str, dict]:
+    dionysus_prep_pack_ref = owner_prep_pack_ref(repo_root)
     build = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "agent_build_snapshot.example.json"))
     ledger = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "reputation_ledger.example.json"))
     run = copy.deepcopy(read_json(repo_root / RPG_EXAMPLE_ROOT / "quest_run_result.example.json"))
@@ -151,7 +160,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         },
         {
             "action": "handoff",
-            "target_ref": DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF,
+            "target_ref": dionysus_prep_pack_ref,
             "note": "Sync the Dionysus prep-pack lineage after the runtime body lands.",
         },
     ]
@@ -188,7 +197,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
     bundle["views"]["campaign_lane_cards"][0]["recommended_build_refs"] = [build_ref]
-    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF
+    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = dionysus_prep_pack_ref
     bundle["views"]["progression_timeline_entries"][0]["summary"] = (
         "Filesystem-first runtime collections were materialized without turning projection bundles into authority."
     )

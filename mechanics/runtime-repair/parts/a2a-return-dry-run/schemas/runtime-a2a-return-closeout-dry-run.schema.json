@@ -80,10 +80,11 @@
       "const": "a2a-return-closeout"
     },
     "request_kind": {
-      "const": "a2a_wave5_closeout_request"
+      "const": "a2a-return-closeout-request"
     },
     "upstream_request_kind": {
-      "const": "a2a_wave5_closeout_request"
+      "type": "string",
+      "minLength": 1
     },
     "source_input_ref": {
       "type": "string",

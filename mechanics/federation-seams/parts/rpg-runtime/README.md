@@ -15,9 +15,10 @@ meaning.
   wrapper.
 - Generated collections belong in `mechanics/federation-seams/parts/rpg-runtime/generated/`.
 
-The generated runtime projection may point to `Dionysus/seed_staging/...`
-prep packs because `Dionysus` currently owns seed garden and staging lineage.
-That path is an owner handoff route, not an `abyss-stack` active topology name.
+The generated runtime projection may point to Dionysus prep-pack routes through
+the upstream compatibility bridge because `Dionysus` currently owns seed garden
+and staging lineage. That path is an owner handoff route, not an `abyss-stack`
+active topology name.
 
 Keep root questbook schemas and examples in root `schemas/` and `examples/`
 until their mixed quest and repository-contract role has a cleaner owner split.

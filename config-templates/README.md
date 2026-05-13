@@ -37,6 +37,11 @@ These `Services/*` entries are source-managed build contexts for lightweight
 runtime helper services. They are bootstrapped into the deployed runtime tree by
 `scripts/aoa-bootstrap-configs`.
 
+`Configs/federation/upstream-compatibility-bridge.json` is the public-safe
+runtime bridge data file for sibling-owner names that still need compatibility
+handling. Layer YAML files should keep clean local required files and let that
+bridge carry upstream legacy identifiers.
+
 The `Configs/agent-api/` family currently carries the public-safe runtime
 templates for:
 

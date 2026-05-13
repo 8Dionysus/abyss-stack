@@ -11,21 +11,38 @@ from typing import Any
 
 EVAL_NAME = "aoa-memo-contradiction-integrity"
 OBJECT_UNDER_EVALUATION = "integrity of contradiction-visible memo consumption on lifecycle-aware object recall paths"
-SELECTION_ID = "memo-contradiction-rerun-v1"
-UPSTREAM_SELECTION_ID = "phase-alpha-memo-contradiction-rerun-v1"
-SELECTION_SOURCE_CANDIDATES = (
-    Path("examples/runtime_evidence_selection.memo-contradiction-rerun.example.json"),
-    Path("examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"),
-)
 
-UPSTREAM_MEMO_CONTRADICTION_IDS = {
-    "closure_claim": "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history",
-    "pending_claim": "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff",
-    "retired_overread_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired",
-    "later_track_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track",
-    "supersession_audit": "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession",
-    "retraction_audit": "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction",
-}
+BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
+RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH = Path("Configs/federation/upstream-compatibility-bridge.json")
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+def load_bridge_config() -> dict[str, Any]:
+    stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
+    runtime_path = stack_root / RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH
+    source_path = find_repo_root(Path(__file__).resolve().parent) / BRIDGE_CONFIG_RELATIVE_PATH
+    for path in (runtime_path, source_path):
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    raise SystemExit(f"error: missing upstream compatibility bridge config: expected {runtime_path} or {source_path}")
+
+
+MEMO_COMPATIBILITY = load_bridge_config()["memo_contradiction_sidecar"]
+SELECTION_ID = str(MEMO_COMPATIBILITY["selection_id"])
+UPSTREAM_SELECTION_ID = str(MEMO_COMPATIBILITY["upstream_selection_id"])
+SELECTION_SOURCE_CANDIDATES = tuple(Path(item) for item in MEMO_COMPATIBILITY["source_candidates"])
+
+UPSTREAM_MEMO_CONTRADICTION_IDS = dict(MEMO_COMPATIBILITY["upstream_memo_ids"])
 CLOSURE_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["closure_claim"]
 PENDING_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["pending_claim"]
 RETIRED_OVERREAD_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["retired_overread_claim"]
@@ -44,15 +61,10 @@ REQUIRED_LOG_PATHS = {
     ),
 }
 LEGACY_LOG_PATHS = {
-    "next_pass_brief": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/next_pass_brief.md"),
-    "memory_delta": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/memory_delta.json"),
-    "contradiction_map": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json"),
-    "failure_map": Path("Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/failure_map.json"),
-    "handoff_record": Path("Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/handoff_record.json"),
-    "remediation_decision": Path(
-        "Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/remediation_decision.json"
-    ),
+    key: Path(value)
+    for key, value in MEMO_COMPATIBILITY["legacy_log_paths"].items()
 }
+LEGACY_ARTIFACT_KINDS = set(MEMO_COMPATIBILITY.get("legacy_artifact_kinds", []))
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -235,10 +247,7 @@ def validate_runtime_logs(logs: dict[str, Any], failures: list[str]) -> None:
     contradiction_map = logs["contradiction_map"]
     notes = " ".join(contradiction_map.get("notes", [])) if isinstance(contradiction_map.get("notes"), list) else ""
     require(
-        contradiction_map.get("artifact_kind") in {
-            "memo-contradiction-rerun.contradiction-map",
-            "phase-alpha.contradiction-map",
-        },
+        contradiction_map.get("artifact_kind") in {"memo-contradiction-rerun.contradiction-map", *LEGACY_ARTIFACT_KINDS},
         failures,
         "contradiction_map.json",
         "artifact_kind mismatch",

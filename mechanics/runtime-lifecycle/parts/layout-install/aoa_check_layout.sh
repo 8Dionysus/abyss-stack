@@ -70,10 +70,39 @@ check_warn_file() {
   fi
 }
 
-AOA_EVALS_MEMO_RECALL_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
-AOA_EVALS_MEMO_CONTRADICTION_GAP_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
-AOA_EVALS_MEMO_CONTRADICTION_RERUN_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
-AOA_PLAYBOOKS_AUTOMATION_PLANS_UPSTREAM_FILE="generated/playbook_automation_seeds.json"
+AOA_UPSTREAM_COMPATIBILITY_BRIDGE_CONFIG="${AOA_CONFIGS_ROOT}/federation/upstream-compatibility-bridge.json"
+
+compatibility_bridge_value() {
+  local query="$1"
+  if [[ ! -f "${AOA_UPSTREAM_COMPATIBILITY_BRIDGE_CONFIG}" ]]; then
+    printf '__missing_upstream_compatibility_bridge__/%s\n' "$query"
+    return 0
+  fi
+  python3 - "${AOA_UPSTREAM_COMPATIBILITY_BRIDGE_CONFIG}" "$query" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+value = payload
+for part in sys.argv[2].split("."):
+    value = value[part]
+print(value)
+PY
+}
+
+AOA_EVALS_MEMO_RECALL_UPSTREAM_TEMPLATE="$(
+  compatibility_bridge_value "runtime_evidence_templates.memo-recall-rerun.upstream_source_ref"
+)"
+AOA_EVALS_MEMO_CONTRADICTION_GAP_UPSTREAM_TEMPLATE="$(
+  compatibility_bridge_value "runtime_evidence_templates.memo-contradiction-gap.upstream_source_ref"
+)"
+AOA_EVALS_MEMO_CONTRADICTION_RERUN_UPSTREAM_TEMPLATE="$(
+  compatibility_bridge_value "runtime_evidence_templates.memo-contradiction-rerun.upstream_source_ref"
+)"
+AOA_PLAYBOOKS_AUTOMATION_PLANS_UPSTREAM_FILE="$(
+  compatibility_bridge_value "playbook_automation_plans.upstream_rel_path"
+)"
 
 has_module() {
   local target="$1"
@@ -159,6 +188,7 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-playbooks federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-playbooks.yaml"
   check_warn_file "aoa-kag federation config" "${AOA_STACK_ROOT}/Configs/federation/aoa-kag.yaml"
   check_warn_file "tos-source federation config" "${AOA_STACK_ROOT}/Configs/federation/tos-source.yaml"
+  check_warn_file "upstream compatibility bridge config" "${AOA_UPSTREAM_COMPATIBILITY_BRIDGE_CONFIG}"
   check_warn_file "aoa-agents runtime seam doc" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/docs/AGENT_RUNTIME_SEAM.md"
   check_warn_file "aoa-agents agent registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/agent_registry.min.json"
   check_warn_file "aoa-agents tier registry" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents/generated/model_tier_registry.json"

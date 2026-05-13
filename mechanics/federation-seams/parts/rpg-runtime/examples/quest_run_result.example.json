@@ -85,7 +85,7 @@
   "next_hops": [
     {
       "action": "handoff",
-      "target_ref": "Dionysus/seed_staging/rpg/seed_rpg_architecture_rfc_pack.md",
+      "target_ref": "UPSTREAM_COMPATIBILITY_BRIDGE.rpg_runtime_projection.owner_architecture_ref",
       "note": "stage the transport pack after target-repo review"
     }
   ],

@@ -1,0 +1,85 @@
+{
+  "artifact_kind": "abyss-stack.upstream-compatibility-bridge",
+  "schema_version": "1",
+  "runtime_evidence_templates": {
+    "memo-recall-rerun": {
+      "owner_repo": "aoa-evals",
+      "canonical_selection_id": "memo-recall-rerun-v1",
+      "local_source_ref": "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
+      "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+      "upstream_selection_id": "phase-alpha-memo-recall-rerun-v1",
+      "bridge_names": [
+        "phase-alpha-memo-recall-rerun"
+      ]
+    },
+    "memo-contradiction-gap": {
+      "owner_repo": "aoa-evals",
+      "canonical_selection_id": "memo-contradiction-gap-v1",
+      "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-gap.example.json",
+      "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+      "upstream_selection_id": "phase-alpha-memo-contradiction-gap-v1",
+      "bridge_names": [
+        "phase-alpha-memo-contradiction-gap"
+      ]
+    },
+    "memo-contradiction-rerun": {
+      "owner_repo": "aoa-evals",
+      "canonical_selection_id": "memo-contradiction-rerun-v1",
+      "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
+      "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+      "upstream_selection_id": "phase-alpha-memo-contradiction-rerun-v1",
+      "bridge_names": [
+        "phase-alpha-memo-contradiction-rerun"
+      ]
+    }
+  },
+  "playbook_automation_plans": {
+    "owner_repo": "aoa-playbooks",
+    "local_collection_route": "/playbooks/automation-plans",
+    "local_item_route": "/playbooks/automation-plan",
+    "upstream_source_ref": "aoa-playbooks/generated/playbook_automation_seeds.json",
+    "upstream_rel_path": "generated/playbook_automation_seeds.json",
+    "compatibility_collection_route": "/playbooks/automation-seeds",
+    "compatibility_item_route": "/playbooks/automation-seed"
+  },
+  "a2a_return_closeout": {
+    "owner_repo": "aoa-sdk",
+    "local_request_family": "a2a-return-closeout",
+    "local_request_kind": "a2a-return-closeout-request",
+    "upstream_request_kind": "a2a_wave5_closeout_request",
+    "upstream_doc_ref": "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md"
+  },
+  "memo_contradiction_sidecar": {
+    "owner_repo": "aoa-memo",
+    "selection_id": "memo-contradiction-rerun-v1",
+    "upstream_selection_id": "phase-alpha-memo-contradiction-rerun-v1",
+    "source_candidates": [
+      "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
+      "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+    ],
+    "upstream_memo_ids": {
+      "closure_claim": "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history",
+      "pending_claim": "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff",
+      "retired_overread_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired",
+      "later_track_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track",
+      "supersession_audit": "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession",
+      "retraction_audit": "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction"
+    },
+    "legacy_log_paths": {
+      "next_pass_brief": "Logs/phase-alpha/alpha-05-restartable-inquiry-loop/next_pass_brief.md",
+      "memory_delta": "Logs/phase-alpha/alpha-05-restartable-inquiry-loop/memory_delta.json",
+      "contradiction_map": "Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json",
+      "failure_map": "Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/failure_map.json",
+      "handoff_record": "Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/handoff_record.json",
+      "remediation_decision": "Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/remediation_decision.json"
+    },
+    "legacy_artifact_kinds": [
+      "phase-alpha.contradiction-map"
+    ]
+  },
+  "rpg_runtime_projection": {
+    "owner_repo": "Dionysus",
+    "owner_architecture_ref": "Dionysus/seed_staging/rpg/seed_rpg_architecture_rfc_pack.md",
+    "owner_prep_pack_ref": "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md"
+  }
+}

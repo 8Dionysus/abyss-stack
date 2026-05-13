@@ -4,8 +4,10 @@ This is the single active bridge for upstream compatibility names in
 `abyss-stack` federation seams.
 
 Active runtime surfaces should use clean local names and route old or
-owner-published names through this bridge. Detailed upstream identifiers,
-lineage notes, and removal triggers live in
+owner-published names through this bridge. The machine-readable runtime bridge
+data lives at
+[`config-templates/Configs/federation/upstream-compatibility-bridge.json`](../../../../../config-templates/Configs/federation/upstream-compatibility-bridge.json).
+Detailed upstream identifiers, lineage notes, and removal triggers live in
 [`../legacy/upstream-compatibility/INDEX.md`](../legacy/upstream-compatibility/INDEX.md).
 
 ## Active Bridge
@@ -22,6 +24,8 @@ lineage notes, and removal triggers live in
 ## Rule
 
 - Active docs link here, not to the detailed legacy inventory.
+- Runtime code reads the bridge config instead of repeating detailed upstream
+  identifiers in each adapter.
 - Runtime adapters may accept upstream contract values only at explicit bridge
   boundaries.
 - Tests may assert upstream values only when proving the bridge.
