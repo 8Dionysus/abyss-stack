@@ -105,6 +105,7 @@ MECHANIC_PACKAGE_REQUIRED_FILES = (
     "AGENTS.md",
     "README.md",
     "DIRECTION.md",
+    "PROVENANCE.md",
     "PARTS.md",
     "ROADMAP.md",
     "LANDING_LOG.md",

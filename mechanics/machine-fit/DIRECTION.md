@@ -1,14 +1,20 @@
 # Machine Fit Direction
 
-The current contour is read-only toward machine control and conservative toward
-accelerator-specific tuning.
+This package keeps host capability evidence readable by the stack without
+turning `abyss-stack` into the machine control plane.
 
-Short term:
+Current posture:
 
-- keep host facts public/private split explicit
-- keep fit records advisory unless runtime checks confirm the path
-- keep the read-only `aoa-machine-bridge` route aligned with `abyss-machine`
-  without mutating `/srv/abyss-machine`
+- keep reference-platform docs public-safe
+- keep host facts, machine bridge, machine fit, platform adaptation, Windows
+  bridge, and inference tuning as separate parts
+- keep stack-side bridge reads bounded and read-only
+- keep root wrappers stable while part-local backends own implementation
 
-Next movement should consume the bridge from runtime diagnosis and launch
-planning before adding any automatic stack-side policy action.
+Near direction:
+
+- keep private host captures out of git
+- keep fit records advisory unless a live check proves the selected route
+- keep inference tuning connected to inference-pilots without making model
+  quality claims
+- route machine provisioning and storage control to `abyss-machine`

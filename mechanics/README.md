@@ -45,6 +45,7 @@ Every package starts with:
 - `AGENTS.md`
 - `README.md`
 - `DIRECTION.md`
+- `PROVENANCE.md`
 - `PARTS.md`
 - `ROADMAP.md`
 - `LANDING_LOG.md`
@@ -66,15 +67,15 @@ Each package `README.md` is a runtime mechanic card with these sections:
 
 | Package | Runtime question | Start here |
 |---|---|---|
-| [runtime-lifecycle](runtime-lifecycle/README.md) | How is the stack installed, started, stopped, checked, and operated? | `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, `systemd/README.md` |
-| [config-projection](config-projection/README.md) | How do source templates become deployed runtime config without smuggling secrets? | `config-templates/`, `env/`, `scripts/aoa-bootstrap-configs`, `scripts/aoa-sync-configs` |
-| [machine-fit](machine-fit/README.md) | How does the runtime read host facts, fit, and machine-local tuning without owning the machine? | `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`, `scripts/aoa-host-facts`, `scripts/aoa-machine-fit` |
+| [runtime-lifecycle](runtime-lifecycle/README.md) | How is the stack installed, started, stopped, checked, and operated? | `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, `systemd/README.md`, `mechanics/runtime-lifecycle/PROVENANCE.md` |
+| [config-projection](config-projection/README.md) | How do source templates become deployed runtime config without smuggling secrets? | `config-templates/`, `env/`, `scripts/aoa-bootstrap-configs`, `scripts/aoa-sync-configs`, `mechanics/config-projection/PROVENANCE.md` |
+| [machine-fit](machine-fit/README.md) | How does the runtime read host facts, fit, and machine-local tuning without owning the machine? | `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`, `scripts/aoa-host-facts`, `scripts/aoa-machine-fit`, `mechanics/machine-fit/PROVENANCE.md` |
 | [inference-pilots](inference-pilots/README.md) | How do local model trials, llama.cpp, Qwen, LangGraph, and benchmark promotion stay bounded? | `mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md`, `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`, `mechanics/inference-pilots/PROVENANCE.md` |
 | [agon-runtime](agon-runtime/README.md) | How do Agon dry-run kernels, event logs, registries, and trials stay local and non-authoritative? | `mechanics/agon-runtime/parts/runtime-kernels/docs/RUNTIME_KERNELS.md`, `mechanics/agon-runtime/PROVENANCE.md` |
 | [experience-runtime](experience-runtime/README.md) | How do archived experience runtime contracts, schemas, examples, and tests stay contained? | `mechanics/experience-runtime/parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md`, `mechanics/experience-runtime/PROVENANCE.md` |
-| [federation-seams](federation-seams/README.md) | How does runtime consume sibling owner surfaces without taking their authority? | `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`, `scripts/aoa-sync-federation-surfaces` |
-| [governed-execution](governed-execution/README.md) | How do local worker runs, autonomy gates, return policy, and candidate exports stay reviewable? | `mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md`, `scripts/aoa-governed-run`, `scripts/aoa-status` |
-| [diagnostic-spine](diagnostic-spine/README.md) | How does the runtime locate itself, compare truth goals, and emit repair handoff candidates? | `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`, `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`, `scripts/aoa-diagnose` |
+| [federation-seams](federation-seams/README.md) | How does runtime consume sibling owner surfaces without taking their authority? | `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`, `scripts/aoa-sync-federation-surfaces`, `mechanics/federation-seams/PROVENANCE.md` |
+| [governed-execution](governed-execution/README.md) | How do local worker runs, autonomy gates, return policy, and candidate exports stay reviewable? | `mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md`, `scripts/aoa-governed-run`, `scripts/aoa-status`, `mechanics/governed-execution/PROVENANCE.md` |
+| [diagnostic-spine](diagnostic-spine/README.md) | How does the runtime locate itself, compare truth goals, and emit repair handoff candidates? | `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`, `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`, `scripts/aoa-diagnose`, `mechanics/diagnostic-spine/PROVENANCE.md` |
 | [runtime-repair](runtime-repair/README.md) | How do degradation receipts, repair-safe closeout, A2A return, and antifragility stay bounded? | `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`, `mechanics/runtime-repair/PROVENANCE.md` |
 
 ## Package Route Standard
@@ -85,6 +86,7 @@ For a package, start with the package `README.md`. Then use:
 |---|---|
 | `AGENTS.md` | local law, validation, closeout, and stop-lines |
 | `DIRECTION.md` | current operating contour |
+| `PROVENANCE.md` | lineage, owner-boundary bridges, and stop-lines |
 | `PARTS.md` | active source-surface map |
 | `ROADMAP.md` | next movements and deferred moves |
 | `LANDING_LOG.md` | checked landings and validation anchors |

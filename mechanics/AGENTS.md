@@ -28,7 +28,8 @@ authority. Those owners remain stronger than this repository.
 
 Root files should stay route-shaped. If a detail belongs to one mechanic, put
 it in that package's `README.md`, `DIRECTION.md`, `PARTS.md`, `ROADMAP.md`,
-`LANDING_LOG.md`, `parts/`, `docs/`, or a future part-local surface.
+`LANDING_LOG.md`, `PROVENANCE.md`, `parts/`, `docs/`, or a future part-local
+surface.
 
 ## Package law
 
@@ -37,6 +38,7 @@ Every mechanics package contains:
 - `AGENTS.md`
 - `README.md`
 - `DIRECTION.md`
+- `PROVENANCE.md`
 - `PARTS.md`
 - `ROADMAP.md`
 - `LANDING_LOG.md`
@@ -48,12 +50,13 @@ mechanic, what abyss-stack owns, which stronger owners remain outside it, what
 may enter, what may leave, what must not be claimed, how to validate, and where
 to route next.
 
-`DIRECTION.md` owns current contour. `PARTS.md` owns the active source-surface
-map. `parts/README.md` owns the package-local part index, and each
-`parts/<part>/README.md` owns the route for that part. `ROADMAP.md` owns future
-movement. `LANDING_LOG.md` records checked topology landings. `docs/` holds
-package-owned prose detail when it is not a machine-readable contract, example,
-generated capsule, or focused part-local test.
+`DIRECTION.md` owns current contour. `PROVENANCE.md` owns source lineage,
+owner-boundary bridges, and stop-lines. `PARTS.md` owns the active
+source-surface map. `parts/README.md` owns the package-local part index, and
+each `parts/<part>/README.md` owns the route for that part. `ROADMAP.md` owns
+future movement. `LANDING_LOG.md` records checked topology landings. `docs/`
+holds package-owned prose detail when it is not a machine-readable contract,
+example, generated capsule, or focused part-local test.
 
 ## Boundaries
 
