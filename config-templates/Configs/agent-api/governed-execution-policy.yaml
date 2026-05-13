@@ -88,16 +88,16 @@
             "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-policy.schema.json",
             "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-request.schema.json",
             "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-canary-catalog.schema.json",
-            "scripts/_aoa_governed_execution.py",
+            "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             "scripts/aoa-governed-run",
             "scripts/validate_stack.py",
-            "mechanics/governed-execution/parts/runtime-contracts/tests/test_governed_execution.py",
+            "mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py",
             ".github/workflows/validate-stack.yml"
           ],
           "acceptance_commands": [
             "python scripts/validate_stack.py",
-            "python -m py_compile scripts/_aoa_governed_execution.py scripts/aoa-governed-run scripts/validate_stack.py",
-            "python -m unittest tests.test_governed_execution"
+            "python -m py_compile mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py scripts/aoa-governed-run scripts/validate_stack.py",
+            "python -m pytest mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py"
           ],
           "break_glass_allowed": true,
           "repair_allowed": true

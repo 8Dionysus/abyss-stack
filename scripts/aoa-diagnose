@@ -139,4 +139,4 @@ for reviewed_diagnosis_ref in "${reviewed_diagnosis_refs[@]}"; do
   backend_args+=(--with-reviewed-diagnosis-ref "$reviewed_diagnosis_ref")
 done
 
-exec python "${SCRIPT_DIR}/_aoa_diagnose.py" "${backend_args[@]}"
+exec python "${SCRIPT_DIR}/../mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py" "${backend_args[@]}"

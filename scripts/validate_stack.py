@@ -105,7 +105,7 @@ MECHANIC_PACKAGE_PARTS = {
         "langgraph-pilot",
         "local-trials",
         "promotion-loop",
-        "preserved-wave-surfaces",
+        "preserved-pilot-surfaces",
         "quiet-bridge-commands",
         "agon-dry-run-handoff",
     ),
@@ -190,9 +190,6 @@ PARITY_IGNORED_PARTS = {".git", "__pycache__"}
 PARITY_IGNORED_SUFFIXES = {".pyc"}
 
 REQUIRED_SCRIPTS = {
-    "_aoa_governed_execution.py",
-    "_aoa_diagnose.py",
-    "_aoa_status_autonomy.py",
     "aoa-diagnose",
     "aoa-governed-run",
     "aoa-doctor",
@@ -462,7 +459,11 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "reputation_ledgers.json",
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "quest_run_results.json",
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "frontend_projection_bundles.json",
-    ROOT / "mechanics" / "governed-execution" / "parts" / "runtime-contracts" / "tests" / "test_governed_execution.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnose-wrapper" / "aoa_diagnose.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "diagnostic_surface_catalog_common.py",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "governed-runner" / "aoa_governed_execution.py",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "autonomy-status" / "aoa_status_autonomy.py",
+    ROOT / "mechanics" / "governed-execution" / "parts" / "governed-runner" / "tests" / "test_governed_execution.py",
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "tests" / "test_runtime_eval_evidence_export.py",
     ROOT / "mechanics" / "governed-execution" / "parts" / "autonomy-status" / "tests" / "test_aoa_status_autonomy.py",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "tests" / "test_aoa_local_ai_trials.py",
@@ -475,7 +476,7 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_validate_stack_diagnostic_spine.py",
     ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "tests" / "test_runtime_hygiene.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_diagnostic_spine_contracts.py",
-    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_aoa_diagnose.py",
+    ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnose-wrapper" / "tests" / "test_aoa_diagnose.py",
     ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_aoa_federated_check.py",
     ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_langchain_api_federated.py",
     ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_route_api_closure_status.py",
@@ -1020,7 +1021,7 @@ def validate_questbook_surface(errors: list[str]) -> None:
         (
             RPG_ROUTE_API_SEAM_PATH,
             (
-                "It is not implemented in this wave.",
+                "It is not implemented in this source contract.",
                 "`/rpg/*` is advisory and read-only.",
                 "The seam should read like a lantern, not a wand.",
             ),
@@ -2248,7 +2249,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md",
         "mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md",
         "mechanics/diagnostic-spine/docs/LOCAL_OPS_DOCTOR_SPLIT.md",
-        "does not add new HTTP endpoints in this wave",
+        "does not add new HTTP endpoints in this contract surface",
         "bounded runtime artifact",
     ):
         if snippet not in service_catalog_doc:
@@ -2260,7 +2261,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "runtime_usage_snapshot",
         "Logs/runtime-gateway/cache-status/latest/",
         "Logs/runtime-usage/latest/",
-        "absence is not a failure in this wave",
+        "absence is not a failure",
     ):
         if snippet not in runbook_doc:
             errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")

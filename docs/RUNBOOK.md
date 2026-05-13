@@ -183,7 +183,7 @@ jq . "${AOA_STACK_ROOT}/Logs/runtime-gateway/cache-status/latest/gateway-local.j
 ```
 
 Read `hit_state`, `inflight_state`, and `recent_decisions` there.
-Its absence is not a failure in this wave because the contract lands before live cache activation.
+Its absence is not a failure because the contract lands before live cache activation.
 
 For planned runtime usage snapshot inspection when the artifact exists locally:
 
@@ -192,7 +192,7 @@ jq . "${AOA_STACK_ROOT}/Logs/runtime-usage/latest/workhorse-local.snapshot.json"
 ```
 
 Read `policy_mode`, `degrade_state`, `strict_stop`, `baseline_cost_estimate`, `savings_estimate`, and `reset_at` there.
-Its absence is not a failure in this wave because the contract lands before live aggregation.
+Its absence is not a failure because the contract lands before live aggregation.
 
 For planned diagnostic spine inspection when the artifact exists locally:
 

@@ -98,7 +98,7 @@ The preserved W5/W6 pilot contracts now live under
 `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
 rather than keeping wave names as root command topology.
 
-Antifragility wave two stays contract-only in this repository. It adds
+Antifragility repair posture stays contract-only in this repository. It adds
 runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
@@ -109,7 +109,7 @@ Current contract surfaces are `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTI
 `mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
 `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`, and
 `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.example.json`.
-Wave-1 family examples also now include
+Legacy chaos family examples also now include
 `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`,
 `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`,
 `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
@@ -143,7 +143,7 @@ The repo-local bounded `abyss-*` overlay skill surface also includes
 `.agents/skills/abyss-sanitized-share`, both sourced from `aoa-skills` and
 kept distinct from the wider shared `aoa-*` install set.
 The current read-only runtime seam is `scripts/aoa-diagnose`, backed by
-`scripts/_aoa_diagnose.py`. It can now emit `diagnosis_companion.json` and
+`mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`. It can now emit `diagnosis_companion.json` and
 `repair_handoff.json` on `--write-latest`, write an explicit
 `reviewed_diagnosis.ref.json` bridge on `--write-reviewed-diagnosis-ref`,
 accept explicit `--with-reviewed-diagnosis-ref` inputs, and refresh

@@ -31,7 +31,7 @@ Together they should answer:
 - what unsafe repair remained blocked
 - what reviewed closeout happened afterward
 
-## Wave-1 example families
+## Legacy Example Families
 
 The first bounded chaos wave uses the current contracts through named example
 families:

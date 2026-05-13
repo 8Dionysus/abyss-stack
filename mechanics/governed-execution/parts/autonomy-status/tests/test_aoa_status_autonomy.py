@@ -17,7 +17,14 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
-MODULE_PATH = REPO_ROOT / "scripts" / "_aoa_status_autonomy.py"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "autonomy-status"
+    / "aoa_status_autonomy.py"
+)
 
 
 def load_module():

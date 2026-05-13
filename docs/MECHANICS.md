@@ -12,10 +12,10 @@ diagnostics, or repair-safe closeout.
 
 This file is a `docs/` entry route. It does not own mechanic doctrine.
 
-The first mechanics wave added first-class package homes under `mechanics/`.
-The second wave starts moving noisy flat artifact families into package-local
-legacy homes when validators, links, tests, and generated companions move with
-them.
+The initial mechanics topology added first-class package homes under
+`mechanics/`. Current movement pushes noisy flat artifact families into
+package-local legacy homes when validators, links, tests, and generated
+companions move with them.
 
 ## Canonical surfaces
 

@@ -24,7 +24,7 @@ A useful repair-safe closeout receipt includes:
 - an explicit flag that mutation widening remained blocked
 - evidence refs for what was checked after repair or no-action review
 
-## Wave-1 closeout examples
+## Legacy Closeout Examples
 
 The first bounded chaos wave now includes named closeout examples for:
 

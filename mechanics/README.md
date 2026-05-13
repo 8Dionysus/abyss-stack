@@ -27,10 +27,10 @@ The root of `mechanics/` is a dispatcher.
 | [README.md](README.md) | this atlas, route contract, and package compass | a duplicate of every package card |
 | [ARTIFACT_TOPOLOGY.md](ARTIFACT_TOPOLOGY.md) | future placement rules for source docs, scripts, schemas, examples, generated companions, tests, and deployed mirrors | a migration log |
 
-## Wave Contract
+## Movement Contract
 
-The first wave created the convex mechanics topology. The second wave starts
-moving old flat artifact families into package-local legacy homes when the
+The initial mechanics topology created the package homes. Current movement
+pushes old flat artifact families into package-local legacy homes when the
 owning package, validators, tests, generated companions, and route links move
 together.
 
@@ -71,7 +71,7 @@ Each package `README.md` is a runtime mechanic card with these sections:
 | [machine-fit](machine-fit/README.md) | How does the runtime read host facts, fit, and machine-local tuning without owning the machine? | `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`, `scripts/aoa-host-facts`, `scripts/aoa-machine-fit` |
 | [inference-pilots](inference-pilots/README.md) | How do local model trials, llama.cpp, Qwen, LangGraph, and benchmark promotion stay bounded? | `mechanics/inference-pilots/docs/LLAMACPP_PILOT.md`, `mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md`, `mechanics/inference-pilots/PROVENANCE.md` |
 | [agon-runtime](agon-runtime/README.md) | How do Agon dry-run kernels, event logs, registries, and trials stay local and non-authoritative? | `mechanics/agon-runtime/PROVENANCE.md`, `mechanics/agon-runtime/legacy/INDEX.md` |
-| [experience-runtime](experience-runtime/README.md) | How do old experience seed contracts, `_v1` schemas, examples, and wave tests stay contained? | `mechanics/experience-runtime/PROVENANCE.md`, `mechanics/experience-runtime/legacy/INDEX.md` |
+| [experience-runtime](experience-runtime/README.md) | How do old experience seed contracts, `_v1` schemas, examples, and legacy tests stay contained? | `mechanics/experience-runtime/PROVENANCE.md`, `mechanics/experience-runtime/legacy/INDEX.md` |
 | [federation-seams](federation-seams/README.md) | How does runtime consume sibling owner surfaces without taking their authority? | `mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md`, `scripts/aoa-sync-federation-surfaces` |
 | [governed-execution](governed-execution/README.md) | How do local worker runs, autonomy gates, return policy, and candidate exports stay reviewable? | `mechanics/governed-execution/docs/GOVERNED_EXECUTION.md`, `scripts/aoa-governed-run`, `scripts/aoa-status` |
 | [diagnostic-spine](diagnostic-spine/README.md) | How does the runtime locate itself, compare truth goals, and emit repair handoff candidates? | `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`, `mechanics/diagnostic-spine/docs/DOCTOR.md`, `scripts/aoa-diagnose` |

@@ -12,7 +12,14 @@ from jsonschema import Draft202012Validator
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-MODULE_PATH = REPO_ROOT / "scripts" / "_aoa_diagnose.py"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "diagnostic-spine"
+    / "parts"
+    / "diagnose-wrapper"
+    / "aoa_diagnose.py"
+)
 
 
 def load_module():

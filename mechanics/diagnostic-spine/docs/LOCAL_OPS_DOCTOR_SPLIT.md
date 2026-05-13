@@ -37,7 +37,7 @@ It does not replace `aoa-doctor`.
 It does not absorb `aoa-host-facts` or `aoa-machine-fit`.
 It does not grant repair authority.
 
-## What this wave does not do
+## What This Contract Does Not Do
 
 This wave does not add new `aoa-doctor` exit semantics.
 This wave does not add operator UI.

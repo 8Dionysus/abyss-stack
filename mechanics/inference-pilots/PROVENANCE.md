@@ -10,7 +10,7 @@ The active route remains:
 - `mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md`
 - current root pilot commands for active operator workflows
 
-Old wave-specific runner docs and scripts are preserved under package-local
+Old W5/W6 runner docs and scripts are preserved under package-local
 `legacy` so the flat root no longer has to carry W5/W6 wave names as primary
 topology.
 

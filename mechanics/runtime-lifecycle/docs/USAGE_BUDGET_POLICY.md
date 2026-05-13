@@ -48,7 +48,7 @@ The artifact should make these things explicit:
 This slice is for operator readout only.
 It does not change `aoa-doctor`.
 It does not create a remote payment contract.
-It does not create an `aoa-evals` evidence contract in this wave.
+It does not create an `aoa-evals` evidence contract in this source contract.
 
 ## Boundary notes
 

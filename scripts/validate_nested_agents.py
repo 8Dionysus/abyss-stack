@@ -152,7 +152,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mechanics/governed-execution/AGENTS.md': (
         'governed-execution',
         'governed local-worker execution',
-        'mechanics/governed-execution/parts/runtime-contracts/tests/test_governed_execution.py',
+        'mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py',
         'Do not turn advisory execution into autonomous authority',
     ),
     'mechanics/diagnostic-spine/AGENTS.md': (

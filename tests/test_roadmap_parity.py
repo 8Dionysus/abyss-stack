@@ -32,7 +32,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "langchain-api" in roadmap
     assert "`llama.cpp`" in roadmap
     assert "LangGraph" in roadmap
-    assert "antifragility wave two" in roadmap
+    assert "antifragility repair posture" in roadmap
     assert "diagnostic spine" in roadmap
     assert "`scripts/aoa-diagnose`" in roadmap
     assert "`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`" in roadmap
@@ -59,7 +59,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
         "scripts/aoa-diagnose",
-        "scripts/_aoa_diagnose.py",
+        "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py",
         "scripts/build_diagnostic_surface_catalog.py",
         "scripts/validate_diagnostic_surface_catalog.py",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",

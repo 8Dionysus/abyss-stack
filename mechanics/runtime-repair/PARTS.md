@@ -9,5 +9,5 @@
 | A2A return dry-run | `parts/a2a-return-dry-run/` | `mechanics/runtime-repair/docs/A2A_RETURN_DRY_RUN.md`, `scripts/aoa-a2a-return-closeout-dry-run`, active schema, example, and focused tests |
 | Memo contradiction sidecar | `parts/memo-contradiction-sidecar/` | `scripts/aoa-run-memo-contradiction-integrity`, focused sidecar tests |
 
-Old wave and `_v1` receipt surfaces are now package-local legacy. Active repair
+Old chaos and `_v1` receipt surfaces are now package-local legacy. Active repair
 work should start at `README.md`, `DIRECTION.md`, and `PROVENANCE.md`.

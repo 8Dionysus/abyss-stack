@@ -82,7 +82,7 @@ A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
 
 The optional `llama.cpp` benchmark lane deliberately stays outside the default profiles and presets.
-Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
+Use [LLAMACPP_PILOT](../mechanics/inference-pilots/docs/LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
 
 ## Dependency note
 

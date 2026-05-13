@@ -7,7 +7,18 @@ import json
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
 DIAGNOSTIC_SURFACE_CATALOG_PATH = (
     REPO_ROOT
     / "mechanics"

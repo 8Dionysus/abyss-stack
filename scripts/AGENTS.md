@@ -67,7 +67,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
-python -m py_compile scripts/validate_stack.py scripts/_aoa_diagnose.py scripts/aoa-host-facts scripts/aoa-machine-bridge scripts/aoa-machine-fit scripts/aoa-qwen-run
+python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py scripts/aoa-host-facts scripts/aoa-machine-bridge scripts/aoa-machine-fit scripts/aoa-qwen-run
 shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
 bash -n scripts/<touched-script>
 scripts/aoa-host-facts --mode public

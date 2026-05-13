@@ -17,6 +17,6 @@ Validation:
 python scripts/validate_stack.py
 python scripts/build_diagnostic_surface_catalog.py --check
 python scripts/validate_diagnostic_surface_catalog.py
-python -m pytest mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_aoa_diagnose.py mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py -q
+python -m pytest mechanics/diagnostic-spine/parts/diagnose-wrapper/tests/test_aoa_diagnose.py mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py -q
 bash -n scripts/aoa-doctor scripts/aoa-diagnose
 ```

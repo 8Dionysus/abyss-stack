@@ -135,7 +135,7 @@ This object should:
 
 Use multiple axes instead of one global green/red light.
 
-Suggested first-wave axes:
+Suggested initial axes:
 - `readiness`
 - `posture`
 - `render_truth`
@@ -187,7 +187,7 @@ It should not pretend to prove more than the evidence supports.
 
 ## Exit classes
 
-Suggested first-wave exit classes:
+Suggested initial exit classes:
 
 - `ready_to_start`
 - `running_as_intended`

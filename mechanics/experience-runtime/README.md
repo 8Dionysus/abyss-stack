@@ -9,7 +9,7 @@ and worker records.
 ### Trigger
 
 Use this package when changing legacy experience seed contracts, their examples,
-or their wave-specific tests.
+or their legacy-specific tests.
 
 ### abyss-stack owns
 
@@ -54,6 +54,5 @@ editing moved legacy files.
 ## Active Route
 
 This package is a bridge and containment layer. Future work can distill quiet
-active docs under `docs/`, but this wave only moves and validates the old
+active docs under `docs/`, but this pass only moves and validates the old
 contract family.
-
