@@ -7,7 +7,7 @@ This document defines the bounded LangGraph sidecar pilot for `abyss-stack` and 
 It is not a new service and not a migration of `aoa-local-ai-trials`.
 It began as a comparison layer for the preserved local-trials bounded-edit
 compatibility gate and now serves as the origin surface for the adopted bounded
-execution layer used by the preserved autonomy pilots.
+execution layer used by legacy trial-backed autonomy pilots.
 
 ## Current pilot
 
@@ -67,7 +67,7 @@ The sidecar pilot does not:
 
 Current adopted role:
 - `LangGraph` is the preferred bounded execution layer for preserved autonomy pilots and follow-on local-worker flows
-- `aoa-local-ai-trials` remains the preserved compatibility runner for `W0` through `W4` wire IDs
+- `aoa-local-ai-trials` remains the preserved compatibility runner for legacy trial gate IDs routed through `legacy/trials/`
 - `aoa-langgraph-pilot` remains the comparison and fixture surface for the bounded-edit compatibility gate
 
 ## Artifacts

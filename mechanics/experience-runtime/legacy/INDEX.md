@@ -25,3 +25,6 @@ Old root artifacts now live under `legacy/artifacts/`:
 
 Start at `../README.md`. Use these legacy files for lineage and validation, not
 as the first active runtime route.
+
+Use `ARCHIVE_CLASSIFICATION.md` to decide whether a family stays archive-only
+or has enough concrete runtime ownership to promote.

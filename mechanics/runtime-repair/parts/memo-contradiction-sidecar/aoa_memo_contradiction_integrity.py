@@ -11,7 +11,12 @@ from typing import Any
 
 EVAL_NAME = "aoa-memo-contradiction-integrity"
 OBJECT_UNDER_EVALUATION = "integrity of contradiction-visible memo consumption on lifecycle-aware object recall paths"
-SELECTION_ID = "phase-alpha-memo-contradiction-rerun-v1"
+SELECTION_ID = "memo-contradiction-rerun-v1"
+UPSTREAM_SELECTION_ID = "phase-alpha-memo-contradiction-rerun-v1"
+SELECTION_SOURCE_CANDIDATES = (
+    Path("examples/runtime_evidence_selection.memo-contradiction-rerun.example.json"),
+    Path("examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"),
+)
 
 CLOSURE_CLAIM = "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history"
 PENDING_CLAIM = "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff"
@@ -21,6 +26,16 @@ SUPERSESSION_AUDIT = "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersessi
 RETRACTION_AUDIT = "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction"
 
 REQUIRED_LOG_PATHS = {
+    "next_pass_brief": Path("Logs/memo-contradiction-rerun/restartable-inquiry-loop/next_pass_brief.md"),
+    "memory_delta": Path("Logs/memo-contradiction-rerun/restartable-inquiry-loop/memory_delta.json"),
+    "contradiction_map": Path("Logs/memo-contradiction-rerun/restartable-inquiry-loop/contradiction_map.json"),
+    "failure_map": Path("Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/failure_map.json"),
+    "handoff_record": Path("Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/handoff_record.json"),
+    "remediation_decision": Path(
+        "Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/remediation_decision.json"
+    ),
+}
+LEGACY_LOG_PATHS = {
     "next_pass_brief": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/next_pass_brief.md"),
     "memory_delta": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/memory_delta.json"),
     "contradiction_map": Path("Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json"),
@@ -150,14 +165,29 @@ def load_runtime_logs(stack_root: Path) -> dict[str, Any]:
     logs: dict[str, Any] = {}
     for key, rel_path in REQUIRED_LOG_PATHS.items():
         path = stack_root / rel_path
+        if not path.exists():
+            path = stack_root / LEGACY_LOG_PATHS[key]
         logs[key] = read_text(path) if path.suffix == ".md" else read_json(path)
     return logs
 
 
+def load_runtime_selection(evals_root: Path) -> dict[str, Any]:
+    for rel_path in SELECTION_SOURCE_CANDIDATES:
+        path = evals_root / rel_path
+        if path.exists():
+            return read_json(path)
+    expected = ", ".join(str(evals_root / rel_path) for rel_path in SELECTION_SOURCE_CANDIDATES)
+    raise SystemExit(f"error: missing runtime evidence selection; expected one of: {expected}")
+
+
 def validate_runtime_selection(evals_root: Path, stack_root: Path, failures: list[str]) -> None:
-    selection_path = evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
-    selection = read_json(selection_path)
-    require(selection.get("selection_id") == SELECTION_ID, failures, "runtime selection", "selection_id mismatch")
+    selection = load_runtime_selection(evals_root)
+    require(
+        selection.get("selection_id") in {SELECTION_ID, UPSTREAM_SELECTION_ID},
+        failures,
+        "runtime selection",
+        "selection_id mismatch",
+    )
     require(
         selection.get("candidate_eval_refs") == [f"candidate:{EVAL_NAME}"],
         failures,
@@ -197,7 +227,10 @@ def validate_runtime_logs(logs: dict[str, Any], failures: list[str]) -> None:
     contradiction_map = logs["contradiction_map"]
     notes = " ".join(contradiction_map.get("notes", [])) if isinstance(contradiction_map.get("notes"), list) else ""
     require(
-        contradiction_map.get("artifact_kind") == "phase-alpha.contradiction-map",
+        contradiction_map.get("artifact_kind") in {
+            "memo-contradiction-rerun.contradiction-map",
+            "phase-alpha.contradiction-map",
+        },
         failures,
         "contradiction_map.json",
         "artifact_kind mismatch",
@@ -386,7 +419,7 @@ def build_report(failures: list[str]) -> dict[str, Any]:
             "This report does not replace approval, return-anchor, or verification evals.",
             *failures,
         ],
-        "case_family": "phase-alpha-memo-contradiction-rerun-v1 runtime sidecar run over memo-contradiction-guardrail-v1",
+        "case_family": "memo-contradiction-rerun-v1 runtime sidecar run over memo-contradiction-guardrail-v1",
         "breakdown": {
             "lifecycle_visibility": breakdown_value,
             "current_recall_honesty": breakdown_value,
@@ -409,7 +442,7 @@ def build_report(failures: list[str]) -> dict[str, Any]:
         "case_notes": [
             {
                 "case_id": "PACR-01",
-                "read_path": "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json -> memory_object_catalog.min.json -> memory_object_sections.full.json",
+                "read_path": "runtime_evidence_selection.memo-contradiction-rerun.example.json -> memory_object_catalog.min.json -> memory_object_sections.full.json",
                 "contradiction_reading": verdict,
                 "lifecycle_note": "The sidecar checks confirmed/preferred closure and confirmed/allowed later-track posture from generated memo object surfaces.",
                 "current_recall_note": "The current closure reading and still-open later-track reading remain distinct in current_recall_status.",

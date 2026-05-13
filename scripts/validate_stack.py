@@ -228,9 +228,27 @@ ARCHIVE_MECHANIC_REQUIRED_FILES = (
     "legacy/README.md",
     "legacy/INDEX.md",
     "legacy/DISTILLATION_LOG.md",
-    "legacy/raw/README.md",
-    "legacy/artifacts/README.md",
 )
+ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES = {
+    "agon-runtime": (
+        "legacy/raw/README.md",
+        "legacy/artifacts/README.md",
+    ),
+    "experience-runtime": (
+        "legacy/raw/README.md",
+        "legacy/artifacts/README.md",
+        "legacy/ARCHIVE_CLASSIFICATION.md",
+    ),
+    "inference-pilots": (
+        "legacy/trials/README.md",
+        "legacy/trials/raw/README.md",
+        "legacy/trials/artifacts/README.md",
+    ),
+    "runtime-repair": (
+        "legacy/raw/README.md",
+        "legacy/artifacts/README.md",
+    ),
+}
 ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
     "agon-runtime": (),
     "experience-runtime": (
@@ -239,7 +257,7 @@ ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
         "legacy/artifacts/tests",
     ),
     "inference-pilots": (
-        "legacy/artifacts/scripts",
+        "legacy/trials/artifacts/scripts",
     ),
     "runtime-repair": (),
 }
@@ -394,12 +412,19 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "config-projection" / "parts" / "rendering" / "docs" / "RENDER_TRUTH.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "LOCAL_AI_TRIALS.md",
-    ROOT / "mechanics" / "inference-pilots" / "legacy" / "artifacts" / "scripts" / "aoa-local-ai-trials",
+    ROOT
+    / "mechanics"
+    / "inference-pilots"
+    / "legacy"
+    / "trials"
+    / "artifacts"
+    / "scripts"
+    / "aoa-local-ai-trials",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "truth-surfaces" / "docs" / "TRUTH_SURFACES.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "langgraph-pilot" / "docs" / "LANGGRAPH_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "llamacpp-pilot" / "docs" / "LLAMACPP_PILOT.md",
-    ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md",
-    ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md",
+    ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W5_PILOT.md",
+    ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W6_PILOT.md",
     ROOT
     / "mechanics"
     / "machine-fit"
@@ -1810,6 +1835,7 @@ def validate_paths(errors: list[str]) -> None:
         / "mechanics"
         / "inference-pilots"
         / "legacy"
+        / "trials"
         / "raw"
         / "LOCAL_AI_TRIALS_W0_W4_BASELINE.md"
     ).read_text(encoding="utf-8")
@@ -1854,7 +1880,7 @@ def validate_paths(errors: list[str]) -> None:
     ):
         if required_snippet not in local_ai_trials_w0_w4_baseline:
             errors.append(
-                f"mechanics/inference-pilots/legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md must mention `{required_snippet}`"
+                f"mechanics/inference-pilots/legacy/trials/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md must mention `{required_snippet}`"
             )
 
     truth_doc = (
@@ -1915,7 +1941,7 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in governed_doc:
             errors.append(f"mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md must mention `{required_snippet}`")
 
-    w5_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md"
+    w5_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W5_PILOT.md"
     w5_doc = w5_doc_path.read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
@@ -1936,7 +1962,7 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in w5_doc:
             errors.append(f"{w5_doc_path.relative_to(ROOT)} must mention `{required_snippet}`")
 
-    w6_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md"
+    w6_doc_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W6_PILOT.md"
     w6_doc = w6_doc_path.read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
@@ -2288,7 +2314,11 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                 )
 
         if package in ARCHIVE_MECHANIC_PACKAGES:
-            for required_file in ARCHIVE_MECHANIC_REQUIRED_FILES:
+            required_files = (
+                *ARCHIVE_MECHANIC_REQUIRED_FILES,
+                *ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES.get(package, ()),
+            )
+            for required_file in required_files:
                 path = package_root / required_file
                 if not path.is_file():
                     errors.append(f"mechanics archive package {package} is missing {required_file}")
@@ -2431,14 +2461,23 @@ def validate_agent_skill_projection_routes(errors: list[str]) -> None:
 
 def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
     bridge_path = ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "aoa_local_ai_trials.py"
-    legacy_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "artifacts" / "scripts" / "aoa-local-ai-trials"
+    legacy_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "legacy"
+        / "trials"
+        / "artifacts"
+        / "scripts"
+        / "aoa-local-ai-trials"
+    )
     bridge_text = read_text_or_none(bridge_path) or ""
     legacy_text = read_text_or_none(legacy_path) or ""
 
     if "LEGACY_BACKEND" not in bridge_text or "aoa-local-ai-trials" not in bridge_text:
         errors.append("local trials active backend must be a compatibility bridge to the legacy runner")
     if "WAVE_METADATA =" in bridge_text:
-        errors.append("local trials wave metadata must stay in legacy/artifacts/scripts, not the active bridge")
+        errors.append("local trials wave metadata must stay in legacy/trials/artifacts/scripts, not the active bridge")
     if "WAVE_METADATA =" not in legacy_text:
         errors.append("legacy local AI trials runner must preserve the W0-W4 compatibility metadata")
     if not is_executable_source_path(legacy_path):
@@ -2518,7 +2557,7 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
     for required_snippet in (
         "preserved local-trials bounded-edit",
         "bounded-edit compatibility gate",
-        "`W0` through `W4` wire IDs",
+        "legacy/trials/",
     ):
         if required_snippet not in langgraph_doc:
             errors.append(
@@ -2543,8 +2582,8 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
     for required_snippet in (
         "runtime compatibility gate",
         "edit fixture compatibility gate",
-        "`W0` wire ID",
-        "`W4` wire ID",
+        "legacy trial runtime gate ID",
+        "legacy trial edit gate ID",
     ):
         if required_snippet not in llamacpp_doc:
             errors.append(
@@ -2563,9 +2602,9 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
                 "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py "
                 f"must route preserved pilot indexes through `{required_snippet}`"
             )
-    if "pilot index IDs" not in autonomy_status_readme:
+    if "legacy trial compatibility route" not in autonomy_status_readme:
         errors.append(
-            "mechanics/governed-execution/parts/autonomy-status/README.md must explain preserved pilot index IDs"
+            "mechanics/governed-execution/parts/autonomy-status/README.md must explain the legacy trial compatibility route"
         )
 
     active_texts = {

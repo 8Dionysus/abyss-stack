@@ -127,31 +127,31 @@ def make_memo_root(root: Path) -> None:
 
 def make_evals_root(root: Path) -> None:
     write_json(
-        root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+        root / "examples" / "runtime_evidence_selection.memo-contradiction-rerun.example.json",
         {
-            "selection_id": "phase-alpha-memo-contradiction-rerun-v1",
+            "selection_id": "memo-contradiction-rerun-v1",
             "candidate_eval_refs": ["candidate:aoa-memo-contradiction-integrity"],
             "source_manifests": [
-                "repo:abyss-stack/Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json"
+                "repo:abyss-stack/Logs/memo-contradiction-rerun/restartable-inquiry-loop/contradiction_map.json"
             ],
             "selected_evidence": [
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-05-restartable-inquiry-loop/next_pass_brief.md"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/restartable-inquiry-loop/next_pass_brief.md"
                 },
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-05-restartable-inquiry-loop/memory_delta.json"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/restartable-inquiry-loop/memory_delta.json"
                 },
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/restartable-inquiry-loop/contradiction_map.json"
                 },
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/failure_map.json"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/failure_map.json"
                 },
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/handoff_record.json"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/handoff_record.json"
                 },
                 {
-                    "artifact_ref": "repo:abyss-stack/Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/remediation_decision.json"
+                    "artifact_ref": "repo:abyss-stack/Logs/memo-contradiction-rerun/validation-remediation-recall-rerun/remediation_decision.json"
                 },
             ],
         },
@@ -160,22 +160,22 @@ def make_evals_root(root: Path) -> None:
 
 def make_stack_root(root: Path) -> None:
     write_text(
-        root / "Logs" / "phase-alpha" / "alpha-05-restartable-inquiry-loop" / "next_pass_brief.md",
+        root / "Logs" / "memo-contradiction-rerun" / "restartable-inquiry-loop" / "next_pass_brief.md",
         "use inspect -> capsule -> expand; stop and escalate when memo is insufficient\n",
     )
     write_json(
-        root / "Logs" / "phase-alpha" / "alpha-05-restartable-inquiry-loop" / "memory_delta.json",
-        {"artifact_kind": "phase-alpha.memory-delta"},
+        root / "Logs" / "memo-contradiction-rerun" / "restartable-inquiry-loop" / "memory_delta.json",
+        {"artifact_kind": "memo-contradiction-rerun.memory-delta"},
     )
     write_json(
-        root / "Logs" / "phase-alpha" / "alpha-05-restartable-inquiry-loop" / "contradiction_map.json",
+        root / "Logs" / "memo-contradiction-rerun" / "restartable-inquiry-loop" / "contradiction_map.json",
         {
-            "artifact_kind": "phase-alpha.contradiction-map",
+            "artifact_kind": "memo-contradiction-rerun.contradiction-map",
             "notes": ["Residual historical-script lineage remains a known risk"],
         },
     )
     write_json(
-        root / "Logs" / "phase-alpha" / "alpha-06-validation-driven-remediation-recall-rerun" / "failure_map.json",
+        root / "Logs" / "memo-contradiction-rerun" / "validation-remediation-recall-rerun" / "failure_map.json",
         {
             "recall_mode": "memo-only",
             "inspect_capsule_expand_refs": ["repo:aoa-memo/generated/memory_object_sections.full.json"],
@@ -183,14 +183,14 @@ def make_stack_root(root: Path) -> None:
         },
     )
     write_json(
-        root / "Logs" / "phase-alpha" / "alpha-06-validation-driven-remediation-recall-rerun" / "handoff_record.json",
+        root / "Logs" / "memo-contradiction-rerun" / "validation-remediation-recall-rerun" / "handoff_record.json",
         {
             "memo_contradiction_acceptance": {"memo_only_rerun_present": True},
             "summary": "eval readout -> memo writeback -> recall-driven rerun",
         },
     )
     write_json(
-        root / "Logs" / "phase-alpha" / "alpha-06-validation-driven-remediation-recall-rerun" / "remediation_decision.json",
+        root / "Logs" / "memo-contradiction-rerun" / "validation-remediation-recall-rerun" / "remediation_decision.json",
         {"decision": "close remediation recurrence as proven under memo-only recall"},
     )
 

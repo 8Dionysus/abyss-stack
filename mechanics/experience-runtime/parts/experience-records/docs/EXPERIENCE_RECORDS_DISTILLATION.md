@@ -6,7 +6,8 @@ The preserved experience contract family has schemas, examples, and tests, but
 it does not currently have one concrete `abyss-stack` service, storage path,
 operator command, or runtime validator that consumes it as an active contract.
 For now, promotion would make old names look active without giving the runtime a
-real owner.
+real owner. The archive families are classified in
+`../../../legacy/ARCHIVE_CLASSIFICATION.md`.
 
 ## Current Classification
 

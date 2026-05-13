@@ -12,6 +12,7 @@ from types import ModuleType
 LEGACY_BACKEND = (
     Path(__file__).resolve().parents[2]
     / "legacy"
+    / "trials"
     / "artifacts"
     / "scripts"
     / "aoa-local-ai-trials"

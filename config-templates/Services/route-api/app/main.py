@@ -29,12 +29,17 @@ RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
     "memo-contradiction-gap": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
     "memo-contradiction-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
 }
+RUNTIME_EVIDENCE_TEMPLATE_CANONICAL_SELECTION_IDS = {
+    "memo-recall-rerun": "memo-recall-rerun-v1",
+    "memo-contradiction-gap": "memo-contradiction-gap-v1",
+    "memo-contradiction-rerun": "memo-contradiction-rerun-v1",
+}
 RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES = {
     "phase-alpha-memo-recall-rerun": "memo-recall-rerun",
     "phase-alpha-memo-contradiction-gap": "memo-contradiction-gap",
     "phase-alpha-memo-contradiction-rerun": "memo-contradiction-rerun",
 }
-PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF = "aoa-playbooks/generated/playbook_automation_seeds.json"
+UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF = "aoa-playbooks/generated/playbook_automation_seeds.json"
 
 
 @dataclass(frozen=True)
@@ -260,7 +265,7 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
         "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
         "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
         "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
-        "automation_seeds": load_json(mirror_root / "generated/playbook_automation_seeds.json"),
+        "automation_plans": load_json(mirror_root / "generated/playbook_automation_seeds.json"),
         "composition_manifest": load_json(mirror_root / "generated/playbook_composition_manifest.json"),
     }
 
@@ -467,7 +472,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "handoff_playbook_count": len(layer.payloads["handoffs"]["playbooks"]),
                 "failure_count": len(layer.payloads["failures"]["failures"]),
                 "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
-                "automation_plan_count": len(layer.payloads["automation_seeds"]["seeds"]),
+                "automation_plan_count": len(playbook_automation_plan_entries_for_layer(layer)),
             }
         elif layer.layer == "aoa-kag":
             metadata = {
@@ -774,6 +779,12 @@ def playbooks_payload(store: AppStore, key: str) -> Any:
     return store.playbooks.payloads[key]
 
 
+def playbook_automation_plan_entries_for_layer(layer: LayerStore) -> list[dict[str, Any]]:
+    payload = layer.payloads["automation_plans"]
+    entries = payload.get("plans", payload.get("seeds", []))
+    return entries if isinstance(entries, list) else []
+
+
 def kag_payload(store: AppStore, key: str) -> dict[str, Any]:
     return store.kag.payloads[key]
 
@@ -807,7 +818,7 @@ def playbook_subagent_recipe_entries(store: AppStore) -> list[dict[str, Any]]:
 
 
 def playbook_automation_plan_entries(store: AppStore) -> list[dict[str, Any]]:
-    return playbooks_payload(store, "automation_seeds")["seeds"]
+    return playbook_automation_plan_entries_for_layer(store.playbooks)
 
 
 def playbook_review_status_entries(store: AppStore) -> list[dict[str, Any]]:
@@ -893,7 +904,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
     if subagent_recipes:
         source_files.append("aoa-playbooks/generated/playbook_subagent_recipes.json")
     if automation_plans:
-        source_files.append(PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF)
+        source_files.append(UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF)
 
     return {
         "playbook_id": playbook_id,
@@ -1444,6 +1455,7 @@ def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> di
         "ok": True,
         "name": canonical_name,
         "requested_name": template_name,
+        "canonical_selection_id": RUNTIME_EVIDENCE_TEMPLATE_CANONICAL_SELECTION_IDS.get(canonical_name),
         "template": template,
         "source_files": [
             "aoa-evals/generated/runtime_candidate_template_index.min.json",
@@ -2259,7 +2271,11 @@ def playbooks_subagent_recipes() -> dict[str, Any]:
 @app.get("/playbooks/automation-plans")
 def playbooks_automation_plans() -> dict[str, Any]:
     store = require_store()
-    return {"ok": True, "data": playbooks_payload(store, "automation_seeds")}
+    return {
+        "ok": True,
+        "data": {"plans": playbook_automation_plan_entries(store)},
+        "source_files": [UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
+    }
 
 
 @app.get("/playbooks/automation-seeds")
@@ -2323,7 +2339,7 @@ def playbooks_failure(request: PlaybookFailureRequest) -> dict[str, Any]:
             "aoa-playbooks/generated/playbook_federation_surfaces.min.json",
             "aoa-playbooks/generated/playbook_handoff_contracts.json",
             "aoa-playbooks/generated/playbook_subagent_recipes.json",
-            PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF,
+            UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF,
         ],
     }
 
@@ -2348,7 +2364,7 @@ def playbooks_automation_plan(request: PlaybookAutomationPlanRequest) -> dict[st
         "ok": True,
         "name": request.name,
         "plan": plan,
-        "source_files": [PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
+        "source_files": [UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
     }
 
 

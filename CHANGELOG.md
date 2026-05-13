@@ -73,7 +73,7 @@ Tracking starts with the community-docs baseline for this repository.
   machine-fit surfaces instead of spelling the old W0-W4 qualification runner
   as part of normal bootstrap
 - `aoa-local-ai-trials` now keeps its preserved W0-W4 runner under
-  `mechanics/inference-pilots/legacy/artifacts/scripts/` with a thin active
+  `mechanics/inference-pilots/legacy/trials/artifacts/scripts/` with a thin active
   compatibility bridge in `parts/local-trials/`
 - root residual route surfaces were tightened: the audit contract now lives at
   `docs/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and

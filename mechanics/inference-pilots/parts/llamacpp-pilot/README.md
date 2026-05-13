@@ -7,5 +7,5 @@ Routes `scripts/aoa-llamacpp-pilot`,
 `tests/test_aoa_llamacpp_pilot.py`.
 
 This part keeps llama.cpp sidecar experiments bounded and explicit.
-Preserved `W0`/`W4` appears here only as runtime/edit gate wire IDs for
-promotion compatibility packets.
+Old runtime/edit gate IDs appear here only through the legacy trial
+compatibility route under `../../legacy/trials/`.

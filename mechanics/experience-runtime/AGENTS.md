@@ -6,7 +6,8 @@ This package owns the `abyss-stack` runtime-side experience contract family
 after the mechanics archive refactor.
 
 Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
-`PARTS.md`, `parts/README.md`, `PROVENANCE.md`, and
+`PARTS.md`, `parts/README.md`, `PROVENANCE.md`,
+`legacy/ARCHIVE_CLASSIFICATION.md`, and
 `parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md` before
 editing.
 

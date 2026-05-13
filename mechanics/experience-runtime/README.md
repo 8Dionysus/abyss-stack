@@ -49,7 +49,8 @@ Run the commands in [AGENTS.md](AGENTS.md).
 
 ### Next route
 
-Use [PROVENANCE.md](PROVENANCE.md) and [legacy/INDEX.md](legacy/INDEX.md) before
+Use [PROVENANCE.md](PROVENANCE.md), [legacy/INDEX.md](legacy/INDEX.md), and
+[legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) before
 editing moved archive files. Use
 [parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md](parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md)
 before promoting anything out of legacy.

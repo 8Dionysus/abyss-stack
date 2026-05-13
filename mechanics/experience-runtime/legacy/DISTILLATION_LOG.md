@@ -28,3 +28,12 @@ stronger owner repositories for meaning and authority.
 
 The active classification lives in
 `parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md`.
+
+## 2026-05-13 archive classification
+
+Added `legacy/ARCHIVE_CLASSIFICATION.md` so the large preserved family is
+grouped by runtime concern instead of remaining an undifferentiated legacy
+mass.
+
+Verdict remains archive-only until one concrete `abyss-stack` service, storage
+path, operator command, or validator consumes a single family.

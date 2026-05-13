@@ -62,8 +62,8 @@ AoA or ToS meaning. Its current checked surface is:
 - promoted local-worker and Intel serving posture:
   `mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md`,
   `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`,
-  `mechanics/inference-pilots/legacy/raw/W5_PILOT.md`,
-  `mechanics/inference-pilots/legacy/raw/W6_PILOT.md`,
+  `mechanics/inference-pilots/legacy/trials/raw/W5_PILOT.md`,
+  `mechanics/inference-pilots/legacy/trials/raw/W6_PILOT.md`,
   `scripts/aoa-long-horizon-pilot`,
   `scripts/aoa-bounded-autonomy-pilot`,
   `compose/tuning/llamacpp.runtime-fallback.yml`,

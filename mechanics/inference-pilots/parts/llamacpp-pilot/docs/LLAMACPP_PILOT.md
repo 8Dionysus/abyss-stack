@@ -129,8 +129,8 @@ build instead of trying to force `Vulkan0` through the default
 
 - screens the fixed `Q4_K_M` and `Q6_K` `bartowski` candidates on the same CPU-safe sidecar posture
 - chooses a winner only if the candidate stays stable and `exact-reply` is not more than `15%` slower than the fresh historical comparison basis
-- runs the preserved runtime compatibility gate on `http://127.0.0.1:5403/run` under `qwen-llamacpp-pilot-v1` using the `W0` wire ID
-- runs one disposable edit fixture compatibility gate under `langgraph-sidecar-llamacpp-v1` using the `W4` wire ID
+- runs the preserved runtime compatibility gate on `http://127.0.0.1:5403/run` under `qwen-llamacpp-pilot-v1` using the legacy trial runtime gate ID
+- runs one disposable edit fixture compatibility gate under `langgraph-sidecar-llamacpp-v1` using the legacy trial edit gate ID
 - writes the promotion packet under:
   - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/promotions/llamacpp-promotion-gate-v1/`
 
