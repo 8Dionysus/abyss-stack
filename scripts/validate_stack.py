@@ -22,6 +22,23 @@ RUNTIME_CONFIGS_MIRROR_MODE = (
 STALE_ABYSS_PATH = "/srv/abyss"
 STALE_ABYSS_PATTERN = re.compile(r"/srv/abyss(?!-)")
 STALE_STACK_ROOT = "/srv/" + "abyss-stack"
+WORKSPACE_ROOT_DEFAULT = "/srv/AbyssOS"
+WORKSPACE_SIBLING_ROOTS = {
+    "aoa-techniques": f"{WORKSPACE_ROOT_DEFAULT}/aoa-techniques",
+    "aoa-skills": f"{WORKSPACE_ROOT_DEFAULT}/aoa-skills",
+    "aoa-evals": f"{WORKSPACE_ROOT_DEFAULT}/aoa-evals",
+    "aoa-memo": f"{WORKSPACE_ROOT_DEFAULT}/aoa-memo",
+    "aoa-agents": f"{WORKSPACE_ROOT_DEFAULT}/aoa-agents",
+    "Agents-of-Abyss": f"{WORKSPACE_ROOT_DEFAULT}/Agents-of-Abyss",
+    "aoa-playbooks": f"{WORKSPACE_ROOT_DEFAULT}/aoa-playbooks",
+    "aoa-kag": f"{WORKSPACE_ROOT_DEFAULT}/aoa-kag",
+    "Tree-of-Sophia": f"{WORKSPACE_ROOT_DEFAULT}/Tree-of-Sophia",
+    "aoa-routing": f"{WORKSPACE_ROOT_DEFAULT}/aoa-routing",
+    "aoa-sdk": f"{WORKSPACE_ROOT_DEFAULT}/aoa-sdk",
+}
+STALE_ACTIVE_SIBLING_ROOT_PATTERN = re.compile(
+    r"/srv/(?:aoa-[A-Za-z0-9_-]+|Agents-of-Abyss|Tree-of-Sophia)"
+)
 HOST_LOCAL_SOURCE_CHECKOUT_ROOTS = (
     "/home/dionysus/src/" + "abyss-stack",
 )
@@ -747,9 +764,11 @@ DIAGNOSTIC_SURFACE_CATALOG_PATH = (
 DIAGNOSTIC_SPINE_SKILL_PATH = Path(".agents") / "skills" / "abyss-self-diagnostic-spine"
 ABYSS_SAFE_INFRA_SKILL_PATH = Path(".agents") / "skills" / "abyss-safe-infra-change"
 ABYSS_SANITIZED_SHARE_SKILL_PATH = Path(".agents") / "skills" / "abyss-sanitized-share"
+AOA_SKILL_INSTALL_ROOT = f"{WORKSPACE_SIBLING_ROOTS['aoa-skills']}/.agents/skills"
+LOCAL_SKILL_OVERLAY_NAMES = {"abyss-self-diagnostic-spine"}
 OVERLAY_SKILL_INSTALL_TARGETS = {
-    ABYSS_SAFE_INFRA_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-safe-infra-change",
-    ABYSS_SANITIZED_SHARE_SKILL_PATH: "/srv/aoa-skills/.agents/skills/abyss-sanitized-share",
+    ABYSS_SAFE_INFRA_SKILL_PATH: f"{AOA_SKILL_INSTALL_ROOT}/abyss-safe-infra-change",
+    ABYSS_SANITIZED_SHARE_SKILL_PATH: f"{AOA_SKILL_INSTALL_ROOT}/abyss-sanitized-share",
 }
 QUEST_SURFACE_ROOT = Path("quests")
 QUEST_SCHEMA_PATH = QUEST_SURFACE_ROOT / "schemas" / "quest.schema.json"
@@ -1047,6 +1066,27 @@ def validate_no_moved_mechanic_doc_refs(errors: list[str]) -> None:
                     f"moved mechanic doc ref found in {path.relative_to(ROOT)}: "
                     f"{moved_ref}"
                 )
+
+
+def is_legacy_archive_path(path: Path) -> bool:
+    try:
+        return "legacy" in path.relative_to(ROOT).parts
+    except ValueError:
+        return "legacy" in path.parts
+
+
+def validate_no_stale_active_sibling_roots(errors: list[str]) -> None:
+    for path in iter_text_files():
+        if is_legacy_archive_path(path):
+            continue
+        text = read_text_or_none(path)
+        if text is None:
+            continue
+        for match in STALE_ACTIVE_SIBLING_ROOT_PATTERN.finditer(text):
+            errors.append(
+                "stale active sibling root found in "
+                f"{path.relative_to(ROOT)}: {match.group(0)}"
+            )
 
 
 def load_names(file_path: Path) -> list[str]:
@@ -2095,15 +2135,15 @@ def validate_paths(errors: list[str]) -> None:
                 errors.append("aoa-routing AOA-P-0011 governed policy entry must declare explicit acceptance commands")
             else:
                 required_root_flags = (
-                    "--techniques-root /srv/aoa-techniques",
-                    "--skills-root /srv/aoa-skills",
-                    "--evals-root /srv/aoa-evals",
-                    "--memo-root /srv/aoa-memo",
-                    "--agents-root /srv/aoa-agents",
-                    "--aoa-root /srv/Agents-of-Abyss",
-                    "--playbooks-root /srv/aoa-playbooks",
-                    "--kag-root /srv/aoa-kag",
-                    "--tos-root /srv/Tree-of-Sophia",
+                    f"--techniques-root {WORKSPACE_SIBLING_ROOTS['aoa-techniques']}",
+                    f"--skills-root {WORKSPACE_SIBLING_ROOTS['aoa-skills']}",
+                    f"--evals-root {WORKSPACE_SIBLING_ROOTS['aoa-evals']}",
+                    f"--memo-root {WORKSPACE_SIBLING_ROOTS['aoa-memo']}",
+                    f"--agents-root {WORKSPACE_SIBLING_ROOTS['aoa-agents']}",
+                    f"--aoa-root {WORKSPACE_SIBLING_ROOTS['Agents-of-Abyss']}",
+                    f"--playbooks-root {WORKSPACE_SIBLING_ROOTS['aoa-playbooks']}",
+                    f"--kag-root {WORKSPACE_SIBLING_ROOTS['aoa-kag']}",
+                    f"--tos-root {WORKSPACE_SIBLING_ROOTS['Tree-of-Sophia']}",
                 )
                 for required_command in (
                     "python scripts/validate_router.py",
@@ -2306,6 +2346,35 @@ def validate_root_residual_topology(errors: list[str]) -> None:
         errors.append(".agents/README.md must route the Spark fast-loop lane")
     if "AUDIT.md" not in docs_readme:
         errors.append("docs/README.md must route docs/AUDIT.md")
+
+
+def validate_agent_skill_projection_routes(errors: list[str]) -> None:
+    skills_root = ROOT / ".agents" / "skills"
+    if not skills_root.is_dir():
+        errors.append(".agents/skills must exist as the repo-local skill projection surface")
+        return
+
+    for path in sorted(skills_root.iterdir()):
+        if path.name == "AGENTS.md":
+            continue
+        rel_path = path.relative_to(ROOT).as_posix()
+        if path.name in LOCAL_SKILL_OVERLAY_NAMES:
+            if not path.is_dir() or not (path / "SKILL.md").is_file():
+                errors.append(f"{rel_path} must stay as a local overlay directory with SKILL.md")
+            continue
+        if not path.is_symlink():
+            errors.append(f"{rel_path} must be a symlink into {AOA_SKILL_INSTALL_ROOT}")
+            continue
+        try:
+            actual_target = path.readlink().as_posix()
+        except OSError:
+            errors.append(f"{rel_path} symlink target cannot be read")
+            continue
+        expected_target = f"{AOA_SKILL_INSTALL_ROOT}/{path.name}"
+        if actual_target != expected_target:
+            errors.append(
+                f"{rel_path} must target {expected_target}, got {actual_target}"
+            )
 
 
 def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
@@ -4008,11 +4077,13 @@ def main() -> int:
     validate_git_mirror_hygiene(errors)
     validate_no_host_local_source_checkout_paths(errors)
     validate_no_moved_mechanic_doc_refs(errors)
+    validate_no_stale_active_sibling_roots(errors)
     validate_paths(errors)
     validate_mechanics_topology(errors)
     validate_scripts(errors)
     validate_required_files(errors)
     validate_root_residual_topology(errors)
+    validate_agent_skill_projection_routes(errors)
     validate_local_trials_legacy_bridge(errors)
     validate_inference_pilot_compatibility_gate_language(errors)
     validate_root_design_surfaces(errors)

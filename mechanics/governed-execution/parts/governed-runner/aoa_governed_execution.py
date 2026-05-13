@@ -449,7 +449,7 @@ def candidate_repo_roots_for_target(
         env_root = os.environ.get("AOA_ROUTING_ROOT")
         if env_root:
             candidates.append(Path(env_root).expanduser())
-        candidates.append(Path("/srv/aoa-routing"))
+        candidates.append(Path("/srv/AbyssOS/aoa-routing"))
         candidates.append(Path.home() / "src" / "aoa-routing")
     else:
         raise RuntimeError(f"unsupported governed target_id: {target_id}")

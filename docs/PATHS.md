@@ -14,12 +14,17 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_CONFIGS_ROOT` — config root, usually `${AOA_STACK_ROOT}/Configs`
 - `AOA_VAULT_ROOT` — optional heavy-data vault root
 - `AOA_SOURCE_ROOT` — optional canonical source checkout root used for parity-aware helpers such as `aoa-status --autonomy`
+- `AOA_WORKSPACE_ROOT` — optional shared AbyssOS workspace root for sibling repository checkouts, usually `/srv/AbyssOS`
 - `AOA_AGENTS_ROOT` — optional source root used to mirror public-safe `aoa-agents` surfaces into the runtime tree
+- `AOA_SKILLS_ROOT` — optional source root used by repo-local skill projection surfaces
 - `AOA_ROUTING_ROOT` — optional source root used to mirror public-safe `aoa-routing` advisory surfaces into the runtime tree
 - `AOA_MEMO_ROOT` — optional source root used to mirror public-safe `aoa-memo` recall and writeback-seam surfaces into the runtime tree
 - `AOA_EVALS_ROOT` — optional source root used to mirror public-safe `aoa-evals` eval-selection and export-contract surfaces into the runtime tree
 - `AOA_PLAYBOOKS_ROOT` — optional source root used to mirror public-safe `aoa-playbooks` activation and composition advisory surfaces into the runtime tree
 - `AOA_KAG_ROOT` — optional source root used to mirror public-safe `aoa-kag` derived retrieval and regrounding surfaces into the runtime tree
+- `AOA_TECHNIQUES_ROOT` — optional source root used when sibling routing checks need reusable technique surfaces
+- `AOA_AOA_ROOT` — optional source root for the `Agents-of-Abyss` center repository
+- `AOA_SDK_ROOT` — optional source root for SDK examples used by runtime repair dry-runs
 - `AOA_TOS_ROOT` — optional source root used to mirror the source-owned `Tree-of-Sophia` handoff companion surfaces into the runtime tree
 - `AOA_RUNTIME_USER` — runtime username for a few host-specific mounts
 - `AOA_RUNTIME_UID` — runtime UID for a few host-specific mounts
@@ -39,18 +44,28 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 | stack-side machine bridge logs | `/srv/AbyssOS/abyss-stack/Logs/machine-bridge` |
 | codex home | `/srv/AbyssOS/abyss-stack/.codex-home` |
 | optional vault | `/abyss` |
-| optional `aoa-agents` source root | `/srv/aoa-agents` |
-| optional `aoa-routing` source root | `/srv/aoa-routing` |
-| optional `aoa-memo` source root | `/srv/aoa-memo` |
-| optional `aoa-evals` source root | `/srv/aoa-evals` |
-| optional `aoa-playbooks` source root | `/srv/aoa-playbooks` |
-| optional `aoa-kag` source root | `/srv/aoa-kag` |
-| optional `Tree-of-Sophia` source root | `/srv/Tree-of-Sophia` |
+| shared AbyssOS workspace root | `/srv/AbyssOS` |
+| optional `Agents-of-Abyss` source root | `/srv/AbyssOS/Agents-of-Abyss` |
+| optional `Tree-of-Sophia` source root | `/srv/AbyssOS/Tree-of-Sophia` |
+| optional `aoa-agents` source root | `/srv/AbyssOS/aoa-agents` |
+| optional `aoa-routing` source root | `/srv/AbyssOS/aoa-routing` |
+| optional `aoa-memo` source root | `/srv/AbyssOS/aoa-memo` |
+| optional `aoa-evals` source root | `/srv/AbyssOS/aoa-evals` |
+| optional `aoa-playbooks` source root | `/srv/AbyssOS/aoa-playbooks` |
+| optional `aoa-kag` source root | `/srv/AbyssOS/aoa-kag` |
+| optional `aoa-skills` source root | `/srv/AbyssOS/aoa-skills` |
+| optional `aoa-techniques` source root | `/srv/AbyssOS/aoa-techniques` |
+| optional `aoa-sdk` source root | `/srv/AbyssOS/aoa-sdk` |
 
 The source checkout path is a Fedora-first default, not a universal host constant.
 If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path.
 
 The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](decisions/2026-05-07-runtime-root-under-abyssos.md).
+
+Sibling repository defaults live under the same `/srv/AbyssOS` workspace root.
+The older `/srv/<repo>` shape is historical compatibility only; active source
+docs, examples, symlinks, and helper defaults should use `/srv/AbyssOS/<repo>`
+unless a user explicitly overrides the matching environment variable.
 
 ## Windows-usable path model
 

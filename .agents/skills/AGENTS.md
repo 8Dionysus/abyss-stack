@@ -8,11 +8,15 @@ Local guidance for `.agents/skills/` in `abyss-stack`. Read the root
 This directory is the repo-local skill install and overlay surface. Most entries
 are symlinks into the stronger `aoa-skills` owner; local directories exist only
 when `abyss-stack` needs a portable overlay tied to stack runtime contracts.
+In this workspace, symlinked skills target
+`/srv/AbyssOS/aoa-skills/.agents/skills/<skill-name>`; older flat sibling
+targets are historical drift, not an active route.
 
 ## Local Contract
 
 - Do not move canonical skill law into this repository.
 - Keep symlinked skill names aligned with the stronger `aoa-skills` source.
+- Keep symlink targets under `/srv/AbyssOS/aoa-skills/.agents/skills/`.
 - Keep local overlays thin, source-safe, and explicit about their canonical
   upstream.
 - When an overlay references stack surfaces, point to package-local mechanics

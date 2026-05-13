@@ -129,7 +129,7 @@
     "aoa-routing": {
       "repo_scope": "aoa-routing",
       "description": "First external governed target for bounded thin-router wording and generated-surface refreshes only.",
-      "default_repo_root": "/srv/aoa-routing",
+      "default_repo_root": "/srv/AbyssOS/aoa-routing",
       "playbooks": {
         "AOA-P-0011": {
           "enabled": true,
@@ -151,8 +151,8 @@
             "tests/test_validate_router.py"
           ],
           "acceptance_commands": [
-            "python scripts/validate_router.py --techniques-root /srv/aoa-techniques --skills-root /srv/aoa-skills --evals-root /srv/aoa-evals --memo-root /srv/aoa-memo --agents-root /srv/aoa-agents --aoa-root /srv/Agents-of-Abyss --playbooks-root /srv/aoa-playbooks --kag-root /srv/aoa-kag --tos-root /srv/Tree-of-Sophia",
-            "python scripts/build_router.py --check --techniques-root /srv/aoa-techniques --skills-root /srv/aoa-skills --evals-root /srv/aoa-evals --memo-root /srv/aoa-memo --agents-root /srv/aoa-agents --aoa-root /srv/Agents-of-Abyss --playbooks-root /srv/aoa-playbooks --kag-root /srv/aoa-kag --tos-root /srv/Tree-of-Sophia",
+            "python scripts/validate_router.py --techniques-root /srv/AbyssOS/aoa-techniques --skills-root /srv/AbyssOS/aoa-skills --evals-root /srv/AbyssOS/aoa-evals --memo-root /srv/AbyssOS/aoa-memo --agents-root /srv/AbyssOS/aoa-agents --aoa-root /srv/AbyssOS/Agents-of-Abyss --playbooks-root /srv/AbyssOS/aoa-playbooks --kag-root /srv/AbyssOS/aoa-kag --tos-root /srv/AbyssOS/Tree-of-Sophia",
+            "python scripts/build_router.py --check --techniques-root /srv/AbyssOS/aoa-techniques --skills-root /srv/AbyssOS/aoa-skills --evals-root /srv/AbyssOS/aoa-evals --memo-root /srv/AbyssOS/aoa-memo --agents-root /srv/AbyssOS/aoa-agents --aoa-root /srv/AbyssOS/Agents-of-Abyss --playbooks-root /srv/AbyssOS/aoa-playbooks --kag-root /srv/AbyssOS/aoa-kag --tos-root /srv/AbyssOS/Tree-of-Sophia",
             "pytest"
           ],
           "break_glass_allowed": false,

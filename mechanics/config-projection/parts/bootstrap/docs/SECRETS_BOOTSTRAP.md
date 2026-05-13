@@ -82,7 +82,7 @@ chmod 600 /srv/AbyssOS/abyss-stack/Secrets/Configs/tos-graph.env
 ```
 
 Related stack-level defaults that usually belong in `/srv/AbyssOS/abyss-stack/Configs/stack.env`:
-- `AOA_TOS_ROOT=/srv/Tree-of-Sophia`
+- `AOA_TOS_ROOT=/srv/AbyssOS/Tree-of-Sophia`
 - `AOA_TOS_GRAPH_HOST_PORT=5410`
 - `TOS_GRAPH_WRITE_ENABLED=false`
 - `NEO4J_AUTH=neo4j/<runtime-secret>`

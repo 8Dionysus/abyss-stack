@@ -15,3 +15,4 @@ Use these notes to understand why a contract exists. Keep operational evidence, 
 - [2026-05-13 Inference Pilot Compatibility Gates](2026-05-13-inference-pilot-compatibility-gates.md)
 - [2026-05-13 Root Design And Agent Surfaces](2026-05-13-root-design-agent-surfaces.md)
 - [2026-05-13 Root Residual Topology Cleanup](2026-05-13-root-residual-topology-cleanup.md)
+- [2026-05-13 Workspace Sibling Roots Under AbyssOS](2026-05-13-workspace-sibling-roots-under-abyssos.md)

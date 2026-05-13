@@ -12,7 +12,7 @@
   "closeout_id": "closeout-example-child",
   "session_ref": "session:example",
   "request_kind": "a2a_wave5_closeout_request",
-  "source_input_ref": "local:/srv/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
+  "source_input_ref": "local:/srv/AbyssOS/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
   "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "reviewed": true,
   "reviewed_artifact_path": "/srv/notes/reviewed_session_artifact.md",

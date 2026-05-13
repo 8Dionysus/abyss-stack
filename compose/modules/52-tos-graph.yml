@@ -14,7 +14,7 @@ services:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/tos-graph/config.yaml:/app/config/config.yaml:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env:/app/config/runtime-stack.env:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/tos-graph:/app/logs:Z"
-      - "${AOA_TOS_ROOT:-/srv/Tree-of-Sophia}:/workspace/Tree-of-Sophia:ro,Z"
+      - "${AOA_TOS_ROOT:-/srv/AbyssOS/Tree-of-Sophia}:/workspace/Tree-of-Sophia:ro,Z"
     depends_on:
       neo4j:
         condition: service_started

@@ -133,6 +133,58 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             ],
         )
 
+    def test_stale_active_sibling_root_fails_outside_legacy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            active_doc = repo_root / "docs" / "ROUTE.md"
+            legacy_doc = repo_root / "mechanics" / "inference-pilots" / "legacy" / "raw" / "ROUTE.md"
+            stale_root = "/srv/" + "aoa-routing"
+            active_doc.parent.mkdir(parents=True, exist_ok=True)
+            legacy_doc.parent.mkdir(parents=True, exist_ok=True)
+            active_doc.write_text(f"Old active route: {stale_root}\n", encoding="utf-8")
+            legacy_doc.write_text(f"Preserved lineage route: {stale_root}\n", encoding="utf-8")
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                validate_stack.validate_no_stale_active_sibling_roots(errors)
+
+        self.assertEqual(
+            errors,
+            [
+                "stale active sibling root found in "
+                f"docs/ROUTE.md: {stale_root}"
+            ],
+        )
+
+    def test_skill_projection_symlink_target_must_use_abyssos_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            skill_root = repo_root / ".agents" / "skills"
+            skill_root.mkdir(parents=True)
+            (skill_root / "AGENTS.md").write_text("# Skill surface\n", encoding="utf-8")
+            overlay = skill_root / "abyss-self-diagnostic-spine"
+            overlay.mkdir()
+            (overlay / "SKILL.md").write_text("# Overlay\n", encoding="utf-8")
+            (skill_root / "aoa-change-protocol").symlink_to(
+                "/srv/AbyssOS/aoa-skills/.agents/skills/aoa-change-protocol"
+            )
+            (skill_root / "aoa-source-of-truth-check").symlink_to(
+                "/srv/" + "aoa-skills/.agents/skills/aoa-source-of-truth-check"
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                validate_stack.validate_agent_skill_projection_routes(errors)
+
+        self.assertEqual(
+            errors,
+            [
+                ".agents/skills/aoa-source-of-truth-check must target "
+                "/srv/AbyssOS/aoa-skills/.agents/skills/aoa-source-of-truth-check, "
+                "got " + "/srv/" + "aoa-skills/.agents/skills/aoa-source-of-truth-check"
+            ],
+        )
+
     def test_missing_operator_backend_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
