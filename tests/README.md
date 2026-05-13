@@ -22,4 +22,3 @@ roadmap checks.
 - `test_aoa_lib_env_compat.py`: shared shell env compatibility.
 
 See [AGENTS.md](AGENTS.md) for editing rules.
-

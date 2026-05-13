@@ -30,4 +30,3 @@ ship with the `abyss-stack` source checkout.
 python scripts/validate_nested_agents.py
 python scripts/validate_stack.py
 ```
-
