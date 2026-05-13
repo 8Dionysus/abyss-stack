@@ -32,7 +32,7 @@
     "python scripts/validate_stack.py --parity-check#2026-04-07T13:39:10Z"
   ],
   "emitted_to": [
-    "aoa-sdk:closeout_manifest#session:2026-04-07-antifragility-wave-2"
+    "aoa-sdk:closeout_manifest#session:2026-04-07-antifragility-closeout-2"
   ],
   "next_checks": [
     "python scripts/validate_stack.py",

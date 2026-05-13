@@ -10,4 +10,8 @@ package-local.
 - `aoa_local_ai_trials.py` is the part-local backend for
   `scripts/aoa-local-ai-trials`.
 
+The old phase-gated runner narrative routes through `../../legacy/INDEX.md`;
+keep active part docs in trial, scenario, benchmark, model-card, and promotion
+language.
+
 Live benchmark runs remain runtime artifacts under `${AOA_STACK_ROOT}/Logs/`.

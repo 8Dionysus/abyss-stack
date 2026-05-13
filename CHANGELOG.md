@@ -9,13 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
-- first-wave `mechanics/` topology with runtime lifecycle, config projection,
+- initial `mechanics/` topology with runtime lifecycle, config projection,
   machine fit, inference pilots, federation seams, governed execution,
   diagnostic spine, and runtime repair package cards
-- second-wave `mechanics/agon-runtime` and `mechanics/experience-runtime`
-  legacy containment packages with provenance and legacy indexes
-- legacy containment bridges for `mechanics/runtime-repair` and
-  `mechanics/inference-pilots`, including quiet W5/W6 pilot bridge commands
+- follow-up `mechanics/agon-runtime` and `mechanics/experience-runtime`
+  archive-containment packages with provenance and `legacy/` indexes
+- archive-containment bridges for `mechanics/runtime-repair` and
+  `mechanics/inference-pilots`, including quiet pilot bridge commands
 - stack-side `abyss-machine` bridge capture via `scripts/aoa-machine-bridge`,
   with `Logs/machine-bridge/` latest/history/index routes and package-local
   contract docs
@@ -33,11 +33,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 - top-level route docs now point runtime-move work through the mechanics atlas
   before entering package-specific docs, scripts, schemas, or config surfaces
-- noisy Agon and experience seed artifacts, including late-found experience
+- noisy Agon and experience archival artifacts, including late-found experience
   job/worker/storage-plan docs, moved out of flat root districts into
-  package-local legacy homes with validators and tests following the move
-- runtime repair chaos-wave receipts and W5/W6 pilot wave files moved out of
-  flat root districts into package-local legacy homes with route bridges
+  package-local `legacy/` homes with validators and tests following the move
+- runtime repair chaos receipts and preserved pilot files moved out of flat
+  root districts into package-local `legacy/` homes with route bridges
 - GitHub mirror hygiene now keeps the repository source/install-only by
   ignoring obvious local runtime artifacts and failing validation on tracked
   live/private/heavy files while preserving public examples and fixtures
@@ -62,6 +62,11 @@ Tracking starts with the community-docs baseline for this repository.
 - the local diagnostic-spine skill overlay now points at current part-local
   diagnostic surfaces, and `validate_stack.py` blocks stale moved mechanic doc
   references
+- active mechanics route docs now keep old family labels in provenance,
+  contract paths, and bridges instead of package-active prose
+- `FIRST_RUN` now routes optional local model trials to inference-pilot and
+  machine-fit surfaces instead of spelling the old W0-W4 qualification runner
+  as part of normal bootstrap
 
 ## [0.2.2] - 2026-04-23
 
@@ -91,7 +96,7 @@ Tracking starts with the community-docs baseline for this repository.
 ### Changed
 
 - runtime review follow-up drift, event-log schema checks, mechanical-trial
-  contract checks, W5 pilot record posture, federation runtime review
+  contract checks, long-horizon pilot record posture, federation runtime review
   contracts, and source/deployed parity expectations were tightened
 
 ### Validation
@@ -116,7 +121,7 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
-- chaos wave 1 runtime recovery surfaces, an A2A return closeout dry-run
+- runtime chaos recovery surfaces, an A2A return closeout dry-run
   adapter, and memo contradiction runtime-sidecar coverage
 
 ### Changed

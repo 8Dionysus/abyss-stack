@@ -39,10 +39,10 @@ It does not grant repair authority.
 
 ## What This Contract Does Not Do
 
-This wave does not add new `aoa-doctor` exit semantics.
-This wave does not add operator UI.
-This wave does not add usage accounting to `aoa-doctor`.
-This wave does not let `aoa-diagnose` mutate runtime, quest, or repair state.
+This contract does not add new `aoa-doctor` exit semantics.
+This contract does not add operator UI.
+This contract does not add usage accounting to `aoa-doctor`.
+This contract does not let `aoa-diagnose` mutate runtime, quest, or repair state.
 
 ## One-line rule
 

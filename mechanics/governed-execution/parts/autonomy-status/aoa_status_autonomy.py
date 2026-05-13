@@ -32,14 +32,14 @@ def find_repo_root(start: Path) -> Path:
 
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
 
-W5_INDEX_PATH = (
+LONG_HORIZON_INDEX_PATH = (
     STACK_ROOT
     / "Logs"
     / "local-ai-trials"
     / "w5-langgraph-llamacpp-v1"
     / "W5-long-horizon-index.json"
 )
-W6_INDEX_PATH = (
+BOUNDED_AUTONOMY_INDEX_PATH = (
     STACK_ROOT
     / "Logs"
     / "local-ai-trials"
@@ -413,18 +413,18 @@ def run_federation_layer_checks(requirement: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_wave_index(path: Path) -> dict[str, Any] | None:
+def load_trial_index(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     return load_json_text(path.read_text(encoding="utf-8"))
 
 
-def summarize_wave(name: str, index_path: Path) -> dict[str, Any]:
-    payload = load_wave_index(index_path)
+def summarize_trial_index(name: str, index_path: Path) -> dict[str, Any]:
+    payload = load_trial_index(index_path)
     if payload is None:
         return make_check(
             status="degraded",
-            summary=f"{name} wave index is missing",
+            summary=f"{name} trial index is missing",
             detail={"path": str(index_path), "truth_status": normalize_truth_status(None)},
         )
 
@@ -448,7 +448,7 @@ def summarize_wave(name: str, index_path: Path) -> dict[str, Any]:
         )
     return make_check(
         status="degraded",
-        summary=f"{name} is not yet a live-available promoted wave",
+        summary=f"{name} is not yet a live-available promoted trial",
         detail=detail,
     )
 
@@ -462,8 +462,8 @@ def control_truth_status(
     route_api_health: dict[str, Any],
     route_api_surface_status: dict[str, Any],
     federation_layers: dict[str, Any],
-    w5: dict[str, Any],
-    w6: dict[str, Any],
+    long_horizon: dict[str, Any],
+    bounded_autonomy: dict[str, Any],
 ) -> dict[str, Any]:
     source_authored = source_root is not None
     deployed = (
@@ -472,8 +472,8 @@ def control_truth_status(
         and (CONFIGS_ROOT / "scripts" / "aoa-sync-federation-surfaces").exists()
     )
     trial_proven = bool(
-        w5["detail"]["truth_status"]["trial_proven"]
-        and w6["detail"]["truth_status"]["trial_proven"]
+        long_horizon["detail"]["truth_status"]["trial_proven"]
+        and bounded_autonomy["detail"]["truth_status"]["trial_proven"]
     )
     route_api_required = bool(route_api_requirement["required"])
     surface_closure = route_api_surface_status.get("detail", {}).get("closure_summary") or {}
@@ -488,14 +488,14 @@ def control_truth_status(
         and llamacpp_verify["status"] == "pass"
         and (not route_api_required or route_api_ready)
         and (not route_api_required or federation_ready)
-        and w5["detail"]["truth_status"]["live_available"]
-        and w6["detail"]["truth_status"]["live_available"]
+        and long_horizon["detail"]["truth_status"]["live_available"]
+        and bounded_autonomy["detail"]["truth_status"]["live_available"]
     )
     notes = [
         "control_plane source_authored tracks whether the canonical source checkout is discoverable for parity checks.",
         "control_plane deployed tracks whether the deployed operator scripts are present under /srv/AbyssOS/abyss-stack/Configs/scripts.",
-        "control_plane trial_proven requires both W5 and W6 to remain trial_proven.",
-        "control_plane live_available requires parity, promoted runtime verify, and W5/W6 live availability.",
+        "control_plane trial_proven requires the preserved autonomy pilot summaries to remain trial_proven.",
+        "control_plane live_available requires parity, promoted runtime verify, and preserved pilot live availability.",
     ]
     if route_api_required:
         notes.append(
@@ -513,8 +513,8 @@ def control_truth_status(
             "live_available": live_available,
             "notes": notes,
         },
-        "w5": w5["detail"]["truth_status"],
-        "w6": w6["detail"]["truth_status"],
+        "long_horizon": long_horizon["detail"]["truth_status"],
+        "bounded_autonomy": bounded_autonomy["detail"]["truth_status"],
     }
 
 
@@ -531,7 +531,7 @@ def recommended_action(
         return "Repair the promoted llama.cpp lane first. Rerun `python /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-llamacpp-pilot verify --timeout 60` before trusting autonomy readiness."
     if "route_api_health_failed" in degradation_reasons or "route_api_surface_status_invalid" in degradation_reasons:
         return "Restore route-api health and closure reporting, then rerun `aoa-status --autonomy --json`."
-    return "Inspect the degraded layers and wave truth gaps, then rerun the deployed federation checks and W5/W6 summary refresh."
+    return "Inspect the degraded layers and pilot truth gaps, then rerun the deployed federation checks and preserved pilot summary refresh."
 
 
 def collect_autonomy_status(
@@ -545,8 +545,11 @@ def collect_autonomy_status(
     route_health = fetch_route_api_health(route_requirement)
     route_surface = fetch_route_api_surface_status(route_requirement)
     federation = run_federation_layer_checks(route_requirement)
-    w5 = summarize_wave("W5", W5_INDEX_PATH)
-    w6 = summarize_wave("W6", W6_INDEX_PATH)
+    long_horizon = summarize_trial_index("long-horizon pilot", LONG_HORIZON_INDEX_PATH)
+    bounded_autonomy = summarize_trial_index(
+        "bounded-autonomy pilot",
+        BOUNDED_AUTONOMY_INDEX_PATH,
+    )
 
     degradation_reasons: list[str] = []
     if parity["status"] != "pass":
@@ -571,14 +574,20 @@ def collect_autonomy_status(
         for layer, check in federation["layers"].items():
             if check["status"] != "pass":
                 degradation_reasons.append(f"federation_layer_failed:{layer}")
-    if w5["detail"]["truth_status"]["trial_proven"] and not w5["detail"]["truth_status"]["live_available"]:
-        degradation_reasons.append("trial_live_gap:W5")
-    elif w5["status"] != "pass":
-        degradation_reasons.append("wave_status_unavailable:W5")
-    if w6["detail"]["truth_status"]["trial_proven"] and not w6["detail"]["truth_status"]["live_available"]:
-        degradation_reasons.append("trial_live_gap:W6")
-    elif w6["status"] != "pass":
-        degradation_reasons.append("wave_status_unavailable:W6")
+    if (
+        long_horizon["detail"]["truth_status"]["trial_proven"]
+        and not long_horizon["detail"]["truth_status"]["live_available"]
+    ):
+        degradation_reasons.append("trial_live_gap:long_horizon")
+    elif long_horizon["status"] != "pass":
+        degradation_reasons.append("trial_status_unavailable:long_horizon")
+    if (
+        bounded_autonomy["detail"]["truth_status"]["trial_proven"]
+        and not bounded_autonomy["detail"]["truth_status"]["live_available"]
+    ):
+        degradation_reasons.append("trial_live_gap:bounded_autonomy")
+    elif bounded_autonomy["status"] != "pass":
+        degradation_reasons.append("trial_status_unavailable:bounded_autonomy")
 
     unique_reasons = sorted(set(degradation_reasons))
     if any(
@@ -605,8 +614,8 @@ def collect_autonomy_status(
         route_api_health=route_health,
         route_api_surface_status=route_surface,
         federation_layers=federation,
-        w5=w5,
-        w6=w6,
+        long_horizon=long_horizon,
+        bounded_autonomy=bounded_autonomy,
     )
 
     return {
@@ -619,8 +628,8 @@ def collect_autonomy_status(
             "route_api_health": route_health,
             "route_api_surface_status": route_surface,
             "federation_layers": federation,
-            "w5": w5,
-            "w6": w6,
+            "long_horizon": long_horizon,
+            "bounded_autonomy": bounded_autonomy,
         },
         "degradation_reasons": unique_reasons,
         "recommended_action": recommended_action(
@@ -651,8 +660,8 @@ def render_text(payload: dict[str, Any]) -> str:
         f"- route-api health: `{payload['checks']['route_api_health']['status']}`",
         f"- route-api closure: `{payload['checks']['route_api_surface_status']['status']}`",
         f"- Federation layers: `{federation['status']}`",
-        f"- W5: `{payload['checks']['w5']['status']}`",
-        f"- W6: `{payload['checks']['w6']['status']}`",
+        f"- Long-horizon pilot: `{payload['checks']['long_horizon']['status']}`",
+        f"- Bounded-autonomy pilot: `{payload['checks']['bounded_autonomy']['status']}`",
     ]
     if payload["degradation_reasons"]:
         lines.extend(

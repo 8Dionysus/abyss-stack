@@ -26,7 +26,7 @@ A useful repair-safe closeout receipt includes:
 
 ## Closeout Examples
 
-The first bounded chaos wave now includes named closeout examples for:
+The bounded closeout examples include:
 
 - `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json`
 - `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json`

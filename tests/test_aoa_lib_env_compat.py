@@ -20,13 +20,13 @@ def run_aoa_lib(script: str) -> str:
 
 
 class AoaLibEnvCompatTests(unittest.TestCase):
-    def test_legacy_no_op_offload_true_maps_to_op_offload_zero(self) -> None:
+    def test_compat_no_op_offload_true_maps_to_op_offload_zero(self) -> None:
         output = run_aoa_lib(
             "unset AOA_LLAMACPP_OP_OFFLOAD; export AOA_LLAMACPP_NO_OP_OFFLOAD=1; source scripts/aoa-lib.sh; printf '%s' \"$AOA_LLAMACPP_OP_OFFLOAD\""
         )
         self.assertEqual(output, "0")
 
-    def test_legacy_no_op_offload_false_maps_to_op_offload_one(self) -> None:
+    def test_compat_no_op_offload_false_maps_to_op_offload_one(self) -> None:
         output = run_aoa_lib(
             "unset AOA_LLAMACPP_OP_OFFLOAD; export AOA_LLAMACPP_NO_OP_OFFLOAD=0; source scripts/aoa-lib.sh; printf '%s' \"$AOA_LLAMACPP_OP_OFFLOAD\""
         )

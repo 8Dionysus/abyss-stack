@@ -23,7 +23,7 @@ The first wave creates route homes and package cards without moving the
 established docs, scripts, schemas, examples, generated artifacts, compose
 modules, or tests out of their current source districts.
 
-First-wave packages:
+Initial packages:
 
 - `runtime-lifecycle`
 - `config-projection`

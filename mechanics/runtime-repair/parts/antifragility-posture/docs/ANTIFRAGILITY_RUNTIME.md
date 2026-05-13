@@ -19,7 +19,7 @@ Examples include:
 
 ## Receipt contracts
 
-This wave introduces two owner-local receipt families:
+This package posture defines two owner-local receipt families:
 
 - `service_degradation_receipt_v1`
 - `repair_safe_closeout_receipt_v1`
@@ -33,7 +33,7 @@ Together they should answer:
 
 ## Example Families
 
-The first bounded chaos wave uses the current contracts through named example
+The bounded chaos examples use the current contracts through named example
 families:
 
 - `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json`

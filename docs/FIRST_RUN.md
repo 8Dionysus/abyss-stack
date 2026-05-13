@@ -139,17 +139,23 @@ scripts/aoa-smoke --with-internal --preset agent-full
 scripts/aoa-qwen-bench --preset agent-full
 ```
 
-## Optional supervised local AI qualification
+## Optional local model trials
 
-Once the intended Qwen path is healthy, materialize the bounded local pilot and run the runtime wave:
+The first-run path ends once the selected profile launches, waits, smokes, and
+passes its intended Qwen check. Local model trials, benchmark packets, model
+cards, and promotion candidates are separate inference-pilot work, not a
+required first-run health gate.
 
-```bash
-scripts/aoa-local-ai-trials materialize
-scripts/aoa-local-ai-trials run-wave W0
-```
+Use these package-owned routes after the runtime path is already healthy:
 
-That flow keeps machine-readable trial truth under `Logs/local-ai-trials/` and writes Markdown mirrors to `Dionysus/reports/local-ai-trials/`.
-Use [LOCAL_AI_TRIALS](../mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md) for the full contract.
+- [LOCAL_AI_TRIALS](../mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md) for supervised trial routing and compatibility boundaries
+- [RUNTIME_BENCH_POLICY](../mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md) for runtime benchmark packets
+- [MODEL_CARDS](../mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md) for model-family and variant fit notes
+
+Those flows keep machine-readable runtime truth under
+`${AOA_STACK_ROOT}/Logs/local-ai-trials/` or
+`${AOA_STACK_ROOT}/Logs/runtime-benchmarks/`, and may mirror curated Markdown
+summaries to `/srv/Dionysus/reports/local-ai-trials/`.
 
 ## Optional bounded llama.cpp pilot
 

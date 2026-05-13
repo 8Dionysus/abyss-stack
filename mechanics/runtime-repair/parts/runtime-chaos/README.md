@@ -1,5 +1,6 @@
 # Runtime Chaos
 
-Routes `legacy/raw/RUNTIME_CHAOS_WAVE1.md`.
+Routes archived runtime chaos lineage through `../../PROVENANCE.md` and
+`../../legacy/INDEX.md`.
 
-The old wave name stays contained as lineage, not active route naming.
+The old route name stays contained as lineage, not active route naming.

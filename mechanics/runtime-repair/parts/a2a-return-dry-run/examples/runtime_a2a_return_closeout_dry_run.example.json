@@ -34,8 +34,8 @@
     ]
   },
   "runtime_receipt_candidate": {
-    "artifact_kind": "runtime_wave_closeout_receipt",
-    "publisher": "abyss-stack.runtime-wave-closeouts",
+    "artifact_kind": "runtime_closeout_receipt_candidate",
+    "publisher": "abyss-stack.runtime-closeouts",
     "dry_run": true,
     "live_automation": false,
     "child_task_id": "task-child-1",

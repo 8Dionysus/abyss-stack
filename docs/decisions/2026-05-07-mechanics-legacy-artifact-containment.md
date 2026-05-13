@@ -15,10 +15,10 @@ manifests.
 Four families were ready to move as bounded units:
 
 - Agon dry-run runtime kernels and mechanical trial artifacts.
-- Experience seed-derived runtime contracts, job/worker/storage docs, examples,
+- Experience archive-derived runtime contracts, job/worker/storage docs, examples,
   and wave tests.
 - Runtime repair chaos-wave and `_v1` receipt artifacts.
-- Inference W5/W6 pilot wave docs and runner scripts.
+- Inference long-horizon and bounded-autonomy archived pilot docs and runner scripts.
 
 The sibling `Agents-of-Abyss` refactor showed the useful pattern: active
 mechanic package route first, detailed old material under package-local
@@ -50,7 +50,7 @@ clean active contracts. It also keeps runnable artifacts testable: Agon builders
 and validators moved with their config/generated/example/test surfaces,
 experience contract tests now read package-local schemas and examples, and
 runtime repair receipt tests now read package-local receipt schemas and
-examples, and W5/W6 pilot runners now execute through quieter root bridge
+examples, and archived pilot runners now execute through quieter root bridge
 commands.
 
 The choice preserves stronger-owner boundaries. `Agents-of-Abyss` still owns

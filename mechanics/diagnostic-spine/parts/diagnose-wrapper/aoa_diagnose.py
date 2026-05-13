@@ -630,26 +630,26 @@ def autonomy_drifts(
                 evidence_refs=[autonomy_ref],
             )
         elif reason.startswith("trial_live_gap:"):
-            wave = reason.split(":", 1)[1]
+            trial = reason.split(":", 1)[1]
             add_drift(
                 drifts,
                 seen,
                 kind="truth_gap",
                 severity="medium",
-                summary=f"{wave} remains trial-proven but not live-available on the promoted path.",
-                probable_causes=[f"{wave} still needs a live-available promoted runtime claim."],
+                summary=f"{trial} remains trial-proven but not live-available on the promoted path.",
+                probable_causes=[f"{trial} still needs a live-available promoted runtime claim."],
                 owner_hint="abyss-stack/promoted-runtime",
                 evidence_refs=[autonomy_ref],
             )
-        elif reason.startswith("wave_status_unavailable:"):
-            wave = reason.split(":", 1)[1]
+        elif reason.startswith("trial_status_unavailable:"):
+            trial = reason.split(":", 1)[1]
             add_drift(
                 drifts,
                 seen,
                 kind="evidence_gap",
                 severity="medium",
-                summary=f"{wave} truth status is unavailable for the autonomy verdict.",
-                probable_causes=[f"{wave} summary artifacts are missing or unreadable."],
+                summary=f"{trial} truth status is unavailable for the autonomy verdict.",
+                probable_causes=[f"{trial} summary artifacts are missing or unreadable."],
                 owner_hint="abyss-stack/local-ai-trials",
                 evidence_refs=[autonomy_ref],
             )

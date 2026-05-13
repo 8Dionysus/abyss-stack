@@ -1,6 +1,6 @@
 # Config Projection Landing Log
 
-## 2026-05-07 - First-wave package landing
+## 2026-05-07 - Initial package landing
 
 Created the config projection package as a route home for templates, env
 examples, bootstrap, render, and sync surfaces.

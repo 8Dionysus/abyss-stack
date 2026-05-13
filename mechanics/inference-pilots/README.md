@@ -57,6 +57,6 @@ Current source surfaces stay in package-local `parts/` routes, root
 `scripts/` wrappers, `compose/tuning/`,
 `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/`, package
 benchmark surfaces under `mechanics/inference-pilots/parts/local-trials/`, and
-package tests under `mechanics/inference-pilots/parts/`. Preserved W5/W6 pilot
+package tests under `mechanics/inference-pilots/parts/`. Archived pilot
 surfaces now stay under `legacy/` with quiet root bridge commands for operator
 compatibility.

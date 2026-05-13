@@ -64,8 +64,8 @@ class DegradationReceiptContractTests(unittest.TestCase):
             self.assertIs(payload.get("operator_visible"), True, path.name)
             self.assertIs(payload.get("unsafe_repair_blocked"), True, path.name)
 
-    def test_legacy_bridge_points_to_active_part(self) -> None:
-        legacy_readme = (
+    def test_archive_bridge_points_to_active_part(self) -> None:
+        archive_readme = (
             REPO_ROOT
             / "mechanics"
             / "runtime-repair"
@@ -73,9 +73,9 @@ class DegradationReceiptContractTests(unittest.TestCase):
             / "artifacts"
             / "README.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("parts/degradation-receipts/", legacy_readme)
-        self.assertIn("parts/repair-safe-closeout/", legacy_readme)
-        self.assertIn("legacy/raw/RUNTIME_CHAOS_WAVE1.md", legacy_readme)
+        self.assertIn("parts/degradation-receipts/", archive_readme)
+        self.assertIn("parts/repair-safe-closeout/", archive_readme)
+        self.assertIn("legacy/raw/RUNTIME_CHAOS_WAVE1.md", archive_readme)
 
 
 if __name__ == "__main__":

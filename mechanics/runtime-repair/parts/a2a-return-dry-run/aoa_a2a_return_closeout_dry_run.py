@@ -82,7 +82,7 @@ def first_publisher(payload: dict[str, Any]) -> str:
         for item in batches:
             if isinstance(item, dict) and isinstance(item.get("publisher"), str):
                 return item["publisher"]
-    return "abyss-stack.runtime-wave-closeouts"
+    return "abyss-stack.runtime-closeouts"
 
 
 def build_memo_export_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -168,7 +168,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
         "return_plan": return_plan,
         "checkpoint_bridge_plan": checkpoint_bridge_plan,
         "runtime_receipt_candidate": {
-            "artifact_kind": "runtime_wave_closeout_receipt",
+            "artifact_kind": "runtime_closeout_receipt_candidate",
             "publisher": first_publisher(payload),
             "dry_run": True,
             "live_automation": False,

@@ -1,6 +1,6 @@
 # Runtime Lifecycle Landing Log
 
-## 2026-05-07 - First-wave package landing
+## 2026-05-07 - Initial package landing
 
 Created the runtime lifecycle package as a route home for deployment, layout,
 up/down, smoke, logs, and systemd lifecycle surfaces.

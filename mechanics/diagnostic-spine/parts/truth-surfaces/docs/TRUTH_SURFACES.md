@@ -36,7 +36,7 @@ trial_proven is not a synonym for production readiness.
 
 ## Current motivating example
 
-The W6 drift pattern made this distinction operationally important:
+The bounded-autonomy drift pattern made this distinction operationally important:
 
 - `aoa-llamacpp-pilot verify` existed in source before it existed in the deployed `Configs/scripts` copy
 - `aoa-sync-federation-surfaces --check --json` existed in source before it existed in the deployed `Configs/scripts` copy
@@ -65,7 +65,7 @@ Note: Governed canary trust evidence is not a fifth truth status and does not wi
 
 ## Historical backfill rule
 
-Older W5 and W6 mirrors may predate explicit `truth_status` fields.
+Older pilot mirrors may predate explicit `truth_status` fields.
 
 When backfilling those reports:
 

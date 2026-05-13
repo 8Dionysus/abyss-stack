@@ -10,7 +10,7 @@ The AOA pattern being mirrored is:
 - raw historical sources in `legacy/raw`
 - technical runnable artifacts in `legacy/artifacts`
 - an index that maps old names to their current package path
-- no claim that legacy raw files are current doctrine
+- no claim that archived raw files are current doctrine
 
 ## Owner Boundary
 
@@ -22,5 +22,5 @@ that it cannot mutate live authority.
 
 - [legacy/INDEX.md](legacy/INDEX.md) maps old flat paths to package-local paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what has and
-  has not been distilled out of legacy.
+  has not been distilled out of the archive.
 - `legacy/artifacts/scripts/` remains runnable for narrow validation.

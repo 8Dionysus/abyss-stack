@@ -28,5 +28,5 @@ python -m py_compile mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w5-
 ```
 
 Agon dry-run kernels now route through `mechanics/agon-runtime/`.
-Preserved W5/W6 pilot surfaces route through `mechanics/inference-pilots/legacy/`
+Archived pilot surfaces route through `mechanics/inference-pilots/legacy/`
 and `PROVENANCE.md`.

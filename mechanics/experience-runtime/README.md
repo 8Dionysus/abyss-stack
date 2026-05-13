@@ -2,20 +2,20 @@
 
 ## Mechanic card
 
-Experience runtime is the `abyss-stack` package for old seed-derived runtime
-contracts around adoption, governance, release, office mesh, storage migration,
-and worker records.
+Experience runtime is the `abyss-stack` package for the archived experience
+runtime contract family around adoption, governance, release, office mesh,
+storage migration, and worker records.
 
 ### Trigger
 
-Use this package when changing legacy experience seed contracts, their examples,
-or their legacy-specific tests.
+Use this package when changing archived experience runtime contracts, their
+examples, or their package-specific tests.
 
 ### abyss-stack owns
 
-- runtime-side contract schemas and examples for this legacy family
+- runtime-side contract schemas and examples for this preserved family
 - public-safe validation of those examples
-- package-local preservation of old wave, seed, and `_v1` names
+- package-local archiving of old file and contract names
 - route bridges that keep stronger owner boundaries visible
 
 ### Stronger owner split
@@ -27,7 +27,7 @@ stack service would need to validate or transport it.
 
 ### Inputs
 
-Legacy seed docs, `_v1` schemas, examples, and wave2-wave5 contract tests.
+Archived docs, schemas, examples, and contract tests.
 
 ### Outputs
 
@@ -39,8 +39,8 @@ future distillation.
 - release approval authority
 - direct Tree of Sophia write authority
 - polis/governance doctrine
-- that old wave tests define the whole runtime lifecycle
-- that `_v1` filename scaffolding is the active topology
+- that old contract tests define the whole runtime lifecycle
+- that old filename scaffolding is the active topology
 
 ### Validation
 
@@ -49,7 +49,7 @@ Run the commands in [AGENTS.md](AGENTS.md).
 ### Next route
 
 Use [PROVENANCE.md](PROVENANCE.md) and [legacy/INDEX.md](legacy/INDEX.md) before
-editing moved legacy files.
+editing moved archive files.
 
 ## Active Route
 

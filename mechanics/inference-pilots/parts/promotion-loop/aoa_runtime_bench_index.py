@@ -319,7 +319,7 @@ def determine_cohorts(
         if label in latest_by_target_label
     )
 
-    legacy_baseline_refs = sorted(
+    historical_baseline_refs = sorted(
         row["run_ref"]
         for row in retention["classes"]["historical"]
         if row.get("target_label") in control_target_labels
@@ -354,7 +354,7 @@ def determine_cohorts(
         ("promotion-basis", promotion_basis_refs, "runs referenced by the current latest comparison or promotion packets"),
         ("current-promoted", sorted(set(promoted_substrate_refs)), "latest promoted llama.cpp winner runs referenced by the current promotion verdict"),
         ("comparison-challenger", sorted(set(comparison_challenger_refs)), "latest challenger runs kept beside the promoted winner for bounded backend comparison"),
-        ("legacy-baseline", legacy_baseline_refs, "historical control-path runs kept for baseline lineage and drift review"),
+        ("historical-baseline", historical_baseline_refs, "historical control-path runs kept for baseline lineage and drift review"),
     ]
 
     classes: dict[str, list[dict[str, Any]]] = {}

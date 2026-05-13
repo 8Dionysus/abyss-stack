@@ -1,6 +1,6 @@
 # GOVERNED EXECUTION
 
-This document defines the first governed mutation lane after the promoted `W5/W6` autonomy pilots.
+This document defines the governed mutation lane after the preserved autonomy pilot evidence.
 
 The default stance is intentionally narrow:
 
@@ -50,7 +50,7 @@ The request contract is runtime-owned and JSON-shaped:
 - optional `canary_id`
 - optional `task_class`
 
-The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current wave. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
+The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
 For seeded canary preparation, use:
 
@@ -198,7 +198,7 @@ Use `--explain` when you want a one-screen summary instead of raw JSON.
 
 ## Approval posture
 
-This wave keeps approvals explicit and file-backed.
+This lane keeps approvals explicit and file-backed.
 
 `approval.status.json` is the pause/resume seam.
 Operators review proposal artifacts at `plan_freeze`, then review `landing.diff` and `worktree.manifest.json` at `landing`.

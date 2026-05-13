@@ -42,10 +42,10 @@ def make_check(*, status: str, summary: str, detail: dict | None = None) -> dict
     return payload
 
 
-def wave_check(*, status: str, trial_proven: bool, live_available: bool) -> dict:
+def trial_check(*, status: str, trial_proven: bool, live_available: bool) -> dict:
     return make_check(
         status=status,
-        summary="wave status",
+        summary="trial status",
         detail={
             "path": "/tmp/index.json",
             "gate_result": "pass" if trial_proven else "fail",
@@ -83,8 +83,8 @@ class AutonomyCollectorTests(unittest.TestCase):
         route_health: dict | None = None,
         route_surface: dict | None = None,
         federation: dict | None = None,
-        w5: dict | None = None,
-        w6: dict | None = None,
+        long_horizon: dict | None = None,
+        bounded_autonomy: dict | None = None,
     ) -> dict:
         parity = parity or make_check(status="pass", summary="parity green", detail={})
         verify = verify or make_check(status="pass", summary="verify green", detail={"payload": {"ok": True}})
@@ -135,8 +135,8 @@ class AutonomyCollectorTests(unittest.TestCase):
                 for layer in self.module.FEDERATION_LAYERS
             },
         }
-        w5 = w5 or wave_check(status="pass", trial_proven=True, live_available=True)
-        w6 = w6 or wave_check(status="pass", trial_proven=True, live_available=True)
+        long_horizon = long_horizon or trial_check(status="pass", trial_proven=True, live_available=True)
+        bounded_autonomy = bounded_autonomy or trial_check(status="pass", trial_proven=True, live_available=True)
 
         with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
                 with patch.object(self.module, "run_parity_check", return_value=parity):
@@ -157,7 +157,7 @@ class AutonomyCollectorTests(unittest.TestCase):
                                         "run_federation_layer_checks",
                                         return_value=federation,
                                     ):
-                                        with patch.object(self.module, "summarize_wave", side_effect=[w5, w6]):
+                                        with patch.object(self.module, "summarize_trial_index", side_effect=[long_horizon, bounded_autonomy]):
                                             return self.module.collect_autonomy_status(source_root=REPO_ROOT)
 
     def test_green_path_returns_pass_and_live_available(self) -> None:
@@ -212,11 +212,11 @@ class AutonomyCollectorTests(unittest.TestCase):
 
     def test_trial_live_gap_returns_degraded(self) -> None:
         payload = self.collect_payload(
-            w5=wave_check(status="degraded", trial_proven=True, live_available=False),
+            long_horizon=trial_check(status="degraded", trial_proven=True, live_available=False),
         )
 
         self.assertEqual(payload["overall_status"], "degraded")
-        self.assertIn("trial_live_gap:W5", payload["degradation_reasons"])
+        self.assertIn("trial_live_gap:long_horizon", payload["degradation_reasons"])
         self.assertFalse(payload["truth_status"]["control_plane"]["live_available"])
 
     def test_route_api_not_enabled_does_not_fail_the_default_runtime_shape(self) -> None:

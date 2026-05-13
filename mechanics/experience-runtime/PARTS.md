@@ -2,8 +2,7 @@
 
 | Part | Route | Current source surfaces |
 |---|---|---|
-| Active route | `parts/active-route/` | `README.md`, `DIRECTION.md`, `PROVENANCE.md` |
-| Legacy experience records | `parts/legacy-experience-records/` | `legacy/raw/`, `legacy/artifacts/schemas/*_v1.json`, `legacy/artifacts/examples/*.example.json`, `legacy/artifacts/tests/test_experience_wave*_seed_contracts.py` |
+| Experience records | `parts/experience-records/` | `PROVENANCE.md`, `legacy/INDEX.md`, `legacy/DISTILLATION_LOG.md`, `legacy/artifacts/` |
 
-The active package route names the boundary. Legacy retains the exact old file
-names for review and reproducibility.
+The package route names the boundary. Old file names remain reviewable only
+under `legacy/`.

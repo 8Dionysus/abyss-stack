@@ -5,7 +5,7 @@ The canonical runtime mechanics atlas lives at
 
 Use that tree when the task is about the kind of runtime move being made:
 lifecycle, config projection, machine fit, inference pilots, Agon dry-run
-runtime, experience seed contracts, federation seams, governed execution,
+runtime, experience archive contracts, federation seams, governed execution,
 diagnostics, or repair-safe closeout.
 
 ## Current role
@@ -14,7 +14,7 @@ This file is a `docs/` entry route. It does not own mechanic doctrine.
 
 The initial mechanics topology added first-class package homes under
 `mechanics/`. Current movement pushes noisy flat artifact families into
-package-local legacy homes when validators, links, tests, and generated
+package-local archive homes when validators, links, tests, and generated
 companions move with them.
 
 ## Canonical surfaces
