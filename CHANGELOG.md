@@ -101,6 +101,10 @@ Tracking starts with the community-docs baseline for this repository.
   contract fields and compatibility maps for eval templates, memo contradiction
   sidecar inputs, A2A return dry-runs, playbook automation plans, and Dionysus
   RPG prep-pack handoffs
+- upstream compatibility IDs now flow through
+  `Configs/federation/upstream-compatibility-bridge.json` instead of being
+  repeated in route-api, exporter, repair, layout, and federation config
+  surfaces
 
 ## [0.2.2] - 2026-04-23
 

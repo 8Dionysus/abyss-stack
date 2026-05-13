@@ -591,6 +591,7 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-kag.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "tos-source.yaml",
+    ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "aoa-browser" / "Dockerfile",
@@ -801,15 +802,16 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
         "generated/runtime_candidate_intake.min.json",
         "examples/runtime_evidence_selection.workhorse-local.example.json",
         "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
-        "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
     },
     Path("config-templates") / "Configs" / "federation" / "aoa-playbooks.yaml": {
         "generated/playbook_review_packet_contracts.min.json",
         "generated/playbook_review_intake.min.json",
     },
 }
+
+UPSTREAM_COMPATIBILITY_BRIDGE_PATH = (
+    ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json"
+)
 
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
@@ -2616,6 +2618,36 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
                 )
 
 
+def compatibility_bridge_config(errors: list[str]) -> dict[str, Any]:
+    try:
+        payload = json.loads(UPSTREAM_COMPATIBILITY_BRIDGE_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        errors.append("missing config-templates/Configs/federation/upstream-compatibility-bridge.json")
+        return {}
+    except json.JSONDecodeError as exc:
+        errors.append(f"upstream compatibility bridge config must be valid JSON: {exc}")
+        return {}
+    if payload.get("artifact_kind") != "abyss-stack.upstream-compatibility-bridge":
+        errors.append("upstream compatibility bridge config must use artifact_kind abyss-stack.upstream-compatibility-bridge")
+    return payload
+
+
+def iter_compatibility_bridge_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        strings: list[str] = []
+        for item in value:
+            strings.extend(iter_compatibility_bridge_strings(item))
+        return strings
+    if isinstance(value, dict):
+        strings = []
+        for item in value.values():
+            strings.extend(iter_compatibility_bridge_strings(item))
+        return strings
+    return []
+
+
 def validate_federation_upstream_compatibility(errors: list[str]) -> None:
     verdict_path = (
         ROOT
@@ -2650,10 +2682,17 @@ def validate_federation_upstream_compatibility(errors: list[str]) -> None:
     readme = read_text_or_none(readme_path) or ""
     parts = read_text_or_none(parts_path) or ""
     legacy_index = read_text_or_none(legacy_index_path) or ""
+    evals_config = read_text_or_none(ROOT / "config-templates" / "Configs" / "federation" / "aoa-evals.yaml") or ""
+    playbooks_config = (
+        read_text_or_none(ROOT / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml") or ""
+    )
+    bridge_config = compatibility_bridge_config(errors)
+    bridge_strings = iter_compatibility_bridge_strings(bridge_config)
 
     for required_snippet in (
         "single active bridge",
         "legacy/upstream-compatibility/INDEX.md",
+        "upstream-compatibility-bridge.json",
         "memo-recall-rerun",
         "automation-plans",
     ):
@@ -2663,37 +2702,35 @@ def validate_federation_upstream_compatibility(errors: list[str]) -> None:
                 f"must keep the lightweight bridge and mention `{required_snippet}`"
             )
 
-    for required_snippet in (
-        "memo-recall-rerun",
-        "phase-alpha-memo-recall-rerun",
-        "memo-contradiction-gap",
-        "memo-contradiction-rerun",
-        "playbook_automation_seeds.json",
-        "/playbooks/automation-plans",
-        "/playbooks/automation-seeds",
-        "compatibility_bridge_for",
-    ):
+    for required_snippet in ("memo-recall-rerun", "memo-contradiction-gap", "memo-contradiction-rerun"):
         if required_snippet not in legacy_index:
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
                 f"must classify `{required_snippet}`"
             )
-    for stale_snippet in (
-        "phase-alpha-memo-recall-rerun",
-        "playbook_automation_seeds.json",
-        "/playbooks/automation-seeds",
-        "compatibility_bridge_for",
-    ):
-        if stale_snippet in verdict:
+    for bridge_value in bridge_strings:
+        if any(marker in bridge_value for marker in ("phase-alpha", "a2a_wave", "playbook_automation_seeds", "seed_staging")):
+            if bridge_value not in legacy_index:
+                errors.append(
+                    "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                    f"must classify bridge value `{bridge_value}`"
+                )
+        if bridge_value in verdict and any(
+            marker in bridge_value for marker in ("phase-alpha", "a2a_wave", "playbook_automation_seeds", "seed_staging")
+        ):
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-                f"must keep detailed legacy value `{stale_snippet}` in legacy/upstream-compatibility/INDEX.md"
+                f"must keep detailed legacy value `{bridge_value}` in legacy/upstream-compatibility/INDEX.md"
             )
     for path, text in ((readme_path, readme), (parts_path, parts)):
         if "UPSTREAM_COMPATIBILITY.md" not in text:
             errors.append(
                 f"{path.relative_to(ROOT)} must route upstream compatibility names through UPSTREAM_COMPATIBILITY.md"
             )
+    if "phase-alpha" in evals_config:
+        errors.append("aoa-evals federation config must keep upstream memo template names in the bridge config")
+    if "playbook_automation_seeds" in playbooks_config:
+        errors.append("aoa-playbooks federation config must keep upstream automation file names in the bridge config")
 
 
 def validate_active_topology_language(errors: list[str]) -> None:
@@ -2802,14 +2839,11 @@ def validate_active_topology_language(errors: list[str]) -> None:
         errors.append("aoa-playbooks federation allowlist must not require the split-wave activation example")
 
     route_api = read_text_or_none(ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py") or ""
-    for required_snippet in (
-        "memo-recall-rerun",
-        "memo-contradiction-gap",
-        "memo-contradiction-rerun",
-        '"/playbooks/automation-plans"',
-        '"/playbooks/automation-plan"',
-        "RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES",
-    ):
+    bridge_config_text = read_text_or_none(UPSTREAM_COMPATIBILITY_BRIDGE_PATH) or ""
+    for required_snippet in ("memo-recall-rerun", "memo-contradiction-gap", "memo-contradiction-rerun"):
+        if required_snippet not in bridge_config_text:
+            errors.append(f"upstream compatibility bridge config must expose clean route `{required_snippet}`")
+    for required_snippet in ('"/playbooks/automation-plans"', '"/playbooks/automation-plan"', "upstream-compatibility-bridge.json"):
         if required_snippet not in route_api:
             errors.append(f"route-api must expose clean active bridge `{required_snippet}`")
     for required_bridge in (
@@ -2935,6 +2969,23 @@ def validate_federation_required_files(errors: list[str]) -> None:
                 f"{rel_path.as_posix()} must list required_files for runtime-loaded federation inputs: "
                 + ", ".join(missing_refs)
             )
+
+    bridge = compatibility_bridge_config(errors)
+    runtime_templates = bridge.get("runtime_evidence_templates", {})
+    if not isinstance(runtime_templates, dict) or not runtime_templates:
+        errors.append("upstream compatibility bridge must list runtime_evidence_templates")
+    else:
+        for route in ("memo-recall-rerun", "memo-contradiction-gap", "memo-contradiction-rerun"):
+            entry = runtime_templates.get(route)
+            if not isinstance(entry, dict):
+                errors.append(f"upstream compatibility bridge must list runtime template {route}")
+                continue
+            for key in ("canonical_selection_id", "local_source_ref", "upstream_source_ref", "upstream_selection_id"):
+                if not isinstance(entry.get(key), str) or not entry.get(key):
+                    errors.append(f"upstream compatibility bridge runtime template {route} must include {key}")
+    playbook_bridge = bridge.get("playbook_automation_plans")
+    if not isinstance(playbook_bridge, dict) or not playbook_bridge.get("upstream_rel_path"):
+        errors.append("upstream compatibility bridge must list playbook automation upstream_rel_path")
 
 
 def validate_reference_platform(errors: list[str]) -> None:
@@ -4113,9 +4164,12 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         / "upstream-compatibility"
         / "INDEX.md"
     ).read_text(encoding="utf-8")
+    bridge_config = compatibility_bridge_config(errors)
+    bridge_strings = iter_compatibility_bridge_strings(bridge_config)
     for snippet in (
         "single active bridge",
         "legacy/upstream-compatibility/INDEX.md",
+        "upstream-compatibility-bridge.json",
         "Clean local route",
     ):
         if snippet not in compatibility_doc:
@@ -4123,31 +4177,19 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
                 f"must keep the lightweight active bridge and mention {snippet}"
             )
-    for stale_snippet in (
-        "phase-alpha-memo-recall-rerun",
-        "phase-alpha-memo-contradiction-gap",
-        "phase-alpha-memo-contradiction-rerun",
-        "a2a_wave5_closeout_request",
-        "playbook_automation_seeds.json",
-        "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
-    ):
-        if stale_snippet in compatibility_doc:
+    for bridge_value in bridge_strings:
+        is_legacy_value = any(
+            marker in bridge_value for marker in ("phase-alpha", "a2a_wave", "playbook_automation_seeds", "seed_staging")
+        )
+        if is_legacy_value and bridge_value in compatibility_doc:
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-                f"must route detailed legacy value {stale_snippet} through legacy/upstream-compatibility/INDEX.md"
+                f"must route detailed legacy value {bridge_value} through legacy/upstream-compatibility/INDEX.md"
             )
-    for snippet in (
-        "phase-alpha-memo-recall-rerun",
-        "phase-alpha-memo-contradiction-gap",
-        "phase-alpha-memo-contradiction-rerun",
-        "a2a_wave5_closeout_request",
-        "playbook_automation_seeds.json",
-        "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
-    ):
-        if snippet not in compatibility_legacy_index:
+        if is_legacy_value and bridge_value not in compatibility_legacy_index:
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
-                f"must mention {snippet}"
+                f"must mention {bridge_value}"
             )
 
     evidence_schema = json.loads(
@@ -4278,8 +4320,12 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         errors.append("runtime A2A return closeout dry-run example must set live_automation false")
     if a2a_example.get("request_family") != "a2a-return-closeout":
         errors.append("runtime A2A return closeout dry-run example must set request_family a2a-return-closeout")
-    if a2a_example.get("upstream_request_kind") != "a2a_wave5_closeout_request":
-        errors.append("runtime A2A return closeout dry-run example must preserve upstream_request_kind")
+    if a2a_example.get("request_kind") != "a2a-return-closeout-request":
+        errors.append("runtime A2A return closeout dry-run example must set clean request_kind")
+    if "UPSTREAM_COMPATIBILITY_BRIDGE.a2a_return_closeout.upstream_request_kind" not in str(
+        a2a_example.get("upstream_request_kind", "")
+    ):
+        errors.append("runtime A2A return closeout dry-run example must route upstream_request_kind through the bridge")
 
 
 def validate_playbook_runtime_seam(errors: list[str]) -> None:

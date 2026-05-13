@@ -17,6 +17,11 @@ MODULE_PATH = (
     / "governed-runner"
     / "aoa_governed_execution.py"
 )
+BRIDGE_CONFIG = json.loads(
+    (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 def load_module():
@@ -679,9 +684,9 @@ class GovernedExecutionTests(unittest.TestCase):
             "docs/RECURRENCE_PROOF_PROGRAM.md",
             "examples/runtime_evidence_selection.workhorse-local.example.json",
             "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
-            "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-            "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-            "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-recall-rerun"]["upstream_source_ref"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-contradiction-gap"]["upstream_source_ref"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-contradiction-rerun"]["upstream_source_ref"],
             "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
         ):
             path = stack_root / "Knowledge" / "federation" / "aoa-evals" / rel_path

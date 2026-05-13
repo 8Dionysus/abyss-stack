@@ -11,14 +11,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-run-memo-contradiction-integrity"
 
-UPSTREAM_MEMO_CONTRADICTION_IDS = {
-    "closure_claim": "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history",
-    "pending_claim": "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff",
-    "retired_overread_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired",
-    "later_track_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track",
-    "supersession_audit": "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession",
-    "retraction_audit": "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction",
-}
+UPSTREAM_MEMO_CONTRADICTION_IDS = json.loads(
+    (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
+        encoding="utf-8"
+    )
+)["memo_contradiction_sidecar"]["upstream_memo_ids"]
 CLOSURE_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["closure_claim"]
 PENDING_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["pending_claim"]
 RETIRED_OVERREAD_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["retired_overread_claim"]

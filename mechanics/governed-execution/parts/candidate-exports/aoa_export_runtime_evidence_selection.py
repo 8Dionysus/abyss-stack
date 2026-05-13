@@ -22,43 +22,49 @@ def default_title(selection_id: str) -> str:
     return f"runtime evidence selection {selection_id}"
 
 
-MEMO_RUNTIME_EVIDENCE_COMPATIBILITY = {
-    "memo-recall-rerun": {
-        "local_source_ref": "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
-        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-        "selection_ids": {"memo-recall-rerun-v1", "phase-alpha-memo-recall-rerun-v1"},
-    },
-    "memo-contradiction-gap": {
-        "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-gap.example.json",
-        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-        "selection_ids": {"memo-contradiction-gap-v1", "phase-alpha-memo-contradiction-gap-v1"},
-    },
-    "memo-contradiction-rerun": {
-        "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
-        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
-        "selection_ids": {"memo-contradiction-rerun-v1", "phase-alpha-memo-contradiction-rerun-v1"},
-    },
-}
+BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
+RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH = Path("Configs/federation/upstream-compatibility-bridge.json")
 
 
-def compatibility_source_refs(name: str) -> set[str]:
-    compatibility = MEMO_RUNTIME_EVIDENCE_COMPATIBILITY[name]
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+def read_bridge(stack_root: Path) -> dict[str, Any]:
+    runtime_path = stack_root / RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH
+    source_path = find_repo_root(Path(__file__).resolve().parent) / BRIDGE_CONFIG_RELATIVE_PATH
+    for path in (runtime_path, source_path):
+        if path.exists():
+            return read_json(path)
+    raise SystemExit(f"error: missing upstream compatibility bridge config: expected {runtime_path} or {source_path}")
+
+
+def memo_runtime_evidence_compatibility(stack_root: Path) -> dict[str, dict[str, Any]]:
+    bridge = read_bridge(stack_root)
+    compatibility = bridge.get("runtime_evidence_templates")
+    if not isinstance(compatibility, dict):
+        raise SystemExit("error: upstream compatibility bridge must contain runtime_evidence_templates")
+    return {str(name): dict(value) for name, value in compatibility.items() if isinstance(value, dict)}
+
+
+def compatibility_source_refs(compatibility: dict[str, dict[str, Any]], name: str) -> set[str]:
+    entry = compatibility[name]
     return {
-        str(compatibility["local_source_ref"]),
-        str(compatibility["upstream_source_ref"]),
+        str(entry["local_source_ref"]),
+        str(entry["upstream_source_ref"]),
     }
 
 
-def compatibility_selection_ids(name: str) -> set[str]:
-    return set(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY[name]["selection_ids"])
-
-
-MEMO_RECALL_SOURCE_REFS = compatibility_source_refs("memo-recall-rerun")
-MEMO_CONTRADICTION_GAP_SOURCE_REFS = compatibility_source_refs("memo-contradiction-gap")
-MEMO_CONTRADICTION_RERUN_SOURCE_REFS = compatibility_source_refs("memo-contradiction-rerun")
-MEMO_RECALL_SELECTION_IDS = compatibility_selection_ids("memo-recall-rerun")
-MEMO_CONTRADICTION_GAP_SELECTION_IDS = compatibility_selection_ids("memo-contradiction-gap")
-MEMO_CONTRADICTION_RERUN_SELECTION_IDS = compatibility_selection_ids("memo-contradiction-rerun")
+def compatibility_selection_ids(compatibility: dict[str, dict[str, Any]], name: str) -> set[str]:
+    entry = compatibility[name]
+    return {str(entry["canonical_selection_id"]), str(entry["upstream_selection_id"])}
 
 
 def read_json(path: Path) -> dict:
@@ -88,20 +94,25 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     stack_root = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
+    memo_compatibility = memo_runtime_evidence_compatibility(stack_root)
+    memo_recall_source_refs = compatibility_source_refs(memo_compatibility, "memo-recall-rerun")
+    memo_contradiction_gap_source_refs = compatibility_source_refs(memo_compatibility, "memo-contradiction-gap")
+    memo_contradiction_rerun_source_refs = compatibility_source_refs(memo_compatibility, "memo-contradiction-rerun")
+    memo_recall_selection_ids = compatibility_selection_ids(memo_compatibility, "memo-recall-rerun")
+    memo_contradiction_gap_selection_ids = compatibility_selection_ids(memo_compatibility, "memo-contradiction-gap")
+    memo_contradiction_rerun_selection_ids = compatibility_selection_ids(memo_compatibility, "memo-contradiction-rerun")
     evals_root = stack_root / "Knowledge" / "federation" / "aoa-evals"
     schema_path = evals_root / "schemas" / "runtime-evidence-selection.schema.json"
     bench_guide_path = evals_root / "docs" / "RUNTIME_BENCH_PROMOTION_GUIDE.md"
     recurrence_path = evals_root / "docs" / "RECURRENCE_PROOF_PROGRAM.md"
     workhorse_example_path = evals_root / "examples" / "runtime_evidence_selection.workhorse-local.example.json"
     return_example_path = evals_root / "examples" / "runtime_evidence_selection.return-anchor-integrity.example.json"
-    memo_recall_example_path = (
-        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-recall-rerun"]["upstream_source_ref"])
-    )
+    memo_recall_example_path = evals_root / str(memo_compatibility["memo-recall-rerun"]["upstream_source_ref"])
     memo_contradiction_gap_example_path = (
-        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-contradiction-gap"]["upstream_source_ref"])
+        evals_root / str(memo_compatibility["memo-contradiction-gap"]["upstream_source_ref"])
     )
     memo_contradiction_rerun_example_path = (
-        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-contradiction-rerun"]["upstream_source_ref"])
+        evals_root / str(memo_compatibility["memo-contradiction-rerun"]["upstream_source_ref"])
     )
 
     input_path = Path(args.input_file).resolve()
@@ -129,11 +140,11 @@ def main() -> int:
             return_example_path,
         ],
     }
-    for ref in MEMO_RECALL_SOURCE_REFS:
+    for ref in memo_recall_source_refs:
         example_contract_refs[ref] = [memo_recall_example_path]
-    for ref in MEMO_CONTRADICTION_GAP_SOURCE_REFS:
+    for ref in memo_contradiction_gap_source_refs:
         example_contract_refs[ref] = [memo_contradiction_gap_example_path]
-    for ref in MEMO_CONTRADICTION_RERUN_SOURCE_REFS:
+    for ref in memo_contradiction_rerun_source_refs:
         example_contract_refs[ref] = [memo_contradiction_rerun_example_path]
 
     if isinstance(source_example_ref, str) and source_example_ref in example_contract_refs:
@@ -142,15 +153,15 @@ def main() -> int:
         ref_paths.extend([f"local:{recurrence_path}", f"local:{return_example_path}"])
     elif (
         any(ref == "candidate:aoa-memo-recall-integrity" for ref in candidate_eval_refs)
-        or selection_id in MEMO_RECALL_SELECTION_IDS
+        or selection_id in memo_recall_selection_ids
     ):
         ref_paths.append(f"local:{memo_recall_example_path}")
     elif (
         any(ref == "candidate:aoa-memo-contradiction-integrity" for ref in candidate_eval_refs)
-        or selection_id in MEMO_CONTRADICTION_GAP_SELECTION_IDS
-        or selection_id in MEMO_CONTRADICTION_RERUN_SELECTION_IDS
+        or selection_id in memo_contradiction_gap_selection_ids
+        or selection_id in memo_contradiction_rerun_selection_ids
     ):
-        if selection_id in MEMO_CONTRADICTION_RERUN_SELECTION_IDS:
+        if selection_id in memo_contradiction_rerun_selection_ids:
             ref_paths.append(f"local:{memo_contradiction_rerun_example_path}")
         else:
             ref_paths.append(f"local:{memo_contradiction_gap_example_path}")

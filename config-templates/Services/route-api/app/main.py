@@ -13,6 +13,7 @@ from pydantic import BaseModel, model_validator
 
 
 CONFIG_DIR = Path(os.environ.get("ROUTE_API_CONFIG_DIR", "/app/config"))
+COMPATIBILITY_BRIDGE_CONFIG = "upstream-compatibility-bridge.json"
 REQUIRED_CONFIGS = {
     "aoa-agents": "aoa-agents.yaml",
     "aoa-routing": "aoa-routing.yaml",
@@ -22,55 +23,10 @@ REQUIRED_CONFIGS = {
     "aoa-kag": "aoa-kag.yaml",
     "tos-source": "tos-source.yaml",
 }
-
-
-@dataclass(frozen=True)
-class RuntimeEvidenceTemplateCompatibility:
-    canonical_selection_id: str
-    upstream_source_ref: str
-    upstream_selection_id: str
-    bridge_names: tuple[str, ...] = ()
-
-
-RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY = {
-    "memo-recall-rerun": RuntimeEvidenceTemplateCompatibility(
-        canonical_selection_id="memo-recall-rerun-v1",
-        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-        upstream_selection_id="phase-alpha-memo-recall-rerun-v1",
-        bridge_names=("phase-alpha-memo-recall-rerun",),
-    ),
-    "memo-contradiction-gap": RuntimeEvidenceTemplateCompatibility(
-        canonical_selection_id="memo-contradiction-gap-v1",
-        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-        upstream_selection_id="phase-alpha-memo-contradiction-gap-v1",
-        bridge_names=("phase-alpha-memo-contradiction-gap",),
-    ),
-    "memo-contradiction-rerun": RuntimeEvidenceTemplateCompatibility(
-        canonical_selection_id="memo-contradiction-rerun-v1",
-        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
-        upstream_selection_id="phase-alpha-memo-contradiction-rerun-v1",
-        bridge_names=("phase-alpha-memo-contradiction-rerun",),
-    ),
-}
-RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
+BASE_RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
     "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
     "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
-    **{
-        name: compatibility.upstream_source_ref
-        for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
-    },
 }
-RUNTIME_EVIDENCE_TEMPLATE_CANONICAL_SELECTION_IDS = {
-    name: compatibility.canonical_selection_id
-    for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
-}
-RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES = {
-    bridge_name: name
-    for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
-    for bridge_name in compatibility.bridge_names
-}
-UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF = "aoa-playbooks/generated/playbook_automation_seeds.json"
-UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_REL_PATH = UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF.removeprefix("aoa-playbooks/")
 
 
 @dataclass(frozen=True)
@@ -92,6 +48,7 @@ class AppStore:
     playbooks: LayerStore
     kag: LayerStore
     tos_source: LayerStore
+    compatibility_bridge: dict[str, Any]
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -111,6 +68,68 @@ def load_json(path: Path) -> dict[str, Any]:
         raise RuntimeError(f"required mirrored JSON missing: {path}") from exc
     if not isinstance(payload, dict):
         raise RuntimeError(f"mirrored JSON must be an object: {path}")
+    return payload
+
+
+def require_mapping(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{label} must be an object")
+    return value
+
+
+def require_string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise RuntimeError(f"{label} must be a non-empty string")
+    return value
+
+
+def load_compatibility_bridge(config_dir: Path) -> dict[str, Any]:
+    bridge = load_json(config_dir / COMPATIBILITY_BRIDGE_CONFIG)
+    if bridge.get("artifact_kind") != "abyss-stack.upstream-compatibility-bridge":
+        raise RuntimeError("upstream compatibility bridge config has an unexpected artifact_kind")
+    for section in (
+        "runtime_evidence_templates",
+        "playbook_automation_plans",
+        "a2a_return_closeout",
+        "memo_contradiction_sidecar",
+        "rpg_runtime_projection",
+    ):
+        require_mapping(bridge.get(section), f"upstream compatibility bridge {section}")
+    return bridge
+
+
+def runtime_evidence_template_bridge(bridge: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_templates = require_mapping(bridge.get("runtime_evidence_templates"), "runtime evidence template bridge")
+    templates: dict[str, dict[str, Any]] = {}
+    for name, payload in raw_templates.items():
+        if not isinstance(name, str) or not name:
+            raise RuntimeError("runtime evidence template bridge names must be non-empty strings")
+        templates[name] = require_mapping(payload, f"runtime evidence template bridge {name}")
+    return templates
+
+
+def runtime_evidence_template_source_refs(bridge: dict[str, Any]) -> dict[str, str]:
+    refs = dict(BASE_RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS)
+    for name, payload in runtime_evidence_template_bridge(bridge).items():
+        refs[name] = require_string(payload.get("upstream_source_ref"), f"{name}.upstream_source_ref")
+    return refs
+
+
+def runtime_evidence_template_bridge_names(bridge: dict[str, Any]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for local_name, payload in runtime_evidence_template_bridge(bridge).items():
+        bridge_names = payload.get("bridge_names", [])
+        if not isinstance(bridge_names, list):
+            raise RuntimeError(f"{local_name}.bridge_names must be a list")
+        for bridge_name in bridge_names:
+            names[require_string(bridge_name, f"{local_name}.bridge_names entry")] = local_name
+    return names
+
+
+def playbook_automation_bridge(bridge: dict[str, Any]) -> dict[str, Any]:
+    payload = require_mapping(bridge.get("playbook_automation_plans"), "playbook automation bridge")
+    require_string(payload.get("upstream_source_ref"), "playbook automation upstream_source_ref")
+    require_string(payload.get("upstream_rel_path"), "playbook automation upstream_rel_path")
     return payload
 
 
@@ -246,8 +265,14 @@ def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path
     )
 
 
-def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+def load_evals_layer(
+    config_path: Path,
+    config: dict[str, Any],
+    mirror_root: Path,
+    compatibility_bridge: dict[str, Any],
+) -> LayerStore:
     required_files = validated_required_files(config, mirror_root)
+    template_source_refs = runtime_evidence_template_source_refs(compatibility_bridge)
     payloads = {
         "catalog": load_json(mirror_root / "generated/eval_catalog.min.json"),
         "capsules": load_json(mirror_root / "generated/eval_capsules.json"),
@@ -256,7 +281,7 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
         "runtime_candidate_template_index": load_json(mirror_root / "generated/runtime_candidate_template_index.min.json"),
         "runtime_evidence_templates": {
             name: load_json(mirror_root / rel_path)
-            for name, rel_path in RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS.items()
+            for name, rel_path in template_source_refs.items()
         },
         "hook_templates": {
             "self-agent-checkpoint-rollout": load_json(
@@ -285,8 +310,14 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
     )
 
 
-def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
+def load_playbooks_layer(
+    config_path: Path,
+    config: dict[str, Any],
+    mirror_root: Path,
+    compatibility_bridge: dict[str, Any],
+) -> LayerStore:
     required_files = validated_required_files(config, mirror_root)
+    automation_bridge = playbook_automation_bridge(compatibility_bridge)
     payloads = {
         "registry": load_json(mirror_root / "generated/playbook_registry.min.json"),
         "activation": load_json_value(mirror_root / "generated/playbook_activation_surfaces.min.json"),
@@ -296,7 +327,7 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
         "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
         "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
         "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
-        "automation_plans": load_json(mirror_root / UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_REL_PATH),
+        "automation_plans": load_json(mirror_root / automation_bridge["upstream_rel_path"]),
         "composition_manifest": load_json(mirror_root / "generated/playbook_composition_manifest.json"),
     }
 
@@ -376,7 +407,7 @@ def load_tos_source_layer(config_path: Path, config: dict[str, Any], mirror_root
     )
 
 
-def load_layer(config_path: Path) -> LayerStore:
+def load_layer(config_path: Path, compatibility_bridge: dict[str, Any]) -> LayerStore:
     config = load_yaml(config_path)
     layer = config.get("layer")
     if not isinstance(layer, str) or not layer:
@@ -394,9 +425,9 @@ def load_layer(config_path: Path) -> LayerStore:
     if layer == "aoa-memo":
         return load_memo_layer(config_path, config, mirror_root)
     if layer == "aoa-evals":
-        return load_evals_layer(config_path, config, mirror_root)
+        return load_evals_layer(config_path, config, mirror_root, compatibility_bridge)
     if layer == "aoa-playbooks":
-        return load_playbooks_layer(config_path, config, mirror_root)
+        return load_playbooks_layer(config_path, config, mirror_root, compatibility_bridge)
     if layer == "aoa-kag":
         return load_kag_layer(config_path, config, mirror_root)
     if layer == "tos-source":
@@ -405,9 +436,10 @@ def load_layer(config_path: Path) -> LayerStore:
 
 
 def load_store(config_dir: Path) -> AppStore:
+    compatibility_bridge = load_compatibility_bridge(config_dir)
     loaded_layers: dict[str, LayerStore] = {}
     for layer, file_name in REQUIRED_CONFIGS.items():
-        loaded = load_layer(config_dir / file_name)
+        loaded = load_layer(config_dir / file_name, compatibility_bridge)
         if loaded.layer != layer:
             raise RuntimeError(f"route-api config mismatch for {file_name}: expected {layer}, got {loaded.layer}")
         loaded_layers[layer] = loaded
@@ -420,6 +452,7 @@ def load_store(config_dir: Path) -> AppStore:
         playbooks=loaded_layers["aoa-playbooks"],
         kag=loaded_layers["aoa-kag"],
         tos_source=loaded_layers["tos-source"],
+        compatibility_bridge=compatibility_bridge,
     )
 
 
@@ -816,6 +849,13 @@ def playbook_automation_plan_entries_for_layer(layer: LayerStore) -> list[dict[s
     return entries if isinstance(entries, list) else []
 
 
+def playbook_automation_source_ref(store: AppStore) -> str:
+    return require_string(
+        playbook_automation_bridge(store.compatibility_bridge).get("upstream_source_ref"),
+        "playbook automation upstream_source_ref",
+    )
+
+
 def kag_payload(store: AppStore, key: str) -> dict[str, Any]:
     return store.kag.payloads[key]
 
@@ -935,7 +975,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
     if subagent_recipes:
         source_files.append("aoa-playbooks/generated/playbook_subagent_recipes.json")
     if automation_plans:
-        source_files.append(UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF)
+        source_files.append(playbook_automation_source_ref(store))
 
     return {
         "playbook_id": playbook_id,
@@ -1479,26 +1519,31 @@ def resolve_eval_comparison(store: AppStore, baseline_mode: str | None) -> dict[
 
 
 def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> dict[str, Any]:
-    canonical_name = RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES.get(template_name, template_name)
+    template_bridge = runtime_evidence_template_bridge(store.compatibility_bridge)
+    bridge_names = runtime_evidence_template_bridge_names(store.compatibility_bridge)
+    template_source_refs = runtime_evidence_template_source_refs(store.compatibility_bridge)
+    canonical_name = bridge_names.get(template_name, template_name)
+    if canonical_name not in evals_payload(store, "runtime_evidence_templates"):
+        raise HTTPException(status_code=404, detail="unknown runtime evidence template")
     template = evals_payload(store, "runtime_evidence_templates")[canonical_name]
-    rel_path = RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS[canonical_name]
+    rel_path = template_source_refs[canonical_name]
+    compatibility = template_bridge.get(canonical_name)
     payload: dict[str, Any] = {
         "ok": True,
         "name": canonical_name,
         "requested_name": template_name,
-        "canonical_selection_id": RUNTIME_EVIDENCE_TEMPLATE_CANONICAL_SELECTION_IDS.get(canonical_name),
+        "canonical_selection_id": compatibility.get("canonical_selection_id") if compatibility else None,
         "template": template,
         "source_files": [
             "aoa-evals/generated/runtime_candidate_template_index.min.json",
             f"aoa-evals/{rel_path}",
         ],
     }
-    compatibility = RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.get(canonical_name)
     if compatibility is not None:
         payload["upstream_contract"] = {
-            "owner_repo": "aoa-evals",
-            "source_ref": f"aoa-evals/{compatibility.upstream_source_ref}",
-            "selection_id": compatibility.upstream_selection_id,
+            "owner_repo": compatibility.get("owner_repo", "aoa-evals"),
+            "source_ref": f"aoa-evals/{compatibility['upstream_source_ref']}",
+            "selection_id": compatibility["upstream_selection_id"],
             "local_route": canonical_name,
         }
     if template_name != canonical_name:
@@ -1802,16 +1847,7 @@ class EvalComparisonRequest(BaseModel):
 
 
 class RuntimeEvidenceTemplateRequest(BaseModel):
-    name: Literal[
-        "workhorse-local",
-        "return-anchor-integrity",
-        "memo-recall-rerun",
-        "memo-contradiction-gap",
-        "memo-contradiction-rerun",
-        "phase-alpha-memo-recall-rerun",
-        "phase-alpha-memo-contradiction-gap",
-        "phase-alpha-memo-contradiction-rerun",
-    ]
+    name: str
 
 
 class HookTemplateRequest(BaseModel):
@@ -2316,7 +2352,7 @@ def playbooks_automation_plans() -> dict[str, Any]:
     return {
         "ok": True,
         "data": {"plans": playbook_automation_plan_entries(store)},
-        "source_files": [UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
+        "source_files": [playbook_automation_source_ref(store)],
     }
 
 
@@ -2381,7 +2417,7 @@ def playbooks_failure(request: PlaybookFailureRequest) -> dict[str, Any]:
             "aoa-playbooks/generated/playbook_federation_surfaces.min.json",
             "aoa-playbooks/generated/playbook_handoff_contracts.json",
             "aoa-playbooks/generated/playbook_subagent_recipes.json",
-            UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF,
+            playbook_automation_source_ref(store),
         ],
     }
 
@@ -2406,7 +2442,7 @@ def playbooks_automation_plan(request: PlaybookAutomationPlanRequest) -> dict[st
         "ok": True,
         "name": request.name,
         "plan": plan,
-        "source_files": [UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
+        "source_files": [playbook_automation_source_ref(store)],
     }
 
 

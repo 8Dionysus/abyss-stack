@@ -12,8 +12,8 @@
   "closeout_id": "closeout-example-child",
   "session_ref": "session:example",
   "request_family": "a2a-return-closeout",
-  "request_kind": "a2a_wave5_closeout_request",
-  "upstream_request_kind": "a2a_wave5_closeout_request",
+  "request_kind": "a2a-return-closeout-request",
+  "upstream_request_kind": "UPSTREAM_COMPATIBILITY_BRIDGE.a2a_return_closeout.upstream_request_kind",
   "source_input_ref": "local:/srv/AbyssOS/aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
   "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "reviewed": true,
@@ -87,7 +87,7 @@
     }
   ],
   "contract_refs": [
-    "repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md",
+    "UPSTREAM_COMPATIBILITY_BRIDGE.a2a_return_closeout.upstream_doc_ref",
     "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json",
     "repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json",
     "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md",
@@ -104,7 +104,7 @@
   ],
   "candidate_payload": {
     "schema_version": 1,
-    "request_kind": "a2a_wave5_closeout_request",
+    "request_kind": "UPSTREAM_COMPATIBILITY_BRIDGE.a2a_return_closeout.upstream_request_kind",
     "closeout_id": "closeout-example-child",
     "session_ref": "session:example",
     "reviewed": true,

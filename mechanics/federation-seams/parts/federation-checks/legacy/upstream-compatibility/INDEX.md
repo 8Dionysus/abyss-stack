@@ -18,6 +18,40 @@ expect them.
 | `/playbooks/automation-plan` | `/playbooks/automation-seeds`, `/playbooks/automation-seed` | route-api compatibility bridge for `aoa-playbooks` consumers | old callers may still use the previous endpoint names; responses must report `compatibility_bridge_for` | runtime callers stop using the compatibility endpoints |
 | `rpg-runtime-projection` | `Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md` | `Dionysus` | `Dionysus` currently owns seed garden and prep-pack staging; `abyss-stack` only points to it as an owner handoff route | Dionysus plants the prep pack into a stronger owner route or publishes a clean non-seed handoff path |
 
+## Bridge Payload Inventory
+
+The active bridge config may contain the following old upstream values because
+runtime code still has to accept or locate them at explicit compatibility
+boundaries:
+
+- `examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json`
+- `phase-alpha-memo-recall-rerun-v1`
+- `phase-alpha-memo-recall-rerun`
+- `examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json`
+- `phase-alpha-memo-contradiction-gap-v1`
+- `phase-alpha-memo-contradiction-gap`
+- `examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json`
+- `phase-alpha-memo-contradiction-rerun-v1`
+- `phase-alpha-memo-contradiction-rerun`
+- `aoa-playbooks/generated/playbook_automation_seeds.json`
+- `generated/playbook_automation_seeds.json`
+- `a2a_wave5_closeout_request`
+- `memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history`
+- `memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff`
+- `memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired`
+- `memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track`
+- `memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession`
+- `memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction`
+- `Logs/phase-alpha/alpha-05-restartable-inquiry-loop/next_pass_brief.md`
+- `Logs/phase-alpha/alpha-05-restartable-inquiry-loop/memory_delta.json`
+- `Logs/phase-alpha/alpha-05-restartable-inquiry-loop/contradiction_map.json`
+- `Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/failure_map.json`
+- `Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/handoff_record.json`
+- `Logs/phase-alpha/alpha-06-validation-driven-remediation-recall-rerun/remediation_decision.json`
+- `phase-alpha.contradiction-map`
+- `Dionysus/seed_staging/rpg/seed_rpg_architecture_rfc_pack.md`
+- `Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md`
+
 ## Retirement Procedure
 
 1. Confirm the stronger owner published the clean replacement.

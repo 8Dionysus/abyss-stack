@@ -18,6 +18,7 @@ The local runtime family is `a2a-return-closeout`; the accepted upstream
 
 - `artifact_kind`: `aoa.runtime-a2a-return-closeout-dry-run`
 - `request_family`: `a2a-return-closeout`
+- `request_kind`: `a2a-return-closeout-request`
 - `upstream_request_kind`: accepted SDK compatibility request kind
 - `dry_run`: `true`
 - `live_automation`: `false`
@@ -86,7 +87,7 @@ Use `--write` only when a private runtime-local candidate file is wanted.
 
 ## Owner Refs
 
-- `repo:aoa-sdk/docs/A2A_WAVE5_CODEX_RETURN_CHECKPOINT.md`
+- SDK reviewed closeout doc ref from `upstream-compatibility-bridge.json`
 - `repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`
 - `repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md`
 - `repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json`

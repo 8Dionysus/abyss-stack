@@ -10,7 +10,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-a2a-return-closeout-dry-run"
-UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = "a2a_wave5_closeout_request"
+BRIDGE_CONFIG = json.loads(
+    (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
+        encoding="utf-8"
+    )
+)["a2a_return_closeout"]
+LOCAL_REQUEST_KIND = BRIDGE_CONFIG["local_request_kind"]
+UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = BRIDGE_CONFIG["upstream_request_kind"]
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -90,7 +96,7 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
                 ["aoa-session-donor-harvest", "aoa-session-progression-lift", "aoa-quest-harvest"],
             )
             self.assertEqual(artifact["request_family"], "a2a-return-closeout")
-            self.assertEqual(artifact["request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
+            self.assertEqual(artifact["request_kind"], LOCAL_REQUEST_KIND)
             self.assertEqual(artifact["upstream_request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
             self.assertIn(
                 "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
@@ -105,7 +111,7 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {
-                "fixture_id": "wave5-a2a-summon-return-checkpoint-e2e",
+                "fixture_id": "a2a-return-closeout-e2e",
                 "dry_run": True,
                 "live_automation": False,
                 "reviewed_closeout_request": reviewed_closeout_payload(),
@@ -114,7 +120,7 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             artifact = json.loads(result.stdout)
 
-            self.assertEqual(artifact["request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
+            self.assertEqual(artifact["request_kind"], LOCAL_REQUEST_KIND)
             self.assertEqual(artifact["candidate_payload"]["closeout_id"], "closeout-example-child")
             self.assertTrue(artifact["runtime_receipt_candidate"]["dry_run"])
             self.assertFalse(artifact["runtime_receipt_candidate"]["live_automation"])

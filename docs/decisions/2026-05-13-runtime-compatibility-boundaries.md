@@ -22,19 +22,22 @@ source truth.
 Keep clean `abyss-stack` active names at the local route boundary and preserve
 old upstream names only behind one explicit compatibility bridge.
 
-The active bridge is
+The active route card is
 `mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`.
+The machine-readable bridge data lives in
+`config-templates/Configs/federation/upstream-compatibility-bridge.json`.
 Detailed upstream IDs, lineage notes, and removal triggers live under
 `mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md`.
 Code that still accepts those values must isolate them behind compatibility
-constants, upstream-contract response fields, or explicit historical fallbacks.
+config reads, upstream-contract response fields, or explicit historical
+fallbacks.
 
 ## Consequences
 
 - Route-api and runtime adapters can continue to consume existing sibling
   mirrors without exposing old names as local topology.
-- A2A return dry-run artifacts now carry the clean local `request_family`
-  alongside the upstream SDK `request_kind`.
+- A2A return dry-run artifacts now carry clean local `request_family` and
+  `request_kind` values alongside the upstream SDK compatibility kind.
 - Memo contradiction sidecar reports now state which upstream eval selection,
   memo IDs, and historical log paths were consumed.
 - Future cleanup should remove legacy-index entries only after the stronger

@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import tempfile
 import types
@@ -19,6 +20,11 @@ def find_repo_root(start: Path) -> Path:
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
 MODULE_PATH = REPO_ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py"
+BRIDGE_CONFIG = json.loads(
+    (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 def load_module():
@@ -89,6 +95,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.addCleanup(temp_dir.cleanup)
         root = Path(temp_dir.name)
         module = self.module
+        runtime_templates = BRIDGE_CONFIG["runtime_evidence_templates"]
 
         return module.AppStore(
             agents=module.LayerStore(
@@ -204,13 +211,13 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "runtime_evidence_templates": {
                         "workhorse-local": {},
                         "memo-recall-rerun": {
-                            "selection_id": "phase-alpha-memo-recall-rerun-v1"
+                            "selection_id": runtime_templates["memo-recall-rerun"]["upstream_selection_id"]
                         },
                         "memo-contradiction-gap": {
-                            "selection_id": "phase-alpha-memo-contradiction-gap-v1"
+                            "selection_id": runtime_templates["memo-contradiction-gap"]["upstream_selection_id"]
                         },
                         "memo-contradiction-rerun": {
-                            "selection_id": "phase-alpha-memo-contradiction-rerun-v1"
+                            "selection_id": runtime_templates["memo-contradiction-rerun"]["upstream_selection_id"]
                         },
                     },
                     "hook_templates": {"restartable-inquiry-loop": {}},
@@ -345,6 +352,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "tiny_entry_surface": {"route_id": "route-1"},
                 },
             ),
+            compatibility_bridge=BRIDGE_CONFIG,
         )
 
     def test_health_reports_closure_summary_when_all_layers_are_ready(self) -> None:
@@ -381,11 +389,14 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["canonical_selection_id"], "memo-recall-rerun-v1")
-        self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-recall-rerun-v1")
+        self.assertEqual(
+            payload["template"]["selection_id"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-recall-rerun"]["upstream_selection_id"],
+        )
         self.assertEqual(payload["upstream_contract"]["local_route"], "memo-recall-rerun")
         self.assertEqual(payload["upstream_contract"]["owner_repo"], "aoa-evals")
         self.assertIn(
-            "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+            f"aoa-evals/{BRIDGE_CONFIG['runtime_evidence_templates']['memo-recall-rerun']['upstream_source_ref']}",
             payload["source_files"],
         )
 
@@ -394,12 +405,15 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
 
         payload = self.module.resolve_runtime_evidence_template(
             store,
-            "phase-alpha-memo-recall-rerun",
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-recall-rerun"]["bridge_names"][0],
         )
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["name"], "memo-recall-rerun")
-        self.assertEqual(payload["requested_name"], "phase-alpha-memo-recall-rerun")
+        self.assertEqual(
+            payload["requested_name"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-recall-rerun"]["bridge_names"][0],
+        )
         self.assertEqual(payload["compatibility_bridge_for"], "memo-recall-rerun")
 
     def test_memo_contradiction_gap_runtime_evidence_template_resolves_source_files(self) -> None:
@@ -412,9 +426,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["canonical_selection_id"], "memo-contradiction-gap-v1")
-        self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-gap-v1")
+        self.assertEqual(
+            payload["template"]["selection_id"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-contradiction-gap"]["upstream_selection_id"],
+        )
         self.assertIn(
-            "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+            f"aoa-evals/{BRIDGE_CONFIG['runtime_evidence_templates']['memo-contradiction-gap']['upstream_source_ref']}",
             payload["source_files"],
         )
 
@@ -428,9 +445,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["canonical_selection_id"], "memo-contradiction-rerun-v1")
-        self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-rerun-v1")
+        self.assertEqual(
+            payload["template"]["selection_id"],
+            BRIDGE_CONFIG["runtime_evidence_templates"]["memo-contradiction-rerun"]["upstream_selection_id"],
+        )
         self.assertIn(
-            "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+            f"aoa-evals/{BRIDGE_CONFIG['runtime_evidence_templates']['memo-contradiction-rerun']['upstream_source_ref']}",
             payload["source_files"],
         )
 
