@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-a2a-return-closeout-dry-run"
+UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = "a2a_wave5_closeout_request"
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -20,7 +21,7 @@ def write_json(path: Path, payload: dict) -> None:
 def reviewed_closeout_payload() -> dict:
     return {
         "schema_version": 1,
-        "request_kind": "a2a_wave5_closeout_request",
+        "request_kind": UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND,
         "closeout_id": "closeout-example-child",
         "session_ref": "session:example",
         "reviewed": True,
@@ -88,6 +89,9 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
                 artifact["runtime_receipt_candidate"]["checkpoint_bridge_steps"],
                 ["aoa-session-donor-harvest", "aoa-session-progression-lift", "aoa-quest-harvest"],
             )
+            self.assertEqual(artifact["request_family"], "a2a-return-closeout")
+            self.assertEqual(artifact["request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
+            self.assertEqual(artifact["upstream_request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
             self.assertIn(
                 "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json",
                 artifact["contract_refs"],
@@ -110,7 +114,7 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             artifact = json.loads(result.stdout)
 
-            self.assertEqual(artifact["request_kind"], "a2a_wave5_closeout_request")
+            self.assertEqual(artifact["request_kind"], UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND)
             self.assertEqual(artifact["candidate_payload"]["closeout_id"], "closeout-example-child")
             self.assertTrue(artifact["runtime_receipt_candidate"]["dry_run"])
             self.assertFalse(artifact["runtime_receipt_candidate"]["live_automation"])

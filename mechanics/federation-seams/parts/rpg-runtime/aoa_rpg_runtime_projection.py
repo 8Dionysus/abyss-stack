@@ -36,6 +36,7 @@ ROUTING_REF = "aoa-routing/generated/rpg_navigation.min.example.json#nav.AOA-P-0
 CAMPAIGN_REF = "aoa-playbooks/examples/questline_outline.example.yaml#AOA-PB-CAMP-0001"
 CHRONICLE_REF = "aoa-memo/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
 OVERLAY_REF = "Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
+DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF = "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md"
 
 
 def read_json(path: Path) -> dict:
@@ -150,7 +151,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         },
         {
             "action": "handoff",
-            "target_ref": "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
+            "target_ref": DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF,
             "note": "Sync the Dionysus prep-pack lineage after the runtime body lands.",
         },
     ]
@@ -187,7 +188,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
     bundle["views"]["campaign_lane_cards"][0]["recommended_build_refs"] = [build_ref]
-    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md"
+    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = DIONYSUS_RPG_RUNTIME_PROJECTION_PREP_PACK_REF
     bundle["views"]["progression_timeline_entries"][0]["summary"] = (
         "Filesystem-first runtime collections were materialized without turning projection bundles into authority."
     )

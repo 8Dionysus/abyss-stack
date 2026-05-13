@@ -2635,10 +2635,33 @@ def validate_federation_upstream_compatibility(errors: list[str]) -> None:
         / "README.md"
     )
     parts_path = ROOT / "mechanics" / "federation-seams" / "PARTS.md"
+    legacy_index_path = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "federation-checks"
+        / "legacy"
+        / "upstream-compatibility"
+        / "INDEX.md"
+    )
 
     verdict = read_text_or_none(verdict_path) or ""
     readme = read_text_or_none(readme_path) or ""
     parts = read_text_or_none(parts_path) or ""
+    legacy_index = read_text_or_none(legacy_index_path) or ""
+
+    for required_snippet in (
+        "single active bridge",
+        "legacy/upstream-compatibility/INDEX.md",
+        "memo-recall-rerun",
+        "automation-plans",
+    ):
+        if required_snippet not in verdict:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
+                f"must keep the lightweight bridge and mention `{required_snippet}`"
+            )
 
     for required_snippet in (
         "memo-recall-rerun",
@@ -2648,12 +2671,23 @@ def validate_federation_upstream_compatibility(errors: list[str]) -> None:
         "playbook_automation_seeds.json",
         "/playbooks/automation-plans",
         "/playbooks/automation-seeds",
-        "compatibility_alias_for",
+        "compatibility_bridge_for",
     ):
-        if required_snippet not in verdict:
+        if required_snippet not in legacy_index:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                f"must classify `{required_snippet}`"
+            )
+    for stale_snippet in (
+        "phase-alpha-memo-recall-rerun",
+        "playbook_automation_seeds.json",
+        "/playbooks/automation-seeds",
+        "compatibility_bridge_for",
+    ):
+        if stale_snippet in verdict:
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-                f"must classify `{required_snippet}`"
+                f"must keep detailed legacy value `{stale_snippet}` in legacy/upstream-compatibility/INDEX.md"
             )
     for path, text in ((readme_path, readme), (parts_path, parts)):
         if "UPSTREAM_COMPATIBILITY.md" not in text:
@@ -2774,14 +2808,14 @@ def validate_active_topology_language(errors: list[str]) -> None:
         "memo-contradiction-rerun",
         '"/playbooks/automation-plans"',
         '"/playbooks/automation-plan"',
-        "RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES",
+        "RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES",
     ):
         if required_snippet not in route_api:
-            errors.append(f"route-api must expose clean active alias `{required_snippet}`")
+            errors.append(f"route-api must expose clean active bridge `{required_snippet}`")
     for required_bridge in (
         '"/playbooks/automation-seeds"',
         '"/playbooks/automation-seed"',
-        "compatibility_alias_for",
+        "compatibility_bridge_for",
     ):
         if required_bridge not in route_api:
             errors.append(f"route-api must preserve compatibility bridge `{required_bridge}`")
@@ -4060,6 +4094,62 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         if snippet not in seam_doc:
             errors.append(f"mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
 
+    compatibility_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "federation-checks"
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY.md"
+    ).read_text(encoding="utf-8")
+    compatibility_legacy_index = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "federation-checks"
+        / "legacy"
+        / "upstream-compatibility"
+        / "INDEX.md"
+    ).read_text(encoding="utf-8")
+    for snippet in (
+        "single active bridge",
+        "legacy/upstream-compatibility/INDEX.md",
+        "Clean local route",
+    ):
+        if snippet not in compatibility_doc:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
+                f"must keep the lightweight active bridge and mention {snippet}"
+            )
+    for stale_snippet in (
+        "phase-alpha-memo-recall-rerun",
+        "phase-alpha-memo-contradiction-gap",
+        "phase-alpha-memo-contradiction-rerun",
+        "a2a_wave5_closeout_request",
+        "playbook_automation_seeds.json",
+        "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
+    ):
+        if stale_snippet in compatibility_doc:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
+                f"must route detailed legacy value {stale_snippet} through legacy/upstream-compatibility/INDEX.md"
+            )
+    for snippet in (
+        "phase-alpha-memo-recall-rerun",
+        "phase-alpha-memo-contradiction-gap",
+        "phase-alpha-memo-contradiction-rerun",
+        "a2a_wave5_closeout_request",
+        "playbook_automation_seeds.json",
+        "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
+    ):
+        if snippet not in compatibility_legacy_index:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                f"must mention {snippet}"
+            )
+
     evidence_schema = json.loads(
         (
             ROOT
@@ -4137,7 +4227,9 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
     ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-a2a-return-closeout-dry-run",
-        "a2a_wave5_closeout_request",
+        "request_family",
+        "upstream_request_kind",
+        "UPSTREAM_COMPATIBILITY.md",
         "dry_run",
         "live_automation",
         "Logs/a2a-return-closeouts/",
@@ -4184,6 +4276,10 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         errors.append("runtime A2A return closeout dry-run example must set dry_run true")
     if a2a_example.get("live_automation") is not False:
         errors.append("runtime A2A return closeout dry-run example must set live_automation false")
+    if a2a_example.get("request_family") != "a2a-return-closeout":
+        errors.append("runtime A2A return closeout dry-run example must set request_family a2a-return-closeout")
+    if a2a_example.get("upstream_request_kind") != "a2a_wave5_closeout_request":
+        errors.append("runtime A2A return closeout dry-run example must preserve upstream_request_kind")
 
 
 def validate_playbook_runtime_seam(errors: list[str]) -> None:

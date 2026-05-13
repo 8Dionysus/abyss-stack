@@ -13,6 +13,8 @@ from typing import Any
 
 
 SCRIPT_NAME = "scripts/aoa-a2a-return-closeout-dry-run"
+LOCAL_REQUEST_FAMILY = "a2a-return-closeout"
+UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND = "a2a_wave5_closeout_request"
 PLAYBOOK_REF = "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md"
 EVAL_HOOK_REF = "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json"
 MEMO_WRITEBACK_REF = "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md"
@@ -52,7 +54,7 @@ def ensure_reviewed(payload: dict[str, Any]) -> None:
 
 
 def extract_reviewed_closeout_request(payload: dict[str, Any]) -> dict[str, Any]:
-    if payload.get("request_kind") == "a2a_wave5_closeout_request":
+    if payload.get("request_kind") == UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND:
         return payload
     nested = payload.get("reviewed_closeout_request")
     if isinstance(nested, dict):
@@ -123,8 +125,10 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
     payload = extract_reviewed_closeout_request(payload)
     ensure_reviewed(payload)
     request_kind = payload.get("request_kind")
-    if request_kind != "a2a_wave5_closeout_request":
-        raise SystemExit("error: closeout payload must use request_kind a2a_wave5_closeout_request")
+    if request_kind != UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND:
+        raise SystemExit(
+            f"error: closeout payload must use upstream request_kind {UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND}"
+        )
 
     closeout_id = payload.get("closeout_id")
     if not isinstance(closeout_id, str) or not closeout_id:
@@ -159,7 +163,9 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
         "summary": summary,
         "closeout_id": closeout_id,
         "session_ref": payload.get("session_ref"),
+        "request_family": LOCAL_REQUEST_FAMILY,
         "request_kind": request_kind,
+        "upstream_request_kind": UPSTREAM_REVIEWED_CLOSEOUT_REQUEST_KIND,
         "source_input_ref": f"local:{input_path}",
         "source_input_sha256": hashlib.sha256(rendered_input).hexdigest(),
         "reviewed": True,

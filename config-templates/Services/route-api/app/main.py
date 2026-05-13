@@ -22,24 +22,55 @@ REQUIRED_CONFIGS = {
     "aoa-kag": "aoa-kag.yaml",
     "tos-source": "tos-source.yaml",
 }
+
+
+@dataclass(frozen=True)
+class RuntimeEvidenceTemplateCompatibility:
+    canonical_selection_id: str
+    upstream_source_ref: str
+    upstream_selection_id: str
+    bridge_names: tuple[str, ...] = ()
+
+
+RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY = {
+    "memo-recall-rerun": RuntimeEvidenceTemplateCompatibility(
+        canonical_selection_id="memo-recall-rerun-v1",
+        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+        upstream_selection_id="phase-alpha-memo-recall-rerun-v1",
+        bridge_names=("phase-alpha-memo-recall-rerun",),
+    ),
+    "memo-contradiction-gap": RuntimeEvidenceTemplateCompatibility(
+        canonical_selection_id="memo-contradiction-gap-v1",
+        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+        upstream_selection_id="phase-alpha-memo-contradiction-gap-v1",
+        bridge_names=("phase-alpha-memo-contradiction-gap",),
+    ),
+    "memo-contradiction-rerun": RuntimeEvidenceTemplateCompatibility(
+        canonical_selection_id="memo-contradiction-rerun-v1",
+        upstream_source_ref="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+        upstream_selection_id="phase-alpha-memo-contradiction-rerun-v1",
+        bridge_names=("phase-alpha-memo-contradiction-rerun",),
+    ),
+}
 RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
     "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
     "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
-    "memo-recall-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-    "memo-contradiction-gap": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-    "memo-contradiction-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+    **{
+        name: compatibility.upstream_source_ref
+        for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
+    },
 }
 RUNTIME_EVIDENCE_TEMPLATE_CANONICAL_SELECTION_IDS = {
-    "memo-recall-rerun": "memo-recall-rerun-v1",
-    "memo-contradiction-gap": "memo-contradiction-gap-v1",
-    "memo-contradiction-rerun": "memo-contradiction-rerun-v1",
+    name: compatibility.canonical_selection_id
+    for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
 }
-RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES = {
-    "phase-alpha-memo-recall-rerun": "memo-recall-rerun",
-    "phase-alpha-memo-contradiction-gap": "memo-contradiction-gap",
-    "phase-alpha-memo-contradiction-rerun": "memo-contradiction-rerun",
+RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES = {
+    bridge_name: name
+    for name, compatibility in RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.items()
+    for bridge_name in compatibility.bridge_names
 }
 UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF = "aoa-playbooks/generated/playbook_automation_seeds.json"
+UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_REL_PATH = UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF.removeprefix("aoa-playbooks/")
 
 
 @dataclass(frozen=True)
@@ -265,7 +296,7 @@ def load_playbooks_layer(config_path: Path, config: dict[str, Any], mirror_root:
         "handoffs": load_json(mirror_root / "generated/playbook_handoff_contracts.json"),
         "failures": load_json(mirror_root / "generated/playbook_failure_catalog.json"),
         "subagent_recipes": load_json(mirror_root / "generated/playbook_subagent_recipes.json"),
-        "automation_plans": load_json(mirror_root / "generated/playbook_automation_seeds.json"),
+        "automation_plans": load_json(mirror_root / UPSTREAM_PLAYBOOK_AUTOMATION_PLANS_REL_PATH),
         "composition_manifest": load_json(mirror_root / "generated/playbook_composition_manifest.json"),
     }
 
@@ -1448,10 +1479,10 @@ def resolve_eval_comparison(store: AppStore, baseline_mode: str | None) -> dict[
 
 
 def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> dict[str, Any]:
-    canonical_name = RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES.get(template_name, template_name)
+    canonical_name = RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_BRIDGES.get(template_name, template_name)
     template = evals_payload(store, "runtime_evidence_templates")[canonical_name]
     rel_path = RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS[canonical_name]
-    return {
+    payload: dict[str, Any] = {
         "ok": True,
         "name": canonical_name,
         "requested_name": template_name,
@@ -1462,6 +1493,17 @@ def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> di
             f"aoa-evals/{rel_path}",
         ],
     }
+    compatibility = RUNTIME_EVIDENCE_TEMPLATE_UPSTREAM_COMPATIBILITY.get(canonical_name)
+    if compatibility is not None:
+        payload["upstream_contract"] = {
+            "owner_repo": "aoa-evals",
+            "source_ref": f"aoa-evals/{compatibility.upstream_source_ref}",
+            "selection_id": compatibility.upstream_selection_id,
+            "local_route": canonical_name,
+        }
+    if template_name != canonical_name:
+        payload["compatibility_bridge_for"] = canonical_name
+    return payload
 
 
 def resolve_hook_template(store: AppStore, template_name: str) -> dict[str, Any]:
@@ -2281,7 +2323,7 @@ def playbooks_automation_plans() -> dict[str, Any]:
 @app.get("/playbooks/automation-seeds")
 def playbooks_automation_seeds_compatibility() -> dict[str, Any]:
     payload = playbooks_automation_plans()
-    payload["compatibility_alias_for"] = "/playbooks/automation-plans"
+    payload["compatibility_bridge_for"] = "/playbooks/automation-plans"
     return payload
 
 
@@ -2371,7 +2413,7 @@ def playbooks_automation_plan(request: PlaybookAutomationPlanRequest) -> dict[st
 @app.post("/playbooks/automation-seed")
 def playbooks_automation_seed_compatibility(request: PlaybookAutomationPlanRequest) -> dict[str, Any]:
     payload = playbooks_automation_plan(request)
-    payload["compatibility_alias_for"] = "/playbooks/automation-plan"
+    payload["compatibility_bridge_for"] = "/playbooks/automation-plan"
     return payload
 
 

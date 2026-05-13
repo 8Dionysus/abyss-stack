@@ -3,7 +3,7 @@
 | Part | Route | Current source surfaces |
 |---|---|---|
 | Sync wrapper | `parts/sync-wrapper/` | `scripts/aoa-sync-federation-surfaces`, `parts/sync-wrapper/aoa_sync_federation_surfaces.sh` |
-| Federation checks | `parts/federation-checks/` | `scripts/aoa-federated-check`, `parts/federation-checks/aoa_federated_check.py`, `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`; archived harvest worker docs now route through `mechanics/experience-runtime/PROVENANCE.md` |
+| Federation checks | `parts/federation-checks/` | `scripts/aoa-federated-check`, `parts/federation-checks/aoa_federated_check.py`, active compatibility bridge at `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`, detailed compatibility legacy index at `parts/federation-checks/legacy/upstream-compatibility/INDEX.md`; archived harvest worker docs now route through `mechanics/experience-runtime/PROVENANCE.md` |
 | Memo seam | `parts/memo-seam/` | `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md` |
 | Eval seam | `parts/eval-seam/` | `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md` |
 | Playbook seam | `parts/playbook-seam/` | `mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md` |

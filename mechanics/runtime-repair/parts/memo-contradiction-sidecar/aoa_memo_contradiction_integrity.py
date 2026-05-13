@@ -18,12 +18,20 @@ SELECTION_SOURCE_CANDIDATES = (
     Path("examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"),
 )
 
-CLOSURE_CLAIM = "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history"
-PENDING_CLAIM = "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff"
-RETIRED_OVERREAD_CLAIM = "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired"
-LATER_TRACK_CLAIM = "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track"
-SUPERSESSION_AUDIT = "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession"
-RETRACTION_AUDIT = "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction"
+UPSTREAM_MEMO_CONTRADICTION_IDS = {
+    "closure_claim": "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history",
+    "pending_claim": "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff",
+    "retired_overread_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired",
+    "later_track_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track",
+    "supersession_audit": "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession",
+    "retraction_audit": "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction",
+}
+CLOSURE_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["closure_claim"]
+PENDING_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["pending_claim"]
+RETIRED_OVERREAD_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["retired_overread_claim"]
+LATER_TRACK_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["later_track_claim"]
+SUPERSESSION_AUDIT = UPSTREAM_MEMO_CONTRADICTION_IDS["supersession_audit"]
+RETRACTION_AUDIT = UPSTREAM_MEMO_CONTRADICTION_IDS["retraction_audit"]
 
 REQUIRED_LOG_PATHS = {
     "next_pass_brief": Path("Logs/memo-contradiction-rerun/restartable-inquiry-loop/next_pass_brief.md"),
@@ -420,6 +428,15 @@ def build_report(failures: list[str]) -> dict[str, Any]:
             *failures,
         ],
         "case_family": "memo-contradiction-rerun-v1 runtime sidecar run over memo-contradiction-guardrail-v1",
+        "compatibility_boundary": {
+            "local_selection_id": SELECTION_ID,
+            "upstream_selection_id": UPSTREAM_SELECTION_ID,
+            "upstream_owner_refs": {
+                "aoa_evals_selection": str(SELECTION_SOURCE_CANDIDATES[1]),
+                "aoa_memo_object_ids": UPSTREAM_MEMO_CONTRADICTION_IDS,
+            },
+            "legacy_log_fallbacks": {key: str(path) for key, path in LEGACY_LOG_PATHS.items()},
+        },
         "breakdown": {
             "lifecycle_visibility": breakdown_value,
             "current_recall_honesty": breakdown_value,

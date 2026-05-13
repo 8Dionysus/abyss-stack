@@ -17,7 +17,9 @@
     "summary",
     "closeout_id",
     "session_ref",
+    "request_family",
     "request_kind",
+    "upstream_request_kind",
     "source_input_ref",
     "source_input_sha256",
     "reviewed",
@@ -74,7 +76,13 @@
     "session_ref": {
       "type": ["string", "null"]
     },
+    "request_family": {
+      "const": "a2a-return-closeout"
+    },
     "request_kind": {
+      "const": "a2a_wave5_closeout_request"
+    },
+    "upstream_request_kind": {
       "const": "a2a_wave5_closeout_request"
     },
     "source_input_ref": {

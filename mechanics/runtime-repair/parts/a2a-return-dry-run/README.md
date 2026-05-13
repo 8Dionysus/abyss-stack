@@ -8,3 +8,7 @@ and focused tests.
 - `schemas/runtime-a2a-return-closeout-dry-run.schema.json`
 - `examples/runtime_a2a_return_closeout_dry_run.example.json`
 - `tests/test_a2a_return_closeout_dry_run.py`
+
+The local request family is `a2a-return-closeout`. Older SDK wire input is
+accepted only as an upstream compatibility request kind routed through
+`mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`.

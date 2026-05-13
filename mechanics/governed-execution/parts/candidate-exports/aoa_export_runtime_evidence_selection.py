@@ -22,34 +22,43 @@ def default_title(selection_id: str) -> str:
     return f"runtime evidence selection {selection_id}"
 
 
-UPSTREAM_MEMO_RECALL_SOURCE_REF = "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
-UPSTREAM_MEMO_CONTRADICTION_GAP_SOURCE_REF = (
-    "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
-)
-UPSTREAM_MEMO_CONTRADICTION_RERUN_SOURCE_REF = (
-    "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
-)
-MEMO_RECALL_SOURCE_REFS = {
-    "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
-    UPSTREAM_MEMO_RECALL_SOURCE_REF,
+MEMO_RUNTIME_EVIDENCE_COMPATIBILITY = {
+    "memo-recall-rerun": {
+        "local_source_ref": "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
+        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+        "selection_ids": {"memo-recall-rerun-v1", "phase-alpha-memo-recall-rerun-v1"},
+    },
+    "memo-contradiction-gap": {
+        "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-gap.example.json",
+        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+        "selection_ids": {"memo-contradiction-gap-v1", "phase-alpha-memo-contradiction-gap-v1"},
+    },
+    "memo-contradiction-rerun": {
+        "local_source_ref": "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
+        "upstream_source_ref": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+        "selection_ids": {"memo-contradiction-rerun-v1", "phase-alpha-memo-contradiction-rerun-v1"},
+    },
 }
-MEMO_CONTRADICTION_GAP_SOURCE_REFS = {
-    "examples/runtime_evidence_selection.memo-contradiction-gap.example.json",
-    UPSTREAM_MEMO_CONTRADICTION_GAP_SOURCE_REF,
-}
-MEMO_CONTRADICTION_RERUN_SOURCE_REFS = {
-    "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
-    UPSTREAM_MEMO_CONTRADICTION_RERUN_SOURCE_REF,
-}
-MEMO_RECALL_SELECTION_IDS = {"memo-recall-rerun-v1", "phase-alpha-memo-recall-rerun-v1"}
-MEMO_CONTRADICTION_GAP_SELECTION_IDS = {
-    "memo-contradiction-gap-v1",
-    "phase-alpha-memo-contradiction-gap-v1",
-}
-MEMO_CONTRADICTION_RERUN_SELECTION_IDS = {
-    "memo-contradiction-rerun-v1",
-    "phase-alpha-memo-contradiction-rerun-v1",
-}
+
+
+def compatibility_source_refs(name: str) -> set[str]:
+    compatibility = MEMO_RUNTIME_EVIDENCE_COMPATIBILITY[name]
+    return {
+        str(compatibility["local_source_ref"]),
+        str(compatibility["upstream_source_ref"]),
+    }
+
+
+def compatibility_selection_ids(name: str) -> set[str]:
+    return set(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY[name]["selection_ids"])
+
+
+MEMO_RECALL_SOURCE_REFS = compatibility_source_refs("memo-recall-rerun")
+MEMO_CONTRADICTION_GAP_SOURCE_REFS = compatibility_source_refs("memo-contradiction-gap")
+MEMO_CONTRADICTION_RERUN_SOURCE_REFS = compatibility_source_refs("memo-contradiction-rerun")
+MEMO_RECALL_SELECTION_IDS = compatibility_selection_ids("memo-recall-rerun")
+MEMO_CONTRADICTION_GAP_SELECTION_IDS = compatibility_selection_ids("memo-contradiction-gap")
+MEMO_CONTRADICTION_RERUN_SELECTION_IDS = compatibility_selection_ids("memo-contradiction-rerun")
 
 
 def read_json(path: Path) -> dict:
@@ -86,13 +95,13 @@ def main() -> int:
     workhorse_example_path = evals_root / "examples" / "runtime_evidence_selection.workhorse-local.example.json"
     return_example_path = evals_root / "examples" / "runtime_evidence_selection.return-anchor-integrity.example.json"
     memo_recall_example_path = (
-        evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
+        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-recall-rerun"]["upstream_source_ref"])
     )
     memo_contradiction_gap_example_path = (
-        evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
+        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-contradiction-gap"]["upstream_source_ref"])
     )
     memo_contradiction_rerun_example_path = (
-        evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+        evals_root / str(MEMO_RUNTIME_EVIDENCE_COMPATIBILITY["memo-contradiction-rerun"]["upstream_source_ref"])
     )
 
     input_path = Path(args.input_file).resolve()
