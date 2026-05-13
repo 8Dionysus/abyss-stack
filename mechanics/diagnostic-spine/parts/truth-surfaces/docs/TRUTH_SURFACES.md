@@ -52,7 +52,7 @@ This is not a wording nuance. It is a real runtime-boundary distinction.
 
 ## Reporting rule
 
-Local trial surfaces should carry `truth_status` in their summaries and wave indexes.
+Local trial surfaces should carry `truth_status` in their summaries and trial indexes.
 
 At minimum, reports should let an operator see:
 

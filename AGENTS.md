@@ -139,6 +139,7 @@ It does not own:
 | Diagnostics | `mechanics/diagnostic-spine/README.md` |
 | Repair posture | `mechanics/runtime-repair/README.md` |
 | Scripts | `scripts/README.md` and the owning mechanic part |
+| Repo-local agent overlays | `.agents/README.md` and the nearest `.agents/**/AGENTS.md` |
 | CI or GitHub route | `.github/README.md` and `.github/AGENTS.md` |
 
 ## AGENTS Stack Law

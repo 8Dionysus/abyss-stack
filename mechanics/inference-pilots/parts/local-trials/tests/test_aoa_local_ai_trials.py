@@ -107,8 +107,8 @@ class AoALocalAiTrialsTests(unittest.TestCase):
                         encoding="utf-8",
                     )
 
-            with patch.object(module, "W4_DOC_CASE_IDS", set()):
-                with patch.object(module, "write_wave_surfaces", side_effect=fake_write_wave_surfaces):
+            with patch.object(module._BACKEND, "W4_DOC_CASE_IDS", set()):
+                with patch.object(module._BACKEND, "write_wave_surfaces", side_effect=fake_write_wave_surfaces):
                     module.update_w4_index(log_root, mirror_root, catalog)
                     module.update_w4_index(log_root, mirror_root, catalog)
 
@@ -169,8 +169,8 @@ class AoALocalAiTrialsTests(unittest.TestCase):
                         encoding="utf-8",
                     )
 
-            with patch.object(module, "W4_DOC_CASE_IDS", set()):
-                with patch.object(module, "write_wave_surfaces", side_effect=fake_write_wave_surfaces):
+            with patch.object(module._BACKEND, "W4_DOC_CASE_IDS", set()):
+                with patch.object(module._BACKEND, "write_wave_surfaces", side_effect=fake_write_wave_surfaces):
                     module.update_w4_index(log_root, mirror_root, catalog)
                     first_case_path = (
                         module.case_dir(log_root, "W4", catalog["W4"][0]["case_id"]) / "result.summary.json"

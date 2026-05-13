@@ -79,9 +79,9 @@ It also added a root `systemd/` route card and README. The actual unit contract
 still belongs under `systemd/user/` and `mechanics/runtime-lifecycle/`; the new
 root surfaces only make the top-level folder legible.
 
-`Spark/README.md` was added for the same root-folder legibility reason. It does
-not make Spark a new owner; it only points to the local AGENTS and SWARM
-surfaces for bounded fast-loop work.
+The fast-loop Spark surface was first added for root-folder legibility and later
+moved to `.agents/spark/README.md`. It does not make Spark a new owner; it only
+points to the local AGENTS and SWARM surfaces for bounded fast-loop work.
 
 `scripts/README.md` was added as a command map instead of moving root wrappers
 under mechanics. Operator command names stay stable in `scripts/`; mechanic

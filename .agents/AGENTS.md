@@ -12,14 +12,17 @@ ship with the `abyss-stack` source checkout.
 
 1. `.agents/README.md`
 2. `.agents/skills/AGENTS.md`
-3. `mechanics/README.md`
-4. `docs/MECHANICS.md`
-5. `scripts/validate_nested_agents.py`
+3. `.agents/spark/AGENTS.md` when editing the Spark fast-loop lane
+4. `mechanics/README.md`
+5. `docs/MECHANICS.md`
+6. `scripts/validate_nested_agents.py`
 
 ## Directory Contract
 
 - Keep canonical skill law in the owning skill repository.
 - Keep local overlays thin, portable, and explicit about the canonical upstream.
+- Keep agent model lanes under `.agents/<lane>/`, not as top-level runtime
+  districts.
 - Do not commit private agent state, session transcripts, cache payloads, or
   generated runtime captures here.
 - Route local overlay references to current package-local mechanics paths.

@@ -99,7 +99,7 @@ If a runtime doc starts authoring another layer's semantics, stop and reroute.
 
 ## Audit contract
 
-For repository audits and GitHub review, read `AUDIT.md` after the core docs and also follow the nearest nested `AGENTS.md` in touched subdirectories.
+For repository audits and GitHub review, read `docs/AUDIT.md` after the core docs and also follow the nearest nested `AGENTS.md` in touched subdirectories.
 
 ## Workflow
 

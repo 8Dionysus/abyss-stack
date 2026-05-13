@@ -121,6 +121,9 @@ The fixed report sections are:
 The `scripts/aoa-local-ai-trials` helper remains the stable root wrapper for
 the preserved baseline because existing runtime logs, closeout packets, and
 compatibility checks still refer to that command surface.
+The active part-local Python file is only a compatibility bridge; the preserved
+runner implementation lives under
+`mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`.
 
 For the old command sequence, phase details, and preserved mutation-safety
 contract, start from [legacy/INDEX](../../../legacy/INDEX.md).
@@ -130,7 +133,7 @@ The bridge does not:
 - make the preserved baseline a first-run requirement
 - introduce a new serving API
 - upgrade runtime success into portable proof wording
-- make wave names acceptable for new active trial topology
+- make old family names acceptable for new active trial topology
 
 ## LangGraph sidecar origin and promoted role
 

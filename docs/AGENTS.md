@@ -7,7 +7,8 @@ first.
 
 This directory owns repo-wide operator and source-checkout documentation:
 architecture, deployment, first-run, lifecycle, storage, security, release,
-branch policy, migration notes, questbook integration, and decision records.
+branch policy, migration notes, questbook integration, the audit contract, and
+decision records.
 
 Root-level system and agent-surface design live at `DESIGN.md` and
 `DESIGN.AGENTS.md`, not under `docs/`.

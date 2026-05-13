@@ -21,7 +21,8 @@ Tracking starts with the community-docs baseline for this repository.
   contract docs
 - root `systemd/` route card and README so user-unit skeletons no longer sit
   behind an unowned top-level folder
-- `Spark/README.md` as a plain route surface for the fast-loop lane
+- `.agents/spark/README.md` as the repo-local route surface for the fast-loop
+  lane
 - `scripts/README.md` as the stable command map for root wrappers, validators,
   and their mechanic ownership routes
 - `docs/README.md` and `tests/README.md` as root district indexes for
@@ -71,6 +72,12 @@ Tracking starts with the community-docs baseline for this repository.
 - `FIRST_RUN` now routes optional local model trials to inference-pilot and
   machine-fit surfaces instead of spelling the old W0-W4 qualification runner
   as part of normal bootstrap
+- `aoa-local-ai-trials` now keeps its preserved W0-W4 runner under
+  `mechanics/inference-pilots/legacy/artifacts/scripts/` with a thin active
+  compatibility bridge in `parts/local-trials/`
+- root residual route surfaces were tightened: the audit contract now lives at
+  `docs/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and
+  validators block those root-level residual paths from returning
 
 ## [0.2.2] - 2026-04-23
 
@@ -186,8 +193,8 @@ Tracking starts with the community-docs baseline for this repository.
   receipt schemas, machine-fit fallback and tuning, and federated advisory
   seams
 - runtime follow-through and operator surfaces under `.agents/`, `.github/`,
-  `AUDIT.md`, `ROADMAP.md`, `QUESTBOOK.md`, `quests/`, `README.md`,
-  `AGENTS.md`, `Spark/`, and `tests/`, including quest-harvest installs,
+  `docs/AUDIT.md`, `ROADMAP.md`, `QUESTBOOK.md`, `quests/`, `README.md`,
+  `AGENTS.md`, `.agents/spark/`, and `tests/`, including quest-harvest installs,
   runtime closeout receipts, winner promotion, route-first ToS graph UI and
   curation overlays, OVMS text-lab lanes, and parity-safe source and deployed
   mirror checks

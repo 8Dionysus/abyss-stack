@@ -58,7 +58,7 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 - `intel-text.ovms-gpu-lab.yml`
 - `intel-text.ovms-qwen3-settings.yml`
 
-These overlays land the current Fedora Intel seed as runnable, explicit host-fit candidates for the `Intel Core Ultra 9 285H` class.
+These overlays land the current Fedora Intel baseline as runnable, explicit host-fit candidates for the `Intel Core Ultra 9 285H` class.
 They are intentionally additive:
 
 - `cpu-safe` keeps CPU-first serving with `q8_0/q8_0` KV-cache settings
