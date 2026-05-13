@@ -59,5 +59,5 @@ Current source surfaces stay in `mechanics/machine-fit/parts/host-facts/`,
 `mechanics/machine-fit/parts/fit-record/`,
 `mechanics/machine-fit/parts/platform-adaptations/`,
 `mechanics/machine-fit/parts/machine-bridge/`,
-`mechanics/machine-fit/parts/windows-bridge/`, matching scripts, and the part
-index under `mechanics/machine-fit/parts/`.
+`mechanics/machine-fit/parts/windows-bridge/`, matching root wrappers, and the
+part index under `mechanics/machine-fit/parts/`.

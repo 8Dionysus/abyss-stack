@@ -7,6 +7,8 @@ bridge artifact.
 
 - `schemas/schema.v1.json` - machine-readable contract for `aoa.machine-bridge`
 - `examples/machine-bridge.public.json.example` - public-safe example shape
+- `aoa_machine_bridge.py` - part-local backend for
+  `scripts/aoa-machine-bridge`
 
 ## Runtime Capture
 

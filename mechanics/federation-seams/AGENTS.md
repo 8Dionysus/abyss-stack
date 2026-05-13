@@ -17,5 +17,6 @@ Validation:
 python scripts/validate_stack.py
 python scripts/aoa-rpg-runtime-projection --generated-only --check
 python -m pytest mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py -q
-bash -n scripts/aoa-sync-federation-surfaces scripts/aoa-federated-check
+python -m py_compile mechanics/federation-seams/parts/federation-checks/aoa_federated_check.py mechanics/federation-seams/parts/rpg-runtime/aoa_rpg_runtime_projection.py
+bash -n scripts/aoa-sync-federation-surfaces mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh
 ```

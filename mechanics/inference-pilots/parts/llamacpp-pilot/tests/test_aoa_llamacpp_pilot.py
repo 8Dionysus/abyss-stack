@@ -18,7 +18,14 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
-MODULE_PATH = REPO_ROOT / "scripts" / "aoa-llamacpp-pilot"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "inference-pilots"
+    / "parts"
+    / "llamacpp-pilot"
+    / "aoa_llamacpp_pilot.py"
+)
 
 
 def load_module():

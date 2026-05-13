@@ -59,5 +59,5 @@ Current source surfaces stay in antifragility docs, A2A docs, package-local
 receipt parts under `mechanics/runtime-repair/parts/degradation-receipts/` and
 `mechanics/runtime-repair/parts/repair-safe-closeout/`, dry-run surfaces under
 `mechanics/runtime-repair/parts/a2a-return-dry-run/`, focused package tests
-under `mechanics/runtime-repair/parts/`, legacy chaos raw docs, and root
-operator scripts.
+under `mechanics/runtime-repair/parts/`, legacy chaos raw docs, root operator
+wrappers, and part-local repair adapter backends.

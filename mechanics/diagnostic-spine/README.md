@@ -56,7 +56,8 @@ when the gap is host-specific.
 ## Active route
 
 Current source surfaces stay in `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`, `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`,
-`scripts/aoa-diagnose`, `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`,
+`scripts/aoa-diagnose`, `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh`, `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`,
+`scripts/aoa-doctor`, `mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/`,
 `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/`, `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/`,
 and `mechanics/diagnostic-spine/parts/diagnose-wrapper/tests/test_aoa_diagnose.py`.

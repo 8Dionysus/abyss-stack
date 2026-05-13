@@ -18,7 +18,14 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
-MODULE_PATH = REPO_ROOT / "scripts" / "aoa-federated-check"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "federation-checks"
+    / "aoa_federated_check.py"
+)
 
 
 def load_module():

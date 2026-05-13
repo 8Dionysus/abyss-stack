@@ -19,7 +19,14 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve().parent)
-MODULE_PATH = REPO_ROOT / "scripts" / "aoa-qwen-check"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "inference-pilots"
+    / "parts"
+    / "qwen-routes"
+    / "aoa_qwen_check.py"
+)
 
 
 def load_module():

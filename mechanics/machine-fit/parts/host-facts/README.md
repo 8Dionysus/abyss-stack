@@ -7,6 +7,7 @@ This part owns the machine-readable public host-facts layer for `abyss-stack`.
 - `schemas/schema.v1.json` defines the v1 host-facts contract.
 - `examples/reference-host.public.json.example` shows the intended public-safe shape.
 - `examples/reference-host.public.json` is the reviewed canonical Linux reference-host snapshot when one has been intentionally selected and refreshed.
+- `aoa_host_facts.py` is the part-local backend for `scripts/aoa-host-facts`.
 
 ## Rules
 
@@ -15,4 +16,4 @@ This part owns the machine-readable public host-facts layer for `abyss-stack`.
 - once selected, refresh `reference-host.public.json` intentionally rather than treating it as a routine local capture
 - do not store private host captures here
 - private captures belong under `${AOA_STACK_ROOT}/Logs/host-facts/`
-- when the schema changes, update `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`, `scripts/aoa-host-facts`, validation, and workflow coverage in the same change
+- when the schema changes, update `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`, `aoa_host_facts.py`, validation, and workflow coverage in the same change

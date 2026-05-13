@@ -49,6 +49,10 @@ Tracking starts with the community-docs baseline for this repository.
   root `scripts/` wrappers while their implementation bodies live under the
   owning mechanic parts, with validator and CI shellcheck coverage for the
   wrapper/backend bridge
+- remaining root operator commands now follow the same wrapper/backend pattern
+  across diagnostic spine, machine fit, inference pilots, federation seams,
+  governed execution, runtime lifecycle, runtime repair, and Windows bridge
+  surfaces
 - `release_check.py` now uses synthetic Configs parity by default, keeping
   source release audits independent from stale live runtime mirrors unless
   `--parity-mode live` is requested

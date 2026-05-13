@@ -10,15 +10,16 @@ operator command names out of `scripts/` would make deployment and operator
 muscle memory worse.
 
 At the same time, keeping every implementation body in `scripts/` preserves a
-flat source topology. Config projection and runtime lifecycle already have
-owning mechanic packages and parts, so their implementation details can live
-near their docs, route cards, tests, and validation contracts.
+flat source topology. Mechanic packages and parts now own the local route cards,
+tests, schemas, docs, and package-specific validation contracts for operator
+behavior, so implementation details should live near those owner surfaces.
 
 ## Decision
 
-Keep stable root command names in `scripts/` as thin wrappers. Move the
-implementation bodies for config-projection and runtime-lifecycle operator
-commands into their owning `mechanics/<package>/parts/<part>/` homes.
+Keep stable root command names in `scripts/` as thin wrappers. Move operator
+implementation bodies into their owning `mechanics/<package>/parts/<part>/`
+homes when the owning part is clear and deployment sync carries both the root
+wrapper and backend path.
 
 The source checkout and deployed `Configs` mirror both sync `scripts/` and
 `mechanics/`, so wrappers can execute part-local backends without changing the
@@ -27,10 +28,13 @@ operator command names.
 ## Consequences
 
 - `scripts/` remains the public operator entrypoint district.
-- Part-local backend scripts become the source-owned implementation homes.
+- Part-local backend scripts become the source-owned implementation homes for
+  config projection, runtime lifecycle, diagnostic spine, machine fit,
+  inference pilots, federation seams, governed execution, runtime repair, and
+  Windows bridge commands.
 - `scripts/validate_stack.py` checks that wrappers still point to their
   expected backend scripts.
 - CI shellcheck covers both the root wrappers and the part-local backend
   scripts.
-- Future moves should follow the same pattern only when the owning part is
-  clear and deployment sync carries both sides.
+- Future commands must declare a backend route in `scripts/validate_stack.py`
+  instead of leaving new implementation bodies in the root command plane.
