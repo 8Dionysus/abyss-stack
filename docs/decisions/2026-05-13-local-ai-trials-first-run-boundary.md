@@ -29,9 +29,9 @@ variant fit notes through
 `mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md`.
 
 Preserve the old W0-W4 qualification narrative under
-`mechanics/inference-pilots/legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`.
+`mechanics/inference-pilots/legacy/trials/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`.
 Preserve the old runner implementation under
-`mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`,
+`mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials`,
 with `mechanics/inference-pilots/parts/local-trials/aoa_local_ai_trials.py`
 kept as a thin compatibility bridge for the stable root command.
 

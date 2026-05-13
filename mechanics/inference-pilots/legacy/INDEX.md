@@ -1,17 +1,15 @@
 # Inference Pilots Legacy Index
 
-## Raw Docs
+## Trial Legacy
 
-Old root docs now live in `legacy/raw/`:
+Old trial and pilot docs now live in `legacy/trials/raw/`:
 
 - `docs/W5_PILOT.md`
 - `docs/W6_PILOT.md`
 - W0-W4 local AI trial baseline narrative:
-  `legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`
+  `legacy/trials/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`
 
-## Artifacts
-
-Old root runner scripts now live under `legacy/artifacts/scripts/`:
+Old trial runner scripts now live under `legacy/trials/artifacts/scripts/`:
 
 - `scripts/aoa-local-ai-trials` preserved compatibility backend
 - `scripts/aoa-w5-pilot`
@@ -30,7 +28,7 @@ surface quieter.
 The `scripts/aoa-local-ai-trials` command remains an active compatibility
 wrapper because current runtime packets and closeout records still use its
 W0-W4 command names. Its preserved runner now lives at
-`legacy/artifacts/scripts/aoa-local-ai-trials`, and its wave-era narrative
-routes through `legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`. New active trial
+`legacy/trials/artifacts/scripts/aoa-local-ai-trials`, and its wave-era narrative
+routes through `legacy/trials/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`. New active trial
 topology should use trial, scenario, benchmark, model-card, and promotion
 language instead.

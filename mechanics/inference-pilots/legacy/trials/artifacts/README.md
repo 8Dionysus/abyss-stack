@@ -1,4 +1,4 @@
-# Inference Pilots Legacy Artifacts
+# Inference Pilots Trial Legacy Artifacts
 
 This directory holds preserved local trial runner scripts and related artifacts,
 including the W0-W4 compatibility runner and old W5/W6 runners.

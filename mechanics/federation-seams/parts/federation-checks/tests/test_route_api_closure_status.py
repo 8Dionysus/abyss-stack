@@ -282,7 +282,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     "subagent_recipes": {
                         "recipes": [{"recipe_id": "R-1", "name": "fixture-recipe", "playbook": "fixture-playbook"}]
                     },
-                    "automation_seeds": {
+                    "automation_plans": {
                         "seeds": [{"seed_id": "S-1", "name": "fixture-plan", "playbook": "fixture-playbook"}]
                     },
                     "composition_manifest": {"manifest_version": "1"},
@@ -380,6 +380,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         )
 
         self.assertTrue(payload["ok"])
+        self.assertEqual(payload["canonical_selection_id"], "memo-recall-rerun-v1")
         self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-recall-rerun-v1")
         self.assertIn(
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
@@ -407,6 +408,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         )
 
         self.assertTrue(payload["ok"])
+        self.assertEqual(payload["canonical_selection_id"], "memo-contradiction-gap-v1")
         self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-gap-v1")
         self.assertIn(
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
@@ -422,6 +424,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         )
 
         self.assertTrue(payload["ok"])
+        self.assertEqual(payload["canonical_selection_id"], "memo-contradiction-rerun-v1")
         self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-contradiction-rerun-v1")
         self.assertIn(
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
@@ -437,6 +440,26 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertEqual(card["automation_plans"][0]["name"], "fixture-plan")
         self.assertNotIn("automation_seeds", card)
         self.assertEqual(compact["automation_plan_names"], ["fixture-plan"])
+
+    def test_playbook_automation_plans_endpoint_exposes_clean_payload(self) -> None:
+        self.module.STORE = self.make_store()
+
+        payload = self.module.playbooks_automation_plans()
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"]["plans"][0]["name"], "fixture-plan")
+        self.assertNotIn("seeds", payload["data"])
+
+    def test_playbook_automation_seed_endpoint_is_compatibility_alias(self) -> None:
+        self.module.STORE = self.make_store()
+
+        payload = self.module.playbooks_automation_seed_compatibility(
+            self.module.PlaybookAutomationPlanRequest(name="fixture-plan")
+        )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["compatibility_alias_for"], "/playbooks/automation-plan")
+        self.assertEqual(payload["plan"]["name"], "fixture-plan")
 
     def test_kag_structured_reads_stay_mirror_backed(self) -> None:
         store = self.make_store()

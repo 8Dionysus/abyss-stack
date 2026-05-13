@@ -137,8 +137,8 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     ),
     'mechanics/inference-pilots/legacy/AGENTS.md': (
         'archived pilot docs',
-        'legacy/raw',
-        'legacy/artifacts/scripts',
+        'legacy/trials',
+        'legacy/trials/artifacts/scripts',
         'aoa-bounded-autonomy-pilot',
     ),
     'mechanics/agon-runtime/AGENTS.md': (
@@ -158,12 +158,14 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mechanics/experience-runtime/AGENTS.md': (
         'experience-runtime',
         'experience contract family',
+        'legacy/ARCHIVE_CLASSIFICATION.md',
         'PROVENANCE.md',
         'EXPERIENCE_RECORDS_DISTILLATION.md',
         'test_experience_wave',
     ),
     'mechanics/experience-runtime/legacy/AGENTS.md': (
         'experience runtime archive surfaces',
+        'ARCHIVE_CLASSIFICATION.md',
         '_v1',
         'EXPERIENCE_RECORDS_DISTILLATION.md',
         'legacy/artifacts/tests',

@@ -22,6 +22,36 @@ def default_title(selection_id: str) -> str:
     return f"runtime evidence selection {selection_id}"
 
 
+UPSTREAM_MEMO_RECALL_SOURCE_REF = "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
+UPSTREAM_MEMO_CONTRADICTION_GAP_SOURCE_REF = (
+    "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
+)
+UPSTREAM_MEMO_CONTRADICTION_RERUN_SOURCE_REF = (
+    "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+)
+MEMO_RECALL_SOURCE_REFS = {
+    "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
+    UPSTREAM_MEMO_RECALL_SOURCE_REF,
+}
+MEMO_CONTRADICTION_GAP_SOURCE_REFS = {
+    "examples/runtime_evidence_selection.memo-contradiction-gap.example.json",
+    UPSTREAM_MEMO_CONTRADICTION_GAP_SOURCE_REF,
+}
+MEMO_CONTRADICTION_RERUN_SOURCE_REFS = {
+    "examples/runtime_evidence_selection.memo-contradiction-rerun.example.json",
+    UPSTREAM_MEMO_CONTRADICTION_RERUN_SOURCE_REF,
+}
+MEMO_RECALL_SELECTION_IDS = {"memo-recall-rerun-v1", "phase-alpha-memo-recall-rerun-v1"}
+MEMO_CONTRADICTION_GAP_SELECTION_IDS = {
+    "memo-contradiction-gap-v1",
+    "phase-alpha-memo-contradiction-gap-v1",
+}
+MEMO_CONTRADICTION_RERUN_SELECTION_IDS = {
+    "memo-contradiction-rerun-v1",
+    "phase-alpha-memo-contradiction-rerun-v1",
+}
+
+
 def read_json(path: Path) -> dict:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -89,31 +119,29 @@ def main() -> int:
             recurrence_path,
             return_example_path,
         ],
-        "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json": [
-            memo_recall_example_path,
-        ],
-        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json": [
-            memo_contradiction_gap_example_path,
-        ],
-        "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json": [
-            memo_contradiction_rerun_example_path,
-        ],
     }
+    for ref in MEMO_RECALL_SOURCE_REFS:
+        example_contract_refs[ref] = [memo_recall_example_path]
+    for ref in MEMO_CONTRADICTION_GAP_SOURCE_REFS:
+        example_contract_refs[ref] = [memo_contradiction_gap_example_path]
+    for ref in MEMO_CONTRADICTION_RERUN_SOURCE_REFS:
+        example_contract_refs[ref] = [memo_contradiction_rerun_example_path]
+
     if isinstance(source_example_ref, str) and source_example_ref in example_contract_refs:
         ref_paths.extend(f"local:{path}" for path in example_contract_refs[source_example_ref])
     elif any(ref == "candidate:aoa-return-anchor-integrity" for ref in candidate_eval_refs):
         ref_paths.extend([f"local:{recurrence_path}", f"local:{return_example_path}"])
     elif (
         any(ref == "candidate:aoa-memo-recall-integrity" for ref in candidate_eval_refs)
-        or selection_id == "phase-alpha-memo-recall-rerun-v1"
+        or selection_id in MEMO_RECALL_SELECTION_IDS
     ):
         ref_paths.append(f"local:{memo_recall_example_path}")
     elif (
         any(ref == "candidate:aoa-memo-contradiction-integrity" for ref in candidate_eval_refs)
-        or selection_id == "phase-alpha-memo-contradiction-gap-v1"
-        or selection_id == "phase-alpha-memo-contradiction-rerun-v1"
+        or selection_id in MEMO_CONTRADICTION_GAP_SELECTION_IDS
+        or selection_id in MEMO_CONTRADICTION_RERUN_SELECTION_IDS
     ):
-        if selection_id == "phase-alpha-memo-contradiction-rerun-v1":
+        if selection_id in MEMO_CONTRADICTION_RERUN_SELECTION_IDS:
             ref_paths.append(f"local:{memo_contradiction_rerun_example_path}")
         else:
             ref_paths.append(f"local:{memo_contradiction_gap_example_path}")

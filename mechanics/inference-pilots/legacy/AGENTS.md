@@ -2,13 +2,13 @@
 
 Applies to `mechanics/inference-pilots/legacy/`.
 
-This directory preserves archived pilot docs, runner scripts, and wave-era
+This directory preserves archived pilot docs, trial runner scripts, and old
 local trial baseline notes after the mechanics topology refactor.
 
 Use `../README.md` and `../PROVENANCE.md` before treating a legacy wave artifact
-as current evidence. Raw docs in `legacy/raw/` are historical route material.
-Runner scripts under `legacy/artifacts/scripts/` remain executable only through
-current bridge commands and tests.
+as current evidence. Trial docs and runners live under `legacy/trials/`.
+Runner scripts under `legacy/trials/artifacts/scripts/` remain executable only
+through current bridge commands and tests.
 
 Do not:
 
@@ -24,5 +24,5 @@ Validation:
 scripts/aoa-long-horizon-pilot --help
 scripts/aoa-bounded-autonomy-pilot --help
 bash -n scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
-python -m py_compile mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w6-pilot
+python -m py_compile mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot
 ```

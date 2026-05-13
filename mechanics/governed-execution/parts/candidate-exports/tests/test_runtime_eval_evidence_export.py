@@ -37,7 +37,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
             payload = {
                 "surface_type": "runtime_evidence_selection",
                 "selection_id": "governed-run--memo-recall-rerun-v1",
-                "source_example_ref": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+                "source_example_ref": "examples/runtime_evidence_selection.memo-recall-rerun.example.json",
             }
 
             artifact = self.run_export(stack_root, payload)
@@ -53,7 +53,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {
                 "surface_type": "runtime_evidence_selection",
-                "selection_id": "phase-alpha-memo-recall-rerun-v1",
+                "selection_id": "memo-recall-rerun-v1",
                 "candidate_eval_refs": ["candidate:aoa-memo-recall-integrity"],
             }
 
@@ -70,7 +70,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {
                 "surface_type": "runtime_evidence_selection",
-                "selection_id": "phase-alpha-memo-contradiction-gap-v1",
+                "selection_id": "memo-contradiction-gap-v1",
                 "candidate_eval_refs": ["candidate:aoa-memo-contradiction-integrity"],
             }
 
@@ -87,7 +87,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {
                 "surface_type": "runtime_evidence_selection",
-                "selection_id": "phase-alpha-memo-contradiction-rerun-v1",
+                "selection_id": "memo-contradiction-rerun-v1",
                 "candidate_eval_refs": ["candidate:aoa-memo-contradiction-integrity"],
             }
 

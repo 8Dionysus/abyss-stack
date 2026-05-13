@@ -11,6 +11,13 @@ Validation route: `python scripts/validate_nested_agents.py` and
 ## 2026-05-13 - Part-local docs topology
 
 Moved LangGraph, llama.cpp, local-trial, benchmark, and promotion-loop docs into
-their owning parts. Old pilot files remain under `legacy/raw/`.
+their owning parts. Old pilot files remain under `legacy/trials/raw/`.
+
+Validation route: `python scripts/validate_stack.py`.
+
+## 2026-05-13 - Trial legacy specialization
+
+Moved preserved W0-W6 trial docs and runner scripts under
+`legacy/trials/`.
 
 Validation route: `python scripts/validate_stack.py`.

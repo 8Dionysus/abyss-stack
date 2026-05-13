@@ -19,7 +19,7 @@ containment, not trash and not the new active route.
 | Artifact kind | Current default | Package home when clearly local |
 |---|---|---|
 | operator docs | `docs/` | `mechanics/<package>/docs/` for package-owned prose detail, `mechanics/<package>/parts/<part>/README.md` for part routes, or `mechanics/<package>/legacy/raw/` for old raw docs |
-| runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementation bodies when the root command can remain a thin wrapper, or `mechanics/<package>/legacy/artifacts/scripts/` while old names remain archived |
+| runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementation bodies when the root command can remain a thin wrapper, `mechanics/<package>/legacy/<family>/artifacts/scripts/` for specialized archives such as trial runners, or `mechanics/<package>/legacy/artifacts/scripts/` while unspecialized old names remain archived |
 | schemas | `schemas/` | `mechanics/<package>/parts/<part>/schemas/` for active package-local contracts, or `mechanics/<package>/legacy/artifacts/schemas/` when the family is contained |
 | examples | `examples/` | `mechanics/<package>/parts/<part>/examples/` for active package-local public examples, or `mechanics/<package>/legacy/artifacts/examples/` with validator updates |
 | generated capsules | `generated/` | `mechanics/<package>/parts/<part>/generated/` when the source builder moves too, or `mechanics/<package>/legacy/artifacts/generated/` when old names remain contained |

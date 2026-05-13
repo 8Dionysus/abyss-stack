@@ -23,4 +23,7 @@ meaning and write stop-lines.
 - [legacy/INDEX.md](legacy/INDEX.md) maps old root families to current paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
   raw archive.
+- [legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) records
+  why each preserved family remains archive-only until a concrete runtime
+  consumer exists.
 - `legacy/artifacts/tests/` proves the package-local schemas and examples.

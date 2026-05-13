@@ -39,8 +39,8 @@ them.
 
 Canonical local-worker path:
 - `qwen-local-pilot-v1`
-- `w5-langgraph-llamacpp-v1`
-- `w6-bounded-autonomy-llamacpp-v1`
+- `long-horizon-langgraph-llamacpp-v1`
+- `bounded-autonomy-langgraph-llamacpp-v1`
 
 Canonical runtime posture:
 - preset: `intel-full`
@@ -60,12 +60,12 @@ Durable program roots now in use:
 - `qwen-local-pilot-v1`
 - `langgraph-sidecar-pilot-v1`
 - `qwen-llamacpp-pilot-v1`
-- `w5-langgraph-llamacpp-v1`
-- `w6-bounded-autonomy-llamacpp-v1`
+- `long-horizon-langgraph-llamacpp-v1`
+- `bounded-autonomy-langgraph-llamacpp-v1`
 
-The `w5-*` and `w6-*` program ids are retained for runtime-lineage
-compatibility. Active docs should describe those routes as long-horizon and
-bounded-autonomy trials.
+Old program ids for the same long-horizon and bounded-autonomy trial families
+are retained only through the legacy trial route. Active docs should describe
+those routes by role, not by old program numbering.
 
 ## Dual-surface reporting
 
@@ -79,8 +79,8 @@ Current durable program roots:
 - `qwen-local-pilot-v1`
 - `langgraph-sidecar-pilot-v1`
 - `qwen-llamacpp-pilot-v1`
-- `w5-langgraph-llamacpp-v1`
-- `w6-bounded-autonomy-llamacpp-v1`
+- `long-horizon-langgraph-llamacpp-v1`
+- `bounded-autonomy-langgraph-llamacpp-v1`
 
 Keep the split explicit:
 
@@ -123,7 +123,7 @@ the preserved baseline because existing runtime logs, closeout packets, and
 compatibility checks still refer to that command surface.
 The active part-local Python file is only a compatibility bridge; the preserved
 runner implementation lives under
-`mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`.
+`mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials`.
 
 For the old command sequence, stage details, and preserved mutation-safety
 contract, start from [legacy/INDEX](../../../legacy/INDEX.md).

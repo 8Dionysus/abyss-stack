@@ -5,5 +5,5 @@ Routes `scripts/aoa-langgraph-pilot`,
 `mechanics/inference-pilots/parts/langgraph-pilot/docs/LANGGRAPH_PILOT.md`.
 
 This part keeps local worker pilots governed and bounded.
-Preserved `W4` appears here only as the edit-gate compatibility ID for
-the local-trials runner shape.
+The old edit-gate ID appears here only through the legacy trial compatibility
+route under `../../legacy/trials/`.
