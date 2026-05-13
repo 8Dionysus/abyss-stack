@@ -29,7 +29,7 @@ activation:
   note: open when the route-first ToS graph helper is ready for a real owner-repo rollout in abyss-stack
 anchor_ref:
   artifact: tos_graph_curation
-  ref: mechanics/federation-seams/docs/TOS_GRAPH_CURATION.md
+  ref: mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md
   note: the helper stays runtime-owned, route-first, localhost-only, and subordinate to Tree-of-Sophia canonical truth
 handoff_role: runtime-maintainer
 evidence:

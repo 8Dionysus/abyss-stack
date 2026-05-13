@@ -59,7 +59,7 @@ The new stack now uses `/srv/AbyssOS/abyss-stack` as the canonical deployed runt
 
 - old `README.md` -> new `README.md` plus focused docs
 - old `ARCHITECTURE.md` -> `docs/ARCHITECTURE.md`
-- old `REQUIREMENTS.md` -> `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`
+- old `REQUIREMENTS.md` -> `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
 - old `BUILD.md` -> `docs/LIFECYCLE.md`
 - old `SECURITY.md` -> `docs/SECURITY.md`
 - old compose surfaces -> `compose/modules/*`

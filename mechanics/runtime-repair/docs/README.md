@@ -1,9 +1,14 @@
 # Runtime Repair Docs
 
-Package-owned runtime repair prose detail lives here.
+Package-wide runtime repair prose detail lives here.
 
-Active runtime-repair JSON Schema contracts, examples, and focused tests live
-under `../parts/a2a-return-dry-run/` and
-`../parts/memo-contradiction-sidecar/`.
+Part-specific runtime repair docs, JSON Schema contracts, examples, and focused
+tests live under the owning `../parts/` route:
 
-Legacy receipt artifacts remain under `legacy/artifacts/`.
+- `../parts/antifragility-posture/`
+- `../parts/degradation-receipts/`
+- `../parts/repair-safe-closeout/`
+- `../parts/a2a-return-dry-run/`
+- `../parts/memo-contradiction-sidecar/`
+
+Legacy chaos lineage remains under `../legacy/`.

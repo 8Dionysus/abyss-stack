@@ -20,14 +20,14 @@ Use stable anchors such as:
 - `docs/PROFILES.md`
 - `docs/PRESETS.md`
 - `docs/PROFILE_RECIPES.md`
-- `mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md`
-- `mechanics/federation-seams/docs/TOS_GRAPH_CURATION.md`
+- `mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md`
+- `mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md`
 - `mechanics/config-projection/docs/RENDER_TRUTH.md`
 - `docs/FIRST_RUN.md`
 - `mechanics/diagnostic-spine/docs/DOCTOR.md`
-- `mechanics/machine-fit/docs/WINDOWS_BRIDGE.md`
-- `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`
-- `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`
+- `mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md`
+- `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
+- `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`
 
 ## Initial posture
 

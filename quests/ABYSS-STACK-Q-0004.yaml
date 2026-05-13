@@ -26,11 +26,11 @@ parent: null
 depends_on: []
 activation:
   mode: on_review_of
-  ref: mechanics/machine-fit/docs/WINDOWS_BRIDGE.md
+  ref: mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md
   note: review when bridge or platform posture changes
 anchor_ref:
   artifact: machine-fit-policy
-  ref: mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md
+  ref: mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md
 handoff_role: infra-maintainer
 evidence:
   - platform follow-ups receive stable quest IDs

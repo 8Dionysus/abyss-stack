@@ -74,10 +74,10 @@ Before changing runtime surfaces, read in this order:
 7. `docs/PROFILES.md` and `docs/PRESETS.md`
 8. `docs/PATHS.md`
 9. `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, and `docs/SECURITY.md`
-10. `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md`, `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`, and `mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md` when host posture or machine-fit policy is in scope
+10. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`, `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`, and `mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md` when host posture or machine-fit policy is in scope
 11. `docs/BRANCH_POLICY.md` and `mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md` when recurrence or long-horizon runtime posture is touched
-12. `mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md`, `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`, and `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md` when those seams are in scope
-13. `mechanics/runtime-repair/docs/VIA_NEGATIVA_CHECKLIST.md` for destructive, boundary-sensitive, or ambiguity-heavy changes
+12. `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`, `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`, and `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md` when those seams are in scope
+13. `mechanics/runtime-repair/parts/antifragility-posture/docs/VIA_NEGATIVA_CHECKLIST.md` for destructive, boundary-sensitive, or ambiguity-heavy changes
 
 If a nearer `AGENTS.md` exists for the directory you are editing, follow that file first.
 
@@ -136,9 +136,9 @@ For repository audits and GitHub review, read `AUDIT.md` after the core docs and
 
 ## Host-facts and root rules
 
-- `mechanics/machine-fit/docs/REFERENCE_PLATFORM.md` owns the intended host posture
-- `mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations
-- `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md` owns the current-machine adaptation policy and capture destinations
+- `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md` owns the intended host posture
+- `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md` owns the machine-readable contract and capture destinations
+- `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md` owns the current-machine adaptation policy and capture destinations
 - `scripts/aoa-doctor` answers readiness, not durable inventory
 - `scripts/aoa-host-facts` captures durable host facts
 - `scripts/aoa-machine-fit` captures the bounded current-machine runtime posture

@@ -77,7 +77,7 @@ If a proposed field makes attacker reconnaissance easier but does not materially
 2. Capture a public snapshot and review it before commit.
 3. Capture a private snapshot locally when you need fuller deployment evidence.
 4. Keep the schema version stable until the contract changes.
-5. Use [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md) when you need the bounded current-host runtime posture.
+5. Use [MACHINE_FIT_POLICY](../../fit-record/docs/MACHINE_FIT_POLICY.md) when you need the bounded current-host runtime posture.
 6. When the shape changes, update this doc, the schema, the capture script, validation, and workflow coverage together.
 
 ## Suggested commands

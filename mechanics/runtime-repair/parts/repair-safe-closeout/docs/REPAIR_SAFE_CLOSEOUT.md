@@ -24,12 +24,12 @@ A useful repair-safe closeout receipt includes:
 - an explicit flag that mutation widening remained blocked
 - evidence refs for what was checked after repair or no-action review
 
-## Legacy Closeout Examples
+## Closeout Examples
 
 The first bounded chaos wave now includes named closeout examples for:
 
-- `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`
-- `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
+- `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json`
+- `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json`
 
 Those examples keep closeout bounded to the owner-local runtime lane and do not
 authorize broader recovery or verdict logic.

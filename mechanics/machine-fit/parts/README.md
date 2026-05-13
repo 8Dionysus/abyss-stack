@@ -9,3 +9,4 @@ platform adaptation, reference-platform posture, and inference tuning distinct.
 - [fit-record](fit-record/README.md)
 - [platform-adaptations](platform-adaptations/README.md)
 - [inference-tuning](inference-tuning/README.md)
+- [windows-bridge](windows-bridge/README.md)

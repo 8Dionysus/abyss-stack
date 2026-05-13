@@ -1,9 +1,9 @@
 # Runtime Repair Surface Contracts
 
-This directory keeps active runtime-repair machine-readable surfaces
-package-local.
+This part owns the A2A return closeout dry-run doc, runtime contract, example,
+and focused tests.
 
-- `schemas/` defines active repair-side adapter contracts.
-- `examples/` carries matching public-safe examples.
-
-Legacy receipt families remain under `mechanics/runtime-repair/legacy/`.
+- `docs/A2A_RETURN_DRY_RUN.md`
+- `schemas/runtime-a2a-return-closeout-dry-run.schema.json`
+- `examples/runtime_a2a_return_closeout_dry_run.example.json`
+- `tests/test_a2a_return_closeout_dry_run.py`

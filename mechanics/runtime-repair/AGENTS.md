@@ -17,6 +17,6 @@ Validation:
 
 ```bash
 python scripts/validate_stack.py
-python -m pytest mechanics/runtime-repair/legacy/artifacts/tests mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py
+python -m pytest mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py mechanics/runtime-repair/parts/repair-safe-closeout/tests/test_repair_safe_closeout_receipts.py mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py
 bash -n scripts/aoa-a2a-return-closeout-dry-run scripts/aoa-run-memo-contradiction-integrity
 ```

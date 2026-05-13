@@ -1,7 +1,13 @@
 # Runtime Repair Legacy Artifacts
 
-This directory holds old runtime repair receipt schemas, examples, and contract
-tests.
+This directory is now a bridge for old runtime repair receipt artifact routes.
 
-The tests remain runnable so the moved artifacts keep their contract value, but
-the old wave and `_v1` names remain contained legacy scaffolding.
+Active receipt contracts live under their owning parts:
+
+- `../../parts/degradation-receipts/`
+- `../../parts/repair-safe-closeout/`
+
+The old chaos wave note remains in
+`mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`.
+Do not add active schemas, examples, generated files, or tests back under this
+legacy artifact route.

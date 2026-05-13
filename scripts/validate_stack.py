@@ -116,6 +116,7 @@ MECHANIC_PACKAGE_PARTS = {
         "fit-record",
         "platform-adaptations",
         "inference-tuning",
+        "windows-bridge",
     ),
     "runtime-lifecycle": (
         "layout-install",
@@ -168,11 +169,7 @@ LEGACY_MECHANIC_ARTIFACT_DIRS = {
     "inference-pilots": (
         "legacy/artifacts/scripts",
     ),
-    "runtime-repair": (
-        "legacy/artifacts/examples",
-        "legacy/artifacts/schemas",
-        "legacy/artifacts/tests",
-    ),
+    "runtime-repair": (),
 }
 MECHANIC_CARD_HEADINGS = (
     "## Mechanic card",
@@ -264,30 +261,85 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "inference-pilots" / "docs" / "LLAMACPP_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W5_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "raw" / "W6_PILOT.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "PLATFORM_ADAPTATION_POLICY.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "platform-adaptations"
+    / "docs"
+    / "PLATFORM_ADAPTATION_POLICY.md",
     ROOT / "docs" / "BRANCH_POLICY.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "MEMO_RUNTIME_SEAM.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "EVAL_RUNTIME_SEAM.md",
-    ROOT / "mechanics" / "runtime-repair" / "docs" / "A2A_RETURN_DRY_RUN.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "KAG_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "memo-seam" / "docs" / "MEMO_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "eval-seam" / "docs" / "EVAL_RUNTIME_SEAM.md",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "a2a-return-dry-run"
+    / "docs"
+    / "A2A_RETURN_DRY_RUN.md",
+    ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "playbook-seam"
+    / "docs"
+    / "PLAYBOOK_RUNTIME_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "kag-seam" / "docs" / "KAG_RUNTIME_SEAM.md",
     ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DIAGNOSTIC_SPINE.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "TOS_GRAPH_CURATION.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_RUNTIME_BUILDERS.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_ROUTE_API_SEAM.md",
-    ROOT / "mechanics" / "federation-seams" / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
+    ROOT / "mechanics" / "federation-seams" / "parts" / "tos-graph" / "docs" / "TOS_GRAPH_CURATION.md",
+    ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "rpg-runtime"
+    / "docs"
+    / "RPG_RUNTIME_COLLECTIONS.md",
+    ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "rpg-runtime"
+    / "docs"
+    / "RPG_RUNTIME_BUILDERS.md",
+    ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "rpg-runtime"
+    / "docs"
+    / "RPG_ROUTE_API_SEAM.md",
+    ROOT
+    / "mechanics"
+    / "federation-seams"
+    / "parts"
+    / "rpg-runtime"
+    / "docs"
+    / "RPG_FRONTEND_PROJECTION_SEAM.md",
     ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "GATEWAY_CACHE_POLICY.md",
     ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "USAGE_BUDGET_POLICY.md",
     ROOT / "mechanics" / "diagnostic-spine" / "docs" / "LOCAL_OPS_DOCTOR_SPLIT.md",
     ROOT / "mechanics" / "runtime-lifecycle" / "docs" / "INTERNAL_PROBES.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM_SPEC.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "MACHINE_FIT_POLICY.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "reference-platform" / "docs" / "REFERENCE_PLATFORM.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "reference-platform"
+    / "docs"
+    / "REFERENCE_PLATFORM_SPEC.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "docs" / "MACHINE_FIT_POLICY.md",
     ROOT / "mechanics" / "config-projection" / "docs" / "SECRETS_BOOTSTRAP.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_BRIDGE.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_SETUP.md",
-    ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_PERFORMANCE.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "windows-bridge" / "README.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "windows-bridge" / "docs" / "WINDOWS_BRIDGE.md",
+    ROOT / "mechanics" / "machine-fit" / "parts" / "windows-bridge" / "docs" / "WINDOWS_SETUP.md",
+    ROOT
+    / "mechanics"
+    / "machine-fit"
+    / "parts"
+    / "windows-bridge"
+    / "docs"
+    / "WINDOWS_PERFORMANCE.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "inference-tuning" / "docs" / "MODEL_CARDS.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "inference-tuning" / "docs" / "MODEL_PROFILES.md",
     ROOT
@@ -395,6 +447,20 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "schemas" / "runtime-a2a-return-closeout-dry-run.schema.json",
     ROOT
     / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "schemas"
+    / "service-degradation-receipt.schema.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "repair-safe-closeout"
+    / "schemas"
+    / "repair-safe-closeout-receipt.schema.json",
+    ROOT
+    / "mechanics"
     / "governed-execution"
     / "parts"
     / "return-policy"
@@ -428,6 +494,55 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_eval_evidence_selection_candidate.workhorse-local.example.json",
     ROOT / "mechanics" / "governed-execution" / "parts" / "candidate-exports" / "examples" / "runtime_artifact_hook_candidate.self-agent-checkpoint-rollout.example.json",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "examples" / "runtime_a2a_return_closeout_dry_run.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "examples"
+    / "service-degradation-receipt.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "examples"
+    / "service-degradation-receipt.timeout-chaos.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "examples"
+    / "service-degradation-receipt.honest-degradation.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "examples"
+    / "service-degradation-receipt.retrieval-outage-honesty.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "repair-safe-closeout"
+    / "examples"
+    / "repair-safe-closeout-receipt.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "repair-safe-closeout"
+    / "examples"
+    / "repair-safe-closeout-receipt.timeout-chaos.example.json",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "repair-safe-closeout"
+    / "examples"
+    / "repair-safe-closeout-receipt.retrieval-outage-honesty.example.json",
     ROOT
     / "mechanics"
     / "governed-execution"
@@ -482,6 +597,20 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "federation-seams" / "parts" / "federation-checks" / "tests" / "test_route_api_closure_status.py",
     ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "tests" / "test_rpg_runtime_projection.py",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "a2a-return-dry-run" / "tests" / "test_a2a_return_closeout_dry_run.py",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "degradation-receipts"
+    / "tests"
+    / "test_degradation_receipts.py",
+    ROOT
+    / "mechanics"
+    / "runtime-repair"
+    / "parts"
+    / "repair-safe-closeout"
+    / "tests"
+    / "test_repair_safe_closeout_receipts.py",
     ROOT / "mechanics" / "runtime-repair" / "parts" / "memo-contradiction-sidecar" / "tests" / "test_memo_contradiction_integrity_runner.py",
     ROOT / "quests" / "AGENTS.md",
     ROOT / "quests" / "README.md",
@@ -513,12 +642,12 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
 
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
 QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
-FEDERATION_SEAMS_DOC_ROOT = Path("mechanics") / "federation-seams" / "docs"
-RPG_RUNTIME_FRONTEND_POSTURE_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_FRONTEND_POSTURE.md"
-RPG_RUNTIME_COLLECTIONS_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_COLLECTIONS.md"
-RPG_RUNTIME_BUILDERS_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_RUNTIME_BUILDERS.md"
-RPG_ROUTE_API_SEAM_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_ROUTE_API_SEAM.md"
-RPG_FRONTEND_PROJECTION_SEAM_PATH = FEDERATION_SEAMS_DOC_ROOT / "RPG_FRONTEND_PROJECTION_SEAM.md"
+RPG_RUNTIME_DOC_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs"
+RPG_RUNTIME_FRONTEND_POSTURE_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_RUNTIME_FRONTEND_POSTURE.md"
+RPG_RUNTIME_COLLECTIONS_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_RUNTIME_COLLECTIONS.md"
+RPG_RUNTIME_BUILDERS_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_RUNTIME_BUILDERS.md"
+RPG_ROUTE_API_SEAM_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_ROUTE_API_SEAM.md"
+RPG_FRONTEND_PROJECTION_SEAM_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_FRONTEND_PROJECTION_SEAM.md"
 DIAGNOSTIC_SPINE_DOC_ROOT = Path("mechanics") / "diagnostic-spine" / "docs"
 DIAGNOSTIC_SPINE_PATH = DIAGNOSTIC_SPINE_DOC_ROOT / "DIAGNOSTIC_SPINE.md"
 DIAGNOSTIC_SURFACE_ROOT = Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces"
@@ -1234,9 +1363,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0005 kind must stay doctrine")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md":
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md":
                 errors.append(
-                    "ABYSS-STACK-Q-0005 must stay anchored to mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
+                    "ABYSS-STACK-Q-0005 must stay anchored to mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md"
                 )
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "shadow authority layer" not in note:
@@ -1251,9 +1380,9 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0006 kind must stay doctrine")
             anchor_ref = quest_payload.get("anchor_ref")
-            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md":
+            if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md":
                 errors.append(
-                    "ABYSS-STACK-Q-0006 must stay anchored to mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md"
+                    "ABYSS-STACK-Q-0006 must stay anchored to mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"
                 )
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
             if not isinstance(note, str) or "read models" not in note or "route or quest authority" not in note:
@@ -1444,24 +1573,24 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must state Windows-usable posture")
     if "mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md" not in readme:
         errors.append("README.md must route readers to mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md")
-    if "mechanics/machine-fit/docs/REFERENCE_PLATFORM.md" not in readme:
-        errors.append("README.md must route readers to mechanics/machine-fit/docs/REFERENCE_PLATFORM.md")
-    if "mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
-        errors.append("README.md must route readers to mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md")
-    if "mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md" not in readme:
-        errors.append("README.md must route readers to mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md")
-    if "mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
-        errors.append("README.md must route readers to mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md")
+    if "mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md")
+    if "mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md")
+    if "mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md")
+    if "mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
+        errors.append("README.md must route readers to mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md")
     if "docs/BRANCH_POLICY.md" not in readme:
         errors.append("README.md must route readers to docs/BRANCH_POLICY.md")
-    if "mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md")
-    if "mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md")
-    if "mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md")
-    if "mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md" not in readme:
-        errors.append("README.md must route readers to mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md")
+    if "mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md" not in readme:
+        errors.append("README.md must route readers to mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md")
 
     local_ai_trials = (ROOT / "mechanics" / "inference-pilots" / "docs" / "LOCAL_AI_TRIALS.md").read_text(encoding="utf-8")
     for required_snippet in (
@@ -1708,7 +1837,15 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in lifecycle_doc:
             errors.append(f"docs/LIFECYCLE.md must mention `{required_snippet}`")
 
-    playbook_runtime_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    playbook_runtime_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "playbook-seam"
+        / "docs"
+        / "PLAYBOOK_RUNTIME_SEAM.md"
+    ).read_text(encoding="utf-8")
     for required_snippet in (
         "aoa-governed-run",
         "governed-execution-policy.yaml",
@@ -1716,7 +1853,7 @@ def validate_paths(errors: list[str]) -> None:
         "runtime permission semantics still live in `abyss-stack`",
     ):
         if required_snippet not in playbook_runtime_doc:
-            errors.append(f"mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md must mention `{required_snippet}`")
+            errors.append(f"mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md must mention `{required_snippet}`")
 
     recurrence_doc = (ROOT / "mechanics" / "governed-execution" / "docs" / "RECURRENCE_RUNTIME_POLICY.md").read_text(encoding="utf-8")
     for required_snippet in (
@@ -1927,16 +2064,22 @@ def validate_federation_required_files(errors: list[str]) -> None:
 
 
 def validate_reference_platform(errors: list[str]) -> None:
-    reference_platform = (ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM.md").read_text(
-        encoding="utf-8"
-    )
+    reference_platform = (
+        ROOT
+        / "mechanics"
+        / "machine-fit"
+        / "parts"
+        / "reference-platform"
+        / "docs"
+        / "REFERENCE_PLATFORM.md"
+    ).read_text(encoding="utf-8")
     if "aoa-host-facts" not in reference_platform:
-        errors.append("mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
+        errors.append("mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md must mention aoa-host-facts")
     if "mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md" not in reference_platform:
-        errors.append("mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md")
+        errors.append("mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md must point to mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md")
     if "REFERENCE_PLATFORM_SPEC.md" not in reference_platform:
         errors.append(
-            "mechanics/machine-fit/docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
+            "mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md must point to REFERENCE_PLATFORM_SPEC.md"
         )
 
     doctor_doc = (ROOT / "mechanics" / "diagnostic-spine" / "docs" / "DOCTOR.md").read_text(encoding="utf-8")
@@ -1951,12 +2094,18 @@ def validate_reference_platform(errors: list[str]) -> None:
             "docs/FIRST_RUN.md must mention reference-host.public.json capture"
         )
 
-    spec_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "REFERENCE_PLATFORM_SPEC.md").read_text(
-        encoding="utf-8"
-    )
+    spec_doc = (
+        ROOT
+        / "mechanics"
+        / "machine-fit"
+        / "parts"
+        / "reference-platform"
+        / "docs"
+        / "REFERENCE_PLATFORM_SPEC.md"
+    ).read_text(encoding="utf-8")
     if "latest.private.json" not in spec_doc:
         errors.append(
-            "mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md must define the local private capture path"
+            "mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md must define the local private capture path"
         )
 
     schema = json.loads(
@@ -2061,19 +2210,35 @@ def validate_platform_adaptations(errors: list[str]) -> None:
     if "aoa-platform-adaptation" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-platform-adaptation")
 
-    windows_perf_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "WINDOWS_PERFORMANCE.md").read_text(encoding="utf-8")
+    windows_perf_doc = (
+        ROOT
+        / "mechanics"
+        / "machine-fit"
+        / "parts"
+        / "windows-bridge"
+        / "docs"
+        / "WINDOWS_PERFORMANCE.md"
+    ).read_text(encoding="utf-8")
     if "aoa-platform-adaptation" not in windows_perf_doc:
-        errors.append("mechanics/machine-fit/docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
+        errors.append("mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
 
     storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Logs/platform-adaptations/" not in storage_doc:
         errors.append("docs/STORAGE_LAYOUT.md must mention Logs/platform-adaptations/")
 
-    policy_doc = (ROOT / "mechanics" / "machine-fit" / "docs" / "PLATFORM_ADAPTATION_POLICY.md").read_text(encoding="utf-8")
+    policy_doc = (
+        ROOT
+        / "mechanics"
+        / "machine-fit"
+        / "parts"
+        / "platform-adaptations"
+        / "docs"
+        / "PLATFORM_ADAPTATION_POLICY.md"
+    ).read_text(encoding="utf-8")
     if "aoa-host-facts" not in policy_doc:
-        errors.append("mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md must mention aoa-host-facts")
+        errors.append("mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md must mention aoa-host-facts")
     if "runtime benchmarks" not in policy_doc and "runtime benchmark" not in policy_doc:
-        errors.append("mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
+        errors.append("mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md must mention runtime benchmarks")
 
     schema = json.loads(
         (
@@ -2957,7 +3122,15 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
     if "aoa-export-memo-candidate" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-export-memo-candidate")
 
-    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "MEMO_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "memo-seam"
+        / "docs"
+        / "MEMO_RUNTIME_SEAM.md"
+    ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-memo",
         "/memo/",
@@ -2965,7 +3138,7 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
         "Logs/memo-exports/",
     ):
         if snippet not in seam_doc:
-            errors.append(f"mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md must mention {snippet}")
 
     schema = json.loads(
         (
@@ -3009,7 +3182,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
     if "aoa-a2a-return-closeout-dry-run" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention aoa-a2a-return-closeout-dry-run")
 
-    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "EVAL_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "eval-seam"
+        / "docs"
+        / "EVAL_RUNTIME_SEAM.md"
+    ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-evals",
         "/evals/",
@@ -3021,7 +3202,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "Logs/a2a-return-closeouts/",
     ):
         if snippet not in seam_doc:
-            errors.append(f"mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md must mention {snippet}")
 
     evidence_schema = json.loads(
         (
@@ -3089,7 +3270,15 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
     if hook_example.get("exported_by") != "scripts/aoa-export-artifact-hook-candidate":
         errors.append("runtime artifact hook example must use exported_by scripts/aoa-export-artifact-hook-candidate")
 
-    a2a_doc = (ROOT / "mechanics" / "runtime-repair" / "docs" / "A2A_RETURN_DRY_RUN.md").read_text(encoding="utf-8")
+    a2a_doc = (
+        ROOT
+        / "mechanics"
+        / "runtime-repair"
+        / "parts"
+        / "a2a-return-dry-run"
+        / "docs"
+        / "A2A_RETURN_DRY_RUN.md"
+    ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-a2a-return-closeout-dry-run",
         "a2a_wave5_closeout_request",
@@ -3098,7 +3287,7 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
         "Logs/a2a-return-closeouts/",
     ):
         if snippet not in a2a_doc:
-            errors.append(f"mechanics/runtime-repair/docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
+            errors.append(f"mechanics/runtime-repair/parts/a2a-return-dry-run/docs/A2A_RETURN_DRY_RUN.md must mention {snippet}")
 
     a2a_schema = json.loads(
         (
@@ -3146,7 +3335,15 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
     if "playbooks/activation" not in runbook_doc and "/playbooks/" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention playbook advisory seam inspection")
 
-    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "PLAYBOOK_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "playbook-seam"
+        / "docs"
+        / "PLAYBOOK_RUNTIME_SEAM.md"
+    ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-playbooks",
         "/playbooks/",
@@ -3155,7 +3352,7 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
         "aoa-sync-federation-surfaces --layer aoa-playbooks",
     ):
         if snippet not in seam_doc:
-            errors.append(f"mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md must mention {snippet}")
 
 
 def validate_kag_runtime_seam(errors: list[str]) -> None:
@@ -3163,7 +3360,15 @@ def validate_kag_runtime_seam(errors: list[str]) -> None:
     if "/kag/" not in runbook_doc and "kag/registry" not in runbook_doc:
         errors.append("docs/RUNBOOK.md must mention KAG advisory seam inspection")
 
-    seam_doc = (ROOT / "mechanics" / "federation-seams" / "docs" / "KAG_RUNTIME_SEAM.md").read_text(encoding="utf-8")
+    seam_doc = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "kag-seam"
+        / "docs"
+        / "KAG_RUNTIME_SEAM.md"
+    ).read_text(encoding="utf-8")
     for snippet in (
         "aoa-kag",
         "tos-source",
@@ -3174,7 +3379,7 @@ def validate_kag_runtime_seam(errors: list[str]) -> None:
         "aoa-sync-federation-surfaces --layer tos-source",
     ):
         if snippet not in seam_doc:
-            errors.append(f"mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
+            errors.append(f"mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
 
 
 def validate_runtime_configs_mirror(errors: list[str]) -> None:

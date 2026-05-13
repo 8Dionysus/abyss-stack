@@ -110,8 +110,8 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     run["execution"]["build_snapshot_refs"] = [build_ref]
     run["artifact_refs"] = [
         "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md",
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
     run["proof_refs"] = [UNLOCK_PROOF_REF]
     run["chronicle_refs"] = [CHRONICLE_REF]
@@ -138,7 +138,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     run["next_hops"] = [
         {
             "action": "inspect",
-            "target_ref": "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
+            "target_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
             "note": "Keep the frontend bundle derived and cited.",
         },
         {
@@ -176,8 +176,8 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     bundle["views"]["campaign_lane_cards"][0]["stage_label"] = "collections before services"
     bundle["views"]["campaign_lane_cards"][0]["anchor_refs"] = [
         "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md",
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
     bundle["views"]["campaign_lane_cards"][0]["recommended_build_refs"] = [build_ref]
     bundle["views"]["campaign_lane_cards"][0]["source_ref"] = "Dionysus/seed_rpg_runtime_projection_pack.md#rpg-runtime-projection-wave"

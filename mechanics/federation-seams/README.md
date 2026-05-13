@@ -54,8 +54,8 @@ local-worker behavior.
 
 ## Active route
 
-Current source surfaces stay in `docs/*_RUNTIME_SEAM.md`, RPG runtime docs,
-TOS graph docs, federation scripts, compose modules, and config templates.
+Current source surfaces stay under the owning `parts/` routes, federation
+scripts, compose modules, and config templates.
 RPG runtime read-model schemas and examples live in
 `mechanics/federation-seams/parts/rpg-runtime/`, their source-generated transport
 files live in `mechanics/federation-seams/parts/rpg-runtime/generated/`, and their script

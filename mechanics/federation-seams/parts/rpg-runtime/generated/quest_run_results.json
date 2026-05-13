@@ -44,8 +44,8 @@
       },
       "artifact_refs": [
         "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md",
-        "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md",
+        "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md"
       ],
       "proof_refs": [
         "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
@@ -88,7 +88,7 @@
       "next_hops": [
         {
           "action": "inspect",
-          "target_ref": "abyss-stack/mechanics/federation-seams/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
+          "target_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
           "note": "Keep the frontend bundle derived and cited."
         },
         {

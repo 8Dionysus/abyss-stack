@@ -10,6 +10,7 @@ Use it when you need one compact artifact that says:
 - which bounded overlays should travel with that posture
 
 Surfaces:
+- `docs/MACHINE_FIT_POLICY.md` - bounded current-host fit policy
 - `schemas/schema.v1.json` - machine-readable contract
 - `examples/machine-fit.public.json.example` - public-safe example shape
 

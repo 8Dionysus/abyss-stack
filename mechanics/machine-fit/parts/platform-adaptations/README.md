@@ -8,6 +8,7 @@ Use it when you need one compact artifact that says:
 - what should be re-tested when the stack moves to another platform
 
 Surfaces:
+- `docs/PLATFORM_ADAPTATION_POLICY.md` - bounded platform-adaptation policy
 - `schemas/schema.v1.json` - machine-readable contract
 - `examples/platform-adaptation.public.json.example` - public-safe example shape
 

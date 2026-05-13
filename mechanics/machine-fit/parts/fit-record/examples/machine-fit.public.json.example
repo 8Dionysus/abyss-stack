@@ -180,7 +180,7 @@
     ]
   },
   "evidence_refs": [
-    "repo:mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md"
+    "repo:mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md"
   ],
   "non_claims": [
     "This record does not claim global model quality.",

@@ -30,7 +30,7 @@ activation:
   note: open when the federation-level RFC is ready and runtime/service boundaries can be planted cleanly
 anchor_ref:
   artifact: rpg_runtime_frontend_posture
-  ref: mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md
+  ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md
   note: runtime must own live state without becoming a shadow authority layer
 handoff_role: runtime-maintainer
 evidence:

@@ -1,9 +1,8 @@
 # Federation Seams Docs
 
-Package-owned federation seam detail lives here when it is more specific than
-the root route docs.
+Package-wide federation seam detail lives here.
 
-Active RPG runtime read-model schemas, examples, generated collections, and
-focused tests live under `../parts/rpg-runtime/`. RPG posture and builder notes
-now live here as package-local federation seam docs named in
-[PARTS.md](../PARTS.md).
+Part-specific federation seam docs, schemas, examples, generated collections,
+and focused tests live under the owning `../parts/` route.
+
+Use [PARTS.md](../PARTS.md) for the active source-surface map.
