@@ -1,10 +1,11 @@
 # Runtime Lifecycle Docs
 
-Package-owned lifecycle detail lives here when it is more specific than the
-root operator docs.
+This directory is now a route index.
 
-Active source-safe runtime status readout contracts and focused tests live under
-`../parts/status-readouts/`. Root docs such as
-`mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md`, `mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md`, and
-`docs/RUNBOOK.md` remain the human-facing policy and operator route surfaces
-named in [PARTS.md](../PARTS.md).
+Active part-owned lifecycle docs live under:
+
+- `../parts/status-readouts/docs/`
+- `../parts/wait-smoke/docs/`
+
+Root docs such as `docs/RUNBOOK.md` remain repo-wide operator route surfaces.
+Use [PARTS.md](../PARTS.md) for the active source-surface map.

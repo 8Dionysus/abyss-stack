@@ -16,3 +16,11 @@ root-facing because they remain operator orientation surfaces.
 
 Validation route: package-local pytest, `python scripts/validate_stack.py`, and
 `python scripts/validate_nested_agents.py`.
+
+## 2026-05-13 - Part-local docs topology
+
+Moved cache, usage, and internal-probe docs into the status-readouts and
+wait-smoke parts. Root runbook and deployment docs remain repo-wide operator
+entrypoints.
+
+Validation route: `python scripts/validate_stack.py`.

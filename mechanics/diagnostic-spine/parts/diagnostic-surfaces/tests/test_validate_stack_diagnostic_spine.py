@@ -20,7 +20,7 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
             Path("README.md"),
-            Path("mechanics") / "diagnostic-spine" / "docs" / "DIAGNOSTIC_SPINE.md",
+            Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "docs" / "DIAGNOSTIC_SPINE.md",
             Path("docs") / "RUNBOOK.md",
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "generated" / "diagnostic_surface_catalog.min.json",
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_target.schema.json",
@@ -64,12 +64,14 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
                 repo_root
                 / "mechanics"
                 / "diagnostic-spine"
+                / "parts"
+                / "diagnostic-surfaces"
                 / "docs"
                 / "DIAGNOSTIC_SPINE.md"
             ).unlink()
             errors = self.validate_surface(repo_root)
 
-        self.assertTrue(any("mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md" in error for error in errors))
+        self.assertTrue(any("mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md" in error for error in errors))
 
     def test_missing_diagnostic_surface_catalog_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

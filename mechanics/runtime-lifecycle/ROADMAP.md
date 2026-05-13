@@ -3,7 +3,8 @@
 ## Initial landing
 
 - create this package as the route home
-- keep active docs and scripts in their current source districts
+- keep root operator docs in root `docs/` and part-specific docs under owning
+  lifecycle parts
 - make future lifecycle movement reviewable
 - land optional cache/usage status readout schemas, examples, and tests under
   the package

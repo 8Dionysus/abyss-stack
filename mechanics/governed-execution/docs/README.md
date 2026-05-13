@@ -1,11 +1,14 @@
 # Governed Execution Docs
 
-Package-owned governed execution prose detail lives here.
+This directory is now a route index.
 
-Active governed execution schemas, examples, and focused tests live under
-`../parts/runtime-contracts/` and `../parts/candidate-exports/`.
+Active part-owned governed execution docs live under:
 
-Operator-facing doctrine remains in `mechanics/governed-execution/docs/GOVERNED_EXECUTION.md`; this package
-directory owns the mechanic-local machine contracts.
+- `../parts/governed-runner/docs/`
+- `../parts/local-worker-path/docs/`
+- `../parts/return-policy/docs/`
+
+Active schemas, examples, and focused tests live under the owning part
+directories.
 
 Use [PARTS.md](../PARTS.md) for the active source-surface map.

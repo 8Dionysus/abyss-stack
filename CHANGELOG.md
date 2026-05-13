@@ -19,6 +19,15 @@ Tracking starts with the community-docs baseline for this repository.
 - stack-side `abyss-machine` bridge capture via `scripts/aoa-machine-bridge`,
   with `Logs/machine-bridge/` latest/history/index routes and package-local
   contract docs
+- root `systemd/` route card and README so user-unit skeletons no longer sit
+  behind an unowned top-level folder
+- `Spark/README.md` as a plain route surface for the fast-loop lane
+- `scripts/README.md` as the stable command map for root wrappers, validators,
+  and their mechanic ownership routes
+- `docs/README.md` and `tests/README.md` as root district indexes for
+  repository docs and repo-level validation
+- `.agents/` and `.github/` route README surfaces, plus `.agents/AGENTS.md` for
+  repo-local agent overlays
 
 ### Changed
 
@@ -32,6 +41,16 @@ Tracking starts with the community-docs baseline for this repository.
 - GitHub mirror hygiene now keeps the repository source/install-only by
   ignoring obvious local runtime artifacts and failing validation on tracked
   live/private/heavy files while preserving public examples and fixtures
+- part-owned mechanic docs now live under their owning `parts/<part>/docs/`
+  homes for config projection, diagnostic spine, governed execution, inference
+  pilots, and runtime lifecycle, with validators, tests, quest anchors, and
+  generated diagnostic refs following the move
+- model-card docs no longer carry host-local source checkout links, and
+  `validate_stack.py` now blocks that portability drift while still allowing
+  the canonical deployed runtime root references
+- the local diagnostic-spine skill overlay now points at current part-local
+  diagnostic surfaces, and `validate_stack.py` blocks stale moved mechanic doc
+  references
 
 ## [0.2.2] - 2026-04-23
 

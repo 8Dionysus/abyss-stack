@@ -289,12 +289,12 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml",
                 (repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml")
                 .read_text(encoding="utf-8")
-                .replace("ref: mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"),
+                .replace("ref: mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"),
             )
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("ABYSS-STACK-Q-0007 must stay anchored to mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md" in error for error in errors)
+            any("ABYSS-STACK-Q-0007 must stay anchored to mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md" in error for error in errors)
         )
 
 

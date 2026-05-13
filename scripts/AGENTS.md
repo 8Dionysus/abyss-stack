@@ -5,20 +5,21 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 
 ## Read before editing
 1. `scripts/aoa-lib.sh`
-2. `.github/workflows/validate-stack.yml` in the source checkout only; the runtime `Configs/` mirror does not include `.github/`
-3. `docs/FIRST_RUN.md`
-4. `mechanics/diagnostic-spine/docs/DOCTOR.md`
-5. `docs/DEPLOYMENT.md`
-6. `docs/PRESETS.md`
-7. `docs/PROFILE_RECIPES.md`
-8. `mechanics/config-projection/docs/RENDER_TRUTH.md`
-9. `mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md`
-10. `mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md`
-11. `docs/PATHS.md`
-12. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
-13. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`
-14. `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`
-15. `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`
+2. `scripts/README.md`
+3. `.github/workflows/validate-stack.yml` in the source checkout only; the runtime `Configs/` mirror does not include `.github/`
+4. `docs/FIRST_RUN.md`
+5. `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
+6. `docs/DEPLOYMENT.md`
+7. `docs/PRESETS.md`
+8. `docs/PROFILE_RECIPES.md`
+9. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
+10. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
+11. `mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md`
+12. `docs/PATHS.md`
+13. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
+14. `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md`
+15. `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`
+16. `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.

@@ -35,7 +35,7 @@ scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-f
 
 `aoa-first-run --strict` is strict about layout and bootstrapped config presence, but still ignores missing secrets on that first pass by design.
 
-Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md).
+Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
 If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack, the `aoa-routing` advisory pack, the `aoa-memo` recall pack, the `aoa-evals` eval-selection pack, the `aoa-playbooks` advisory pack, the `aoa-kag` derived retrieval pack, and the source-owned `tos-source` handoff companion after bootstrap:
 
@@ -80,7 +80,7 @@ scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
 
-Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](../mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md).
+Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
 ## Scenario B: Windows checkout plus Linux runtime
 
@@ -278,9 +278,9 @@ scripts/aoa-profile-endpoints --profile core
 
 After that capture, `aoa-up`, `aoa-down`, `aoa-render-services`, and `aoa-render-config` automatically honor the latest machine-fit posture unless you explicitly disable it.
 
-Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md).
+Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
-For claim wording after bootstrap, use [TRUTH_SURFACES](../mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md).
+For claim wording after bootstrap, use [TRUTH_SURFACES](../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md).
 
 For local-Ollama profiles, `aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model resident for `30m` unless the stack restarts or the model is explicitly evicted.
 

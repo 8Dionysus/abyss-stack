@@ -28,7 +28,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "runtime-substrate hardening" in roadmap
     assert "without claiming live service mutation" in roadmap
     assert payload["schema_version"] == "abyss_stack_diagnostic_surface_catalog_v1"
-    assert payload["authority_ref"] == "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md"
+    assert payload["authority_ref"] == "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"
     assert "langchain-api" in roadmap
     assert "`llama.cpp`" in roadmap
     assert "LangGraph" in roadmap
@@ -46,7 +46,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
         "scripts/aoa-sync-configs",
         "scripts/validate_stack.py",
         "scripts/release_check.py",
-        "mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
@@ -76,8 +76,8 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
         "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.example.json",
         "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json",
         "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json",
-        "mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md",
-        "mechanics/inference-pilots/docs/LLAMACPP_PILOT.md",
+        "mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md",
+        "mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md",
         "mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md",
         "compose/tuning/llamacpp.runtime-fallback.yml",
         "compose/tuning/llamacpp.intel-285h.cpu-safe.yml",

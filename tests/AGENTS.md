@@ -13,6 +13,7 @@ They should prove the source checkout contract without requiring a live deployed
 
 ## Local contract
 
+- Keep `tests/README.md` as the short index for repo-level tests.
 - Keep tests deterministic and public-safe.
 - Prefer fixtures, temp directories, stub inputs, and loopback assumptions over live services.
 - Do not depend on no live host state, private `/srv/AbyssOS/abyss-stack` captures, real secrets, local model downloads, or workstation-specific paths.

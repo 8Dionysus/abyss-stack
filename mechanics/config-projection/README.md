@@ -54,5 +54,5 @@ and [federation-seams](../federation-seams/README.md) for owner-surface mirrors.
 ## Active route
 
 Current source surfaces stay in `config-templates/`, `env/`, `scripts/`, and
-`mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md`.
+`mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`.
 

@@ -45,9 +45,9 @@
 
 ## Evidence Surfaces
 
-- [LLAMACPP_PILOT](/home/dionysus/src/abyss-stack/mechanics/inference-pilots/docs/LLAMACPP_PILOT.md)
+- [LLAMACPP_PILOT](../../../../../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md)
 - [MACHINE_FIT_POLICY](../../../fit-record/docs/MACHINE_FIT_POLICY.md)
-- [compose tuning README](/home/dionysus/src/abyss-stack/compose/tuning/README.md)
+- [compose tuning README](../../../../../../compose/tuning/README.md)
 
 ## Next Test
 

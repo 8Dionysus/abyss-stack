@@ -32,7 +32,7 @@ activation:
   note: open when runtime-body self-diagnosis needs a stable session artifact and honest handoff to self-repair or quest harvest
 anchor_ref:
   artifact: diagnostic_spine
-  ref: mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md
+  ref: mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md
   note: runtime diagnosis stays a read model with handoff posture and must not grant mutation authority
 handoff_role: runtime-maintainer
 evidence:

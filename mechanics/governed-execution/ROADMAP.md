@@ -8,6 +8,7 @@
 
 ## Next candidates
 
-- move long-lived doctrine into package `docs/`
 - split pilot evidence from standing execution law
 - add package-local tests only if discovery and release checks include them
+- keep governed runner, return-policy, and context-budget docs under their
+  owning parts

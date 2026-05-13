@@ -19,7 +19,7 @@ Use the canonical skill in `aoa-skills` as the source of truth, then adapt it
 through the local runtime contracts and docs that live in this repository.
 
 Canonical source:
-- `/srv/aoa-skills/skills/abyss-self-diagnostic-spine/SKILL.md`
+- `repo:8Dionysus/aoa-skills skills/abyss-self-diagnostic-spine/SKILL.md`
 
 ## Local overlay notes
 
@@ -30,9 +30,9 @@ In `abyss-stack`, the diagnostic spine stays:
 - separate from mutation authority
 
 Primary local surfaces:
-- `mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`
 - `scripts/aoa-diagnose`
-- `scripts/_aoa_diagnose.py`
+- `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`
 - `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`
 - `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`
 - `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json`

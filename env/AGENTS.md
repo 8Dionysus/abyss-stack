@@ -5,7 +5,7 @@ This directory contains public-safe env examples only. It does not contain live 
 
 ## Read before editing
 1. `env/README.md`
-2. `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md`
+2. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
 3. `docs/PATHS.md`
 4. `docs/STORAGE_LAYOUT.md`
 
@@ -27,7 +27,7 @@ This directory contains public-safe env examples only. It does not contain live 
 
 ## When adding or changing variables
 - Update the consuming compose module or service config if the contract changes.
-- Update `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md` if the change affects secret bootstrap.
+- Update `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md` if the change affects secret bootstrap.
 - Update `scripts/aoa-check-layout` if a new secret-bearing file becomes required.
 - Update `scripts/validate_stack.py` if the file should be treated as required project structure.
 
@@ -38,7 +38,7 @@ scripts/aoa-first-run --strict
 scripts/aoa-check-layout --ignore-secrets
 ```
 
-If the example set changed, re-read `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md` and confirm the bootstrap instructions still match.
+If the example set changed, re-read `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md` and confirm the bootstrap instructions still match.
 
 ## Hard no
 - do not commit live `.env` files

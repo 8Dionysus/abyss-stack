@@ -163,7 +163,8 @@ The same runner can also be pointed at an alternate backend/program root:
 scripts/aoa-langgraph-pilot --url http://127.0.0.1:5403/run --program-id langgraph-sidecar-llamacpp-v1 run-case fixture-docs-wording-alignment --until approval
 ```
 
-Use [LANGGRAPH_PILOT](LANGGRAPH_PILOT.md) for the sidecar contract.
+Use [LANGGRAPH_PILOT](../../langgraph-pilot/docs/LANGGRAPH_PILOT.md) for the
+sidecar contract.
 
 That sidecar surface established the now-adopted execution posture:
 
@@ -182,7 +183,7 @@ scripts/aoa-long-horizon-pilot resume-scenario <scenario-id>
 scripts/aoa-long-horizon-pilot status --all
 ```
 
-Use [W5_PILOT](../legacy/raw/W5_PILOT.md) for the preserved W5 contract.
+Use [W5_PILOT](../../../legacy/raw/W5_PILOT.md) for the preserved W5 contract.
 
 The W5 runner:
 
@@ -207,7 +208,7 @@ scripts/aoa-bounded-autonomy-pilot resume-scenario <scenario-id>
 scripts/aoa-bounded-autonomy-pilot status --all
 ```
 
-Use [W6_PILOT](../legacy/raw/W6_PILOT.md) for the preserved W6 contract.
+Use [W6_PILOT](../../../legacy/raw/W6_PILOT.md) for the preserved W6 contract.
 
 The W6 runner:
 
@@ -222,7 +223,9 @@ The W6 runner:
 
 ## Truth status
 
-Use [TRUTH_SURFACES](../../diagnostic-spine/docs/TRUTH_SURFACES.md) when reading or publishing trial outcomes.
+Use
+[TRUTH_SURFACES](../../../../diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md)
+when reading or publishing trial outcomes.
 
 Trial summaries should keep these fields separate:
 
@@ -249,7 +252,8 @@ scripts/aoa-status --autonomy --json
 
 `W5` and `W6` remain pilot evidence.
 The first governed mutation lane now lives at `scripts/aoa-governed-run`.
-The canonical runtime contract for that lane is documented in [GOVERNED_EXECUTION](../../governed-execution/docs/GOVERNED_EXECUTION.md).
+The canonical runtime contract for that lane is documented in
+[GOVERNED_EXECUTION](../../../../governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md).
 
 Use:
 

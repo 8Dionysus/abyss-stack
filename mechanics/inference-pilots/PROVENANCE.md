@@ -7,7 +7,7 @@ The active route remains:
 - `README.md`
 - `DIRECTION.md`
 - `PARTS.md`
-- `mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md`
+- `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`
 - current root pilot commands for active operator workflows
 
 Old W5/W6 runner docs and scripts are preserved under package-local

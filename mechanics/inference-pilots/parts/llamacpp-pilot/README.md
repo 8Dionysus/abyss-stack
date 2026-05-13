@@ -1,6 +1,6 @@
 # llama.cpp Pilot
 
-Routes `mechanics/inference-pilots/docs/LLAMACPP_PILOT.md`, `scripts/aoa-llamacpp-pilot`, and
+Routes `mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md`, `scripts/aoa-llamacpp-pilot`, and
 `compose/modules/32-llamacpp-inference.yml`, with focused coverage in
 `tests/test_aoa_llamacpp_pilot.py`.
 

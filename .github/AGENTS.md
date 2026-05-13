@@ -8,6 +8,7 @@ issue templates, CODEOWNERS, and repository metadata.
 Read the root `AGENTS.md` first. Root `AGENTS.md` owns repository identity,
 runtime owner boundaries, the branch/PR/CI/merge route, and the shortest local
 validation path. This file owns only the GitHub-native files under `.github/`.
+Use `.github/README.md` as the short human map for this directory.
 
 Do not encode sibling-repo doctrine, private workspace assumptions, host secrets,
 or hidden release behavior here. Do not add workflow steps that mutate sibling
