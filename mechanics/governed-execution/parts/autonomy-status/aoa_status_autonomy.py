@@ -32,19 +32,23 @@ def find_repo_root(start: Path) -> Path:
 
 SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
 
+PRESERVED_LONG_HORIZON_PROGRAM_ID = "w5-langgraph-llamacpp-v1"
+PRESERVED_LONG_HORIZON_INDEX_NAME = "W5-long-horizon-index.json"
+PRESERVED_BOUNDED_AUTONOMY_PROGRAM_ID = "w6-bounded-autonomy-llamacpp-v1"
+PRESERVED_BOUNDED_AUTONOMY_INDEX_NAME = "W6-autonomy-index.json"
 LONG_HORIZON_INDEX_PATH = (
     STACK_ROOT
     / "Logs"
     / "local-ai-trials"
-    / "w5-langgraph-llamacpp-v1"
-    / "W5-long-horizon-index.json"
+    / PRESERVED_LONG_HORIZON_PROGRAM_ID
+    / PRESERVED_LONG_HORIZON_INDEX_NAME
 )
 BOUNDED_AUTONOMY_INDEX_PATH = (
     STACK_ROOT
     / "Logs"
     / "local-ai-trials"
-    / "w6-bounded-autonomy-llamacpp-v1"
-    / "W6-autonomy-index.json"
+    / PRESERVED_BOUNDED_AUTONOMY_PROGRAM_ID
+    / PRESERVED_BOUNDED_AUTONOMY_INDEX_NAME
 )
 FEDERATION_LAYERS = [
     "aoa-agents",

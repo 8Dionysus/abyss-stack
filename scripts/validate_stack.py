@@ -2324,6 +2324,154 @@ def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
         errors.append("legacy local AI trials runner must stay executable")
 
 
+def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> None:
+    langgraph_code_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "langgraph-pilot"
+        / "aoa_langgraph_pilot.py"
+    )
+    langgraph_doc_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "langgraph-pilot"
+        / "docs"
+        / "LANGGRAPH_PILOT.md"
+    )
+    llamacpp_code_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "llamacpp-pilot"
+        / "aoa_llamacpp_pilot.py"
+    )
+    llamacpp_doc_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "llamacpp-pilot"
+        / "docs"
+        / "LLAMACPP_PILOT.md"
+    )
+    autonomy_status_path = (
+        ROOT
+        / "mechanics"
+        / "governed-execution"
+        / "parts"
+        / "autonomy-status"
+        / "aoa_status_autonomy.py"
+    )
+    autonomy_status_readme_path = (
+        ROOT
+        / "mechanics"
+        / "governed-execution"
+        / "parts"
+        / "autonomy-status"
+        / "README.md"
+    )
+
+    langgraph_code = read_text_or_none(langgraph_code_path) or ""
+    langgraph_doc = read_text_or_none(langgraph_doc_path) or ""
+    llamacpp_code = read_text_or_none(llamacpp_code_path) or ""
+    llamacpp_doc = read_text_or_none(llamacpp_doc_path) or ""
+    autonomy_status = read_text_or_none(autonomy_status_path) or ""
+    autonomy_status_readme = read_text_or_none(autonomy_status_readme_path) or ""
+
+    for required_snippet in (
+        "LEGACY_EDIT_GATE_ID",
+        "LEGACY_EDIT_GATE_INDEX_NAME",
+        "preserved bounded-edit compatibility contract",
+    ):
+        if required_snippet not in langgraph_code:
+            errors.append(
+                "mechanics/inference-pilots/parts/langgraph-pilot/aoa_langgraph_pilot.py "
+                f"must route the preserved edit gate through `{required_snippet}`"
+            )
+
+    for required_snippet in (
+        "preserved local-trials bounded-edit",
+        "bounded-edit compatibility gate",
+        "`W0` through `W4` wire IDs",
+    ):
+        if required_snippet not in langgraph_doc:
+            errors.append(
+                "mechanics/inference-pilots/parts/langgraph-pilot/docs/LANGGRAPH_PILOT.md "
+                f"must explain `{required_snippet}`"
+            )
+
+    for required_snippet in (
+        "LEGACY_RUNTIME_GATE_ID",
+        "LEGACY_EDIT_GATE_ID",
+        "LLAMACPP_RUNTIME_GATE_PROGRAM_ID",
+        "LLAMACPP_EDIT_GATE_PROGRAM_ID",
+        "runtime_gate_result",
+        "edit_fixture_gate_result",
+    ):
+        if required_snippet not in llamacpp_code:
+            errors.append(
+                "mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py "
+                f"must route promotion gates through `{required_snippet}`"
+            )
+
+    for required_snippet in (
+        "runtime compatibility gate",
+        "edit fixture compatibility gate",
+        "`W0` wire ID",
+        "`W4` wire ID",
+    ):
+        if required_snippet not in llamacpp_doc:
+            errors.append(
+                "mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md "
+                f"must explain `{required_snippet}`"
+            )
+
+    for required_snippet in (
+        "PRESERVED_LONG_HORIZON_PROGRAM_ID",
+        "PRESERVED_LONG_HORIZON_INDEX_NAME",
+        "PRESERVED_BOUNDED_AUTONOMY_PROGRAM_ID",
+        "PRESERVED_BOUNDED_AUTONOMY_INDEX_NAME",
+    ):
+        if required_snippet not in autonomy_status:
+            errors.append(
+                "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py "
+                f"must route preserved pilot indexes through `{required_snippet}`"
+            )
+    if "pilot index IDs" not in autonomy_status_readme:
+        errors.append(
+            "mechanics/governed-execution/parts/autonomy-status/README.md must explain preserved pilot index IDs"
+        )
+
+    active_texts = {
+        langgraph_code_path: langgraph_code,
+        langgraph_doc_path: langgraph_doc,
+        llamacpp_code_path: llamacpp_code,
+        llamacpp_doc_path: llamacpp_doc,
+    }
+    forbidden_active_phrases = (
+        "W4-shaped",
+        "widen W4",
+        "existing W4 bounded runner",
+        "W4 bounded edit contract",
+        "W4 bounded-mutation contract",
+        "W4 supervised-edit contract",
+        "W4-compatible",
+        "W4 dry-run promotion verdict",
+        "bounded W0 + W4 promotion gate",
+    )
+    for path, text in active_texts.items():
+        for phrase in forbidden_active_phrases:
+            if phrase in text:
+                errors.append(
+                    f"{path.relative_to(ROOT)} must use compatibility gate language instead of `{phrase}`"
+                )
+
+
 def validate_root_design_surfaces(errors: list[str]) -> None:
     def read_required(path: Path) -> str:
         try:
@@ -3866,6 +4014,7 @@ def main() -> int:
     validate_required_files(errors)
     validate_root_residual_topology(errors)
     validate_local_trials_legacy_bridge(errors)
+    validate_inference_pilot_compatibility_gate_language(errors)
     validate_root_design_surfaces(errors)
     validate_sync_managed_items(errors)
     validate_federation_required_files(errors)

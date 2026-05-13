@@ -67,10 +67,14 @@ LLAMACPP_HEALTH_URL = "http://127.0.0.1:11435/health"
 LLAMACPP_HEALTH_FALLBACK_URL = "http://127.0.0.1:11435/v1/health"
 CANDIDATE_HEALTH_URL = "http://127.0.0.1:5403/health"
 CANDIDATE_RUN_URL = "http://127.0.0.1:5403/run"
-LLAMACPP_W0_PROGRAM_ID = "qwen-llamacpp-pilot-v1"
-LLAMACPP_W4_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
-LLAMACPP_W4_GATE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / "langgraph-sidecar-llamacpp-promotion-gate"
-LLAMACPP_W4_GATE_MIRROR_ROOT = Path("/srv/Dionysus/reports/local-ai-trials/langgraph-sidecar-llamacpp-promotion-gate")
+LEGACY_RUNTIME_GATE_ID = "W0"
+LEGACY_EDIT_GATE_ID = "W4"
+LEGACY_RUNTIME_GATE_INDEX_NAME = f"{LEGACY_RUNTIME_GATE_ID}-runtime-index.json"
+LEGACY_EDIT_GATE_INDEX_NAME = f"{LEGACY_EDIT_GATE_ID}-langgraph-sidecar-index.json"
+LLAMACPP_RUNTIME_GATE_PROGRAM_ID = "qwen-llamacpp-pilot-v1"
+LLAMACPP_EDIT_GATE_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
+LLAMACPP_EDIT_GATE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / "langgraph-sidecar-llamacpp-promotion-gate"
+LLAMACPP_EDIT_GATE_MIRROR_ROOT = Path("/srv/Dionysus/reports/local-ai-trials/langgraph-sidecar-llamacpp-promotion-gate")
 
 CANDIDATE_MODEL_SPECS = (
     {
@@ -818,8 +822,8 @@ def screening_report(
             [
                 "",
                 "## Promotion Gate",
-                f"- W0 gate: `{promotion['w0_gate_result']}`",
-                f"- W4 fixture gate: `{promotion['w4_gate_result']}`",
+                f"- runtime compatibility gate: `{promotion['runtime_gate_result']}`",
+                f"- edit fixture compatibility gate: `{promotion['edit_fixture_gate_result']}`",
                 f"- baseline healthy after teardown: `{promotion['baseline_after_teardown']}`",
                 f"- recommendation: `{promotion['recommendation']}`",
             ]
@@ -1045,7 +1049,7 @@ def candidate_screening(
 
 
 def auto_approve_fixture(log_root: Path, *, case_id: str) -> Path:
-    approval_path = log_root / "waves" / "W4" / case_id / "artifacts" / "approval.status.json"
+    approval_path = log_root / "waves" / LEGACY_EDIT_GATE_ID / case_id / "artifacts" / "approval.status.json"
     payload = json.loads(approval_path.read_text(encoding="utf-8"))
     payload["status"] = "approved"
     payload["approved"] = True
@@ -1074,32 +1078,36 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
                 "--url",
                 CANDIDATE_RUN_URL,
                 "--program-id",
-                LLAMACPP_W0_PROGRAM_ID,
+                LLAMACPP_RUNTIME_GATE_PROGRAM_ID,
                 "run-wave",
-                "W0",
+                LEGACY_RUNTIME_GATE_ID,
             ],
             env=base_env(),
             check=True,
         )
         w0_index = json.loads(
-            (STACK_ROOT / "Logs" / "local-ai-trials" / LLAMACPP_W0_PROGRAM_ID / "W0-runtime-index.json").read_text(
-                encoding="utf-8"
-            )
+            (
+                STACK_ROOT
+                / "Logs"
+                / "local-ai-trials"
+                / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
+                / LEGACY_RUNTIME_GATE_INDEX_NAME
+            ).read_text(encoding="utf-8")
         )
 
-        shutil.rmtree(LLAMACPP_W4_GATE_LOG_ROOT, ignore_errors=True)
-        shutil.rmtree(LLAMACPP_W4_GATE_MIRROR_ROOT, ignore_errors=True)
+        shutil.rmtree(LLAMACPP_EDIT_GATE_LOG_ROOT, ignore_errors=True)
+        shutil.rmtree(LLAMACPP_EDIT_GATE_MIRROR_ROOT, ignore_errors=True)
         run_cmd(
             [
                 str(SCRIPT_DIR / "aoa-langgraph-pilot"),
                 "--url",
                 CANDIDATE_RUN_URL,
                 "--program-id",
-                LLAMACPP_W4_PROGRAM_ID,
+                LLAMACPP_EDIT_GATE_PROGRAM_ID,
                 "--log-root",
-                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                str(LLAMACPP_EDIT_GATE_LOG_ROOT),
                 "--mirror-root",
-                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                str(LLAMACPP_EDIT_GATE_MIRROR_ROOT),
                 "materialize",
             ],
             env=base_env(),
@@ -1112,11 +1120,11 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
                 "--url",
                 CANDIDATE_RUN_URL,
                 "--program-id",
-                LLAMACPP_W4_PROGRAM_ID,
+                LLAMACPP_EDIT_GATE_PROGRAM_ID,
                 "--log-root",
-                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                str(LLAMACPP_EDIT_GATE_LOG_ROOT),
                 "--mirror-root",
-                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                str(LLAMACPP_EDIT_GATE_MIRROR_ROOT),
                 "run-case",
                 "fixture-docs-wording-alignment",
                 "--until",
@@ -1125,7 +1133,7 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
             env=base_env(),
             check=True,
         )
-        fixture_log_root = LLAMACPP_W4_GATE_LOG_ROOT
+        fixture_log_root = LLAMACPP_EDIT_GATE_LOG_ROOT
         auto_approve_fixture(fixture_log_root, case_id="fixture-docs-wording-alignment")
         run_cmd(
             [
@@ -1133,11 +1141,11 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
                 "--url",
                 CANDIDATE_RUN_URL,
                 "--program-id",
-                LLAMACPP_W4_PROGRAM_ID,
+                LLAMACPP_EDIT_GATE_PROGRAM_ID,
                 "--log-root",
-                str(LLAMACPP_W4_GATE_LOG_ROOT),
+                str(LLAMACPP_EDIT_GATE_LOG_ROOT),
                 "--mirror-root",
-                str(LLAMACPP_W4_GATE_MIRROR_ROOT),
+                str(LLAMACPP_EDIT_GATE_MIRROR_ROOT),
                 "resume-case",
                 "fixture-docs-wording-alignment",
             ],
@@ -1145,7 +1153,7 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
             check=True,
         )
         w4_index = json.loads(
-            (fixture_log_root / "W4-langgraph-sidecar-index.json").read_text(encoding="utf-8")
+            (fixture_log_root / LEGACY_EDIT_GATE_INDEX_NAME).read_text(encoding="utf-8")
         )
     finally:
         stop_sidecars()
@@ -1161,10 +1169,26 @@ def run_promotion_gate(args: argparse.Namespace, winner: dict[str, Any]) -> dict
     return {
         "winner_quant": winner["quant"],
         "winner_model_host_path": winner["model_host_path"],
+        "runtime_gate_result": w0_index.get("gate_result"),
+        "runtime_gate_index_ref": str(
+            STACK_ROOT
+            / "Logs"
+            / "local-ai-trials"
+            / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
+            / LEGACY_RUNTIME_GATE_INDEX_NAME
+        ),
+        "edit_fixture_gate_result": w4_index.get("gate_result"),
+        "edit_fixture_gate_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / LEGACY_EDIT_GATE_INDEX_NAME),
         "w0_gate_result": w0_index.get("gate_result"),
-        "w0_index_ref": str(STACK_ROOT / "Logs" / "local-ai-trials" / LLAMACPP_W0_PROGRAM_ID / "W0-runtime-index.json"),
+        "w0_index_ref": str(
+            STACK_ROOT
+            / "Logs"
+            / "local-ai-trials"
+            / LLAMACPP_RUNTIME_GATE_PROGRAM_ID
+            / LEGACY_RUNTIME_GATE_INDEX_NAME
+        ),
         "w4_gate_result": w4_index.get("gate_result"),
-        "w4_index_ref": str(LLAMACPP_W4_GATE_LOG_ROOT / "W4-langgraph-sidecar-index.json"),
+        "w4_index_ref": str(LLAMACPP_EDIT_GATE_LOG_ROOT / LEGACY_EDIT_GATE_INDEX_NAME),
         "baseline_after_teardown": bool(baseline_after_teardown.get("ready")),
         "baseline_recheck_payload": baseline_after_teardown,
         "recommendation": recommendation,
@@ -1315,15 +1339,20 @@ def promote_command(args: argparse.Namespace) -> int:
     if winner is not None:
         promotion = run_promotion_gate(args, winner)
     else:
+        baseline_after_teardown = wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0)
         promotion = {
             "winner_quant": None,
             "winner_model_host_path": None,
+            "runtime_gate_result": "not-run",
+            "runtime_gate_index_ref": None,
+            "edit_fixture_gate_result": "not-run",
+            "edit_fixture_gate_index_ref": None,
             "w0_gate_result": "not-run",
             "w0_index_ref": None,
             "w4_gate_result": "not-run",
             "w4_index_ref": None,
-            "baseline_after_teardown": bool(wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0).get("ready")),
-            "baseline_recheck_payload": wait_for_url("langchain-api", BASE_HEALTH_URL, timeout_s=20.0),
+            "baseline_after_teardown": bool(baseline_after_teardown.get("ready")),
+            "baseline_recheck_payload": baseline_after_teardown,
             "recommendation": "stay on Ollama",
             "reason": "no candidate satisfied the stability and exact-reply regression rule",
         }
@@ -1435,7 +1464,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     promote = subparsers.add_parser(
         "promote",
-        help="Screen fixed llama.cpp quants and run the bounded W0 + W4 promotion gate on the winner.",
+        help="Screen fixed llama.cpp quants and run the runtime plus edit compatibility promotion gates on the winner.",
     )
     add_common_flags(promote)
     promote.set_defaults(func=promote_command)

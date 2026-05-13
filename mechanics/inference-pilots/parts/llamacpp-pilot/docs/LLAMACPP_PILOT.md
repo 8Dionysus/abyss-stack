@@ -129,8 +129,8 @@ build instead of trying to force `Vulkan0` through the default
 
 - screens the fixed `Q4_K_M` and `Q6_K` `bartowski` candidates on the same CPU-safe sidecar posture
 - chooses a winner only if the candidate stays stable and `exact-reply` is not more than `15%` slower than the fresh historical comparison basis
-- runs `W0` on `http://127.0.0.1:5403/run` under `qwen-llamacpp-pilot-v1`
-- runs one disposable `W4` docs fixture dry-run under `langgraph-sidecar-llamacpp-v1`
+- runs the preserved runtime compatibility gate on `http://127.0.0.1:5403/run` under `qwen-llamacpp-pilot-v1` using the `W0` wire ID
+- runs one disposable edit fixture compatibility gate under `langgraph-sidecar-llamacpp-v1` using the `W4` wire ID
 - writes the promotion packet under:
   - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/promotions/llamacpp-promotion-gate-v1/`
 
@@ -238,8 +238,8 @@ Promotion packets stay runtime-local too and capture:
 - fresh historical comparison smoke + bench
 - both quant screening outcomes
 - winner selection
-- `W0` verdict on the sidecar path
-- disposable `W4` fixture verdict
+- runtime compatibility verdict on the sidecar path
+- disposable edit fixture compatibility verdict
 - rollback status after sidecar teardown
 
 ## Promotion rule
