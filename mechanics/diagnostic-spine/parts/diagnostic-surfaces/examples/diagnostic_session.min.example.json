@@ -41,7 +41,7 @@
       "owner_hint": "abyss-stack/config-sync",
       "evidence_refs": [
         "python:scripts/validate_stack.py --parity-check",
-        "mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md"
+        "mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md"
       ]
     }
   ],

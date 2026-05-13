@@ -63,8 +63,8 @@
 
 ## Variant Cards
 
-- [qwen3-4b-int4-ov](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-4b-int4-ov.md)
-- [qwen3-8b-int4-ov](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-8b-int4-ov.md)
+- [qwen3-4b-int4-ov](qwen3-4b-int4-ov.md)
+- [qwen3-8b-int4-ov](qwen3-8b-int4-ov.md)
 
 ## Candidate Lanes
 
@@ -73,9 +73,9 @@
 
 ## Evidence Surfaces
 
-- [MODEL_CARDS](/home/dionysus/src/abyss-stack/mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md)
-- [PROFILE_RECIPES](/home/dionysus/src/abyss-stack/docs/PROFILE_RECIPES.md)
-- [SERVICE_CATALOG](/home/dionysus/src/abyss-stack/docs/SERVICE_CATALOG.md)
+- [MODEL_CARDS](../MODEL_CARDS.md)
+- [PROFILE_RECIPES](../../../../../../docs/PROFILE_RECIPES.md)
+- [SERVICE_CATALOG](../../../../../../docs/SERVICE_CATALOG.md)
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T155804Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab-extended`

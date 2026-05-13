@@ -1,9 +1,15 @@
 # Inference Pilots Docs
 
-Package-owned inference pilot prose detail lives here.
+This directory is now a route index.
+
+Active part-owned inference pilot docs live under:
+
+- `../parts/langgraph-pilot/docs/`
+- `../parts/llamacpp-pilot/docs/`
+- `../parts/local-trials/docs/`
+- `../parts/promotion-loop/docs/`
 
 Active runtime benchmark schemas, examples, and focused tests live under
 `../parts/local-trials/`.
 
-Operator-facing narrative remains in root `docs/` surfaces such as
-`mechanics/inference-pilots/docs/RUNTIME_BENCH_POLICY.md` and `mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md`.
+Use [PARTS.md](../PARTS.md) for the active source-surface map.

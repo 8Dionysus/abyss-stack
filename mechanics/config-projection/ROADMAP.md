@@ -8,7 +8,6 @@
 
 ## Next candidates
 
-- audit `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md` for package-local detail
 - add package-specific examples only after validators know their location
-- decide whether render-truth docs stay root-facing or split
-
+- keep bootstrap/rendering docs part-local and update validators with any future
+  path movement

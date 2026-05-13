@@ -1,7 +1,10 @@
 # Config Projection Docs
 
-Package-owned config projection detail can land here in later waves.
+This directory is now a route index.
 
-For now, use the active source surfaces named in
-[PARTS.md](../PARTS.md).
+Active part-owned config projection docs live under:
 
+- `../parts/bootstrap/docs/`
+- `../parts/rendering/docs/`
+
+Use [PARTS.md](../PARTS.md) for the full active surface map.

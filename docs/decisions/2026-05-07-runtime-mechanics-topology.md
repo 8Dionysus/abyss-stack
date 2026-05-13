@@ -54,3 +54,47 @@ skill, memo, eval, playbook, routing, KAG, stats, machine, or operator truth.
 - Later waves should move concrete artifacts only with validators, links, and
   deployment sync expectations updated in the same change.
 
+## Continuation: 2026-05-13 part-local docs topology
+
+The next topology wave moved unambiguous part-owned mechanic documents from
+package-level `docs/` directories into their owning `parts/<part>/docs/`
+homes. Package `docs/README.md` files remain as route indexes rather than active
+contract homes.
+
+This continuation applies the original decision rather than replacing it:
+active docs move only where an owning part already exists, validators and tests
+move with the paths, and generated references such as the diagnostic surface
+catalog keep pointing at the active authority surface.
+
+Legacy-only Agon and experience-runtime artifact families stay in package-local
+`legacy/` containment until a separate active contract design exists.
+
+The same continuation also removed host-local source checkout links from
+model-card docs and added a narrow validator guard against reintroducing
+absolute workstation checkout paths as committed source links. The canonical
+deployed runtime root remains an intentional runtime contract, not a source
+checkout link.
+
+It also added a root `systemd/` route card and README. The actual unit contract
+still belongs under `systemd/user/` and `mechanics/runtime-lifecycle/`; the new
+root surfaces only make the top-level folder legible.
+
+`Spark/README.md` was added for the same root-folder legibility reason. It does
+not make Spark a new owner; it only points to the local AGENTS and SWARM
+surfaces for bounded fast-loop work.
+
+`scripts/README.md` was added as a command map instead of moving root wrappers
+under mechanics. Operator command names stay stable in `scripts/`; mechanic
+parts own the meaning, contracts, tests, and implementation homes where moving
+them is safe.
+
+Root `docs/README.md` and `tests/README.md` were added as short indexes. They
+do not create new authority; they make repo-wide docs and repo-level validation
+discoverable while preserving mechanic-owned docs and tests under `mechanics/`.
+
+Hidden source-owned districts now follow the same rule: `.github/README.md`
+maps GitHub-native automation, and `.agents/README.md` plus `.agents/AGENTS.md`
+map repo-local agent overlays. The diagnostic-spine overlay was updated to the
+current part-local diagnostic paths, and the validator now blocks stale moved
+mechanic doc references so hidden overlays cannot keep old package-level docs
+alive.

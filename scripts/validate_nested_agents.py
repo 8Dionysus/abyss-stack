@@ -39,6 +39,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     ),
     'docs/AGENTS.md': (
         'repo-wide operator and source-checkout documentation',
+        'docs/README.md',
         'Mechanic-owned runtime doctrine',
         'docs/decisions',
         'python scripts/validate_nested_agents.py',
@@ -49,8 +50,15 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'local overlays thin',
         'python scripts/validate_nested_agents.py',
     ),
+    '.agents/AGENTS.md': (
+        'repo-local agent install and overlay surfaces',
+        '.agents/README.md',
+        'canonical skill law',
+        'python scripts/validate_nested_agents.py',
+    ),
     'scripts/AGENTS.md': (
         'runtime bridge, bootstrap helpers',
+        'scripts/README.md',
         'scripts/validate_stack.py',
         'AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack',
         'aoa-host-facts',
@@ -63,14 +71,22 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'systemd-analyze --user verify',
         'do not point units at the source checkout',
     ),
+    'systemd/AGENTS.md': (
+        'source-managed systemd route surfaces',
+        'systemd/user/',
+        'mechanics/runtime-lifecycle',
+        'Do not point units at the source checkout',
+    ),
     '.github/AGENTS.md': (
         'GitHub platform surface',
+        '.github/README.md',
         'GitHub automation public-safe',
         'Repo Validation',
         'root route card',
     ),
     'Spark/AGENTS.md': (
         'fast-loop lane',
+        'Spark/README.md',
         'one bounded patch per loop',
         'narrowest relevant validation',
         'secret-bearing material stayed out of committed surfaces',
@@ -81,6 +97,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'quests/schemas',
         'quests/examples',
         'python scripts/validate_stack.py',
+    ),
+    'tests/AGENTS.md': (
+        'runtime validation gate',
+        'tests/README.md',
+        'Package-owned mechanics tests',
+        'python -m pytest',
     ),
     'mechanics/AGENTS.md': (
         'runtime mechanics tree',

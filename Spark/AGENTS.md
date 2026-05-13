@@ -10,6 +10,7 @@ If `SWARM.md` exists in this directory, treat it as queue / swarm context. This 
 
 ## Default Spark posture
 
+- Read `Spark/README.md` and `Spark/SWARM.md` before changing this subtree.
 - Use Spark for short-loop work where a small diff is enough.
 - Start with a map: task, files, risks, and validation path.
 - Prefer one bounded patch per loop.

@@ -14,6 +14,7 @@ more specific `mechanics/<package>/parts/<part>/docs/` surface.
 
 ## Local Contract
 
+- Keep `docs/README.md` as the short index for this directory.
 - Keep root docs as entrypoints for the whole repository, not as a flat dumping
   ground for package-owned mechanics.
 - Do not duplicate mechanic-owned doctrine here once a package-local canonical

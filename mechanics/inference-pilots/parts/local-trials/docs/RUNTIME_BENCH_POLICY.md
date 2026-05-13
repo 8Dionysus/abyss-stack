@@ -192,7 +192,8 @@ Use the catalog layer to answer:
 - which promotion packet currently represents the active substrate verdict
 
 For the reviewed operator loop that turns a candidate packet into a live winner
-decision, use [RUNTIME_WINNER_PROMOTION_LOOP](RUNTIME_WINNER_PROMOTION_LOOP.md).
+decision, use
+[RUNTIME_WINNER_PROMOTION_LOOP](../../promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md).
 That note owns the operator sequence from fresh machine-fit through candidate
 packet, promotion decision, adaptation record, and live re-check.
 

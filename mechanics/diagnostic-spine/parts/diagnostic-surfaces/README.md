@@ -2,6 +2,7 @@
 
 This directory keeps the diagnostic spine machine-readable surfaces package-local.
 
+- `docs/DIAGNOSTIC_SPINE.md` owns the diagnostic surface authority posture.
 - `schemas/` defines the public diagnostic JSON Schema contracts.
 - `examples/` provides public-safe minimal examples for those contracts.
 
