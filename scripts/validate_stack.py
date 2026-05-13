@@ -177,6 +177,45 @@ MECHANIC_PACKAGE_PARTS = {
         "memo-contradiction-sidecar",
     ),
 }
+MECHANIC_PART_REQUIRED_FILES = {
+    ("agon-runtime", "runtime-kernels"): (
+        "docs/RUNTIME_KERNELS.md",
+        "definitions/duel-runtime-kernels.json",
+        "definitions/mechanical-trial-runs.json",
+        "generated/duel-runtime-kernel-registry.min.json",
+        "generated/mechanical-trial-run-registry.min.json",
+        "examples/duel-runtime-kernel.example.json",
+        "examples/mechanical-duel-event-log.example.json",
+        "examples/mechanical-trial-event-log.assistant-escalation.example.json",
+        "examples/mechanical-trial-event-log.broken-trace.example.json",
+        "examples/mechanical-trial-event-log.contradiction-endurance.example.json",
+        "examples/mechanical-trial-event-log.costly-closure.example.json",
+        "examples/mechanical-trial-event-log.expensive-summon-intent.example.json",
+        "examples/mechanical-trial-event-log.fallback-honor.example.json",
+        "examples/mechanical-trial-event-log.prediction.example.json",
+        "recurrence/component.duel-runtime-kernel-surfaces.json",
+        "recurrence/component.mechanical-trial-runs.json",
+        "recurrence/hooks/component.duel-runtime-kernel-surfaces.hooks.json",
+        "recurrence/hooks/component.mechanical-trial-runs.hooks.json",
+        "schemas/duel-runtime-kernel-registry.schema.json",
+        "schemas/duel-runtime-kernel.schema.json",
+        "schemas/duel-event.schema.json",
+        "schemas/mechanical-trial-run-registry.schema.json",
+        "schemas/mechanical-trial-run.schema.json",
+        "schemas/mechanical-trial-event-log.schema.json",
+        "build_duel_runtime_kernel_registry.py",
+        "build_mechanical_trial_run_registry.py",
+        "validate_duel_runtime_kernels.py",
+        "validate_mechanical_trial_runs.py",
+        "simulate_mechanical_duel_kernel.py",
+        "simulate_mechanical_trials.py",
+        "tests/test_duel_runtime_kernels.py",
+        "tests/test_mechanical_trial_runs.py",
+    ),
+    ("experience-runtime", "experience-records"): (
+        "docs/EXPERIENCE_RECORDS_DISTILLATION.md",
+    ),
+}
 ARCHIVE_MECHANIC_PACKAGES = (
     "agon-runtime",
     "experience-runtime",
@@ -193,15 +232,7 @@ ARCHIVE_MECHANIC_REQUIRED_FILES = (
     "legacy/artifacts/README.md",
 )
 ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
-    "agon-runtime": (
-        "legacy/artifacts/config",
-        "legacy/artifacts/generated",
-        "legacy/artifacts/examples",
-        "legacy/artifacts/scripts",
-        "legacy/artifacts/tests",
-        "legacy/artifacts/schemas",
-        "legacy/artifacts/manifests/recurrence",
-    ),
+    "agon-runtime": (),
     "experience-runtime": (
         "legacy/artifacts/examples",
         "legacy/artifacts/schemas",
@@ -211,6 +242,9 @@ ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
         "legacy/artifacts/scripts",
     ),
     "runtime-repair": (),
+}
+MARKER_ONLY_ARCHIVE_ARTIFACT_PACKAGES = {
+    "agon-runtime",
 }
 MECHANIC_CARD_HEADINGS = (
     "## Mechanic card",
@@ -2229,6 +2263,12 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                 errors.append(
                     f"mechanics package {package} parts/README.md must route to parts/{part}/README.md"
                 )
+            for required_file in MECHANIC_PART_REQUIRED_FILES.get((package, part), ()):
+                path = package_root / "parts" / part / required_file
+                if not path.is_file():
+                    errors.append(
+                        f"mechanics package {package} part {part} is missing {required_file}"
+                    )
 
         active_route_files = [package_root / "PARTS.md"]
         if parts_root.is_dir():
@@ -2256,6 +2296,18 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                 path = package_root / required_dir
                 if not path.is_dir():
                     errors.append(f"mechanics archive package {package} is missing {required_dir}")
+            if package in MARKER_ONLY_ARCHIVE_ARTIFACT_PACKAGES:
+                marker_root = package_root / "legacy" / "artifacts"
+                artifact_files = sorted(
+                    item.relative_to(package_root).as_posix()
+                    for item in marker_root.rglob("*")
+                    if item.is_file()
+                    and item.relative_to(marker_root).as_posix() != "README.md"
+                )
+                if artifact_files:
+                    errors.append(
+                        f"mechanics archive package {package} legacy/artifacts must stay marker-only, found {artifact_files}"
+                    )
 
 
 def git_index_mode(path: Path) -> str | None:

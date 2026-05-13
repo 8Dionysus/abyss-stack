@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "count": {
+      "type": "integer"
+    },
+    "digest": {
+      "type": "string"
+    },
+    "lineage_ref": {
+      "type": "string"
+    },
+    "registry_id": {
+      "type": "string"
+    },
+    "runtime_posture": {
+      "const": "local_dry_run_candidate_only"
+    },
+    "runs": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "registry_id",
+    "lineage_ref",
+    "runtime_posture",
+    "count",
+    "runs",
+    "digest"
+  ],
+  "title": "Mechanical Trial Run Registry",
+  "type": "object"
+}

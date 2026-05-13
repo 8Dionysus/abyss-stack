@@ -5,9 +5,11 @@ Applies to `mechanics/experience-runtime/legacy/`.
 This directory preserves old flat experience runtime archive surfaces after the
 mechanics topology refactor.
 
-Use `../README.md` and `../PROVENANCE.md` before treating any legacy file as
-evidence. Raw docs are historical source material. Artifact schemas/examples
-remain contract-tested, but they are still contained legacy surfaces.
+Use `../README.md`, `../PROVENANCE.md`, and
+`../parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md` before
+treating any legacy file as evidence. Raw docs are historical source material.
+Artifact schemas/examples remain contract-tested, but they are still contained
+legacy surfaces.
 
 Do not:
 

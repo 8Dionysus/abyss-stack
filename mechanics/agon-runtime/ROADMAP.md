@@ -2,13 +2,13 @@
 
 ## Current route
 
-- move flat Agon runtime artifacts under this package
-- add provenance and archive bridges
-- update validators, tests, and route cards to the new paths
+- keep active dry-run runtime-kernel surfaces under `parts/runtime-kernels/`
+- keep old raw Agon docs contained under `legacy/raw/`
+- keep validators, tests, route cards, and generated registries pointed at the
+  active part path
 
 ## Next candidates
 
-- distill a quiet active kernel contract out of archived raw docs
 - split dry-run event-log validation from generated registry construction
-- decide whether recurrence manifests should get a package-local active
-  artifact map
+- add a higher-level operator wrapper only if this becomes a reviewed runtime
+  command

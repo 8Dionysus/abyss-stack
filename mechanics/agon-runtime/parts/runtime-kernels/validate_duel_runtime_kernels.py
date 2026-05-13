@@ -15,9 +15,9 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / "mechanics" / "agon-runtime" / "legacy" / "artifacts"
-REG = ARTIFACTS / "generated" / "agon_duel_runtime_kernel_registry.min.json"
-LOG = ARTIFACTS / "examples" / "agon_mechanical_duel_event_log.example.json"
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+REG = PART_ROOT / "generated" / "duel-runtime-kernel-registry.min.json"
+LOG = PART_ROOT / "examples" / "mechanical-duel-event-log.example.json"
 
 
 def digest_obj(obj):

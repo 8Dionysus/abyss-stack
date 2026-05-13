@@ -11,12 +11,12 @@ def find_repo_root(start: Path) -> Path:
 
 
 ROOT = find_repo_root(Path(__file__).resolve())
-SCRIPTS = ROOT / "mechanics" / "agon-runtime" / "legacy" / "artifacts" / "scripts"
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
 
 
 def test_runtime_registry_build_check():
     result = subprocess.run(
-        [sys.executable, str(SCRIPTS / 'build_agon_duel_runtime_kernel_registry.py'), '--check'],
+        [sys.executable, str(PART_ROOT / "build_duel_runtime_kernel_registry.py"), "--check"],
         cwd=str(ROOT),
         text=True,
         capture_output=True,
@@ -26,7 +26,7 @@ def test_runtime_registry_build_check():
 
 def test_runtime_registry_validates():
     result = subprocess.run(
-        [sys.executable, str(SCRIPTS / 'validate_agon_duel_runtime_kernels.py')],
+        [sys.executable, str(PART_ROOT / "validate_duel_runtime_kernels.py")],
         cwd=str(ROOT),
         text=True,
         capture_output=True,
@@ -36,7 +36,7 @@ def test_runtime_registry_validates():
 
 def test_local_duel_simulation_check():
     result = subprocess.run(
-        [sys.executable, str(SCRIPTS / 'simulate_agon_mechanical_duel_kernel.py'), '--check'],
+        [sys.executable, str(PART_ROOT / "simulate_mechanical_duel_kernel.py"), "--check"],
         cwd=str(ROOT),
         text=True,
         capture_output=True,

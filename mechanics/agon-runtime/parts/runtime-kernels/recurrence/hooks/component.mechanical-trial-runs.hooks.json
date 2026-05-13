@@ -1,0 +1,11 @@
+{
+  "component_id": "component:agon-runtime:mechanical-trial-runs",
+  "hook_set_id": "hooks:component:agon-runtime:mechanical-trial-runs",
+  "hooks": [
+    {
+      "action": "emit_review_observation",
+      "event": "generated_surface_changed",
+      "hook_id": "agon-runtime.mechanical-trial-run-drift"
+    }
+  ]
+}

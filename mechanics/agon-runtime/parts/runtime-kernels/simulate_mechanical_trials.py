@@ -11,9 +11,9 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / 'mechanics' / 'agon-runtime' / 'legacy' / 'artifacts'
-VALIDATE = ARTIFACTS / 'scripts' / 'validate_agon_mechanical_trial_runs.py'
-CONFIG = ARTIFACTS / 'config' / 'agon_mechanical_trial_runs.seed.json'
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+VALIDATE = PART_ROOT / "validate_mechanical_trial_runs.py"
+CONFIG = PART_ROOT / "definitions" / "mechanical-trial-runs.json"
 
 def main():
     ap = argparse.ArgumentParser()

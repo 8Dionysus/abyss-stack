@@ -16,3 +16,23 @@ Still legacy:
 
 Future distillation should create quieter active names only when the runtime
 contract is clear and validation has moved with it.
+
+## 2026-05-13
+
+Distilled the runnable dry-run artifact family out of `legacy/artifacts/` and
+into `parts/runtime-kernels/`.
+
+Now active:
+
+- quiet definition files under `parts/runtime-kernels/definitions/`
+- generated registry capsules under `parts/runtime-kernels/generated/`
+- examples, schemas, validators, simulations, tests, and recurrence
+  observation manifests under the same active part
+
+Still legacy:
+
+- raw `AGON_*` docs
+- wave landing and stop-line notes
+- old quest stubs
+
+`legacy/artifacts/` is no longer a runnable home.

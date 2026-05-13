@@ -1,0 +1,10 @@
+{
+  "authority": "observation_only",
+  "component_id": "component:agon-runtime:mechanical-trial-runs",
+  "observation_intent": "Detect drift in dry-run event logs, hash-chain trace, and forbidden runtime authority leaks.",
+  "repo": "abyss-stack",
+  "surfaces": [
+    "mechanics/agon-runtime/parts/runtime-kernels/generated/mechanical-trial-run-registry.min.json",
+    "mechanics/agon-runtime/parts/runtime-kernels/examples/mechanical-trial-event-log.*.example.json"
+  ]
+}

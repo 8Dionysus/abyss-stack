@@ -9,3 +9,11 @@
 
 Validation status is recorded in the session report after path rewrites and
 test execution.
+
+## 2026-05-13 - Experience records distillation audit
+
+- Reviewed the large legacy artifact family against active service ownership.
+- Kept the preserved contract tests and `_v1` schema/example family in
+  `legacy/artifacts/`.
+- Added an active stop-line document under `parts/experience-records/docs/` so
+  future passes do not promote archive-only material by inertia.

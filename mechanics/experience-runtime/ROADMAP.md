@@ -2,13 +2,15 @@
 
 ## Current route
 
-- move flat experience docs, schemas, examples, and tests into this package
-- add provenance and archive bridges
-- update contract tests to use package-local artifacts
+- keep flat experience docs, schemas, examples, and tests contained in
+  package-local `legacy/`
+- keep provenance, archive bridges, and contract tests green
+- keep the distillation stop-line visible before any future promotion
 
 ## Next candidates
 
-- distill storage-worker contracts into quiet active package docs
-- split adoption, governance, and office/release slices if they become active
-  runtime service families
+- distill one storage-worker contract into quiet active package docs only after
+  a concrete stack service path consumes it
+- split adoption, governance, and office/release slices only if they become
+  active runtime service families
 - decide which schemas still need public root export, if any

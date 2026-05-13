@@ -86,6 +86,11 @@ Tracking starts with the community-docs baseline for this repository.
 - active workspace sibling defaults and repo-local skill symlinks now route
   through `/srv/AbyssOS/<repo>`, with validation blocking stale active
   `/srv/<repo>` sibling roots outside legacy archives
+- Agon dry-run runtime kernels now live as an active
+  `mechanics/agon-runtime/parts/runtime-kernels/` substrate with quiet
+  definitions, validators, tests, examples, schemas, generated registries, and
+  recurrence observation manifests; experience-runtime records remain
+  archive-only with an explicit distillation stop-line
 
 ## [0.2.2] - 2026-04-23
 

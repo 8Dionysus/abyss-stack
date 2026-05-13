@@ -15,8 +15,9 @@ trial-run registries, or runtime validation scripts.
 
 - local event-log validation and generated registry checks
 - runtime-only examples that prove dry-run behavior remains bounded
-- package-local scripts and tests that keep the Agon runtime artifact set green
-- archive bridges from old flat artifact names into the current mechanics tree
+- package-local definitions, scripts, schemas, examples, and tests that keep
+  the Agon runtime kernel substrate green
+- archive lineage from old flat artifact names into the current mechanics tree
 
 ### Stronger owner split
 
@@ -27,8 +28,9 @@ substrate and dry-run proof shape.
 
 ### Inputs
 
-Archived Agon source docs, config seeds, generated registry capsules, event-log
-examples, runtime validators, and recurrence component manifests.
+Archived Agon source docs plus active runtime-kernel definitions, generated
+registry capsules, event-log examples, runtime validators, tests, and recurrence
+observation manifests under `parts/runtime-kernels/`.
 
 ### Outputs
 
@@ -49,11 +51,12 @@ Run the commands in [AGENTS.md](AGENTS.md).
 
 ### Next route
 
-Use [PROVENANCE.md](PROVENANCE.md) for source lineage and
-[legacy/INDEX.md](legacy/INDEX.md) for the old flat file map.
+Use [parts/runtime-kernels/docs/RUNTIME_KERNELS.md](parts/runtime-kernels/docs/RUNTIME_KERNELS.md)
+for the active substrate, [PROVENANCE.md](PROVENANCE.md) for source lineage,
+and [legacy/INDEX.md](legacy/INDEX.md) for the old flat file map.
 
 ## Active Route
 
 Start from this file, then `DIRECTION.md`, `PARTS.md`, and `PROVENANCE.md`.
-The old raw and generated artifact names now live only under `legacy/` with
-explicit mapping.
+The old raw docs live under `legacy/`; the old runnable artifact family has
+been distilled into quiet active names under `parts/runtime-kernels/`.

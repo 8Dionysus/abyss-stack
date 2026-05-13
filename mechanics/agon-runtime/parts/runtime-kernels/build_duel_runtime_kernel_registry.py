@@ -11,14 +11,14 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / 'mechanics' / 'agon-runtime' / 'legacy' / 'artifacts'
-SRC = ARTIFACTS / 'config' / 'agon_duel_runtime_kernels.seed.json'
-OUT = ARTIFACTS / 'generated' / 'agon_duel_runtime_kernel_registry.min.json'
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+SRC = PART_ROOT / "definitions" / "duel-runtime-kernels.json"
+OUT = PART_ROOT / "generated" / "duel-runtime-kernel-registry.min.json"
 def digest_obj(obj): return hashlib.sha256(json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 def build():
     data = json.loads(SRC.read_text(encoding='utf-8'))
     kernels = data.get('kernels', [])
-    return {'registry_id': data['registry_id'], 'wave': data.get('wave','XII'), 'count': len(kernels), 'runtime_status': data.get('runtime_status'), 'kernels': kernels, 'digest': digest_obj(kernels)}
+    return {'registry_id': data['registry_id'], 'lineage_ref': data.get('lineage_ref'), 'count': len(kernels), 'runtime_status': data.get('runtime_status'), 'kernels': kernels, 'digest': digest_obj(kernels)}
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--check', action='store_true'); args = ap.parse_args()
     txt = json.dumps(build(), ensure_ascii=False, sort_keys=True, separators=(',', ':')) + '\n'

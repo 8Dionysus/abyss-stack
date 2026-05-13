@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "assistant_contestant_allowed": {
+      "const": false
+    },
+    "event_log_example": {
+      "type": "string"
+    },
+    "kernel_id": {
+      "type": "string"
+    },
+    "live_protocol": {
+      "const": false
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "runtime_effect": {
+      "const": "local_dry_run_candidate_only"
+    },
+    "trial_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "trial_id",
+    "kernel_id",
+    "event_log_example",
+    "live_protocol",
+    "assistant_contestant_allowed",
+    "runtime_effect"
+  ],
+  "title": "Mechanical Trial Run Definition",
+  "type": "object"
+}

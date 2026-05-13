@@ -16,3 +16,15 @@ Still legacy:
 
 Future distillation should create quieter package docs only when a concrete
 runtime service or storage path consumes the contract.
+
+## 2026-05-13
+
+Reviewed the legacy-heavy artifact family and kept it archive-only.
+
+Reason: the schemas, examples, and tests are real preservation value, but no
+current `abyss-stack` service, storage path, operator command, or runtime
+validator consumes the family as an active contract. Several raw docs point to
+stronger owner repositories for meaning and authority.
+
+The active classification lives in
+`parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md`.
