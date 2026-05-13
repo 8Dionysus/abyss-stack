@@ -2,7 +2,7 @@
 
 Applies to `mechanics/runtime-repair/legacy/`.
 
-This directory preserves old runtime repair wave lineage after the mechanics
+This directory preserves the runtime repair archive lineage after the mechanics
 topology refactor.
 
 Use `../README.md` and `../PROVENANCE.md` before treating a legacy artifact as

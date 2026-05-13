@@ -13,3 +13,4 @@ Use these notes to understand why a contract exists. Keep operational evidence, 
 - [2026-05-12 Operator Wrappers With Part-Local Backends](2026-05-12-operator-wrappers-with-part-local-backends.md)
 - [2026-05-13 Local AI Trials First-Run Boundary](2026-05-13-local-ai-trials-first-run-boundary.md)
 - [2026-05-13 Root Design And Agent Surfaces](2026-05-13-root-design-agent-surfaces.md)
+- [2026-05-13 Root Residual Topology Cleanup](2026-05-13-root-residual-topology-cleanup.md)

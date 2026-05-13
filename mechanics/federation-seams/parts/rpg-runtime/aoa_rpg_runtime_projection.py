@@ -167,7 +167,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     bundle["views"]["agent_sheet_cards"][0]["build_snapshot_ref"] = build_ref
     bundle["views"]["agent_sheet_cards"][0]["active_quest_refs"] = ["AOA-Q-0008"]
     bundle["views"]["quest_board_cards"][0]["quest_ref"] = "AOA-Q-0008"
-    bundle["views"]["quest_board_cards"][0]["title"] = "Define the RPG runtime/projection wave for the first body-facing AoA slice"
+    bundle["views"]["quest_board_cards"][0]["title"] = "Define the RPG runtime projection slice for the first body-facing AoA route"
     bundle["views"]["quest_board_cards"][0]["state"] = "triaged"
     bundle["views"]["quest_board_cards"][0]["source_ref"] = "Agents-of-Abyss/quests/AOA-Q-0008.yaml"
     bundle["views"]["quest_board_cards"][0]["reward_hints"] = [
@@ -178,16 +178,16 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         "no direct quest-state writes",
         "no secret reward engine",
     ]
-    bundle["views"]["campaign_lane_cards"][0]["campaign_ref"] = "campaign.rpg.runtime-projection-wave"
-    bundle["views"]["campaign_lane_cards"][0]["title"] = "RPG Runtime Projection Wave"
+    bundle["views"]["campaign_lane_cards"][0]["campaign_ref"] = "campaign.rpg.runtime-projection"
+    bundle["views"]["campaign_lane_cards"][0]["title"] = "RPG Runtime Projection"
     bundle["views"]["campaign_lane_cards"][0]["stage_label"] = "collections before services"
     bundle["views"]["campaign_lane_cards"][0]["anchor_refs"] = [
-        "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
+        "Agents-of-Abyss/mechanics/rpg/parts/runtime-projection/README.md",
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md",
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
     bundle["views"]["campaign_lane_cards"][0]["recommended_build_refs"] = [build_ref]
-    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = "Dionysus/seed_rpg_runtime_projection_pack.md#rpg-runtime-projection-wave"
+    bundle["views"]["campaign_lane_cards"][0]["source_ref"] = "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md"
     bundle["views"]["progression_timeline_entries"][0]["summary"] = (
         "Filesystem-first runtime collections were materialized without turning projection bundles into authority."
     )

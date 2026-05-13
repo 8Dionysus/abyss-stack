@@ -1,9 +1,12 @@
 # Spark Swarm Recipe — abyss-stack
 
-Рекомендуемый путь назначения: `Spark/SWARM.md`
+Рекомендуемый путь назначения: `.agents/spark/SWARM.md`
 
 ## Для чего этот рой
-Используй Spark здесь для одного infra seam: profile/preset/module alignment, runbook/doc consistency, compose module hardening, doctor/first-run/render-truth path или template safety. Этот рой должен двигать стек, не ломая locality, secrecy, recoverability и Fedora-first posture.
+Используй Spark здесь для одного infra seam: profile/preset/module alignment,
+runbook/doc consistency, compose module hardening,
+doctor/first-run/render-truth path или template safety. Этот рой должен двигать
+стек, не ломая locality, secrecy, recoverability и Fedora-first posture.
 
 ## Читать перед стартом
 - `AGENTS.md`

@@ -904,7 +904,7 @@ def compare_against_anchor(
                 kind="truth_gap",
                 severity="medium",
                 summary="The current target lost trial-proven posture compared with the supplied last-good anchor.",
-                probable_causes=["The promoted wave truth surface regressed since the anchor was recorded."],
+                probable_causes=["The promoted trial truth surface regressed since the anchor was recorded."],
                 owner_hint="abyss-stack/diagnostic-spine",
                 evidence_refs=against_ref,
             )

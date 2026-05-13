@@ -32,6 +32,7 @@ repository-level entry layer, not a dumping ground for package-local details.
 ## Governance
 
 - [root DESIGN.AGENTS](../DESIGN.AGENTS.md)
+- [AUDIT](AUDIT.md)
 - [BRANCH_POLICY](BRANCH_POLICY.md)
 - [RELEASING](RELEASING.md)
 - [QUESTBOOK_STACK_INTEGRATION](QUESTBOOK_STACK_INTEGRATION.md)

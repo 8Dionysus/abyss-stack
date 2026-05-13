@@ -321,10 +321,14 @@ REQUIRED_FILES = {
     ROOT / "DESIGN.AGENTS.md",
     ROOT / "docs" / "AGENTS.md",
     ROOT / "docs" / "README.md",
+    ROOT / "docs" / "AUDIT.md",
     ROOT / "tests" / "README.md",
     ROOT / ".agents" / "AGENTS.md",
     ROOT / ".agents" / "README.md",
     ROOT / ".agents" / "skills" / "AGENTS.md",
+    ROOT / ".agents" / "spark" / "AGENTS.md",
+    ROOT / ".agents" / "spark" / "README.md",
+    ROOT / ".agents" / "spark" / "SWARM.md",
     ROOT / ".github" / "README.md",
     ROOT / "mechanics" / "governed-execution" / "parts" / "return-policy" / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
     ROOT / "docs" / "MECHANICS.md",
@@ -339,6 +343,7 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "config-projection" / "parts" / "rendering" / "docs" / "RENDER_TRUTH.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "LOCAL_AI_TRIALS.md",
+    ROOT / "mechanics" / "inference-pilots" / "legacy" / "artifacts" / "scripts" / "aoa-local-ai-trials",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "truth-surfaces" / "docs" / "TRUTH_SURFACES.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "langgraph-pilot" / "docs" / "LANGGRAPH_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "llamacpp-pilot" / "docs" / "LLAMACPP_PILOT.md",
@@ -2284,6 +2289,41 @@ def validate_required_files(errors: list[str]) -> None:
             errors.append(f"missing required file: {path.relative_to(ROOT)}")
 
 
+def validate_root_residual_topology(errors: list[str]) -> None:
+    forbidden_paths = {
+        ROOT / "AUDIT.md": "docs/AUDIT.md",
+        ROOT / "Spark": ".agents/spark/",
+    }
+    for path, target in forbidden_paths.items():
+        if path.exists():
+            errors.append(
+                f"root residual topology path {path.relative_to(ROOT)} must live under {target}"
+            )
+
+    agents_readme = read_text_or_none(ROOT / ".agents" / "README.md") or ""
+    docs_readme = read_text_or_none(ROOT / "docs" / "README.md") or ""
+    if ".agents/spark" not in agents_readme and "spark/README.md" not in agents_readme:
+        errors.append(".agents/README.md must route the Spark fast-loop lane")
+    if "AUDIT.md" not in docs_readme:
+        errors.append("docs/README.md must route docs/AUDIT.md")
+
+
+def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
+    bridge_path = ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "aoa_local_ai_trials.py"
+    legacy_path = ROOT / "mechanics" / "inference-pilots" / "legacy" / "artifacts" / "scripts" / "aoa-local-ai-trials"
+    bridge_text = read_text_or_none(bridge_path) or ""
+    legacy_text = read_text_or_none(legacy_path) or ""
+
+    if "LEGACY_BACKEND" not in bridge_text or "aoa-local-ai-trials" not in bridge_text:
+        errors.append("local trials active backend must be a compatibility bridge to the legacy runner")
+    if "WAVE_METADATA =" in bridge_text:
+        errors.append("local trials wave metadata must stay in legacy/artifacts/scripts, not the active bridge")
+    if "WAVE_METADATA =" not in legacy_text:
+        errors.append("legacy local AI trials runner must preserve the W0-W4 compatibility metadata")
+    if not is_executable_source_path(legacy_path):
+        errors.append("legacy local AI trials runner must stay executable")
+
+
 def validate_root_design_surfaces(errors: list[str]) -> None:
     def read_required(path: Path) -> str:
         try:
@@ -3824,6 +3864,8 @@ def main() -> int:
     validate_mechanics_topology(errors)
     validate_scripts(errors)
     validate_required_files(errors)
+    validate_root_residual_topology(errors)
+    validate_local_trials_legacy_bridge(errors)
     validate_root_design_surfaces(errors)
     validate_sync_managed_items(errors)
     validate_federation_required_files(errors)

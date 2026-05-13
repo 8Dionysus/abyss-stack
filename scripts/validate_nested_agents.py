@@ -84,9 +84,9 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Repo Validation',
         'root route card',
     ),
-    'Spark/AGENTS.md': (
+    '.agents/spark/AGENTS.md': (
         'fast-loop lane',
-        'Spark/README.md',
+        '.agents/spark/README.md',
         'one bounded patch per loop',
         'narrowest relevant validation',
         'secret-bearing material stayed out of committed surfaces',
@@ -190,7 +190,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Do not perform repair',
     ),
     'mechanics/runtime-repair/legacy/AGENTS.md': (
-        'runtime repair wave',
+        'runtime repair archive',
         '_v1',
         'legacy/artifacts',
         'python -m pytest',

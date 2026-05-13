@@ -2,15 +2,19 @@
 
 Spark lane for `abyss-stack`.
 
-This file governs work on files under the `Spark/` subtree.
+This file governs work on files under `.agents/spark/`.
 
-The root `AGENTS.md` remains authoritative for repository identity, ownership boundaries, reading order, and validation commands. This local file only narrows how GPT-5.3-Codex-Spark should behave when used as the fast-loop lane.
+The root `AGENTS.md` and `.agents/AGENTS.md` remain authoritative for
+repository identity, ownership boundaries, agent-overlay posture, reading
+order, and validation commands. This local file only narrows how
+GPT-5.3-Codex-Spark should behave when used as the fast-loop lane.
 
 If `SWARM.md` exists in this directory, treat it as queue / swarm context. This `AGENTS.md` is the operating policy for Spark work.
 
 ## Default Spark posture
 
-- Read `Spark/README.md` and `Spark/SWARM.md` before changing this subtree.
+- Read `.agents/spark/README.md` and `.agents/spark/SWARM.md` before changing
+  this subtree.
 - Use Spark for short-loop work where a small diff is enough.
 - Start with a map: task, files, risks, and validation path.
 - Prefer one bounded patch per loop.
@@ -47,7 +51,8 @@ A Spark task is done here when:
 
 ## Local note
 
-Spark should behave like an infra mechanic here: small tools, clear rollback, no heroic rewiring.
+Spark should behave like an infra mechanic here: small tools, clear rollback,
+no heroic rewiring.
 
 ## Reporting contract
 

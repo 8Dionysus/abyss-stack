@@ -1,7 +1,8 @@
-# Spark
+# Spark Fast Loop
 
-`Spark/` is the fast-loop lane for small, reversible `abyss-stack`
-infrastructure corrections.
+`.agents/spark/` is the repo-local fast-loop lane for small, reversible
+`abyss-stack` infrastructure corrections. It is an agent overlay inside
+`.agents/`, not a root runtime district and not a new owner.
 
 ## Current Surfaces
 

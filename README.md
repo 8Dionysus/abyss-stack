@@ -29,6 +29,7 @@ Then branch by need:
 - **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/parts/antifragility-posture/docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 - **root route and design surfaces**: [AGENTS](AGENTS.md), [DESIGN](DESIGN.md), and [DESIGN.AGENTS](DESIGN.AGENTS.md)
+- **agent overlays and fast-loop lanes**: [.agents](.agents/README.md) and [.agents/spark](.agents/spark/README.md)
 - **operator command map**: [scripts/README](scripts/README.md)
 
 ## What this repository is for
@@ -99,7 +100,7 @@ The current bounded promoted local-worker posture is `langchain-api` on `5403` b
 The archived long-horizon and bounded-autonomy pilot contracts now route through
 `mechanics/inference-pilots/PROVENANCE.md`; operator entry uses
 `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
-rather than keeping wave names as root command topology.
+rather than keeping old family labels as root command topology.
 
 Antifragility repair posture stays contract-only in this repository. It adds
 runtime-side doctrine plus receipt schemas/examples for degradation and

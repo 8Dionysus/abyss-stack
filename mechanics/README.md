@@ -88,7 +88,7 @@ For a package, start with the package `README.md`. Then use:
 | `PARTS.md` | active source-surface map |
 | `ROADMAP.md` | next movements and deferred moves |
 | `LANDING_LOG.md` | checked landings and validation anchors |
-| `docs/` | detailed package-owned notes in later waves |
+| `docs/` | detailed package-owned notes in later passes |
 
 ## Artifact Placement
 

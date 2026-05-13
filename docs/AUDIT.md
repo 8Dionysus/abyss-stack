@@ -1,8 +1,10 @@
-# AUDIT.md
+# Audit
 
-This file is the repo-local audit contract for `abyss-stack`.
+This file is the repo-local audit contract for `abyss-stack`. Its canonical
+path is `docs/AUDIT.md`.
 
-Read it after `AGENTS.md` and before making changes.
+Read it after the root route surfaces and before repository-wide audits,
+reviews, or risky source topology changes.
 
 ## Repository role
 
@@ -26,26 +28,29 @@ It does **not** own:
 
 Default reading order for audits:
 
-1. `README.md`
-2. `CHARTER.md`
-3. `BOUNDARIES.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/SERVICE_CATALOG.md`
-6. `docs/PROFILES.md`
-7. `docs/PRESETS.md`
-8. `docs/PROFILE_RECIPES.md`
-9. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
-10. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-11. `docs/PATHS.md`
-12. `docs/STORAGE_LAYOUT.md`
-13. `docs/DEPLOYMENT.md`
-14. `docs/FIRST_RUN.md`
-15. `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
-16. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
-17. `docs/LIFECYCLE.md`
-18. `docs/RUNBOOK.md`
-19. `docs/SECURITY.md`
-20. `docs/MIGRATION_FROM_OLD.md`
+1. `AGENTS.md`
+2. `README.md`
+3. `CHARTER.md`
+4. `BOUNDARIES.md`
+5. `DESIGN.md`
+6. `DESIGN.AGENTS.md` when auditing agent-facing route surfaces
+7. `docs/ARCHITECTURE.md`
+8. `docs/SERVICE_CATALOG.md`
+9. `docs/PROFILES.md`
+10. `docs/PRESETS.md`
+11. `docs/PROFILE_RECIPES.md`
+12. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
+13. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
+14. `docs/PATHS.md`
+15. `docs/STORAGE_LAYOUT.md`
+16. `docs/DEPLOYMENT.md`
+17. `docs/FIRST_RUN.md`
+18. `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
+19. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
+20. `docs/LIFECYCLE.md`
+21. `docs/RUNBOOK.md`
+22. `docs/SECURITY.md`
+23. `docs/MIGRATION_FROM_OLD.md`
 
 Also apply the nearest nested `AGENTS.md` when working in subdirectories such as `scripts/`.
 

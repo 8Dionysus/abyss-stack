@@ -64,7 +64,7 @@ Phase 4 adds two private runtime export wrappers:
 - `aoa-export-runtime-evidence-selection`
 - `aoa-export-artifact-hook-candidate`
 
-The Wave 5 A2A return lane adds one private dry-run closeout wrapper:
+The A2A return dry-run lane adds one private closeout wrapper:
 - `aoa-a2a-return-closeout-dry-run`
 
 The Phase Alpha memo contradiction lane also has one bounded sidecar runner:

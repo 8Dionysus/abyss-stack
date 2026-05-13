@@ -13,6 +13,7 @@ Old root docs now live in `legacy/raw/`:
 
 Old root runner scripts now live under `legacy/artifacts/scripts/`:
 
+- `scripts/aoa-local-ai-trials` preserved compatibility backend
 - `scripts/aoa-w5-pilot`
 - `scripts/aoa-w6-pilot`
 
@@ -28,6 +29,8 @@ surface quieter.
 
 The `scripts/aoa-local-ai-trials` command remains an active compatibility
 wrapper because current runtime packets and closeout records still use its
-W0-W4 command names. Its wave-era narrative now routes through
-`legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`; new active trial topology should
-use trial, scenario, benchmark, model-card, and promotion language instead.
+W0-W4 command names. Its preserved runner now lives at
+`legacy/artifacts/scripts/aoa-local-ai-trials`, and its wave-era narrative
+routes through `legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`. New active trial
+topology should use trial, scenario, benchmark, model-card, and promotion
+language instead.

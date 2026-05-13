@@ -40,7 +40,7 @@ Prefer:
 - 1 focused infrastructure change per PR
 - or 1 focused validation or hardening improvement
 - or 1 focused documentation update that clarifies runtime posture
-- and 1 short-lived branch per bounded wave
+- and 1 short-lived branch per bounded change
 
 ## Review criteria
 

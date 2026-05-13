@@ -29,6 +29,10 @@ Still compatibility-bound:
 - `scripts/aoa-local-ai-trials run-wave`
 - `scripts/aoa-local-ai-trials prepare-wave`
 - `scripts/aoa-local-ai-trials apply-case`
+
+The preserved runner implementation now lives at
+`mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`; the
+active part keeps only a compatibility bridge for the stable root command.
 - W0-W4 runtime artifact names in existing local trial packets
 
 Current active wording should use trial, scenario, benchmark, model-card, and

@@ -30,6 +30,10 @@ variant fit notes through
 
 Preserve the old W0-W4 qualification narrative under
 `mechanics/inference-pilots/legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md`.
+Preserve the old runner implementation under
+`mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`,
+with `mechanics/inference-pilots/parts/local-trials/aoa_local_ai_trials.py`
+kept as a thin compatibility bridge for the stable root command.
 
 ## Consequences
 
@@ -37,7 +41,7 @@ Preserve the old W0-W4 qualification narrative under
   benchmark as a normal bootstrap step
 - active trial docs use trial, scenario, benchmark, model-card, and promotion
   language
-- the W0-W4 command surface remains available for compatibility with existing
-  logs and closeout packets
+- the W0-W4 command surface remains available through the compatibility bridge
+  for existing logs and closeout packets
 - validators now check active route wording separately from the preserved
   compatibility baseline
