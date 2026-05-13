@@ -24,3 +24,12 @@ wait-smoke parts. Root runbook and deployment docs remain repo-wide operator
 entrypoints.
 
 Validation route: `python scripts/validate_stack.py`.
+
+## 2026-05-13 - Federation layout compatibility labels
+
+Kept layout checks on clean local labels while moving the old upstream
+`aoa-evals` and `aoa-playbooks` filenames into explicit compatibility
+variables documented through the federation compatibility table.
+
+Validation route: shell parse checks, `python scripts/validate_stack.py`, and
+`python scripts/validate_nested_agents.py`.

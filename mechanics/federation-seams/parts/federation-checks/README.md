@@ -7,7 +7,7 @@ part.
 
 Checks stay read-only and bounded to runtime consumption of owner surfaces.
 
-`docs/UPSTREAM_COMPATIBILITY.md` is the allowlist for upstream names that still
-appear at the route-api or mirror boundary, such as eval selection IDs and
-playbook automation compatibility endpoints. Active local docs should use clean
-runtime aliases and route old names through that verdict table.
+`docs/UPSTREAM_COMPATIBILITY.md` is the single active bridge for upstream names
+that still appear at the route-api or mirror boundary. Detailed old-name
+accounting stays in `legacy/upstream-compatibility/INDEX.md`; active local docs
+should use clean runtime names and route old names through the bridge only.

@@ -382,12 +382,14 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["canonical_selection_id"], "memo-recall-rerun-v1")
         self.assertEqual(payload["template"]["selection_id"], "phase-alpha-memo-recall-rerun-v1")
+        self.assertEqual(payload["upstream_contract"]["local_route"], "memo-recall-rerun")
+        self.assertEqual(payload["upstream_contract"]["owner_repo"], "aoa-evals")
         self.assertIn(
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
             payload["source_files"],
         )
 
-    def test_runtime_evidence_template_keeps_compatibility_alias_but_reports_clean_name(self) -> None:
+    def test_runtime_evidence_template_keeps_compatibility_bridge_but_reports_clean_name(self) -> None:
         store = self.make_store()
 
         payload = self.module.resolve_runtime_evidence_template(
@@ -398,6 +400,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["name"], "memo-recall-rerun")
         self.assertEqual(payload["requested_name"], "phase-alpha-memo-recall-rerun")
+        self.assertEqual(payload["compatibility_bridge_for"], "memo-recall-rerun")
 
     def test_memo_contradiction_gap_runtime_evidence_template_resolves_source_files(self) -> None:
         store = self.make_store()
@@ -450,7 +453,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertEqual(payload["data"]["plans"][0]["name"], "fixture-plan")
         self.assertNotIn("seeds", payload["data"])
 
-    def test_playbook_automation_seed_endpoint_is_compatibility_alias(self) -> None:
+    def test_playbook_automation_seed_endpoint_is_compatibility_bridge(self) -> None:
         self.module.STORE = self.make_store()
 
         payload = self.module.playbooks_automation_seed_compatibility(
@@ -458,7 +461,7 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         )
 
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["compatibility_alias_for"], "/playbooks/automation-plan")
+        self.assertEqual(payload["compatibility_bridge_for"], "/playbooks/automation-plan")
         self.assertEqual(payload["plan"]["name"], "fixture-plan")
 
     def test_kag_structured_reads_stay_mirror_backed(self) -> None:

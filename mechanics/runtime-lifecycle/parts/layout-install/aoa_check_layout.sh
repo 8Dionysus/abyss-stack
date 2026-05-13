@@ -70,6 +70,11 @@ check_warn_file() {
   fi
 }
 
+AOA_EVALS_MEMO_RECALL_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
+AOA_EVALS_MEMO_CONTRADICTION_GAP_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
+AOA_EVALS_MEMO_CONTRADICTION_RERUN_UPSTREAM_TEMPLATE="examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+AOA_PLAYBOOKS_AUTOMATION_PLANS_UPSTREAM_FILE="generated/playbook_automation_seeds.json"
+
 has_module() {
   local target="$1"
   local module
@@ -220,9 +225,9 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_file "aoa-evals runtime candidate intake" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/runtime_candidate_intake.min.json"
   check_file "aoa-evals workhorse evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.workhorse-local.example.json"
   check_file "aoa-evals return evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.return-anchor-integrity.example.json"
-  check_file "aoa-evals memo recall evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
-  check_file "aoa-evals memo contradiction gap evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
-  check_file "aoa-evals memo contradiction rerun evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
+  check_file "aoa-evals memo recall evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/${AOA_EVALS_MEMO_RECALL_UPSTREAM_TEMPLATE}"
+  check_file "aoa-evals memo contradiction gap evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/${AOA_EVALS_MEMO_CONTRADICTION_GAP_UPSTREAM_TEMPLATE}"
+  check_file "aoa-evals memo contradiction rerun evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/${AOA_EVALS_MEMO_CONTRADICTION_RERUN_UPSTREAM_TEMPLATE}"
   check_warn_file "aoa-evals self-agent hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"
   check_warn_file "aoa-evals model-tier hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json"
   check_warn_file "aoa-evals restartable hook template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json"
@@ -241,7 +246,7 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-playbooks handoffs" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_handoff_contracts.json"
   check_warn_file "aoa-playbooks failures" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_failure_catalog.json"
   check_warn_file "aoa-playbooks subagent recipes" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_subagent_recipes.json"
-  check_warn_file "aoa-playbooks automation plans" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_automation_seeds.json"
+  check_warn_file "aoa-playbooks automation plans" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/${AOA_PLAYBOOKS_AUTOMATION_PLANS_UPSTREAM_FILE}"
   check_warn_file "aoa-playbooks composition manifest" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/generated/playbook_composition_manifest.json"
   check_warn_file "aoa-playbooks registry schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/schemas/playbook-registry.schema.json"
   check_warn_file "aoa-playbooks activation schema" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-playbooks/schemas/playbook-activation-surface.schema.json"

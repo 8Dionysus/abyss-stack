@@ -97,6 +97,10 @@ Tracking starts with the community-docs baseline for this repository.
   definitions, validators, tests, examples, schemas, generated registries, and
   recurrence observation manifests; experience-runtime records remain
   archive-only with an explicit distillation stop-line
+- runtime compatibility names are now isolated behind explicit upstream
+  contract fields and compatibility maps for eval templates, memo contradiction
+  sidecar inputs, A2A return dry-runs, playbook automation plans, and Dionysus
+  RPG prep-pack handoffs
 
 ## [0.2.2] - 2026-04-23
 
@@ -119,7 +123,7 @@ Tracking starts with the community-docs baseline for this repository.
   registry generation, and source/deployed recurrence manifests
 - Agon Wave XIII mechanical-trial runtime records, event-log examples,
   trial-run registries, and runtime stop-lines
-- Experience watchtower runtime records plus wave3 federation/adoption worker
+- Experience watchtower runtime records plus archived federation/adoption worker
   plans, runtime storage plans, canary probes, rollback jobs, KAG promotion
   jobs, and pattern-registry service records
 
@@ -142,7 +146,7 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Summary
 
-- this patch adds chaos-wave runtime recovery, memo contradiction sidecars,
+- this patch adds archived chaos runtime recovery, memo contradiction sidecars,
   and A2A return dry-run adapters across the runtime layer
 - federated-consumer warnings, release parity CI, and roadmap/current-direction
   docs are tightened around the current runtime contour

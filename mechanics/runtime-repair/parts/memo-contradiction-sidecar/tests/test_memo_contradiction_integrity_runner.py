@@ -11,12 +11,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-run-memo-contradiction-integrity"
 
-CLOSURE_CLAIM = "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history"
-PENDING_CLAIM = "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff"
-RETIRED_OVERREAD_CLAIM = "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired"
-LATER_TRACK_CLAIM = "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track"
-SUPERSESSION_AUDIT = "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession"
-RETRACTION_AUDIT = "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction"
+UPSTREAM_MEMO_CONTRADICTION_IDS = {
+    "closure_claim": "memo.claim.2026-04-03.phase-alpha-closure-with-residual-runtime-history",
+    "pending_claim": "memo.claim.2026-04-03.phase-alpha-rerun-pending-handoff",
+    "retired_overread_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-fully-retired",
+    "later_track_claim": "memo.claim.2026-04-03.phase-alpha-runtime-history-later-infra-track",
+    "supersession_audit": "memo.audit.2026-04-03.phase-alpha-rerun-pending-supersession",
+    "retraction_audit": "memo.audit.2026-04-03.phase-alpha-runtime-history-overread-retraction",
+}
+CLOSURE_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["closure_claim"]
+PENDING_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["pending_claim"]
+RETIRED_OVERREAD_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["retired_overread_claim"]
+LATER_TRACK_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["later_track_claim"]
+SUPERSESSION_AUDIT = UPSTREAM_MEMO_CONTRADICTION_IDS["supersession_audit"]
+RETRACTION_AUDIT = UPSTREAM_MEMO_CONTRADICTION_IDS["retraction_audit"]
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -224,6 +232,11 @@ class MemoContradictionIntegrityRunnerTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(report["verdict"], "supports bounded claim")
+        self.assertEqual(report["compatibility_boundary"]["local_selection_id"], "memo-contradiction-rerun-v1")
+        self.assertEqual(
+            report["compatibility_boundary"]["upstream_owner_refs"]["aoa_memo_object_ids"],
+            UPSTREAM_MEMO_CONTRADICTION_IDS,
+        )
         self.assertEqual(report["breakdown"]["contradiction_linkage"], "strong")
         self.assertEqual(report["breakdown"]["audit_trace_visibility"], "strong")
         self.assertTrue(

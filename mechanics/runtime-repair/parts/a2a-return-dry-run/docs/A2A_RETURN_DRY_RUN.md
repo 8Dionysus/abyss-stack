@@ -11,10 +11,14 @@ It does not replace the `aoa-sdk` A2A control-plane helpers.
 ## Adapter
 
 `scripts/aoa-a2a-return-closeout-dry-run` reads one reviewed
-`a2a_wave5_closeout_request` payload and emits a private runtime-owned wrapper
-artifact:
+SDK closeout payload and emits a private runtime-owned wrapper artifact.
+The local runtime family is `a2a-return-closeout`; the accepted upstream
+`request_kind` is documented in the single federation compatibility bridge
+`UPSTREAM_COMPATIBILITY.md` until `aoa-sdk` publishes a clean replacement:
 
 - `artifact_kind`: `aoa.runtime-a2a-return-closeout-dry-run`
+- `request_family`: `a2a-return-closeout`
+- `upstream_request_kind`: accepted SDK compatibility request kind
 - `dry_run`: `true`
 - `live_automation`: `false`
 - `exported_by`: `scripts/aoa-a2a-return-closeout-dry-run`
@@ -29,7 +33,7 @@ With `--write`, it writes under:
 
 The adapter expects the SDK-shaped reviewed closeout request:
 
-- `request_kind`: `a2a_wave5_closeout_request`
+- `request_kind`: accepted SDK compatibility request kind
 - `reviewed`: `true`
 - `closeout_id`
 - `a2a_child`
@@ -37,6 +41,8 @@ The adapter expects the SDK-shaped reviewed closeout request:
 - `checkpoint_bridge_plan`
 
 The source contract lives in `aoa-sdk`, not in this repository.
+The exact wire value is treated as an upstream compatibility detail, not as an
+active `abyss-stack` topology name.
 
 The adapter may also accept the full SDK E2E fixture at
 `/srv/AbyssOS/aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`; in that

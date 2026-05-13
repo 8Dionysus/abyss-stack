@@ -80,9 +80,12 @@ These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-
 The outputs are not `aoa-evals` objects.
 They are bounded runtime candidates waiting for later review or export.
 The memo contradiction sidecar is narrower: it reads log-backed selected memo evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
-The A2A return dry-run wrapper is similarly narrow: it reads a reviewed `aoa-sdk`
-`a2a_wave5_closeout_request`, keeps `dry_run=true` and `live_automation=false`,
-and assembles only a runtime receipt candidate plus memo/eval handoff hints.
+The A2A return dry-run wrapper is similarly narrow: it reads a reviewed
+`aoa-sdk` closeout payload, exposes the clean local `a2a-return-closeout`
+request family, preserves older SDK wire input only through the single
+federation compatibility bridge, keeps `dry_run=true` and
+`live_automation=false`, and assembles only a runtime receipt candidate plus
+memo/eval handoff hints.
 
 Example usage:
 

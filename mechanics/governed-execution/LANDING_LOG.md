@@ -15,3 +15,12 @@ their owning parts while keeping runtime policy templates under
 `config-templates/`.
 
 Validation route: `python scripts/validate_stack.py`.
+
+## 2026-05-13 - Runtime evidence compatibility constants
+
+Kept candidate-export active names on clean memo rerun routes while collecting
+older upstream eval template filenames and selection IDs behind the single
+federation compatibility bridge.
+
+Validation route: candidate-export focused pytest, py_compile,
+`python scripts/validate_stack.py`, and `python scripts/validate_nested_agents.py`.
