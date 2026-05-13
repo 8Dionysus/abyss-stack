@@ -13,13 +13,13 @@
     "registry_id": {
       "type": "string"
     },
-    "wave": {
+    "lineage_ref": {
       "type": "string"
     }
   },
   "required": [
     "registry_id",
-    "wave",
+    "lineage_ref",
     "count",
     "kernels",
     "digest"

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "events": {
+      "type": "array"
+    },
+    "final_state": {
+      "type": "string"
+    },
+    "kernel_id": {
+      "type": "string"
+    },
+    "live_protocol": {
+      "const": false
+    },
+    "log_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "trial_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "log_id",
+    "trial_id",
+    "run_id",
+    "kernel_id",
+    "live_protocol",
+    "events",
+    "final_state"
+  ],
+  "title": "Mechanical Trial Event Log",
+  "type": "object"
+}

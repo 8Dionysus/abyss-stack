@@ -2,7 +2,7 @@
 
 | Part | Route | Current source surfaces |
 |---|---|---|
-| Runtime kernels | `parts/runtime-kernels/` | `PROVENANCE.md`, `legacy/INDEX.md`, `legacy/DISTILLATION_LOG.md`, `legacy/artifacts/` |
+| Runtime kernels | `parts/runtime-kernels/` | `parts/runtime-kernels/docs/RUNTIME_KERNELS.md`, active definitions, generated registries, examples, schemas, validators, simulations, tests, recurrence observation manifests |
 
-Old file names are intentionally archived only under `legacy/`. Any active
-surface that graduates out must receive a quiet package-local name.
+Old raw document names are intentionally archived only under `legacy/`. The
+runnable artifact family has graduated into quiet package-local names.

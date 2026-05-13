@@ -11,9 +11,9 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / 'mechanics' / 'agon-runtime' / 'legacy' / 'artifacts'
-EXAMPLE = ARTIFACTS / 'examples' / 'agon_mechanical_duel_event_log.example.json'
-VALIDATE = ARTIFACTS / 'scripts' / 'validate_agon_duel_runtime_kernels.py'
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+EXAMPLE = PART_ROOT / "examples" / "mechanical-duel-event-log.example.json"
+VALIDATE = PART_ROOT / "validate_duel_runtime_kernels.py"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--check', action='store_true', help='Validate the bundled dry-run event log instead of printing it.')

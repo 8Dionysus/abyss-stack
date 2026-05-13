@@ -13,9 +13,9 @@ diagnostics, or repair-safe closeout.
 This file is a `docs/` entry route. It does not own mechanic doctrine.
 
 The initial mechanics topology added first-class package homes under
-`mechanics/`. Current movement pushes noisy flat artifact families into
-package-local archive homes when validators, links, tests, and generated
-companions move with them.
+`mechanics/`. Current movement either distills a validated runnable family into
+quiet part-local active names or keeps archive-only material in package-local
+legacy when no runtime consumer exists.
 
 ## Canonical surfaces
 

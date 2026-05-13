@@ -18,6 +18,8 @@ meaning and write stop-lines.
 
 ## Current Bridges
 
+- [parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md](parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md)
+  records the active/archive classification.
 - [legacy/INDEX.md](legacy/INDEX.md) maps old root families to current paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
   raw archive.

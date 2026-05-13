@@ -11,9 +11,9 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / 'mechanics' / 'agon-runtime' / 'legacy' / 'artifacts'
-SRC = ARTIFACTS / 'config' / 'agon_mechanical_trial_runs.seed.json'
-OUT = ARTIFACTS / 'generated' / 'agon_mechanical_trial_run_registry.min.json'
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+SRC = PART_ROOT / "definitions" / "mechanical-trial-runs.json"
+OUT = PART_ROOT / "generated" / "mechanical-trial-run-registry.min.json"
 EXPECTED_COUNT = 7
 
 def fail(msg):
@@ -26,7 +26,7 @@ def digest_obj(obj):
 def expected_registry(data, runs):
     return {
         'registry_id': data.get('registry_id', 'agon.mechanical_trial_run.registry.v0'),
-        'wave': data.get('wave', 'XIII'),
+        'lineage_ref': data.get('lineage_ref', 'legacy/raw/AGON_WAVE13_RUNTIME_LANDING.md'),
         'runtime_posture': data.get('runtime_posture', 'candidate_only'),
         'count': len(runs),
         'runs': runs,

@@ -11,12 +11,12 @@ def find_repo_root(start):
 
 
 ROOT = find_repo_root(pathlib.Path(__file__).resolve())
-ARTIFACTS = ROOT / 'mechanics' / 'agon-runtime' / 'legacy' / 'artifacts'
-SRC = ARTIFACTS / 'config' / 'agon_mechanical_trial_runs.seed.json'
-OUT = ARTIFACTS / 'generated' / 'agon_mechanical_trial_run_registry.min.json'
+PART_ROOT = ROOT / "mechanics" / "agon-runtime" / "parts" / "runtime-kernels"
+SRC = PART_ROOT / "definitions" / "mechanical-trial-runs.json"
+OUT = PART_ROOT / "generated" / "mechanical-trial-run-registry.min.json"
 ITEM_KEY = 'runs'
 REGISTRY_ID = 'agon.mechanical_trial_run.registry.v0'
-WAVE = 'XIII'
+LINEAGE_REF = 'legacy/raw/AGON_WAVE13_RUNTIME_LANDING.md'
 
 def digest_obj(obj):
     return hashlib.sha256(json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -26,7 +26,7 @@ def build():
     items = data.get(ITEM_KEY, [])
     return {
         'registry_id': data.get('registry_id', REGISTRY_ID),
-        'wave': data.get('wave', WAVE),
+        'lineage_ref': data.get('lineage_ref', LINEAGE_REF),
         'runtime_posture': data.get('runtime_posture', 'candidate_only'),
         'count': len(items),
         ITEM_KEY: items,

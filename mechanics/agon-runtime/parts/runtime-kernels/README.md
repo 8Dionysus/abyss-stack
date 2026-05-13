@@ -1,7 +1,15 @@
 # Runtime Kernels
 
-This part routes archived agon runtime kernel artifacts under `legacy/`.
+This part owns the active Agon dry-run runtime-kernel substrate for
+`abyss-stack`.
 
-Old family-specific generated registry, script, schema, config, example, test,
-and recurrence-manifest names stay reviewable only under `legacy/` until a
-future change graduates a quieter active surface.
+It contains:
+
+- `definitions/` for source JSON definitions that build generated registries
+- `generated/` for deterministic registry capsules
+- `examples/` for bounded dry-run event logs and kernel examples
+- `schemas/` for package-local contracts
+- validators, simulations, and tests beside the part they prove
+- `recurrence/` observation manifests with no scheduler authority
+
+Use [docs/RUNTIME_KERNELS.md](docs/RUNTIME_KERNELS.md) for the current boundary.

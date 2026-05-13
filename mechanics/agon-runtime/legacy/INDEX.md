@@ -21,18 +21,21 @@ Old root quest stubs now live in `legacy/raw/quests/`:
 
 ## Artifacts
 
-Old root artifacts now live under `legacy/artifacts/`:
+Old root artifacts were distilled into active `parts/runtime-kernels/` paths:
 
-- `config/agon_*.seed.json` -> `legacy/artifacts/config/`
-- `generated/agon_*.min.json` -> `legacy/artifacts/generated/`
-- `examples/agon_*` -> `legacy/artifacts/examples/`
-- `schemas/agon-*.schema.json` -> `legacy/artifacts/schemas/`
-- `scripts/*agon*` -> `legacy/artifacts/scripts/`
-- `tests/test_agon_*` -> `legacy/artifacts/tests/`
-- `manifests/recurrence/component.agon.*` -> `legacy/artifacts/manifests/recurrence/`
-- `manifests/recurrence/hooks/component.agon.*` -> `legacy/artifacts/manifests/recurrence/hooks/`
+- `config/agon_*.seed.json` -> `parts/runtime-kernels/definitions/*.json`
+- `generated/agon_*.min.json` -> `parts/runtime-kernels/generated/*.min.json`
+- `examples/agon_*` -> `parts/runtime-kernels/examples/*.example.json`
+- `schemas/agon-*.schema.json` -> `parts/runtime-kernels/schemas/*.schema.json`
+- `scripts/*agon*` -> `parts/runtime-kernels/*.py`
+- `tests/test_agon_*` -> `parts/runtime-kernels/tests/test_*.py`
+- `manifests/recurrence/component.agon.*` -> `parts/runtime-kernels/recurrence/component.*.json`
+- `manifests/recurrence/hooks/component.agon.*` -> `parts/runtime-kernels/recurrence/hooks/component.*.hooks.json`
+
+`legacy/artifacts/README.md` remains only to explain where the old technical
+artifact family went.
 
 ## Active Bridge
 
-Start at `../README.md`. Use these legacy files only when you need lineage,
-drift checks, or runnable dry-run proof.
+Start at `../README.md`. Use legacy files only when you need lineage. Use
+`../parts/runtime-kernels/` for runnable dry-run proof.

@@ -1,8 +1,10 @@
 # Agon Runtime Package Docs
 
-Package-owned active Agon runtime docs can land here after archived material is
-distilled into quiet current names.
+Package-wide active Agon runtime docs live here when they describe the whole
+package. Part-owned docs live under their owning part.
 
-Do not move raw `AGON_*` or generated artifact files here directly.
-Those remain in `legacy/` until a future distillation pass creates an active
-surface.
+The current active runtime-kernel boundary is
+[`parts/runtime-kernels/docs/RUNTIME_KERNELS.md`](../parts/runtime-kernels/docs/RUNTIME_KERNELS.md).
+
+Do not move raw `AGON_*` lineage files here directly; those remain in
+`legacy/raw/`.

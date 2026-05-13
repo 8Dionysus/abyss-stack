@@ -12,10 +12,10 @@
       ],
       "id": "abyss.runtime.agon.mechanical_duel_kernel.v0",
       "input_surfaces": [
-        "Agents-of-Abyss/generated/agon_duel_kernel_model_registry.min.json",
-        "Agents-of-Abyss/generated/agon_state_packet_registry.min.json",
-        "Agents-of-Abyss/generated/agon_ccs_law_registry.min.json",
-        "Agents-of-Abyss/generated/agon_vds_bridge_registry.min.json",
+        "Agents-of-Abyss/mechanics/agon/parts/duel-kernel/generated/agon_duel_kernel_model_registry.min.json",
+        "Agents-of-Abyss/mechanics/agon/parts/packet-arena/generated/agon_state_packet_registry.min.json",
+        "Agents-of-Abyss/mechanics/agon/parts/compatibility-bridges/generated/agon_ccs_law_registry.min.json",
+        "Agents-of-Abyss/mechanics/agon/parts/verdict-retention-rank/generated/agon_vds_bridge_registry.min.json",
         "aoa-sdk/generated/agon_duel_kernel_sdk_bindings.min.json"
       ],
       "runtime_effect": "local_event_log_candidate_only",
@@ -100,7 +100,7 @@
           }
         ]
       },
-      "status": "seeded_bounded_local_dry_run",
+      "status": "bounded_local_dry_run",
       "stop_lines": [
         "no_live_verdict_authority",
         "no_durable_scar_write",
@@ -120,5 +120,5 @@
   ],
   "registry_id": "agon.duel_runtime_kernel_registry.v1",
   "runtime_status": "bounded_local_event_log_substrate_candidate",
-  "wave": "XII"
+  "lineage_ref": "legacy/raw/AGON_WAVE12_RUNTIME_LANDING.md"
 }

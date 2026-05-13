@@ -13,7 +13,8 @@ examples, or their package-specific tests.
 
 ### abyss-stack owns
 
-- runtime-side contract schemas and examples for this preserved family
+- archive-only runtime-side contract schemas and examples for this preserved
+  family
 - public-safe validation of those examples
 - package-local archiving of old file and contract names
 - route bridges that keep stronger owner boundaries visible
@@ -31,8 +32,8 @@ Archived docs, schemas, examples, and contract tests.
 
 ### Outputs
 
-Package-local contract validation, provenance mapping, and a quieter route for
-future distillation.
+Package-local contract validation, provenance mapping, and an explicit
+distillation stop-line for future runtime service work.
 
 ### Must not claim
 
@@ -49,10 +50,12 @@ Run the commands in [AGENTS.md](AGENTS.md).
 ### Next route
 
 Use [PROVENANCE.md](PROVENANCE.md) and [legacy/INDEX.md](legacy/INDEX.md) before
-editing moved archive files.
+editing moved archive files. Use
+[parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md](parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md)
+before promoting anything out of legacy.
 
 ## Active Route
 
-This package is a bridge and containment layer. Future work can distill quiet
-active docs under `docs/`, but this pass only moves and validates the old
-contract family.
+This package is a bridge and containment layer. The current contract family
+remains archive-only until one concrete `abyss-stack` service, storage path, or
+operator route consumes a quiet active contract.
