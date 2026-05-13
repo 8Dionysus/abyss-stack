@@ -1,0 +1,50 @@
+# 2026-05-13 Root Design And Agent Surfaces
+
+## Status
+
+Accepted.
+
+## Context
+
+`abyss-stack` already had a root route card, charter, boundaries, architecture,
+and mechanics atlas, but it did not have a separate design surface for the
+runtime form or for the shape of agent-facing route guidance.
+
+`Agents-of-Abyss` uses a clearer split: root `AGENTS.md` routes work,
+`DESIGN.md` describes system form, and `DESIGN.AGENTS.md` describes the intended
+shape of agent surfaces. The same principle is useful here, but the content must
+stay runtime-specific and must not import AoA constitutional authority into
+`abyss-stack`.
+
+## Decision
+
+Add root `DESIGN.md` and `DESIGN.AGENTS.md` to `abyss-stack`.
+
+- `DESIGN.md` describes the intended form of the runtime substrate: source
+  checkout, deployed runtime root, config projection, service topology,
+  lifecycle, machine fit, inference pilots, federation seams, diagnostics,
+  repair, validators, and source/runtime authority.
+- `DESIGN.AGENTS.md` describes the intended form of agent guidance: root card,
+  district cards, mechanic package cards, part cards, legacy/provenance cards,
+  validation surfaces, generated companions, and closeout expectations.
+- Root `AGENTS.md` is reshaped as a route card that points to these design
+  surfaces instead of trying to carry all design rationale itself.
+
+## Consequences
+
+Future topology and route-card refactors should check these surfaces before
+editing local packages. New root, district, mechanic, or part route cards should
+prefer the canonical card shape unless a smaller local card is enough.
+
+Validators should treat the new design files as required source surfaces and as
+sync-managed public-safe docs. Runtime mirror state remains separate from source
+truth; live secrets, logs, models, local databases, rendered private config, and
+machine captures remain outside the GitHub mirror.
+
+## Non-goals
+
+- This does not move AoA doctrine into `abyss-stack`.
+- This does not change deployed services or runtime state.
+- This does not make generated catalogs authoritative over source surfaces.
+- This does not require every existing local `AGENTS.md` to be rewritten in this
+  pass.

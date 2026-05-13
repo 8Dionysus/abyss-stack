@@ -9,6 +9,9 @@ This directory owns repo-wide operator and source-checkout documentation:
 architecture, deployment, first-run, lifecycle, storage, security, release,
 branch policy, migration notes, questbook integration, and decision records.
 
+Root-level system and agent-surface design live at `DESIGN.md` and
+`DESIGN.AGENTS.md`, not under `docs/`.
+
 Mechanic-owned runtime doctrine belongs under `mechanics/<package>/docs/` or a
 more specific `mechanics/<package>/parts/<part>/docs/` surface.
 

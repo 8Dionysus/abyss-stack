@@ -7,3 +7,6 @@ Routes config sync helpers and deployment docs:
 
 Sync owns source-to-runtime projection behavior. It must not become a Git mirror
 of live private machine state.
+
+Root public-safe route and design surfaces, including `AGENTS.md`, `DESIGN.md`,
+and `DESIGN.AGENTS.md`, are synced with the source-managed `Configs` mirror.

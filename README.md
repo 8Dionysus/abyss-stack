@@ -10,13 +10,14 @@ Read in this order:
 
 1. [CHARTER](CHARTER.md)
 2. [BOUNDARIES](BOUNDARIES.md)
-3. [docs/ARCHITECTURE](docs/ARCHITECTURE.md)
-4. [mechanics/README](mechanics/README.md)
-5. [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md)
-6. [docs/PROFILES](docs/PROFILES.md) and [docs/PRESETS](docs/PRESETS.md)
-7. [docs/PATHS](docs/PATHS.md)
-8. [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [docs/RUNBOOK](docs/RUNBOOK.md), and [docs/SECURITY](docs/SECURITY.md)
-9. [ROADMAP](ROADMAP.md)
+3. [DESIGN](DESIGN.md)
+4. [docs/ARCHITECTURE](docs/ARCHITECTURE.md)
+5. [mechanics/README](mechanics/README.md)
+6. [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md)
+7. [docs/PROFILES](docs/PROFILES.md) and [docs/PRESETS](docs/PRESETS.md)
+8. [docs/PATHS](docs/PATHS.md)
+9. [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [docs/RUNBOOK](docs/RUNBOOK.md), and [docs/SECURITY](docs/SECURITY.md)
+10. [ROADMAP](ROADMAP.md)
 
 Then branch by need:
 
@@ -27,6 +28,7 @@ Then branch by need:
 - **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md), [runtime repair provenance](mechanics/runtime-repair/PROVENANCE.md), [repair-safe closeout](mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/parts/antifragility-posture/docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
+- **root route and design surfaces**: [AGENTS](AGENTS.md), [DESIGN](DESIGN.md), and [DESIGN.AGENTS](DESIGN.AGENTS.md)
 - **operator command map**: [scripts/README](scripts/README.md)
 
 ## What this repository is for

@@ -48,6 +48,8 @@ items=(
   README.md
   CHARTER.md
   BOUNDARIES.md
+  DESIGN.md
+  DESIGN.AGENTS.md
   ROADMAP.md
   AGENTS.md
 )
