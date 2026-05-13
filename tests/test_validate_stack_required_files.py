@@ -72,3 +72,66 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
                 f".agents/skills/overlay.md: {moved_ref}"
             ],
         )
+
+    def test_missing_operator_backend_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            scripts_dir = repo_root / "scripts"
+            scripts_dir.mkdir(parents=True)
+            wrapper = scripts_dir / "aoa-check-layout"
+            wrapper.write_text(
+                "#!/usr/bin/env bash\nexec \"${BASH_SOURCE[0]}\" \"$@\"\n",
+                encoding="utf-8",
+            )
+            pilot = scripts_dir / "aoa-llamacpp-pilot"
+            pilot.write_text('podman", "network", "connect"\nabyss_default\n', encoding="utf-8")
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-check-layout", "aoa-llamacpp-pilot"}):
+                    with patch.object(
+                        validate_stack,
+                        "OPERATOR_BACKEND_SCRIPTS",
+                        {"aoa-check-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"},
+                    ):
+                        validate_stack.validate_scripts(errors)
+
+        self.assertIn(
+            "missing operator backend for scripts/aoa-check-layout: "
+            "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+            errors,
+        )
+
+    def test_operator_wrapper_must_point_to_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            scripts_dir = repo_root / "scripts"
+            backend = repo_root / "mechanics" / "runtime-lifecycle" / "parts" / "layout-install" / "aoa_check_layout.sh"
+            backend.parent.mkdir(parents=True)
+            scripts_dir.mkdir(parents=True)
+            backend.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            backend.chmod(0o755)
+            (scripts_dir / "aoa-check-layout").write_text(
+                "#!/usr/bin/env bash\nexec ../wrong/path.sh \"$@\"\n",
+                encoding="utf-8",
+            )
+            (scripts_dir / "aoa-llamacpp-pilot").write_text(
+                'podman", "network", "connect"\nabyss_default\n',
+                encoding="utf-8",
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-check-layout", "aoa-llamacpp-pilot"}):
+                    with patch.object(
+                        validate_stack,
+                        "OPERATOR_BACKEND_SCRIPTS",
+                        {"aoa-check-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"},
+                    ):
+                        validate_stack.validate_scripts(errors)
+
+        self.assertIn(
+            "scripts/aoa-check-layout must exec "
+            "../mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+            errors,
+        )

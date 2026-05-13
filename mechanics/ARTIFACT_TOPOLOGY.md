@@ -19,7 +19,7 @@ not trash and not the new active route.
 | Artifact kind | Current default | Package home when clearly local |
 |---|---|---|
 | operator docs | `docs/` | `mechanics/<package>/docs/` for package-owned prose detail, `mechanics/<package>/parts/<part>/README.md` for part routes, or `mechanics/<package>/legacy/raw/` for old raw docs |
-| runtime scripts | `scripts/` | `mechanics/<package>/legacy/artifacts/scripts/` while old names remain legacy |
+| runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementation bodies when the root command can remain a thin wrapper, or `mechanics/<package>/legacy/artifacts/scripts/` while old names remain legacy |
 | schemas | `schemas/` | `mechanics/<package>/parts/<part>/schemas/` for active package-local contracts, or `mechanics/<package>/legacy/artifacts/schemas/` when the family is contained |
 | examples | `examples/` | `mechanics/<package>/parts/<part>/examples/` for active package-local public examples, or `mechanics/<package>/legacy/artifacts/examples/` with validator updates |
 | generated capsules | `generated/` | `mechanics/<package>/parts/<part>/generated/` when the source builder moves too, or `mechanics/<package>/legacy/artifacts/generated/` when old names remain contained |
@@ -44,7 +44,10 @@ Before moving an artifact into a package:
 
 ## Stop-lines
 
-- Do not hide runtime scripts where operator wrappers cannot find them.
+- Do not move operator command names out of `scripts/` unless deployment sync,
+  runbooks, and validators all move with them.
+- Do not hide runtime implementations where the stable operator wrappers cannot
+  find them in both source checkout and deployed `Configs` mirror shape.
 - Do not move public-safe examples into a package while validators still read
   the old path.
 - Do not move generated JSON without moving or updating the builder.

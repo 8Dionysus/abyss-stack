@@ -2,23 +2,4 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SMOKE_SCRIPT="${SCRIPT_DIR}/aoa-smoke"
-# shellcheck source=scripts/aoa-lib.sh
-source "${SCRIPT_DIR}/aoa-lib.sh"
-
-aoa_parse_profile_args "$@"
-
-timeout_s="${AOA_WAIT_TIMEOUT_S:-120}"
-interval_s="${AOA_WAIT_INTERVAL_S:-5}"
-deadline=$((SECONDS + timeout_s))
-
-while ((SECONDS < deadline)); do
-  if AOA_STACK_PRESET="$AOA_STACK_PRESET" AOA_STACK_PROFILE="$AOA_STACK_PROFILE" "$SMOKE_SCRIPT" "${AOA_FORWARD_ARGS[@]}" >/dev/null 2>&1; then
-    printf 'profile selection is ready\n'
-    exit 0
-  fi
-  sleep "$interval_s"
-done
-
-printf 'error: timeout waiting for profile selection\n' >&2
-exit 1
+exec "${SCRIPT_DIR}/../mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh" "$@"

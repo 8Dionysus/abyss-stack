@@ -56,7 +56,9 @@ checks.
 
 ## Active route
 
-Current source surfaces stay in `docs/`, `scripts/`, `compose/`, and
-`systemd/user/`. Runtime cache/usage readout schemas and examples live in
-`mechanics/runtime-lifecycle/parts/status-readouts/`, with regression coverage in
-`mechanics/runtime-lifecycle/parts/status-readouts/tests/`.
+Stable operator entrypoints stay in `scripts/`. Runtime-lifecycle
+implementation bodies for first-run, layout, start/stop, warmup, wait/smoke,
+logs/status, and user-unit helpers live under their owning
+`mechanics/runtime-lifecycle/parts/` routes. Runtime cache/usage readout schemas
+and examples live in `mechanics/runtime-lifecycle/parts/status-readouts/`, with
+regression coverage in `mechanics/runtime-lifecycle/parts/status-readouts/tests/`.

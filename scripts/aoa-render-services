@@ -2,10 +2,4 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/aoa-lib.sh
-source "${SCRIPT_DIR}/aoa-lib.sh"
-
-aoa_parse_profile_args "$@"
-aoa_resolve_modules
-
-aoa_compose config --services
+exec "${SCRIPT_DIR}/../mechanics/config-projection/parts/rendering/aoa_render_services.sh" "$@"
