@@ -47,3 +47,10 @@ If the answer points to authored meaning or duplicated authority, it does not be
 Runtime benchmark evidence may live here; proof wording about what that evidence means does not.
 Public-safe host-facts contracts may live here; private captures belong in runtime logs, not git history.
 Platform-adaptation records may live here; they should stay bounded to runtime seams, adaptations, and portability notes.
+
+## Related root surfaces
+
+- `CHARTER.md` authorizes the owner lane.
+- `DESIGN.md` describes the intended runtime form.
+- `DESIGN.AGENTS.md` describes the intended agent-route form.
+- `AGENTS.md` tells agents how to move through those surfaces.

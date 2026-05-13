@@ -60,6 +60,8 @@ SYNC_MANAGED_ITEMS = (
     "README.md",
     "CHARTER.md",
     "BOUNDARIES.md",
+    "DESIGN.md",
+    "DESIGN.AGENTS.md",
     "ROADMAP.md",
     "AGENTS.md",
 )
@@ -315,6 +317,8 @@ REQUIRED_FILES = {
     ROOT / "systemd" / "user" / "AGENTS.md",
     ROOT / "scripts" / "AGENTS.md",
     ROOT / "scripts" / "README.md",
+    ROOT / "DESIGN.md",
+    ROOT / "DESIGN.AGENTS.md",
     ROOT / "docs" / "AGENTS.md",
     ROOT / "docs" / "README.md",
     ROOT / "tests" / "README.md",
@@ -1686,6 +1690,10 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must state Fedora-first posture")
     if "Windows-usable" not in readme:
         errors.append("README.md must state Windows-usable posture")
+    if "DESIGN.md" not in readme:
+        errors.append("README.md must route readers to DESIGN.md")
+    if "DESIGN.AGENTS.md" not in readme:
+        errors.append("README.md must route readers to DESIGN.AGENTS.md")
     if "mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md" not in readme:
         errors.append("README.md must route readers to mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md")
     if "mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md" not in readme:
@@ -2274,6 +2282,97 @@ def validate_required_files(errors: list[str]) -> None:
     for path in sorted(REQUIRED_FILES):
         if not path.exists():
             errors.append(f"missing required file: {path.relative_to(ROOT)}")
+
+
+def validate_root_design_surfaces(errors: list[str]) -> None:
+    def read_required(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            errors.append(f"missing required file: {path.relative_to(ROOT)}")
+            return ""
+
+    agents = read_required(ROOT / "AGENTS.md")
+    design = read_required(ROOT / "DESIGN.md")
+    design_agents = read_required(ROOT / "DESIGN.AGENTS.md")
+    charter = read_required(ROOT / "CHARTER.md")
+    boundaries = read_required(ROOT / "BOUNDARIES.md")
+    docs_readme = read_required(ROOT / "docs" / "README.md")
+
+    for heading in (
+        "## Applies to",
+        "## Role",
+        "## Read before editing",
+        "## Boundaries",
+        "## Validation",
+        "## Closeout",
+    ):
+        if heading not in agents:
+            errors.append(f"AGENTS.md must include `{heading}`")
+
+    for snippet in (
+        "DESIGN.md",
+        "DESIGN.AGENTS.md",
+        "source checkout",
+        "deployed runtime root",
+        "GitHub Landing Workflow",
+        "Post-change Route Review",
+    ):
+        if snippet not in agents:
+            errors.append(f"AGENTS.md must route or describe `{snippet}`")
+
+    for snippet in (
+        "runtime body",
+        "source checkout",
+        "deployed runtime root",
+        "Generated companions stay companions",
+        "Runtime, not meaning",
+    ):
+        if snippet not in design:
+            errors.append(f"DESIGN.md must describe `{snippet}`")
+
+    for snippet in (
+        "Canonical Card Shape",
+        "root card",
+        "district cards",
+        "mechanic package cards",
+        "part cards",
+        "generated companions",
+    ):
+        if snippet not in design_agents:
+            errors.append(f"DESIGN.AGENTS.md must describe `{snippet}`")
+
+    if "DESIGN.md" not in charter or "DESIGN.AGENTS.md" not in charter:
+        errors.append("CHARTER.md must point to root design surfaces")
+
+    for snippet in ("DESIGN.md", "DESIGN.AGENTS.md", "AGENTS.md"):
+        if snippet not in boundaries:
+            errors.append(f"BOUNDARIES.md must point to `{snippet}`")
+        if snippet not in docs_readme:
+            errors.append(f"docs/README.md must point to `{snippet}`")
+
+
+def validate_sync_managed_items(errors: list[str]) -> None:
+    sync_script = read_text_or_none(
+        ROOT / "mechanics" / "config-projection" / "parts" / "sync" / "aoa_sync_configs.sh"
+    ) or ""
+    sync_readme = read_text_or_none(
+        ROOT / "mechanics" / "config-projection" / "parts" / "sync" / "README.md"
+    ) or ""
+
+    for item in SYNC_MANAGED_ITEMS:
+        if item not in sync_script:
+            errors.append(
+                "mechanics/config-projection/parts/sync/aoa_sync_configs.sh "
+                f"must sync `{item}`"
+            )
+
+    for item in ("AGENTS.md", "DESIGN.md", "DESIGN.AGENTS.md"):
+        if item not in sync_readme:
+            errors.append(
+                "mechanics/config-projection/parts/sync/README.md "
+                f"must mention `{item}`"
+            )
 
 
 def validate_federation_required_files(errors: list[str]) -> None:
@@ -3725,6 +3824,8 @@ def main() -> int:
     validate_mechanics_topology(errors)
     validate_scripts(errors)
     validate_required_files(errors)
+    validate_root_design_surfaces(errors)
+    validate_sync_managed_items(errors)
     validate_federation_required_files(errors)
     validate_questbook_surface(errors)
     validate_reference_platform(errors)

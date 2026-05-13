@@ -36,3 +36,6 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 - anchor-based return over drifted continuity when runtime routes lose shape
 - operational clarity over cleverness
 - reversible changes over wide refactors
+
+`DESIGN.md` owns the system-form description for this stance.
+`DESIGN.AGENTS.md` owns the form of agent-facing route guidance.

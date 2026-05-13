@@ -28,9 +28,13 @@ Tracking starts with the community-docs baseline for this repository.
   repository docs and repo-level validation
 - `.agents/` and `.github/` route README surfaces, plus `.agents/AGENTS.md` for
   repo-local agent overlays
+- root `DESIGN.md` and `DESIGN.AGENTS.md` surfaces, adapting the AoA route-card
+  pattern to the `abyss-stack` runtime substrate
 
 ### Changed
 
+- root `AGENTS.md` now follows the canonical route-card shape and routes future
+  passes through runtime design and agent-surface design before local work
 - top-level route docs now point runtime-move work through the mechanics atlas
   before entering package-specific docs, scripts, schemas, or config surfaces
 - noisy Agon and experience archival artifacts, including late-found experience
