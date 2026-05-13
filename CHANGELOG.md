@@ -78,6 +78,11 @@ Tracking starts with the community-docs baseline for this repository.
 - root residual route surfaces were tightened: the audit contract now lives at
   `docs/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and
   validators block those root-level residual paths from returning
+- LangGraph and llama.cpp promotion surfaces now treat `W0`/`W4` as preserved
+  runtime/edit compatibility gate IDs instead of active topology names, with a
+  validator guard against old wave-shaped prose returning
+- autonomy status now routes preserved `W5`/`W6` artifact names through
+  long-horizon and bounded-autonomy index constants
 
 ## [0.2.2] - 2026-04-23
 

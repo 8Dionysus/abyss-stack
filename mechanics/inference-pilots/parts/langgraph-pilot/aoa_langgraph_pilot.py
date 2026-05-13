@@ -26,7 +26,9 @@ except ImportError as exc:  # pragma: no cover - guarded by runtime usage
 DEFAULT_PROGRAM_ID = "langgraph-sidecar-pilot-v1"
 FIXTURE_PROGRAM_ID = "langgraph-sidecar-llamacpp-v1"
 PROGRAM_ID = DEFAULT_PROGRAM_ID
-WAVE_ID = "W4"
+LEGACY_EDIT_GATE_ID = "W4"
+LEGACY_EDIT_GATE_INDEX_NAME = f"{LEGACY_EDIT_GATE_ID}-langgraph-sidecar-index"
+LEGACY_EDIT_GATE_CLOSEOUT_NAME = f"{LEGACY_EDIT_GATE_ID}-closeout.json"
 MODEL = "qwen3.5:9b"
 DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
 LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
@@ -47,7 +49,7 @@ MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 BASELINE_PROGRAM_ID = "qwen-local-pilot-v1"
 BASELINE_LOG_ROOT = STACK_ROOT / "Logs" / "local-ai-trials" / BASELINE_PROGRAM_ID
 COMPARISON_MEMO_NAME = "LANGGRAPH_COMPARISON.md"
-PILOT_INDEX_NAME = "W4-langgraph-sidecar-index"
+PILOT_INDEX_NAME = LEGACY_EDIT_GATE_INDEX_NAME
 
 DEFAULT_DOCS_CASE_ID = "8dionysus-profile-routing-clarity"
 GENERATED_CASE_ID = "aoa-routing-generated-surface-refresh"
@@ -126,7 +128,7 @@ def fixture_repo_root(log_root: Path) -> Path:
 
 def fixture_case_from_template(log_root: Path) -> dict[str, Any]:
     catalog = ORIGINAL_TRIALS_BUILD_CATALOG()
-    template = next(case for case in catalog["W4"] if case["case_id"] == DEFAULT_DOCS_CASE_ID)
+    template = next(case for case in catalog[LEGACY_EDIT_GATE_ID] if case["case_id"] == DEFAULT_DOCS_CASE_ID)
     item = copy.deepcopy(template)
     repo_root = fixture_repo_root(log_root)
     readme = repo_root / "README.md"
@@ -158,13 +160,13 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
             raise RuntimeError("fixture program requires a log_root to build its disposable repo case")
         return [fixture_case_from_template(log_root)]
     selected = []
-    for case in catalog["W4"]:
+    for case in catalog[LEGACY_EDIT_GATE_ID]:
         if case["case_id"] not in {DEFAULT_DOCS_CASE_ID, GENERATED_CASE_ID}:
             continue
         item = copy.deepcopy(case)
         item["program_id"] = PROGRAM_ID
         item["notes"] = list(item.get("notes") or []) + [
-            "This case is frozen into the LangGraph sidecar pilot and intentionally reuses the W4 bounded-mutation contract.",
+            "This case is frozen into the LangGraph sidecar pilot and intentionally reuses the preserved bounded-edit compatibility gate.",
         ]
         selected.append(item)
     by_id = {case["case_id"]: case for case in selected}
@@ -172,7 +174,7 @@ def available_cases(log_root: Path | None = None) -> list[dict[str, Any]]:
 
 
 def pilot_catalog(log_root: Path | None = None) -> dict[str, list[dict[str, Any]]]:
-    return {WAVE_ID: available_cases(log_root)}
+    return {LEGACY_EDIT_GATE_ID: available_cases(log_root)}
 
 
 def run_git(repo_root: Path, *args: str) -> None:
@@ -274,7 +276,7 @@ def ensure_fixture_repo(log_root: Path) -> Path:
 
 
 def case_root(log_root: Path, case_id: str) -> Path:
-    return TRIALS.case_dir(log_root, WAVE_ID, case_id)
+    return TRIALS.case_dir(log_root, LEGACY_EDIT_GATE_ID, case_id)
 
 
 def state_path(log_root: Path, case_id: str) -> Path:
@@ -299,7 +301,7 @@ def program_readme() -> str:
     return (
         f"# {PROGRAM_ID}\n\n"
         "This directory stores the runtime-truth artifacts for the bounded LangGraph sidecar pilot.\n\n"
-        "It reuses the W4 supervised-edit contract while comparing a graph-shaped orchestration layer to the existing runner.\n"
+        "It reuses the preserved local-trials bounded-edit compatibility gate while comparing a graph-shaped orchestration layer to the runner.\n"
     )
 
 
@@ -343,7 +345,7 @@ def comparison_memo(log_root: Path) -> str:
             f"# {PROGRAM_ID} Comparison Memo",
             "",
             "## Summary",
-            "- This pilot compares graph-shaped orchestration against the existing W4 bounded runner.",
+            "- This pilot compares graph-shaped orchestration against the preserved bounded-edit local-trials runner.",
             "",
             "## Current Evidence",
             f"- Docs case pass: `{docs_pass}`",
@@ -353,7 +355,7 @@ def comparison_memo(log_root: Path) -> str:
             "",
             "## Comparison Notes",
             "- Pause/resume is explicit through persisted `graph.state.json`, `graph.history.jsonl`, and `approval.status.json`.",
-            "- Proposal and worktree safety continue to reuse the established W4 bounded-mutation contract.",
+            "- Proposal and worktree safety continue to reuse the preserved bounded-edit compatibility gate.",
             "- Glue code increases slightly because the pilot stays side-by-side with the existing runner instead of replacing it.",
             "",
             "## Recommendation",
@@ -364,6 +366,11 @@ def comparison_memo(log_root: Path) -> str:
 
 def render_index_md(index_payload: dict[str, Any]) -> str:
     return TRIALS.render_wave_index_md(index_payload)
+
+
+# The preserved local-trials backend still exposes W4-named attributes as its
+# compatibility API. Active LangGraph wording routes those names through the
+# edit-gate constants above instead of treating them as current topology.
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -482,7 +489,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
                 "case_spec": str(case_root(log_root, case["case_id"]) / "case.spec.json"),
                 "summary": case["title"],
                 **(
-                    {"report_md": str(mirror_root / TRIALS.case_report_name(WAVE_ID, case["case_id"]))}
+                    {"report_md": str(mirror_root / TRIALS.case_report_name(LEGACY_EDIT_GATE_ID, case["case_id"]))}
                     if (case_root(log_root, case["case_id"]) / "report.md").exists()
                     else {}
                 ),
@@ -497,13 +504,13 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
     if gate_pass:
         gate_result = "pass"
         next_action = (
-            "Use the fixture packet as the W4 dry-run promotion verdict for the candidate backend."
+            "Use the fixture packet as the legacy edit-gate dry-run promotion verdict for the candidate backend."
             if is_fixture_program()
             else "Use the comparison memo to decide whether the long-horizon pilot should run on the LangGraph sidecar substrate."
         )
     elif fail_count or critical_failures:
         gate_result = "fail"
-        next_action = "Inspect the failed case packet and compare it against the baseline W4 runner before promoting LangGraph."
+        next_action = "Inspect the failed case packet and compare it against the preserved bounded-edit runner before promoting LangGraph."
     elif planned_count == len(cases):
         gate_result = "not-run"
         next_action = "Materialize the sidecar pilot and run the docs case to the approval boundary first."
@@ -514,12 +521,12 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
     return {
         "artifact_kind": "aoa.local-ai-trial.wave-index",
         "program_id": PROGRAM_ID,
-        "wave_id": WAVE_ID,
+        "wave_id": LEGACY_EDIT_GATE_ID,
         "wave_title": "LangGraph Sidecar Pilot",
         "wave_summary": (
-            "Bounded disposable W4 fixture used as a backend promotion gate."
+            "Bounded disposable edit-gate fixture used as a backend promotion gate."
             if is_fixture_program()
-            else "Bounded comparison pilot for a graph-shaped W4 execution layer."
+            else "Bounded comparison pilot for a graph-shaped bounded-edit execution layer."
         ),
         "case_count": len(cases),
         "status_counts": {
@@ -576,13 +583,13 @@ def materialize(log_root: Path, mirror_root: Path) -> None:
     refresh_sidecar_outputs(log_root, mirror_root)
 
 
-def ensure_baseline_w4_closeout() -> None:
-    closeout_path = BASELINE_LOG_ROOT / "W4-closeout.json"
+def ensure_baseline_edit_gate_closeout() -> None:
+    closeout_path = BASELINE_LOG_ROOT / LEGACY_EDIT_GATE_CLOSEOUT_NAME
     if not closeout_path.exists():
-        raise RuntimeError(f"missing W4 closeout artifact: {closeout_path}")
+        raise RuntimeError(f"missing preserved edit-gate closeout artifact: {closeout_path}")
     payload = load_json(closeout_path)
     if payload.get("gate_result") != "pass":
-        raise RuntimeError(f"W4 closeout is not pass: {closeout_path}")
+        raise RuntimeError(f"preserved edit-gate closeout is not pass: {closeout_path}")
 
 
 def ensure_runtime_ready(case_dir_path: Path) -> None:
@@ -612,7 +619,7 @@ def write_interrupt(log_root: Path, state: PilotState, *, reason: str) -> None:
     payload = {
         "artifact_kind": "aoa.local-ai-trial.langgraph-interrupt",
         "program_id": PROGRAM_ID,
-        "wave_id": WAVE_ID,
+        "wave_id": LEGACY_EDIT_GATE_ID,
         "case_id": state["case_id"],
         "paused_at": utc_now(),
         "reason": reason,
@@ -628,7 +635,7 @@ def write_rejected_terminal(case: dict[str, Any], *, log_root: Path, mirror_root
     run_manifest = {
         "artifact_kind": "aoa.local-ai-trial.run-manifest",
         "program_id": PROGRAM_ID,
-        "wave_id": WAVE_ID,
+        "wave_id": LEGACY_EDIT_GATE_ID,
         "case_id": case["case_id"],
         "executed_at": utc_now(),
         "runtime_selection": case["runtime_selection"],
@@ -775,9 +782,9 @@ def build_graph(log_root: Path, mirror_root: Path):
         case_id = state["case_id"]
         root = case_root(log_root, case_id)
         try:
-            ensure_baseline_w4_closeout()
+            ensure_baseline_edit_gate_closeout()
             ensure_runtime_ready(root)
-            history = record_event(state, node="preflight", status="pass", note="Baseline W4 closeout and local runtime preflight are green.")
+            history = record_event(state, node="preflight", status="pass", note="Preserved edit-gate closeout and local runtime preflight are green.")
             node_json(
                 log_root,
                 case_id,
@@ -785,7 +792,7 @@ def build_graph(log_root: Path, mirror_root: Path):
                 {
                     "case_id": case_id,
                     "checked_at": utc_now(),
-                    "baseline_closeout": str(BASELINE_LOG_ROOT / "W4-closeout.json"),
+                    "baseline_closeout": str(BASELINE_LOG_ROOT / LEGACY_EDIT_GATE_CLOSEOUT_NAME),
                     "doctor_preset": "intel-full",
                     "langchain_health": TRIALS.langchain_endpoint("/health"),
                     "status": "pass",
@@ -821,7 +828,7 @@ def build_graph(log_root: Path, mirror_root: Path):
                 run_manifest = {
                     "artifact_kind": "aoa.local-ai-trial.run-manifest",
                     "program_id": PROGRAM_ID,
-                    "wave_id": WAVE_ID,
+                    "wave_id": LEGACY_EDIT_GATE_ID,
                     "case_id": case_id,
                     "executed_at": utc_now(),
                     "runtime_selection": case["runtime_selection"],
@@ -840,9 +847,9 @@ def build_graph(log_root: Path, mirror_root: Path):
                         "failures": [str(exc)],
                     },
                     failure_class="preflight_failure",
-                    reviewer_notes="The LangGraph sidecar preflight did not satisfy the required W4 closeout and runtime-health posture.",
+                    reviewer_notes="The LangGraph sidecar preflight did not satisfy the required preserved edit-gate closeout and runtime-health posture.",
                     boundary_notes=TRIALS.w4_boundary_note(),
-                    next_action="Repair baseline W4 or runtime readiness before retrying the sidecar pilot.",
+                    next_action="Repair the preserved edit-gate baseline or runtime readiness before retrying the sidecar pilot.",
                 )
                 TRIALS.finalize_case(case=case, log_root=log_root, mirror_root=mirror_root, run_manifest=run_manifest, result_summary=result_summary)
             return Command(
@@ -944,7 +951,7 @@ def build_graph(log_root: Path, mirror_root: Path):
             state,
             node="build_edit_proposal",
             status="pass" if result.get("proposal_valid") else "fail",
-            note="Docs proposal prepared through the W4 edit-spec contract.",
+            note="Docs proposal prepared through the preserved edit-spec compatibility contract.",
             extra={"proposal_valid": bool(result.get("proposal_valid"))},
         )
         node_json(
@@ -1102,7 +1109,7 @@ def build_graph(log_root: Path, mirror_root: Path):
         interrupt_payload = {
             "artifact_kind": "aoa.local-ai-trial.langgraph-interrupt",
             "program_id": PROGRAM_ID,
-            "wave_id": WAVE_ID,
+            "wave_id": LEGACY_EDIT_GATE_ID,
             "case_id": state["case_id"],
             "paused_at": utc_now(),
             "reason": "approval_pending",
@@ -1138,7 +1145,7 @@ def build_graph(log_root: Path, mirror_root: Path):
             state,
             node="worktree_apply",
             status=status,
-            note="Reused the existing W4 worktree-first bounded apply path.",
+            note="Reused the preserved worktree-first bounded apply path.",
             extra={"failure_class": result_summary.get("failure_class")},
         )
         node_json(
@@ -1168,7 +1175,7 @@ def build_graph(log_root: Path, mirror_root: Path):
             state,
             node="acceptance_validate",
             status=status,
-            note="Acceptance outcome was read from the landed W4-compatible result summary.",
+            note="Acceptance outcome was read from the landed legacy-compatible result summary.",
         )
         node_json(
             log_root,
@@ -1196,7 +1203,7 @@ def build_graph(log_root: Path, mirror_root: Path):
             state,
             node="land_or_rollback",
             status="pass" if landed else "fail",
-            note="Landing status was read from the W4-compatible case result.",
+            note="Landing status was read from the legacy-compatible case result.",
         )
         node_json(
             log_root,
@@ -1303,7 +1310,9 @@ def print_status(log_root: Path, case_id: str) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the LangGraph sidecar pilot on top of the W4 bounded edit contract.")
+    parser = argparse.ArgumentParser(
+        description="Run the LangGraph sidecar pilot on top of the preserved bounded-edit compatibility contract."
+    )
     parser.add_argument("--url", default=DEFAULT_LANGCHAIN_RUN_URL)
     parser.add_argument("--program-id", default=DEFAULT_PROGRAM_ID)
     parser.add_argument("--log-root", default=None)

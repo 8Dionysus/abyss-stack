@@ -5,9 +5,9 @@
 This document defines the bounded LangGraph sidecar pilot for `abyss-stack` and records the execution-layer decision that came out of it.
 
 It is not a new service and not a migration of `aoa-local-ai-trials`.
-It began as a comparison layer for one W4-shaped supervised edit flow and now
-serves as the origin surface for the adopted bounded execution layer used by
-the preserved autonomy pilots.
+It began as a comparison layer for the preserved local-trials bounded-edit
+compatibility gate and now serves as the origin surface for the adopted bounded
+execution layer used by the preserved autonomy pilots.
 
 ## Current pilot
 
@@ -53,7 +53,7 @@ scripts/aoa-langgraph-pilot --url http://127.0.0.1:5403/run --program-id langgra
 ## Boundaries
 
 The sidecar pilot:
-- reuses the W4 bounded-mutation contract
+- reuses the preserved bounded-edit compatibility gate
 - reuses `approval.status.json`
 - reuses the existing worktree-first landing safety posture
 - keeps runtime truth local under `Logs/local-ai-trials/`
@@ -63,12 +63,12 @@ The sidecar pilot does not:
 - add a new HTTP API
 - replace `aoa-local-ai-trials`
 - replace `langchain-api /run`
-- widen W4 into autonomous long-horizon execution
+- turn the preserved edit-gate compatibility ID into active topology
 
 Current adopted role:
 - `LangGraph` is the preferred bounded execution layer for preserved autonomy pilots and follow-on local-worker flows
-- `aoa-local-ai-trials` remains the historical baseline for `W0` through `W4`
-- `aoa-langgraph-pilot` remains the W4-shaped comparison and fixture surface
+- `aoa-local-ai-trials` remains the preserved compatibility runner for `W0` through `W4` wire IDs
+- `aoa-langgraph-pilot` remains the comparison and fixture surface for the bounded-edit compatibility gate
 
 ## Artifacts
 
@@ -98,7 +98,7 @@ The sidecar adds:
 The sidecar should answer a narrow question:
 
 - does LangGraph improve pause/resume and recovery clarity for a bounded supervised edit flow
-- without reducing W4 safety, scope discipline, or reportability
+- without reducing preserved local-trials safety, scope discipline, or reportability
 
 That answer is now positive for bounded local-worker flows.
 Keep the sidecar pilot as the comparison and origin surface, and use the
