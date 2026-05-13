@@ -271,7 +271,7 @@ def ensure_fixture_repo(log_root: Path) -> Path:
     run_git(repo_root, "config", "user.name", "Codex Fixture")
     run_git(repo_root, "config", "user.email", "codex-fixture@example.invalid")
     run_git(repo_root, "add", ".")
-    run_git(repo_root, "commit", "-m", "Seed disposable fixture docs repo")
+    run_git(repo_root, "commit", "-m", "Initialize disposable fixture docs repo")
     return repo_root
 
 

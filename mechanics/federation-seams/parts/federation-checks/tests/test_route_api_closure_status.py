@@ -203,13 +203,13 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     },
                     "runtime_evidence_templates": {
                         "workhorse-local": {},
-                        "phase-alpha-memo-recall-rerun": {
+                        "memo-recall-rerun": {
                             "selection_id": "phase-alpha-memo-recall-rerun-v1"
                         },
-                        "phase-alpha-memo-contradiction-gap": {
+                        "memo-contradiction-gap": {
                             "selection_id": "phase-alpha-memo-contradiction-gap-v1"
                         },
-                        "phase-alpha-memo-contradiction-rerun": {
+                        "memo-contradiction-rerun": {
                             "selection_id": "phase-alpha-memo-contradiction-rerun-v1"
                         },
                     },
@@ -279,8 +279,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
                     },
                     "handoffs": {"playbooks": [{"playbook_id": "AOA-P-0001", "name": "fixture-playbook"}]},
                     "failures": {"failures": [{"failure_id": "F-1"}]},
-                    "subagent_recipes": {"recipes": [{"recipe_id": "R-1", "playbook": "fixture-playbook"}]},
-                    "automation_seeds": {"seeds": [{"seed_id": "S-1", "playbook": "fixture-playbook"}]},
+                    "subagent_recipes": {
+                        "recipes": [{"recipe_id": "R-1", "name": "fixture-recipe", "playbook": "fixture-playbook"}]
+                    },
+                    "automation_seeds": {
+                        "seeds": [{"seed_id": "S-1", "name": "fixture-plan", "playbook": "fixture-playbook"}]
+                    },
                     "composition_manifest": {"manifest_version": "1"},
                 },
             ),
@@ -367,12 +371,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertFalse(closure["consumer_ready"])
         self.assertIn("playbook registry missing entries", closure["reasons"])
 
-    def test_phase_alpha_memo_recall_runtime_evidence_template_resolves_source_files(self) -> None:
+    def test_memo_recall_runtime_evidence_template_resolves_source_files(self) -> None:
         store = self.make_store()
 
         payload = self.module.resolve_runtime_evidence_template(
             store,
-            "phase-alpha-memo-recall-rerun",
+            "memo-recall-rerun",
         )
 
         self.assertTrue(payload["ok"])
@@ -382,12 +386,24 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
             payload["source_files"],
         )
 
-    def test_phase_alpha_memo_contradiction_gap_runtime_evidence_template_resolves_source_files(self) -> None:
+    def test_runtime_evidence_template_keeps_compatibility_alias_but_reports_clean_name(self) -> None:
         store = self.make_store()
 
         payload = self.module.resolve_runtime_evidence_template(
             store,
-            "phase-alpha-memo-contradiction-gap",
+            "phase-alpha-memo-recall-rerun",
+        )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["name"], "memo-recall-rerun")
+        self.assertEqual(payload["requested_name"], "phase-alpha-memo-recall-rerun")
+
+    def test_memo_contradiction_gap_runtime_evidence_template_resolves_source_files(self) -> None:
+        store = self.make_store()
+
+        payload = self.module.resolve_runtime_evidence_template(
+            store,
+            "memo-contradiction-gap",
         )
 
         self.assertTrue(payload["ok"])
@@ -397,12 +413,12 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
             payload["source_files"],
         )
 
-    def test_phase_alpha_memo_contradiction_rerun_runtime_evidence_template_resolves_source_files(self) -> None:
+    def test_memo_contradiction_rerun_runtime_evidence_template_resolves_source_files(self) -> None:
         store = self.make_store()
 
         payload = self.module.resolve_runtime_evidence_template(
             store,
-            "phase-alpha-memo-contradiction-rerun",
+            "memo-contradiction-rerun",
         )
 
         self.assertTrue(payload["ok"])
@@ -411,6 +427,16 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
             "aoa-evals/examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
             payload["source_files"],
         )
+
+    def test_playbook_card_exposes_clean_automation_plan_names(self) -> None:
+        store = self.make_store()
+
+        card = self.module.playbook_card(store, "AOA-P-0001")
+        compact = self.module.compact_playbook_card(store, "AOA-P-0001")
+
+        self.assertEqual(card["automation_plans"][0]["name"], "fixture-plan")
+        self.assertNotIn("automation_seeds", card)
+        self.assertEqual(compact["automation_plan_names"], ["fixture-plan"])
 
     def test_kag_structured_reads_stay_mirror_backed(self) -> None:
         store = self.make_store()

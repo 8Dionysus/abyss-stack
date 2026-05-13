@@ -11,7 +11,7 @@ package-local.
   `scripts/aoa-local-ai-trials`; the preserved runner lives under
   `../../legacy/artifacts/scripts/aoa-local-ai-trials`.
 
-The old phase-gated runner implementation and narrative route through
+The old step-gated runner implementation and narrative remain routed through
 `../../legacy/INDEX.md`; keep active part docs in trial, scenario, benchmark,
 model-card, and promotion language.
 

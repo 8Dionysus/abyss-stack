@@ -126,7 +126,7 @@ This runner stays on the intended `langchain-api /run` path and writes machine-l
 It performs one uncounted warmup call per case before measured repeats so warm-latency reads stay warm by definition instead of by accident.
 
 The default helper posture now targets the promoted local-worker path on `5403`.
-Use explicit `--url`, `--backend-label`, `--runtime-variant`, and `--target-label` only when you are refreshing an explicit challenger packet or keeping historical comparison lineage readable. Phase Alpha does not treat a second local control lane as part of the canonical operator path.
+Use explicit `--url`, `--backend-label`, `--runtime-variant`, and `--target-label` only when you are refreshing an explicit challenger packet or keeping historical comparison lineage readable. The current bounded posture does not treat a second local control lane as part of the canonical operator path.
 
 Refresh the durable catalog after new runs:
 
@@ -165,13 +165,13 @@ Cohort layer:
 
 If you need a supervised per-case trial program rather than a standalone
 benchmark run, route through [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md). The old
-phase-gated command sequence is preserved only as a compatibility baseline
+step-gated command sequence is preserved only as a compatibility baseline
 routed through `../../../legacy/INDEX.md`.
 
 That helper may reuse runtime benchmark artifacts as evidence inside case packets, but it does not change the benchmark boundary:
 
 - benchmark artifacts remain runtime-local truth in `abyss-stack`
-- trial-phase verdicts remain bounded trial judgments, not portable eval canon
+- trial-step verdicts remain bounded trial judgments, not portable eval canon
 - portable proof wording still belongs in `aoa-evals`
 
 ## Optional backend-parity pilot

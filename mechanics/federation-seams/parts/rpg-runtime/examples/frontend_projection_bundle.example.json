@@ -104,7 +104,7 @@
       {
         "campaign_ref": "campaign.rpg-runtime-foundation",
         "title": "RPG Runtime Foundation",
-        "status": "seed",
+        "status": "draft",
         "stage_label": "architecture fixed before service bloom",
         "anchor_refs": [
           "Agents-of-Abyss/docs/RPG_ARCHITECTURE_RFC.md",

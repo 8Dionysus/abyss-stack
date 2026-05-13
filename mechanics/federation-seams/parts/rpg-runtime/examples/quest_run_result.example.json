@@ -41,8 +41,8 @@
     "summary": "RFC surfaces drafted, schemas validated, and runtime/frontend boundary fixed without widening source ownership."
   },
   "artifact_refs": [
-    "rpg_architecture_rfc_seed/Agents-of-Abyss/docs/RPG_ARCHITECTURE_RFC.md",
-    "rpg_architecture_rfc_seed/abyss-stack/mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot.schema.json"
+    "Agents-of-Abyss/mechanics/rpg/parts/source-boundary/README.md",
+    "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/schemas/agent_build_snapshot.schema.json"
   ],
   "proof_refs": [
     "aoa-evals/reports/progression-evidence/PE-2026-04-01-0001.json"
@@ -85,7 +85,7 @@
   "next_hops": [
     {
       "action": "handoff",
-      "target_ref": "Dionysus/seed_rpg_architecture_rfc_pack.md",
+      "target_ref": "Dionysus/seed_staging/rpg/seed_rpg_architecture_rfc_pack.md",
       "note": "stage the transport pack after target-repo review"
     }
   ],

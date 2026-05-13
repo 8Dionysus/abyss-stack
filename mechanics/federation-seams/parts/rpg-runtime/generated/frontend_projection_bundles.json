@@ -108,7 +108,7 @@
           {
             "campaign_ref": "campaign.rpg.runtime-projection",
             "title": "RPG Runtime Projection",
-            "status": "seed",
+            "status": "draft",
             "stage_label": "collections before services",
             "anchor_refs": [
               "Agents-of-Abyss/mechanics/rpg/parts/runtime-projection/README.md",

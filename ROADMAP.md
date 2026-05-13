@@ -3,7 +3,7 @@
 ## Current posture
 
 The bootstrap-to-federation landing path is largely complete.
-Phases 0 through 6 have already been landed as source and runtime seams:
+Stages 0 through 6 have already been landed as source and runtime seams:
 
 - modular runtime bootstrap
 - service extraction and profile-aware lifecycle wrappers
@@ -92,7 +92,7 @@ Those landings should be read carefully:
 - the `federation` profile remains opt-in rather than part of the default promoted presets
 - current operator truth still depends on parity, promoted runtime verify, and `aoa-status --autonomy --json`
 
-## Phase 0: structured bootstrap
+## Stage 0: structured bootstrap
 
 - establish repository charter and boundaries
 - create modular compose skeleton
@@ -100,14 +100,14 @@ Those landings should be read carefully:
 - define env and secrets posture
 - write migration notes from `abyss-stack_old`
 
-## Phase 1: service extraction
+## Stage 1: service extraction
 
 - reintroduce storage services cleanly
 - reintroduce orchestration and local inference
 - reintroduce gateway and agent API modules
 - reintroduce speech, browser, and monitoring modules
 
-## Phase 2: operational hardening
+## Stage 2: operational hardening
 
 - add smoke and health routines
 - add profile-aware lifecycle wrappers
@@ -118,26 +118,26 @@ Those landings should be read carefully:
 - make the Fedora-first and Windows-usable path model explicit
 - make deployment from source checkout to runtime tree explicit and repeatable
 
-## Phase 3: hybrid growth
+## Stage 3: hybrid growth
 
 - clarify local versus hybrid execution paths
 - refine Intel and OVMS posture
 - define clean bridges to sibling AoA repositories
 - consume the read-only `abyss-machine` bridge through stack-local `Logs/machine-bridge/` records before adding automatic policy action
 
-## Phase 4: mature substrate
+## Stage 4: mature substrate
 
 - keep the stack legible under growth
 - resist monolith relapse
 - let new capability arrive as modules and profiles rather than as hidden sprawl
 
-## Phase 5: live runtime consumption
+## Stage 5: live runtime consumption
 
 - decide which federation seams remain advisory-only and which become part of the live loop
 - introduce bounded recall, playbook, eval, and KAG consumption in explicit steps
 - preserve source-owned authority while adding runtime utility
 
-## Phase 6: platform and operations hardening
+## Stage 6: platform and operations hardening
 
 - keep runtime cleanup repeatable and legible
 - validate reboot and cold-start behavior

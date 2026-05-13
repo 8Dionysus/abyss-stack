@@ -72,9 +72,9 @@ That keeps the authority boundary legible:
 - `aoa-kag` provides derived retrieval/regrounding surfaces
 - `Tree-of-Sophia` remains the source-owned handoff authority
 
-## What this phase does not do
+## What this landing does not do
 
-This phase is advisory-only and intentionally does not add:
+This landing is advisory-only and intentionally does not add:
 - live KAG querying
 - runtime reasoning execution
 - graph traversal beyond mirrored pack contents

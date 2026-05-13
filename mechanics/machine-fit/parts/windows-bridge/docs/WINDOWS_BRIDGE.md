@@ -83,7 +83,7 @@ That keeps profiles and presets canonical while still allowing carefully bounded
 
 ## Current limits
 
-The bridge is intentionally modest in this first phase.
+The bridge is intentionally modest in this first landing.
 
 ### Intel path
 

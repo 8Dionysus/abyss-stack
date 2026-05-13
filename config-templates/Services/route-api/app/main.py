@@ -22,6 +22,19 @@ REQUIRED_CONFIGS = {
     "aoa-kag": "aoa-kag.yaml",
     "tos-source": "tos-source.yaml",
 }
+RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
+    "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
+    "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+    "memo-recall-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
+    "memo-contradiction-gap": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
+    "memo-contradiction-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
+}
+RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES = {
+    "phase-alpha-memo-recall-rerun": "memo-recall-rerun",
+    "phase-alpha-memo-contradiction-gap": "memo-contradiction-gap",
+    "phase-alpha-memo-contradiction-rerun": "memo-contradiction-rerun",
+}
+PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF = "aoa-playbooks/generated/playbook_automation_seeds.json"
 
 
 @dataclass(frozen=True)
@@ -206,19 +219,8 @@ def load_evals_layer(config_path: Path, config: dict[str, Any], mirror_root: Pat
         "comparison_spine": load_json(mirror_root / "generated/comparison_spine.json"),
         "runtime_candidate_template_index": load_json(mirror_root / "generated/runtime_candidate_template_index.min.json"),
         "runtime_evidence_templates": {
-            "workhorse-local": load_json(mirror_root / "examples/runtime_evidence_selection.workhorse-local.example.json"),
-            "return-anchor-integrity": load_json(
-                mirror_root / "examples/runtime_evidence_selection.return-anchor-integrity.example.json"
-            ),
-            "phase-alpha-memo-recall-rerun": load_json(
-                mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
-            ),
-            "phase-alpha-memo-contradiction-gap": load_json(
-                mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
-            ),
-            "phase-alpha-memo-contradiction-rerun": load_json(
-                mirror_root / "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
-            ),
+            name: load_json(mirror_root / rel_path)
+            for name, rel_path in RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS.items()
         },
         "hook_templates": {
             "self-agent-checkpoint-rollout": load_json(
@@ -465,7 +467,7 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
                 "handoff_playbook_count": len(layer.payloads["handoffs"]["playbooks"]),
                 "failure_count": len(layer.payloads["failures"]["failures"]),
                 "subagent_recipe_count": len(layer.payloads["subagent_recipes"]["recipes"]),
-                "automation_seed_count": len(layer.payloads["automation_seeds"]["seeds"]),
+                "automation_plan_count": len(layer.payloads["automation_seeds"]["seeds"]),
             }
         elif layer.layer == "aoa-kag":
             metadata = {
@@ -804,7 +806,7 @@ def playbook_subagent_recipe_entries(store: AppStore) -> list[dict[str, Any]]:
     return playbooks_payload(store, "subagent_recipes")["recipes"]
 
 
-def playbook_automation_seed_entries(store: AppStore) -> list[dict[str, Any]]:
+def playbook_automation_plan_entries(store: AppStore) -> list[dict[str, Any]]:
     return playbooks_payload(store, "automation_seeds")["seeds"]
 
 
@@ -862,8 +864,8 @@ def playbook_subagent_recipes_for_name(store: AppStore, playbook_name: str) -> l
     return [entry for entry in playbook_subagent_recipe_entries(store) if entry.get("playbook") == playbook_name]
 
 
-def playbook_automation_seeds_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
-    return [entry for entry in playbook_automation_seed_entries(store) if entry.get("playbook") == playbook_name]
+def playbook_automation_plans_for_name(store: AppStore, playbook_name: str) -> list[dict[str, Any]]:
+    return [entry for entry in playbook_automation_plan_entries(store) if entry.get("playbook") == playbook_name]
 
 
 def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
@@ -875,7 +877,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
     review_packet_contract = optional_playbook_review_packet_contract_entry(store, playbook_id)
     handoff_contract = optional_playbook_handoff_entry(store, playbook_id)
     subagent_recipes = playbook_subagent_recipes_for_name(store, playbook_name)
-    automation_seeds = playbook_automation_seeds_for_name(store, playbook_name)
+    automation_plans = playbook_automation_plans_for_name(store, playbook_name)
 
     source_files = ["aoa-playbooks/generated/playbook_registry.min.json"]
     if activation_entry is not None:
@@ -890,8 +892,8 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         source_files.append("aoa-playbooks/generated/playbook_handoff_contracts.json")
     if subagent_recipes:
         source_files.append("aoa-playbooks/generated/playbook_subagent_recipes.json")
-    if automation_seeds:
-        source_files.append("aoa-playbooks/generated/playbook_automation_seeds.json")
+    if automation_plans:
+        source_files.append(PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF)
 
     return {
         "playbook_id": playbook_id,
@@ -903,7 +905,7 @@ def playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         "review_packet_contract": review_packet_contract,
         "handoff_contract": handoff_contract,
         "subagent_recipes": subagent_recipes,
-        "automation_seeds": automation_seeds,
+        "automation_plans": automation_plans,
         "source_files": source_files,
     }
 
@@ -919,7 +921,7 @@ def compact_playbook_card(store: AppStore, playbook_id: str) -> dict[str, Any]:
         "review_packet_contract": card["review_packet_contract"],
         "handoff_contract": card["handoff_contract"],
         "subagent_recipe_names": [entry["name"] for entry in card["subagent_recipes"]],
-        "automation_seed_names": [entry["name"] for entry in card["automation_seeds"]],
+        "automation_plan_names": [entry["name"] for entry in card["automation_plans"]],
     }
 
 
@@ -937,11 +939,11 @@ def require_playbook_subagent_recipe(store: AppStore, name: str) -> dict[str, An
     raise HTTPException(status_code=404, detail=f"no aoa-playbooks subagent recipe found for name={name}")
 
 
-def require_playbook_automation_seed(store: AppStore, name: str) -> dict[str, Any]:
-    for entry in playbook_automation_seed_entries(store):
+def require_playbook_automation_plan(store: AppStore, name: str) -> dict[str, Any]:
+    for entry in playbook_automation_plan_entries(store):
         if entry["name"] == name:
             return entry
-    raise HTTPException(status_code=404, detail=f"no aoa-playbooks automation seed found for name={name}")
+    raise HTTPException(status_code=404, detail=f"no aoa-playbooks automation plan found for name={name}")
 
 
 def resolve_playbook_select(
@@ -1435,17 +1437,13 @@ def resolve_eval_comparison(store: AppStore, baseline_mode: str | None) -> dict[
 
 
 def resolve_runtime_evidence_template(store: AppStore, template_name: str) -> dict[str, Any]:
-    template = evals_payload(store, "runtime_evidence_templates")[template_name]
-    rel_path = {
-        "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
-        "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
-        "phase-alpha-memo-recall-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
-        "phase-alpha-memo-contradiction-gap": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json",
-        "phase-alpha-memo-contradiction-rerun": "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json",
-    }[template_name]
+    canonical_name = RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES.get(template_name, template_name)
+    template = evals_payload(store, "runtime_evidence_templates")[canonical_name]
+    rel_path = RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS[canonical_name]
     return {
         "ok": True,
-        "name": template_name,
+        "name": canonical_name,
+        "requested_name": template_name,
         "template": template,
         "source_files": [
             "aoa-evals/generated/runtime_candidate_template_index.min.json",
@@ -1753,6 +1751,9 @@ class RuntimeEvidenceTemplateRequest(BaseModel):
     name: Literal[
         "workhorse-local",
         "return-anchor-integrity",
+        "memo-recall-rerun",
+        "memo-contradiction-gap",
+        "memo-contradiction-rerun",
         "phase-alpha-memo-recall-rerun",
         "phase-alpha-memo-contradiction-gap",
         "phase-alpha-memo-contradiction-rerun",
@@ -1790,7 +1791,7 @@ class PlaybookSubagentRecipeRequest(BaseModel):
     name: str
 
 
-class PlaybookAutomationSeedRequest(BaseModel):
+class PlaybookAutomationPlanRequest(BaseModel):
     name: str
 
 
@@ -2255,10 +2256,17 @@ def playbooks_subagent_recipes() -> dict[str, Any]:
     return {"ok": True, "data": playbooks_payload(store, "subagent_recipes")}
 
 
-@app.get("/playbooks/automation-seeds")
-def playbooks_automation_seeds() -> dict[str, Any]:
+@app.get("/playbooks/automation-plans")
+def playbooks_automation_plans() -> dict[str, Any]:
     store = require_store()
     return {"ok": True, "data": playbooks_payload(store, "automation_seeds")}
+
+
+@app.get("/playbooks/automation-seeds")
+def playbooks_automation_seeds_compatibility() -> dict[str, Any]:
+    payload = playbooks_automation_plans()
+    payload["compatibility_alias_for"] = "/playbooks/automation-plans"
+    return payload
 
 
 @app.get("/playbooks/composition-manifest")
@@ -2315,7 +2323,7 @@ def playbooks_failure(request: PlaybookFailureRequest) -> dict[str, Any]:
             "aoa-playbooks/generated/playbook_federation_surfaces.min.json",
             "aoa-playbooks/generated/playbook_handoff_contracts.json",
             "aoa-playbooks/generated/playbook_subagent_recipes.json",
-            "aoa-playbooks/generated/playbook_automation_seeds.json",
+            PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF,
         ],
     }
 
@@ -2332,16 +2340,23 @@ def playbooks_subagent_recipe(request: PlaybookSubagentRecipeRequest) -> dict[st
     }
 
 
-@app.post("/playbooks/automation-seed")
-def playbooks_automation_seed(request: PlaybookAutomationSeedRequest) -> dict[str, Any]:
+@app.post("/playbooks/automation-plan")
+def playbooks_automation_plan(request: PlaybookAutomationPlanRequest) -> dict[str, Any]:
     store = require_store()
-    seed = require_playbook_automation_seed(store, request.name)
+    plan = require_playbook_automation_plan(store, request.name)
     return {
         "ok": True,
         "name": request.name,
-        "seed": seed,
-        "source_files": ["aoa-playbooks/generated/playbook_automation_seeds.json"],
+        "plan": plan,
+        "source_files": [PLAYBOOK_AUTOMATION_PLANS_SOURCE_REF],
     }
+
+
+@app.post("/playbooks/automation-seed")
+def playbooks_automation_seed_compatibility(request: PlaybookAutomationPlanRequest) -> dict[str, Any]:
+    payload = playbooks_automation_plan(request)
+    payload["compatibility_alias_for"] = "/playbooks/automation-plan"
+    return payload
 
 
 @app.get("/kag/registry")

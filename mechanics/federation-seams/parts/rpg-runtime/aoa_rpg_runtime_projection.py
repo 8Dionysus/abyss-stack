@@ -104,7 +104,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
             "cause_ref": run_ref,
             "evidence_refs": [
                 run_ref,
-                "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
+                "Agents-of-Abyss/mechanics/rpg/parts/runtime-projection/README.md",
             ],
             "freshness": "hot",
             "recorded_at": ledger["generated_at"],
@@ -116,7 +116,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     run["quest_ref"] = "AOA-Q-0008"
     run["execution"]["build_snapshot_refs"] = [build_ref]
     run["artifact_refs"] = [
-        "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md",
+        "Agents-of-Abyss/mechanics/rpg/parts/runtime-projection/README.md",
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md",
         "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/docs/RPG_FRONTEND_PROJECTION_SEAM.md",
     ]
@@ -150,8 +150,8 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
         },
         {
             "action": "handoff",
-            "target_ref": "Dionysus/seed_rpg_runtime_projection_pack.md",
-            "note": "Sync the seed lineage after the runtime body lands.",
+            "target_ref": "Dionysus/seed_staging/rpg/seed_rpg_runtime_projection_pack.md",
+            "note": "Sync the Dionysus prep-pack lineage after the runtime body lands.",
         },
     ]
     run["notes"] = "Generated transport run envelope for the body-facing RPG slice. Quest-state motion remains a hint, not a source write."

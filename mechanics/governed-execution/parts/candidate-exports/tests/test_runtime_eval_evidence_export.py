@@ -31,12 +31,12 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
         )
         return json.loads(result.stdout)
 
-    def test_phase_alpha_memo_recall_source_example_ref_uses_matching_contract_ref(self) -> None:
+    def test_memo_recall_source_example_ref_uses_matching_contract_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {
                 "surface_type": "runtime_evidence_selection",
-                "selection_id": "governed-run--phase-alpha-memo-recall-rerun-v1",
+                "selection_id": "governed-run--memo-recall-rerun-v1",
                 "source_example_ref": "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json",
             }
 
@@ -48,7 +48,7 @@ class RuntimeEvalEvidenceExportTests(unittest.TestCase):
         )
         self.assertFalse(any("runtime_evidence_selection.workhorse-local.example.json" in ref for ref in refs))
 
-    def test_memo_recall_candidate_eval_ref_uses_phase_alpha_contract_ref(self) -> None:
+    def test_memo_recall_candidate_eval_ref_uses_upstream_contract_ref(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             stack_root = Path(tmpdir) / "abyss-stack"
             payload = {

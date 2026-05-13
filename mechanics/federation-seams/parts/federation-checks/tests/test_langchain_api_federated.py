@@ -199,11 +199,11 @@ class LangchainFederatedRunTests(unittest.TestCase):
         self.assertEqual(calls, ["/memo/recall-contract"])
         self.assertEqual(response.json()["advisory_trace"]["memo"]["resolution"], "contract_only")
 
-    def test_playbook_surface_can_seed_default_memo_contract_without_override(self) -> None:
+    def test_playbook_surface_can_prepare_default_memo_contract_without_override(self) -> None:
         calls: list[tuple[str, dict]] = []
         playbook = {
             "playbook_id": "AOA-P-0010",
-            "name": "Split Wave Cross Repo Rollout",
+            "name": "Cross Repo Boundary Rollout",
             "registry_entry": {},
             "activation_entry": {
                 "memo_recall_modes": ["episodic", "semantic"],
@@ -411,7 +411,7 @@ class LangchainFederatedRunTests(unittest.TestCase):
         prompts: list[str] = []
         playbook = {
             "playbook_id": "AOA-P-0010",
-            "name": "Split Wave Cross Repo Rollout",
+            "name": "Cross Repo Boundary Rollout",
             "registry_entry": {},
             "activation_entry": {
                 "memo_recall_modes": ["episodic", "semantic"],
@@ -526,8 +526,8 @@ class LangchainFederatedRunTests(unittest.TestCase):
         prompts: list[str] = []
         playbook = {
             "playbook_id": "AOA-P-0017",
-            "name": "split-wave-cross-repo-rollout",
-            "registry_entry": {"scenario": "split_wave_cross_repo_rollout"},
+            "name": "cross-repo-boundary-rollout",
+            "registry_entry": {"scenario": "cross_repo_boundary_rollout"},
             "activation_entry": {"trigger": "release_window"},
             "federation_entry": {},
             "review_status": {
@@ -537,7 +537,7 @@ class LangchainFederatedRunTests(unittest.TestCase):
             },
             "review_packet_contract": {
                 "playbook_id": "AOA-P-0017",
-                "scenario": "split_wave_cross_repo_rollout",
+                "scenario": "cross_repo_boundary_rollout",
                 "expected_artifacts": ["boundary_map", "handoff_record"],
                 "eval_anchors": ["aoa-approval-boundary-adherence"],
                 "memo_runtime_surfaces": [],

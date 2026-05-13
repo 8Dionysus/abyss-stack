@@ -7,7 +7,7 @@ It defines how the runtime may mirror public-safe memo surfaces, inspect them th
 
 ## What is mirrored
 
-The Phase 3 memo landing mirrors a bounded public-safe subset of `aoa-memo` into:
+The memo runtime landing mirrors a bounded public-safe subset of `aoa-memo` into:
 
 `${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/`
 
@@ -28,7 +28,7 @@ It is not a loose copy of the whole `aoa-memo` repository.
 
 The existing localhost-only `route-api` remains the single federation facade on `127.0.0.1:5402`.
 
-Phase 3 adds a `/memo/*` namespace for bounded read-only inspection:
+The landing adds a `/memo/*` namespace for bounded read-only inspection:
 
 - `GET /memo/registry`
 - `GET /memo/catalog`
@@ -66,9 +66,9 @@ The export seam maps only the currently mirrored contract surfaces:
 - `distillation_pattern_candidate`
 - `distillation_bridge_candidate`
 
-## What this phase does not do
+## What this landing does not do
 
-This phase does not:
+This landing does not:
 
 - auto-write memo objects from runtime traffic
 - add a new host-facing port

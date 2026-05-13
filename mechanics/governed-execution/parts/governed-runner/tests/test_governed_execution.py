@@ -1713,7 +1713,7 @@ class GovernedExecutionTests(unittest.TestCase):
                 "mode": "anchored_replace",
                 "target_file": "README.md",
                 "anchor_before": "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```",
-                "anchor_after": "The optional wave-9 seam can also be exercised directly:",
+                "anchor_after": "The optional downstream seam can also be exercised directly:",
                 "old_text": "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```",
                 "new_text": (
                     "Validate the generated outputs:\n\n```bash\npython scripts/validate_router.py\n```\n\n"

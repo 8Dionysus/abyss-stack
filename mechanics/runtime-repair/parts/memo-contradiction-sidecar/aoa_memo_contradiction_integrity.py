@@ -221,7 +221,7 @@ def validate_runtime_logs(logs: dict[str, Any], failures: list[str]) -> None:
     )
 
     handoff = logs["handoff_record"]
-    acceptance = handoff.get("phase_alpha_acceptance", {})
+    acceptance = handoff.get("memo_contradiction_acceptance") or handoff.get("phase_alpha_acceptance", {})
     require(
         isinstance(acceptance, dict) and acceptance.get("memo_only_rerun_present") is True,
         failures,
@@ -369,17 +369,17 @@ def build_report(failures: list[str]) -> dict[str, Any]:
         "object_under_evaluation": OBJECT_UNDER_EVALUATION,
         "verdict": verdict,
         "claim_boundary": (
-            "On the selected Phase Alpha evidence path, the runtime sidecar consumed the log-backed "
+            "On the selected memo contradiction evidence path, the runtime sidecar consumed the log-backed "
             "contradiction rerun selection and the generated aoa-memo object surfaces. It verified that "
             "preferred, historical, withdrawn, and still-open lifecycle posture, contradiction refs, "
             "replacement refs, and audit walkback all remain inspectable on the bounded object-facing path. "
-            "This supports the bundle claim only for this Phase Alpha runtime sidecar path, not for broad memo readiness."
+            "This supports the bundle claim only for this selected runtime sidecar path, not for broad memo readiness."
             if supports_claim
-            else "The runtime sidecar could not verify the selected Phase Alpha memo contradiction path. "
+            else "The runtime sidecar could not verify the selected memo contradiction path. "
             "The failure list below is the concrete blocker for lifting the bundle."
         ),
         "limitations": [
-            "This report reads the selected Phase Alpha runtime evidence and generated memo object surfaces only.",
+            "This report reads the selected memo contradiction runtime evidence and generated memo object surfaces only.",
             "This report proves a bounded runtime sidecar consumer path, not broad memo readiness.",
             "This report does not prove contradiction resolution.",
             "This report does not prove permission or authority safety from memo fields.",
@@ -397,12 +397,12 @@ def build_report(failures: list[str]) -> dict[str, Any]:
         "strongest_contradiction_signal": (
             "The runtime sidecar verified the generated memo object catalog and sections for "
             f"{CLOSURE_CLAIM}, {PENDING_CLAIM}, {RETIRED_OVERREAD_CLAIM}, {LATER_TRACK_CLAIM}, "
-            f"{SUPERSESSION_AUDIT}, and {RETRACTION_AUDIT} while preserving log-backed Phase Alpha evidence refs."
+            f"{SUPERSESSION_AUDIT}, and {RETRACTION_AUDIT} while preserving log-backed selected evidence refs."
             if supports_claim
             else "The sidecar reached the selected runtime evidence path but failed one or more lifecycle or audit checks."
         ),
         "strongest_contradiction_risk": (
-            "The result is bounded to one Phase Alpha sidecar run and still must not be read as contradiction resolution or full memo readiness."
+            "The result is bounded to one selected sidecar run and still must not be read as contradiction resolution or full memo readiness."
             if supports_claim
             else "The bundle must remain export-not-ready until the listed sidecar failures are fixed and rerun."
         ),
@@ -439,7 +439,7 @@ def build_report(failures: list[str]) -> dict[str, Any]:
                 "read_path": "next_pass_brief.md -> failure_map.json -> remediation_decision.json -> handoff_record.json",
                 "contradiction_reading": verdict,
                 "lifecycle_note": "The runtime sidecar confirms the memo-only inspect-capsule-expand boundary before trusting the memo object surfaces.",
-                "current_recall_note": "Runtime logs anchor the sidecar to the bounded Phase Alpha rerun rather than free-text recall.",
+                "current_recall_note": "Runtime logs anchor the sidecar to the bounded memo contradiction rerun rather than free-text recall.",
                 "contradiction_note": "The runtime contradiction map keeps the residual historical-script lineage risk explicit.",
                 "audit_or_replacement_note": "The handoff record keeps eval readout, memo writeback, and recall-driven rerun in the same evidence chain.",
             },
@@ -449,7 +449,7 @@ def build_report(failures: list[str]) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run the bounded Phase Alpha memo contradiction integrity sidecar proof."
+        description="Run the bounded memo contradiction integrity sidecar proof."
     )
     parser.add_argument("--stack-root", default=os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
     parser.add_argument(

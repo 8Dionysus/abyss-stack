@@ -2593,6 +2593,130 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
                 )
 
 
+def validate_active_topology_language(errors: list[str]) -> None:
+    text_guards = {
+        ROOT / "ROADMAP.md": (
+            "## Phase ",
+            "Phases 0 through 6",
+        ),
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "playbook-seam"
+        / "docs"
+        / "PLAYBOOK_RUNTIME_SEAM.md": (
+            "/playbooks/automation-seeds",
+            "/playbooks/automation-seed",
+            "automation-seed",
+            "automation seeds",
+        ),
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "eval-seam"
+        / "docs"
+        / "EVAL_RUNTIME_SEAM.md": (
+            "Phase Alpha",
+            "this phase",
+        ),
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "memo-seam"
+        / "docs"
+        / "MEMO_RUNTIME_SEAM.md": (
+            "Phase 3",
+            "this phase",
+        ),
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "rpg-runtime"
+        / "docs"
+        / "RPG_RUNTIME_BUILDERS.md": (
+            "### Phase ",
+        ),
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "docs"
+        / "LOCAL_AI_TRIALS.md": (
+            "qualification phase",
+            "phase-by-phase",
+            "archived phase",
+        ),
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "README.md": (
+            "phase-gated",
+        ),
+    }
+    for path, forbidden_snippets in text_guards.items():
+        text = read_text_or_none(path) or ""
+        for snippet in forbidden_snippets:
+            if snippet in text:
+                errors.append(
+                    f"{path.relative_to(ROOT)} must not keep active topology wording `{snippet}`"
+                )
+
+    rpg_text_paths = (
+        ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "aoa_rpg_runtime_projection.py",
+        ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "examples" / "quest_run_result.example.json",
+        ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "quest_run_results.json",
+        ROOT / "mechanics" / "federation-seams" / "parts" / "rpg-runtime" / "generated" / "reputation_ledgers.json",
+    )
+    for path in rpg_text_paths:
+        text = read_text_or_none(path) or ""
+        if "RPG_RUNTIME_PROJECTION_WAVE.md" in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} must target the Agents-of-Abyss runtime-projection part, not the legacy wave doc"
+            )
+
+    rpg_bundle_paths = (
+        ROOT / FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH,
+        ROOT / FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH,
+        ROOT / GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH,
+    )
+    for path in rpg_bundle_paths:
+        text = read_text_or_none(path) or ""
+        if '"seed"' in text or '"status": "seed"' in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} must use draft/promoted runtime status language instead of seed status"
+            )
+
+    playbooks_config = read_text_or_none(ROOT / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml") or ""
+    if "playbook_activation.split-wave-cross-repo-rollout.example.json" in playbooks_config:
+        errors.append("aoa-playbooks federation allowlist must not require the split-wave activation example")
+
+    route_api = read_text_or_none(ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py") or ""
+    for required_snippet in (
+        "memo-recall-rerun",
+        "memo-contradiction-gap",
+        "memo-contradiction-rerun",
+        '"/playbooks/automation-plans"',
+        '"/playbooks/automation-plan"',
+        "RUNTIME_EVIDENCE_TEMPLATE_COMPATIBILITY_ALIASES",
+    ):
+        if required_snippet not in route_api:
+            errors.append(f"route-api must expose clean active alias `{required_snippet}`")
+    for required_bridge in (
+        '"/playbooks/automation-seeds"',
+        '"/playbooks/automation-seed"',
+        "compatibility_alias_for",
+    ):
+        if required_bridge not in route_api:
+            errors.append(f"route-api must preserve compatibility bridge `{required_bridge}`")
+
+
 def validate_root_design_surfaces(errors: list[str]) -> None:
     def read_required(path: Path) -> str:
         try:
@@ -4138,6 +4262,7 @@ def main() -> int:
     validate_agent_skill_projection_routes(errors)
     validate_local_trials_legacy_bridge(errors)
     validate_inference_pilot_compatibility_gate_language(errors)
+    validate_active_topology_language(errors)
     validate_root_design_surfaces(errors)
     validate_sync_managed_items(errors)
     validate_federation_required_files(errors)
