@@ -556,7 +556,7 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "README.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "schemas" / "schema.v1.json",
     ROOT / "mechanics" / "machine-fit" / "parts" / "fit-record" / "examples" / "machine-fit.public.json.example",
-    ROOT / "scripts" / "requirements-langgraph-pilot.txt",
+    ROOT / "mechanics" / "inference-pilots" / "parts" / "langgraph-pilot" / "requirements.txt",
     ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "README.md",
     ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "schemas" / "schema.v1.json",
     ROOT / "mechanics" / "machine-fit" / "parts" / "platform-adaptations" / "examples" / "platform-adaptation.public.json.example",
@@ -2422,7 +2422,7 @@ def validate_agent_skill_projection_routes(errors: list[str]) -> None:
             )
 
 
-def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
+def validate_local_trials_compatibility_bridge(errors: list[str]) -> None:
     bridge_path = ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "aoa_local_ai_trials.py"
     adapter_path = (
         ROOT
@@ -2430,7 +2430,7 @@ def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
         / "inference-pilots"
         / "parts"
         / "local-trials"
-        / "legacy_trial_adapter.py"
+        / "trial_compatibility_bridge.py"
     )
     legacy_path = (
         ROOT
@@ -2457,9 +2457,28 @@ def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
     ):
         if required_snippet not in adapter_text:
             errors.append(
-                "mechanics/inference-pilots/parts/local-trials/legacy_trial_adapter.py "
+                "mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py "
                 f"must expose `{required_snippet}`"
             )
+    stale_adapter_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "legacy_trial_adapter.py"
+    )
+    if stale_adapter_path.exists():
+        errors.append(
+            "mechanics/inference-pilots/parts/local-trials/legacy_trial_adapter.py "
+            "must not return as an active module; use trial_compatibility_bridge.py"
+        )
+    stale_requirements_path = ROOT / "scripts" / "requirements-langgraph-pilot.txt"
+    if stale_requirements_path.exists():
+        errors.append(
+            "scripts/requirements-langgraph-pilot.txt must stay moved to "
+            "mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt"
+        )
     if "WAVE_METADATA =" in bridge_text:
         errors.append("local trials wave metadata must stay in legacy/trials/artifacts/scripts, not the active bridge")
     if "WAVE_METADATA =" not in legacy_text:
@@ -4472,7 +4491,7 @@ def main() -> int:
     validate_required_files(errors)
     validate_root_residual_topology(errors)
     validate_agent_skill_projection_routes(errors)
-    validate_local_trials_legacy_bridge(errors)
+    validate_local_trials_compatibility_bridge(errors)
     validate_inference_pilot_compatibility_gate_language(errors)
     validate_federation_upstream_compatibility(errors)
     validate_active_topology_language(errors)

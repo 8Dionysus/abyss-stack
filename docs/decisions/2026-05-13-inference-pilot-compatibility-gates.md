@@ -35,6 +35,15 @@ runner schemas and artifact paths, and may still read `W5`/`W6` runtime index
 files. It must route those tokens through compatibility or preserved-artifact
 constants, not through active topology names such as waves.
 
+The active role-level bridge is
+`mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py`.
+Older legacy wording belongs in `legacy/trials/`; active imports should use the
+quiet bridge name.
+
+The LangGraph dependency manifest belongs with the LangGraph part at
+`mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt`, not under
+the root command wrapper directory.
+
 ## Consequences
 
 - Runtime artifact compatibility remains intact.
@@ -43,3 +52,5 @@ constants, not through active topology names such as waves.
 - `scripts/validate_stack.py` now checks that LangGraph, llama.cpp, and
   autonomy-status surfaces keep the compatibility-gate language and do not
   reintroduce old wave-shaped prose outside the preserved legacy runner.
+- The root `scripts/` directory remains a command-wrapper surface, not a
+  dependency-manifest home for part-owned pilots.

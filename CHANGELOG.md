@@ -105,6 +105,10 @@ Tracking starts with the community-docs baseline for this repository.
   `Configs/federation/upstream-compatibility-bridge.json` instead of being
   repeated in route-api, exporter, repair, layout, and federation config
   surfaces
+- inference-pilot trial compatibility now uses the quiet active bridge
+  `parts/local-trials/trial_compatibility_bridge.py`, and the LangGraph
+  dependency manifest lives in `parts/langgraph-pilot/requirements.txt`
+  instead of the root command-wrapper directory
 
 ## [0.2.2] - 2026-04-23
 

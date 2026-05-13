@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Role-level adapter for the preserved local-trials compatibility runner."""
+"""Role-level bridge for preserved local-trials compatibility wire IDs."""
 from __future__ import annotations
 
 from dataclasses import dataclass

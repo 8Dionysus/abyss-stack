@@ -21,3 +21,12 @@ Moved preserved W0-W6 trial docs and runner scripts under
 `legacy/trials/`.
 
 Validation route: `python scripts/validate_stack.py`.
+
+## 2026-05-13 - Trial compatibility bridge cleanup
+
+Renamed the active role-level compatibility adapter to
+`parts/local-trials/trial_compatibility_bridge.py` so old stage labels remain
+wire IDs rather than active module topology. Moved the LangGraph pilot
+dependency manifest into `parts/langgraph-pilot/requirements.txt`.
+
+Validation route: `python scripts/validate_stack.py`.

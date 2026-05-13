@@ -20,7 +20,7 @@ try:
 except ImportError as exc:  # pragma: no cover - guarded by runtime usage
     raise SystemExit(
         "langgraph is not installed. Install dependencies from "
-        "`scripts/requirements-langgraph-pilot.txt` first."
+        "`mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt` first."
     ) from exc
 
 
