@@ -15,7 +15,7 @@ Builders may not invent upstream meaning.
 
 ## Recommended order
 
-### Phase 1. Refresh build snapshots
+### Step 1. Refresh build snapshots
 
 Build snapshots combine:
 - role and progression refs
@@ -25,7 +25,7 @@ Build snapshots combine:
 - capability envelope
 - reputation refs if already known
 
-### Phase 2. Refresh quest run results
+### Step 2. Refresh quest run results
 
 A run result captures:
 - quest ref
@@ -39,7 +39,7 @@ A run result captures:
 
 It must not claim to be the quest itself.
 
-### Phase 3. Refresh reputation ledgers
+### Step 3. Refresh reputation ledgers
 
 Reputation comes after evidence and runs.
 
@@ -51,7 +51,7 @@ Ledger refresh may consume:
 
 Keep every slice scoped and cited.
 
-### Phase 4. Refresh frontend bundles
+### Step 4. Refresh frontend bundles
 
 Projection bundles are the last derived layer.
 

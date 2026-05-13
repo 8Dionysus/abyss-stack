@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note seeds the next honest self-diagnosis spine for `abyss-stack`.
+This note lays down the next honest self-diagnosis spine for `abyss-stack`.
 
 The spine should unify runtime-body evidence into one runtime-owned diagnostic
 read model while preserving clean handoff toward the newer session-level

@@ -185,7 +185,7 @@ def make_stack_root(root: Path) -> None:
     write_json(
         root / "Logs" / "phase-alpha" / "alpha-06-validation-driven-remediation-recall-rerun" / "handoff_record.json",
         {
-            "phase_alpha_acceptance": {"memo_only_rerun_present": True},
+            "memo_contradiction_acceptance": {"memo_only_rerun_present": True},
             "summary": "eval readout -> memo writeback -> recall-driven rerun",
         },
     )

@@ -5,7 +5,7 @@ helper services that belong to the stack body.
 
 Bootstrap behavior:
 
-- `scripts/aoa-bootstrap-configs` seeds these trees into
+- `scripts/aoa-bootstrap-configs` populates these trees into
   `${AOA_STACK_ROOT}/Services/`
 - default mode is non-destructive and keeps existing runtime files
 - use `scripts/aoa-bootstrap-configs --force` when you intentionally want the

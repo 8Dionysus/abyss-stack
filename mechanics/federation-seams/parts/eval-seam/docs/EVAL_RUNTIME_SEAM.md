@@ -6,7 +6,7 @@ It is intentionally bounded:
 - read-only eval selection and inspection via `/evals/*`
 - filesystem-first private export candidates under `Logs/eval-exports/`
 - filesystem-first private A2A return dry-run candidates under `Logs/a2a-return-closeouts/`
-- one targeted runtime sidecar proof for the Phase Alpha memo contradiction lane
+- one targeted runtime sidecar proof for the memo contradiction evidence family
 - no general verdict loop
 - no judge runtime
 - no promotion or publication back into `aoa-evals`
@@ -27,8 +27,8 @@ The current allowlist includes:
 - selected docs such as `TRACE_EVAL_BRIDGE.md` and `RUNTIME_BENCH_PROMOTION_GUIDE.md`
 - generated eval catalog, capsules, sections, and comparison spine surfaces
 - public-safe example payloads for runtime evidence selection, including the
-  workhorse, return-anchor, Phase Alpha memo recall rerun, and Phase Alpha memo
-  contradiction gap evidence templates
+  workhorse, return-anchor, memo recall rerun, and memo contradiction evidence
+  templates
 - the public-safe schemas that define those payloads
 
 `abyss-stack` treats this mirror as a read-only contract surface.
@@ -60,14 +60,14 @@ These endpoints:
 
 ## Filesystem-first eval export candidates
 
-Phase 4 adds two private runtime export wrappers:
+The eval export landing adds two private runtime export wrappers:
 - `aoa-export-runtime-evidence-selection`
 - `aoa-export-artifact-hook-candidate`
 
 The A2A return dry-run lane adds one private closeout wrapper:
 - `aoa-a2a-return-closeout-dry-run`
 
-The Phase Alpha memo contradiction lane also has one bounded sidecar runner:
+The memo contradiction evidence family also has one bounded sidecar runner:
 - `aoa-run-memo-contradiction-integrity`
 
 These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-evals` contract references, and write private runtime-owned wrapper artifacts under:
@@ -79,7 +79,7 @@ These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-
 
 The outputs are not `aoa-evals` objects.
 They are bounded runtime candidates waiting for later review or export.
-The memo contradiction sidecar is narrower: it reads log-backed Phase Alpha evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
+The memo contradiction sidecar is narrower: it reads log-backed selected memo evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
 The A2A return dry-run wrapper is similarly narrow: it reads a reviewed `aoa-sdk`
 `a2a_wave5_closeout_request`, keeps `dry_run=true` and `live_automation=false`,
 and assembles only a runtime receipt candidate plus memo/eval handoff hints.
@@ -104,7 +104,7 @@ aoa-run-memo-contradiction-integrity \
   --evals-root "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals"
 ```
 
-## What this phase intentionally does not do
+## What this landing intentionally does not do
 
 This seam does not:
 - run local evals

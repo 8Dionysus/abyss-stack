@@ -33,7 +33,7 @@
           "cause_ref": "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/quest_run_results.json#QRR-2026-04-01-0001",
           "evidence_refs": [
             "abyss-stack/mechanics/federation-seams/parts/rpg-runtime/generated/quest_run_results.json#QRR-2026-04-01-0001",
-            "Agents-of-Abyss/docs/RPG_RUNTIME_PROJECTION_WAVE.md"
+            "Agents-of-Abyss/mechanics/rpg/parts/runtime-projection/README.md"
           ],
           "freshness": "hot",
           "recorded_at": "2026-04-01T18:20:00Z",

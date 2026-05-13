@@ -32,7 +32,7 @@ The same runtime family now also carries a public-safe canary catalog at:
 ${AOA_STACK_ROOT}/Configs/agent-api/governed-canary-catalog.json
 ```
 
-That catalog exists to seed real bounded `abyss-stack` canary tasks.
+That catalog exists to prepare real bounded `abyss-stack` canary tasks.
 It does not replace the policy and it does not authorize execution by itself.
 
 ## Request shape
@@ -52,7 +52,7 @@ The request contract is runtime-owned and JSON-shaped:
 
 The green repo-scope expansion gate serves as evidence for later review only; it does not widen governed repo scope implicitly during the current governed run. The default governed target remains mutation-only and `abyss-stack`-owned, while any external target still requires explicit policy coverage and evidence-backed scope promotion.
 
-For seeded canary preparation, use:
+For canary preparation, use:
 
 ```bash
 scripts/aoa-governed-run prepare-canary docs-truth-wording-alignment --write /tmp/governed-request.json

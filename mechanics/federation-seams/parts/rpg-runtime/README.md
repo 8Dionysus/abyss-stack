@@ -9,7 +9,7 @@ meaning.
 - `docs/` defines the runtime route, collection, builder, and frontend
   projection posture.
 - `schemas/` defines item and collection contracts for RPG runtime read models.
-- `examples/` defines public-safe seed items used by
+- `examples/` defines public-safe fixture items used by
   `scripts/aoa-rpg-runtime-projection`.
 - `aoa_rpg_runtime_projection.py` is the part-local backend for the root
   wrapper.

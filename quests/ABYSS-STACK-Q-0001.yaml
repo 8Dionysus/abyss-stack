@@ -43,6 +43,6 @@ tags:
   - questbook
   - infra
   - human-gate
-notes: Closed in the Phase 2 manual-first hygiene pass after the infra-specific
+notes: Closed in the manual-first hygiene pass after the infra-specific
   questbook surface, schemas, example projections, and guardrail defaults all landed.
 public_safe: true

@@ -16,21 +16,21 @@ It is narrower than a proof layer and narrower than a benchmark-only surface:
 This active document owns the local-trial route, truth-status boundaries, and
 handoffs to benchmark, model-card, scenario, and governed-execution surfaces.
 
-It does not keep the old phase-by-phase qualification narrative inline. The
+It does not keep the old step-by-step qualification narrative inline. The
 historical command surface is preserved as a compatibility baseline routed
 through [legacy/INDEX](../../../legacy/INDEX.md).
 
 Use role language for new work:
 
 - `trial program`
-- `qualification phase`
+- `qualification stage`
 - `scenario`
 - `benchmark family`
 - `model profile`
 - `model card`
 - `promotion candidate`
 
-Do not add new active programs with archived phase names. Existing old command
+Do not add new active programs with archived stage names. Existing old command
 and artifact names remain documented under the legacy route only where
 compatibility with runner output, runtime logs, or archived lineage requires
 them.
@@ -125,7 +125,7 @@ The active part-local Python file is only a compatibility bridge; the preserved
 runner implementation lives under
 `mechanics/inference-pilots/legacy/artifacts/scripts/aoa-local-ai-trials`.
 
-For the old command sequence, phase details, and preserved mutation-safety
+For the old command sequence, stage details, and preserved mutation-safety
 contract, start from [legacy/INDEX](../../../legacy/INDEX.md).
 
 The bridge does not:
@@ -156,7 +156,7 @@ sidecar contract.
 
 That sidecar surface established the now-adopted execution posture:
 
-- `aoa-local-ai-trials` remains the historical baseline for the phase-gated qualification runner
+- `aoa-local-ai-trials` remains the historical baseline for the step-gated qualification runner
 - `LangGraph` is now the primary orchestration layer for long-horizon, bounded-autonomy, and the current bounded local-worker path
 - `aoa-langgraph-pilot` remains the staged-edit comparison and fixture surface rather than the full execution baseline
 
@@ -178,7 +178,7 @@ The long-horizon runner:
 - defaults to `http://127.0.0.1:5403/run`
 - treats the canonical `llama.cpp` path as the primary substrate
 - keeps `LangGraph` as the primary orchestration layer
-- uses milestone gates instead of a monolithic archived phase command
+- uses milestone gates instead of a monolithic archived stage command
 - supports `read_only_summary`, `qwen_patch`, `script_refresh`, and `implementation_patch`
 - reuses `approval.status.json` at `plan_freeze`, `first_mutation`, and `landing`
 - keeps mutation scenarios worktree-first and explicitly approved before landing
@@ -263,7 +263,7 @@ This lane:
 - records `landing.diff` and `worktree.manifest.json` before main-checkout apply
 - writes `rollback.status.json` if post-apply validation fails
 - keeps runtime execution permissions in `config-templates/Configs/agent-api/governed-execution-policy.yaml`
-- may seed bounded real-task requests from `config-templates/Configs/agent-api/governed-canary-catalog.json`
+- may prepare bounded real-task requests from `config-templates/Configs/agent-api/governed-canary-catalog.json`
 - now records trust evidence and operator triage instead of treating governed runs as opaque packets
 
 ## Relationship to runtime benchmarks

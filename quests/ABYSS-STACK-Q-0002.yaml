@@ -45,7 +45,7 @@ tags:
   - rollout
   - adaptation
 notes: >-
-  2026-04-07 seed landing review: keep/open quest. The Fedora Intel host-profile
+  2026-04-07 Dionysus landing review: keep/open quest. The Fedora Intel host-profile
   landing was merged into existing abyss-stack source-of-truth surfaces instead
   of creating a parallel doctrine tree. Keep the current reviewed llama.cpp-first
   text default explicit, keep broader OVMS/OpenVINO/OpenVINO GenAI lanes additive

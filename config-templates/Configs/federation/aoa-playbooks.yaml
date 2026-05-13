@@ -28,7 +28,6 @@ required_files:
   - examples/playbook_activation.long-horizon-model-tier-orchestra.example.json
   - examples/playbook_activation.restartable-inquiry-loop.example.json
   - examples/playbook_activation.cross-repo-boundary-rollout.example.json
-  - examples/playbook_activation.split-wave-cross-repo-rollout.example.json
   - examples/playbook_activation.validation-driven-remediation.example.json
   - examples/playbook_activation.release-migration-cutover.example.json
   - examples/playbook_activation.incident-recovery-routing.example.json

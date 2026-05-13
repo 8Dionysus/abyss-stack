@@ -48,6 +48,6 @@ fi
 "${SCRIPTS_DIR}/aoa-bootstrap-configs" "${bootstrap_args[@]}"
 "${SCRIPTS_DIR}/aoa-check-layout" "${check_args[@]}"
 
-aoa_note "first-run bootstrap phase complete"
+aoa_note "first-run bootstrap step complete"
 aoa_note "missing secrets were intentionally ignored on this pass"
 aoa_note "next: run ${AOA_CONFIGS_ROOT}/scripts/aoa-doctor, capture ${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json with aoa-machine-fit, and create real secrets as described in ${AOA_CONFIGS_ROOT}/mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md"

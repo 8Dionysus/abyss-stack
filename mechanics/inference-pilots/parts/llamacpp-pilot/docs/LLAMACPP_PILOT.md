@@ -67,7 +67,7 @@ When the canonical promoted path is healthy, it relies on two localhost-only ser
 - `llama-cpp` -> `http://127.0.0.1:11435`
 - canonical `langchain-api /run` -> `http://127.0.0.1:5403/health`
 
-Historical comparison packets may still refer to earlier sidecar and baseline service names. In the current Phase Alpha posture, those names should be read as archived artifact lineage, not as a second live control lane.
+Historical comparison packets may still refer to earlier sidecar and baseline service names. In the current bounded posture, those names should be read as archived artifact lineage, not as a second live control lane.
 
 ## Operator commands
 

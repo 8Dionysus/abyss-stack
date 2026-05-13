@@ -55,13 +55,13 @@ def main() -> int:
     recurrence_path = evals_root / "docs" / "RECURRENCE_PROOF_PROGRAM.md"
     workhorse_example_path = evals_root / "examples" / "runtime_evidence_selection.workhorse-local.example.json"
     return_example_path = evals_root / "examples" / "runtime_evidence_selection.return-anchor-integrity.example.json"
-    phase_alpha_memo_example_path = (
+    memo_recall_example_path = (
         evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json"
     )
-    phase_alpha_memo_contradiction_gap_example_path = (
+    memo_contradiction_gap_example_path = (
         evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json"
     )
-    phase_alpha_memo_contradiction_rerun_example_path = (
+    memo_contradiction_rerun_example_path = (
         evals_root / "examples" / "runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json"
     )
 
@@ -90,13 +90,13 @@ def main() -> int:
             return_example_path,
         ],
         "examples/runtime_evidence_selection.phase-alpha-memo-recall-rerun.example.json": [
-            phase_alpha_memo_example_path,
+            memo_recall_example_path,
         ],
         "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-gap.example.json": [
-            phase_alpha_memo_contradiction_gap_example_path,
+            memo_contradiction_gap_example_path,
         ],
         "examples/runtime_evidence_selection.phase-alpha-memo-contradiction-rerun.example.json": [
-            phase_alpha_memo_contradiction_rerun_example_path,
+            memo_contradiction_rerun_example_path,
         ],
     }
     if isinstance(source_example_ref, str) and source_example_ref in example_contract_refs:
@@ -107,16 +107,16 @@ def main() -> int:
         any(ref == "candidate:aoa-memo-recall-integrity" for ref in candidate_eval_refs)
         or selection_id == "phase-alpha-memo-recall-rerun-v1"
     ):
-        ref_paths.append(f"local:{phase_alpha_memo_example_path}")
+        ref_paths.append(f"local:{memo_recall_example_path}")
     elif (
         any(ref == "candidate:aoa-memo-contradiction-integrity" for ref in candidate_eval_refs)
         or selection_id == "phase-alpha-memo-contradiction-gap-v1"
         or selection_id == "phase-alpha-memo-contradiction-rerun-v1"
     ):
         if selection_id == "phase-alpha-memo-contradiction-rerun-v1":
-            ref_paths.append(f"local:{phase_alpha_memo_contradiction_rerun_example_path}")
+            ref_paths.append(f"local:{memo_contradiction_rerun_example_path}")
         else:
-            ref_paths.append(f"local:{phase_alpha_memo_contradiction_gap_example_path}")
+            ref_paths.append(f"local:{memo_contradiction_gap_example_path}")
     else:
         ref_paths.append(f"local:{workhorse_example_path}")
 

@@ -22,19 +22,19 @@ scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 
 The current allowlist includes:
 - selected docs such as `PLAYBOOK_EXECUTION_SEAM.md` and `PLAYBOOK_LIFECYCLE.md`
-- generated registry, activation, federation, review-status, handoff, failure, subagent-recipe, automation-seed, and composition surfaces
+- generated registry, activation, federation, review-status, handoff, failure, subagent-recipe, automation-plan, and composition surfaces
 - public-safe schemas for the mirrored registry and activation/federation surfaces
 - a public-safe schema for the mirrored review-status surface
 - public-safe example activation payloads
 
-Authored `playbooks/*/PLAYBOOK.md` bundles are intentionally not mirrored in this phase.
+Authored `playbooks/*/PLAYBOOK.md` bundles are intentionally not mirrored in this landing.
 The runtime reads only derived public-safe surfaces, not the authored playbook canon.
 
 ## What `/playbooks/*` exposes
 
 The localhost-only `route-api` remains the single federation facade on `127.0.0.1:5402`.
 
-Phase 5 adds a bounded `/playbooks/*` namespace:
+The playbook landing adds a bounded `/playbooks/*` namespace:
 
 Raw read surfaces:
 - `GET /playbooks/registry`
@@ -43,7 +43,7 @@ Raw read surfaces:
 - `GET /playbooks/handoffs`
 - `GET /playbooks/failures`
 - `GET /playbooks/subagent-recipes`
-- `GET /playbooks/automation-seeds`
+- `GET /playbooks/automation-plans`
 - `GET /playbooks/composition-manifest`
 
 Structured advisory read surfaces:
@@ -51,7 +51,7 @@ Structured advisory read surfaces:
 - `POST /playbooks/select`
 - `POST /playbooks/failure`
 - `POST /playbooks/subagent-recipe`
-- `POST /playbooks/automation-seed`
+- `POST /playbooks/automation-plan`
 
 `POST /playbooks/inspect` now returns the same compact playbook card as before, plus:
 
@@ -81,13 +81,13 @@ The first governed mutation lane does not change this seam into a playbook engin
 This keeps `/playbooks/*` advisory even when the governed lane uses those surfaces as input.
 The governed lane may use `review_packet_contract` only to materialize runtime-owned candidate packets for later human review; it must not mutate `aoa-playbooks` directly.
 
-## What this phase does not do
+## What this landing does not do
 
 This landing does not:
 - mirror authored `PLAYBOOK.md` bundles
 - add a playbook execution engine
 - emit execution packets
-- trigger automation seeds
+- trigger automation plans
 - auto-spawn helper agents
 - add a new export seam or a new host port
 
