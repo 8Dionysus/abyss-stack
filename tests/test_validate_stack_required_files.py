@@ -9,6 +9,42 @@ import scripts.validate_stack as validate_stack
 
 
 class ValidateStackRequiredFilesTests(unittest.TestCase):
+    def write_operator_backend_fixture(
+        self,
+        repo_root: Path,
+        *,
+        executable: bool,
+    ) -> tuple[Path, str]:
+        scripts_dir = repo_root / "scripts"
+        backend_rel = "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"
+        backend = repo_root / backend_rel
+        backend.parent.mkdir(parents=True)
+        scripts_dir.mkdir(parents=True)
+        backend.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        backend.chmod(0o755 if executable else 0o644)
+        (scripts_dir / "aoa-check-layout").write_text(
+            f"#!/usr/bin/env bash\nexec ../{backend_rel} \"$@\"\n",
+            encoding="utf-8",
+        )
+        (scripts_dir / "aoa-llamacpp-pilot").write_text(
+            'podman", "network", "connect"\nabyss_default\n',
+            encoding="utf-8",
+        )
+        return backend, backend_rel
+
+    def validate_operator_backend_fixture(
+        self,
+        repo_root: Path,
+        backend_rel: str,
+        errors: list[str],
+    ) -> None:
+        required_scripts = {"aoa-check-layout", "aoa-llamacpp-pilot"}
+        backend_scripts = {"aoa-check-layout": backend_rel}
+        with patch.object(validate_stack, "ROOT", repo_root):
+            with patch.object(validate_stack, "REQUIRED_SCRIPTS", required_scripts):
+                with patch.object(validate_stack, "OPERATOR_BACKEND_SCRIPTS", backend_scripts):
+                    validate_stack.validate_scripts(errors)
+
     def test_current_repo_required_files_pass(self) -> None:
         errors: list[str] = []
         validate_stack.validate_required_files(errors)
@@ -85,16 +121,10 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
             pilot = scripts_dir / "aoa-llamacpp-pilot"
             pilot.write_text('podman", "network", "connect"\nabyss_default\n', encoding="utf-8")
+            backend_rel = "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-check-layout", "aoa-llamacpp-pilot"}):
-                    with patch.object(
-                        validate_stack,
-                        "OPERATOR_BACKEND_SCRIPTS",
-                        {"aoa-check-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"},
-                    ):
-                        validate_stack.validate_scripts(errors)
+            self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
 
         self.assertIn(
             "missing operator backend for scripts/aoa-check-layout: "
@@ -102,33 +132,54 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             errors,
         )
 
+    def test_operator_backend_accepts_git_index_executable_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            backend, backend_rel = self.write_operator_backend_fixture(
+                repo_root,
+                executable=False,
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "git_index_mode", return_value="100755") as git_index_mode:
+                self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
+
+        self.assertEqual(errors, [])
+        git_index_mode.assert_called_once_with(backend)
+
+    def test_operator_backend_nonexecutable_index_mode_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            _, backend_rel = self.write_operator_backend_fixture(
+                repo_root,
+                executable=False,
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "git_index_mode", return_value="100644"):
+                self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
+
+        self.assertIn(
+            "operator backend is not executable: "
+            "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+            errors,
+        )
+
     def test_operator_wrapper_must_point_to_backend(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
+            _, backend_rel = self.write_operator_backend_fixture(
+                repo_root,
+                executable=True,
+            )
             scripts_dir = repo_root / "scripts"
-            backend = repo_root / "mechanics" / "runtime-lifecycle" / "parts" / "layout-install" / "aoa_check_layout.sh"
-            backend.parent.mkdir(parents=True)
-            scripts_dir.mkdir(parents=True)
-            backend.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-            backend.chmod(0o755)
             (scripts_dir / "aoa-check-layout").write_text(
                 "#!/usr/bin/env bash\nexec ../wrong/path.sh \"$@\"\n",
                 encoding="utf-8",
             )
-            (scripts_dir / "aoa-llamacpp-pilot").write_text(
-                'podman", "network", "connect"\nabyss_default\n',
-                encoding="utf-8",
-            )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-check-layout", "aoa-llamacpp-pilot"}):
-                    with patch.object(
-                        validate_stack,
-                        "OPERATOR_BACKEND_SCRIPTS",
-                        {"aoa-check-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh"},
-                    ):
-                        validate_stack.validate_scripts(errors)
+            self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
 
         self.assertIn(
             "scripts/aoa-check-layout must exec "

@@ -2137,6 +2137,37 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                     errors.append(f"mechanics legacy package {package} is missing {required_dir}")
 
 
+def git_index_mode(path: Path) -> str | None:
+    try:
+        rel_path = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return None
+
+    completed = subprocess.run(
+        ["git", "ls-files", "--stage", "--", rel_path],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+
+    first_line = completed.stdout.strip().splitlines()
+    if not first_line:
+        return None
+    fields = first_line[0].split()
+    if not fields:
+        return None
+    return fields[0]
+
+
+def is_executable_source_path(path: Path) -> bool:
+    if path.stat().st_mode & 0o111:
+        return True
+    return git_index_mode(path) == "100755"
+
+
 def validate_scripts(errors: list[str]) -> None:
     script_names = {path.name for path in (ROOT / "scripts").iterdir() if path.is_file()}
     missing = sorted(REQUIRED_SCRIPTS - script_names)
@@ -2149,7 +2180,7 @@ def validate_scripts(errors: list[str]) -> None:
         if not backend_path.is_file():
             errors.append(f"missing operator backend for scripts/{script_name}: {backend_rel}")
             continue
-        if not (backend_path.stat().st_mode & 0o111):
+        if not is_executable_source_path(backend_path):
             errors.append(f"operator backend is not executable: {backend_rel}")
 
         wrapper_path = ROOT / "scripts" / script_name
