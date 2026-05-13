@@ -18,7 +18,20 @@ from typing import Any, Callable
 
 
 SCRIPT_PATH = Path(__file__).resolve()
-SCRIPT_ROOT = SCRIPT_PATH.parents[1]
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 ROUTE_API_BASE_URL = os.environ.get("AOA_ROUTE_API_BASE_URL", "http://127.0.0.1:5402").rstrip("/")

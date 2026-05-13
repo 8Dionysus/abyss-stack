@@ -46,7 +46,7 @@ The artifact may describe:
 
 This slice is for readout only.
 It does not alter `/run` or `/run/federated`.
-It does not add new HTTP endpoints in this wave.
+It does not add new HTTP endpoints in this contract surface.
 
 ## Intended future seam
 

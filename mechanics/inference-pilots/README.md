@@ -56,5 +56,5 @@ reviewable local-worker path.
 Current source surfaces stay in `docs/`, `scripts/`, `compose/tuning/`,
 `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/`, package benchmark surfaces under
 `mechanics/inference-pilots/parts/local-trials/`, and package tests under
-`mechanics/inference-pilots/parts/local-trials/tests/`. Preserved W5/W6 wave surfaces now stay
+`mechanics/inference-pilots/parts/local-trials/tests/`. Preserved W5/W6 pilot surfaces now stay
 under `legacy/` with quiet root bridge commands for operator compatibility.

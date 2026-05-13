@@ -144,7 +144,7 @@ Use those overlays for bounded runtime packets and pilot work.
 Do not auto-promote them into machine-fit `recommended_overlays` until the runtime packet says which lane actually survived on this host.
 
 When a candidate lane looks strong enough to challenge the current live winner,
-use [RUNTIME_WINNER_PROMOTION_LOOP](RUNTIME_WINNER_PROMOTION_LOOP.md) instead of
+use [RUNTIME_WINNER_PROMOTION_LOOP](../../inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md) instead of
 promoting from one packet or one model card by intuition alone.
 
 ## Suggested commands

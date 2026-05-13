@@ -3,13 +3,13 @@
 ## Mechanic card
 
 Runtime repair is the mechanic for bounded degradation evidence, repair-safe
-closeout, A2A return dry-run, chaos-wave recovery posture, and antifragility
+closeout, A2A return dry-run, legacy chaos recovery posture, and antifragility
 contracts.
 
 ### Trigger
 
 Use this package when changing service degradation receipts, repair-safe
-closeout receipts, chaos-wave runtime docs, A2A return closeout dry-run,
+closeout receipts, legacy chaos runtime docs, A2A return closeout dry-run,
 contradiction integrity runners, or antifragility runtime posture.
 
 ### abyss-stack owns

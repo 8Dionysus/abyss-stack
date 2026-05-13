@@ -26,9 +26,9 @@ done
 
 if ((autonomy_mode)); then
   if ((json_mode)); then
-    exec python "${SCRIPT_DIR}/_aoa_status_autonomy.py" --json
+    exec python "${SCRIPT_DIR}/../mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py" --json
   fi
-  exec python "${SCRIPT_DIR}/_aoa_status_autonomy.py"
+  exec python "${SCRIPT_DIR}/../mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py"
 fi
 
 if ((json_mode)); then

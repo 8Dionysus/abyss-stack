@@ -1,4 +1,4 @@
-# Preserved Wave Surfaces
+# Preserved Pilot Surfaces
 
 Routes old W5/W6 pilot docs and scripts under `legacy/`.
 

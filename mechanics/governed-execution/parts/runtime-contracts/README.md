@@ -1,7 +1,7 @@
 # Runtime Contracts
 
-This part owns governed-execution request, policy, and canary catalog schemas
-plus the focused runtime-contract tests.
+This part owns governed-execution request, policy, and canary catalog schemas.
 
 - `schemas/` carries active governed execution JSON Schema contracts.
-- `tests/` carries focused contract and runner tests.
+Runner behavior and tests live in
+`mechanics/governed-execution/parts/governed-runner/`.

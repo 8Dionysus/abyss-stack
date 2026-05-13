@@ -32,7 +32,7 @@ it in that package's `README.md`, `DIRECTION.md`, `PARTS.md`, `ROADMAP.md`,
 
 ## Package law
 
-Every first-wave package contains:
+Every mechanics package contains:
 
 - `AGENTS.md`
 - `README.md`

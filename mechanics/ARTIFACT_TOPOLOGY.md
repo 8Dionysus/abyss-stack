@@ -5,7 +5,7 @@ source surface becomes more convex.
 
 ## Current rule
 
-The first wave created route homes. The second wave makes package topology
+The initial pass created route homes. Current movement makes package topology
 convex: every mechanic has `parts/README.md`, every named part has
 `parts/<part>/README.md`, and active package-local artifacts live inside the
 owning part.

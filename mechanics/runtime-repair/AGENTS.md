@@ -2,7 +2,7 @@
 
 Applies to `mechanics/runtime-repair/`.
 
-This package owns the route shape for degradation receipts, chaos-wave runtime
+This package owns the route shape for degradation receipts, legacy chaos runtime
 recovery, repair-safe closeout, A2A return closeout dry-run, and bounded
 antifragility runtime posture.
 

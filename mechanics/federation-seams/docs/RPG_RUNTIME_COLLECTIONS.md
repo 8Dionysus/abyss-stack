@@ -111,7 +111,7 @@ Optional in this pass:
 - `Agents-of-Abyss` dual-vocabulary overlay ref
 
 Those optional inputs may stay pass-through refs.
-They do not require runtime-local mirrors in this wave.
+They do not require runtime-local mirrors in this source contract.
 
 ## Write posture
 

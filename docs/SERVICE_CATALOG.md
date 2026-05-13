@@ -41,7 +41,7 @@ This file maps the first migrated runtime modules to their intended services.
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
 - returns the normal model answer plus a redacted `advisory_trace` when the federated path is enabled
-- future gateway cache-lane status contract is documented in `mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md`; it is a status-only runtime artifact and does not add new HTTP endpoints in this wave
+- future gateway cache-lane status contract is documented in `mechanics/runtime-lifecycle/docs/GATEWAY_CACHE_POLICY.md`; it is a status-only runtime artifact and does not add new HTTP endpoints in this contract surface
 - future runtime usage and budget readout is documented in `mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md`; it remains a bounded runtime artifact, not routing, billing, or quality authority
 
 ## `42-agent-api-intel.yml`

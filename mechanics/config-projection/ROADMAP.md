@@ -1,12 +1,12 @@
 # Config Projection Roadmap
 
-## First wave
+## Initial landing
 
 - create this package as the route home
 - keep template and env source districts intact
 - state the source/deployed/private split plainly
 
-## Next wave candidates
+## Next candidates
 
 - audit `mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md` for package-local detail
 - add package-specific examples only after validators know their location

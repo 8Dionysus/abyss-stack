@@ -11,12 +11,12 @@
 ## Topic branches
 
 - Use short-lived topic branches for reviewable work.
-- Prefer names that explain one wave only:
-  - `codex/<focused-wave>`
-  - `docs/<focused-wave>`
-  - `ops/<focused-wave>`
+- Prefer names that explain one focused change only:
+  - `codex/<focused-change>`
+  - `docs/<focused-change>`
+  - `ops/<focused-change>`
 - One branch should carry one bounded concern:
-  - one federation wave
+  - one federation change
   - one platform-adaptation layer
   - one runtime hardening pass
   - one docs clarification set

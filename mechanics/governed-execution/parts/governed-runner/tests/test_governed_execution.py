@@ -9,7 +9,14 @@ from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-MODULE_PATH = REPO_ROOT / "scripts" / "_aoa_governed_execution.py"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "governed-execution"
+    / "parts"
+    / "governed-runner"
+    / "aoa_governed_execution.py"
+)
 
 
 def load_module():
@@ -819,19 +826,19 @@ class GovernedExecutionTests(unittest.TestCase):
         prompt = self.module.build_edit_spec_prompt(
             request={
                 "goal": (
-                    "Update scripts/_aoa_governed_execution.py so list_runs computes "
+                    "Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so list_runs computes "
                     "operator_triage.latest_operator_action from the freshest run in each request lineage."
                 )
             },
             playbook_id="AOA-P-0018",
-            target_file="scripts/_aoa_governed_execution.py",
+            target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             target_text=target_text,
             failure_context=[],
         )
         self.assertIn("def list_runs", prompt)
         self.assertIn("latest_blocked", prompt)
         self.assertNotIn("def make_pass_summary", prompt)
-        self.assertLess(len(prompt), 5700)
+        self.assertLess(len(prompt), 5800)
 
     def test_extract_python_symbol_excerpt_prefers_named_function(self) -> None:
         target_text = (
@@ -845,7 +852,7 @@ class GovernedExecutionTests(unittest.TestCase):
         )
         excerpt = self.module.extract_python_symbol_excerpt(
             target_text,
-            goal="Update scripts/_aoa_governed_execution.py so list_runs computes operator triage from the freshest request lineage.",
+            goal="Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so list_runs computes operator triage from the freshest request lineage.",
             char_limit=500,
         )
         assert excerpt is not None
@@ -862,7 +869,7 @@ class GovernedExecutionTests(unittest.TestCase):
         )
         excerpt = self.module.extract_python_symbol_excerpt(
             target_text,
-            goal="Update scripts/_aoa_governed_execution.py so list_runs computes operator triage from request lineage.",
+            goal="Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so list_runs computes operator triage from request lineage.",
             char_limit=220,
         )
         assert excerpt is not None
@@ -893,9 +900,9 @@ class GovernedExecutionTests(unittest.TestCase):
 
     def test_python_symbol_hints_from_goal_prefers_identifier_tokens(self) -> None:
         hints = self.module.python_symbol_hints_from_goal(
-            "Update scripts/_aoa_governed_execution.py so list_runs computes latest_operator_action from request lineage."
+            "Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so list_runs computes latest_operator_action from request lineage."
         )
-        self.assertIn("_aoa_governed_execution", hints)
+        self.assertIn("aoa_governed_execution", hints)
         self.assertIn("list_runs", hints)
         self.assertIn("latest_operator_action", hints)
 
@@ -924,12 +931,12 @@ class GovernedExecutionTests(unittest.TestCase):
         prompt = self.module.build_edit_spec_prompt(
             request={
                 "goal": (
-                    "Update scripts/_aoa_governed_execution.py so list_runs computes "
+                    "Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so list_runs computes "
                     "latest_operator_action from the freshest request lineage."
                 )
             },
             playbook_id="AOA-P-0018",
-            target_file="scripts/_aoa_governed_execution.py",
+            target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             target_text=target_text,
             failure_context=[],
         )
@@ -968,12 +975,12 @@ class GovernedExecutionTests(unittest.TestCase):
         prompt = self.module.build_edit_spec_prompt(
             request={
                 "goal": (
-                    "Update scripts/_aoa_governed_execution.py so build_run_record "
+                    "Update mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py so build_run_record "
                     "includes request_path in the returned record."
                 )
             },
             playbook_id="AOA-P-0018",
-            target_file="scripts/_aoa_governed_execution.py",
+            target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             target_text=target_text,
             failure_context=[],
         )
@@ -1089,9 +1096,9 @@ class GovernedExecutionTests(unittest.TestCase):
         narrowed = self.module.narrow_candidate_files(
             [
                 "mechanics/diagnostic-spine/docs/TRUTH_SURFACES.md",
-                "scripts/_aoa_governed_execution.py",
+                "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                 "scripts/aoa-governed-run",
-                "mechanics/governed-execution/parts/runtime-contracts/tests/test_governed_execution.py",
+                "mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py",
             ],
             goal="Improve scripts/aoa-governed-run status --all and related triage rendering.",
         )
@@ -1208,11 +1215,11 @@ class GovernedExecutionTests(unittest.TestCase):
             self.module.normalize_edit_spec(
                 {
                     "mode": "exact_replace",
-                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "target_file": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                     "old_text": "    latest_blocked =",
                     "new_text": "    latest_blocked = max(runs)",
                 },
-                selected_target_file="scripts/_aoa_governed_execution.py",
+                selected_target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             )
 
     def test_validate_edit_spec_candidate_rejects_non_applicable_change(self) -> None:
@@ -1232,10 +1239,10 @@ class GovernedExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "invalid Python syntax"):
             self.module.validate_edit_spec_candidate(
                 "value = 1\n",
-                selected_target_file="scripts/_aoa_governed_execution.py",
+                selected_target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                 spec={
                     "mode": "exact_replace",
-                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "target_file": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                     "old_text": "value = 1",
                     "new_text": "value =",
                 },
@@ -1245,10 +1252,10 @@ class GovernedExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unused Python assignment"):
             self.module.validate_edit_spec_candidate(
                 "blocked_runs = []\nreturn blocked_runs\n",
-                selected_target_file="scripts/_aoa_governed_execution.py",
+                selected_target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                 spec={
                     "mode": "exact_replace",
-                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "target_file": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                     "old_text": "blocked_runs = []",
                     "new_text": "blocked_runs = []\nlineage_map: dict[str, str] = {}",
                 },
@@ -1367,10 +1374,10 @@ class GovernedExecutionTests(unittest.TestCase):
                 "    \"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\",\n"
                 "}\n"
             ),
-            selected_target_file="scripts/_aoa_governed_execution.py",
+            selected_target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             spec={
                 "mode": "exact_replace",
-                "target_file": "scripts/_aoa_governed_execution.py",
+                "target_file": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                 "old_text": "latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"updated_at\") or \"\"), reverse=True)",
                 "new_text": "latest_blocked = sorted(blocked_runs, key=lambda item: str(item.get(\"request_path\") or item.get(\"updated_at\") or \"\"), reverse=True)",
             },
@@ -1389,10 +1396,10 @@ class GovernedExecutionTests(unittest.TestCase):
                     "    \"recommended_action\": latest_blocked[0][\"triage\"][\"recommended_action\"] if latest_blocked else \"No operator action required.\",\n"
                     "}\n"
                 ),
-                selected_target_file="scripts/_aoa_governed_execution.py",
+                selected_target_file="mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                 spec={
                     "mode": "exact_replace",
-                    "target_file": "scripts/_aoa_governed_execution.py",
+                    "target_file": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
                     "old_text": "latest_blocked = freshest_runs_by_request_lineage(blocked_runs)",
                     "new_text": (
                         "latest_blocked = freshest_runs_by_request_lineage(blocked_runs)\n"
@@ -1468,7 +1475,7 @@ class GovernedExecutionTests(unittest.TestCase):
                 "profile_class": "workhorse",
             },
             "playbook_id": "AOA-P-0018",
-            "allowed_files": ["scripts/_aoa_governed_execution.py", "scripts/aoa-governed-run"],
+            "allowed_files": ["mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py", "scripts/aoa-governed-run"],
             "advisory_context": {"playbook": {"title": "governed-lane", "summary": "test"}},
             "repo_root": self.repo_root,
             "failure_context": [],

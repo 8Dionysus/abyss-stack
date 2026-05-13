@@ -2,8 +2,8 @@
 
 | Part | Route | Current source surfaces |
 |---|---|---|
-| Governed runner | `parts/governed-runner/` | `scripts/aoa-governed-run`, `scripts/_aoa_governed_execution.py` |
-| Autonomy status | `parts/autonomy-status/` | `scripts/aoa-status`, `scripts/_aoa_status_autonomy.py` |
+| Governed runner | `parts/governed-runner/` | `scripts/aoa-governed-run`, `mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py` |
+| Autonomy status | `parts/autonomy-status/` | `scripts/aoa-status`, `mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py` |
 | Return policy | `parts/return-policy/` | `config-templates/Configs/agent-api/return-policy.yaml`, `parts/return-policy/schemas/`, `parts/return-policy/examples/`, `mechanics/governed-execution/docs/GOVERNED_EXECUTION.md` |
 | Runtime contracts | `parts/runtime-contracts/` | governed execution schemas and focused tests |
 | Candidate exports | `parts/candidate-exports/` | export scripts, candidate schemas, examples, and focused tests |

@@ -13,8 +13,8 @@ Phases 0 through 6 have already been landed as source and runtime seams:
 - bounded promoted local-worker posture through `langchain-api` on `5403`
   backed by `llama.cpp`, with `LangGraph` as the adopted execution layer for
   bounded long-horizon and autonomy-focused local-worker flows
-- antifragility wave two as contract-only runtime doctrine and receipt
-  surfaces, now including bounded wave-one chaos example families, without
+- antifragility repair posture as contract-only runtime doctrine and receipt
+  surfaces, now including bounded legacy chaos example families, without
   mutating live services or deployment behavior
 - read-only diagnostic spine groundwork through `scripts/aoa-diagnose` and
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`, still weaker than repair
@@ -42,7 +42,7 @@ AoA or ToS meaning. Its current checked surface is:
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json`,
-  `scripts/aoa-diagnose`, `scripts/_aoa_diagnose.py`,
+  `scripts/aoa-diagnose`, `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`,
   `scripts/build_diagnostic_surface_catalog.py`,
   `scripts/validate_diagnostic_surface_catalog.py`,
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py`, and

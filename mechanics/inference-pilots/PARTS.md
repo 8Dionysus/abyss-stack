@@ -7,7 +7,7 @@
 | LangGraph pilot | `parts/langgraph-pilot/` | `mechanics/inference-pilots/docs/LANGGRAPH_PILOT.md`, `scripts/aoa-langgraph-pilot` |
 | Local trials | `parts/local-trials/` | `mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md`, `mechanics/inference-pilots/docs/RUNTIME_BENCH_POLICY.md`, `scripts/aoa-local-ai-trials`, runtime benchmark schema, example, and focused test |
 | Promotion loop | `parts/promotion-loop/` | `mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `scripts/aoa-runtime-bench-index` |
-| Preserved wave surfaces | `parts/preserved-wave-surfaces/` | `legacy/raw/W5_PILOT.md`, `legacy/raw/W6_PILOT.md`, `legacy/artifacts/scripts/aoa-w5-pilot`, `legacy/artifacts/scripts/aoa-w6-pilot` |
+| Preserved pilot surfaces | `parts/preserved-pilot-surfaces/` | `legacy/raw/W5_PILOT.md`, `legacy/raw/W6_PILOT.md`, `legacy/artifacts/scripts/aoa-w5-pilot`, `legacy/artifacts/scripts/aoa-w6-pilot` |
 | Quiet bridge commands | `parts/quiet-bridge-commands/` | `scripts/aoa-long-horizon-pilot`, `scripts/aoa-bounded-autonomy-pilot` |
 | Agon dry-run handoff | `parts/agon-dry-run-handoff/` | `mechanics/agon-runtime/README.md` |
 

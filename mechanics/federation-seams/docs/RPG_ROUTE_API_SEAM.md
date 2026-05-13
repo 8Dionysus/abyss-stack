@@ -4,7 +4,7 @@
 
 This note defines the future read-only `/rpg/*` seam for the existing localhost-only `route-api`.
 
-It is not implemented in this wave.
+It is not implemented in this source contract.
 The seam exists as a bounded contract so the runtime RPG collections can later become inspectable without adding a new authority layer or a new host port.
 
 ## Core rule

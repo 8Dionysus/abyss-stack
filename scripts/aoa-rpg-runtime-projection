@@ -68,7 +68,7 @@ def build_collections(repo_root: Path) -> dict[str, dict]:
     build["reputation_refs"] = [ledger_ref]
     build["notes"] = (
         "Generated transport build snapshot for the body-facing RPG slice. "
-        "Ability and feat ids remain pass-through refs in this wave."
+        "Ability and feat ids remain pass-through refs in this source contract."
     )
 
     ledger["slices"] = [

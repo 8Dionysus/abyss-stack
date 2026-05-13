@@ -1,14 +1,13 @@
 # Governed Execution Roadmap
 
-## First wave
+## Initial landing
 
 - create this package as the route home
 - keep active implementation in root scripts and tests
 - keep owner-acceptance stop-lines visible
 
-## Next wave candidates
+## Next candidates
 
 - move long-lived doctrine into package `docs/`
-- split wave evidence from standing execution law
+- split pilot evidence from standing execution law
 - add package-local tests only if discovery and release checks include them
-

@@ -10,5 +10,4 @@ Short term:
 - keep return policy public-safe in templates and private in runtime
 
 Next movement should separate long-lived governed execution doctrine from
-wave-specific local-worker trial docs.
-
+pilot-specific local-worker trial docs.

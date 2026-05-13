@@ -9,7 +9,7 @@ This guide is the shortest careful path from a source checkout to a running loca
 - `rsync` is available
 - the runtime root should be `/srv/AbyssOS/abyss-stack`
 
-If you are starting from Windows, read [WINDOWS_SETUP](WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
+If you are starting from Windows, read [WINDOWS_SETUP](../mechanics/machine-fit/docs/WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
 
 ## Fast path
 
@@ -41,7 +41,7 @@ pwsh -File scripts/aoa.ps1 first-run --strict
 ## Then do the one thing it cannot do for you
 
 Create the real secret-bearing files described in:
-- [SECRETS_BOOTSTRAP](SECRETS_BOOTSTRAP.md)
+- [SECRETS_BOOTSTRAP](../mechanics/config-projection/docs/SECRETS_BOOTSTRAP.md)
 
 If the agent API layer is part of the selected profile or preset, verify that `Configs/agent-api/return-policy.yaml` was bootstrapped before launch.
 
@@ -149,7 +149,7 @@ scripts/aoa-local-ai-trials run-wave W0
 ```
 
 That flow keeps machine-readable trial truth under `Logs/local-ai-trials/` and writes Markdown mirrors to `Dionysus/reports/local-ai-trials/`.
-Use [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md) for the full contract.
+Use [LOCAL_AI_TRIALS](../mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md) for the full contract.
 
 ## Optional bounded llama.cpp pilot
 
@@ -161,7 +161,7 @@ scripts/aoa-llamacpp-pilot run --preset intel-full
 
 That pilot re-verifies the bounded `llama.cpp` launch path, starts the explicit pilot sidecar when needed, exposes `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`. If the first locally resolved model candidate is rejected by `llama.cpp` on this machine, the pilot falls back to a locally cached curated `bartowski` candidate when one is already present.
 Use the same bounded lane for additive Intel 285H host-profile checks such as Gemma 4, Vulkan-first validation, or KV-cache candidate screening instead of treating those as instant defaults.
-Use [LLAMACPP_PILOT](LLAMACPP_PILOT.md) for the full contract.
+Use [LLAMACPP_PILOT](../mechanics/inference-pilots/docs/LLAMACPP_PILOT.md) for the full contract.
 
 ## Compose optional layers manually
 
@@ -199,10 +199,10 @@ scripts/aoa-logs --profile core
 Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
-- [DOCTOR](DOCTOR.md)
-- [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md)
-- [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md)
+- [DOCTOR](../mechanics/diagnostic-spine/docs/DOCTOR.md)
+- [REFERENCE_PLATFORM_SPEC](../mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md)
+- [MACHINE_FIT_POLICY](../mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md)
 - [PRESETS](PRESETS.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
-- [RENDER_TRUTH](RENDER_TRUTH.md)
-- [INTERNAL_PROBES](INTERNAL_PROBES.md)
+- [RENDER_TRUTH](../mechanics/config-projection/docs/RENDER_TRUTH.md)
+- [INTERNAL_PROBES](../mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md)

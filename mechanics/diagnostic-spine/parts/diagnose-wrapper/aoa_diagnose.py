@@ -16,7 +16,20 @@ STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))
 HOME_SOURCE_ROOT = Path.home() / "src" / "abyss-stack"
 SCRIPT_PATH = Path(__file__).resolve()
-SCRIPT_ROOT = SCRIPT_PATH.parents[1]
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            and (candidate / "scripts").is_dir()
+            and (candidate / "mechanics").is_dir()
+        ):
+            return candidate
+    raise RuntimeError("could not locate abyss-stack repository root")
+
+
+SCRIPT_ROOT = find_repo_root(SCRIPT_PATH.parent)
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 DRIFT_SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}

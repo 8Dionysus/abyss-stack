@@ -4,7 +4,7 @@
 
 This note records the minimal builder order for the RPG runtime/body slice.
 
-In this wave, the builder is filesystem-first and local to `abyss-stack`.
+In this source contract, the builder is filesystem-first and local to `abyss-stack`.
 It is not route-api code and it does not widen authority.
 
 ## Builder rule
@@ -76,7 +76,7 @@ After each refresh pass:
 
 ## Storage step
 
-The honest posture in this wave is filesystem-first:
+The honest posture in this source contract is filesystem-first:
 - source-managed transport under `mechanics/federation-seams/parts/rpg-runtime/generated/`
 - live runtime materialization under `Logs/rpg/latest/`
 - historical records under `Logs/rpg/records/`

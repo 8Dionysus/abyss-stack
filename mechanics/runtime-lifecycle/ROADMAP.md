@@ -1,6 +1,6 @@
 # Runtime Lifecycle Roadmap
 
-## First wave
+## Initial landing
 
 - create this package as the route home
 - keep active docs and scripts in their current source districts
@@ -8,7 +8,7 @@
 - land optional cache/usage status readout schemas, examples, and tests under
   the package
 
-## Next wave candidates
+## Next candidates
 
 - decide whether `docs/RUNBOOK.md` stays root-facing or splits into package detail
 - map profile and preset docs against compose ownership
