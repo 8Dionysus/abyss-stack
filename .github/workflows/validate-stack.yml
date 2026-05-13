@@ -42,6 +42,7 @@ jobs:
             scripts/aoa-check-layout \
             scripts/aoa-install-systemd \
             scripts/aoa-first-run \
+            scripts/aoa-warmup \
             scripts/aoa-preset-profiles \
             scripts/aoa-profile-modules \
             scripts/aoa-profile-endpoints \
@@ -55,7 +56,25 @@ jobs:
             scripts/aoa-status \
             scripts/aoa-logs \
             scripts/aoa-smoke \
-            scripts/aoa-wait
+            scripts/aoa-wait \
+            mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh \
+            mechanics/config-projection/parts/sync/aoa_sync_configs.sh \
+            mechanics/config-projection/parts/rendering/aoa_preset_profiles.sh \
+            mechanics/config-projection/parts/rendering/aoa_profile_modules.sh \
+            mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh \
+            mechanics/config-projection/parts/rendering/aoa_render_services.sh \
+            mechanics/config-projection/parts/rendering/aoa_render_config.sh \
+            mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh \
+            mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh \
+            mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh \
+            mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh \
+            mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh \
+            mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh \
+            mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh \
+            mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh \
+            mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh \
+            mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh \
+            mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh
 
       - name: Rehearse bootstrap flow
         run: |

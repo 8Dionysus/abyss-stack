@@ -7,13 +7,18 @@ These files stay at the source root because deployment sync copies them into
 the runtime `Configs/scripts/` command surface. Mechanic pages own the meaning
 and part routes; this directory owns stable command entrypoints.
 
+For config-projection and runtime-lifecycle commands, root files are thin
+wrappers. The implementation bodies live under the owning
+`mechanics/<package>/parts/<part>/` routes and are still synced into deployed
+`Configs/` with the wrappers.
+
 ## Command Groups
 
 | Group | Commands | Owning route |
 |---|---|---|
-| Layout and sync | `aoa-install-layout`, `aoa-sync-configs`, `aoa-bootstrap-configs`, `aoa-check-layout` | [config projection](../mechanics/config-projection/README.md), [runtime lifecycle](../mechanics/runtime-lifecycle/README.md) |
-| Lifecycle wrappers | `aoa-up`, `aoa-down`, `aoa-status`, `aoa-logs`, `aoa-wait`, `aoa-smoke`, `aoa-install-systemd` | [runtime lifecycle](../mechanics/runtime-lifecycle/README.md) |
-| Compose introspection | `aoa-preset-profiles`, `aoa-profile-modules`, `aoa-profile-endpoints`, `aoa-render-services`, `aoa-render-config` | [config projection rendering](../mechanics/config-projection/parts/rendering/README.md) |
+| Layout and sync | `aoa-install-layout`, `aoa-sync-configs`, `aoa-bootstrap-configs`, `aoa-check-layout`, `aoa-first-run` | [config projection](../mechanics/config-projection/README.md), [runtime lifecycle](../mechanics/runtime-lifecycle/README.md); implementations under `mechanics/config-projection/parts/{bootstrap,sync}/` and `mechanics/runtime-lifecycle/parts/{layout-install,first-run-bootstrap}/` |
+| Lifecycle wrappers | `aoa-up`, `aoa-down`, `aoa-warmup`, `aoa-status`, `aoa-logs`, `aoa-wait`, `aoa-smoke`, `aoa-install-systemd` | [runtime lifecycle](../mechanics/runtime-lifecycle/README.md); implementations under `mechanics/runtime-lifecycle/parts/{start-stop,logs-status,wait-smoke,user-unit}/` |
+| Compose introspection | `aoa-preset-profiles`, `aoa-profile-modules`, `aoa-profile-endpoints`, `aoa-render-services`, `aoa-render-config` | [config projection rendering](../mechanics/config-projection/parts/rendering/README.md); implementations under `mechanics/config-projection/parts/rendering/` |
 | Diagnostics | `aoa-doctor`, `aoa-diagnose`, `aoa-internal-probes`, `build_diagnostic_surface_catalog.py`, `validate_diagnostic_surface_catalog.py` | [diagnostic spine](../mechanics/diagnostic-spine/README.md) |
 | Machine fit | `aoa-host-facts`, `aoa-machine-bridge`, `aoa-machine-fit`, `aoa-platform-adaptation` | [machine fit](../mechanics/machine-fit/README.md) |
 | Inference pilots | `aoa-qwen-run`, `aoa-qwen-check`, `aoa-qwen-bench`, `aoa-llamacpp-pilot`, `aoa-langgraph-pilot`, `aoa-local-ai-trials`, `aoa-long-horizon-pilot`, `aoa-bounded-autonomy-pilot`, `aoa-runtime-bench-index` | [inference pilots](../mechanics/inference-pilots/README.md) |
@@ -27,6 +32,8 @@ and part routes; this directory owns stable command entrypoints.
 
 - Keep command names stable unless the route cards, docs, validators, and
   deployment sync behavior move with the change.
+- Keep thin wrappers and part-local backend paths aligned; `validate_stack.py`
+  treats this bridge as a required topology contract.
 - Keep source checkout and deployed runtime paths distinct.
 - Keep wrappers public-safe and avoid printing secrets.
 - Put mechanic-specific implementation logic under the owning
@@ -34,3 +41,8 @@ and part routes; this directory owns stable command entrypoints.
   operator command stability.
 
 See [AGENTS.md](AGENTS.md) for editing rules.
+
+`release_check.py` uses synthetic Configs parity by default so source release
+audits do not depend on the current machine's live runtime mirror. Use
+`python scripts/release_check.py --parity-mode live` only when deliberately
+checking `/srv/AbyssOS/abyss-stack/Configs`.

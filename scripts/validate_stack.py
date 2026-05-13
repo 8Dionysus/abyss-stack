@@ -257,6 +257,27 @@ REQUIRED_SCRIPTS = {
     "aoa-bootstrap-wsl.ps1",
 }
 
+OPERATOR_BACKEND_SCRIPTS = {
+    "aoa-bootstrap-configs": "mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh",
+    "aoa-sync-configs": "mechanics/config-projection/parts/sync/aoa_sync_configs.sh",
+    "aoa-preset-profiles": "mechanics/config-projection/parts/rendering/aoa_preset_profiles.sh",
+    "aoa-profile-modules": "mechanics/config-projection/parts/rendering/aoa_profile_modules.sh",
+    "aoa-profile-endpoints": "mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh",
+    "aoa-render-services": "mechanics/config-projection/parts/rendering/aoa_render_services.sh",
+    "aoa-render-config": "mechanics/config-projection/parts/rendering/aoa_render_config.sh",
+    "aoa-install-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
+    "aoa-check-layout": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+    "aoa-first-run": "mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh",
+    "aoa-install-systemd": "mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+    "aoa-up": "mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh",
+    "aoa-down": "mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh",
+    "aoa-warmup": "mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh",
+    "aoa-wait": "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh",
+    "aoa-smoke": "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh",
+    "aoa-logs": "mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh",
+    "aoa-status": "mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh",
+}
+
 REQUIRED_FILES = {
     ROOT / "compose" / "AGENTS.md",
     ROOT / "env" / "AGENTS.md",
@@ -2116,12 +2137,57 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                     errors.append(f"mechanics legacy package {package} is missing {required_dir}")
 
 
+def git_index_mode(path: Path) -> str | None:
+    try:
+        rel_path = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return None
+
+    completed = subprocess.run(
+        ["git", "ls-files", "--stage", "--", rel_path],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+
+    first_line = completed.stdout.strip().splitlines()
+    if not first_line:
+        return None
+    fields = first_line[0].split()
+    if not fields:
+        return None
+    return fields[0]
+
+
+def is_executable_source_path(path: Path) -> bool:
+    if path.stat().st_mode & 0o111:
+        return True
+    return git_index_mode(path) == "100755"
+
+
 def validate_scripts(errors: list[str]) -> None:
     script_names = {path.name for path in (ROOT / "scripts").iterdir() if path.is_file()}
     missing = sorted(REQUIRED_SCRIPTS - script_names)
 
     for name in missing:
         errors.append(f"missing required script: scripts/{name}")
+
+    for script_name, backend_rel in sorted(OPERATOR_BACKEND_SCRIPTS.items()):
+        backend_path = ROOT / backend_rel
+        if not backend_path.is_file():
+            errors.append(f"missing operator backend for scripts/{script_name}: {backend_rel}")
+            continue
+        if not is_executable_source_path(backend_path):
+            errors.append(f"operator backend is not executable: {backend_rel}")
+
+        wrapper_path = ROOT / "scripts" / script_name
+        if wrapper_path.exists():
+            wrapper_text = wrapper_path.read_text(encoding="utf-8")
+            if f"../{backend_rel}" not in wrapper_text:
+                errors.append(f"scripts/{script_name} must exec ../{backend_rel}")
 
     llamacpp_pilot = (ROOT / "scripts" / "aoa-llamacpp-pilot").read_text(encoding="utf-8")
     if "podman\", \"network\", \"connect\"" not in llamacpp_pilot:

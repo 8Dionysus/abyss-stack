@@ -45,6 +45,13 @@ Tracking starts with the community-docs baseline for this repository.
   homes for config projection, diagnostic spine, governed execution, inference
   pilots, and runtime lifecycle, with validators, tests, quest anchors, and
   generated diagnostic refs following the move
+- config-projection and runtime-lifecycle operator commands now keep stable
+  root `scripts/` wrappers while their implementation bodies live under the
+  owning mechanic parts, with validator and CI shellcheck coverage for the
+  wrapper/backend bridge
+- `release_check.py` now uses synthetic Configs parity by default, keeping
+  source release audits independent from stale live runtime mirrors unless
+  `--parity-mode live` is requested
 - model-card docs no longer carry host-local source checkout links, and
   `validate_stack.py` now blocks that portability drift while still allowing
   the canonical deployed runtime root references

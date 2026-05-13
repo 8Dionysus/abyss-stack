@@ -16,4 +16,5 @@ Validation:
 ```bash
 python scripts/validate_stack.py
 bash -n scripts/aoa-bootstrap-configs scripts/aoa-sync-configs scripts/aoa-render-config scripts/aoa-render-services
+bash -n mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh mechanics/config-projection/parts/sync/aoa_sync_configs.sh mechanics/config-projection/parts/rendering/aoa_*.sh
 ```

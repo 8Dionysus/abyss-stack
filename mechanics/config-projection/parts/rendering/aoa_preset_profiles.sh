@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MECHANIC_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_ROOT="$(cd -- "${MECHANIC_SCRIPT_DIR}/../../../.." && pwd)"
+SCRIPTS_DIR="${SOURCE_ROOT}/scripts"
+# shellcheck source=scripts/aoa-lib.sh
+source "${SCRIPTS_DIR}/aoa-lib.sh"
+
+paths_mode=0
+selector_args=()
+while (($#)); do
+  case "$1" in
+    --paths)
+      paths_mode=1
+      ;;
+    *)
+      selector_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${selector_args[@]}"
+aoa_resolve_modules
+aoa_print_profile_summary
+
+if ((${#AOA_PRESET_NAMES[@]} == 0)); then
+  aoa_note ""
+  aoa_note "no presets resolved"
+  exit 0
+fi
+
+if ((paths_mode)); then
+  preset_file=""
+  profile_file=""
+  aoa_note ""
+  aoa_note "preset files:"
+  for preset_file in "${AOA_PRESET_FILES[@]}"; do
+    aoa_note "- ${preset_file}"
+  done
+  aoa_note ""
+  aoa_note "resolved profile files:"
+  for profile_file in "${AOA_PROFILE_FILES[@]}"; do
+    aoa_note "- ${profile_file}"
+  done
+fi

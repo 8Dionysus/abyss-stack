@@ -23,6 +23,8 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 
 ## Directory contract
 - Bash wrappers are operator-facing helpers and should be safe by default.
+- Config-projection and runtime-lifecycle root scripts are stable wrappers;
+  their implementation bodies live under the owning mechanic parts.
 - Shared env defaults, selector parsing, compose resolution, and probe helpers live in `scripts/aoa-lib.sh`.
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
 - `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
@@ -70,7 +72,8 @@ For shell work, run the smallest useful set:
 python scripts/validate_stack.py
 python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py scripts/aoa-host-facts scripts/aoa-machine-bridge scripts/aoa-machine-fit scripts/aoa-qwen-run
 shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
-bash -n scripts/<touched-script>
+shellcheck scripts/aoa-lib.sh mechanics/<package>/parts/<part>/<touched-backend>.sh
+bash -n scripts/<touched-script> mechanics/<package>/parts/<part>/<touched-backend>.sh
 scripts/aoa-host-facts --mode public
 scripts/aoa-machine-bridge --mode public --write /tmp/machine-bridge.public.review.json
 scripts/aoa-machine-fit --mode public

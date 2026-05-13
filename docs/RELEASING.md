@@ -14,6 +14,9 @@ See also:
 2. Update `CHANGELOG.md` in the `Summary / Validation / Notes` shape.
 3. Run the repo-level verifier:
    - `python scripts/release_check.py`
+   - this uses synthetic Configs parity by default; use
+     `python scripts/release_check.py --parity-mode live` only after an
+     intentional deployed mirror sync
 4. Run federation preflight:
    - `aoa release audit /srv --phase preflight --repo abyss-stack --strict --json`
 5. Publish only through `aoa release publish`.
