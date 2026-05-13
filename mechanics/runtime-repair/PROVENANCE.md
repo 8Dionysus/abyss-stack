@@ -8,10 +8,11 @@ The active repair route stays in this package and the standing docs:
 - `README.md`
 - `DIRECTION.md`
 - `PARTS.md`
-- `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`
-- `mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`
+- `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`
+- `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`
 
-Old wave and `_v1` artifacts now live in package-local `legacy`.
+Old wave docs live in package-local `legacy`. Active receipt artifacts live
+under their owning parts.
 
 ## Owner Boundary
 
@@ -25,4 +26,5 @@ affected owner repositories.
 - [legacy/INDEX.md](legacy/INDEX.md) maps old root paths to current legacy paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
   legacy.
-- `legacy/artifacts/tests/` keeps the receipt schema/example contract runnable.
+- `parts/degradation-receipts/tests/` and `parts/repair-safe-closeout/tests/`
+  keep the receipt schema/example contracts runnable.

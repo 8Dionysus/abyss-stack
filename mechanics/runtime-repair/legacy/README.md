@@ -1,10 +1,9 @@
 # Runtime Repair Legacy
 
-This is the provenance home for old runtime repair wave and `_v1` receipt
-artifacts.
+This is the provenance home for old runtime repair wave routes.
 
-The files here were moved out of flat root folders because they carry old wave
-and raw version scaffolding. They are retained for review and validation; the
-active route starts one level up.
+The old raw files were moved out of flat root folders because they carry old
+wave scaffolding. Active receipt artifacts now live under the owning parts; this
+legacy tree keeps the lineage map.
 
 Use [INDEX.md](INDEX.md) to map old locations to current locations.

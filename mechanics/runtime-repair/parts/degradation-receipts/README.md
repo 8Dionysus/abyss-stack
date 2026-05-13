@@ -1,6 +1,11 @@
 # Degradation Receipts
 
-Routes legacy service degradation receipt schemas and examples under
-`legacy/artifacts/`.
+Owns active service degradation receipt schemas, examples, and focused contract
+tests.
 
-Old `_v1` names remain provenance until a quieter active surface is designed.
+The receipt payload keeps the `service_degradation_receipt_v1` schema version for
+wire compatibility, but the active file route is the clean part-local surface:
+
+- `schemas/service-degradation-receipt.schema.json`
+- `examples/service-degradation-receipt*.example.json`
+- `tests/test_degradation_receipts.py`

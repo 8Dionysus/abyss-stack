@@ -1751,7 +1751,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "Owning Repo For Platform Adaptation Records",
             "Which single repo owns local platform-adaptation records and machine-local runtime posture evidence?",
             "abyss-stack",
-            [repo_path("abyss-stack", "Configs/mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md"), stack_path("Logs/platform-adaptations/latest/latest.private.json")],
+            [repo_path("abyss-stack", "Configs/mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md"), stack_path("Logs/platform-adaptations/latest/latest.private.json")],
             ["aoa-evals", "Dionysus"],
         ),
         base_case(
@@ -2032,7 +2032,7 @@ def build_catalog() -> dict[str, list[dict[str, Any]]]:
             "runtime-inspect-platform-adaptation",
             "Inspect Latest Platform Adaptation Record",
             ["abyss-stack"],
-            [stack_path("Logs/platform-adaptations/latest/latest.private.json"), repo_path("abyss-stack", "Configs/mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md")],
+            [stack_path("Logs/platform-adaptations/latest/latest.private.json"), repo_path("abyss-stack", "Configs/mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md")],
             ["Read the latest local-private platform adaptation record and summarize the validated Qwen posture.", "Keep the result machine-local rather than portable proof wording."],
             ["The answer cites the latest platform adaptation record.", "The summary keeps runtime behavior local to abyss-stack."],
         ),

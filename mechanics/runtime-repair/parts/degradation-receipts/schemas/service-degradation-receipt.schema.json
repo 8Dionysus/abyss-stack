@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://aoa.local/abyss-stack/schemas/service_degradation_receipt_v1.json",
-  "title": "service_degradation_receipt_v1",
+  "$id": "https://aoa.local/abyss-stack/runtime-repair/degradation-receipts/service-degradation-receipt.schema.json",
+  "title": "abyss-stack service degradation receipt",
   "type": "object",
   "additionalProperties": false,
   "required": [

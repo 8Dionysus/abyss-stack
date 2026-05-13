@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://aoa.local/abyss-stack/schemas/repair_safe_closeout_receipt_v1.json",
-  "title": "repair_safe_closeout_receipt_v1",
+  "$id": "https://aoa.local/abyss-stack/runtime-repair/repair-safe-closeout/repair-safe-closeout-receipt.schema.json",
+  "title": "abyss-stack repair-safe closeout receipt",
   "type": "object",
   "additionalProperties": false,
   "required": [

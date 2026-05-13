@@ -19,9 +19,9 @@ created outside git through `scripts/aoa-install-layout`,
 `scripts/aoa-sync-configs`, and `scripts/aoa-bootstrap-configs`.
 
 If you are operating from a Windows host through WSL, also read:
-- [WINDOWS_BRIDGE](../mechanics/machine-fit/docs/WINDOWS_BRIDGE.md)
-- [WINDOWS_SETUP](../mechanics/machine-fit/docs/WINDOWS_SETUP.md)
-- [WINDOWS_PERFORMANCE](../mechanics/machine-fit/docs/WINDOWS_PERFORMANCE.md)
+- [WINDOWS_BRIDGE](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md)
+- [WINDOWS_SETUP](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md)
+- [WINDOWS_PERFORMANCE](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md)
 
 ## Fastest guided route
 
@@ -49,10 +49,10 @@ scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
 ```
 
-See [MEMO_RUNTIME_SEAM](../mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
-See [EVAL_RUNTIME_SEAM](../mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
-See [PLAYBOOK_RUNTIME_SEAM](../mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md) for the runtime-facing playbook mirror and `/playbooks/*` activation and composition advisory surfaces.
-See [KAG_RUNTIME_SEAM](../mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md) for the runtime-facing `aoa-kag` mirror, `/kag/*` inspection surfaces, and the `Tree-of-Sophia` handoff companion.
+See [MEMO_RUNTIME_SEAM](../mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
+See [EVAL_RUNTIME_SEAM](../mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
+See [PLAYBOOK_RUNTIME_SEAM](../mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md) for the runtime-facing playbook mirror and `/playbooks/*` activation and composition advisory surfaces.
+See [KAG_RUNTIME_SEAM](../mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md) for the runtime-facing `aoa-kag` mirror, `/kag/*` inspection surfaces, and the `Tree-of-Sophia` handoff companion.
 
 ## Scenario A: Fedora-native source checkout
 

@@ -26,11 +26,11 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
         for relative_path in (
             Path("QUESTBOOK.md"),
             Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md",
-            Path("mechanics") / "federation-seams" / "docs" / "RPG_RUNTIME_FRONTEND_POSTURE.md",
-            Path("mechanics") / "federation-seams" / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
-            Path("mechanics") / "federation-seams" / "docs" / "RPG_RUNTIME_BUILDERS.md",
-            Path("mechanics") / "federation-seams" / "docs" / "RPG_ROUTE_API_SEAM.md",
-            Path("mechanics") / "federation-seams" / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
+            Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_FRONTEND_POSTURE.md",
+            Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
+            Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_BUILDERS.md",
+            Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_ROUTE_API_SEAM.md",
+            Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_FRONTEND_PROJECTION_SEAM.md",
             Path("quests") / "schemas" / "quest.schema.json",
             Path("quests") / "schemas" / "quest_dispatch.schema.json",
             RPG_RUNTIME_SCHEMA_ROOT / "agent_build_snapshot.schema.json",
@@ -196,13 +196,15 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 repo_root
                 / "mechanics"
                 / "federation-seams"
+                / "parts"
+                / "rpg-runtime"
                 / "docs"
                 / "RPG_RUNTIME_FRONTEND_POSTURE.md"
             ).unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("mechanics/federation-seams/docs/RPG_RUNTIME_FRONTEND_POSTURE.md" in error for error in errors)
+            any("mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md" in error for error in errors)
         )
 
     def test_runtime_example_schema_version_drift_fails(self) -> None:
@@ -232,13 +234,15 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 repo_root
                 / "mechanics"
                 / "federation-seams"
+                / "parts"
+                / "rpg-runtime"
                 / "docs"
                 / "RPG_RUNTIME_COLLECTIONS.md"
             ).unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
+            any("mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
         )
 
     def test_generated_collection_schema_version_drift_fails(self) -> None:
@@ -269,12 +273,12 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml",
                 (repo_root / "quests" / "ABYSS-STACK-Q-0006.yaml")
                 .read_text(encoding="utf-8")
-                .replace("ref: mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md", "ref: mechanics/federation-seams/docs/RPG_ROUTE_API_SEAM.md"),
+                .replace("ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_ROUTE_API_SEAM.md"),
             )
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("ABYSS-STACK-Q-0006 must stay anchored to mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
+            any("ABYSS-STACK-Q-0006 must stay anchored to mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md" in error for error in errors)
         )
 
     def test_diagnostic_spine_anchor_drift_fails(self) -> None:
@@ -285,7 +289,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml",
                 (repo_root / "quests" / "ABYSS-STACK-Q-0007.yaml")
                 .read_text(encoding="utf-8")
-                .replace("ref: mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/docs/RPG_RUNTIME_COLLECTIONS.md"),
+                .replace("ref: mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"),
             )
             errors = self.validate_surface(repo_root)
 

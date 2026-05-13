@@ -17,7 +17,7 @@ Examples include:
 - inference path degradation
 - runtime-vs-source path confusion that risks unsafe edits
 
-## Wave-2 contracts
+## Receipt contracts
 
 This wave introduces two owner-local receipt families:
 
@@ -31,14 +31,14 @@ Together they should answer:
 - what unsafe repair remained blocked
 - what reviewed closeout happened afterward
 
-## Legacy Example Families
+## Example Families
 
 The first bounded chaos wave uses the current contracts through named example
 families:
 
-- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`
-- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`
-- `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`
+- `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json`
+- `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json`
+- `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.retrieval-outage-honesty.example.json`
 
 Use those examples to exercise timeout, honest degradation, and retrieval
 outage posture without widening runtime behavior or introducing a live harness.

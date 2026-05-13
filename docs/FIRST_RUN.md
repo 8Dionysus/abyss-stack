@@ -9,7 +9,7 @@ This guide is the shortest careful path from a source checkout to a running loca
 - `rsync` is available
 - the runtime root should be `/srv/AbyssOS/abyss-stack`
 
-If you are starting from Windows, read [WINDOWS_SETUP](../mechanics/machine-fit/docs/WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
+If you are starting from Windows, read [WINDOWS_SETUP](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
 
 ## Fast path
 
@@ -200,8 +200,8 @@ Then read:
 - [RUNBOOK](RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
 - [DOCTOR](../mechanics/diagnostic-spine/docs/DOCTOR.md)
-- [REFERENCE_PLATFORM_SPEC](../mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md)
-- [MACHINE_FIT_POLICY](../mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md)
+- [REFERENCE_PLATFORM_SPEC](../mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md)
+- [MACHINE_FIT_POLICY](../mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md)
 - [PRESETS](PRESETS.md)
 - [PROFILE_RECIPES](PROFILE_RECIPES.md)
 - [RENDER_TRUTH](../mechanics/config-projection/docs/RENDER_TRUTH.md)

@@ -60,7 +60,7 @@
   },
   "host_facts_ref": "repo:mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json",
   "evidence_refs": [
-    "repo:mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md",
+    "repo:mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md",
     "local:${AOA_STACK_ROOT}/Logs/host-facts/latest.private.json"
   ],
   "portability": {

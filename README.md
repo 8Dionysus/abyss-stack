@@ -20,12 +20,12 @@ Read in this order:
 
 Then branch by need:
 
-- **Windows host and WSL bridge**: [Windows bridge](mechanics/machine-fit/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/docs/WINDOWS_PERFORMANCE.md)
-- **host posture and machine facts**: [reference platform](mechanics/machine-fit/docs/REFERENCE_PLATFORM.md), [reference platform spec](mechanics/machine-fit/docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md), [machine fit policy](mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md), [platform adaptation policy](mechanics/machine-fit/docs/PLATFORM_ADAPTATION_POLICY.md)
+- **Windows host and WSL bridge**: [Windows bridge](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md)
+- **host posture and machine facts**: [reference platform](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md), [reference platform spec](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md), [machine fit policy](mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md), [platform adaptation policy](mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [runtime bench policy](mechanics/inference-pilots/docs/RUNTIME_BENCH_POLICY.md), [winner promotion loop](mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [llama.cpp pilot](mechanics/inference-pilots/docs/LLAMACPP_PILOT.md), [local AI trials](mechanics/inference-pilots/docs/LOCAL_AI_TRIALS.md), [model profiles](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_PROFILES.md), [model cards](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md), [context budget policy](mechanics/governed-execution/docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [branch policy](docs/BRANCH_POLICY.md), [recurrence runtime policy](mechanics/governed-execution/docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [repair-safe closeout](mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md)
-- **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/docs/VIA_NEGATIVA_CHECKLIST.md)
+- **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [repair-safe closeout](mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/docs/DIAGNOSTIC_SPINE.md)
+- **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/parts/antifragility-posture/docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 
 ## What this repository is for
@@ -102,19 +102,19 @@ Antifragility repair posture stays contract-only in this repository. It adds
 runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
-Current contract surfaces are `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`,
+Current contract surfaces are `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`,
 `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
-`mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`,
-`mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
-`mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
-`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`, and
-`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.example.json`.
-Legacy chaos family examples also now include
-`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`,
-`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`,
-`mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
-`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
-`mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`.
+`mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`,
+`mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json`,
+`mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json`,
+`mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.example.json`, and
+`mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.example.json`.
+Chaos receipt examples also now include
+`mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json`,
+`mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json`,
+`mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.retrieval-outage-honesty.example.json`,
+`mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json`, and
+`mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json`.
 
 Diagnostic spine groundwork now includes a read-only `aoa-diagnose` seam in
 this repository. It adds a runtime-owned diagnostic read model, tracked quest

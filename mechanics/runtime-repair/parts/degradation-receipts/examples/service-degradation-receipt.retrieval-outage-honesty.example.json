@@ -21,7 +21,7 @@
   "evidence_refs": [
     "python scripts/validate_stack.py#retrieval-outage-honesty-example",
     "python scripts/validate_stack.py --parity-check#retrieval-outage-honesty-example",
-    "repo:abyss-stack/mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md#mirror-and-export-only"
+    "repo:abyss-stack/mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md#mirror-and-export-only"
   ],
   "host_facts_refs": [
     "generated/host_facts.current.json#machine:fedora-workstation"

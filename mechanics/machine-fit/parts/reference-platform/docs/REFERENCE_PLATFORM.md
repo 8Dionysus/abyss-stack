@@ -14,8 +14,9 @@ This file is normative. It names the intended operating posture.
 
 Observed machine facts belong to the machine-readable host-facts layer described in [REFERENCE_PLATFORM_SPEC](REFERENCE_PLATFORM_SPEC.md).
 The stack-side route into the host control plane belongs to
-[mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md](../parts/machine-bridge/docs/MACHINE_BRIDGE.md).
-The current-host runtime choice belongs to [MACHINE_FIT_POLICY](MACHINE_FIT_POLICY.md).
+[mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md](../../machine-bridge/docs/MACHINE_BRIDGE.md).
+The current-host runtime choice belongs to
+[MACHINE_FIT_POLICY](../../fit-record/docs/MACHINE_FIT_POLICY.md).
 
 Recommended local review flow:
 

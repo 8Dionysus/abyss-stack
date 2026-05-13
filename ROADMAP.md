@@ -48,20 +48,20 @@ AoA or ToS meaning. Its current checked surface is:
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py`, and
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py`
 - antifragility contract-only runtime receipts:
-  `mechanics/runtime-repair/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
-  `mechanics/runtime-repair/docs/REPAIR_SAFE_CLOSEOUT.md`,
-  `mechanics/runtime-repair/legacy/artifacts/schemas/service_degradation_receipt_v1.json`,
-  `mechanics/runtime-repair/legacy/artifacts/schemas/repair_safe_closeout_receipt_v1.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.example.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.timeout-chaos.example.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.honest-degradation.example.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/service_degradation_receipt.retrieval-outage-honesty.example.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.example.json`,
-  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.timeout-chaos.example.json`, and
-  `mechanics/runtime-repair/legacy/artifacts/examples/repair_safe_closeout_receipt.retrieval-outage-honesty.example.json`
+  `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
+  `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`,
+  `mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json`,
+  `mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json`,
+  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.example.json`,
+  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json`,
+  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json`,
+  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.retrieval-outage-honesty.example.json`,
+  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.example.json`,
+  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json`, and
+  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json`
 - promoted local-worker and Intel serving posture:
   `mechanics/inference-pilots/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `mechanics/inference-pilots/docs/LLAMACPP_PILOT.md`,
-  `mechanics/machine-fit/docs/MACHINE_FIT_POLICY.md`,
+  `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`,
   `mechanics/inference-pilots/legacy/raw/W5_PILOT.md`,
   `mechanics/inference-pilots/legacy/raw/W6_PILOT.md`,
   `scripts/aoa-long-horizon-pilot`,
@@ -72,10 +72,10 @@ AoA or ToS meaning. Its current checked surface is:
   `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md`, and
   `scripts/aoa-llamacpp-pilot`
 - bounded federation, runtime-chat, and ToS graph curation seams:
-  `mechanics/federation-seams/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md`,
-  `mechanics/federation-seams/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/docs/KAG_RUNTIME_SEAM.md`,
+  `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md`,
+  `mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`,
   `docs/SERVICE_CATALOG.md`, `docs/PROFILES.md`,
-  `mechanics/federation-seams/docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
+  `mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
   `compose/modules/52-tos-graph.yml`, `compose/profiles/curation.txt`, and
   `config-templates/Services/tos-graph/app/main.py`
 

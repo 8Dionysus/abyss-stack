@@ -21,7 +21,7 @@
   "evidence_refs": [
     "python scripts/validate_stack.py#honest-degradation-example",
     "bash:/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-status --autonomy --json#honest-degradation-example",
-    "repo:abyss-stack/mechanics/federation-seams/docs/EVAL_RUNTIME_SEAM.md#bounded-export-only"
+    "repo:abyss-stack/mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md#bounded-export-only"
   ],
   "host_facts_refs": [
     "generated/host_facts.current.json#machine:fedora-workstation"
