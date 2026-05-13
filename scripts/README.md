@@ -7,10 +7,9 @@ These files stay at the source root because deployment sync copies them into
 the runtime `Configs/scripts/` command surface. Mechanic pages own the meaning
 and part routes; this directory owns stable command entrypoints.
 
-For config-projection and runtime-lifecycle commands, root files are thin
-wrappers. The implementation bodies live under the owning
-`mechanics/<package>/parts/<part>/` routes and are still synced into deployed
-`Configs/` with the wrappers.
+All operator command files at this root are thin wrappers. The implementation
+bodies live under the owning `mechanics/<package>/parts/<part>/` routes and are
+still synced into deployed `Configs/` with the wrappers.
 
 ## Command Groups
 
@@ -19,12 +18,12 @@ wrappers. The implementation bodies live under the owning
 | Layout and sync | `aoa-install-layout`, `aoa-sync-configs`, `aoa-bootstrap-configs`, `aoa-check-layout`, `aoa-first-run` | [config projection](../mechanics/config-projection/README.md), [runtime lifecycle](../mechanics/runtime-lifecycle/README.md); implementations under `mechanics/config-projection/parts/{bootstrap,sync}/` and `mechanics/runtime-lifecycle/parts/{layout-install,first-run-bootstrap}/` |
 | Lifecycle wrappers | `aoa-up`, `aoa-down`, `aoa-warmup`, `aoa-status`, `aoa-logs`, `aoa-wait`, `aoa-smoke`, `aoa-install-systemd` | [runtime lifecycle](../mechanics/runtime-lifecycle/README.md); implementations under `mechanics/runtime-lifecycle/parts/{start-stop,logs-status,wait-smoke,user-unit}/` |
 | Compose introspection | `aoa-preset-profiles`, `aoa-profile-modules`, `aoa-profile-endpoints`, `aoa-render-services`, `aoa-render-config` | [config projection rendering](../mechanics/config-projection/parts/rendering/README.md); implementations under `mechanics/config-projection/parts/rendering/` |
-| Diagnostics | `aoa-doctor`, `aoa-diagnose`, `aoa-internal-probes`, `build_diagnostic_surface_catalog.py`, `validate_diagnostic_surface_catalog.py` | [diagnostic spine](../mechanics/diagnostic-spine/README.md) |
-| Machine fit | `aoa-host-facts`, `aoa-machine-bridge`, `aoa-machine-fit`, `aoa-platform-adaptation` | [machine fit](../mechanics/machine-fit/README.md) |
-| Inference pilots | `aoa-qwen-run`, `aoa-qwen-check`, `aoa-qwen-bench`, `aoa-llamacpp-pilot`, `aoa-langgraph-pilot`, `aoa-local-ai-trials`, `aoa-long-horizon-pilot`, `aoa-bounded-autonomy-pilot`, `aoa-runtime-bench-index` | [inference pilots](../mechanics/inference-pilots/README.md) |
-| Governed execution | `aoa-governed-run`, `aoa-export-memo-candidate`, `aoa-export-runtime-evidence-selection`, `aoa-export-artifact-hook-candidate`, `aoa-run-memo-contradiction-integrity` | [governed execution](../mechanics/governed-execution/README.md) |
-| Federation and RPG seams | `aoa-federated-check`, `aoa-sync-federation-surfaces`, `aoa-rpg-runtime-projection` | [federation seams](../mechanics/federation-seams/README.md) |
-| Repair adapters | `aoa-a2a-return-closeout-dry-run` | [runtime repair](../mechanics/runtime-repair/README.md) |
+| Diagnostics | `aoa-doctor`, `aoa-diagnose`, `aoa-internal-probes`, `build_diagnostic_surface_catalog.py`, `validate_diagnostic_surface_catalog.py` | [diagnostic spine](../mechanics/diagnostic-spine/README.md); command backends under diagnostic-spine and runtime-lifecycle parts |
+| Machine fit | `aoa-host-facts`, `aoa-machine-bridge`, `aoa-machine-fit`, `aoa-platform-adaptation` | [machine fit](../mechanics/machine-fit/README.md); command backends under `mechanics/machine-fit/parts/` |
+| Inference pilots | `aoa-qwen-run`, `aoa-qwen-check`, `aoa-qwen-bench`, `aoa-llamacpp-pilot`, `aoa-langgraph-pilot`, `aoa-local-ai-trials`, `aoa-long-horizon-pilot`, `aoa-bounded-autonomy-pilot`, `aoa-runtime-bench-index` | [inference pilots](../mechanics/inference-pilots/README.md); command backends under `mechanics/inference-pilots/parts/` |
+| Governed execution | `aoa-governed-run`, `aoa-export-memo-candidate`, `aoa-export-runtime-evidence-selection`, `aoa-export-artifact-hook-candidate`, `aoa-run-memo-contradiction-integrity` | [governed execution](../mechanics/governed-execution/README.md); command backends under governed-execution and runtime-repair parts |
+| Federation and RPG seams | `aoa-federated-check`, `aoa-sync-federation-surfaces`, `aoa-rpg-runtime-projection` | [federation seams](../mechanics/federation-seams/README.md); command backends under `mechanics/federation-seams/parts/` |
+| Repair adapters | `aoa-a2a-return-closeout-dry-run` | [runtime repair](../mechanics/runtime-repair/README.md); command backend under `mechanics/runtime-repair/parts/` |
 | Repository validation | `validate_stack.py`, `validate_nested_agents.py`, `release_check.py` | root `AGENTS.md`, [mechanics artifact topology](../mechanics/ARTIFACT_TOPOLOGY.md) |
 | Windows bridge | `aoa.ps1`, `aoa-doctor-win.ps1`, `aoa-bootstrap-wsl.ps1` | [machine-fit windows bridge](../mechanics/machine-fit/parts/windows-bridge/README.md) |
 

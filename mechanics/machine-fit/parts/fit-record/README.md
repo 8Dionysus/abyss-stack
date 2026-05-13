@@ -13,6 +13,7 @@ Surfaces:
 - `docs/MACHINE_FIT_POLICY.md` - bounded current-host fit policy
 - `schemas/schema.v1.json` - machine-readable contract
 - `examples/machine-fit.public.json.example` - public-safe example shape
+- `aoa_machine_fit.py` - part-local backend for `scripts/aoa-machine-fit`
 
 Private captures belong under:
 - `${AOA_STACK_ROOT}/Logs/machine-fit/`

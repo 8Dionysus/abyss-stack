@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python "$repo_root/mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w5-pilot" "$@"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/../mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh" "$@"

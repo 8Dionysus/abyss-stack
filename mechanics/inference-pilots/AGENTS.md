@@ -8,6 +8,11 @@ benchmarks, model profiles, and trial evidence.
 Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
 `PARTS.md`, and `parts/README.md` before editing.
 
+Stable operator wrappers such as `scripts/aoa-llamacpp-pilot`,
+`scripts/aoa-qwen-run`, and `scripts/aoa-local-ai-trials` stay at the root
+command surface; their implementation bodies belong under this package's
+part-local backend paths.
+
 Do not promote a model, tuning overlay, or worker path without recorded evidence
 and a runtime check.
 
@@ -16,7 +21,9 @@ Validation:
 ```bash
 python scripts/validate_stack.py
 python -m pytest mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py -q
-bash -n scripts/aoa-llamacpp-pilot scripts/aoa-qwen-run scripts/aoa-qwen-bench scripts/aoa-local-ai-trials scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
+python -m py_compile mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_check.py mechanics/inference-pilots/parts/local-trials/aoa_local_ai_trials.py mechanics/inference-pilots/parts/langgraph-pilot/aoa_langgraph_pilot.py mechanics/inference-pilots/parts/promotion-loop/aoa_runtime_bench_index.py
+bash -n scripts/aoa-qwen-bench scripts/aoa-long-horizon-pilot scripts/aoa-bounded-autonomy-pilot
+bash -n mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh
 python -m py_compile mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w5-pilot mechanics/inference-pilots/legacy/artifacts/scripts/aoa-w6-pilot
 ```
 

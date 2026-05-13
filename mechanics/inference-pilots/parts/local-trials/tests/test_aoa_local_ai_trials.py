@@ -11,7 +11,14 @@ from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-MODULE_PATH = REPO_ROOT / "scripts" / "aoa-local-ai-trials"
+MODULE_PATH = (
+    REPO_ROOT
+    / "mechanics"
+    / "inference-pilots"
+    / "parts"
+    / "local-trials"
+    / "aoa_local_ai_trials.py"
+)
 
 
 def load_module():

@@ -38,8 +38,26 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
         backend_rel: str,
         errors: list[str],
     ) -> None:
+        scripts_dir = repo_root / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        pilot_backend_rel = "mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py"
+        pilot_backend = repo_root / pilot_backend_rel
+        pilot_backend.parent.mkdir(parents=True, exist_ok=True)
+        pilot_backend.write_text(
+            'podman", "network", "connect"\nabyss_default\n',
+            encoding="utf-8",
+        )
+        pilot_backend.chmod(0o755)
+        (scripts_dir / "aoa-llamacpp-pilot").write_text(
+            f"#!/usr/bin/env python3\n# ../{pilot_backend_rel}\n",
+            encoding="utf-8",
+        )
+        (scripts_dir / "aoa-llamacpp-pilot").chmod(0o755)
         required_scripts = {"aoa-check-layout", "aoa-llamacpp-pilot"}
-        backend_scripts = {"aoa-check-layout": backend_rel}
+        backend_scripts = {
+            "aoa-check-layout": backend_rel,
+            "aoa-llamacpp-pilot": pilot_backend_rel,
+        }
         with patch.object(validate_stack, "ROOT", repo_root):
             with patch.object(validate_stack, "REQUIRED_SCRIPTS", required_scripts):
                 with patch.object(validate_stack, "OPERATOR_BACKEND_SCRIPTS", backend_scripts):
@@ -49,6 +67,12 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
         errors: list[str] = []
         validate_stack.validate_required_files(errors)
         self.assertEqual(errors, [])
+
+    def test_required_operator_scripts_have_backend_routes(self) -> None:
+        self.assertEqual(
+            validate_stack.REQUIRED_SCRIPTS,
+            set(validate_stack.OPERATOR_BACKEND_SCRIPTS),
+        )
 
     def test_missing_aoa_browser_template_files_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -164,6 +188,49 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
             errors,
         )
+
+    def test_powershell_operator_backend_does_not_require_posix_executable_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            scripts_dir = repo_root / "scripts"
+            backend_rel = "mechanics/machine-fit/parts/windows-bridge/aoa_doctor_win.ps1"
+            backend = repo_root / backend_rel
+            backend.parent.mkdir(parents=True)
+            scripts_dir.mkdir(parents=True)
+            backend.write_text("Write-Host 'ok'\n", encoding="utf-8")
+            backend.chmod(0o644)
+            (scripts_dir / "aoa-doctor-win.ps1").write_text(
+                f"$Backend = Join-Path $PSScriptRoot \"../{backend_rel}\"\n",
+                encoding="utf-8",
+            )
+            pilot_backend_rel = "mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py"
+            pilot_backend = repo_root / pilot_backend_rel
+            pilot_backend.parent.mkdir(parents=True)
+            pilot_backend.write_text(
+                'podman", "network", "connect"\nabyss_default\n',
+                encoding="utf-8",
+            )
+            pilot_backend.chmod(0o755)
+            (scripts_dir / "aoa-llamacpp-pilot").write_text(
+                f"#!/usr/bin/env python3\n# ../{pilot_backend_rel}\n",
+                encoding="utf-8",
+            )
+            (scripts_dir / "aoa-llamacpp-pilot").chmod(0o755)
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-doctor-win.ps1", "aoa-llamacpp-pilot"}):
+                    with patch.object(
+                        validate_stack,
+                        "OPERATOR_BACKEND_SCRIPTS",
+                        {
+                            "aoa-doctor-win.ps1": backend_rel,
+                            "aoa-llamacpp-pilot": pilot_backend_rel,
+                        },
+                    ):
+                        validate_stack.validate_scripts(errors)
+
+        self.assertEqual(errors, [])
 
     def test_operator_wrapper_must_point_to_backend(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

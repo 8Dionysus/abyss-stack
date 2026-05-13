@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${AOA_SOURCE_ROOT:-$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)}"
+# shellcheck source=scripts/aoa-lib.sh
+source "${REPO_ROOT}/scripts/aoa-lib.sh"
+
+repeat=2
+timeout_s=90
+write_root="${AOA_STACK_ROOT}/Logs/runtime-benchmarks"
+run_url="http://127.0.0.1:5403/run"
+backend_label="langchain-api-llamacpp -> llama.cpp-openai"
+model_label="qwen3.5:9b"
+runtime_variant="Q4_K_M via llama.cpp sidecar"
+target_label="workhorse-local-qwen3.5-9b-llamacpp"
+selector_args=()
+
+while (($#)); do
+  case "$1" in
+    --repeat)
+      shift || true
+      (($#)) || aoa_die "missing value after --repeat"
+      repeat="$1"
+      ;;
+    --repeat=*)
+      repeat="${1#*=}"
+      ;;
+    --timeout)
+      shift || true
+      (($#)) || aoa_die "missing value after --timeout"
+      timeout_s="$1"
+      ;;
+    --timeout=*)
+      timeout_s="${1#*=}"
+      ;;
+    --write-root)
+      shift || true
+      (($#)) || aoa_die "missing value after --write-root"
+      write_root="$1"
+      ;;
+    --write-root=*)
+      write_root="${1#*=}"
+      ;;
+    --url)
+      shift || true
+      (($#)) || aoa_die "missing value after --url"
+      run_url="$1"
+      ;;
+    --url=*)
+      run_url="${1#*=}"
+      ;;
+    --backend-label)
+      shift || true
+      (($#)) || aoa_die "missing value after --backend-label"
+      backend_label="$1"
+      ;;
+    --backend-label=*)
+      backend_label="${1#*=}"
+      ;;
+    --model-label)
+      shift || true
+      (($#)) || aoa_die "missing value after --model-label"
+      model_label="$1"
+      ;;
+    --model-label=*)
+      model_label="${1#*=}"
+      ;;
+    --runtime-variant)
+      shift || true
+      (($#)) || aoa_die "missing value after --runtime-variant"
+      runtime_variant="$1"
+      ;;
+    --runtime-variant=*)
+      runtime_variant="${1#*=}"
+      ;;
+    --target-label)
+      shift || true
+      (($#)) || aoa_die "missing value after --target-label"
+      target_label="$1"
+      ;;
+    --target-label=*)
+      target_label="${1#*=}"
+      ;;
+    *)
+      selector_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${selector_args[@]}"
+aoa_resolve_modules
+aoa_print_profile_summary
+
+has_module() {
+  local target="$1"
+  local module
+  for module in "${AOA_PROFILE_MODULE_NAMES[@]}"; do
+    [[ "$module" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+has_module "41-agent-api.yml" || aoa_die "qwen bench requires 41-agent-api.yml in the selected runtime"
+
+timestamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
+run_dir="${write_root}/runs/${timestamp}__latency-single-turn__${target_label}"
+mkdir -p "${run_dir}/raw"
+
+export AOA_QWEN_BENCH_REPEAT="$repeat"
+export AOA_QWEN_BENCH_TIMEOUT_S="$timeout_s"
+export AOA_QWEN_BENCH_URL="$run_url"
+export AOA_QWEN_BENCH_PRESET="$AOA_STACK_PRESET"
+export AOA_QWEN_BENCH_PROFILE="$AOA_STACK_PROFILE"
+export AOA_QWEN_BENCH_RUN_DIR="$run_dir"
+export AOA_QWEN_CHECK_PATH="${REPO_ROOT}/scripts/aoa-qwen-check"
+export AOA_QWEN_BENCH_BACKEND_LABEL="$backend_label"
+export AOA_QWEN_BENCH_MODEL_LABEL="$model_label"
+export AOA_QWEN_BENCH_RUNTIME_VARIANT="$runtime_variant"
+export AOA_QWEN_BENCH_TARGET_LABEL="$target_label"
+
+python3 - <<'PY'
+from __future__ import annotations
+
+import json
+import os
+import platform
+import statistics
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+repeat = int(os.environ["AOA_QWEN_BENCH_REPEAT"])
+timeout_s = float(os.environ["AOA_QWEN_BENCH_TIMEOUT_S"])
+run_url = os.environ["AOA_QWEN_BENCH_URL"]
+preset = os.environ.get("AOA_QWEN_BENCH_PRESET", "")
+profile = os.environ.get("AOA_QWEN_BENCH_PROFILE", "")
+run_dir = Path(os.environ["AOA_QWEN_BENCH_RUN_DIR"])
+check_path = os.environ["AOA_QWEN_CHECK_PATH"]
+backend_label = os.environ.get("AOA_QWEN_BENCH_BACKEND_LABEL", "langchain-api-llamacpp -> llama.cpp-openai")
+model_label = os.environ.get("AOA_QWEN_BENCH_MODEL_LABEL", "qwen3.5:9b")
+runtime_variant = os.environ.get("AOA_QWEN_BENCH_RUNTIME_VARIANT", "Q4_K_M via llama.cpp sidecar")
+target_label = os.environ.get("AOA_QWEN_BENCH_TARGET_LABEL", "workhorse-local-qwen3.5-9b-llamacpp")
+cases = ["exact-reply", "repo-routing", "repo-choice", "json-decision"]
+warmup_runs_per_case = 1
+
+
+def maybe_cpu_model() -> str | None:
+    try:
+        output = subprocess.run(
+            ["lscpu"],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout.splitlines()
+    except Exception:
+        return None
+
+    for line in output:
+        if line.startswith("Model name:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+raw_results: list[dict[str, object]] = []
+warmup_results: list[dict[str, object]] = []
+all_passed = True
+
+for case in cases:
+    for warmup_index in range(1, warmup_runs_per_case + 1):
+        proc = subprocess.run(
+            [
+                check_path,
+                "--case",
+                case,
+                "--url",
+                run_url,
+                "--timeout",
+                str(timeout_s),
+                "--json",
+            ],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        stdout = proc.stdout.strip()
+        if not stdout:
+            result = {
+                "ok": False,
+                "case": case,
+                "error": f"empty_stdout exit={proc.returncode}",
+            }
+        else:
+            result = json.loads(stdout)
+        result["warmup_index"] = warmup_index
+        result["phase"] = "warmup"
+        warmup_results.append(result)
+        if not result.get("ok"):
+            all_passed = False
+
+    for run_index in range(1, repeat + 1):
+        proc = subprocess.run(
+            [
+                check_path,
+                "--case",
+                case,
+                "--url",
+                run_url,
+                "--timeout",
+                str(timeout_s),
+                "--json",
+            ],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        stdout = proc.stdout.strip()
+        if not stdout:
+            result: dict[str, object] = {
+                "ok": False,
+                "case": case,
+                "error": f"empty_stdout exit={proc.returncode}",
+            }
+        else:
+            result = json.loads(stdout)
+        result["run_index"] = run_index
+        result["phase"] = "measured"
+        raw_results.append(result)
+        if not result.get("ok"):
+            all_passed = False
+
+summary_cases: dict[str, object] = {}
+elapsed_all: list[float] = []
+for case in cases:
+    case_rows = [row for row in raw_results if row.get("case") == case]
+    elapsed_values = [
+        float(row["elapsed_s"])
+        for row in case_rows
+        if row.get("ok") and row.get("elapsed_s") is not None
+    ]
+    elapsed_all.extend(elapsed_values)
+    summary_cases[case] = {
+        "runs": len(case_rows),
+        "passed": sum(1 for row in case_rows if row.get("ok")),
+        "mean_s": round(statistics.mean(elapsed_values), 3) if elapsed_values else None,
+        "best_s": round(min(elapsed_values), 3) if elapsed_values else None,
+        "worst_s": round(max(elapsed_values), 3) if elapsed_values else None,
+    }
+
+captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+benchmark_id = f"{target_label}-langchain-latency-single-turn"
+selection = {"preset": preset or None, "profile": profile or None}
+truth_refs = []
+if preset:
+    truth_refs.append(f"scripts/aoa-render-services --preset {preset}")
+    truth_refs.append(f"scripts/aoa-smoke --with-internal --preset {preset}")
+elif profile:
+    truth_refs.append(f"scripts/aoa-render-services --profile {profile}")
+    truth_refs.append(f"scripts/aoa-smoke --profile {profile}")
+
+manifest = {
+    "artifact_kind": "aoa.runtime-benchmark",
+    "schema_version": "1",
+    "captured_at": captured_at,
+    "benchmark_id": benchmark_id,
+    "benchmark_family": "latency-single-turn",
+    "runtime_selection": selection,
+    "system_under_test": {
+        "backend": backend_label,
+        "model": model_label,
+        "profile_class": "workhorse",
+        "context_budget_class": "bounded-local",
+        "quantization_or_runtime_variant": runtime_variant,
+    },
+    "host_surface": {
+        "os_family": platform.system().lower(),
+        "cpu_model": maybe_cpu_model(),
+    },
+    "runtime_truth_refs": truth_refs,
+    "fixture_surface": {
+        "fixture_family": "qwen-run-path-smoke",
+        "case_count": len(raw_results),
+        "cases": cases,
+        "warmup_runs_per_case": warmup_runs_per_case,
+        "token_budgeting": {
+            "exact-reply": 8,
+            "repo-routing": 120,
+            "repo-choice": 8,
+            "json-decision": 32,
+        },
+    },
+    "metrics": {
+        "units": "seconds",
+        "summary_semantics": "end-to-end POST /run latency through langchain-api",
+    },
+    "warmup_results": warmup_results,
+    "results": raw_results,
+    "summary": {
+        "all_passed": all_passed,
+        "warmup_all_passed": all(row.get("ok") for row in warmup_results),
+        "case_breakdown": summary_cases,
+        "overall_mean_s": round(statistics.mean(elapsed_all), 3) if elapsed_all else None,
+        "overall_best_s": round(min(elapsed_all), 3) if elapsed_all else None,
+        "overall_worst_s": round(max(elapsed_all), 3) if elapsed_all else None,
+    },
+    "non_claims": [
+        "This is a runtime latency check, not a reasoning-quality verdict.",
+        "This does not rank Qwen against other models.",
+        "This does not prove long-context behavior or multi-turn stability.",
+    ],
+}
+
+summary = {
+    "benchmark_id": benchmark_id,
+    "captured_at": captured_at,
+    "all_passed": all_passed,
+    "runtime_selection": selection,
+    "case_breakdown": summary_cases,
+    "overall_mean_s": manifest["summary"]["overall_mean_s"],
+    "overall_best_s": manifest["summary"]["overall_best_s"],
+    "overall_worst_s": manifest["summary"]["overall_worst_s"],
+}
+
+notes = [
+    "# Qwen Runtime Notes",
+    "",
+    "- Bench path: `langchain-api /run`.",
+    "- Fixture family: `exact-reply`, `repo-routing`, `repo-choice`, and `json-decision`.",
+    "- One uncounted warmup run is executed per case before measured repeats.",
+    "- This is runtime-local evidence for `abyss-stack`, not a portable proof verdict.",
+    f"- Serving backend label: `{backend_label}`.",
+    f"- Runtime variant: `{runtime_variant}`.",
+    "- The check stays on the intended chat path instead of raw backend probing.",
+]
+
+(run_dir / "benchmark.manifest.json").write_text(
+    json.dumps(manifest, indent=2, ensure_ascii=True) + "\n",
+    encoding="utf-8",
+)
+(run_dir / "summary.json").write_text(
+    json.dumps(summary, indent=2, ensure_ascii=True) + "\n",
+    encoding="utf-8",
+)
+(run_dir / "raw" / "results.json").write_text(
+    json.dumps(raw_results, indent=2, ensure_ascii=True) + "\n",
+    encoding="utf-8",
+)
+(run_dir / "raw" / "warmup_results.json").write_text(
+    json.dumps(warmup_results, indent=2, ensure_ascii=True) + "\n",
+    encoding="utf-8",
+)
+(run_dir / "notes.md").write_text("\n".join(notes) + "\n", encoding="utf-8")
+
+print(f"run dir: {run_dir}")
+print(json.dumps(summary, ensure_ascii=True))
+sys.exit(0 if all_passed else 1)
+PY

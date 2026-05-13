@@ -11,6 +11,8 @@ meaning.
 - `schemas/` defines item and collection contracts for RPG runtime read models.
 - `examples/` defines public-safe seed items used by
   `scripts/aoa-rpg-runtime-projection`.
+- `aoa_rpg_runtime_projection.py` is the part-local backend for the root
+  wrapper.
 - Generated collections belong in `mechanics/federation-seams/parts/rpg-runtime/generated/`.
 
 Keep root questbook schemas and examples in root `schemas/` and `examples/`

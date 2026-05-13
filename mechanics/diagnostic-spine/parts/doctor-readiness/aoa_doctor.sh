@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${AOA_SOURCE_ROOT:-$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)}"
+# shellcheck source=scripts/aoa-lib.sh
+source "${REPO_ROOT}/scripts/aoa-lib.sh"
+
+strict_mode=0
+selector_args=()
+while (($#)); do
+  case "$1" in
+    --strict)
+      strict_mode=1
+      ;;
+    *)
+      selector_args+=("$1")
+      ;;
+  esac
+  shift || true
+done
+
+aoa_parse_profile_args "${selector_args[@]}"
+aoa_resolve_modules
+aoa_print_profile_summary
+
+errors=0
+warnings=0
+
+doctor_ok() {
+  aoa_note "ok   $1"
+}
+
+doctor_warn() {
+  aoa_note "warn $1"
+  warnings=$((warnings + 1))
+}
+
+doctor_fail() {
+  aoa_note "fail $1"
+  errors=$((errors + 1))
+}
+
+doctor_flag_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+doctor_env_file_value() {
+  local key="$1"
+  local env_file="$2"
+  local raw_line line trimmed value
+
+  [[ -f "$env_file" ]] || return 1
+
+  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+    line="${raw_line%%#*}"
+    trimmed="$(aoa_trim "$line")"
+    [[ -n "$trimmed" ]] || continue
+    [[ "$trimmed" == "${key}="* ]] || continue
+
+    value="${trimmed#*=}"
+    value="$(aoa_trim "$value")"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    printf '%s' "$value"
+    return 0
+  done < "$env_file"
+
+  return 1
+}
+
+doctor_federated_consumer_reason() {
+  local env_file="${AOA_STACK_ROOT}/Secrets/Configs/langchain-api.env"
+  local value
+
+  if has_module "44-llamacpp-agent-sidecar.yml"; then
+    printf '%s' "selected runtime includes 44-llamacpp-agent-sidecar.yml, which hard-enables AOA_FEDERATED_RUN_ENABLED=true"
+    return 0
+  fi
+
+  if ! has_module "41-agent-api.yml"; then
+    return 1
+  fi
+
+  if [[ -n "${AOA_FEDERATED_RUN_ENABLED+x}" ]]; then
+    if doctor_flag_truthy "${AOA_FEDERATED_RUN_ENABLED}"; then
+      printf '%s' "the current shell environment enables AOA_FEDERATED_RUN_ENABLED=true"
+      return 0
+    fi
+    return 1
+  fi
+
+  if value="$(doctor_env_file_value "AOA_FEDERATED_RUN_ENABLED" "$env_file")"; then
+    if doctor_flag_truthy "$value"; then
+      printf '%s' "the langchain-api runtime secret enables AOA_FEDERATED_RUN_ENABLED=true"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+check_required_cmd() {
+  local name="$1"
+  if command -v "$name" >/dev/null 2>&1; then
+    doctor_ok "cmd  $name"
+  else
+    doctor_fail "cmd  $name not found"
+  fi
+}
+
+has_module() {
+  local target="$1"
+  local module
+  for module in "${AOA_PROFILE_MODULE_NAMES[@]}"; do
+    [[ "$module" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+uname_s="$(uname -s)"
+aoa_note "stack root: ${AOA_STACK_ROOT}"
+aoa_note "configs root: ${AOA_CONFIGS_ROOT}"
+aoa_note "vault root: ${AOA_VAULT_ROOT}"
+
+if [[ "$uname_s" == "Linux" ]]; then
+  doctor_ok "platform Linux"
+else
+  doctor_warn "platform ${uname_s}; Fedora-first runtime expects Linux"
+fi
+
+if [[ "${AOA_STACK_ROOT}" == "/srv/AbyssOS/abyss-stack" ]]; then
+  doctor_ok "canonical stack root ${AOA_STACK_ROOT}"
+else
+  doctor_warn "non-canonical stack root ${AOA_STACK_ROOT}"
+fi
+
+check_required_cmd podman
+check_required_cmd rsync
+check_required_cmd curl
+
+if podman compose version >/dev/null 2>&1; then
+  doctor_ok "compose backend podman compose"
+elif command -v podman-compose >/dev/null 2>&1; then
+  doctor_ok "compose backend podman-compose"
+else
+  doctor_fail "compose backend unavailable"
+fi
+
+if podman info >/dev/null 2>&1; then
+  doctor_ok "podman info"
+else
+  doctor_warn "podman installed but not currently usable"
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user show-environment >/dev/null 2>&1; then
+    doctor_ok "systemctl --user"
+  else
+    doctor_warn "systemctl exists but user instance unavailable"
+  fi
+else
+  doctor_warn "systemctl not found"
+fi
+
+if has_module "31-intel-inference.yml"; then
+  if [[ -e /dev/dri ]]; then
+    doctor_ok "/dev/dri present for intel-aware selection"
+  else
+    doctor_warn "/dev/dri missing; selected preset/profile includes Intel-aware inference"
+  fi
+else
+  doctor_ok "intel device not required for current selection"
+fi
+
+if has_module "51-browser-tools.yml" || has_module "60-monitoring.yml"; then
+  doctor_ok "internal-only services selected; use aoa-smoke --with-internal after startup"
+fi
+
+federated_consumer_reason=""
+if ! has_module "43-federation-router.yml" && federated_consumer_reason="$(doctor_federated_consumer_reason)"; then
+  doctor_warn "federated advisory consumer is enabled but the federation profile is not selected; ${federated_consumer_reason}. Add --profile federation or use agent-federation/intel-federation before startup, or disable AOA_FEDERATED_RUN_ENABLED"
+fi
+
+machine_fit_path="${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
+if [[ -f "${machine_fit_path}" ]]; then
+  doctor_ok "machine-fit record ${machine_fit_path}"
+else
+  doctor_warn "machine-fit record missing; run ${AOA_CONFIGS_ROOT}/scripts/aoa-machine-fit after bootstrap"
+fi
+
+machine_bridge_path="${AOA_STACK_ROOT}/Logs/machine-bridge/latest/latest.private.json"
+if command -v abyss-machine >/dev/null 2>&1; then
+  if bridge_payload="$(abyss-machine stack-bridge validate --json 2>/dev/null)" \
+    && python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)' <<<"${bridge_payload}"; then
+    doctor_ok "abyss-machine stack bridge validates"
+  else
+    doctor_warn "abyss-machine stack bridge did not validate; run abyss-machine stack-bridge validate --json"
+  fi
+  if [[ -f "${machine_bridge_path}" ]]; then
+    doctor_ok "machine-bridge record ${machine_bridge_path}"
+  else
+    doctor_warn "machine-bridge record missing; run ${AOA_CONFIGS_ROOT}/scripts/aoa-machine-bridge --write-latest"
+  fi
+else
+  doctor_warn "abyss-machine command not found; stack-side machine bridge is unavailable on this host"
+fi
+
+if [[ -r /proc/loadavg ]]; then
+  load_1m="$(awk '{print $1}' /proc/loadavg 2>/dev/null || true)"
+  cpu_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  if [[ -n "${load_1m}" && -n "${cpu_count}" ]]; then
+    if python3 - "$load_1m" "$cpu_count" <<'PY'
+import sys
+load = float(sys.argv[1])
+cpus = int(sys.argv[2])
+sys.exit(0 if load > (cpus * 0.50) else 1)
+PY
+    then
+      doctor_warn "host loadavg ${load_1m} is noisy for latency-sensitive trials on ${cpu_count} logical CPUs"
+    else
+      doctor_ok "host load envelope looks reasonable for latency-sensitive work"
+    fi
+  fi
+fi
+
+if command -v findmnt >/dev/null 2>&1; then
+  if findmnt "${AOA_VAULT_ROOT}" >/dev/null 2>&1; then
+    doctor_ok "vault mount ${AOA_VAULT_ROOT}"
+  else
+    doctor_warn "vault mount ${AOA_VAULT_ROOT} not present"
+  fi
+else
+  doctor_warn "findmnt not found; cannot check vault mount"
+fi
+
+if ((errors > 0)); then
+  aoa_die "doctor found ${errors} hard errors"
+fi
+
+if ((strict_mode)) && ((warnings > 0)); then
+  aoa_die "doctor found ${warnings} warnings in strict mode"
+fi
+
+aoa_note "doctor check passed"
+if ((warnings > 0)); then
+  aoa_note "warnings: ${warnings}"
+fi

@@ -47,6 +47,7 @@ jobs:
             scripts/aoa-profile-modules \
             scripts/aoa-profile-endpoints \
             scripts/aoa-internal-probes \
+            scripts/aoa-qwen-bench \
             scripts/aoa-long-horizon-pilot \
             scripts/aoa-bounded-autonomy-pilot \
             scripts/aoa-render-services \
@@ -64,6 +65,12 @@ jobs:
             mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh \
             mechanics/config-projection/parts/rendering/aoa_render_services.sh \
             mechanics/config-projection/parts/rendering/aoa_render_config.sh \
+            mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh \
+            mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh \
+            mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh \
+            mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh \
+            mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh \
+            mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh \
             mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh \
             mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh \
             mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh \
@@ -72,6 +79,7 @@ jobs:
             mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh \
             mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh \
             mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh \
+            mechanics/runtime-lifecycle/parts/wait-smoke/aoa_internal_probes.sh \
             mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh \
             mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh \
             mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh
@@ -226,7 +234,10 @@ jobs:
           $files = @(
             "scripts/aoa.ps1",
             "scripts/aoa-doctor-win.ps1",
-            "scripts/aoa-bootstrap-wsl.ps1"
+            "scripts/aoa-bootstrap-wsl.ps1",
+            "mechanics/machine-fit/parts/windows-bridge/aoa_windows_bridge.ps1",
+            "mechanics/machine-fit/parts/windows-bridge/aoa_doctor_win.ps1",
+            "mechanics/machine-fit/parts/windows-bridge/aoa_bootstrap_wsl.ps1"
           )
 
           foreach ($file in $files) {

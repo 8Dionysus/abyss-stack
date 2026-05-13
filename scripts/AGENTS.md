@@ -22,17 +22,16 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 16. `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`
 
 ## Directory contract
-- Bash wrappers are operator-facing helpers and should be safe by default.
-- Config-projection and runtime-lifecycle root scripts are stable wrappers;
-  their implementation bodies live under the owning mechanic parts.
+- Root operator scripts are stable wrappers and should be safe by default.
+- Operator implementation bodies live under the owning mechanic parts.
 - Shared env defaults, selector parsing, compose resolution, and probe helpers live in `scripts/aoa-lib.sh`.
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
 - `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
-- `scripts/aoa-host-facts` owns durable machine-readable host-facts capture. Keep it stdlib-only and secret-safe.
-- `scripts/aoa-machine-bridge` owns the stack-side read-only consumer record for `abyss-machine`. Keep it stdlib-only, secret-safe, and non-mutating toward the host.
-- `scripts/aoa-machine-fit` owns the durable bounded record of what the current machine should prefer right now. Keep it stdlib-only and secret-safe.
-- `scripts/aoa-diagnose` owns the read-only runtime diagnostic spine collector, runtime-owned diagnosis companions, explicit `last_good` anchor promotion, explicit `reviewed_diagnosis_ref` bridge writing, and runtime-owned repair handoff artifacts. Keep it stdlib-only and citation-friendly.
-- `scripts/aoa-qwen-run` is the generic bounded prompt runner for `langchain-api /run`. Keep it stdlib-only and local-only.
+- `scripts/aoa-host-facts` routes to `mechanics/machine-fit/parts/host-facts/aoa_host_facts.py`. Keep it stdlib-only and secret-safe.
+- `scripts/aoa-machine-bridge` routes to `mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py`. Keep it stdlib-only, secret-safe, and non-mutating toward the host.
+- `scripts/aoa-machine-fit` routes to `mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py`. Keep it stdlib-only and secret-safe.
+- `scripts/aoa-diagnose` routes through `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh` into the diagnostic Python backend. Keep it stdlib-only and citation-friendly.
+- `scripts/aoa-qwen-run` routes to `mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py`. Keep it stdlib-only and local-only.
 - `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
   are quiet operator bridges into package-local preserved W5/W6 pilot runners.
   Keep the bridge names stable unless the package route changes too.
@@ -70,7 +69,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
-python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py scripts/aoa-host-facts scripts/aoa-machine-bridge scripts/aoa-machine-fit scripts/aoa-qwen-run
+python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py mechanics/machine-fit/parts/host-facts/aoa_host_facts.py mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py
 shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>
 shellcheck scripts/aoa-lib.sh mechanics/<package>/parts/<part>/<touched-backend>.sh
 bash -n scripts/<touched-script> mechanics/<package>/parts/<part>/<touched-backend>.sh

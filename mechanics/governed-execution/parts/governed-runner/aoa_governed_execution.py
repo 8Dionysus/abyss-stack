@@ -155,7 +155,14 @@ MEMO_RUNTIME_WRITEBACK_INTAKE_SOURCE_REF = "aoa-memo/generated/runtime_writeback
 
 
 def load_trials_module() -> Any:
-    target = SCRIPT_ROOT / "scripts" / "aoa-local-ai-trials"
+    target = (
+        SCRIPT_ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "aoa_local_ai_trials.py"
+    )
     loader = importlib.machinery.SourceFileLoader("aoa_local_ai_trials_governed", str(target))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     if spec is None:
