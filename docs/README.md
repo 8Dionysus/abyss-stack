@@ -36,4 +36,3 @@ repository-level entry layer, not a dumping ground for package-local details.
 - [decisions](decisions/README.md)
 
 See [AGENTS.md](AGENTS.md) for editing rules.
-

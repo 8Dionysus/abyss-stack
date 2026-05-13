@@ -13,4 +13,3 @@
 Canonical skill law stays in the owning skill repository. Local files here
 should only adapt that law to source-safe `abyss-stack` runtime contracts and
 current mechanics paths.
-

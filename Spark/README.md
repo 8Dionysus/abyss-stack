@@ -16,4 +16,3 @@ seam.
 
 It must not redesign runtime topology, widen host exposure, commit secrets, or
 claim owner meaning that belongs to sibling AoA or ToS repositories.
-

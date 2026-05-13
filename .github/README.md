@@ -16,4 +16,3 @@ repository docs. It should validate the source checkout; it should not mutate
 deployed runtime state or sibling repositories.
 
 See [AGENTS.md](AGENTS.md) for editing rules.
-
