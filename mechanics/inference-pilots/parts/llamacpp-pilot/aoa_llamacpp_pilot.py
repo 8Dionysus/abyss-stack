@@ -30,7 +30,7 @@ LOCAL_TRIALS_PART = SOURCE_ROOT / "mechanics" / "inference-pilots" / "parts" / "
 if str(LOCAL_TRIALS_PART) not in sys.path:
     sys.path.insert(0, str(LOCAL_TRIALS_PART))
 
-import legacy_trial_adapter as TRIAL_ADAPTER  # noqa: E402
+import trial_compatibility_bridge as TRIAL_ADAPTER  # noqa: E402
 
 STACK_ROOT = Path(os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
 CONFIGS_ROOT = Path(os.environ.get("AOA_CONFIGS_ROOT", str(STACK_ROOT / "Configs")))

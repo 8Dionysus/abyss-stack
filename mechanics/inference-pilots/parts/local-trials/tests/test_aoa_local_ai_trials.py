@@ -35,13 +35,13 @@ def load_module():
 def load_adapter():
     if str(LOCAL_TRIALS_DIR) not in sys.path:
         sys.path.insert(0, str(LOCAL_TRIALS_DIR))
-    import legacy_trial_adapter
+    import trial_compatibility_bridge
 
-    return legacy_trial_adapter
+    return trial_compatibility_bridge
 
 
 class AoALocalAiTrialsTests(unittest.TestCase):
-    def test_legacy_trial_adapter_exposes_role_level_gate_routes(self) -> None:
+    def test_trial_compatibility_bridge_exposes_role_level_gate_routes(self) -> None:
         adapter = load_adapter()
         with tempfile.TemporaryDirectory() as tmpdir:
             log_root = Path(tmpdir)

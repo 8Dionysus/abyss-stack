@@ -30,7 +30,7 @@ The docs case is also used for the explicit pause/resume scenario.
 Install the pilot dependency manifest before use:
 
 ```bash
-python3 -m pip install --user -r scripts/requirements-langgraph-pilot.txt
+python3 -m pip install --user -r mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt
 ```
 
 Use:

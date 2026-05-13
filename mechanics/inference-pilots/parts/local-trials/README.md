@@ -10,8 +10,8 @@ package-local.
 - `aoa_local_ai_trials.py` is the part-local compatibility bridge for
   `scripts/aoa-local-ai-trials`; the preserved runner lives under
   `../../legacy/trials/artifacts/scripts/aoa-local-ai-trials`.
-- `legacy_trial_adapter.py` is the active role-level adapter for callers that
-  need the preserved runner's wire IDs without making archived stage names
+- `trial_compatibility_bridge.py` is the active role-level bridge for callers
+  that need the preserved runner's wire IDs without making archived stage names
   current topology again.
 
 The old step-gated runner implementation and narrative remain routed through

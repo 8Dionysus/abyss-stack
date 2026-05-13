@@ -20,7 +20,7 @@ try:
 except ImportError as exc:  # pragma: no cover - guarded by runtime usage
     raise SystemExit(
         "langgraph is not installed. Install dependencies from "
-        "`scripts/requirements-langgraph-pilot.txt` first."
+        "`mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt` first."
     ) from exc
 
 
@@ -43,7 +43,7 @@ LOCAL_TRIALS_PART = SOURCE_ROOT / "mechanics" / "inference-pilots" / "parts" / "
 if str(LOCAL_TRIALS_PART) not in sys.path:
     sys.path.insert(0, str(LOCAL_TRIALS_PART))
 
-import legacy_trial_adapter as TRIAL_ADAPTER  # noqa: E402
+import trial_compatibility_bridge as TRIAL_ADAPTER  # noqa: E402
 
 EDIT_GATE_WIRE_ID = TRIAL_ADAPTER.EDIT_GATE.wire_id
 EDIT_GATE_INDEX_NAME = TRIAL_ADAPTER.EDIT_GATE_INDEX_STEM

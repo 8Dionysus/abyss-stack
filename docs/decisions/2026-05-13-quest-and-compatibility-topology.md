@@ -29,7 +29,7 @@ Move quest route and read-model construction into
 the repo-wide orchestrator.
 
 Keep preserved local-trials wire IDs behind
-`mechanics/inference-pilots/parts/local-trials/legacy_trial_adapter.py`, and
+`mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py`, and
 have active LangGraph and llama.cpp pilots call the adapter by role.
 
 Record upstream eval/playbook compatibility names in
