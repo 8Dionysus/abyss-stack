@@ -10,9 +10,8 @@ The active route remains:
 - `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`
 - current root pilot commands for active operator workflows
 
-Old W5/W6 runner docs and scripts are preserved under package-local
-`legacy` so the flat root no longer has to carry W5/W6 wave names as primary
-topology.
+Old runner docs and scripts are archived under package-local `legacy/` so the
+flat root no longer has to carry old pilot names as primary topology.
 
 ## Owner Boundary
 
@@ -22,8 +21,8 @@ belong to stronger owner repos and reviewed proof surfaces.
 
 ## Current Bridges
 
-- [legacy/INDEX.md](legacy/INDEX.md) maps old W5/W6 root paths to package paths.
+- [legacy/INDEX.md](legacy/INDEX.md) maps old long-horizon and bounded-autonomy source paths to package paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
-  wave history.
-- Root bridge commands keep quieter operator names while executing the legacy
-  W5/W6 runners.
+  pilot history.
+- Root bridge commands keep quieter operator names while executing the archived
+  archived pilot runners.

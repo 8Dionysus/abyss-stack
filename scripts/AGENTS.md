@@ -33,7 +33,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - `scripts/aoa-diagnose` routes through `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh` into the diagnostic Python backend. Keep it stdlib-only and citation-friendly.
 - `scripts/aoa-qwen-run` routes to `mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py`. Keep it stdlib-only and local-only.
 - `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
-  are quiet operator bridges into package-local preserved W5/W6 pilot runners.
+  are quiet operator bridges into package-local archived pilot runners.
   Keep the bridge names stable unless the package route changes too.
 
 ## Shell script rules
@@ -50,7 +50,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - `AOA_VAULT_ROOT=/abyss`
   - default profile `core`
 - Keep the distinction between source checkout and deployed runtime explicit. Bridge with `aoa-sync-configs` and `aoa-bootstrap-configs`; do not blur them.
-- Do not reintroduce legacy pre-`/srv/AbyssOS/abyss-stack` paths. `validate_stack.py` intentionally guards against that drift.
+- Do not reintroduce stale pre-`/srv/AbyssOS/abyss-stack` paths. `validate_stack.py` intentionally guards against that drift.
 
 ## Cross-file duties
 - If you change layout or bootstrap expectations, update `aoa-install-layout`, `aoa-sync-configs`, `aoa-bootstrap-configs`, `aoa-check-layout`, and the relevant docs as one change.

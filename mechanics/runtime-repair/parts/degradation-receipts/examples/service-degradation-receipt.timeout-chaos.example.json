@@ -34,6 +34,6 @@
     "confirm timeout containment did not widen beyond route-api",
     "prepare a bounded runtime evidence-selection candidate instead of a verdict"
   ],
-  "notes": "Wave-1 timeout chaos example. Do not fan out restarts to unrelated services.",
+  "notes": "Initial timeout chaos example. Do not fan out restarts to unrelated services.",
   "supersedes": []
 }

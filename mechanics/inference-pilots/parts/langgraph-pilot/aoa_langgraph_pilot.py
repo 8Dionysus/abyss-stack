@@ -323,18 +323,18 @@ def comparison_memo(log_root: Path) -> str:
 
     if is_fixture_program():
         recommendation = (
-            "This fixture pilot is suitable as a bounded promotion gate for backend comparison before W5."
+            "This fixture pilot is suitable as a bounded promotion gate for backend comparison before the long-horizon pilot."
             if docs_pass
             else "This fixture pilot is not yet suitable as a promotion gate because the disposable docs case has not passed."
         )
     elif docs_pass and generated_pass and pause_seen and resumed:
         recommendation = (
-            "LangGraph sidecar is recommended as the next bounded W5 execution substrate, "
+            "LangGraph sidecar is recommended as the next bounded long-horizon execution substrate, "
             "while keeping `aoa-local-ai-trials` as the baseline comparator."
         )
     else:
         recommendation = (
-            "LangGraph sidecar is not yet the recommended W5 substrate. Keep the current runner as the execution baseline "
+            "LangGraph sidecar is not yet the recommended long-horizon substrate. Keep the current runner as the execution baseline "
             "until both pilot cases pass and pause/resume is proven end-to-end."
         )
 
@@ -499,7 +499,7 @@ def make_index_payload(log_root: Path, mirror_root: Path) -> dict[str, Any]:
         next_action = (
             "Use the fixture packet as the W4 dry-run promotion verdict for the candidate backend."
             if is_fixture_program()
-            else "Use the comparison memo to decide whether W5 should run on the LangGraph sidecar substrate."
+            else "Use the comparison memo to decide whether the long-horizon pilot should run on the LangGraph sidecar substrate."
         )
     elif fail_count or critical_failures:
         gate_result = "fail"

@@ -158,22 +158,20 @@ Cohort layer:
   The latest promoted winner runs for the active backend substrate.
 - `comparison-challenger`
   The latest challenger runs retained beside the promoted winner.
-- `legacy-baseline`
+- `historical-baseline`
   Older comparison runs kept for lineage and drift review.
 
 ## Relationship to local trial programs
 
-If you need a supervised per-case trial program rather than a standalone benchmark run, use:
-
-```bash
-scripts/aoa-local-ai-trials materialize
-scripts/aoa-local-ai-trials run-wave W0
-```
+If you need a supervised per-case trial program rather than a standalone
+benchmark run, route through [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md). The old
+phase-gated command sequence is preserved only as a compatibility baseline
+routed through `../../../legacy/INDEX.md`.
 
 That helper may reuse runtime benchmark artifacts as evidence inside case packets, but it does not change the benchmark boundary:
 
 - benchmark artifacts remain runtime-local truth in `abyss-stack`
-- wave verdicts remain bounded trial judgments, not portable eval canon
+- trial-phase verdicts remain bounded trial judgments, not portable eval canon
 - portable proof wording still belongs in `aoa-evals`
 
 ## Optional backend-parity pilot

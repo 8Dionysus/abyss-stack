@@ -2,7 +2,7 @@
 
 Applies to `mechanics/experience-runtime/legacy/`.
 
-This directory preserves old flat experience runtime seed surfaces after the
+This directory preserves old flat experience runtime archive surfaces after the
 mechanics topology refactor.
 
 Use `../README.md` and `../PROVENANCE.md` before treating any legacy file as

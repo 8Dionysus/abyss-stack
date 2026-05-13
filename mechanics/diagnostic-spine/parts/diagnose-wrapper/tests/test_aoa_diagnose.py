@@ -247,7 +247,7 @@ class AoADiagnoseTests(unittest.TestCase):
             autonomy["status"] = "degraded"
             autonomy["payload"]["overall_status"] = "degraded"
             autonomy["truth_status"]["live_available"] = False
-            autonomy["degradation_reasons"] = ["trial_live_gap:W6"]
+            autonomy["degradation_reasons"] = ["trial_live_gap:bounded_autonomy"]
 
             with patch.object(self.module, "STACK_ROOT", stack_root), patch.object(
                 self.module,
@@ -953,7 +953,7 @@ class AoADiagnoseTests(unittest.TestCase):
             autonomy["status"] = "degraded"
             autonomy["payload"]["overall_status"] = "degraded"
             autonomy["truth_status"]["live_available"] = False
-            autonomy["degradation_reasons"] = ["trial_live_gap:W6"]
+            autonomy["degradation_reasons"] = ["trial_live_gap:bounded_autonomy"]
 
             with patch.object(self.module, "STACK_ROOT", stack_root), patch.object(
                 self.module,
@@ -1039,7 +1039,7 @@ class AoADiagnoseTests(unittest.TestCase):
             autonomy["status"] = "degraded"
             autonomy["payload"]["overall_status"] = "degraded"
             autonomy["truth_status"]["live_available"] = False
-            autonomy["degradation_reasons"] = ["trial_live_gap:W6"]
+            autonomy["degradation_reasons"] = ["trial_live_gap:bounded_autonomy"]
 
             with patch.object(self.module, "STACK_ROOT", stack_root), patch.object(
                 self.module,

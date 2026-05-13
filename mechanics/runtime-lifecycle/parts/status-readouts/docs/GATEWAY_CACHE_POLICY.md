@@ -5,7 +5,7 @@
 This document defines the bounded cache-lane contract for `abyss-stack`.
 
 It covers future request deduplication and cache-status readout for the `langchain-api` gateway path.
-This wave documents the contract only. It does not activate live cache behavior.
+This surface documents the contract only. It does not activate live cache behavior.
 
 ## Core rule
 

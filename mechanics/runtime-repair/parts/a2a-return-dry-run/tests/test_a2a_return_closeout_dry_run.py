@@ -29,8 +29,8 @@ def reviewed_closeout_payload() -> dict:
         "audit_refs": ["/srv/notes/reviewed_session_artifact.md", "/srv/notes/route_summary.md"],
         "batches": [
             {
-                "publisher": "abyss-stack.runtime-wave-closeouts",
-                "input_paths": ["/srv/receipts/runtime_wave_closeout_receipt.json"],
+                "publisher": "abyss-stack.runtime-closeouts",
+                "input_paths": ["/srv/receipts/runtime_closeout_receipt.json"],
             }
         ],
         "a2a_child": {
@@ -76,6 +76,14 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
             self.assertTrue(artifact["dry_run"])
             self.assertFalse(artifact["live_automation"])
             self.assertEqual(artifact["exported_by"], "scripts/aoa-a2a-return-closeout-dry-run")
+            self.assertEqual(
+                artifact["runtime_receipt_candidate"]["artifact_kind"],
+                "runtime_closeout_receipt_candidate",
+            )
+            self.assertEqual(
+                artifact["runtime_receipt_candidate"]["publisher"],
+                "abyss-stack.runtime-closeouts",
+            )
             self.assertEqual(
                 artifact["runtime_receipt_candidate"]["checkpoint_bridge_steps"],
                 ["aoa-session-donor-harvest", "aoa-session-progression-lift", "aoa-quest-harvest"],

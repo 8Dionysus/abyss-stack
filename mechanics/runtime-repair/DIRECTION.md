@@ -9,4 +9,4 @@ Short term:
 - keep diagnostic and repair surfaces connected but not collapsed
 
 Next movement should map which antifragility and repair docs are standing
-mechanic law and which are legacy evidence.
+mechanic law and which are archived evidence.

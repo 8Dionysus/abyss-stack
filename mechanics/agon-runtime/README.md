@@ -16,7 +16,7 @@ trial-run registries, or runtime validation scripts.
 - local event-log validation and generated registry checks
 - runtime-only examples that prove dry-run behavior remains bounded
 - package-local scripts and tests that keep the Agon runtime artifact set green
-- bridges from old flat artifact names into the current mechanics tree
+- archive bridges from old flat artifact names into the current mechanics tree
 
 ### Stronger owner split
 
@@ -27,7 +27,7 @@ substrate and dry-run proof shape.
 
 ### Inputs
 
-Legacy Agon source docs, config seeds, generated registry capsules, event-log
+Archived Agon source docs, config seeds, generated registry capsules, event-log
 examples, runtime validators, and recurrence component manifests.
 
 ### Outputs
@@ -41,7 +41,7 @@ package-local provenance that points back to stronger owner surfaces.
 - durable scar, rank, or retention mutation
 - Tree of Sophia or KAG promotion rights
 - background service activation
-- that a legacy raw file is the active package route
+- that an archived raw file is the active package route
 
 ### Validation
 
@@ -55,6 +55,5 @@ Use [PROVENANCE.md](PROVENANCE.md) for source lineage and
 ## Active Route
 
 Start from this file, then `DIRECTION.md`, `PARTS.md`, and `PROVENANCE.md`.
-The old `AGON_*`, wave, seed, and generated artifact names now live under
-`legacy/` with explicit mapping.
-
+The old raw and generated artifact names now live only under `legacy/` with
+explicit mapping.

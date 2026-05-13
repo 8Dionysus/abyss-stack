@@ -3,11 +3,11 @@
 This package descends from flat runtime experience surfaces that carried old
 wave, seed, and `_v1` naming.
 
-The refactor mirrors the AOA legacy pattern:
+The refactor mirrors the AOA archive pattern:
 
 - keep active package route short
-- preserve old source names under `legacy`
-- keep a legacy index and distillation log
+- archive old source names under `legacy/`
+- keep an archive index and distillation log
 - route stronger owner meaning away from `abyss-stack`
 
 ## Owner Boundary
@@ -20,6 +20,5 @@ meaning and write stop-lines.
 
 - [legacy/INDEX.md](legacy/INDEX.md) maps old root families to current paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what remains
-  raw legacy.
+  raw archive.
 - `legacy/artifacts/tests/` proves the package-local schemas and examples.
-

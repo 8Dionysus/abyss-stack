@@ -24,7 +24,7 @@ Then branch by need:
 - **host posture and machine facts**: [reference platform](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md), [reference platform spec](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md), [machine bridge](mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md), [machine fit policy](mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md), [platform adaptation policy](mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md)
 - **runtime benchmark and local-model posture**: [runtime bench policy](mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md), [winner promotion loop](mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md), [llama.cpp pilot](mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md), [local AI trials](mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md), [model profiles](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_PROFILES.md), [model cards](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md), [context budget policy](mechanics/governed-execution/parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md)
 - **branch and recurrence posture**: [branch policy](docs/BRANCH_POLICY.md), [recurrence runtime policy](mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md)
-- **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md), [runtime chaos legacy note](mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md), [repair-safe closeout](mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md)
+- **runtime-side AoA seams**: [memo runtime seam](mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md), [eval runtime seam](mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md), [playbook runtime seam](mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG runtime seam](mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md), [antifragility runtime](mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md), [runtime repair provenance](mechanics/runtime-repair/PROVENANCE.md), [repair-safe closeout](mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md), and [diagnostic spine](mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md)
 - **runtime-side via negativa posture**: [via negativa checklist](mechanics/runtime-repair/parts/antifragility-posture/docs/VIA_NEGATIVA_CHECKLIST.md)
 - **runtime mechanics topology**: [mechanics/README](mechanics/README.md) and [docs/MECHANICS](docs/MECHANICS.md)
 - **operator command map**: [scripts/README](scripts/README.md)
@@ -94,8 +94,8 @@ through `scripts/aoa-install-layout`, `scripts/aoa-sync-configs`, and
 `abyss-stack` currently exposes a deployed multi-service runtime substrate with stateful storage, local and Intel-aware inference paths, monitoring, host-facts capture, stack-side `abyss-machine` bridge capture, machine-fit capture, platform-adaptation logging, and landed federation advisory seams for sibling AoA repositories.
 
 The current bounded promoted local-worker posture is `langchain-api` on `5403` backed directly by `llama.cpp`, with `LangGraph` as the adopted execution layer for bounded long-horizon and autonomy-focused local-worker flows. Federation seams remain opt-in, bounded, and explicit: they can enrich runtime behavior when the `federation` profile is active, but they do not replace source-owned meaning and they should not be read as blanket proof of full federated control-plane coherence.
-The preserved W5/W6 pilot contracts now live under
-`mechanics/inference-pilots/legacy/raw/`; operator entry uses
+The archived long-horizon and bounded-autonomy pilot contracts now route through
+`mechanics/inference-pilots/PROVENANCE.md`; operator entry uses
 `scripts/aoa-long-horizon-pilot` and `scripts/aoa-bounded-autonomy-pilot`
 rather than keeping wave names as root command topology.
 
@@ -104,7 +104,7 @@ runtime-side doctrine plus receipt schemas/examples for degradation and
 repair-safe closeout without changing live services, scripts, or deployment
 behavior.
 Current contract surfaces are `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`,
-`mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
+`mechanics/runtime-repair/PROVENANCE.md`,
 `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`,
 `mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json`,
 `mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json`,

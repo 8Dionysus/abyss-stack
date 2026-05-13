@@ -11,20 +11,20 @@ convex: every mechanic has `parts/README.md`, every named part has
 owning part.
 
 Old noisy file names with wave, seed, phase, or raw version scaffolding should
-land under package-local `legacy/` first. Legacy is provenance and containment,
-not trash and not the new active route.
+land under package-local `legacy/` first. The archive lane is provenance and
+containment, not trash and not the new active route.
 
 ## Placement lanes
 
 | Artifact kind | Current default | Package home when clearly local |
 |---|---|---|
 | operator docs | `docs/` | `mechanics/<package>/docs/` for package-owned prose detail, `mechanics/<package>/parts/<part>/README.md` for part routes, or `mechanics/<package>/legacy/raw/` for old raw docs |
-| runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementation bodies when the root command can remain a thin wrapper, or `mechanics/<package>/legacy/artifacts/scripts/` while old names remain legacy |
+| runtime scripts | stable operator wrappers in `scripts/` | `mechanics/<package>/parts/<part>/` for active implementation bodies when the root command can remain a thin wrapper, or `mechanics/<package>/legacy/artifacts/scripts/` while old names remain archived |
 | schemas | `schemas/` | `mechanics/<package>/parts/<part>/schemas/` for active package-local contracts, or `mechanics/<package>/legacy/artifacts/schemas/` when the family is contained |
 | examples | `examples/` | `mechanics/<package>/parts/<part>/examples/` for active package-local public examples, or `mechanics/<package>/legacy/artifacts/examples/` with validator updates |
 | generated capsules | `generated/` | `mechanics/<package>/parts/<part>/generated/` when the source builder moves too, or `mechanics/<package>/legacy/artifacts/generated/` when old names remain contained |
 | config templates | `config-templates/` | package-local config only when bootstrap and sync know the new path |
-| tests | `tests/` | `mechanics/<package>/parts/<part>/tests/` for active package-local contract tests, or `mechanics/<package>/legacy/artifacts/tests/` while old test names remain legacy |
+| tests | `tests/` | `mechanics/<package>/parts/<part>/tests/` for active package-local contract tests, or `mechanics/<package>/legacy/artifacts/tests/` while old test names remain archived |
 | deployed mirror content | `/srv/AbyssOS/abyss-stack/Configs` | never by hand; source sync owns deployed copies |
 
 ## Movement contract
@@ -40,7 +40,7 @@ Before moving an artifact into a package:
    `Configs`.
 5. Run the narrow validator and report any parity check intentionally skipped.
 6. Add or update `PROVENANCE.md`, `legacy/INDEX.md`, and `legacy/DISTILLATION_LOG.md`
-   when old names are moved for lineage rather than active-route promotion.
+   when old names are moved for lineage rather than active promotion.
 
 ## Stop-lines
 

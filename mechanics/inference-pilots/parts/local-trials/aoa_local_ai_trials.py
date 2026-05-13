@@ -38,11 +38,11 @@ LANGCHAIN_BASE_URL = DEFAULT_LANGCHAIN_RUN_URL.rsplit("/", 1)[0]
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
 AOA_SDK_ROOT = Path("/srv/aoa-sdk")
-AOA_CLOSEOUT_TRIGGER = "runtime-wave-closeout"
+AOA_CLOSEOUT_TRIGGER = "runtime-trial-closeout"
 AOA_SKILL_DISPATCH_TIMEOUT_S = 90
 TERMINAL_WAVE_GATE_RESULTS = {"pass", "fail"}
 RUNTIME_RECEIPT_ROOT = STACK_ROOT / ".aoa" / "live_receipts"
-RUNTIME_WAVE_CLOSEOUT_RECEIPT_LOG = RUNTIME_RECEIPT_ROOT / "runtime-wave-closeouts.jsonl"
+RUNTIME_TRIAL_CLOSEOUT_RECEIPT_LOG = RUNTIME_RECEIPT_ROOT / "runtime-trial-closeouts.jsonl"
 
 DATE_STAMP = datetime.now().astimezone().date().isoformat()
 
@@ -1048,15 +1048,15 @@ def wave_closeout_id(wave_id: str) -> str:
     return f"{PROGRAM_ID}-{wave_id}-closeout"
 
 
-def runtime_wave_closeout_event_id(wave_id: str) -> str:
-    return f"evt-runtime-wave-closeout-{PROGRAM_ID}-{wave_id}"
+def runtime_trial_closeout_event_id(wave_id: str) -> str:
+    return f"evt-runtime-trial-closeout-{PROGRAM_ID}-{wave_id}"
 
 
-def runtime_wave_closeout_run_ref(wave_id: str) -> str:
+def runtime_trial_closeout_run_ref(wave_id: str) -> str:
     return f"run:abyss-stack:aoa-local-ai-trials:{PROGRAM_ID}:{wave_id}:closeout"
 
 
-def runtime_wave_closeout_receipt(
+def runtime_trial_closeout_receipt(
     *,
     wave_id: str,
     index_payload: dict[str, Any],
@@ -1071,15 +1071,15 @@ def runtime_wave_closeout_receipt(
     if not isinstance(truth_status, dict):
         truth_status = {}
     return {
-        "event_kind": "runtime_wave_closeout_receipt",
-        "event_id": runtime_wave_closeout_event_id(wave_id),
+        "event_kind": "runtime_trial_closeout_receipt",
+        "event_id": runtime_trial_closeout_event_id(wave_id),
         "observed_at": utc_now(),
-        "run_ref": runtime_wave_closeout_run_ref(wave_id),
+        "run_ref": runtime_trial_closeout_run_ref(wave_id),
         "session_ref": wave_closeout_session_ref(wave_id),
         "actor_ref": "abyss-stack:aoa-local-ai-trials",
         "object_ref": {
             "repo": "abyss-stack",
-            "kind": "runtime_wave_closeout",
+            "kind": "runtime_trial_closeout",
             "id": f"{PROGRAM_ID}:{wave_id}",
             "version": "runtime",
         },
@@ -1113,7 +1113,7 @@ def runtime_wave_closeout_receipt(
     }
 
 
-def publish_runtime_wave_closeout_receipt(
+def publish_runtime_trial_closeout_receipt(
     *,
     wave_id: str,
     index_payload: dict[str, Any],
@@ -1123,7 +1123,7 @@ def publish_runtime_wave_closeout_receipt(
     closeout_submit_status_path: Path,
     status_payload: dict[str, Any],
 ) -> Path:
-    receipt = runtime_wave_closeout_receipt(
+    receipt = runtime_trial_closeout_receipt(
         wave_id=wave_id,
         index_payload=index_payload,
         closeout_json_path=closeout_json_path,
@@ -1132,7 +1132,7 @@ def publish_runtime_wave_closeout_receipt(
         closeout_submit_status_path=closeout_submit_status_path,
         status_payload=status_payload,
     )
-    append_jsonl(RUNTIME_WAVE_CLOSEOUT_RECEIPT_LOG, receipt)
+    append_jsonl(RUNTIME_TRIAL_CLOSEOUT_RECEIPT_LOG, receipt)
     write_json(log_root := closeout_submit_status_path.with_suffix(".receipt.json"), receipt)
     return log_root
 
@@ -1187,7 +1187,7 @@ def write_wave_surfaces(
             "reason": f"gate_result {gate_result!r} is not terminal",
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1206,7 +1206,7 @@ def write_wave_surfaces(
             "reason": "missing `aoa` command in PATH",
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1223,7 +1223,7 @@ def write_wave_surfaces(
             "reason": f"missing aoa-sdk root: {AOA_SDK_ROOT}",
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1274,7 +1274,7 @@ def write_wave_surfaces(
             "stderr": coerce_subprocess_text(exc.stderr),
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1296,7 +1296,7 @@ def write_wave_surfaces(
             "stderr": completed.stderr,
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1320,7 +1320,7 @@ def write_wave_surfaces(
             "stderr": completed.stderr,
         }
         write_json(closeout_submit_status_path, final_status_payload)
-        publish_runtime_wave_closeout_receipt(
+        publish_runtime_trial_closeout_receipt(
             wave_id=wave_id,
             index_payload=index_payload,
             closeout_json_path=closeout_json_path,
@@ -1345,7 +1345,7 @@ def write_wave_surfaces(
         "stdout": completed.stdout,
     }
     write_json(closeout_submit_status_path, final_status_payload)
-    publish_runtime_wave_closeout_receipt(
+    publish_runtime_trial_closeout_receipt(
         wave_id=wave_id,
         index_payload=index_payload,
         closeout_json_path=closeout_json_path,

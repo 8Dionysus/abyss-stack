@@ -8,7 +8,7 @@ inside `abyss-stack`.
 Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
 `PARTS.md`, `parts/README.md`, and `PROVENANCE.md` before editing.
 
-Legacy files under `legacy/` preserve old flat wave and seed surfaces. They are
+Archive files under `legacy/` preserve old flat named surfaces. They are
 provenance and runnable local artifacts, not a new source of AoA doctrine.
 
 Do not:

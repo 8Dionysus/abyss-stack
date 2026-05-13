@@ -97,7 +97,7 @@ class AntifragilityContractTests(unittest.TestCase):
 
         for fragment in [
             "mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md",
-            "mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md",
+            "mechanics/runtime-repair/PROVENANCE.md",
             "mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md",
             "mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json",
             "mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json",

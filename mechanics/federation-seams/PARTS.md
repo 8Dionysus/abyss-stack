@@ -3,7 +3,7 @@
 | Part | Route | Current source surfaces |
 |---|---|---|
 | Sync wrapper | `parts/sync-wrapper/` | `scripts/aoa-sync-federation-surfaces`, `parts/sync-wrapper/aoa_sync_federation_surfaces.sh` |
-| Federation checks | `parts/federation-checks/` | `scripts/aoa-federated-check`, `parts/federation-checks/aoa_federated_check.py`; legacy harvest worker docs now route through `mechanics/experience-runtime/legacy/raw/FEDERATION_HARVEST_WORKER.md` |
+| Federation checks | `parts/federation-checks/` | `scripts/aoa-federated-check`, `parts/federation-checks/aoa_federated_check.py`; archived harvest worker docs now route through `mechanics/experience-runtime/PROVENANCE.md` |
 | Memo seam | `parts/memo-seam/` | `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md` |
 | Eval seam | `parts/eval-seam/` | `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md` |
 | Playbook seam | `parts/playbook-seam/` | `mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md` |

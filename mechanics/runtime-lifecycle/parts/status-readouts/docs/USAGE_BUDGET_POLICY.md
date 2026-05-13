@@ -5,7 +5,7 @@
 This document defines the bounded runtime usage and budget posture for `abyss-stack`.
 
 It covers status readout only.
-This wave documents status surfaces only.
+This surface documents status readouts only.
 It does not activate live spend accounting or remote billing semantics.
 
 ## Core rule

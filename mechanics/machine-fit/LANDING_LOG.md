@@ -1,6 +1,6 @@
 # Machine Fit Landing Log
 
-## 2026-05-07 - First-wave package landing
+## 2026-05-07 - Initial package landing
 
 Created the machine fit package as a route home for reference-platform, host
 facts, fit records, platform adaptation, and future machine bridge work.

@@ -258,4 +258,4 @@ Current result:
 
 Promotion posture still has two layers:
 - `aoa-llamacpp-pilot verify` checks the promoted sidecar lane itself
-- `aoa-status --autonomy --json` checks whether parity, route-api closure, federated mirrors, and W5/W6 truth status align on the deployed path
+- `aoa-status --autonomy --json` checks whether parity, route-api closure, federated mirrors, and preserved pilot truth status align on the deployed path

@@ -2,8 +2,8 @@
 
 ## Current route
 
-- move flat experience seed docs, schemas, examples, and tests into this package
-- add provenance and legacy bridges
+- move flat experience docs, schemas, examples, and tests into this package
+- add provenance and archive bridges
 - update contract tests to use package-local artifacts
 
 ## Next candidates
@@ -12,4 +12,3 @@
 - split adoption, governance, and office/release slices if they become active
   runtime service families
 - decide which schemas still need public root export, if any
-

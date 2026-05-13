@@ -19,8 +19,8 @@ RUNTIME_CONFIGS_MIRROR_MODE = (
     and not (ROOT / "CONTRIBUTING.md").exists()
 )
 
-LEGACY_PATH = "/srv/abyss"
-LEGACY_PATTERN = re.compile(r"/srv/abyss(?!-)")
+STALE_ABYSS_PATH = "/srv/abyss"
+STALE_ABYSS_PATTERN = re.compile(r"/srv/abyss(?!-)")
 STALE_STACK_ROOT = "/srv/" + "abyss-stack"
 HOST_LOCAL_SOURCE_CHECKOUT_ROOTS = (
     "/home/dionysus/src/" + "abyss-stack",
@@ -44,7 +44,7 @@ MOVED_MECHANIC_DOC_REFS = (
     "mechanics/runtime-lifecycle/docs/INTERNAL_PROBES.md",
     "mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md",
 )
-LEGACY_ALLOWED = {
+STALE_ABYSS_PATH_ALLOWED = {
     ROOT / "docs" / "MIGRATION_FROM_OLD.md",
     ROOT / "scripts" / "validate_stack.py",
 }
@@ -87,7 +87,7 @@ MECHANIC_PACKAGE_REQUIRED_FILES = (
     "docs/README.md",
 )
 MECHANIC_PACKAGE_PARTS = {
-    "agon-runtime": ("active-route", "legacy-runtime-kernels"),
+    "agon-runtime": ("runtime-kernels",),
     "config-projection": (
         "public-templates",
         "env-examples",
@@ -102,7 +102,7 @@ MECHANIC_PACKAGE_PARTS = {
         "truth-surfaces",
         "diagnostic-surfaces",
     ),
-    "experience-runtime": ("active-route", "legacy-experience-records"),
+    "experience-runtime": ("experience-records",),
     "federation-seams": (
         "sync-wrapper",
         "federation-checks",
@@ -127,7 +127,7 @@ MECHANIC_PACKAGE_PARTS = {
         "langgraph-pilot",
         "local-trials",
         "promotion-loop",
-        "preserved-pilot-surfaces",
+        "pilot-archive-bridge",
         "quiet-bridge-commands",
         "agon-dry-run-handoff",
     ),
@@ -158,13 +158,13 @@ MECHANIC_PACKAGE_PARTS = {
         "memo-contradiction-sidecar",
     ),
 }
-LEGACY_MECHANIC_PACKAGES = (
+ARCHIVE_MECHANIC_PACKAGES = (
     "agon-runtime",
     "experience-runtime",
     "inference-pilots",
     "runtime-repair",
 )
-LEGACY_MECHANIC_REQUIRED_FILES = (
+ARCHIVE_MECHANIC_REQUIRED_FILES = (
     "PROVENANCE.md",
     "legacy/AGENTS.md",
     "legacy/README.md",
@@ -173,7 +173,7 @@ LEGACY_MECHANIC_REQUIRED_FILES = (
     "legacy/raw/README.md",
     "legacy/artifacts/README.md",
 )
-LEGACY_MECHANIC_ARTIFACT_DIRS = {
+ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
     "agon-runtime": (
         "legacy/artifacts/config",
         "legacy/artifacts/generated",
@@ -204,6 +204,8 @@ MECHANIC_CARD_HEADINGS = (
     "### Validation",
     "### Next route",
 )
+FORBIDDEN_ACTIVE_PART_NAMES = ("active-route",)
+FORBIDDEN_ACTIVE_PART_NAME_FRAGMENT = "legacy"
 
 PARITY_IGNORED_PARTS = {".git", "__pycache__"}
 PARITY_IGNORED_SUFFIXES = {".pyc"}
@@ -1670,9 +1672,9 @@ def validate_paths(errors: list[str]) -> None:
         text = read_text_or_none(path)
         if text is None:
             continue
-        if LEGACY_PATTERN.search(text) and path not in LEGACY_ALLOWED:
+        if STALE_ABYSS_PATTERN.search(text) and path not in STALE_ABYSS_PATH_ALLOWED:
             errors.append(
-                f"legacy path '{LEGACY_PATH}' found in {path.relative_to(ROOT)}"
+                f"stale path '{STALE_ABYSS_PATH}' found in {path.relative_to(ROOT)}"
             )
         if STALE_STACK_ROOT in text:
             errors.append(
@@ -1716,11 +1718,18 @@ def validate_paths(errors: list[str]) -> None:
         / "docs"
         / "LOCAL_AI_TRIALS.md"
     ).read_text(encoding="utf-8")
+    local_ai_trials_w0_w4_baseline = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "legacy"
+        / "raw"
+        / "LOCAL_AI_TRIALS_W0_W4_BASELINE.md"
+    ).read_text(encoding="utf-8")
     for required_snippet in (
         "TRUTH_SURFACES.md",
         "GOVERNED_EXECUTION.md",
-        "prepare-wave W4 --lane docs",
-        "apply-case W4 <case-id>",
+        "legacy/INDEX.md",
         "scripts/aoa-governed-run prepare-canary",
         "scripts/aoa-governed-run materialize-canaries",
         "scripts/aoa-governed-run prepare-request",
@@ -1731,10 +1740,6 @@ def validate_paths(errors: list[str]) -> None:
         "run-scenario <scenario-id> --until milestone",
         "resume-scenario <scenario-id>",
         "implementation_patch",
-        "proposal.edit-spec.json",
-        "exact_replace",
-        "anchored_replace",
-        "deterministically inside the runner",
         "script_refresh",
         "approval.status.json",
         "isolated git worktree",
@@ -1748,6 +1753,21 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in local_ai_trials:
             errors.append(
                 f"mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md must mention `{required_snippet}`"
+            )
+    for required_snippet in (
+        "prepare-wave W4 --lane docs",
+        "apply-case W4 <case-id>",
+        "proposal.edit-spec.json",
+        "exact_replace",
+        "anchored_replace",
+        "deterministically inside the runner",
+        "script_refresh",
+        "approval.status.json",
+        "isolated git worktree",
+    ):
+        if required_snippet not in local_ai_trials_w0_w4_baseline:
+            errors.append(
+                f"mechanics/inference-pilots/legacy/raw/LOCAL_AI_TRIALS_W0_W4_BASELINE.md must mention `{required_snippet}`"
             )
 
     truth_doc = (
@@ -2136,6 +2156,16 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                 errors.append(f"mechanics package {package} is missing {required_file}")
 
         parts_readme = read_text_or_none(package_root / "parts" / "README.md") or ""
+        parts_root = package_root / "parts"
+        if parts_root.is_dir():
+            for part_dir in sorted(item for item in parts_root.iterdir() if item.is_dir()):
+                if (
+                    part_dir.name in FORBIDDEN_ACTIVE_PART_NAMES
+                    or FORBIDDEN_ACTIVE_PART_NAME_FRAGMENT in part_dir.name
+                ):
+                    errors.append(
+                        f"mechanics package {package} has archived/noisy active part name: parts/{part_dir.name}"
+                    )
         for part in MECHANIC_PACKAGE_PARTS.get(package, ()):
             part_readme = package_root / "parts" / part / "README.md"
             if not part_readme.is_file():
@@ -2147,6 +2177,16 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                     f"mechanics package {package} parts/README.md must route to parts/{part}/README.md"
                 )
 
+        active_route_files = [package_root / "PARTS.md"]
+        if parts_root.is_dir():
+            active_route_files.extend(sorted(parts_root.glob("*/README.md")))
+        for route_file in active_route_files:
+            route_text = read_text_or_none(route_file) or ""
+            if "legacy/raw" in route_text:
+                errors.append(
+                    f"{route_file.relative_to(ROOT)} should route through PROVENANCE.md or legacy/INDEX.md instead of legacy/raw"
+                )
+
         readme_text = read_text_or_none(package_root / "README.md") or ""
         for heading in MECHANIC_CARD_HEADINGS:
             if heading not in readme_text:
@@ -2154,15 +2194,15 @@ def validate_mechanics_topology(errors: list[str]) -> None:
                     f"mechanics package {package} README.md must include `{heading}`"
                 )
 
-        if package in LEGACY_MECHANIC_PACKAGES:
-            for required_file in LEGACY_MECHANIC_REQUIRED_FILES:
+        if package in ARCHIVE_MECHANIC_PACKAGES:
+            for required_file in ARCHIVE_MECHANIC_REQUIRED_FILES:
                 path = package_root / required_file
                 if not path.is_file():
-                    errors.append(f"mechanics legacy package {package} is missing {required_file}")
-            for required_dir in LEGACY_MECHANIC_ARTIFACT_DIRS.get(package, ()):
+                    errors.append(f"mechanics archive package {package} is missing {required_file}")
+            for required_dir in ARCHIVE_MECHANIC_ARTIFACT_DIRS.get(package, ()):
                 path = package_root / required_dir
                 if not path.is_dir():
-                    errors.append(f"mechanics legacy package {package} is missing {required_dir}")
+                    errors.append(f"mechanics archive package {package} is missing {required_dir}")
 
 
 def git_index_mode(path: Path) -> str | None:
@@ -2580,7 +2620,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "It does not own truth.",
         "It does not grant routing authority.",
         "It does not lock the stack to one vendor.",
-        "This wave documents the contract only. It does not activate live cache behavior.",
+        "This surface documents the contract only. It does not activate live cache behavior.",
         "`runtime_gateway_cache_status_v1`",
     ):
         if snippet not in cache_doc:
@@ -2601,7 +2641,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "savings",
         "It must not turn runtime budget posture into proof semantics.",
         "It does not create wallet, payment, or vendor-analysis obligations.",
-        "This wave documents status surfaces only.",
+        "This surface documents status readouts only.",
         "`runtime_usage_snapshot_v1`",
     ):
         if snippet not in usage_doc:
@@ -2618,7 +2658,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "local floor availability",
         "It does not become a usage monitor.",
         "bounded local ops status surface",
-        "This wave does not add new `aoa-doctor` exit semantics.",
+        "This contract does not add new `aoa-doctor` exit semantics.",
     ):
         if snippet not in doctor_split_doc:
             errors.append(f"mechanics/diagnostic-spine/parts/doctor-readiness/docs/LOCAL_OPS_DOCTOR_SPLIT.md must mention `{snippet}`")

@@ -2,8 +2,8 @@
 
 Applies to `mechanics/inference-pilots/legacy/`.
 
-This directory preserves old W5/W6 pilot docs and runner scripts after the
-mechanics topology refactor.
+This directory preserves archived pilot docs, runner scripts, and wave-era
+local trial baseline notes after the mechanics topology refactor.
 
 Use `../README.md` and `../PROVENANCE.md` before treating a legacy wave artifact
 as current evidence. Raw docs in `legacy/raw/` are historical route material.
@@ -14,6 +14,7 @@ Do not:
 
 - move W5/W6 docs back into root `docs/`
 - make W5/W6 summaries operator health truth
+- make the W0-W4 baseline a first-run requirement
 - claim trial-proven evidence as live availability
 - widen pilot scripts into autonomous mutation authority
 

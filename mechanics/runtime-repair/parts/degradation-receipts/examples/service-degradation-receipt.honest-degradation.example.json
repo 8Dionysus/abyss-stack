@@ -34,6 +34,6 @@
     "keep route hints source-first until re-entry is reviewed",
     "avoid turning degraded availability into a success verdict"
   ],
-  "notes": "Wave-1 honest degradation example. The system must say that it is degraded, not imply normal operation.",
+  "notes": "Initial honest degradation example. The system must say that it is degraded, not imply normal operation.",
   "supersedes": []
 }
