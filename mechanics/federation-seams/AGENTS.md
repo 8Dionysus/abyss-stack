@@ -10,6 +10,9 @@ Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
 
 Do not treat mirrored owner surfaces as abyss-stack-authored truth. Do not make
 federation mandatory unless the owning profiles and runtime checks move too.
+Upstream names that must remain for route-api or mirror compatibility belong in
+`parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`; active local docs
+should use the clean runtime aliases.
 
 Validation:
 

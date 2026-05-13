@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0005
 title: Land the first runtime and frontend service contracts for the AoA RPG layer
 summary: Define the runtime-owned build snapshot, reputation ledger, quest run result, and projection bundle contracts without absorbing upstream meaning.
 repo: abyss-stack
+lane: rpg-runtime
 owner_surface: runtime/rpg-service-contracts
 theme_ref: ''
 milestone_ref: ''

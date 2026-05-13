@@ -25,5 +25,8 @@ that it cannot mutate live authority.
 - [legacy/INDEX.md](legacy/INDEX.md) maps old flat paths to package-local paths.
 - [legacy/DISTILLATION_LOG.md](legacy/DISTILLATION_LOG.md) records what has and
   has not been distilled out of the archive.
+- [legacy/ARCHIVE_CLASSIFICATION.md](legacy/ARCHIVE_CLASSIFICATION.md) records
+  why raw wave-era docs and old `ABS-Q-AGON-*` quest stubs remain
+  provenance-only unless a concrete runtime-kernel consumer is promoted.
 - `legacy/artifacts/README.md` remains as a marker for the old technical
   artifact family; active validation now runs from `parts/runtime-kernels/`.

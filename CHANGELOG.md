@@ -69,20 +69,26 @@ Tracking starts with the community-docs baseline for this repository.
   references
 - active mechanics route docs now keep old family labels in provenance,
   contract paths, and bridges instead of package-active prose
+- quests now use lane/state source topology under `quests/<lane>/<state>/`,
+  with public-safe catalog and dispatch examples generated from owner-local
+  quest helpers instead of flat root quest files
 - `FIRST_RUN` now routes optional local model trials to inference-pilot and
-  machine-fit surfaces instead of spelling the old W0-W4 qualification runner
+  machine-fit surfaces instead of spelling the old qualification runner
   as part of normal bootstrap
-- `aoa-local-ai-trials` now keeps its preserved W0-W4 runner under
-  `mechanics/inference-pilots/legacy/trials/artifacts/scripts/` with a thin active
-  compatibility bridge in `parts/local-trials/`
+- `aoa-local-ai-trials` now keeps its preserved local-trials runner under
+  `mechanics/inference-pilots/legacy/trials/artifacts/scripts/` with active
+  compatibility bridge and role-level adapter surfaces in `parts/local-trials/`
 - root residual route surfaces were tightened: the audit contract now lives at
   `docs/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and
   validators block those root-level residual paths from returning
-- LangGraph and llama.cpp promotion surfaces now treat `W0`/`W4` as preserved
-  runtime/edit compatibility gate IDs instead of active topology names, with a
-  validator guard against old wave-shaped prose returning
-- autonomy status now routes preserved `W5`/`W6` artifact names through
-  long-horizon and bounded-autonomy index constants
+- LangGraph and llama.cpp promotion surfaces now treat preserved runtime/edit
+  gate IDs as compatibility wire IDs behind role-level adapter names, with a
+  validator guard against archived stage prose returning
+- federation seams now keep upstream eval and playbook compatibility names in
+  `parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md` while active route
+  docs use clean local aliases
+- autonomy status now routes preserved long-horizon and bounded-autonomy
+  artifact names through explicit index constants
 - active workspace sibling defaults and repo-local skill symlinks now route
   through `/srv/AbyssOS/<repo>`, with validation blocking stale active
   `/srv/<repo>` sibling roots outside legacy archives

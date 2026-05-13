@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0007
 title: Unify runtime self-diagnosis spine with session-level diagnosis handoff without widening repair authority
 summary: Add a runtime-owned diagnostic spine that resolves target posture, normalizes runtime evidence into a diagnostic session artifact, and hands off to reviewed session diagnosis, repair, progression, or quest follow-through without silently mutating.
 repo: abyss-stack
+lane: diagnostics
 owner_surface: diagnostics/diagnostic-spine
 theme_ref: ''
 milestone_ref: ''

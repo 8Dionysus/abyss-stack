@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0008
 title: Land a route-first ToS graph curation surface without turning Neo4j into source truth
 summary: Establish the runtime-owned contract, quest anchor, and staged rollout path for a localhost ToS graph helper while keeping Tree-of-Sophia canonical and validator-gated.
 repo: abyss-stack
+lane: tos-graph
 owner_surface: runtime/tos-graph-curation
 theme_ref: ''
 milestone_ref: ''

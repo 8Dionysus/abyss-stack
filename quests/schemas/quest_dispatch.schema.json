@@ -8,6 +8,7 @@
     "schema_version",
     "id",
     "repo",
+    "lane",
     "state",
     "band",
     "difficulty",
@@ -29,6 +30,17 @@
     },
     "repo": {
       "type": "string"
+    },
+    "lane": {
+      "type": "string",
+      "enum": [
+        "stack",
+        "profiles",
+        "machine-fit",
+        "rpg-runtime",
+        "diagnostics",
+        "tos-graph"
+      ]
     },
     "state": {
       "type": "string",

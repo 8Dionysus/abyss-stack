@@ -9,6 +9,7 @@
     "id",
     "title",
     "repo",
+    "lane",
     "owner_surface",
     "kind",
     "state",
@@ -43,6 +44,17 @@
     "repo": {
       "type": "string",
       "minLength": 1
+    },
+    "lane": {
+      "type": "string",
+      "enum": [
+        "stack",
+        "profiles",
+        "machine-fit",
+        "rpg-runtime",
+        "diagnostics",
+        "tos-graph"
+      ]
     },
     "owner_surface": {
       "type": "string",

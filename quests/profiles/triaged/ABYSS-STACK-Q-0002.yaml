@@ -3,6 +3,7 @@ id: ABYSS-STACK-Q-0002
 title: Track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning
 summary: Use quests to keep profile and adaptation work visible without turning abyss-stack into the owner of AoA layer meaning.
 repo: abyss-stack
+lane: profiles
 owner_surface: profiles/rollout
 theme_ref: ''
 milestone_ref: ''

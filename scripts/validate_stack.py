@@ -9,6 +9,12 @@ import sys
 from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
+QUEST_SCRIPT_DIR = ROOT / "quests" / "scripts"
+if str(QUEST_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(QUEST_SCRIPT_DIR))
+
+import quest_surface  # noqa: E402
+
 PROFILE_DIR = ROOT / "compose" / "profiles"
 PRESET_DIR = ROOT / "compose" / "presets"
 MODULE_DIR = ROOT / "compose" / "modules"
@@ -233,6 +239,7 @@ ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES = {
     "agon-runtime": (
         "legacy/raw/README.md",
         "legacy/artifacts/README.md",
+        "legacy/ARCHIVE_CLASSIFICATION.md",
     ),
     "experience-runtime": (
         "legacy/raw/README.md",
@@ -829,7 +836,7 @@ OVERLAY_SKILL_INSTALL_TARGETS = {
     ABYSS_SAFE_INFRA_SKILL_PATH: f"{AOA_SKILL_INSTALL_ROOT}/abyss-safe-infra-change",
     ABYSS_SANITIZED_SHARE_SKILL_PATH: f"{AOA_SKILL_INSTALL_ROOT}/abyss-sanitized-share",
 }
-QUEST_SURFACE_ROOT = Path("quests")
+QUEST_SURFACE_ROOT = quest_surface.QUEST_SURFACE_ROOT
 QUEST_SCHEMA_PATH = QUEST_SURFACE_ROOT / "schemas" / "quest.schema.json"
 QUEST_DISPATCH_SCHEMA_PATH = QUEST_SURFACE_ROOT / "schemas" / "quest_dispatch.schema.json"
 DIAGNOSTIC_TARGET_SCHEMA_PATH = DIAGNOSTIC_SURFACE_SCHEMA_ROOT / "diagnostic_target.schema.json"
@@ -850,8 +857,8 @@ AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "agent_b
 REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "reputation_ledger_collection.schema.json"
 QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "quest_run_result_collection.schema.json"
 FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH = RPG_RUNTIME_SCHEMA_ROOT / "frontend_projection_bundle_collection.schema.json"
-QUEST_CATALOG_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_catalog.min.example.json"
-QUEST_DISPATCH_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_dispatch.min.example.json"
+QUEST_CATALOG_EXAMPLE_PATH = quest_surface.QUEST_CATALOG_EXAMPLE_PATH
+QUEST_DISPATCH_EXAMPLE_PATH = quest_surface.QUEST_DISPATCH_EXAMPLE_PATH
 RETURN_POLICY_SURFACE_ROOT = Path("mechanics") / "governed-execution" / "parts" / "return-policy"
 RETURN_POLICY_SCHEMA_ROOT = RETURN_POLICY_SURFACE_ROOT / "schemas"
 RETURN_POLICY_EXAMPLE_ROOT = RETURN_POLICY_SURFACE_ROOT / "examples"
@@ -893,21 +900,13 @@ DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES = (
     "reviewed_diagnosis_ref",
     "repair_handoff",
 )
-QUEST_IDS = (
-    "ABYSS-STACK-Q-0001",
-    "ABYSS-STACK-Q-0002",
-    "ABYSS-STACK-Q-0003",
-    "ABYSS-STACK-Q-0004",
-    "ABYSS-STACK-Q-0005",
-    "ABYSS-STACK-Q-0006",
-    "ABYSS-STACK-Q-0007",
-    "ABYSS-STACK-Q-0008",
-)
+QUEST_IDS = quest_surface.QUEST_IDS
+QUEST_ROUTES = quest_surface.QUEST_ROUTES
 QUESTBOOK_REQUIRED_TOKENS = (
     "deferred infrastructure obligations that belong to `abyss-stack`",
     "render-truth, doctor, first-run, and runtime guardrail follow-through",
     "source-owned meaning from AoA layer repos",
-    "quests/examples/quest_catalog.min.example.json",
+    "quests/<lane>/<state>/ABYSS-STACK-Q-*.yaml",
     "not generated state, deployed runtime state, or runtime authority",
 )
 QUESTBOOK_FORBIDDEN_TOKENS = ("ATM10-Agent", "aoa-sdk")
@@ -925,6 +924,7 @@ QUEST_SCHEMA_REQUIRED_FIELDS = (
     "id",
     "title",
     "repo",
+    "lane",
     "owner_surface",
     "kind",
     "state",
@@ -945,6 +945,7 @@ QUEST_DISPATCH_REQUIRED_FIELDS = (
     "schema_version",
     "id",
     "repo",
+    "lane",
     "state",
     "band",
     "difficulty",
@@ -1205,67 +1206,16 @@ def validate_quest_schema_envelope(
         errors.append(f"{label} schema_version.const must equal '{schema_version}'")
 
 
+def quest_source_path(quest_id: str) -> Path:
+    return quest_surface.quest_source_path(quest_id)
+
+
 def build_expected_quest_catalog_entry(quest_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": quest_id,
-        "title": payload["title"],
-        "repo": payload["repo"],
-        "theme_ref": payload.get("theme_ref", ""),
-        "milestone_ref": payload.get("milestone_ref", ""),
-        "state": payload["state"],
-        "band": payload["band"],
-        "kind": payload["kind"],
-        "difficulty": payload["difficulty"],
-        "risk": payload["risk"],
-        "owner_surface": payload["owner_surface"],
-        "source_path": f"quests/{quest_id}.yaml",
-        "public_safe": payload["public_safe"],
-    }
+    return quest_surface.build_expected_quest_catalog_entry(quest_id, payload)
 
 
 def build_expected_quest_dispatch_entry(quest_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    if quest_id == "ABYSS-STACK-Q-0003":
-        requires_artifacts = [
-            "bounded_plan",
-            "guardrail_check",
-            "verification_result",
-            "rollout_decision",
-        ]
-    elif quest_id == "ABYSS-STACK-Q-0004":
-        requires_artifacts = [
-            "bounded_plan",
-            "work_result",
-        ]
-    else:
-        requires_artifacts = [
-            "bounded_plan",
-            "work_result",
-            "verification_result",
-        ]
-
-    activation = payload.get("activation")
-    if not isinstance(activation, dict):
-        raise RuntimeError(f"{quest_id} activation must be an object")
-
-    return {
-        "schema_version": "quest_dispatch_v1",
-        "id": quest_id,
-        "repo": payload["repo"],
-        "state": payload["state"],
-        "band": payload["band"],
-        "difficulty": payload["difficulty"],
-        "risk": payload["risk"],
-        "control_mode": payload["control_mode"],
-        "delegate_tier": payload["delegate_tier"],
-        "split_required": payload["split_required"],
-        "write_scope": payload["write_scope"],
-        "requires_artifacts": requires_artifacts,
-        "activation_mode": activation["mode"],
-        "source_path": f"quests/{quest_id}.yaml",
-        "public_safe": payload["public_safe"],
-        "fallback_tier": payload["fallback_tier"],
-        "wrapper_class": payload["wrapper_class"],
-    }
+    return quest_surface.build_expected_quest_dispatch_entry(quest_id, payload)
 
 
 def validate_questbook_surface(errors: list[str]) -> None:
@@ -1297,7 +1247,7 @@ def validate_questbook_surface(errors: list[str]) -> None:
         GENERATED_REPUTATION_LEDGERS_PATH,
         GENERATED_QUEST_RUN_RESULTS_PATH,
         GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH,
-    ) + tuple(Path("quests") / f"{quest_id}.yaml" for quest_id in QUEST_IDS)
+    ) + tuple(quest_source_path(quest_id) for quest_id in QUEST_IDS)
 
     for relative_path in required_paths:
         path = ROOT / relative_path
@@ -1535,7 +1485,8 @@ def validate_questbook_surface(errors: list[str]) -> None:
     active_quest_ids: list[str] = []
     closed_quest_ids: list[str] = []
     for quest_id in QUEST_IDS:
-        quest_path = ROOT / "quests" / f"{quest_id}.yaml"
+        expected_lane, expected_state = QUEST_ROUTES[quest_id]
+        quest_path = ROOT / quest_source_path(quest_id)
         try:
             quest_payload = load_structured_object(quest_path)
         except FileNotFoundError:
@@ -1550,6 +1501,10 @@ def validate_questbook_surface(errors: list[str]) -> None:
             errors.append(f"{quest_path.relative_to(ROOT)} id must equal '{quest_id}'")
         if quest_payload.get("repo") != "abyss-stack":
             errors.append(f"{quest_id} repo must equal 'abyss-stack'")
+        if quest_payload.get("lane") != expected_lane:
+            errors.append(f"{quest_id} lane must equal '{expected_lane}'")
+        if quest_payload.get("state") != expected_state:
+            errors.append(f"{quest_id} state must match path state '{expected_state}'")
         if quest_payload.get("public_safe") is not True:
             errors.append(f"{quest_id} public_safe must be true")
         if quest_payload.get("state") in CLOSED_QUEST_STATES:
@@ -1648,7 +1603,7 @@ def validate_questbook_surface(errors: list[str]) -> None:
         catalog_payload = None
     if catalog_payload is not None and catalog_payload != expected_catalog:
         errors.append(
-            f"{QUEST_CATALOG_EXAMPLE_PATH.as_posix()} must stay aligned with quests/*.yaml"
+            f"{QUEST_CATALOG_EXAMPLE_PATH.as_posix()} must stay aligned with quests/<lane>/<state>/*.yaml"
         )
 
     try:
@@ -1660,7 +1615,13 @@ def validate_questbook_surface(errors: list[str]) -> None:
         dispatch_payload = None
     if dispatch_payload is not None and dispatch_payload != expected_dispatch:
         errors.append(
-            f"{QUEST_DISPATCH_EXAMPLE_PATH.as_posix()} must stay aligned with quests/*.yaml"
+            f"{QUEST_DISPATCH_EXAMPLE_PATH.as_posix()} must stay aligned with quests/<lane>/<state>/*.yaml"
+        )
+
+    flat_aliases = sorted((ROOT / QUEST_SURFACE_ROOT).glob("ABYSS-STACK-Q-*.yaml"))
+    for path in flat_aliases:
+        errors.append(
+            f"{path.relative_to(ROOT).as_posix()} is a root quest alias; use quests/<lane>/<state>/"
         )
 
 
@@ -2461,6 +2422,14 @@ def validate_agent_skill_projection_routes(errors: list[str]) -> None:
 
 def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
     bridge_path = ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "aoa_local_ai_trials.py"
+    adapter_path = (
+        ROOT
+        / "mechanics"
+        / "inference-pilots"
+        / "parts"
+        / "local-trials"
+        / "legacy_trial_adapter.py"
+    )
     legacy_path = (
         ROOT
         / "mechanics"
@@ -2472,10 +2441,23 @@ def validate_local_trials_legacy_bridge(errors: list[str]) -> None:
         / "aoa-local-ai-trials"
     )
     bridge_text = read_text_or_none(bridge_path) or ""
+    adapter_text = read_text_or_none(adapter_path) or ""
     legacy_text = read_text_or_none(legacy_path) or ""
 
     if "LEGACY_BACKEND" not in bridge_text or "aoa-local-ai-trials" not in bridge_text:
         errors.append("local trials active backend must be a compatibility bridge to the legacy runner")
+    for required_snippet in (
+        "CompatibilityGate",
+        "RUNTIME_GATE",
+        "EDIT_GATE",
+        "runtime_gate_run_command",
+        "edit_gate_approval_path",
+    ):
+        if required_snippet not in adapter_text:
+            errors.append(
+                "mechanics/inference-pilots/parts/local-trials/legacy_trial_adapter.py "
+                f"must expose `{required_snippet}`"
+            )
     if "WAVE_METADATA =" in bridge_text:
         errors.append("local trials wave metadata must stay in legacy/trials/artifacts/scripts, not the active bridge")
     if "WAVE_METADATA =" not in legacy_text:
@@ -2544,8 +2526,9 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
     autonomy_status_readme = read_text_or_none(autonomy_status_readme_path) or ""
 
     for required_snippet in (
-        "LEGACY_EDIT_GATE_ID",
-        "LEGACY_EDIT_GATE_INDEX_NAME",
+        "TRIAL_ADAPTER",
+        "EDIT_GATE_WIRE_ID",
+        "EDIT_GATE_INDEX_NAME",
         "preserved bounded-edit compatibility contract",
     ):
         if required_snippet not in langgraph_code:
@@ -2566,8 +2549,9 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
             )
 
     for required_snippet in (
-        "LEGACY_RUNTIME_GATE_ID",
-        "LEGACY_EDIT_GATE_ID",
+        "TRIAL_ADAPTER",
+        "RUNTIME_GATE_WIRE_ID",
+        "EDIT_GATE_WIRE_ID",
         "LLAMACPP_RUNTIME_GATE_PROGRAM_ID",
         "LLAMACPP_EDIT_GATE_PROGRAM_ID",
         "runtime_gate_result",
@@ -2632,6 +2616,52 @@ def validate_inference_pilot_compatibility_gate_language(errors: list[str]) -> N
                 )
 
 
+def validate_federation_upstream_compatibility(errors: list[str]) -> None:
+    verdict_path = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "federation-checks"
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY.md"
+    )
+    readme_path = (
+        ROOT
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "federation-checks"
+        / "README.md"
+    )
+    parts_path = ROOT / "mechanics" / "federation-seams" / "PARTS.md"
+
+    verdict = read_text_or_none(verdict_path) or ""
+    readme = read_text_or_none(readme_path) or ""
+    parts = read_text_or_none(parts_path) or ""
+
+    for required_snippet in (
+        "memo-recall-rerun",
+        "phase-alpha-memo-recall-rerun",
+        "memo-contradiction-gap",
+        "memo-contradiction-rerun",
+        "playbook_automation_seeds.json",
+        "/playbooks/automation-plans",
+        "/playbooks/automation-seeds",
+        "compatibility_alias_for",
+    ):
+        if required_snippet not in verdict:
+            errors.append(
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
+                f"must classify `{required_snippet}`"
+            )
+    for path, text in ((readme_path, readme), (parts_path, parts)):
+        if "UPSTREAM_COMPATIBILITY.md" not in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} must route upstream compatibility names through UPSTREAM_COMPATIBILITY.md"
+            )
+
+
 def validate_active_topology_language(errors: list[str]) -> None:
     text_guards = {
         ROOT / "ROADMAP.md": (
@@ -2658,6 +2688,7 @@ def validate_active_topology_language(errors: list[str]) -> None:
         / "docs"
         / "EVAL_RUNTIME_SEAM.md": (
             "Phase Alpha",
+            "phase-alpha",
             "this phase",
         ),
         ROOT
@@ -3446,7 +3477,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-        "quests/ABYSS-STACK-Q-0007.yaml",
+        "quests/diagnostics/captured/ABYSS-STACK-Q-0007.yaml",
         "scripts/aoa-diagnose",
     ):
         if snippet not in readme:
@@ -4301,6 +4332,7 @@ def main() -> int:
     validate_agent_skill_projection_routes(errors)
     validate_local_trials_legacy_bridge(errors)
     validate_inference_pilot_compatibility_gate_language(errors)
+    validate_federation_upstream_compatibility(errors)
     validate_active_topology_language(errors)
     validate_root_design_surfaces(errors)
     validate_sync_managed_items(errors)

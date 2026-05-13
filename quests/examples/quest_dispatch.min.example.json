@@ -3,6 +3,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0001",
     "repo": "abyss-stack",
+    "lane": "stack",
     "state": "done",
     "band": "frontier",
     "difficulty": "d2_slice",
@@ -17,7 +18,7 @@
       "verification_result"
     ],
     "activation_mode": "immediate",
-    "source_path": "quests/ABYSS-STACK-Q-0001.yaml",
+    "source_path": "quests/stack/done/ABYSS-STACK-Q-0001.yaml",
     "public_safe": true,
     "fallback_tier": "verifier",
     "wrapper_class": "hybrid"
@@ -26,6 +27,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0002",
     "repo": "abyss-stack",
+    "lane": "profiles",
     "state": "triaged",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -40,7 +42,7 @@
       "verification_result"
     ],
     "activation_mode": "on_review_of",
-    "source_path": "quests/ABYSS-STACK-Q-0002.yaml",
+    "source_path": "quests/profiles/triaged/ABYSS-STACK-Q-0002.yaml",
     "public_safe": true,
     "fallback_tier": "verifier",
     "wrapper_class": "hybrid"
@@ -49,6 +51,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0003",
     "repo": "abyss-stack",
+    "lane": "stack",
     "state": "done",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -64,7 +67,7 @@
       "rollout_decision"
     ],
     "activation_mode": "immediate",
-    "source_path": "quests/ABYSS-STACK-Q-0003.yaml",
+    "source_path": "quests/stack/done/ABYSS-STACK-Q-0003.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "human_only"
@@ -73,6 +76,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0004",
     "repo": "abyss-stack",
+    "lane": "machine-fit",
     "state": "captured",
     "band": "near",
     "difficulty": "d2_slice",
@@ -86,7 +90,7 @@
       "work_result"
     ],
     "activation_mode": "on_review_of",
-    "source_path": "quests/ABYSS-STACK-Q-0004.yaml",
+    "source_path": "quests/machine-fit/captured/ABYSS-STACK-Q-0004.yaml",
     "public_safe": true,
     "fallback_tier": "verifier",
     "wrapper_class": "codex_primary"
@@ -95,6 +99,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0005",
     "repo": "abyss-stack",
+    "lane": "rpg-runtime",
     "state": "captured",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -109,7 +114,7 @@
       "verification_result"
     ],
     "activation_mode": "manual",
-    "source_path": "quests/ABYSS-STACK-Q-0005.yaml",
+    "source_path": "quests/rpg-runtime/captured/ABYSS-STACK-Q-0005.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "hybrid"
@@ -118,6 +123,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0006",
     "repo": "abyss-stack",
+    "lane": "rpg-runtime",
     "state": "captured",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -132,7 +138,7 @@
       "verification_result"
     ],
     "activation_mode": "manual",
-    "source_path": "quests/ABYSS-STACK-Q-0006.yaml",
+    "source_path": "quests/rpg-runtime/captured/ABYSS-STACK-Q-0006.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "hybrid"
@@ -141,6 +147,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0007",
     "repo": "abyss-stack",
+    "lane": "diagnostics",
     "state": "captured",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -155,7 +162,7 @@
       "verification_result"
     ],
     "activation_mode": "manual",
-    "source_path": "quests/ABYSS-STACK-Q-0007.yaml",
+    "source_path": "quests/diagnostics/captured/ABYSS-STACK-Q-0007.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "hybrid"
@@ -164,6 +171,7 @@
     "schema_version": "quest_dispatch_v1",
     "id": "ABYSS-STACK-Q-0008",
     "repo": "abyss-stack",
+    "lane": "tos-graph",
     "state": "captured",
     "band": "frontier",
     "difficulty": "d3_seam",
@@ -178,7 +186,7 @@
       "verification_result"
     ],
     "activation_mode": "manual",
-    "source_path": "quests/ABYSS-STACK-Q-0008.yaml",
+    "source_path": "quests/tos-graph/captured/ABYSS-STACK-Q-0008.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "hybrid"

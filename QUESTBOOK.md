@@ -51,7 +51,7 @@ Allowed verdicts:
 
 ## Backing files
 
-- `quests/*.yaml`
+- `quests/<lane>/<state>/ABYSS-STACK-Q-*.yaml`
 - `quests/schemas/quest.schema.json`
 - `quests/schemas/quest_dispatch.schema.json`
 - `quests/examples/quest_catalog.min.example.json`

@@ -39,3 +39,5 @@ artifact family went.
 
 Start at `../README.md`. Use legacy files only when you need lineage. Use
 `../parts/runtime-kernels/` for runnable dry-run proof.
+Use `ARCHIVE_CLASSIFICATION.md` before promoting any raw document or old quest
+stub into an active part.
