@@ -11,6 +11,6 @@ authority or create a free self-repair loop.
 - `done/` holds the closed diagnostic runtime packet. Drifted packets route to
   explicit repair governance only after operator intent; diagnostics still do
   not grant repair authority.
-- `ready/` holds the current route-api health and closure cutover follow-up.
-  It is a durable stop-line for live runtime cutover, not permission to mutate services
-  from source validation.
+- `done/` also holds the closed route-api health and closure cutover follow-up.
+  Its closure is evidence from a reviewed operator action, not permission to
+  skip future live cutover gates.

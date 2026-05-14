@@ -1,0 +1,78 @@
+schema_version: work_quest_v1
+id: ABYSS-STACK-Q-0009
+title: Restore route-api health and closure before live runtime-loop cutover
+summary: Close the deployed route-api drift by making the user-unit runtime selection preserve intel-full while layering the federation profile.
+repo: abyss-stack
+lane: diagnostics
+owner_surface: mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md
+theme_ref: ''
+milestone_ref: live-runtime-cutover
+kind: followup
+state: done
+band: near
+difficulty: d3_seam
+risk: r3_side_effect
+control_mode: human_gate
+delegate_tier: verifier
+fallback_tier: conductor
+wrapper_class: hybrid
+write_scope: repo_local
+split_required: false
+complexity_basis:
+  scope: 2
+  ambiguity: 1
+  boundary: 2
+  verification: 3
+parent: null
+depends_on:
+  - ABYSS-STACK-Q-0007
+activation:
+  mode: manual
+  note: open only when an operator explicitly chooses to diagnose or repair route-api health and closure for the deployed federation shape
+anchor_ref:
+  artifact: live_runtime_cutover_packet
+  ref: mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md
+  note: source/deployed parity was green, but live-loop promotion required durable route-api health through the systemd user-unit path
+handoff_role: runtime-maintainer
+evidence:
+  - source/deployed Configs parity passed after aoa-sync-configs --delete
+  - deployed Configs mirror self-validation passed in runtime mirror mode
+  - public machine bridge reported ready and machine-fit reported qualified for intel-full
+  - aoa-profile-endpoints rendered the federation endpoints
+  - aoa-status --autonomy --json reported route_api_health_failed and route_api_surface_status_invalid
+  - aoa-diagnose --preset agent-federation --truth-goal deployed exited repairable_under_governance
+  - podman events showed route-api removed after the systemd user unit restarted without the federation module
+  - systemctl --user cat showed the live unit selected intel-full without a durable federation profile
+  - source aoa-install-systemd gained explicit --preset, --profile, and --restart-now support for a host-local 20-runtime-selection.conf drop-in
+  - deployed aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now wrote the durable selection and restarted the unit
+  - systemctl --user cat then showed AOA_STACK_PRESET=intel-full and AOA_STACK_PROFILE=federation in 20-runtime-selection.conf
+  - aoa-profile-modules --preset intel-full --profile federation --paths preserved intel, tools, and observability modules while adding 43-federation-router.yml
+  - route-api /health and /surface-status reported closure_ready true for 7 of 7 federation layers after the systemd route
+  - aoa-federated-check --require-enabled passed against langchain-api /run/federated
+  - aoa-status --autonomy --json passed with control_plane live_available true
+  - aoa-diagnose --preset intel-full --profile federation --truth-goal deployed exited running_as_intended with all axes passing
+harvest:
+  target: playbook
+  trigger_count: 2
+  note: if this route-api health and closure repair repeats across cutovers, harvest a bounded operator playbook rather than embedding service mutation into source validation
+opened_at: '2026-05-14'
+touched_at: '2026-05-14'
+tags:
+  - live-runtime
+  - runtime-loop
+  - route-api
+  - diagnostics
+  - cutover
+notes: >
+  The live runtime cutover read-only pass found the source and deployed mirror
+  ready, but live cutover was blocked by route-api health and closure drift.
+  On 2026-05-14, after explicit operator instruction to complete all remaining
+  points, the root cause was traced to the systemd user-unit runtime selection:
+  the live federated consumer was enabled, but the durable unit shape selected
+  intel-full without layering the federation profile, so a systemd restart
+  removed route-api as out of shape. The repair keeps the checked-in unit
+  generic, writes one host-local runtime-selection drop-in, preserves intel-full,
+  and layers federation. The follow-up gates then passed. This closes the
+  specific drift without granting future source closeout permission to start,
+  stop, restart, or repair runtime services without operator intent.
+public_safe: true

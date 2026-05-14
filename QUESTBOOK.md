@@ -21,9 +21,7 @@ Do not use it for:
 - none right now
 
 ## Near / ready
-- `ABYSS-STACK-Q-0009` — restore route-api health and closure before live runtime cutover
-  live-loop cutover; source/deployed parity is green, but service mutation
-  remains operator-gated.
+- none right now
 
 ## Harvest candidates
 - none yet

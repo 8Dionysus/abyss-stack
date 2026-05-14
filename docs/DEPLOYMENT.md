@@ -224,6 +224,18 @@ Rendered compose truth and deployed autonomy readiness are different layers.
 
 Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.
 Use `--enable-now` if you want it enabled and started immediately.
+Use `--restart-now` when the unit is already active and you want the newly
+written selection to take effect immediately.
+Use `--preset` or `--profile` to write an explicit user-unit runtime-selection
+drop-in. This is the durable path when the live machine must keep a non-default
+runtime shape after boot or `systemctl --user restart`. Repeated flags and
+comma-separated forms are both accepted.
+
+If `AOA_FEDERATED_RUN_ENABLED=true` is set in the runtime-secret
+`Secrets/Configs/langchain-api.env`, the selected user-unit shape must include
+the `federation` profile. Preserve the host's current preset and layer
+`--profile federation` unless you intentionally want to change the whole runtime
+shape.
 
 ### `scripts/aoa-preset-profiles`
 
@@ -344,6 +356,13 @@ After the deployed config tree exists:
 
 ```bash
 scripts/aoa-install-systemd --enable-now
+```
+
+For a host whose live `langchain-api` federated consumer is enabled, preserve
+the current host preset and layer the federation profile:
+
+```bash
+scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
 ```
 
 Or manually:

@@ -196,7 +196,7 @@
     "id": "ABYSS-STACK-Q-0009",
     "repo": "abyss-stack",
     "lane": "diagnostics",
-    "state": "ready",
+    "state": "done",
     "band": "near",
     "difficulty": "d3_seam",
     "risk": "r3_side_effect",
@@ -210,7 +210,7 @@
       "verification_result"
     ],
     "activation_mode": "manual",
-    "source_path": "quests/diagnostics/ready/ABYSS-STACK-Q-0009.yaml",
+    "source_path": "quests/diagnostics/done/ABYSS-STACK-Q-0009.yaml",
     "public_safe": true,
     "fallback_tier": "conductor",
     "wrapper_class": "hybrid"

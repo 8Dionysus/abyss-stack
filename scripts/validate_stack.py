@@ -2384,6 +2384,24 @@ def validate_scripts(errors: list[str]) -> None:
     if "abyss_default" not in llamacpp_pilot:
         errors.append("scripts/aoa-llamacpp-pilot must mention abyss_default as the primary runtime network")
 
+    install_systemd_rel = OPERATOR_BACKEND_SCRIPTS.get("aoa-install-systemd")
+    if install_systemd_rel:
+        install_systemd_path = ROOT / install_systemd_rel
+        if install_systemd_path.is_file():
+            install_systemd = install_systemd_path.read_text(encoding="utf-8")
+            for required_snippet in (
+                "--preset",
+                "--profile",
+                "--restart-now",
+                "20-runtime-selection.conf",
+                "aoa_validate_runtime_spec",
+                "aoa_append_runtime_spec",
+            ):
+                if required_snippet not in install_systemd:
+                    errors.append(
+                        f"scripts/aoa-install-systemd must preserve user-unit runtime selection via `{required_snippet}`"
+                    )
+
 
 def validate_required_files(errors: list[str]) -> None:
     for path in sorted(REQUIRED_FILES):
@@ -4038,6 +4056,8 @@ def validate_federation_landing(errors: list[str]) -> None:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-playbooks")
     if "aoa-sync-federation-surfaces --layer aoa-kag" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-kag")
+    if "aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now" not in deployment_doc:
+        errors.append("docs/DEPLOYMENT.md must document the federation user-unit selection route")
     if "aoa-sync-federation-surfaces --layer tos-source" not in deployment_doc:
         errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer tos-source")
 

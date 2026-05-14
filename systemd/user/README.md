@@ -21,6 +21,17 @@ systemctl --user daemon-reload
 systemctl --user enable --now podman-compose-abyss.service
 ```
 
+Prefer `scripts/aoa-install-systemd` when you need a durable runtime selection:
+
+```bash
+scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
+```
+
+That command keeps the checked-in unit generic and writes a host-local drop-in
+for the selected preset/profile. Preserve the current host preset and layer the
+`federation` profile whenever the deployed `langchain-api` federated consumer is
+enabled.
+
 ## Assumption
 
 The unit expects the deployed runtime tree to exist under:

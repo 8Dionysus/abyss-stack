@@ -110,6 +110,14 @@ Its expected deployed location is:
 It assumes the deployed runtime tree exists under:
 - `/srv/AbyssOS/abyss-stack/Configs`
 
+Keep the checked-in unit skeleton generic. Host-local runtime choice belongs in
+a drop-in written by `scripts/aoa-install-systemd --preset <name>` or
+`--profile <name>`; add `--restart-now` when an already-active unit must pick
+up the new selection immediately. If the deployed `langchain-api` federated
+consumer is enabled, choose a shape that includes `federation`, such as
+`--preset intel-full --profile federation` when the host should keep its
+current `intel-full` service shape.
+
 ## Path note
 
 The wrapper scripts treat the deployed Linux runtime path as distinct from any source checkout path.

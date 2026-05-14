@@ -27,7 +27,7 @@ QUEST_ROUTES = {
     "ABYSS-STACK-Q-0006": ("rpg-runtime", "done"),
     "ABYSS-STACK-Q-0007": ("diagnostics", "done"),
     "ABYSS-STACK-Q-0008": ("tos-graph", "done"),
-    "ABYSS-STACK-Q-0009": ("diagnostics", "ready"),
+    "ABYSS-STACK-Q-0009": ("diagnostics", "done"),
 }
 QUEST_CATALOG_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_dispatch.min.example.json"

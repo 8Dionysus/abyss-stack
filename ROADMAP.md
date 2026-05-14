@@ -3,7 +3,7 @@
 ## Current posture
 
 The bootstrap-to-federation landing path is largely complete.
-Stages 0 through 6 have already been landed as source and runtime seams:
+The major source and runtime seams already landed are:
 
 - modular runtime bootstrap
 - service extraction and profile-aware lifecycle wrappers
@@ -102,7 +102,7 @@ Those landings should be read carefully:
 - the `federation` profile remains opt-in rather than part of the default promoted presets
 - current operator truth still depends on parity, promoted runtime verify, and `aoa-status --autonomy --json`
 
-## Stage 0: structured bootstrap
+## Structured bootstrap
 
 - establish repository charter and boundaries
 - create modular compose skeleton
@@ -110,14 +110,14 @@ Those landings should be read carefully:
 - define env and secrets posture
 - write migration notes from `abyss-stack_old`
 
-## Stage 1: service extraction
+## Service extraction
 
 - reintroduce storage services cleanly
 - reintroduce orchestration and local inference
 - reintroduce gateway and agent API modules
 - reintroduce speech, browser, and monitoring modules
 
-## Stage 2: operational hardening
+## Operational hardening
 
 - add smoke and health routines
 - add profile-aware lifecycle wrappers
@@ -128,14 +128,14 @@ Those landings should be read carefully:
 - make the Fedora-first and Windows-usable path model explicit
 - make deployment from source checkout to runtime tree explicit and repeatable
 
-## Stage 3: hybrid growth
+## Hybrid growth
 
 - clarify local versus hybrid execution paths
 - refine Intel and OVMS posture
 - define clean bridges to sibling AoA repositories
 - consume the read-only `abyss-machine` bridge through stack-local `Logs/machine-bridge/` records before adding automatic policy action
 
-## Stage 4: mature substrate
+## Mature substrate
 
 - keep the stack legible under growth
 - resist monolith relapse
@@ -150,8 +150,11 @@ Those landings should be read carefully:
   contract, without adding `/rpg/*` endpoints or quest mutation by accident
 - review diagnostic drift through repair governance only when an operator
   explicitly chooses a repair packet
-- keep the current route-api health and closure stop-line explicit through
-  `ABYSS-STACK-Q-0009` before promoting any live runtime-loop cutover
+- rerun the live runtime cutover packet before promotion; the route-api health
+  and closure stop-line was closed once through `ABYSS-STACK-Q-0009` by
+  preserving the host's `intel-full` selection and layering `federation` in a
+  host-local user-unit drop-in, but future live drift must be rechecked instead
+  of assumed green
 
 ## Platform and operations hardening
 

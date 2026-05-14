@@ -115,8 +115,12 @@ Tracking starts with the community-docs baseline for this repository.
 - residual quest frontier state now closes the profile machine-fit packet,
   machine-fit follow-through packet, RPG runtime materialization packet, and
   diagnostic runtime packet while preserving lane-local `done/` records; the
-  remaining active quest is the operator-gated route-api health and closure
-  stop-line before live runtime-loop cutover
+  route-api health and closure stop-line is now also recorded as a closed
+  operator-gated live runtime cutover repair
+- `aoa-install-systemd` now supports durable host-local runtime selection
+  drop-ins with `--preset`, `--profile`, and `--restart-now`; the live
+  federation repair preserves `intel-full` and layers `federation` instead of
+  narrowing the machine to a federation-only preset
 
 ## [0.2.2] - 2026-04-23
 

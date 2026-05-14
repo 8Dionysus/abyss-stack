@@ -53,11 +53,42 @@ The live autonomy and federation checks still reported runtime-loop drift:
 `aoa-status --autonomy --json` failed on `route_api_health_failed` and
 `route_api_surface_status_invalid`, while `aoa-diagnose --preset
 agent-federation --truth-goal deployed` exited
-`repairable_under_governance`. That is the correct result: live runtime cutover
-is not silently promoted. The next live-loop action is tracked as
-`ABYSS-STACK-Q-0009` and must be an explicit operator choice after reviewing
-route-api health, closure reporting, federation layer readiness, and diagnostic
-handoff posture.
+`repairable_under_governance`. That was the correct result: live runtime
+cutover was not silently promoted. The explicit follow-up action was tracked as
+`ABYSS-STACK-Q-0009` and required operator choice after reviewing route-api
+health, closure reporting, federation layer readiness, and diagnostic handoff
+posture. The durable repair verdict below closes that specific packet.
+
+## 2026-05-14 Q-0009 Durable Repair Verdict
+
+After explicit operator instruction to complete the remaining cutover block,
+the deployed `Configs` mirror was resynced and the disappearing `route-api`
+was traced to the systemd user-unit selection. The live `langchain-api`
+federated consumer was enabled, but the user unit restarted an `intel-full`
+shape without layering `federation`, so `route-api` was removed as outside the
+selected runtime.
+
+The source repair keeps the checked-in unit skeleton generic and teaches
+`aoa-install-systemd` to write one host-local runtime-selection drop-in. The
+live repair preserved the existing full Intel runtime shape and layered the
+federation profile:
+
+```bash
+AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack \
+AOA_CONFIGS_ROOT=/srv/AbyssOS/abyss-stack/Configs \
+  /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd \
+  --preset intel-full --profile federation --enable-now --restart-now
+```
+
+The follow-up gates passed: source/deployed parity, deployed Configs
+dry-run module resolution, systemd user-unit status, `route-api` `/health`,
+`route-api` `/surface-status`,
+`aoa-federated-check`, `aoa-status --autonomy --json`, and `aoa-diagnose
+--preset intel-full --profile federation --truth-goal deployed`.
+`ABYSS-STACK-Q-0009` is now closed as a specific repair record.
+
+This is live evidence from this run, not a standing permission to skip future
+cutover gates or mutate runtime services without explicit operator intent.
 
 ## Stop-Lines
 
