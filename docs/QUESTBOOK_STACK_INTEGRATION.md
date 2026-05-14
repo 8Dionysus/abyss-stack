@@ -11,6 +11,12 @@ This note shows how `QUESTBOOK.md` fits into `abyss-stack` without confusing inf
 - `QUESTBOOK.md` tracks deferred infra obligations that survive the current bounded diff
 - backing quest records live in `quests/<lane>/<state>/` so placement names the
   owner route before the lifecycle posture
+- `ready` means the source route is shaped and the next action is a bounded
+  runtime or operator packet; it does not mean live runtime state already
+  exists
+- `done` means the source-side contract or source slice landed with public-safe
+  evidence or the bounded source/runtime packet was executed and verified;
+  closed records stay in lane-local history rather than the active root index
 - high-risk routes should default toward stronger control modes and human gates
 
 ## Good anchors in this repo
@@ -30,6 +36,10 @@ Use stable anchors such as:
 - `mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md`
 - `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`
 - `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`
+- `mechanics/machine-fit/parts/fit-record/docs/PROFILE_MACHINE_FIT_PACKET.md`
+- `mechanics/machine-fit/parts/platform-adaptations/docs/MACHINE_FIT_FOLLOW_THROUGH_PACKET.md`
+- `mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_MATERIALIZATION_PACKET.md`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_RUNTIME_PACKET.md`
 
 ## Initial posture
 

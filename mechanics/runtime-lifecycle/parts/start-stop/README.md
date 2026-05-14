@@ -8,3 +8,6 @@ in `mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh` because it is a
 post-start lifecycle action, not a benchmark or promotion claim.
 
 Starting runtime services remains an explicit operator action.
+
+Use `docs/LIVE_RUNTIME_CUTOVER_PACKET.md` before promoting a deployed seam into
+the live runtime loop.

@@ -22,3 +22,10 @@ GitHub repo validation.
 Added package-local `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and this
 landing log so future projection changes have the same route-card spine as the
 rest of `mechanics/`.
+
+## 2026-05-13 - Residual frontier alignment
+
+Confirmed the remaining frontier should advance through source-first synthetic
+parity before live runtime sync. Packet closeout now uses synthetic roots when
+runtime evidence is needed, but the source checkout still treats deployed
+`Configs` as a projection target rather than source authority.

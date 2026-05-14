@@ -8,7 +8,7 @@ owner_surface: platform-adaptation
 theme_ref: ''
 milestone_ref: ''
 kind: support
-state: captured
+state: done
 band: near
 difficulty: d2_slice
 risk: r1_repo_local
@@ -42,7 +42,7 @@ harvest:
   trigger_count: 2
   note: repeat platform adaptation patterns may deserve reusable technique surfaces
 opened_at: '2026-03-31'
-touched_at: '2026-04-05'
+touched_at: '2026-05-13'
 tags:
   - windows
   - platform
@@ -57,4 +57,11 @@ notes: >-
   adaptation changes mainly planted the surfaces that this run used. Re-run
   harvest after a second distinct host-fit remediation lands through the same
   route.
+  2026-05-13 residual frontier alignment: route shape was ready. The same
+  pass then executed the public-safe follow-through packet across Windows
+  bridge posture, reference-platform posture, platform adaptation, machine
+  bridge, and machine-fit records. Closeout lives at
+  mechanics/machine-fit/parts/platform-adaptations/docs/MACHINE_FIT_FOLLOW_THROUGH_PACKET.md.
+  The source follow-through is done; future host-specific remediation should
+  rerun the packet instead of touching private host captures from source docs.
 public_safe: true

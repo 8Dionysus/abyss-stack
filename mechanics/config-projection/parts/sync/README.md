@@ -10,3 +10,6 @@ of live private machine state.
 
 Root public-safe route and design surfaces, including `AGENTS.md`, `DESIGN.md`,
 and `DESIGN.AGENTS.md`, are synced with the source-managed `Configs` mirror.
+Quest route surfaces, including `quests/` and `QUESTBOOK.md`, are also synced
+because stack validation and deployed Configs self-checks use the quest surface
+builder as source-managed public metadata.

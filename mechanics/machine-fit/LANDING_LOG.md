@@ -23,3 +23,17 @@ Validation route: py_compile for machine-fit backends and
 Added package-local `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and this
 landing log so host-fit work keeps machine ownership and source/public
 boundaries explicit.
+
+## 2026-05-13 - Residual frontier alignment
+
+Classified the platform and Windows bridge follow-through route before packet
+closeout: Windows bridge posture, reference-platform posture,
+platform-adaptation examples, and machine-fit records must be reviewed together
+without committing private host captures.
+
+## 2026-05-13 - Packet closeout
+
+Closed the profile rollout and machine-fit follow-through quests through
+package-local packet docs. The packet run used public-safe host facts,
+machine-bridge, platform-adaptation, and machine-fit records; it did not commit
+private captures or claim live service health.

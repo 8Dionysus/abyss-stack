@@ -62,3 +62,7 @@ logs/status, and user-unit helpers live under their owning
 `mechanics/runtime-lifecycle/parts/` routes. Runtime cache/usage readout schemas
 and examples live in `mechanics/runtime-lifecycle/parts/status-readouts/`, with
 regression coverage in `mechanics/runtime-lifecycle/parts/status-readouts/tests/`.
+Source/runtime parity now routes through
+`mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`,
+and live runtime cutover inspection routes through
+`mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`.

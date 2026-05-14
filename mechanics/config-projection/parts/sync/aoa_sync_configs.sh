@@ -42,10 +42,12 @@ items=(
   config-templates
   docs
   mechanics
+  quests
   scripts
   systemd
   env
   README.md
+  QUESTBOOK.md
   CHARTER.md
   BOUNDARIES.md
   DESIGN.md

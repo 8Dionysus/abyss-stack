@@ -9,6 +9,8 @@ Use it when you need one compact artifact that says:
 
 Surfaces:
 - `docs/PLATFORM_ADAPTATION_POLICY.md` - bounded platform-adaptation policy
+- `docs/MACHINE_FIT_FOLLOW_THROUGH_PACKET.md` - bridge, reference-platform,
+  adaptation, and fit-record follow-through packet
 - `schemas/schema.v1.json` - machine-readable contract
 - `examples/platform-adaptation.public.json.example` - public-safe example shape
 - `aoa_platform_adaptation.py` - part-local backend for

@@ -11,3 +11,8 @@ readiness, status readouts, and systemd user unit routes.
 - [logs-status](logs-status/README.md)
 - [status-readouts](status-readouts/README.md)
 - [user-unit](user-unit/README.md)
+
+Packet routes:
+
+- [source runtime parity](config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md)
+- [live runtime cutover](start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md)

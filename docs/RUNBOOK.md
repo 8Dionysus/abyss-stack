@@ -44,7 +44,7 @@ aoa-export-memo-candidate --runtime-surface checkpoint_export --input-file /tmp/
 aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selection.json --write
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 aoa-a2a-return-closeout-dry-run --input-file /tmp/reviewed-closeout-request.json --write
-python scripts/aoa-rpg-runtime-projection --check
+scripts/aoa-rpg-runtime-projection --check
 scripts/aoa-governed-run audit <run-id>
 scripts/aoa-governed-run replay-review-packets <run-id>
 curl http://127.0.0.1:5402/playbooks/activation
@@ -116,8 +116,8 @@ aoa-a2a-return-closeout-dry-run \
 For filesystem-first RPG runtime projection refresh and parity check:
 
 ```bash
-python scripts/aoa-rpg-runtime-projection
-python scripts/aoa-rpg-runtime-projection --check
+scripts/aoa-rpg-runtime-projection
+scripts/aoa-rpg-runtime-projection --check
 ```
 
 For governed-run review-packet audit and replay from stored context only:
@@ -202,20 +202,20 @@ jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnostic_target.json"
 jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnostic_session.json"
 jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/diagnosis_companion.json"
 jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/repair_handoff.json"
-jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/reviewed_diagnosis.ref.json"
 jq . "${AOA_STACK_ROOT}/Logs/diagnostics/latest/last_good.ref.json"
 ```
 
 Read `target`, `axes`, `truth_status`, `drifts`, `exit_class`, and `next_moves` there.
 Treat that file as the runtime copy of `diagnostic_session_v1`.
 `aoa-diagnose --write-latest` also refreshes `diagnostic_target.json`,
-`diagnostic_session.json`, `diagnosis_companion.json`, `repair_handoff.json`,
-`reviewed_diagnosis.ref.json`, and the corresponding record copy under
+`diagnostic_session.json`, `diagnosis_companion.json`,
+`repair_handoff.json`, and the corresponding record copy under
 `Logs/diagnostics/records/`.
 Use `--write-last-good-ref` only when you want to promote the current green
 pass into `last_good.ref.json` explicitly.
 Use `--write-reviewed-diagnosis-ref` when you want the runtime seam to record
 an explicit review bridge over the current `diagnosis_companion.json`.
+That is the mode that writes `reviewed_diagnosis.ref.json`.
 Use `--with-reviewed-diagnosis-ref` when a reviewed diagnosis packet already
 exists and the repair handoff should stop blocking on that prerequisite.
 

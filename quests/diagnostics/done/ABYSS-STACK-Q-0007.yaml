@@ -8,7 +8,7 @@ owner_surface: diagnostics/diagnostic-spine
 theme_ref: ''
 milestone_ref: ''
 kind: doctrine
-state: captured
+state: done
 band: frontier
 difficulty: d3_seam
 risk: r2_contract
@@ -47,7 +47,7 @@ harvest:
   trigger_count: 3
   note: if the same diagnostic spine is used repeatedly as a bounded operator workflow, consider a thin local skill overlay sourced from aoa-skills
 opened_at: '2026-04-07'
-touched_at: '2026-04-07'
+touched_at: '2026-05-13'
 tags:
   - diagnostics
   - self-diagnosis
@@ -55,6 +55,12 @@ tags:
   - repair-handoff
   - rpg-reflection
 notes: >
-  Keep the landing contract-only in this pass.
-  Do not add free self-repair, global scoreboards, or new runtime quest authority in this pass.
+  2026-05-13 residual frontier alignment: diagnostic source contracts were
+  ready. The same pass ran a synthetic runtime diagnosis packet that wrote
+  target, session, companion, and repair handoff latest/records artifacts.
+  Closeout lives at
+  mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_RUNTIME_PACKET.md.
+  The packet intentionally surfaced drift and review_required repair handoff
+  posture without adding free self-repair, global scoreboards, or new runtime
+  quest authority.
 public_safe: true

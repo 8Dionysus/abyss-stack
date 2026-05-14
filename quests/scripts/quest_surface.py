@@ -16,16 +16,18 @@ QUEST_IDS = (
     "ABYSS-STACK-Q-0006",
     "ABYSS-STACK-Q-0007",
     "ABYSS-STACK-Q-0008",
+    "ABYSS-STACK-Q-0009",
 )
 QUEST_ROUTES = {
     "ABYSS-STACK-Q-0001": ("stack", "done"),
-    "ABYSS-STACK-Q-0002": ("profiles", "triaged"),
+    "ABYSS-STACK-Q-0002": ("profiles", "done"),
     "ABYSS-STACK-Q-0003": ("stack", "done"),
-    "ABYSS-STACK-Q-0004": ("machine-fit", "captured"),
-    "ABYSS-STACK-Q-0005": ("rpg-runtime", "captured"),
-    "ABYSS-STACK-Q-0006": ("rpg-runtime", "captured"),
-    "ABYSS-STACK-Q-0007": ("diagnostics", "captured"),
-    "ABYSS-STACK-Q-0008": ("tos-graph", "captured"),
+    "ABYSS-STACK-Q-0004": ("machine-fit", "done"),
+    "ABYSS-STACK-Q-0005": ("rpg-runtime", "done"),
+    "ABYSS-STACK-Q-0006": ("rpg-runtime", "done"),
+    "ABYSS-STACK-Q-0007": ("diagnostics", "done"),
+    "ABYSS-STACK-Q-0008": ("tos-graph", "done"),
+    "ABYSS-STACK-Q-0009": ("diagnostics", "ready"),
 }
 QUEST_CATALOG_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_catalog.min.example.json"
 QUEST_DISPATCH_EXAMPLE_PATH = QUEST_SURFACE_ROOT / "examples" / "quest_dispatch.min.example.json"

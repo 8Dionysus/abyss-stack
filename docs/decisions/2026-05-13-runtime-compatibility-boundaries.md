@@ -48,6 +48,6 @@ fallbacks.
 Use the touched package checks plus the root validation stack:
 
 - `python -m pytest mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py -q`
-- `python scripts/aoa-rpg-runtime-projection --generated-only --check`
+- `scripts/aoa-rpg-runtime-projection --generated-only --check`
 - `python scripts/validate_stack.py`
 - `python scripts/validate_nested_agents.py`
