@@ -195,6 +195,9 @@ Tracking starts with the community-docs baseline for this repository.
 - named presets now expand through explicit `substrate + local-worker` or
   `substrate + intel-worker` layers, while broad `agentic` and `intel` profiles
   remain compatibility routes instead of hidden preset bases
+- `aoa-machine-fit` now resolves preset membership from the source checkout
+  before falling back to deployed `Configs`, so stale live mirrors remain parity
+  drift instead of changing the source-owned runtime recommendation
 
 ### Validation
 

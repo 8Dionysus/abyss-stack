@@ -3464,6 +3464,27 @@ def validate_reference_platform(errors: list[str]) -> None:
             "reference-host.public.json.example must use captured_by scripts/aoa-host-facts"
         )
 
+    machine_fit_example = json.loads(
+        (
+            ROOT
+            / "mechanics"
+            / "machine-fit"
+            / "parts"
+            / "fit-record"
+            / "examples"
+            / "machine-fit.public.json.example"
+        ).read_text(encoding="utf-8")
+    )
+    preferred_profiles = (
+        machine_fit_example.get("runtime_recommendation", {}).get("preferred_profile_set")
+        if isinstance(machine_fit_example.get("runtime_recommendation"), dict)
+        else None
+    )
+    if preferred_profiles != ["substrate", "intel-worker", "tools", "observability"]:
+        errors.append(
+            "machine-fit public example must use the composition-first intel-full profile set"
+        )
+
 
 def validate_machine_bridge(errors: list[str]) -> None:
     machine_bridge_doc_path = ROOT / "mechanics" / "machine-fit" / "parts" / "machine-bridge" / "docs" / "MACHINE_BRIDGE.md"

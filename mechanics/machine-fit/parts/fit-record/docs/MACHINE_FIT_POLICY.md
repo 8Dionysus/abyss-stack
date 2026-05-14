@@ -55,6 +55,11 @@ Current means more than "the file exists": the record should be parseable,
 fresh enough for the operator window, captured for the current host OS/kernel,
 and carrying a launchable `fit_verdict.status`.
 
+Preset and profile recommendations are source-owned. When `aoa-machine-fit`
+runs from a source checkout, it should resolve preset membership from that
+checkout before falling back to deployed `Configs`; stale deployed mirrors are
+reported by parity checks, not allowed to rewrite the source recommendation.
+
 ## Artifact surfaces
 
 - `mechanics/machine-fit/parts/fit-record/schemas/schema.v1.json` defines the public contract
@@ -119,7 +124,7 @@ A strong machine-fit record captures:
 - the current hardware class
 - the visible accelerator and driver posture
 - whether relevant host packages are current in configured repos
-- the preferred preset or profile set
+- the preferred preset or source-owned profile set
 - the bounded validated runtime settings worth reusing
 - any bounded recommended overlays worth auto-applying on that host
 - whether the current host envelope is quiet enough for latency-sensitive work
