@@ -37,13 +37,13 @@ Example on Linux:
 
 ```bash
 export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.cpu.yml
-scripts/aoa-up --profile core
+scripts/aoa-up --profile substrate --profile local-worker
 ```
 
 Example on Windows:
 
 ```powershell
-pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile core
+pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile substrate --profile local-worker
 ```
 
 `llamacpp.cpu.yml` is intentionally a placeholder overlay that proves the overlay path works without claiming a measured or production-grade CPU tuning contract.

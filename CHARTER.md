@@ -7,6 +7,7 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 ## It owns
 
 - deployment topology
+- working substrate runtime selection
 - runtime modules
 - local and hybrid service wiring
 - storage layout

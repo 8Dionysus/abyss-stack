@@ -6,6 +6,10 @@
 
 ## Layer model
 
+The default working runtime selection is `substrate`: storage plus
+orchestration. Local workers, Intel lanes, federation seams, tools, and
+observability are explicit profile or preset layers over that base.
+
 ### 1. Storage layer
 
 Persistent state and retrieval substrate:

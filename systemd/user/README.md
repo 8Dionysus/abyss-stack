@@ -21,6 +21,10 @@ systemctl --user daemon-reload
 systemctl --user enable --now podman-compose-abyss.service
 ```
 
+The checked-in unit defaults to the conservative `substrate` profile. Host-local
+drop-ins should carry richer runtime selection rather than editing the source
+skeleton for one machine.
+
 Prefer `scripts/aoa-install-systemd` when you need a durable runtime selection:
 
 ```bash

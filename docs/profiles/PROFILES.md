@@ -8,16 +8,45 @@ They answer a simple question:
 
 ## Current profiles
 
+### `substrate`
+
+The conservative working service base for the AbyssOS runtime:
+- `10-storage.yml`
+- `20-orchestration.yml`
+
+This is the default source-owned runtime substrate. It brings up persistence,
+retrieval stores, and orchestration without silently choosing a local model
+worker, accelerator lane, federation seam, tools, or observability bundle.
+
+### `local-worker`
+
+The canonical local worker layer:
+- `32-llamacpp-inference.yml`
+- `41-agent-api.yml`
+
+This profile keeps `llama.cpp` and `langchain-api` together without also
+claiming to own storage or orchestration. Use it with `substrate` when the
+machine should run the promoted local text worker path:
+
+```bash
+aoa-up --profile substrate --profile local-worker
+```
+
 ### `core`
 
-The smallest useful local substrate:
+Compatibility bundle for substrate plus local model-serving basics:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 
+Use `substrate` for the default OS runtime base and `substrate + local-worker`
+when you also want the agent API. `core` remains useful for older operator
+habits and quick storage/orchestration/`llama.cpp` checks.
+
 ### `agentic`
 
-A local agent-facing runtime surface with a canonical `llama.cpp` chat path:
+A local agent-facing runtime surface with substrate plus the canonical
+`llama.cpp` chat path:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
@@ -81,8 +110,11 @@ Profiles stay small and legible.
 A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
 
-The optional `llama.cpp` benchmark lane deliberately stays outside the default profiles and presets.
-Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
+The optional `llama.cpp` sidecar benchmark lane deliberately stays outside the
+default profile and named presets. Use
+[LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md)
+only when you want an explicit alternate benchmark or promotion surface beyond
+the canonical runtime path.
 
 ## Dependency note
 
@@ -124,8 +156,8 @@ If you want named bundles on top of composition, read:
 Or use:
 
 ```bash
-aoa-profile-modules --profile agentic --profile tools --paths
-aoa-profile-endpoints --profile agentic --profile tools
+aoa-profile-modules --profile substrate --profile local-worker --paths
+aoa-profile-endpoints --profile substrate --profile local-worker
 ```
 
 ## Operating routes

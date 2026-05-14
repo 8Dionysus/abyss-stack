@@ -7,6 +7,10 @@ They are the layer above composition:
 - profiles are named stacks of modules
 - presets are named stacks of profiles
 
+The conservative working substrate is `profiles/substrate.txt`. It stays a
+profile so operators can layer local-worker, federation, tools, or
+observability deliberately.
+
 ## Format
 
 Each preset file is a plain text file listing profile names in activation order.

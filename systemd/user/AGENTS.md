@@ -19,7 +19,7 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 ## Unit rules
 - Preserve the rootless Fedora-first posture. Do not convert these into privileged or system-wide service assumptions casually.
 - Keep explicit environment variables for stack root, configs root, profile, and project name.
-- The default profile should stay conservative, currently `core`, unless the repo-level operating contract changes.
+- The default profile should stay conservative, currently `substrate`, unless the repo-level operating contract changes.
 - Do not embed secrets or machine-specific source paths in units.
 - Do not change lifecycle semantics such as `Type=oneshot`, `RemainAfterExit=yes`, or the start, stop, and reload scripts without checking the runtime wrappers and docs.
 

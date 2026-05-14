@@ -69,14 +69,14 @@ Refresh the private machine-fit record when kernel, firmware, container runtime,
 ## Inspect the profile before launch
 
 ```bash
-scripts/aoa-profile-modules --profile core
-scripts/aoa-profile-endpoints --profile core
+scripts/aoa-profile-modules --profile substrate
+scripts/aoa-profile-endpoints --profile substrate
 ```
 
 For absolute module paths:
 
 ```bash
-scripts/aoa-profile-modules --profile core --paths
+scripts/aoa-profile-modules --profile substrate --paths
 ```
 
 ## Deeper runtime truth before launch
@@ -84,8 +84,8 @@ scripts/aoa-profile-modules --profile core --paths
 After secrets exist, inspect what Compose actually sees:
 
 ```bash
-scripts/aoa-render-services --profile core
-scripts/aoa-render-config --profile core --write /tmp/abyss-core.rendered.yml
+scripts/aoa-render-services --profile substrate
+scripts/aoa-render-config --profile substrate --write /tmp/abyss-substrate.rendered.yml
 ```
 
 Treat the rendered config as potentially secret-bearing.
@@ -93,12 +93,26 @@ Treat the rendered config as potentially secret-bearing.
 ## Bring up the first profile
 
 ```bash
-scripts/aoa-up --profile core
-scripts/aoa-wait --profile core
-scripts/aoa-smoke --profile core
+scripts/aoa-up --profile substrate
+scripts/aoa-wait --profile substrate
+scripts/aoa-smoke --profile substrate
 ```
 
 ## Move to richer profiles
+
+### Local worker runtime
+
+This keeps the base substrate explicit and adds the canonical
+`langchain-api -> llama.cpp` worker path:
+
+```bash
+scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+scripts/aoa-render-services --profile substrate --profile local-worker
+scripts/aoa-up --profile substrate --profile local-worker
+scripts/aoa-smoke --profile substrate --profile local-worker
+scripts/aoa-qwen-check --case exact-reply
+```
 
 ### Agent-facing runtime
 
@@ -198,8 +212,8 @@ Start with:
 ```bash
 scripts/aoa-doctor
 scripts/aoa-check-layout
-scripts/aoa-status --profile core
-scripts/aoa-logs --profile core
+scripts/aoa-status --profile substrate
+scripts/aoa-logs --profile substrate
 ```
 
 Then read:
