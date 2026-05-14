@@ -1,6 +1,6 @@
 services:
   llama-cpp:
-    image: "${AOA_LLAMACPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-openvino}"
+    image: "${AOA_LLAMACPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-openvino@sha256:38c1125b848debd90d109d024b5b90cce9c354561279b59bd23a0565eccad33e}"
     platform: linux/amd64
     container_name: llama-cpp
     restart: unless-stopped

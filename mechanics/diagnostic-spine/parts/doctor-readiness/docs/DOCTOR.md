@@ -19,8 +19,8 @@ The current doctor pass looks at things like:
 - whether the stack root is the canonical `/srv/AbyssOS/abyss-stack`
 - whether the selected runtime includes internal-only layers that should later be checked with `aoa-smoke --with-internal`
 - whether the selected runtime enables a federated advisory consumer without also selecting the localhost federation seam
-- whether a current machine-fit record is missing for the deployed runtime root
-- whether `abyss-machine` is available, its stack bridge validates, and a current stack-side machine-bridge record exists
+- whether a machine-fit record exists, is parseable, is not stale, matches the current host OS/kernel, and has a launchable verdict
+- whether `abyss-machine` is available, its stack bridge validates, and the stack-side machine-bridge record is current enough for the current host bridge
 - whether the current host envelope looks noisy for latency-sensitive work
 
 ## Preset-aware and profile-aware behavior
@@ -45,9 +45,13 @@ Use `aoa-doctor` to decide whether a selected runtime is ready to start.
 Use `scripts/aoa-host-facts` to capture durable machine-readable host facts.
 
 Use `scripts/aoa-machine-bridge` to capture the read-only `abyss-machine`
-handoff into the stack runtime log tree.
+handoff into the stack runtime log tree. `aoa-doctor` treats an old bridge file
+as advisory evidence, not as current proof.
 
 Use `scripts/aoa-machine-fit` to capture the bounded current-machine runtime posture after host facts exist.
+`aoa-doctor` warns when the latest fit record was captured for an older host
+OS or kernel, when the record is older than the configured age budget, or when
+its verdict requires attention.
 
 The two surfaces complement each other and should not absorb each other's job.
 
@@ -99,6 +103,16 @@ scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-f
 
 Keep `mechanics/machine-fit/parts/host-facts/examples/reference-host.public.json` for later canonical-host refreshes, not routine local captures.
 
+Freshness budgets are intentionally soft warnings:
+
+```bash
+AOA_MACHINE_BRIDGE_MAX_AGE_HOURS=24
+AOA_MACHINE_FIT_MAX_AGE_HOURS=720
+```
+
+Use smaller values for a live cutover window. Use larger values only when the
+operator has deliberately frozen host state and accepts that the record is old.
+
 ## Windows host bridge
 
 If your source checkout lives on Windows and the runtime lives in WSL, start with:
@@ -130,21 +144,21 @@ For example:
 For a generic full bundle:
 
 ```bash
+scripts/aoa-machine-bridge --write-latest
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-doctor --preset agent-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
-scripts/aoa-machine-bridge --write-latest
-scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset agent-full
 ```
 
 For an Intel-aware full bundle:
 
 ```bash
+scripts/aoa-machine-bridge --write-latest
+scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-doctor --preset intel-full
 scripts/aoa-first-run --strict
 scripts/aoa-check-layout --strict
-scripts/aoa-machine-bridge --write-latest
-scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-fit/latest/latest.private.json"
 scripts/aoa-smoke --with-internal --preset intel-full
 ```

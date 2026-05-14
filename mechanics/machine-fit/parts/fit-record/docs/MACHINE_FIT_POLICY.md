@@ -51,6 +51,9 @@ Do not use this layer for:
 
 The machine-fit layer is the operational bridge between inventory and retestable posture.
 When a current private machine-fit record exists, the lifecycle wrappers may auto-apply its validated settings and recommended overlays for the deployed runtime.
+Current means more than "the file exists": the record should be parseable,
+fresh enough for the operator window, captured for the current host OS/kernel,
+and carrying a launchable `fit_verdict.status`.
 
 ## Artifact surfaces
 

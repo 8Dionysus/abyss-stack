@@ -1736,7 +1736,6 @@ def validate_profiles(errors: list[str]) -> None:
     orchestration_module = (MODULE_DIR / "20-orchestration.yml").read_text(encoding="utf-8")
     for snippet in (
         "n8n-task-runners:",
-        "docker.io/n8nio/runners@sha256:",
         "N8N_RUNNERS_ENABLED",
         "N8N_RUNNERS_MODE: external",
         "N8N_RUNNERS_BROKER_LISTEN_ADDRESS: 0.0.0.0",
@@ -1745,6 +1744,10 @@ def validate_profiles(errors: list[str]) -> None:
     ):
         if snippet not in orchestration_module:
             errors.append(f"compose/modules/20-orchestration.yml must include n8n external runner setting: {snippet}")
+    if not re.search(r"docker\.io/n8nio/runners:[^\s\"']+@sha256:[0-9a-f]{64}", orchestration_module):
+        errors.append(
+            "compose/modules/20-orchestration.yml must pin n8n-task-runners as docker.io/n8nio/runners:<version>@sha256:<digest>"
+        )
 
     stack_env_example = (ROOT / "env" / "stack.env.example").read_text(encoding="utf-8")
     if "N8N_RUNNERS_AUTH_TOKEN=CHANGE_ME_LONG_RANDOM_SHARED_SECRET" not in stack_env_example:
@@ -3368,6 +3371,67 @@ def validate_machine_bridge(errors: list[str]) -> None:
         errors.append("machine-bridge public example must keep stack_side_mutates_machine false")
 
 
+def validate_machine_integration_freshness_gates(errors: list[str]) -> None:
+    doctor_script = (
+        ROOT
+        / "mechanics"
+        / "diagnostic-spine"
+        / "parts"
+        / "doctor-readiness"
+        / "aoa_doctor.sh"
+    ).read_text(encoding="utf-8")
+    doctor_doc = (
+        ROOT
+        / "mechanics"
+        / "diagnostic-spine"
+        / "parts"
+        / "doctor-readiness"
+        / "docs"
+        / "DOCTOR.md"
+    ).read_text(encoding="utf-8")
+    autonomy_status = (
+        ROOT
+        / "mechanics"
+        / "governed-execution"
+        / "parts"
+        / "autonomy-status"
+        / "aoa_status_autonomy.py"
+    ).read_text(encoding="utf-8")
+    diagnose_wrapper = (
+        ROOT
+        / "mechanics"
+        / "diagnostic-spine"
+        / "parts"
+        / "diagnose-wrapper"
+        / "aoa_diagnose.py"
+    ).read_text(encoding="utf-8")
+
+    for snippet in (
+        "AOA_MACHINE_FIT_MAX_AGE_HOURS",
+        "AOA_MACHINE_BRIDGE_MAX_AGE_HOURS",
+        "machine-fit kernel mismatch",
+        "machine-bridge host bridge version mismatch",
+    ):
+        if snippet not in doctor_script:
+            errors.append(f"aoa-doctor must preserve machine evidence freshness gate `{snippet}`")
+    for snippet in (
+        "AOA_MACHINE_FIT_MAX_AGE_HOURS",
+        "AOA_MACHINE_BRIDGE_MAX_AGE_HOURS",
+        "old bridge file",
+        "captured for an older host",
+    ):
+        if snippet not in doctor_doc:
+            errors.append(f"DOCTOR.md must document machine evidence freshness gate `{snippet}`")
+    current_marker = '"docs" / "install" / "DEPLOYMENT.md"'
+    old_marker = '"docs" / "DEPLOYMENT.md"'
+    if current_marker not in autonomy_status:
+        errors.append("aoa-status autonomy source-root detection must use docs/install/DEPLOYMENT.md")
+    if current_marker not in diagnose_wrapper:
+        errors.append("aoa-diagnose source-root detection must use docs/install/DEPLOYMENT.md")
+    if old_marker in autonomy_status or old_marker in diagnose_wrapper:
+        errors.append("active source-root detection must not use stale docs/DEPLOYMENT.md marker")
+
+
 def validate_platform_adaptations(errors: list[str]) -> None:
     boundaries_doc = (ROOT / "BOUNDARIES.md").read_text(encoding="utf-8")
     if "platform-adaptation" not in boundaries_doc:
@@ -4708,6 +4772,7 @@ def main() -> int:
     validate_questbook_surface(errors)
     validate_reference_platform(errors)
     validate_machine_bridge(errors)
+    validate_machine_integration_freshness_gates(errors)
     validate_platform_adaptations(errors)
     validate_branch_policy(errors)
     validate_memo_runtime_seam(errors)

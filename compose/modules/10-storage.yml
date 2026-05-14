@@ -1,6 +1,6 @@
 services:
   neo4j:
-    image: docker.io/library/neo4j@sha256:0e5d68ed655a64fe57296cc8e1b928f48456462dbf2c46d50a25c47b93ea938b
+    image: docker.io/library/neo4j:5.26.26-community@sha256:f27aaa05476f3e7be0c7cf03988c60c97c4e95b80a2fb3c79a6b39a813e1065c
     env_file:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     ports:
@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: docker.io/qdrant/qdrant@sha256:0425e3e03e7fd9b3dc95c4214546afe19de2eb2e28ca621441a56663ac6e1f46
+    image: docker.io/qdrant/qdrant:v1.18.0@sha256:b3063c673f3973877c038eeecc392bad5011f072ee7892b56c9a8e204a3bdea9
     ports:
       - "127.0.0.1:6333:6333"
     volumes:
@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: docker.io/library/postgres@sha256:d4c3314b2dd74ff23cd6cd07e4d7e737cb6ef791c22a7cbd744cfbfb4815df72
+    image: docker.io/library/postgres:16.13@sha256:5d143123fdf80462d1778cd4f24b9f7ca13c87174bca19141fb194c5a1ebca59
     env_file:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     ports:
@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: docker.io/library/redis@sha256:7fc0068cee4c9e73e3709705c626d0d4fc1dc2019d0cee58cb0f88f76184ee2b
+    image: docker.io/library/redis:7.4.9@sha256:3e1b24a1a8f24ff926b15e5ace8c38a03e5657fb66e1fc7e5188e315aa5fa094
     ports:
       - "127.0.0.1:6379:6379"
     volumes:

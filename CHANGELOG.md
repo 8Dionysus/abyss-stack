@@ -69,6 +69,11 @@ Tracking starts with the community-docs baseline for this repository.
   `docs/install/`, operations under `docs/operations/`, profile selection under
   `docs/profiles/`, governance under `docs/governance/`, and preserved old
   references under `docs/legacy/`
+- source-managed runtime component references now use current inspected
+  `version-tag@sha256` pins across storage, orchestration, inference,
+  monitoring, and helper service bases, while stateful datastores stay on their
+  current compatible lines unless a separate migration packet promotes a major
+  jump
 - noisy Agon and experience archival artifacts, including late-found experience
   job/worker/storage-plan docs, moved out of flat root districts into
   package-local `legacy/` homes with validators and tests following the move
@@ -167,6 +172,10 @@ Tracking starts with the community-docs baseline for this repository.
   `Options considered`, `Rationale`, `Source surfaces`, and `Follow-up route`
   shape, with `scripts/release_check.py` running the decision validator before
   the wider release audit
+- `aoa-doctor`, `aoa-status --autonomy`, and `aoa-diagnose` now keep the
+  machine bridge honest after the docs refactor: source-root detection uses
+  `docs/install/DEPLOYMENT.md`, and doctor warns on stale or host-mismatched
+  machine-fit and machine-bridge records
 
 ### Validation
 

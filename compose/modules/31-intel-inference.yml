@@ -1,6 +1,6 @@
 services:
   ovms:
-    image: docker.io/openvino/model_server@sha256:e5ff7c50f3c36eae98c4e98d373e3fe91c9295630aea3cd8aaea0afd30be0e9c
+    image: docker.io/openvino/model_server:2026.1-gpu@sha256:22f92a1a5ad6784384e47296c43bde239887a623e75de45b0e1802659de416a6
     container_name: ovms
     restart: unless-stopped
     ports:

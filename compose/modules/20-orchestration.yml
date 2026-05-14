@@ -1,6 +1,6 @@
 services:
   n8n:
-    image: docker.io/n8nio/n8n@sha256:5bf25e23d65895ddde4ce42cf6ad1bc1b09673f16fbe824bd48f1baffe84937a
+    image: docker.io/n8nio/n8n:2.21.2@sha256:32d7475fd061772a88e485f804f7079dd5641f35502116d1389dcff269c2d72e
     env_file:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     environment:
@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
   n8n-task-runners:
-    image: docker.io/n8nio/runners@sha256:37a3a6930604fd54c9b52e43660e4962c9f1a60fa8be7154eb44a610abb1ea41
+    image: docker.io/n8nio/runners:2.21.2@sha256:a96d7bd252e15711b77fd04964b9046a7f8e56eff5c3e51d6c30e3a014c664d0
     env_file:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     environment:
