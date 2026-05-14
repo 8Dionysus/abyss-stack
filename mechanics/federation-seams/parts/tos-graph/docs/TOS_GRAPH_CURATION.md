@@ -80,8 +80,8 @@ The first owner-repo slice should verify with:
 python scripts/validate_stack.py
 scripts/aoa-profile-modules --profile curation --paths
 scripts/aoa-profile-endpoints --profile curation
-scripts/aoa-profile-modules --profile core --profile curation --paths
-scripts/aoa-profile-endpoints --profile core --profile curation
+scripts/aoa-profile-modules --profile substrate --profile curation --paths
+scripts/aoa-profile-endpoints --profile substrate --profile curation
 ```
 
 Any later write-capable slice must also pass the relevant `Tree-of-Sophia`

@@ -17,6 +17,7 @@ Validation:
 
 ```bash
 python scripts/validate_stack.py
+python -m pytest mechanics/runtime-lifecycle/parts/start-stop/tests/test_aoa_warmup.py -q
 python -m pytest mechanics/runtime-lifecycle/parts/status-readouts/tests/test_runtime_hygiene.py -q
 bash -n scripts/aoa-install-layout scripts/aoa-check-layout scripts/aoa-first-run scripts/aoa-up scripts/aoa-down scripts/aoa-warmup scripts/aoa-wait scripts/aoa-smoke scripts/aoa-logs scripts/aoa-status scripts/aoa-install-systemd
 bash -n mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_*.sh mechanics/runtime-lifecycle/parts/start-stop/aoa_*.sh mechanics/runtime-lifecycle/parts/wait-smoke/aoa_*.sh mechanics/runtime-lifecycle/parts/logs-status/aoa_*.sh mechanics/runtime-lifecycle/parts/layout-install/aoa_*.sh mechanics/runtime-lifecycle/parts/user-unit/aoa_*.sh

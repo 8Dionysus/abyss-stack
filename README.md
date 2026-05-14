@@ -117,7 +117,8 @@ The active source shape is:
   checks only through explicit operator intent
 - the default source-owned runtime selection is the conservative `substrate`
   profile: storage plus orchestration under `abyss-stack`; local workers,
-  federation, tools, and observability layer on top explicitly
+  retained fallback gateways, federation, tools, and observability layer on top
+  explicitly
 - `abyss-machine` is consumed through read-only bridge and machine-fit packets
   without transferring machine ownership into this repo
 - `langchain-api` on `5403`, `llama.cpp`, and LangGraph remain bounded

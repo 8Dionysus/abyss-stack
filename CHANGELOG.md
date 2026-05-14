@@ -183,6 +183,15 @@ Tracking starts with the community-docs baseline for this repository.
 - root docs, profile docs, CI rehearsal, the checked-in user-unit skeleton, and
   validation now preserve the split between working substrate, local-worker,
   and richer live runtime selections
+- retained Ollama and LiteLLM modules now route through an explicit
+  `fallback-gateway` profile, while module/profile README surfaces classify
+  substrate, worker, fallback, projection, helper, visibility, and pilot rings
+- active render, diagnostic, curation, and machine-fit packet examples now use
+  `substrate`, `local-worker`, `fallback-gateway`, or explicit presets instead
+  of teaching `core` as the default runtime base
+- `aoa-warmup` is now profile-aware across local-worker and fallback modules:
+  `llama.cpp` can warm by default, while retained Ollama warmup requires
+  explicit `AOA_OLLAMA_WARMUP_ENABLED=true`
 
 ### Validation
 

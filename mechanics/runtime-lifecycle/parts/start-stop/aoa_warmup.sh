@@ -26,51 +26,42 @@ is_enabled() {
   esac
 }
 
-if ! is_enabled "$AOA_OLLAMA_WARMUP_ENABLED"; then
-  aoa_note "ollama warmup disabled"
-fi
-
-if has_module "32-llamacpp-inference.yml"; then
-  if ! is_enabled "$AOA_LLAMACPP_WARMUP_ENABLED"; then
-    aoa_note "llama.cpp warmup disabled"
-    exit 0
-  fi
+warm_llamacpp() {
   command -v curl >/dev/null 2>&1 || aoa_die "curl is required"
   wait_deadline=$((SECONDS + AOA_LLAMACPP_WARMUP_WAIT_S))
+
   until curl -fsS --max-time 5 "$AOA_LLAMACPP_WARMUP_URL" >/dev/null 2>&1; do
-    if (( SECONDS >= wait_deadline )); then
+    if ((SECONDS >= wait_deadline)); then
       aoa_note "warn llama.cpp warmup skipped because ${AOA_LLAMACPP_WARMUP_URL} did not become ready in ${AOA_LLAMACPP_WARMUP_WAIT_S}s"
-      exit 0
+      return 0
     fi
     sleep 2
   done
+
   aoa_note "llama.cpp warmup complete"
-  exit 0
-fi
+}
 
-if ! has_module "30-local-inference.yml"; then
-  aoa_note "skip model warmup because selected profiles do not include a warmup-managed inference module"
-  exit 0
-fi
+warm_ollama() {
+  local tags_url chat_url ps_url warmup_payload warmup_response loaded_models wait_deadline
 
-command -v curl >/dev/null 2>&1 || aoa_die "curl is required"
-command -v python >/dev/null 2>&1 || aoa_die "python is required"
+  command -v curl >/dev/null 2>&1 || aoa_die "curl is required"
+  command -v python >/dev/null 2>&1 || aoa_die "python is required"
 
-wait_deadline=$((SECONDS + AOA_OLLAMA_WARMUP_WAIT_S))
-tags_url="${AOA_OLLAMA_WARMUP_URL%/}/api/tags"
-chat_url="${AOA_OLLAMA_WARMUP_URL%/}/api/chat"
-ps_url="${AOA_OLLAMA_WARMUP_URL%/}/api/ps"
+  wait_deadline=$((SECONDS + AOA_OLLAMA_WARMUP_WAIT_S))
+  tags_url="${AOA_OLLAMA_WARMUP_URL%/}/api/tags"
+  chat_url="${AOA_OLLAMA_WARMUP_URL%/}/api/chat"
+  ps_url="${AOA_OLLAMA_WARMUP_URL%/}/api/ps"
 
-until curl -fsS --max-time 5 "$tags_url" >/dev/null 2>&1; do
-  if (( SECONDS >= wait_deadline )); then
-    aoa_note "warn ollama warmup skipped because ${tags_url} did not become ready in ${AOA_OLLAMA_WARMUP_WAIT_S}s"
-    exit 0
-  fi
-  sleep 2
-done
+  until curl -fsS --max-time 5 "$tags_url" >/dev/null 2>&1; do
+    if ((SECONDS >= wait_deadline)); then
+      aoa_note "warn ollama warmup skipped because ${tags_url} did not become ready in ${AOA_OLLAMA_WARMUP_WAIT_S}s"
+      return 0
+    fi
+    sleep 2
+  done
 
-aoa_note "warming ollama model ${AOA_OLLAMA_WARMUP_MODEL}"
-warmup_payload="$(python - <<'PY'
+  aoa_note "warming ollama model ${AOA_OLLAMA_WARMUP_MODEL}"
+  warmup_payload="$(python - <<'PY'
 import json
 import os
 
@@ -93,15 +84,15 @@ print(json.dumps(payload))
 PY
 )"
 
-warmup_response="$(curl -fsS --max-time "${AOA_OLLAMA_WARMUP_TIMEOUT_S}" \
-  -H 'Content-Type: application/json' \
-  -d "${warmup_payload}" \
-  "$chat_url")" || {
-  aoa_note "warn ollama warmup request failed for ${AOA_OLLAMA_WARMUP_MODEL}"
-  exit 0
-}
+  warmup_response="$(curl -fsS --max-time "${AOA_OLLAMA_WARMUP_TIMEOUT_S}" \
+    -H 'Content-Type: application/json' \
+    -d "${warmup_payload}" \
+    "$chat_url")" || {
+    aoa_note "warn ollama warmup request failed for ${AOA_OLLAMA_WARMUP_MODEL}"
+    return 0
+  }
 
-WARMUP_RESPONSE="$warmup_response" python - <<'PY'
+  WARMUP_RESPONSE="$warmup_response" python - <<'PY'
 import json
 import os
 import sys
@@ -114,12 +105,12 @@ if not isinstance(content, str):
     sys.exit(0)
 PY
 
-loaded_models="$(curl -fsS --max-time 10 "$ps_url")" || {
-  aoa_note "warn ollama warmup could not confirm loaded models via /api/ps"
-  exit 0
-}
+  loaded_models="$(curl -fsS --max-time 10 "$ps_url")" || {
+    aoa_note "warn ollama warmup could not confirm loaded models via /api/ps"
+    return 0
+  }
 
-if LOADED_MODELS="$loaded_models" python - <<'PY'
+  if LOADED_MODELS="$loaded_models" python - <<'PY'
 import json
 import os
 import sys
@@ -132,8 +123,33 @@ for entry in models:
         sys.exit(0)
 sys.exit(1)
 PY
-then
-  aoa_note "ollama warmup complete for ${AOA_OLLAMA_WARMUP_MODEL}"
-else
-  aoa_note "warn ollama warmup finished but ${AOA_OLLAMA_WARMUP_MODEL} was not visible in /api/ps"
+  then
+    aoa_note "ollama warmup complete for ${AOA_OLLAMA_WARMUP_MODEL}"
+  else
+    aoa_note "warn ollama warmup finished but ${AOA_OLLAMA_WARMUP_MODEL} was not visible in /api/ps"
+  fi
+}
+
+warmup_managed=0
+
+if has_module "32-llamacpp-inference.yml"; then
+  warmup_managed=1
+  if is_enabled "$AOA_LLAMACPP_WARMUP_ENABLED"; then
+    warm_llamacpp
+  else
+    aoa_note "llama.cpp warmup disabled"
+  fi
+fi
+
+if has_module "30-local-inference.yml"; then
+  warmup_managed=1
+  if is_enabled "$AOA_OLLAMA_WARMUP_ENABLED"; then
+    warm_ollama
+  else
+    aoa_note "ollama warmup disabled"
+  fi
+fi
+
+if ((warmup_managed == 0)); then
+  aoa_note "skip model warmup because selected profiles do not include a warmup-managed inference module"
 fi

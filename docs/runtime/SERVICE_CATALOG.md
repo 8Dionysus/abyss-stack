@@ -8,6 +8,8 @@ This file maps the first migrated runtime modules to their intended services.
   `10-storage.yml` plus `20-orchestration.yml`.
 - `local-worker` owns the canonical `llama.cpp` plus `langchain-api` worker
   layer and is meant to compose over `substrate`.
+- `fallback-gateway` owns retained Ollama plus LiteLLM fallback/control
+  surfaces; it is explicit and not part of the default substrate.
 - `core` remains a compatibility bundle for storage, orchestration, and
   `llama.cpp` basics; it is not the default substrate law.
 - `agentic`, `intel`, federation, tools, curation, and observability profiles
@@ -27,7 +29,8 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `30-local-inference.yml`
 
-- `ollama` — retained local control and rollback serving surface for the current Qwen fallback lane and fallback embeddings
+- `ollama` — retained local control and rollback serving surface for the
+  fallback gateway lane and fallback embeddings
 
 ## `31-intel-inference.yml`
 
@@ -42,7 +45,8 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `40-llm-gateway.yml`
 
-- `litellm` — model gateway and routing facade
+- `litellm` — retained model gateway and routing facade for the explicit
+  `fallback-gateway` profile
 
 ## `41-agent-api.yml`
 

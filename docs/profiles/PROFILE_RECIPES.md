@@ -157,6 +157,29 @@ scripts/aoa-wait --profile core
 scripts/aoa-smoke --profile core
 ```
 
+## `fallback-gateway`
+
+### What it is for
+
+Retained Ollama plus LiteLLM control path.
+Use it when checking the rollback/fallback gateway lane intentionally. It is not
+the default substrate and not the promoted local-worker path.
+
+### Host-facing endpoints
+
+- `ollama` -> `http://127.0.0.1:11434/api/tags`
+- `litellm` -> `127.0.0.1:4000`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile fallback-gateway
+scripts/aoa-render-services --profile fallback-gateway
+scripts/aoa-up --profile fallback-gateway
+scripts/aoa-wait --profile fallback-gateway
+scripts/aoa-smoke --profile fallback-gateway
+```
+
 ## `agentic`
 
 ### What it is for
@@ -166,7 +189,13 @@ This profile uses `langchain-api -> llama.cpp` as the canonical chat path and do
 
 ### Host-facing endpoints
 
-All `core` endpoints, plus:
+Storage/orchestration and local-worker endpoints:
+- `postgres` -> `127.0.0.1:5432`
+- `redis` -> `127.0.0.1:6379`
+- `qdrant` -> `http://127.0.0.1:6333/`
+- `neo4j` -> `http://127.0.0.1:7474/`
+- `n8n` -> `http://127.0.0.1:5678/`
+- `llama-cpp` -> `http://127.0.0.1:11435/health`
 - `langchain-api` -> `http://127.0.0.1:5403/health`
 
 ### First checks
@@ -343,6 +372,23 @@ scripts/aoa-profile-endpoints --profile substrate --profile local-worker
 scripts/aoa-render-services --profile substrate --profile local-worker
 scripts/aoa-up --profile substrate --profile local-worker
 scripts/aoa-smoke --profile substrate --profile local-worker
+```
+
+### `substrate + fallback-gateway`
+
+What it gives you:
+- the working AbyssOS substrate
+- retained Ollama plus LiteLLM fallback/control lane
+- no promoted `langchain-api` worker unless you add `local-worker` or `agentic`
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile substrate --profile fallback-gateway --paths
+scripts/aoa-profile-endpoints --profile substrate --profile fallback-gateway
+scripts/aoa-render-services --profile substrate --profile fallback-gateway
+scripts/aoa-up --profile substrate --profile fallback-gateway
+scripts/aoa-smoke --profile substrate --profile fallback-gateway
 ```
 
 ### `agentic + tools`

@@ -32,6 +32,16 @@ machine should run the promoted local text worker path:
 aoa-up --profile substrate --profile local-worker
 ```
 
+### `fallback-gateway`
+
+Retained local control and gateway fallback path:
+- `30-local-inference.yml`
+- `40-llm-gateway.yml`
+
+This profile keeps Ollama and LiteLLM explicit without returning them to the
+default substrate. Use it when a rollback/control lane or old gateway-oriented
+operator path is intentionally being checked.
+
 ### `core`
 
 Compatibility bundle for substrate plus local model-serving basics:
@@ -116,6 +126,9 @@ default profile and named presets. Use
 only when you want an explicit alternate benchmark or promotion surface beyond
 the canonical runtime path.
 
+Retained fallback modules should also stay explicit. `30-local-inference.yml`
+and `40-llm-gateway.yml` belong to `fallback-gateway`, not to `substrate`.
+
 ## Dependency note
 
 Some modules rely on sibling modules being present in the same profile.
@@ -158,6 +171,7 @@ Or use:
 ```bash
 aoa-profile-modules --profile substrate --profile local-worker --paths
 aoa-profile-endpoints --profile substrate --profile local-worker
+aoa-profile-modules --profile fallback-gateway --paths
 ```
 
 ## Operating routes

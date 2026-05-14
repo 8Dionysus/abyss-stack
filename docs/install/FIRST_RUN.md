@@ -114,6 +114,25 @@ scripts/aoa-smoke --profile substrate --profile local-worker
 scripts/aoa-qwen-check --case exact-reply
 ```
 
+### Retained fallback gateway
+
+This checks the old control lane intentionally, without making it part of the
+default substrate:
+
+```bash
+scripts/aoa-profile-modules --profile fallback-gateway --paths
+scripts/aoa-profile-endpoints --profile fallback-gateway
+scripts/aoa-render-services --profile fallback-gateway
+scripts/aoa-up --profile fallback-gateway
+scripts/aoa-smoke --profile fallback-gateway
+```
+
+Ollama warmup for this retained fallback lane is opt-in:
+
+```bash
+AOA_OLLAMA_WARMUP_ENABLED=true scripts/aoa-up --profile fallback-gateway
+```
+
 ### Agent-facing runtime
 
 This is the generic local agent path and defaults to the canonical `llama.cpp` worker path. Embeddings stay disabled unless an explicit backend overlay is added:

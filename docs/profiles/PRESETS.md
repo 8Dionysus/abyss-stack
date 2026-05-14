@@ -8,7 +8,8 @@ They exist one layer above profile composition:
 - presets are named stacks of profiles
 
 The default working substrate is a profile, not a preset: use `substrate` for
-the conservative OS base and layer worker or helper profiles explicitly.
+the conservative OS base and layer worker, fallback, or helper profiles
+explicitly.
 
 ## Why presets exist
 
