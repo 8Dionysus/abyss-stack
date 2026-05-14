@@ -104,6 +104,12 @@ scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-f
 scripts/aoa-doctor --preset intel-full
 ```
 
+`aoa-doctor` does not treat an old bridge file as fresh proof. It validates the
+current host bridge, checks the runtime-local record status and capture age, and
+warns if the host bridge version, stack-bridge summary, or named bridge set has
+changed since the latest stack-side capture. Refresh the bridge record before a
+cutover or long-running local AI session.
+
 ## Relationship To Existing Surfaces
 
 `aoa-machine-bridge` does not replace:

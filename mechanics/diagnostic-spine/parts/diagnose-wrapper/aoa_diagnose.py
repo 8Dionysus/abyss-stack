@@ -151,7 +151,7 @@ def is_source_checkout(path: Path) -> bool:
     return (
         (path / "CONTRIBUTING.md").exists()
         and (path / "scripts" / "validate_stack.py").exists()
-        and (path / "docs" / "DEPLOYMENT.md").exists()
+        and (path / "docs" / "install" / "DEPLOYMENT.md").exists()
     )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -88,6 +89,18 @@ class AoADiagnoseTests(unittest.TestCase):
             ],
             "internal_selected": True,
         }
+
+    def test_resolve_source_root_accepts_current_install_deployment_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_root = Path(tmpdir) / "source"
+            (source_root / "scripts").mkdir(parents=True)
+            (source_root / "docs" / "install").mkdir(parents=True)
+            (source_root / "CONTRIBUTING.md").write_text("contributing\n", encoding="utf-8")
+            (source_root / "scripts" / "validate_stack.py").write_text("# validator\n", encoding="utf-8")
+            (source_root / "docs" / "install" / "DEPLOYMENT.md").write_text("deploy\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"AOA_SOURCE_ROOT": str(source_root)}):
+                self.assertEqual(self.module.resolve_source_root(), source_root.resolve())
 
     def green_doctor(self) -> dict:
         return {
