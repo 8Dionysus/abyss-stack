@@ -37,3 +37,13 @@ Closed the profile rollout and machine-fit follow-through quests through
 package-local packet docs. The packet run used public-safe host facts,
 machine-bridge, platform-adaptation, and machine-fit records; it did not commit
 private captures or claim live service health.
+
+## 2026-05-14 - Source-owned preset recommendation guard
+
+Fixed the fit-record runtime recommendation so source checkout runs resolve
+`intel-full` membership from source presets before falling back to deployed
+`Configs`. This keeps stale live mirrors visible as parity drift instead of
+letting them poison the source-owned machine-fit packet.
+
+Validation route: targeted fit-record tests, `scripts/aoa-machine-fit --mode
+public`, and `python scripts/validate_stack.py`.

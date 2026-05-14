@@ -122,7 +122,8 @@
   "runtime_recommendation": {
     "preferred_preset": "intel-full",
     "preferred_profile_set": [
-      "intel",
+      "substrate",
+      "intel-worker",
       "tools",
       "observability"
     ],

@@ -354,8 +354,13 @@ def check_package_freshness(installed_names: list[str]) -> tuple[str, list[str],
 
 
 def load_profile_names(preset_name: str) -> list[str]:
-    preset_path = DEFAULT_CONFIGS_ROOT / "compose" / "presets" / f"{preset_name}.txt"
-    if not preset_path.exists():
+    preset_relpath = Path("compose") / "presets" / f"{preset_name}.txt"
+    candidate_roots = [SCRIPT_ROOT, DEFAULT_CONFIGS_ROOT]
+    preset_path = next(
+        (root / preset_relpath for root in candidate_roots if (root / preset_relpath).exists()),
+        None,
+    )
+    if preset_path is None:
         return []
     names: list[str] = []
     for raw in preset_path.read_text(encoding="utf-8").splitlines():
