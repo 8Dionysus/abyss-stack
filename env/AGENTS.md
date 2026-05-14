@@ -6,8 +6,8 @@ This directory contains public-safe env examples only. It does not contain live 
 ## Read before editing
 1. `env/README.md`
 2. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
-3. `docs/PATHS.md`
-4. `docs/STORAGE_LAYOUT.md`
+3. `docs/runtime/PATHS.md`
+4. `docs/runtime/STORAGE_LAYOUT.md`
 
 ## Directory contract
 - Files here are examples and must stay public-safe.

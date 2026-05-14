@@ -13,7 +13,7 @@
 - split render checks by config family if render logic becomes too broad
 - add focused tests for bootstrap and sync helpers if shell behavior grows
 - promote more deployment-path detail into `parts/deployment-paths/` only when
-  root `docs/PATHS.md` becomes too dense
+  root `docs/runtime/PATHS.md` becomes too dense
 
 ## Stop-lines
 

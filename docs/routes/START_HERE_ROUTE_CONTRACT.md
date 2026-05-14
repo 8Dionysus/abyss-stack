@@ -2,7 +2,7 @@
 
 This is the route-mode contract for the `abyss-stack` source checkout.
 
-The canonical file path is `docs/START_HERE_ROUTE_CONTRACT.md`.
+The canonical file path is `docs/routes/START_HERE_ROUTE_CONTRACT.md`.
 
 Use this file when a reader, agent, validator, or future route surface needs to
 choose the first correct owner surface without turning root README, docs root,
@@ -30,15 +30,15 @@ others must move in the same change.
 | Route mode | Audience | Job | Canonical path |
 |---|---|---|---|
 | `first-reading` | humans, new agents, outside readers | understand the runtime source checkout without entering every package | `README.md` -> `CHARTER.md` -> `BOUNDARIES.md` -> `DESIGN.md` -> `mechanics/README.md` |
-| `runtime-design` | maintainers, topology editors, reviewers | change runtime form, source/runtime split, topology, or generated/source authority | first reading -> `DESIGN.md` -> `docs/ARCHITECTURE.md` |
+| `runtime-design` | maintainers, topology editors, reviewers | change runtime form, source/runtime split, topology, or generated/source authority | first reading -> `DESIGN.md` -> `docs/runtime/ARCHITECTURE.md` |
 | `agent-guidance` | coding agents, route-card editors, reviewers | change root or nested agent guidance without losing local ownership | `AGENTS.md` -> `DESIGN.AGENTS.md` -> nearest nested `AGENTS.md` |
-| `source-install` | operators, release agents, setup editors | create or refresh a runtime layout from a source checkout | `docs/PATHS.md` -> `docs/DEPLOYMENT.md` -> `mechanics/config-projection/README.md` -> `mechanics/runtime-lifecycle/README.md` |
-| `runtime-operation` | operators, incident reviewers, lifecycle editors | operate, inspect, smoke, log, or intentionally check deployed runtime state | `docs/RUNBOOK.md` -> `scripts/README.md` -> `mechanics/runtime-lifecycle/README.md` |
+| `source-install` | operators, release agents, setup editors | create or refresh a runtime layout from a source checkout | `docs/runtime/PATHS.md` -> `docs/install/DEPLOYMENT.md` -> `mechanics/config-projection/README.md` -> `mechanics/runtime-lifecycle/README.md` |
+| `runtime-operation` | operators, incident reviewers, lifecycle editors | operate, inspect, smoke, log, or intentionally check deployed runtime state | `docs/operations/RUNBOOK.md` -> `scripts/README.md` -> `mechanics/runtime-lifecycle/README.md` |
 | `mechanic-change` | mechanic authors, package editors, reviewers | change a runtime package, part, owner split, local validation lane, or package card | `mechanics/README.md` -> `mechanics/<package>/README.md` -> nearest part `README.md` or `AGENTS.md` |
 | `machine-fit` | host-fit editors, platform reviewers, Windows/WSL operators | handle host facts, reference platform, machine bridge, model fit, or platform adaptation | `mechanics/machine-fit/README.md` -> relevant `mechanics/machine-fit/parts/<part>/README.md` |
 | `diagnostics-repair` | diagnostic editors, repair reviewers, incident handoff authors | handle read-only diagnosis, diagnostic catalogs, degradation receipts, or repair-safe closeout | `mechanics/diagnostic-spine/README.md` -> `mechanics/runtime-repair/README.md` |
 | `direction-change` | roadmap editors, maintainers, release reviewers | update runtime-wide direction, horizon posture, or future trigger | `ROADMAP.md` -> `CHANGELOG.md` when release-visible -> `docs/decisions/` when rationale matters |
-| `release-history` | release editors, maintainers | record release-visible history without turning it into direction or rationale | `CHANGELOG.md` -> `docs/RELEASING.md` |
+| `release-history` | release editors, maintainers | record release-visible history without turning it into direction or rationale | `CHANGELOG.md` -> `docs/governance/RELEASING.md` |
 | `decision-rationale` | future-agent maintainers, topology editors, reviewers | explain why a durable route, owner split, workflow, validator, public contract, or topology changed | `docs/decisions/README.md` -> `docs/decisions/TEMPLATE.md` |
 
 ## First-Reading Route
@@ -70,7 +70,7 @@ Read:
 
 1. first-reading route
 2. `DESIGN.md`
-3. `docs/ARCHITECTURE.md`
+3. `docs/runtime/ARCHITECTURE.md`
 4. `ROADMAP.md` only if the change moves runtime-wide direction
 5. the package or technical district that owns the concrete surface
 
@@ -100,8 +100,8 @@ runtime layout.
 Read:
 
 1. first-reading route
-2. `docs/PATHS.md`
-3. `docs/DEPLOYMENT.md`
+2. `docs/runtime/PATHS.md`
+3. `docs/install/DEPLOYMENT.md`
 4. `mechanics/config-projection/README.md`
 5. `mechanics/runtime-lifecycle/README.md`
 
@@ -116,7 +116,7 @@ operator-gated runtime checks are involved.
 
 Read:
 
-1. `docs/RUNBOOK.md`
+1. `docs/operations/RUNBOOK.md`
 2. `scripts/README.md`
 3. `mechanics/runtime-lifecycle/README.md`
 4. `mechanics/runtime-repair/README.md` when repair posture is involved
@@ -151,8 +151,8 @@ Read:
 
 1. `mechanics/machine-fit/README.md`
 2. relevant `mechanics/machine-fit/parts/<part>/README.md`
-3. `docs/PATHS.md` when path mapping changes
-4. `docs/SECURITY.md` when host exposure or private state could be affected
+3. `docs/runtime/PATHS.md` when path mapping changes
+4. `docs/operations/SECURITY.md` when host exposure or private state could be affected
 
 `abyss-machine` remains the stronger owner of machine control-plane truth.
 
@@ -197,7 +197,7 @@ Use this route when public release-visible history changes.
 Read:
 
 1. `CHANGELOG.md`
-2. `docs/RELEASING.md`
+2. `docs/governance/RELEASING.md`
 3. `scripts/release_check.py`
 
 Changelog entries record what changed. They do not carry future direction or

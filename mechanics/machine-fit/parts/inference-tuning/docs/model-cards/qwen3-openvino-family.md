@@ -74,8 +74,8 @@
 ## Evidence Surfaces
 
 - [MODEL_CARDS](../MODEL_CARDS.md)
-- [PROFILE_RECIPES](../../../../../../docs/PROFILE_RECIPES.md)
-- [SERVICE_CATALOG](../../../../../../docs/SERVICE_CATALOG.md)
+- [PROFILE_RECIPES](../../../../../../docs/profiles/PROFILE_RECIPES.md)
+- [SERVICE_CATALOG](../../../../../../docs/runtime/SERVICE_CATALOG.md)
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T160340Z__latency-single-turn__intel-text-qwen3-4b-int4-gpu-lab-extended`
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T154510Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab`
 - `/srv/AbyssOS/abyss-stack/Logs/runtime-benchmarks/runs/2026-04-08T155804Z__latency-single-turn__intel-text-qwen3-8b-int4-gpu-lab-extended`

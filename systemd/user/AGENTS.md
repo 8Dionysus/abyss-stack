@@ -5,9 +5,9 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 
 ## Read before editing
 1. `systemd/user/README.md`
-2. `docs/DEPLOYMENT.md`
-3. `docs/PATHS.md`
-4. `docs/LIFECYCLE.md`
+2. `docs/install/DEPLOYMENT.md`
+3. `docs/runtime/PATHS.md`
+4. `docs/operations/LIFECYCLE.md`
 5. `scripts/aoa-install-systemd`
 
 ## Directory contract
@@ -25,7 +25,7 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 
 ## When changing units
 - If the unit name, install path, or install behavior changes, update `scripts/aoa-install-systemd` and `systemd/user/README.md`.
-- If lifecycle semantics change, update `docs/LIFECYCLE.md` and `docs/DEPLOYMENT.md`.
+- If lifecycle semantics change, update `docs/operations/LIFECYCLE.md` and `docs/install/DEPLOYMENT.md`.
 - Keep the deployed-path assumption explicit. The unit should continue to run from the deployed runtime tree, not from a working checkout.
 
 ## Verify

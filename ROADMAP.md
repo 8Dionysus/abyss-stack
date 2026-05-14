@@ -35,8 +35,8 @@ Use the stronger surface when the change is narrower:
 - release-visible repository history: `CHANGELOG.md`
 - durable obligations and packet state: `QUESTBOOK.md` and `quests/`
 - durable rationale: `docs/decisions/`
-- operator runbooks: `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, and
-  `docs/RUNBOOK.md`
+- operator runbooks: `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, and
+  `docs/operations/RUNBOOK.md`
 - live runtime receipts and private machine state: deployed runtime or machine
   owner surfaces, not the GitHub source mirror
 - sibling implementation direction: the sibling repository direction surface

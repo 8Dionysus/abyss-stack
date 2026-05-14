@@ -38,11 +38,11 @@ It also removes a post-relocation tail that could break user units, parity check
 ## Source surfaces
 
 - `README.md`
-- `docs/PATHS.md`
-- `docs/DEPLOYMENT.md`
+- `docs/runtime/PATHS.md`
+- `docs/install/DEPLOYMENT.md`
 - `scripts/aoa-sync-configs`
 - `systemd/user/`
 
 ## Follow-up route
 
-Route future deployed-root changes through `docs/PATHS.md`, deployment docs, systemd surfaces, and parity validation before changing helper defaults.
+Route future deployed-root changes through `docs/runtime/PATHS.md`, deployment docs, systemd surfaces, and parity validation before changing helper defaults.

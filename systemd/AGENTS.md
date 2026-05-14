@@ -12,9 +12,9 @@ runtime. Current units are rootless user units under `systemd/user/`.
 
 1. `systemd/README.md`
 2. `systemd/user/AGENTS.md`
-3. `docs/DEPLOYMENT.md`
-4. `docs/PATHS.md`
-5. `docs/LIFECYCLE.md`
+3. `docs/install/DEPLOYMENT.md`
+4. `docs/runtime/PATHS.md`
+5. `docs/operations/LIFECYCLE.md`
 6. `mechanics/runtime-lifecycle/parts/user-unit/README.md`
 7. `scripts/aoa-install-systemd`
 

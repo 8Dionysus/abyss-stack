@@ -5,8 +5,8 @@
 See also:
 
 - [README](../README.md)
-- [CHANGELOG](../CHANGELOG.md)
-- [DEPLOYMENT](DEPLOYMENT.md)
+- [CHANGELOG](../../CHANGELOG.md)
+- [DEPLOYMENT](../install/DEPLOYMENT.md)
 
 ## Recommended release flow
 

@@ -12,7 +12,7 @@ class CurrentDirectionRoutesTestCase(unittest.TestCase):
         roadmap_path = REPO_ROOT / "ROADMAP.md"
         design_path = REPO_ROOT / "DESIGN.md"
         design_agents_path = REPO_ROOT / "DESIGN.AGENTS.md"
-        route_contract_path = REPO_ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md"
+        route_contract_path = REPO_ROOT / "docs" / "routes" / "START_HERE_ROUTE_CONTRACT.md"
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
         docs_readme = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
@@ -28,15 +28,15 @@ class CurrentDirectionRoutesTestCase(unittest.TestCase):
         self.assertIn("DESIGN.md", agents)
         self.assertIn("DESIGN.AGENTS.md", readme)
         self.assertIn("DESIGN.AGENTS.md", agents)
-        self.assertIn("docs/START_HERE_ROUTE_CONTRACT.md", readme)
-        self.assertIn("docs/START_HERE_ROUTE_CONTRACT.md", agents)
+        self.assertIn("docs/routes/START_HERE_ROUTE_CONTRACT.md", readme)
+        self.assertIn("docs/routes/START_HERE_ROUTE_CONTRACT.md", agents)
         self.assertIn("START_HERE_ROUTE_CONTRACT.md", docs_readme)
         self.assertIn("START_HERE_ROUTE_CONTRACT.md", docs_agents)
 
     def test_route_contract_defines_root_route_modes(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         route_contract = (
-            REPO_ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md"
+            REPO_ROOT / "docs" / "routes" / "START_HERE_ROUTE_CONTRACT.md"
         ).read_text(encoding="utf-8")
 
         for mode in (

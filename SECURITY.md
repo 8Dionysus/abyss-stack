@@ -9,7 +9,7 @@ Do not open a public issue or pull request for security-sensitive findings.
 
 ## Repository-specific note
 
-For runtime posture, secret-handling patterns, and localhost-first deployment guidance, also see `docs/SECURITY.md`.
+For runtime posture, secret-handling patterns, and localhost-first deployment guidance, also see `docs/operations/SECURITY.md`.
 This root file is the community reporting surface; the deeper runtime guidance stays there.
 
 ## Report privately if you find

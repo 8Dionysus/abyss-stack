@@ -21,7 +21,7 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
         for relative_path in (
             Path("README.md"),
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "docs" / "DIAGNOSTIC_SPINE.md",
-            Path("docs") / "RUNBOOK.md",
+            Path("docs") / "operations" / "RUNBOOK.md",
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "generated" / "diagnostic_surface_catalog.min.json",
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_target.schema.json",
             Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "schemas" / "diagnostic_session.schema.json",

@@ -19,9 +19,9 @@ created outside git through `scripts/aoa-install-layout`,
 `scripts/aoa-sync-configs`, and `scripts/aoa-bootstrap-configs`.
 
 If you are operating from a Windows host through WSL, also read:
-- [WINDOWS_BRIDGE](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md)
-- [WINDOWS_SETUP](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md)
-- [WINDOWS_PERFORMANCE](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md)
+- [WINDOWS_BRIDGE](../../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md)
+- [WINDOWS_SETUP](../../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md)
+- [WINDOWS_PERFORMANCE](../../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md)
 
 ## Fastest guided route
 
@@ -35,7 +35,7 @@ scripts/aoa-machine-fit --mode private --write "${AOA_STACK_ROOT}/Logs/machine-f
 
 `aoa-first-run --strict` is strict about layout and bootstrapped config presence, but still ignores missing secrets on that first pass by design.
 
-Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
+Then create secrets per [SECRETS_BOOTSTRAP](../../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
 If you want the optional `federation` profile, sync the public-safe `aoa-agents` contract pack, the `aoa-routing` advisory pack, the `aoa-memo` recall pack, the `aoa-evals` eval-selection pack, the `aoa-playbooks` advisory pack, the `aoa-kag` derived retrieval pack, and the source-owned `tos-source` handoff companion after bootstrap:
 
@@ -49,10 +49,10 @@ scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
 ```
 
-See [MEMO_RUNTIME_SEAM](../mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
-See [EVAL_RUNTIME_SEAM](../mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
-See [PLAYBOOK_RUNTIME_SEAM](../mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md) for the runtime-facing playbook mirror and `/playbooks/*` activation and composition advisory surfaces.
-See [KAG_RUNTIME_SEAM](../mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md) for the runtime-facing `aoa-kag` mirror, `/kag/*` inspection surfaces, and the `Tree-of-Sophia` handoff companion.
+See [MEMO_RUNTIME_SEAM](../../mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md) for the runtime-facing memo mirror, `/memo/*` inspection surfaces, and filesystem-first memo export candidates.
+See [EVAL_RUNTIME_SEAM](../../mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md) for the runtime-facing eval mirror, `/evals/*` inspection surfaces, and filesystem-first eval export candidates.
+See [PLAYBOOK_RUNTIME_SEAM](../../mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md) for the runtime-facing playbook mirror and `/playbooks/*` activation and composition advisory surfaces.
+See [KAG_RUNTIME_SEAM](../../mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md) for the runtime-facing `aoa-kag` mirror, `/kag/*` inspection surfaces, and the `Tree-of-Sophia` handoff companion.
 
 ## Scenario A: Fedora-native source checkout
 
@@ -80,7 +80,7 @@ scripts/aoa-profile-modules --profile core
 scripts/aoa-profile-endpoints --profile core
 ```
 
-Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
+Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](../../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
 ## Scenario B: Windows checkout plus Linux runtime
 
@@ -147,9 +147,9 @@ scripts/aoa-status --autonomy --json
 
 to confirm the canonical source checkout still matches the deployed `Configs` mirror for repo-managed paths.
 For the full machine/runtime parity route, use
-[SOURCE_RUNTIME_PARITY_PACKET](../mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md).
+[SOURCE_RUNTIME_PARITY_PACKET](../../mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md).
 For a live runtime-loop cutover decision, use
-[LIVE_RUNTIME_CUTOVER_PACKET](../mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md)
+[LIVE_RUNTIME_CUTOVER_PACKET](../../mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md)
 before any start, stop, restart, systemd, profile, or exposure-changing action.
 The scheduled source-rooted mirror canary in `.github/workflows/mirror-canary.yml`
 rehearses the same parity flow against a temporary runtime root so source/deployed
@@ -296,9 +296,9 @@ scripts/aoa-profile-endpoints --profile core
 
 After that capture, `aoa-up`, `aoa-down`, `aoa-render-services`, and `aoa-render-config` automatically honor the latest machine-fit posture unless you explicitly disable it.
 
-Then create secrets per [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
+Then create secrets per [SECRETS_BOOTSTRAP](../../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
 
-For claim wording after bootstrap, use [TRUTH_SURFACES](../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md).
+For claim wording after bootstrap, use [TRUTH_SURFACES](../../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md).
 
 For local-Ollama profiles, `aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model resident for `30m` unless the stack restarts or the model is explicitly evicted.
 

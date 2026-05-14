@@ -1,7 +1,7 @@
 # Audit
 
 This file is the repo-local audit contract for `abyss-stack`. Its canonical
-path is `docs/AUDIT.md`.
+path is `docs/routes/AUDIT.md`.
 
 Read it after the root route surfaces and before repository-wide audits,
 reviews, or risky source topology changes.
@@ -34,23 +34,23 @@ Default reading order for audits:
 4. `BOUNDARIES.md`
 5. `DESIGN.md`
 6. `DESIGN.AGENTS.md` when auditing agent-facing route surfaces
-7. `docs/ARCHITECTURE.md`
-8. `docs/SERVICE_CATALOG.md`
-9. `docs/PROFILES.md`
-10. `docs/PRESETS.md`
-11. `docs/PROFILE_RECIPES.md`
+7. `docs/runtime/ARCHITECTURE.md`
+8. `docs/runtime/SERVICE_CATALOG.md`
+9. `docs/profiles/PROFILES.md`
+10. `docs/profiles/PRESETS.md`
+11. `docs/profiles/PROFILE_RECIPES.md`
 12. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
 13. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-14. `docs/PATHS.md`
-15. `docs/STORAGE_LAYOUT.md`
-16. `docs/DEPLOYMENT.md`
-17. `docs/FIRST_RUN.md`
+14. `docs/runtime/PATHS.md`
+15. `docs/runtime/STORAGE_LAYOUT.md`
+16. `docs/install/DEPLOYMENT.md`
+17. `docs/install/FIRST_RUN.md`
 18. `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
 19. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
-20. `docs/LIFECYCLE.md`
-21. `docs/RUNBOOK.md`
-22. `docs/SECURITY.md`
-23. `docs/MIGRATION_FROM_OLD.md`
+20. `docs/operations/LIFECYCLE.md`
+21. `docs/operations/RUNBOOK.md`
+22. `docs/operations/SECURITY.md`
+23. `docs/legacy/MIGRATION_FROM_OLD.md`
 
 Also apply the nearest nested `AGENTS.md` when working in subdirectories such as `scripts/`.
 

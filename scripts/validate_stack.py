@@ -68,7 +68,7 @@ MOVED_MECHANIC_DOC_REFS = (
     "mechanics/runtime-lifecycle/docs/USAGE_BUDGET_POLICY.md",
 )
 STALE_ABYSS_PATH_ALLOWED = {
-    ROOT / "docs" / "MIGRATION_FROM_OLD.md",
+    ROOT / "docs" / "legacy" / "MIGRATION_FROM_OLD.md",
     ROOT / "scripts" / "validate_stack.py",
 }
 
@@ -400,8 +400,34 @@ REQUIRED_FILES = {
     ROOT / "DESIGN.AGENTS.md",
     ROOT / "docs" / "AGENTS.md",
     ROOT / "docs" / "README.md",
-    ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md",
-    ROOT / "docs" / "AUDIT.md",
+    ROOT / "docs" / "routes" / "README.md",
+    ROOT / "docs" / "routes" / "START_HERE_ROUTE_CONTRACT.md",
+    ROOT / "docs" / "routes" / "AUDIT.md",
+    ROOT / "docs" / "runtime" / "README.md",
+    ROOT / "docs" / "runtime" / "ARCHITECTURE.md",
+    ROOT / "docs" / "runtime" / "MECHANICS.md",
+    ROOT / "docs" / "runtime" / "PATHS.md",
+    ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md",
+    ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md",
+    ROOT / "docs" / "install" / "README.md",
+    ROOT / "docs" / "install" / "DEPLOYMENT.md",
+    ROOT / "docs" / "install" / "FIRST_RUN.md",
+    ROOT / "docs" / "operations" / "README.md",
+    ROOT / "docs" / "operations" / "BACKUP_RESTORE.md",
+    ROOT / "docs" / "operations" / "LIFECYCLE.md",
+    ROOT / "docs" / "operations" / "RUNBOOK.md",
+    ROOT / "docs" / "operations" / "SECURITY.md",
+    ROOT / "docs" / "profiles" / "README.md",
+    ROOT / "docs" / "profiles" / "PRESETS.md",
+    ROOT / "docs" / "profiles" / "PROFILES.md",
+    ROOT / "docs" / "profiles" / "PROFILE_RECIPES.md",
+    ROOT / "docs" / "governance" / "README.md",
+    ROOT / "docs" / "governance" / "BRANCH_POLICY.md",
+    ROOT / "docs" / "governance" / "QUESTBOOK_STACK_INTEGRATION.md",
+    ROOT / "docs" / "governance" / "RELEASING.md",
+    ROOT / "docs" / "legacy" / "README.md",
+    ROOT / "docs" / "legacy" / "AGENTS_ROOT_REFERENCE.md",
+    ROOT / "docs" / "legacy" / "MIGRATION_FROM_OLD.md",
     ROOT / "docs" / "decisions" / "AGENTS.md",
     ROOT / "docs" / "decisions" / "TEMPLATE.md",
     ROOT / "tests" / "README.md",
@@ -414,15 +440,11 @@ REQUIRED_FILES = {
     ROOT / ".agents" / "spark" / "SWARM.md",
     ROOT / ".github" / "GITHUB_SURFACE.md",
     ROOT / "mechanics" / "governed-execution" / "parts" / "return-policy" / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
-    ROOT / "docs" / "MECHANICS.md",
     ROOT / "mechanics" / "README.md",
     ROOT / "mechanics" / "AGENTS.md",
     ROOT / "mechanics" / "ARTIFACT_TOPOLOGY.md",
     ROOT / "mechanics" / "governed-execution" / "parts" / "governed-runner" / "docs" / "GOVERNED_EXECUTION.md",
-    ROOT / "docs" / "FIRST_RUN.md",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "doctor-readiness" / "docs" / "DOCTOR.md",
-    ROOT / "docs" / "PRESETS.md",
-    ROOT / "docs" / "PROFILE_RECIPES.md",
     ROOT / "mechanics" / "config-projection" / "parts" / "rendering" / "docs" / "RENDER_TRUTH.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "RUNTIME_BENCH_POLICY.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "local-trials" / "docs" / "LOCAL_AI_TRIALS.md",
@@ -447,7 +469,7 @@ REQUIRED_FILES = {
     / "platform-adaptations"
     / "docs"
     / "PLATFORM_ADAPTATION_POLICY.md",
-    ROOT / "docs" / "BRANCH_POLICY.md",
+    ROOT / "docs" / "governance" / "BRANCH_POLICY.md",
     ROOT / "mechanics" / "federation-seams" / "parts" / "memo-seam" / "docs" / "MEMO_RUNTIME_SEAM.md",
     ROOT / "mechanics" / "federation-seams" / "parts" / "eval-seam" / "docs" / "EVAL_RUNTIME_SEAM.md",
     ROOT
@@ -836,7 +858,7 @@ UPSTREAM_COMPATIBILITY_BRIDGE_PATH = (
 )
 
 QUESTBOOK_PATH = Path("QUESTBOOK.md")
-QUESTBOOK_INTEGRATION_PATH = Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md"
+QUESTBOOK_INTEGRATION_PATH = Path("docs") / "governance" / "QUESTBOOK_STACK_INTEGRATION.md"
 RPG_RUNTIME_DOC_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs"
 RPG_RUNTIME_FRONTEND_POSTURE_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_RUNTIME_FRONTEND_POSTURE.md"
 RPG_RUNTIME_COLLECTIONS_PATH = RPG_RUNTIME_DOC_ROOT / "RPG_RUNTIME_COLLECTIONS.md"
@@ -1551,8 +1573,8 @@ def validate_questbook_surface(errors: list[str]) -> None:
             if not isinstance(anchor_ref, dict) or anchor_ref.get("ref") != "mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md":
                 errors.append("ABYSS-STACK-Q-0003 must stay anchored to mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md")
             note = anchor_ref.get("note") if isinstance(anchor_ref, dict) else ""
-            if not isinstance(note, str) or "docs/FIRST_RUN.md" not in note or "mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md" not in note:
-                errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/FIRST_RUN.md and mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md")
+            if not isinstance(note, str) or "docs/install/FIRST_RUN.md" not in note or "mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md" not in note:
+                errors.append("ABYSS-STACK-Q-0003 anchor note must mention docs/install/FIRST_RUN.md and mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md")
         elif quest_id == "ABYSS-STACK-Q-0005":
             if quest_payload.get("kind") != "doctrine":
                 errors.append("ABYSS-STACK-Q-0005 kind must stay doctrine")
@@ -1728,9 +1750,9 @@ def validate_profiles(errors: list[str]) -> None:
     if "N8N_RUNNERS_AUTH_TOKEN=CHANGE_ME_LONG_RANDOM_SHARED_SECRET" not in stack_env_example:
         errors.append("env/stack.env.example must include N8N_RUNNERS_AUTH_TOKEN placeholder for external n8n runners")
 
-    service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    service_catalog_doc = (ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "n8n-task-runners" not in service_catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention n8n-task-runners")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention n8n-task-runners")
 
     secrets_doc = (
         ROOT
@@ -1793,8 +1815,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md")
     if "mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md" not in readme:
         errors.append("README.md must route readers to mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md")
-    if "docs/BRANCH_POLICY.md" not in readme:
-        errors.append("README.md must route readers to docs/BRANCH_POLICY.md")
+    if "docs/governance/BRANCH_POLICY.md" not in readme:
+        errors.append("README.md must route readers to docs/governance/BRANCH_POLICY.md")
     if "mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md" not in readme:
         errors.append("README.md must route readers to mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md")
     if "mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md" not in readme:
@@ -1805,8 +1827,8 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md")
     if "scripts/README.md" not in readme:
         errors.append("README.md must route readers to scripts/README.md")
-    if "docs/START_HERE_ROUTE_CONTRACT.md" not in readme:
-        errors.append("README.md must route readers to docs/START_HERE_ROUTE_CONTRACT.md")
+    if "docs/routes/START_HERE_ROUTE_CONTRACT.md" not in readme:
+        errors.append("README.md must route readers to docs/routes/START_HERE_ROUTE_CONTRACT.md")
     for forbidden in (
         "Current contract surfaces are",
         "Chaos receipt examples also now include",
@@ -1994,29 +2016,29 @@ def validate_paths(errors: list[str]) -> None:
         if required_snippet not in w6_doc:
             errors.append(f"{w6_doc_path.relative_to(ROOT)} must mention `{required_snippet}`")
 
-    paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
+    paths_doc = (ROOT / "docs" / "runtime" / "PATHS.md").read_text(encoding="utf-8")
     if "/srv/AbyssOS/abyss-stack" not in paths_doc:
-        errors.append("docs/PATHS.md must mention /srv/AbyssOS/abyss-stack")
+        errors.append("docs/runtime/PATHS.md must mention /srv/AbyssOS/abyss-stack")
     if "WSL2" not in paths_doc:
         errors.append(
-            "docs/PATHS.md should mention WSL2 in the Windows-usable model"
+            "docs/runtime/PATHS.md should mention WSL2 in the Windows-usable model"
         )
     if "AOA_ROUTING_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_ROUTING_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_ROUTING_ROOT")
     if "AOA_SOURCE_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_SOURCE_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_SOURCE_ROOT")
     if "AOA_MEMO_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_MEMO_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_MEMO_ROOT")
     if "AOA_EVALS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_EVALS_ROOT")
     if "AOA_PLAYBOOKS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
     if "AOA_KAG_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_KAG_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_KAG_ROOT")
     if "AOA_TOS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_TOS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_TOS_ROOT")
 
-    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    deployment_doc = (ROOT / "docs" / "install" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     for required_snippet in (
         "source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`",
         "python scripts/validate_stack.py --parity-check",
@@ -2029,90 +2051,90 @@ def validate_paths(errors: list[str]) -> None:
     ):
         if required_snippet not in deployment_doc:
             errors.append(
-                f"docs/DEPLOYMENT.md must mention `{required_snippet}`"
+                f"docs/install/DEPLOYMENT.md must mention `{required_snippet}`"
             )
     if "scripts/aoa-sync-federation-surfaces --layer aoa-routing" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-routing federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-routing federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-memo" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-memo federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-memo federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-evals" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-evals federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-evals federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-playbooks" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-playbooks federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-playbooks federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer aoa-kag" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-kag federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-kag federation sync")
     if "scripts/aoa-sync-federation-surfaces --layer tos-source" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention tos-source federation sync")
+        errors.append("docs/install/DEPLOYMENT.md must mention tos-source federation sync")
 
-    profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
+    profiles_doc = (ROOT / "docs" / "profiles" / "PROFILES.md").read_text(encoding="utf-8")
     if "aoa-routing advisory seam" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the aoa-routing advisory seam")
+        errors.append("docs/profiles/PROFILES.md must describe the aoa-routing advisory seam")
     if "aoa-memo" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the aoa-memo recall seam")
+        errors.append("docs/profiles/PROFILES.md must describe the aoa-memo recall seam")
     if "aoa-evals" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the aoa-evals eval selection seam")
+        errors.append("docs/profiles/PROFILES.md must describe the aoa-evals eval selection seam")
     if "aoa-playbooks" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the aoa-playbooks advisory seam")
+        errors.append("docs/profiles/PROFILES.md must describe the aoa-playbooks advisory seam")
     if "aoa-kag" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the aoa-kag advisory seam")
+        errors.append("docs/profiles/PROFILES.md must describe the aoa-kag advisory seam")
     if "tos-source" not in profiles_doc:
-        errors.append("docs/PROFILES.md must describe the tos-source handoff seam")
+        errors.append("docs/profiles/PROFILES.md must describe the tos-source handoff seam")
 
-    recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
+    recipes_doc = (ROOT / "docs" / "profiles" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "aoa-routing" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-routing")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-routing")
     if "aoa-memo" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-memo")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-memo")
     if "aoa-evals" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-evals")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-evals")
     if "aoa-playbooks" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-playbooks")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-playbooks")
     if "aoa-kag" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-kag")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-kag")
     if "tos-source" not in recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention tos-source")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention tos-source")
 
-    catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    catalog_doc = (ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "aoa-routing advisory routing surfaces" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-routing advisory routing surfaces")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-routing advisory routing surfaces")
     if "aoa-memo" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-memo")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-memo")
     if "aoa-evals" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-evals")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-evals")
     if "aoa-playbooks" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-playbooks")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-playbooks")
     if "aoa-kag" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-kag")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-kag")
     if "tos-source" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention tos-source")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention tos-source")
     if "aoa-governed-run" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention aoa-governed-run")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention aoa-governed-run")
     if "promotion summaries" not in catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention promotion summaries")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention promotion summaries")
 
-    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    storage_doc = (ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation/aoa-routing/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-routing/")
     if "Knowledge/federation/aoa-memo/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-memo/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-memo/")
     if "Knowledge/federation/aoa-evals/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-evals/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-evals/")
     if "Knowledge/federation/aoa-playbooks/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-playbooks/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-playbooks/")
     if "Knowledge/federation/aoa-kag/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-kag/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/aoa-kag/")
     if "Knowledge/federation/tos-source/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation/tos-source/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation/tos-source/")
     if "Logs/memo-exports/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Logs/memo-exports/")
     if "Logs/eval-exports/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Logs/eval-exports/")
     if "Logs/rpg/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/rpg/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Logs/rpg/")
     if "mechanics/federation-seams/parts/rpg-runtime/generated/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention mechanics/federation-seams/parts/rpg-runtime/generated/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention mechanics/federation-seams/parts/rpg-runtime/generated/")
 
-    lifecycle_doc = (ROOT / "docs" / "LIFECYCLE.md").read_text(encoding="utf-8")
+    lifecycle_doc = (ROOT / "docs" / "operations" / "LIFECYCLE.md").read_text(encoding="utf-8")
     for required_snippet in (
         "source_authored",
         "deployed",
@@ -2121,7 +2143,7 @@ def validate_paths(errors: list[str]) -> None:
         "python scripts/validate_stack.py --parity-check",
     ):
         if required_snippet not in lifecycle_doc:
-            errors.append(f"docs/LIFECYCLE.md must mention `{required_snippet}`")
+            errors.append(f"docs/operations/LIFECYCLE.md must mention `{required_snippet}`")
 
     playbook_runtime_doc = (
         ROOT
@@ -2266,7 +2288,7 @@ def validate_mechanics_topology(errors: list[str]) -> None:
         mechanics_root / "AGENTS.md",
         mechanics_root / "README.md",
         mechanics_root / "ARTIFACT_TOPOLOGY.md",
-        ROOT / "docs" / "MECHANICS.md",
+        ROOT / "docs" / "runtime" / "MECHANICS.md",
     ):
         if not path.is_file():
             errors.append(f"mechanics topology root is missing {path.relative_to(ROOT)}")
@@ -2445,9 +2467,30 @@ def validate_required_files(errors: list[str]) -> None:
 
 def validate_root_residual_topology(errors: list[str]) -> None:
     forbidden_paths = {
-        ROOT / "AUDIT.md": "docs/AUDIT.md",
+        ROOT / "AUDIT.md": "docs/routes/AUDIT.md",
         ROOT / "Spark": ".agents/spark/",
         ROOT / ".github" / "README.md": ".github/GITHUB_SURFACE.md",
+        ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md": "docs/routes/START_HERE_ROUTE_CONTRACT.md",
+        ROOT / "docs" / "AUDIT.md": "docs/routes/AUDIT.md",
+        ROOT / "docs" / "ARCHITECTURE.md": "docs/runtime/ARCHITECTURE.md",
+        ROOT / "docs" / "MECHANICS.md": "docs/runtime/MECHANICS.md",
+        ROOT / "docs" / "PATHS.md": "docs/runtime/PATHS.md",
+        ROOT / "docs" / "SERVICE_CATALOG.md": "docs/runtime/SERVICE_CATALOG.md",
+        ROOT / "docs" / "STORAGE_LAYOUT.md": "docs/runtime/STORAGE_LAYOUT.md",
+        ROOT / "docs" / "DEPLOYMENT.md": "docs/install/DEPLOYMENT.md",
+        ROOT / "docs" / "FIRST_RUN.md": "docs/install/FIRST_RUN.md",
+        ROOT / "docs" / "BACKUP_RESTORE.md": "docs/operations/BACKUP_RESTORE.md",
+        ROOT / "docs" / "LIFECYCLE.md": "docs/operations/LIFECYCLE.md",
+        ROOT / "docs" / "RUNBOOK.md": "docs/operations/RUNBOOK.md",
+        ROOT / "docs" / "SECURITY.md": "docs/operations/SECURITY.md",
+        ROOT / "docs" / "PRESETS.md": "docs/profiles/PRESETS.md",
+        ROOT / "docs" / "PROFILES.md": "docs/profiles/PROFILES.md",
+        ROOT / "docs" / "PROFILE_RECIPES.md": "docs/profiles/PROFILE_RECIPES.md",
+        ROOT / "docs" / "BRANCH_POLICY.md": "docs/governance/BRANCH_POLICY.md",
+        ROOT / "docs" / "QUESTBOOK_STACK_INTEGRATION.md": "docs/governance/QUESTBOOK_STACK_INTEGRATION.md",
+        ROOT / "docs" / "RELEASING.md": "docs/governance/RELEASING.md",
+        ROOT / "docs" / "AGENTS_ROOT_REFERENCE.md": "docs/legacy/AGENTS_ROOT_REFERENCE.md",
+        ROOT / "docs" / "MIGRATION_FROM_OLD.md": "docs/legacy/MIGRATION_FROM_OLD.md",
     }
     for path, target in forbidden_paths.items():
         if path.exists():
@@ -2459,8 +2502,20 @@ def validate_root_residual_topology(errors: list[str]) -> None:
     docs_readme = read_text_or_none(ROOT / "docs" / "README.md") or ""
     if ".agents/spark" not in agents_readme and "spark/README.md" not in agents_readme:
         errors.append(".agents/README.md must route the Spark fast-loop lane")
-    if "AUDIT.md" not in docs_readme:
-        errors.append("docs/README.md must route docs/AUDIT.md")
+    if "routes/AUDIT.md" not in docs_readme:
+        errors.append("docs/README.md must route docs/routes/AUDIT.md")
+    for district in (
+        "routes/",
+        "runtime/",
+        "install/",
+        "operations/",
+        "profiles/",
+        "governance/",
+        "decisions/",
+        "legacy/",
+    ):
+        if district not in docs_readme:
+            errors.append(f"docs/README.md must route docs/{district}")
 
 
 def validate_agent_skill_projection_routes(errors: list[str]) -> None:
@@ -3013,7 +3068,7 @@ def validate_root_design_surfaces(errors: list[str]) -> None:
 
 
 def validate_entry_route_contract(errors: list[str]) -> None:
-    route_contract = read_text_or_none(ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md") or ""
+    route_contract = read_text_or_none(ROOT / "docs" / "routes" / "START_HERE_ROUTE_CONTRACT.md") or ""
     readme = read_text_or_none(ROOT / "README.md") or ""
     agents = read_text_or_none(ROOT / "AGENTS.md") or ""
     docs_readme = read_text_or_none(ROOT / "docs" / "README.md") or ""
@@ -3040,11 +3095,11 @@ def validate_entry_route_contract(errors: list[str]) -> None:
         ("docs/AGENTS.md", docs_agents),
     ):
         if "START_HERE_ROUTE_CONTRACT.md" not in text:
-            errors.append(f"{surface_name} must point to docs/START_HERE_ROUTE_CONTRACT.md")
+            errors.append(f"{surface_name} must point to docs/routes/START_HERE_ROUTE_CONTRACT.md")
 
     for mode in route_modes:
         if mode not in route_contract:
-            errors.append(f"docs/START_HERE_ROUTE_CONTRACT.md must define route mode `{mode}`")
+            errors.append(f"docs/routes/START_HERE_ROUTE_CONTRACT.md must define route mode `{mode}`")
         if mode not in readme:
             errors.append(f"README.md must expose route mode `{mode}`")
 
@@ -3056,7 +3111,7 @@ def validate_entry_route_contract(errors: list[str]) -> None:
         "Diagnostic and repair surfaces are evidence and handoff routes",
     ):
         if snippet not in route_contract:
-            errors.append(f"docs/START_HERE_ROUTE_CONTRACT.md must mention `{snippet}`")
+            errors.append(f"docs/routes/START_HERE_ROUTE_CONTRACT.md must mention `{snippet}`")
 
 
 def validate_decision_record_surface(errors: list[str]) -> None:
@@ -3200,10 +3255,10 @@ def validate_reference_platform(errors: list[str]) -> None:
     if "aoa-machine-bridge" not in doctor_doc:
         errors.append("mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md must mention aoa-machine-bridge")
 
-    first_run_doc = (ROOT / "docs" / "FIRST_RUN.md").read_text(encoding="utf-8")
+    first_run_doc = (ROOT / "docs" / "install" / "FIRST_RUN.md").read_text(encoding="utf-8")
     if "reference-host.public.json" not in first_run_doc:
         errors.append(
-            "docs/FIRST_RUN.md must mention reference-host.public.json capture"
+            "docs/install/FIRST_RUN.md must mention reference-host.public.json capture"
         )
 
     spec_doc = (
@@ -3281,13 +3336,13 @@ def validate_machine_bridge(errors: list[str]) -> None:
         if fragment not in bridge_doc:
             errors.append(f"{machine_bridge_doc_path.relative_to(ROOT)} must mention {fragment}")
 
-    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    storage_doc = (ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Logs/machine-bridge/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/machine-bridge/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Logs/machine-bridge/")
 
-    paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
+    paths_doc = (ROOT / "docs" / "runtime" / "PATHS.md").read_text(encoding="utf-8")
     if "Logs/machine-bridge" not in paths_doc:
-        errors.append("docs/PATHS.md must mention Logs/machine-bridge")
+        errors.append("docs/runtime/PATHS.md must mention Logs/machine-bridge")
 
     script_doc = (ROOT / "scripts" / "AGENTS.md").read_text(encoding="utf-8")
     if "aoa-machine-bridge" not in script_doc:
@@ -3318,9 +3373,9 @@ def validate_platform_adaptations(errors: list[str]) -> None:
     if "platform-adaptation" not in boundaries_doc:
         errors.append("BOUNDARIES.md must mention platform-adaptation records")
 
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "aoa-platform-adaptation" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-platform-adaptation")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-platform-adaptation")
 
     windows_perf_doc = (
         ROOT
@@ -3334,9 +3389,9 @@ def validate_platform_adaptations(errors: list[str]) -> None:
     if "aoa-platform-adaptation" not in windows_perf_doc:
         errors.append("mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md must mention aoa-platform-adaptation")
 
-    storage_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    storage_doc = (ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Logs/platform-adaptations/" not in storage_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Logs/platform-adaptations/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Logs/platform-adaptations/")
 
     policy_doc = (
         ROOT
@@ -3387,10 +3442,10 @@ def validate_platform_adaptations(errors: list[str]) -> None:
 
 def validate_branch_policy(errors: list[str]) -> None:
     contributing_doc = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
-    if "docs/BRANCH_POLICY.md" not in contributing_doc:
-        errors.append("CONTRIBUTING.md must point to docs/BRANCH_POLICY.md")
+    if "docs/governance/BRANCH_POLICY.md" not in contributing_doc:
+        errors.append("CONTRIBUTING.md must point to docs/governance/BRANCH_POLICY.md")
 
-    policy_doc = (ROOT / "docs" / "BRANCH_POLICY.md").read_text(encoding="utf-8")
+    policy_doc = (ROOT / "docs" / "governance" / "BRANCH_POLICY.md").read_text(encoding="utf-8")
     required_snippets = [
         "`main` is the only long-lived branch",
         "Delete the topic branch locally and on `origin`.",
@@ -3401,7 +3456,7 @@ def validate_branch_policy(errors: list[str]) -> None:
     ]
     for snippet in required_snippets:
         if snippet not in policy_doc:
-            errors.append(f"docs/BRANCH_POLICY.md must mention: {snippet}")
+            errors.append(f"docs/governance/BRANCH_POLICY.md must mention: {snippet}")
 
 
 def validate_return_runtime_contract(errors: list[str]) -> None:
@@ -3411,13 +3466,13 @@ def validate_return_runtime_contract(errors: list[str]) -> None:
     if "governed-canary-catalog.json" not in templates_readme:
         errors.append("config-templates/README.md must mention governed-canary-catalog.json")
 
-    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    deployment_doc = (ROOT / "docs" / "install" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "Configs/agent-api/return-policy.yaml" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention Configs/agent-api/return-policy.yaml")
+        errors.append("docs/install/DEPLOYMENT.md must mention Configs/agent-api/return-policy.yaml")
 
-    first_run_doc = (ROOT / "docs" / "FIRST_RUN.md").read_text(encoding="utf-8")
+    first_run_doc = (ROOT / "docs" / "install" / "FIRST_RUN.md").read_text(encoding="utf-8")
     if "Configs/agent-api/return-policy.yaml" not in first_run_doc:
-        errors.append("docs/FIRST_RUN.md must mention Configs/agent-api/return-policy.yaml")
+        errors.append("docs/install/FIRST_RUN.md must mention Configs/agent-api/return-policy.yaml")
 
     render_truth_doc = (
         ROOT
@@ -3529,7 +3584,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         if snippet not in doctor_split_doc:
             errors.append(f"mechanics/diagnostic-spine/parts/doctor-readiness/docs/LOCAL_OPS_DOCTOR_SPLIT.md must mention `{snippet}`")
 
-    service_catalog_doc = read_required_text(Path("docs") / "SERVICE_CATALOG.md")
+    service_catalog_doc = read_required_text(Path("docs") / "runtime" / "SERVICE_CATALOG.md")
     for snippet in (
         "mechanics/runtime-lifecycle/parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md",
         "mechanics/runtime-lifecycle/parts/status-readouts/docs/USAGE_BUDGET_POLICY.md",
@@ -3538,9 +3593,9 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "bounded runtime artifact",
     ):
         if snippet not in service_catalog_doc:
-            errors.append(f"docs/SERVICE_CATALOG.md must mention `{snippet}`")
+            errors.append(f"docs/runtime/SERVICE_CATALOG.md must mention `{snippet}`")
 
-    runbook_doc = read_required_text(Path("docs") / "RUNBOOK.md")
+    runbook_doc = read_required_text(Path("docs") / "operations" / "RUNBOOK.md")
     for snippet in (
         "runtime_gateway_cache_status",
         "runtime_usage_snapshot",
@@ -3549,7 +3604,7 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
         "absence is not a failure",
     ):
         if snippet not in runbook_doc:
-            errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")
+            errors.append(f"docs/operations/RUNBOOK.md must mention `{snippet}`")
 
     doctor_doc = read_required_text(
         Path("mechanics") / "diagnostic-spine" / "parts" / "doctor-readiness" / "docs" / "DOCTOR.md"
@@ -3758,7 +3813,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         if snippet not in spine_doc:
             errors.append(f"{DIAGNOSTIC_SPINE_PATH.as_posix()} must mention `{snippet}`")
 
-    runbook_doc = read_required_text(Path("docs") / "RUNBOOK.md")
+    runbook_doc = read_required_text(Path("docs") / "operations" / "RUNBOOK.md")
     for snippet in (
         "Logs/diagnostics/latest/",
         "diagnostic_session_v1",
@@ -3770,7 +3825,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         "reviewed_diagnosis.ref.json",
     ):
         if snippet not in runbook_doc:
-            errors.append(f"docs/RUNBOOK.md must mention `{snippet}`")
+            errors.append(f"docs/operations/RUNBOOK.md must mention `{snippet}`")
 
     target_schema = read_required_json(DIAGNOSTIC_TARGET_SCHEMA_PATH)
     if target_schema and target_schema.get("title") != "abyss-stack diagnostic_target_v1":
@@ -4150,87 +4205,87 @@ def validate_federation_landing(errors: list[str]) -> None:
     if "route-api/" not in services_readme:
         errors.append("config-templates/Services/README.md must mention route-api/")
 
-    storage_layout_doc = (ROOT / "docs" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
+    storage_layout_doc = (ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md").read_text(encoding="utf-8")
     if "Knowledge/federation" not in storage_layout_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Knowledge/federation")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Knowledge/federation")
     if "source-managed build context" not in storage_layout_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention the aoa-browser source-managed build context")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention the aoa-browser source-managed build context")
     if "Services/aoa-browser/ms-playwright/" not in storage_layout_doc:
-        errors.append("docs/STORAGE_LAYOUT.md must mention Services/aoa-browser/ms-playwright/")
+        errors.append("docs/runtime/STORAGE_LAYOUT.md must mention Services/aoa-browser/ms-playwright/")
 
-    deployment_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
+    deployment_doc = (ROOT / "docs" / "install" / "DEPLOYMENT.md").read_text(encoding="utf-8")
     if "aoa-sync-federation-surfaces --layer aoa-agents" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-agents")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-agents")
     if "aoa-sync-federation-surfaces --layer aoa-memo" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-memo")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-memo")
     if "aoa-sync-federation-surfaces --layer aoa-evals" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-evals")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-evals")
     if "aoa-sync-federation-surfaces --layer aoa-playbooks" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-playbooks")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-playbooks")
     if "aoa-sync-federation-surfaces --layer aoa-kag" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-kag")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer aoa-kag")
     if "aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must document the federation user-unit selection route")
+        errors.append("docs/install/DEPLOYMENT.md must document the federation user-unit selection route")
     if "aoa-sync-federation-surfaces --layer tos-source" not in deployment_doc:
-        errors.append("docs/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer tos-source")
+        errors.append("docs/install/DEPLOYMENT.md must mention aoa-sync-federation-surfaces --layer tos-source")
 
-    paths_doc = (ROOT / "docs" / "PATHS.md").read_text(encoding="utf-8")
+    paths_doc = (ROOT / "docs" / "runtime" / "PATHS.md").read_text(encoding="utf-8")
     if "AOA_AGENTS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_AGENTS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_AGENTS_ROOT")
     if "AOA_MEMO_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_MEMO_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_MEMO_ROOT")
     if "AOA_EVALS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_EVALS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_EVALS_ROOT")
     if "AOA_PLAYBOOKS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_PLAYBOOKS_ROOT")
     if "AOA_KAG_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_KAG_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_KAG_ROOT")
     if "AOA_TOS_ROOT" not in paths_doc:
-        errors.append("docs/PATHS.md must mention AOA_TOS_ROOT")
+        errors.append("docs/runtime/PATHS.md must mention AOA_TOS_ROOT")
 
-    service_catalog_doc = (ROOT / "docs" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
+    service_catalog_doc = (ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "43-federation-router.yml" not in service_catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention 43-federation-router.yml")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention 43-federation-router.yml")
     if "route-api" not in service_catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention route-api")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention route-api")
     if "POST /run/federated" not in service_catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must mention POST /run/federated")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must mention POST /run/federated")
     if "`abyss_default`" not in service_catalog_doc:
-        errors.append("docs/SERVICE_CATALOG.md must explain the sidecar route-api network attachment")
+        errors.append("docs/runtime/SERVICE_CATALOG.md must explain the sidecar route-api network attachment")
 
-    profiles_doc = (ROOT / "docs" / "PROFILES.md").read_text(encoding="utf-8")
+    profiles_doc = (ROOT / "docs" / "profiles" / "PROFILES.md").read_text(encoding="utf-8")
     if "`federation`" not in profiles_doc:
-        errors.append("docs/PROFILES.md must mention the federation profile")
+        errors.append("docs/profiles/PROFILES.md must mention the federation profile")
     if "AOA_FEDERATED_RUN_ENABLED=true" not in profiles_doc:
-        errors.append("docs/PROFILES.md must explain when AOA_FEDERATED_RUN_ENABLED=true is required")
+        errors.append("docs/profiles/PROFILES.md must explain when AOA_FEDERATED_RUN_ENABLED=true is required")
 
-    profile_recipes_doc = (ROOT / "docs" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
+    profile_recipes_doc = (ROOT / "docs" / "profiles" / "PROFILE_RECIPES.md").read_text(encoding="utf-8")
     if "route-api" not in profile_recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention route-api")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention route-api")
     if "aoa-federated-check" not in profile_recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must mention aoa-federated-check for the federated advisory seam")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must mention aoa-federated-check for the federated advisory seam")
     if "--playbook-id AOA-P-0008" not in profile_recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
     if "--inspect-id AOA-K-0011" not in profile_recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
     if "--memo-id AOA-M-0001" not in profile_recipes_doc:
-        errors.append("docs/PROFILE_RECIPES.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
+        errors.append("docs/profiles/PROFILE_RECIPES.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
 
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "aoa-federated-check" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-federated-check for the live federated advisory seam")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-federated-check for the live federated advisory seam")
     if "--playbook-id AOA-P-0008" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
+        errors.append("docs/operations/RUNBOOK.md must show aoa-federated-check --playbook-id AOA-P-0008 for the first playbook advisory consumer path")
     if "--inspect-id AOA-K-0011" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
+        errors.append("docs/operations/RUNBOOK.md must show aoa-federated-check --inspect-id AOA-K-0011 for the first retrieval-only consumer path")
     if "--memo-id AOA-M-0001" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
+        errors.append("docs/operations/RUNBOOK.md must show aoa-federated-check --memo-id AOA-M-0001 for the first memo advisory consumer path")
 
 
 def validate_memo_runtime_seam(errors: list[str]) -> None:
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "aoa-export-memo-candidate" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-export-memo-candidate")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-export-memo-candidate")
 
     seam_doc = (
         ROOT
@@ -4282,15 +4337,15 @@ def validate_memo_runtime_seam(errors: list[str]) -> None:
 
 
 def validate_eval_runtime_seam(errors: list[str]) -> None:
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "aoa-export-runtime-evidence-selection" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-export-runtime-evidence-selection")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-export-runtime-evidence-selection")
     if "aoa-export-artifact-hook-candidate" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-export-artifact-hook-candidate")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-export-artifact-hook-candidate")
     if "aoa-run-memo-contradiction-integrity" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-run-memo-contradiction-integrity")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-run-memo-contradiction-integrity")
     if "aoa-a2a-return-closeout-dry-run" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention aoa-a2a-return-closeout-dry-run")
+        errors.append("docs/operations/RUNBOOK.md must mention aoa-a2a-return-closeout-dry-run")
 
     seam_doc = (
         ROOT
@@ -4498,9 +4553,9 @@ def validate_eval_runtime_seam(errors: list[str]) -> None:
 
 
 def validate_playbook_runtime_seam(errors: list[str]) -> None:
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "playbooks/activation" not in runbook_doc and "/playbooks/" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention playbook advisory seam inspection")
+        errors.append("docs/operations/RUNBOOK.md must mention playbook advisory seam inspection")
 
     seam_doc = (
         ROOT
@@ -4523,9 +4578,9 @@ def validate_playbook_runtime_seam(errors: list[str]) -> None:
 
 
 def validate_kag_runtime_seam(errors: list[str]) -> None:
-    runbook_doc = (ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+    runbook_doc = (ROOT / "docs" / "operations" / "RUNBOOK.md").read_text(encoding="utf-8")
     if "/kag/" not in runbook_doc and "kag/registry" not in runbook_doc:
-        errors.append("docs/RUNBOOK.md must mention KAG advisory seam inspection")
+        errors.append("docs/operations/RUNBOOK.md must mention KAG advisory seam inspection")
 
     seam_doc = (
         ROOT
@@ -4556,7 +4611,7 @@ def validate_runtime_configs_mirror(errors: list[str]) -> None:
         ROOT / "compose" / "profiles",
         ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
         ROOT / "scripts" / "aoa-check-layout",
-        ROOT / "docs" / "DEPLOYMENT.md",
+        ROOT / "docs" / "install" / "DEPLOYMENT.md",
     ]
     for path in required_runtime_paths:
         if not path.exists():

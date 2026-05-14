@@ -1,7 +1,7 @@
 # AGENTS root reference
 
 This file preserves the previous full root guidance for `abyss-stack`.
-The live root route card is `../AGENTS.md`.
+The live root route card is `../../AGENTS.md`.
 
 Use this reference when:
 
@@ -10,6 +10,9 @@ Use this reference when:
 - checking whether a slimming move should become a nested `AGENTS.md`, owner doc, or validator rule
 
 Do not treat this file as a competing root. If a preserved rule still actively governs a local directory, move or restate it at the smallest owner surface rather than re-bloating the root.
+The preserved block below keeps old path wording for lineage; active docs now
+live under `docs/routes/`, `docs/runtime/`, `docs/install/`,
+`docs/operations/`, `docs/profiles/`, and `docs/governance/`.
 
 ## Preserved root AGENTS.md from before Pack 5
 

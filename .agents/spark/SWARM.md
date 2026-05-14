@@ -13,14 +13,14 @@ doctor/first-run/render-truth path или template safety. Этот рой до�
 - `README.md`
 - `CHARTER.md`
 - `BOUNDARIES.md`
-- `docs/ARCHITECTURE.md`
-- `docs/SERVICE_CATALOG.md`
-- `docs/PROFILES.md`
-- `docs/PROFILE_RECIPES.md`
+- `docs/runtime/ARCHITECTURE.md`
+- `docs/runtime/SERVICE_CATALOG.md`
+- `docs/profiles/PROFILES.md`
+- `docs/profiles/PROFILE_RECIPES.md`
 - `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
 - `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
-- `docs/FIRST_RUN.md`
-- `docs/SECURITY.md`
+- `docs/install/FIRST_RUN.md`
+- `docs/operations/SECURITY.md`
 
 ## Форма роя
 - **Coordinator**: выбирает один profile-aware infra seam
@@ -95,11 +95,11 @@ Rules:
 ```text
 Use only commands/helpers documented in the repo for the touched surface.
 Before running anything, list the exact helper(s) you found in:
-- docs/PROFILE_RECIPES.md
+- docs/profiles/PROFILE_RECIPES.md
 - mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md
-- docs/FIRST_RUN.md
+- docs/install/FIRST_RUN.md
 - mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md
-- docs/RUNBOOK.md
+- docs/operations/RUNBOOK.md
 
 Then run only those applicable commands and report:
 - commands run
@@ -123,11 +123,11 @@ Check:
 ## Verify
 ```bash
 # Use only the exact helper commands documented for the touched surface in:
-# docs/PROFILE_RECIPES.md
+# docs/profiles/PROFILE_RECIPES.md
 # mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md
-# docs/FIRST_RUN.md
+# docs/install/FIRST_RUN.md
 # mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md
-# docs/RUNBOOK.md
+# docs/operations/RUNBOOK.md
 ```
 
 ## Done when

@@ -27,11 +27,11 @@ parent: null
 depends_on: []
 activation:
   mode: on_review_of
-  ref: docs/PROFILES.md
+  ref: docs/profiles/PROFILES.md
   note: review when profile or preset surface changes
 anchor_ref:
   artifact: profile-recipes
-  ref: docs/PROFILE_RECIPES.md
+  ref: docs/profiles/PROFILE_RECIPES.md
 handoff_role: infra-maintainer
 evidence:
   - host-profile obligations receive stable quest IDs

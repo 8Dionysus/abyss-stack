@@ -82,7 +82,7 @@ A new service should usually enter through a module.
 Only then should it be included in one or more profiles.
 
 The optional `llama.cpp` benchmark lane deliberately stays outside the default profiles and presets.
-Use [LLAMACPP_PILOT](../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
+Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) only when you want an explicit alternate benchmark or promotion surface beyond the canonical runtime path.
 
 ## Dependency note
 
@@ -128,73 +128,8 @@ aoa-profile-modules --profile agentic --profile tools --paths
 aoa-profile-endpoints --profile agentic --profile tools
 ```
 
-## Examples
+## Operating routes
 
-Bring up the smallest substrate:
-
-```bash
-aoa-up --profile core
-```
-
-Bring up the main agent runtime:
-
-```bash
-aoa-profile-modules --profile agentic --paths
-aoa-profile-endpoints --profile agentic
-aoa-up --profile agentic
-```
-
-Bring up the Intel-aware agent runtime:
-
-```bash
-aoa-profile-modules --profile intel --paths
-aoa-profile-endpoints --profile intel
-aoa-up --profile intel
-```
-
-Bring up an agent runtime plus the optional federation seam:
-
-```bash
-scripts/aoa-sync-federation-surfaces --layer aoa-agents
-scripts/aoa-sync-federation-surfaces --layer aoa-routing
-scripts/aoa-sync-federation-surfaces --layer aoa-memo
-scripts/aoa-sync-federation-surfaces --layer aoa-evals
-scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
-scripts/aoa-sync-federation-surfaces --layer aoa-kag
-scripts/aoa-sync-federation-surfaces --layer tos-source
-aoa-profile-modules --profile agentic --profile federation --paths
-aoa-profile-endpoints --profile agentic --profile federation
-aoa-up --profile agentic --profile federation
-```
-
-If you want the live advisory consumer as well, enable `AOA_FEDERATED_RUN_ENABLED=true` for `langchain-api` before starting the combined profile.
-
-Bring up the route-first ToS graph helper:
-
-```bash
-aoa-profile-modules --profile curation --paths
-aoa-profile-endpoints --profile curation
-aoa-up --profile curation
-```
-
-Or layer it onto the current core substrate:
-
-```bash
-aoa-profile-modules --profile core --profile curation --paths
-aoa-profile-endpoints --profile core --profile curation
-aoa-up --profile core --profile curation
-```
-
-Bring up an agent runtime plus tools and observability:
-
-```bash
-aoa-profile-modules --profile agentic --profile tools --profile observability --paths
-aoa-profile-endpoints --profile agentic --profile tools --profile observability
-aoa-up --profile agentic --profile tools --profile observability
-```
-
-Bring up only observability:
-
-```bash
-aoa-up --profile observability
-```
+Keep this file focused on profile contracts. Use [PROFILE_RECIPES](PROFILE_RECIPES.md)
+for startup checks, combined operating examples, federation checks, and
+host-facing endpoint expectations.

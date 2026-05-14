@@ -135,7 +135,7 @@ what was not checked, and what surface owns the next decision.
 - `AGENTS.md` tells agents how to move safely through the repository.
 - `DESIGN.AGENTS.md` describes the intended shape of agent-facing guidance.
 - `ROADMAP.md` names current direction and future triggers.
-- `docs/ARCHITECTURE.md` maps the runtime structure in more concrete detail.
+- `docs/runtime/ARCHITECTURE.md` maps the runtime structure in more concrete detail.
 - `mechanics/README.md` is the atlas for runtime moves.
 
 ## Use by Agents

@@ -54,7 +54,7 @@ skill, memo, eval, playbook, routing, KAG, stats, machine, or operator truth.
 ## Consequences
 
 - `mechanics/README.md` becomes the runtime move-type atlas.
-- `docs/MECHANICS.md` is a docs-side route into the mechanics tree.
+- `docs/runtime/MECHANICS.md` is a docs-side route into the mechanics tree.
 - `scripts/validate_nested_agents.py` now knows the mechanics AGENTS surfaces.
 - `scripts/aoa-sync-configs` and parity expectations include `mechanics/` so
   deployed `Configs` can receive the route tree after an explicit sync.
@@ -110,7 +110,7 @@ package-level docs alive.
 ## Source surfaces
 
 - `mechanics/README.md`
-- `docs/MECHANICS.md`
+- `docs/runtime/MECHANICS.md`
 - `scripts/validate_nested_agents.py`
 - `scripts/validate_stack.py`
 
