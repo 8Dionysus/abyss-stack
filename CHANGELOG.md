@@ -46,8 +46,9 @@ Tracking starts with the community-docs baseline for this repository.
   and their mechanic ownership routes
 - `docs/README.md` and `tests/README.md` as root district indexes for
   repository docs and repo-level validation
-- `.agents/` and `.github/` route README surfaces, plus `.agents/AGENTS.md` for
-  repo-local agent overlays
+- `.agents/` route README and `.github/GITHUB_SURFACE.md`, plus
+  `.agents/AGENTS.md` for repo-local agent overlays and GitHub-native route
+  mapping that does not compete with the homepage README
 - root `DESIGN.md` and `DESIGN.AGENTS.md` surfaces, adapting the AoA route-card
   pattern to the `abyss-stack` runtime substrate
 

@@ -39,6 +39,7 @@ for new records.
 | [2026-05-13 Live Runtime Cutover And Machine Parity](2026-05-13-live-runtime-cutover-parity.md) | decision record for parity and cutover packet surfaces |
 | [2026-05-14 Direction, History, And Decision Surface Roles](2026-05-14-direction-history-decision-surface-roles.md) | decision record for the `README.md`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/decisions/` role split |
 | [2026-05-14 Entry Route Contract And Validation Placement](2026-05-14-entry-route-contract-validation-placement.md) | decision record for the root entry route contract and README validation placement |
+| [2026-05-14 GitHub Homepage README Selection](2026-05-14-github-homepage-readme-selection.md) | decision record for keeping `.github/` from replacing the root homepage README |
 
 ## Record Shape
 

@@ -87,7 +87,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     ),
     '.github/AGENTS.md': (
         'GitHub platform surface',
-        '.github/README.md',
+        '.github/GITHUB_SURFACE.md',
         'GitHub automation public-safe',
         'Repo Validation',
         'root route card',
