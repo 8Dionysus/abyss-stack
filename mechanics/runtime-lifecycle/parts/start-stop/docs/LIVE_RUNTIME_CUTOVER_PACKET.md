@@ -34,7 +34,7 @@ scripts/aoa-machine-fit --mode public --write /tmp/abyss-stack-machine-fit.publi
 scripts/aoa-profile-endpoints --preset agent-federation
 scripts/aoa-federated-check
 scripts/aoa-status --autonomy --json
-scripts/aoa-diagnose --profile core --truth-goal deployed --write /tmp/abyss-stack-diagnostic-session.public.json
+scripts/aoa-diagnose --preset agent-federation --truth-goal deployed --write /tmp/abyss-stack-diagnostic-session.public.json
 ```
 
 Only after these gates are reviewed should an operator choose one explicit

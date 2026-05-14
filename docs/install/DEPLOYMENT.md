@@ -126,8 +126,13 @@ It does not delete existing data.
 
 ### `scripts/aoa-warmup`
 
-Warms the local Ollama chat model after startup when the selected profile includes `30-local-inference.yml`.
-`aoa-up` calls it automatically, so you usually do not need to invoke it by hand.
+Runs profile-aware post-start model warmup. The canonical `llama.cpp`
+local-worker path warms by default when the selected profile includes
+`32-llamacpp-inference.yml`. The retained Ollama fallback path warms only when
+the selected profile includes `30-local-inference.yml` and
+`AOA_OLLAMA_WARMUP_ENABLED=true`.
+`aoa-up` calls it automatically, so you usually do not need to invoke it by
+hand.
 
 ### `scripts/aoa-sync-configs`
 
@@ -300,9 +305,10 @@ Then create secrets per [SECRETS_BOOTSTRAP](../../mechanics/config-projection/pa
 
 For claim wording after bootstrap, use [TRUTH_SURFACES](../../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md).
 
-When the selected runtime explicitly includes `30-local-inference.yml`,
-`aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model
-resident for `30m` unless the stack restarts or the model is explicitly evicted.
+When the selected runtime explicitly includes `30-local-inference.yml`, Ollama
+warmup stays opt-in. Set `AOA_OLLAMA_WARMUP_ENABLED=true` when the retained
+fallback gateway should also warm `qwen3.5:9b` and keep it resident for `30m`
+unless the stack restarts or the model is explicitly evicted.
 
 Then inspect:
 

@@ -613,8 +613,11 @@ REQUIRED_FILES = {
     ROOT / "compose" / "presets" / "intel-tools.txt",
     ROOT / "compose" / "presets" / "intel-observability.txt",
     ROOT / "compose" / "presets" / "intel-full.txt",
+    ROOT / "compose" / "modules" / "README.md",
+    ROOT / "compose" / "profiles" / "README.md",
     ROOT / "compose" / "profiles" / "substrate.txt",
     ROOT / "compose" / "profiles" / "local-worker.txt",
+    ROOT / "compose" / "profiles" / "fallback-gateway.txt",
     ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "llamacpp.cpu.yml",
@@ -807,6 +810,7 @@ REQUIRED_FILES = {
     ROOT / "tests" / "test_validate_stack_questbook.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "doctor-readiness" / "tests" / "test_aoa_doctor.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_validate_stack_diagnostic_spine.py",
+    ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "start-stop" / "tests" / "test_aoa_warmup.py",
     ROOT / "mechanics" / "runtime-lifecycle" / "parts" / "status-readouts" / "tests" / "test_runtime_hygiene.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "tests" / "test_diagnostic_spine_contracts.py",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnose-wrapper" / "tests" / "test_aoa_diagnose.py",
@@ -1701,6 +1705,7 @@ def validate_profiles(errors: list[str]) -> None:
     expected_profiles = {
         "substrate.txt": ["10-storage.yml", "20-orchestration.yml"],
         "local-worker.txt": ["32-llamacpp-inference.yml", "41-agent-api.yml"],
+        "fallback-gateway.txt": ["30-local-inference.yml", "40-llm-gateway.yml"],
     }
     for profile_name, expected_modules in expected_profiles.items():
         profile_path = PROFILE_DIR / profile_name
@@ -1721,11 +1726,13 @@ def validate_profiles(errors: list[str]) -> None:
     if "Environment=AOA_STACK_PROFILE=substrate" not in unit:
         errors.append("systemd/user/podman-compose-abyss.service must default to substrate")
 
+    normal_profile_modules: dict[str, set[str]] = {}
     for profile in sorted(PROFILE_DIR.glob("*.txt")):
         modules = load_names(profile)
         if not modules:
             errors.append(f"profile has no modules: {profile.relative_to(ROOT)}")
             continue
+        normal_profile_modules[profile.name] = set(modules)
 
         seen = set(modules)
         for module_name in modules:
@@ -1746,6 +1753,25 @@ def validate_profiles(errors: list[str]) -> None:
                 errors.append(
                     f"profile {profile.name} includes {module_name} but is missing required modules: {', '.join(missing)}"
                 )
+
+    for profile_name, modules in normal_profile_modules.items():
+        if "44-llamacpp-agent-sidecar.yml" in modules:
+            errors.append(
+                f"profile {profile_name} must not include 44-llamacpp-agent-sidecar.yml; route it through the inference-pilot sidecar"
+            )
+
+    modules_readme = (ROOT / "compose" / "modules" / "README.md").read_text(encoding="utf-8")
+    profiles_readme = (ROOT / "compose" / "profiles" / "README.md").read_text(encoding="utf-8")
+    for required_text in (
+        "`substrate`",
+        "`local-worker`",
+        "`fallback-gateway`",
+        "`44-llamacpp-agent-sidecar.yml`",
+    ):
+        if required_text not in modules_readme:
+            errors.append(f"compose/modules/README.md must mention {required_text}")
+        if required_text not in profiles_readme:
+            errors.append(f"compose/profiles/README.md must mention {required_text}")
 
     sidecar_module = (MODULE_DIR / "44-llamacpp-agent-sidecar.yml").read_text(encoding="utf-8")
     if 'AOA_FEDERATED_RUN_ENABLED: "true"' not in sidecar_module:
@@ -1781,6 +1807,57 @@ def validate_profiles(errors: list[str]) -> None:
     service_catalog_doc = (ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md").read_text(encoding="utf-8")
     if "n8n-task-runners" not in service_catalog_doc:
         errors.append("docs/runtime/SERVICE_CATALOG.md must mention n8n-task-runners")
+
+    warmup_script = (
+        ROOT / "mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh"
+    ).read_text(encoding="utf-8")
+    deployment_doc = (ROOT / "docs" / "install" / "DEPLOYMENT.md").read_text(
+        encoding="utf-8"
+    )
+    start_stop_readme = (
+        ROOT / "mechanics/runtime-lifecycle/parts/start-stop/README.md"
+    ).read_text(encoding="utf-8")
+    if (
+        "AOA_OLLAMA_WARMUP_ENABLED" not in warmup_script
+        or "ollama warmup disabled" not in warmup_script
+    ):
+        errors.append(
+            "aoa-warmup must keep Ollama fallback warmup behind AOA_OLLAMA_WARMUP_ENABLED"
+        )
+    if (
+        "AOA_LLAMACPP_WARMUP_ENABLED" not in warmup_script
+        or "llama.cpp warmup complete" not in warmup_script
+    ):
+        errors.append("aoa-warmup must keep llama.cpp local-worker warmup explicit")
+    for required_text in (
+        "AOA_OLLAMA_WARMUP_ENABLED=true",
+        "`llama.cpp`",
+        "Ollama",
+    ):
+        if required_text not in deployment_doc:
+            errors.append(
+                f"docs/install/DEPLOYMENT.md must mention {required_text} warmup posture"
+            )
+        if required_text not in start_stop_readme:
+            errors.append(
+                f"mechanics/runtime-lifecycle/parts/start-stop/README.md must mention {required_text} warmup posture"
+            )
+
+    for active_route_doc in (
+        ROOT / "mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
+        ROOT
+        / "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_RUNTIME_PACKET.md",
+        ROOT
+        / "mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md",
+        ROOT / "mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md",
+        ROOT / "mechanics/machine-fit/parts/fit-record/docs/PROFILE_MACHINE_FIT_PACKET.md",
+    ):
+        active_route_text = active_route_doc.read_text(encoding="utf-8")
+        if "--profile core" in active_route_text:
+            errors.append(
+                f"{active_route_doc.relative_to(ROOT)} must use substrate/local-worker/"
+                "fallback-gateway or an explicit preset instead of --profile core"
+            )
 
     secrets_doc = (
         ROOT

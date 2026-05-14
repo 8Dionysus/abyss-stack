@@ -8,8 +8,8 @@ They are the layer above composition:
 - presets are named stacks of profiles
 
 The conservative working substrate is `profiles/substrate.txt`. It stays a
-profile so operators can layer local-worker, federation, tools, or
-observability deliberately.
+profile so operators can layer local-worker, fallback-gateway, federation,
+tools, or observability deliberately.
 
 ## Format
 

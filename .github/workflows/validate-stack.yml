@@ -106,6 +106,7 @@ jobs:
 
           scripts/aoa-check-layout --strict --profile substrate
           scripts/aoa-check-layout --strict --profile local-worker
+          scripts/aoa-check-layout --strict --profile fallback-gateway
           scripts/aoa-check-layout --strict --profile core
           scripts/aoa-check-layout --strict --profile agentic
           scripts/aoa-check-layout --strict --profile intel
@@ -118,8 +119,12 @@ jobs:
           scripts/aoa-profile-endpoints --profile substrate
           scripts/aoa-profile-modules --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile local-worker
+          scripts/aoa-profile-modules --profile fallback-gateway --paths
+          scripts/aoa-profile-endpoints --profile fallback-gateway
           scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+          scripts/aoa-profile-modules --profile substrate --profile fallback-gateway --paths
+          scripts/aoa-profile-endpoints --profile substrate --profile fallback-gateway
           scripts/aoa-profile-modules --profile core --paths
           scripts/aoa-profile-endpoints --profile core
           scripts/aoa-profile-modules --profile agentic --paths
@@ -140,7 +145,9 @@ jobs:
           scripts/aoa-profile-endpoints --preset intel-federation
           scripts/aoa-render-services --profile substrate
           scripts/aoa-render-services --profile local-worker
+          scripts/aoa-render-services --profile fallback-gateway
           scripts/aoa-render-services --profile substrate,local-worker
+          scripts/aoa-render-services --profile substrate,fallback-gateway
           scripts/aoa-render-services --profile core
           scripts/aoa-render-services --profile agentic
           scripts/aoa-render-services --profile intel
@@ -151,7 +158,9 @@ jobs:
           scripts/aoa-render-services --preset intel-federation
           scripts/aoa-render-config --profile substrate >/dev/null
           scripts/aoa-render-config --profile local-worker >/dev/null
+          scripts/aoa-render-config --profile fallback-gateway >/dev/null
           scripts/aoa-render-config --profile substrate,local-worker >/dev/null
+          scripts/aoa-render-config --profile substrate,fallback-gateway >/dev/null
           scripts/aoa-render-config --profile core >/dev/null
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"

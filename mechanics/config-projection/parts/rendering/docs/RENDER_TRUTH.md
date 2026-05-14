@@ -34,7 +34,9 @@ Lists the effective service names from the composed runtime view.
 Examples:
 
 ```bash
-scripts/aoa-render-services --profile core
+scripts/aoa-render-services --profile substrate
+scripts/aoa-render-services --profile substrate --profile local-worker
+scripts/aoa-render-services --profile fallback-gateway
 scripts/aoa-render-services --profile agentic
 scripts/aoa-render-services --profile agentic,tools,observability
 ```
@@ -46,7 +48,9 @@ Renders the composed config that Compose sees.
 Examples:
 
 ```bash
-scripts/aoa-render-config --profile core
+scripts/aoa-render-config --profile substrate
+scripts/aoa-render-config --profile substrate --profile local-worker
+scripts/aoa-render-config --profile fallback-gateway
 scripts/aoa-render-config --profile intel > /tmp/abyss-intel.rendered.yml
 scripts/aoa-render-config --profile agentic,tools,observability --write /tmp/abyss-agentic-tools-observability.rendered.yml
 ```

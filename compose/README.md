@@ -1,6 +1,8 @@
 # compose layout
 
 The new stack uses small compose modules, named profiles, and named presets.
+Use [modules](modules/README.md) for module rings and
+[profiles](profiles/README.md) for profile roles.
 
 ## Modules
 
@@ -24,6 +26,7 @@ The new stack uses small compose modules, named profiles, and named presets.
 
 - `profiles/substrate.txt`
 - `profiles/local-worker.txt`
+- `profiles/fallback-gateway.txt`
 - `profiles/core.txt`
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
@@ -36,8 +39,10 @@ A profile is only a list of module filenames in activation order.
 
 `substrate` is the conservative working service base for AbyssOS runtime
 bring-up: storage plus orchestration. `local-worker` is the canonical
-`llama.cpp` plus `langchain-api` worker layer. `core` is kept as a familiar
-compatibility bundle for substrate plus local `llama.cpp` inference basics.
+`llama.cpp` plus `langchain-api` worker layer. `fallback-gateway` keeps the
+retained Ollama plus LiteLLM control path explicit. `core` is kept as a
+familiar compatibility bundle for substrate plus local `llama.cpp` inference
+basics.
 
 ## Presets
 

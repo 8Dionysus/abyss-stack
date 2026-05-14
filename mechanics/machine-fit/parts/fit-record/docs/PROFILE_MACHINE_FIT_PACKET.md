@@ -20,8 +20,8 @@ source checkout:
 - `scripts/aoa-machine-bridge --mode public --write /tmp/<packet>/machine-bridge.public.json`
 - `scripts/aoa-platform-adaptation --mode public --write /tmp/<packet>/platform-adaptation.public.json`
 - `scripts/aoa-machine-fit --mode public --write /tmp/<packet>/machine-fit.public.json`
-- `scripts/aoa-profile-modules --profile core --profile curation --paths`
-- `scripts/aoa-profile-endpoints --profile core --profile curation`
+- `scripts/aoa-profile-modules --profile substrate --profile curation --paths`
+- `scripts/aoa-profile-endpoints --profile substrate --profile curation`
 - `scripts/aoa-profile-modules --profile agentic --profile federation --paths`
 - `scripts/aoa-profile-endpoints --profile agentic --profile federation`
 
@@ -47,4 +47,3 @@ live service availability, private host readiness, or sibling-layer acceptance.
   machine
 - do not copy AoA, ToS, skill, memo, eval, playbook, routing, KAG, or stats
   doctrine into this repository
-

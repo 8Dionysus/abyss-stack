@@ -5,18 +5,22 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 
 ## Read before editing
 1. `compose/README.md`
-2. `compose/presets/README.md`
-3. `docs/profiles/PRESETS.md`
-4. `docs/profiles/PROFILE_RECIPES.md`
-5. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
-6. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-7. `docs/runtime/PATHS.md`
+2. `compose/modules/README.md`
+3. `compose/profiles/README.md`
+4. `compose/presets/README.md`
+5. `docs/profiles/PRESETS.md`
+6. `docs/profiles/PROFILE_RECIPES.md`
+7. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
+8. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
+9. `docs/runtime/PATHS.md`
 
 ## Directory contract
 - `modules/*.yml` are the atomic runtime pieces.
 - `profiles/*.txt` list module filenames in activation order.
 - `presets/*.txt` list profile names in activation order.
 - `tuning/*.yml` are optional overlays. Do not promote a tuning overlay into the default operating contract by accident.
+- `44-llamacpp-agent-sidecar.yml` is a pilot sidecar, not a normal profile
+  member.
 
 ## Composition rules
 - Prefer a new small module over swelling an unrelated existing module.
@@ -60,7 +64,11 @@ scripts/aoa-profile-endpoints --profile substrate
 scripts/aoa-render-services --profile substrate
 scripts/aoa-render-config --profile substrate >/dev/null
 scripts/aoa-profile-modules --profile local-worker --paths
+scripts/aoa-profile-endpoints --profile local-worker
 scripts/aoa-render-config --profile local-worker >/dev/null
+scripts/aoa-profile-modules --profile fallback-gateway --paths
+scripts/aoa-profile-endpoints --profile fallback-gateway
+scripts/aoa-render-config --profile fallback-gateway >/dev/null
 ```
 
 For preset work, use the matching preset form instead of only testing profiles. Treat rendered config as potentially secret-bearing.

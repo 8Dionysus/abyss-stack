@@ -66,6 +66,7 @@ Examples:
 ```bash
 aoa-up --profile substrate
 aoa-up --profile substrate --profile local-worker
+aoa-up --profile fallback-gateway
 aoa-up --profile agentic --profile tools
 aoa-up --profile agentic,tools,observability
 aoa-up --preset agent-full
@@ -75,6 +76,10 @@ aoa-up --preset agent-tools --profile observability
 The order matters because profile ordering is preserved.
 Optional layers such as `tools` and `observability` should usually come after the base profile.
 Presets expand before direct `--profile` additions.
+
+Post-start model warmup follows the selected modules. `llama.cpp` warms by
+default for local-worker selections. Ollama fallback warmup is disabled unless
+the operator sets `AOA_OLLAMA_WARMUP_ENABLED=true`.
 
 ## Low-level canonical path
 

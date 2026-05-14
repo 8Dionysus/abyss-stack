@@ -53,6 +53,8 @@ aoa-preset-profiles --preset agent-full --paths
 aoa-profile-modules --profile substrate
 aoa-profile-endpoints --profile substrate
 aoa-render-services --profile substrate
+aoa-profile-modules --profile fallback-gateway
+aoa-profile-endpoints --profile fallback-gateway
 aoa-internal-probes --preset agent-full
 aoa-status --profile substrate
 aoa-smoke --with-internal --preset agent-full

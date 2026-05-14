@@ -18,7 +18,7 @@ root:
 AOA_STACK_ROOT=/tmp/<runtime> AOA_CONFIGS_ROOT=/tmp/<runtime>/Configs scripts/aoa-install-layout
 AOA_STACK_ROOT=/tmp/<runtime> AOA_CONFIGS_ROOT=/tmp/<runtime>/Configs scripts/aoa-sync-configs --delete
 AOA_SOURCE_ROOT=$(pwd) AOA_STACK_ROOT=/tmp/<runtime> AOA_CONFIGS_ROOT=/tmp/<runtime>/Configs \
-  scripts/aoa-diagnose --profile core --truth-goal deployed --write-latest
+  scripts/aoa-diagnose --profile substrate --truth-goal deployed --write-latest
 ```
 
 The packet writes:
@@ -50,4 +50,3 @@ without granting mutation authority.
 - repair remains a reviewed handoff, not a diagnostic side effect
 - generated diagnostic artifacts are evidence, not stronger than source docs
 - no runtime quest authority is created by diagnostic output
-

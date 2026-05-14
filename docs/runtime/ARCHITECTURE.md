@@ -7,8 +7,9 @@
 ## Layer model
 
 The default working runtime selection is `substrate`: storage plus
-orchestration. Local workers, Intel lanes, federation seams, tools, and
-observability are explicit profile or preset layers over that base.
+orchestration. Local workers, retained fallback gateways, Intel lanes,
+federation seams, tools, and observability are explicit profile or preset
+layers over that base.
 
 ### 1. Storage layer
 
@@ -27,6 +28,8 @@ Workflow coordination and pipeline surfaces:
 ### 3. Inference layer
 
 Local and accelerator-aware model serving:
+- Ollama remains a retained fallback/control serving lane, not the default
+  AbyssOS substrate
 - llama.cpp as the canonical local GGUF-serving path for bounded local-worker flows
 - OVMS as the current reviewed Intel/OpenVINO-oriented serving seam, currently exercised for embeddings in the promoted Intel presets
 - broader Intel serving lanes across OVMS, OpenVINO, and future OpenVINO GenAI may host other model classes through separate reviewed profile, machine-fit, or rollout changes
@@ -35,6 +38,8 @@ Local and accelerator-aware model serving:
 ### 4. Gateway and agent API layer
 
 Model routing and agent-facing runtime APIs:
+- LiteLLM remains a retained fallback gateway lane paired with Ollama in
+  `fallback-gateway`
 - LangChain API as the single canonical local-worker runtime surface on `5403`
 
 This layer may also host the runtime return wrapper that rebuilds context from a last valid anchor rather than continuing under drift.
