@@ -36,7 +36,7 @@ For example:
 - `aoa-doctor --preset agent-full` will not treat missing `/dev/dri` as relevant
 - `aoa-doctor --preset intel-full` will warn if `/dev/dri` is missing
 - `aoa-doctor --preset agent-full` will remind you that internal-only layers are selected and should be checked after startup
-- `aoa-doctor --profile agentic` will warn if `AOA_FEDERATED_RUN_ENABLED=true` is requested without also selecting `--profile federation`
+- `aoa-doctor --profile substrate --profile local-worker` will warn if `AOA_FEDERATED_RUN_ENABLED=true` is requested without also selecting `--profile federation`
 
 ## Relationship to host-facts capture
 

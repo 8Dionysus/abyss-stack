@@ -26,6 +26,7 @@ Use [modules](modules/README.md) for module rings and
 
 - `profiles/substrate.txt`
 - `profiles/local-worker.txt`
+- `profiles/intel-worker.txt`
 - `profiles/fallback-gateway.txt`
 - `profiles/core.txt`
 - `profiles/agentic.txt`
@@ -39,10 +40,11 @@ A profile is only a list of module filenames in activation order.
 
 `substrate` is the conservative working service base for AbyssOS runtime
 bring-up: storage plus orchestration. `local-worker` is the canonical
-`llama.cpp` plus `langchain-api` worker layer. `fallback-gateway` keeps the
-retained Ollama plus LiteLLM control path explicit. `core` is kept as a
-familiar compatibility bundle for substrate plus local `llama.cpp` inference
-basics.
+`llama.cpp` plus `langchain-api` worker layer. `intel-worker` is the reviewed
+OVMS embeddings layer over the canonical local worker. `fallback-gateway` keeps
+the retained Ollama plus LiteLLM control path explicit. `core`, `agentic`, and
+`intel` remain compatibility bundles for older operator habits; current presets
+compose `substrate` plus worker layers directly.
 
 ## Presets
 
@@ -59,8 +61,9 @@ A preset is a list of profile names in activation order.
 
 ## Runtime and pilot modules
 
-`32-llamacpp-inference.yml` is the canonical local-worker inference module and
-is used by `local-worker`, `core`, `agentic`, and `intel`.
+`32-llamacpp-inference.yml` is the canonical local-worker inference module. It
+is used by `local-worker`, `intel-worker`, and the compatibility bundles that
+preserve older profile names.
 
 `44-llamacpp-agent-sidecar.yml` is separate. It exists for the bounded
 `llama.cpp` sidecar pilot and is typically activated through:

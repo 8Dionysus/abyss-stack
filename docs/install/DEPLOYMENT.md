@@ -338,9 +338,9 @@ aoa-up --preset agent-full
 Bring up an agent runtime plus tools and observability without a preset:
 
 ```bash
-aoa-profile-modules --profile agentic --profile tools --profile observability --paths
-aoa-profile-endpoints --profile agentic --profile tools --profile observability
-aoa-up --profile agentic --profile tools --profile observability
+aoa-profile-modules --profile substrate --profile local-worker --profile tools --profile observability --paths
+aoa-profile-endpoints --profile substrate --profile local-worker --profile tools --profile observability
+aoa-up --profile substrate --profile local-worker --profile tools --profile observability
 ```
 
 Bring up an agent runtime plus the optional federation seam:
@@ -353,9 +353,9 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
-aoa-profile-modules --profile agentic --profile federation --paths
-aoa-profile-endpoints --profile agentic --profile federation
-aoa-up --profile agentic --profile federation
+aoa-profile-modules --profile substrate --profile local-worker --profile federation --paths
+aoa-profile-endpoints --profile substrate --profile local-worker --profile federation
+aoa-up --profile substrate --profile local-worker --profile federation
 ```
 
 ## systemd user install

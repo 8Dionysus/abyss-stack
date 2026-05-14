@@ -118,7 +118,7 @@ A strong runtime benchmark run should produce:
 For the current local Qwen path, use the runtime-local bench wrapper:
 
 ```bash
-scripts/aoa-qwen-bench --profile agentic
+scripts/aoa-qwen-bench --profile local-worker
 scripts/aoa-qwen-bench --preset intel-full
 ```
 

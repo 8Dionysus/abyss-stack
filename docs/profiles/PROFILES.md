@@ -32,6 +32,21 @@ machine should run the promoted local text worker path:
 aoa-up --profile substrate --profile local-worker
 ```
 
+### `intel-worker`
+
+The canonical local worker plus the reviewed Intel/OVMS embeddings seam:
+- `32-llamacpp-inference.yml`
+- `31-intel-inference.yml`
+- `41-agent-api.yml`
+- `42-agent-api-intel.yml`
+
+Use it with `substrate` when the runtime should keep chat on `llama.cpp` while
+routing embeddings to OVMS:
+
+```bash
+aoa-up --profile substrate --profile intel-worker
+```
+
 ### `fallback-gateway`
 
 Retained local control and gateway fallback path:
@@ -55,19 +70,20 @@ habits and quick storage/orchestration/`llama.cpp` checks.
 
 ### `agentic`
 
-A local agent-facing runtime surface with substrate plus the canonical
-`llama.cpp` chat path:
+Compatibility bundle for substrate plus the canonical `llama.cpp` chat path:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 - `41-agent-api.yml`
 
-This profile keeps the default `POST /run` path on the canonical `langchain-api -> llama.cpp` lane.
+New presets should compose `substrate + local-worker` directly. This profile
+keeps older operator routes runnable while preserving the same default
+`POST /run` path on the canonical `langchain-api -> llama.cpp` lane.
 Its new `POST /run/federated` path stays opt-in and only becomes useful when the `federation` profile is also present and `AOA_FEDERATED_RUN_ENABLED=true`.
 
 ### `intel`
 
-The agentic surface plus the current reviewed Intel-oriented serving seam through OVMS:
+Compatibility bundle for substrate plus the reviewed Intel-oriented serving seam through OVMS:
 - `10-storage.yml`
 - `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
@@ -75,6 +91,8 @@ The agentic surface plus the current reviewed Intel-oriented serving seam throug
 - `41-agent-api.yml`
 - `42-agent-api-intel.yml`
 
+New presets should compose `substrate + intel-worker` directly. This profile
+keeps older operator routes runnable.
 In the current promoted posture, this routes embeddings to OVMS while keeping the canonical chat path on `llama.cpp`.
 That does not freeze the broader Intel-serving family to embeddings-only forever; wider OVMS, OpenVINO, or OpenVINO GenAI model lanes stay additive and separately reviewed.
 The canonical `langchain-api` path now keeps its text target behind a generic runtime-chat seam, so additive Intel text lanes can be configured explicitly without changing what this profile promotes by default.
@@ -84,10 +102,14 @@ The canonical `langchain-api` path now keeps its text target behind a generic ru
 An opt-in metadata-only federation seam:
 - `43-federation-router.yml`
 
-This profile is intended to layer over `agentic` or `intel`, but it may also be run by itself for seam debugging.
+This profile is intended to layer over `substrate + local-worker`,
+`substrate + intel-worker`, or a compatibility bundle, but it may also be run by
+itself for seam debugging.
 It reads a mirrored `aoa-agents` contract seam, an `aoa-routing advisory seam`, an `aoa-memo` recall seam, an `aoa-evals` eval selection seam, an `aoa-playbooks` activation/composition advisory seam, an `aoa-kag` retrieval/regrounding seam, and a source-owned `tos-source` handoff seam through the single localhost-only `route-api`.
 It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}/Logs/memo-exports/` and filesystem-first eval export candidates under `${AOA_STACK_ROOT}/Logs/eval-exports/`.
-`route-api` remains advisory-only in this shape, but when this profile is layered onto `agentic`, `langchain-api` may consume it through `POST /run/federated`.
+`route-api` remains advisory-only in this shape, but when this profile is
+layered onto a worker path, `langchain-api` may consume it through
+`POST /run/federated`.
 
 ### `curation`
 
@@ -142,13 +164,13 @@ This is the intended way to layer optional surfaces like `tools` and `observabil
 ### Repeated `--profile`
 
 ```bash
-aoa-up --profile agentic --profile tools --profile observability
+aoa-up --profile substrate --profile local-worker --profile tools --profile observability
 ```
 
 ### Comma-separated form
 
 ```bash
-aoa-up --profile agentic,tools,observability
+aoa-up --profile substrate,local-worker,tools,observability
 ```
 
 ## Composition rule
@@ -171,6 +193,8 @@ Or use:
 ```bash
 aoa-profile-modules --profile substrate --profile local-worker --paths
 aoa-profile-endpoints --profile substrate --profile local-worker
+aoa-profile-modules --profile substrate --profile intel-worker --paths
+aoa-profile-endpoints --profile substrate --profile intel-worker
 aoa-profile-modules --profile fallback-gateway --paths
 ```
 

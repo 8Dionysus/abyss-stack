@@ -67,8 +67,8 @@ Examples:
 aoa-up --profile substrate
 aoa-up --profile substrate --profile local-worker
 aoa-up --profile fallback-gateway
-aoa-up --profile agentic --profile tools
-aoa-up --profile agentic,tools,observability
+aoa-up --profile substrate --profile local-worker --profile tools
+aoa-up --profile substrate,local-worker,tools,observability
 aoa-up --preset agent-full
 aoa-up --preset agent-tools --profile observability
 ```

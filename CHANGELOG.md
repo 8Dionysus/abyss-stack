@@ -192,6 +192,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `aoa-warmup` is now profile-aware across local-worker and fallback modules:
   `llama.cpp` can warm by default, while retained Ollama warmup requires
   explicit `AOA_OLLAMA_WARMUP_ENABLED=true`
+- named presets now expand through explicit `substrate + local-worker` or
+  `substrate + intel-worker` layers, while broad `agentic` and `intel` profiles
+  remain compatibility routes instead of hidden preset bases
 
 ### Validation
 

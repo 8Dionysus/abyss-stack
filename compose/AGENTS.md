@@ -66,9 +66,16 @@ scripts/aoa-render-config --profile substrate >/dev/null
 scripts/aoa-profile-modules --profile local-worker --paths
 scripts/aoa-profile-endpoints --profile local-worker
 scripts/aoa-render-config --profile local-worker >/dev/null
+scripts/aoa-profile-modules --profile intel-worker --paths
+scripts/aoa-profile-endpoints --profile intel-worker
+scripts/aoa-render-config --profile intel-worker >/dev/null
 scripts/aoa-profile-modules --profile fallback-gateway --paths
 scripts/aoa-profile-endpoints --profile fallback-gateway
 scripts/aoa-render-config --profile fallback-gateway >/dev/null
+scripts/aoa-preset-profiles --preset agent-full --paths
+scripts/aoa-profile-modules --preset agent-full --paths
+scripts/aoa-preset-profiles --preset intel-full --paths
+scripts/aoa-profile-modules --preset intel-full --paths
 ```
 
 For preset work, use the matching preset form instead of only testing profiles. Treat rendered config as potentially secret-bearing.

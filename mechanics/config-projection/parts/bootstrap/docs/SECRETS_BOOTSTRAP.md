@@ -93,7 +93,7 @@ runtime instead of duplicating the secret into a second committed example.
 
 ## Minimum expectation
 
-Before trying to run the full Intel-aware or agentic surface, ensure that these paths exist in real form.
+Before trying to run the full Intel-aware or local-worker surface, ensure that these paths exist in real form.
 
 ## Helpful check
 

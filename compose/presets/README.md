@@ -19,7 +19,8 @@ Comments and empty lines are allowed.
 Example:
 
 ```text
-agentic
+substrate
+local-worker
 tools
 observability
 ```
@@ -34,6 +35,10 @@ observability
 - `intel-tools`
 - `intel-observability`
 - `intel-full`
+
+Agent presets resolve through `substrate + local-worker`. Intel presets resolve
+through `substrate + intel-worker`. The older broad `agentic` and `intel`
+profiles remain runnable compatibility routes, not the preset substrate.
 
 ## Usage
 

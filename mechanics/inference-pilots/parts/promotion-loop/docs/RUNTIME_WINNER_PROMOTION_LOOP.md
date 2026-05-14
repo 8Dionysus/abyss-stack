@@ -140,7 +140,7 @@ scripts/aoa-doctor --preset intel-full
 scripts/aoa-up --preset intel-full
 scripts/aoa-wait --preset intel-full
 scripts/aoa-smoke --with-internal --preset intel-full
-scripts/aoa-qwen-bench --profile intel
+scripts/aoa-qwen-bench --profile intel-worker
 ```
 
 Or use the narrower live-path verify flow when that is the current reviewed

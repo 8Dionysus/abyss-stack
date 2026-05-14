@@ -1,3 +1,4 @@
-agentic
+substrate
+local-worker
 tools
 observability

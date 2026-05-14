@@ -1,2 +1,3 @@
-intel
+substrate
+intel-worker
 observability
