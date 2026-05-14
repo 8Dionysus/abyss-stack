@@ -7,7 +7,7 @@ meaning.
 ## RPG Runtime Projection
 
 - `docs/` defines the runtime route, collection, builder, and frontend
-  projection posture.
+  projection posture, including the runtime materialization packet.
 - `schemas/` defines item and collection contracts for RPG runtime read models.
 - `examples/` defines public-safe fixture items used by
   `scripts/aoa-rpg-runtime-projection`.

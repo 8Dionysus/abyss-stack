@@ -8,7 +8,7 @@ owner_surface: runtime/rpg-service-contracts
 theme_ref: ''
 milestone_ref: ''
 kind: doctrine
-state: captured
+state: done
 band: frontier
 difficulty: d3_seam
 risk: r2_contract
@@ -42,12 +42,19 @@ evidence:
 harvest:
   target: none
 opened_at: '2026-04-01'
-touched_at: '2026-04-01'
+touched_at: '2026-05-13'
 tags:
   - runtime
   - frontend
   - rpg
   - contracts
 notes: >
-  Keep service contracts public-safe and source-linked. Do not create a global rank engine, hidden score service, or auto-complete quest writer in this pass.
+  2026-05-13 source closeout: the first runtime/frontend service contract
+  layer is landed as public-safe source under
+  mechanics/federation-seams/parts/rpg-runtime/. The build snapshot,
+  reputation ledger, quest run result, and frontend projection bundle contracts
+  have docs, schemas, examples, generated transport validation, and stop-lines
+  against global rank engines, hidden score services, and auto-complete quest
+  writers. Runtime materialization was closed later by the lane-local
+  materialization packet.
 public_safe: true

@@ -9,6 +9,8 @@
 
 ## Next candidates
 
+- route drifted diagnostic packets into explicit repair governance only when
+  an operator asks for a repair packet
 - add a package-local check for doctor/diagnose wrapper parity if wrappers grow
 - split companion summaries from machine-readable contracts if the schema set
   expands

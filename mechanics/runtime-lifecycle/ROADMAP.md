@@ -10,6 +10,10 @@
 
 ## Next candidates
 
+- use the live runtime cutover packet before promoting any deployed seam into the
+  live loop
+- use the source runtime parity packet after source topology or sync-managed
+  surface movement
 - audit root lifecycle docs for authority versus route-card detail
 - add focused wrapper tests if lifecycle shell helpers grow beyond routing and
   environment assembly

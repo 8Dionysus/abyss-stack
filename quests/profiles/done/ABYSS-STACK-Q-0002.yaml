@@ -8,7 +8,7 @@ owner_surface: profiles/rollout
 theme_ref: ''
 milestone_ref: ''
 kind: rollout
-state: triaged
+state: done
 band: frontier
 difficulty: d3_seam
 risk: r2_contract
@@ -40,7 +40,7 @@ evidence:
 harvest:
   target: none
 opened_at: '2026-03-31'
-touched_at: '2026-04-07'
+touched_at: '2026-05-13'
 tags:
   - profiles
   - rollout
@@ -52,4 +52,12 @@ notes: >-
   text default explicit, keep broader OVMS/OpenVINO/OpenVINO GenAI lanes additive
   and separately reviewed, and treat Gemma/Vulkan/KV-cache rollout as host-fit
   obligations that still require bounded runtime packets before promotion.
+  2026-05-13 residual frontier alignment: route shape was ready. The same
+  pass then executed the public-safe source packet through host facts,
+  machine bridge, platform adaptation, machine-fit, profile modules, and
+  profile endpoints. Closeout lives at
+  mechanics/machine-fit/parts/fit-record/docs/PROFILE_MACHINE_FIT_PACKET.md.
+  The route is done for source profile rollout; future live promotion still
+  requires a fresh target-machine packet and must not import sibling-owned
+  meaning or live private state into source.
 public_safe: true

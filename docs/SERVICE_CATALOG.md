@@ -27,7 +27,7 @@ This file maps the first migrated runtime modules to their intended services.
 ## `32-llamacpp-inference.yml`
 
 - `llama-cpp` — canonical OpenAI-compatible GGUF serving surface for bounded local-worker flows
-- reuses a resolved local GGUF model file and backs the canonical local text worker path; the current reviewed default alias remains Qwen, but the model choice is host-fit and env-overridable
+- reuses a resolved local GGUF model file and backs the canonical local text worker path; the current reviewed default model label remains Qwen, but the model choice is host-fit and env-overridable
 
 ## `40-llm-gateway.yml`
 

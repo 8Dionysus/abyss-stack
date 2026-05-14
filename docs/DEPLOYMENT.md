@@ -131,7 +131,8 @@ Warms the local Ollama chat model after startup when the selected profile includ
 
 ### `scripts/aoa-sync-configs`
 
-Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_ROOT}`.
+Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_ROOT}`,
+including public quest route metadata used by stack validation.
 By default it is non-destructive.
 An explicit `--delete` mode exists for a tighter mirror when that is desired.
 This is the boundary where a source-authored change becomes deployed.
@@ -145,6 +146,11 @@ scripts/aoa-status --autonomy --json
 ```
 
 to confirm the canonical source checkout still matches the deployed `Configs` mirror for repo-managed paths.
+For the full machine/runtime parity route, use
+[SOURCE_RUNTIME_PARITY_PACKET](../mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md).
+For a live runtime-loop cutover decision, use
+[LIVE_RUNTIME_CUTOVER_PACKET](../mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md)
+before any start, stop, restart, systemd, profile, or exposure-changing action.
 The scheduled source-rooted mirror canary in `.github/workflows/mirror-canary.yml`
 rehearses the same parity flow against a temporary runtime root so source/deployed
 drift can surface before operator rollout.

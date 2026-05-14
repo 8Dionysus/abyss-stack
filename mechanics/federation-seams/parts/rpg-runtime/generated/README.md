@@ -12,6 +12,6 @@ schemas and examples under `mechanics/federation-seams/parts/rpg-runtime/`.
 Use:
 
 ```bash
-python scripts/aoa-rpg-runtime-projection --generated-only
-python scripts/aoa-rpg-runtime-projection --generated-only --check
+scripts/aoa-rpg-runtime-projection --generated-only
+scripts/aoa-rpg-runtime-projection --generated-only --check
 ```

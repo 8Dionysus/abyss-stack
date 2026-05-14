@@ -75,7 +75,7 @@ class DiagnosticSpineContractTests(unittest.TestCase):
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-            "quests/diagnostics/captured/ABYSS-STACK-Q-0007.yaml",
+            "quests/diagnostics/done/ABYSS-STACK-Q-0007.yaml",
             "scripts/aoa-diagnose",
         ]:
             self.assertIn(fragment, readme)

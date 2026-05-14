@@ -11,6 +11,7 @@ Use it when you need one compact artifact that says:
 
 Surfaces:
 - `docs/MACHINE_FIT_POLICY.md` - bounded current-host fit policy
+- `docs/PROFILE_MACHINE_FIT_PACKET.md` - profile and preset rollout packet
 - `schemas/schema.v1.json` - machine-readable contract
 - `examples/machine-fit.public.json.example` - public-safe example shape
 - `aoa_machine_fit.py` - part-local backend for `scripts/aoa-machine-fit`

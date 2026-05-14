@@ -77,10 +77,12 @@ SYNC_MANAGED_ITEMS = (
     "config-templates",
     "docs",
     "mechanics",
+    "quests",
     "scripts",
     "systemd",
     "env",
     "README.md",
+    "QUESTBOOK.md",
     "CHARTER.md",
     "BOUNDARIES.md",
     "DESIGN.md",
@@ -459,6 +461,20 @@ REQUIRED_FILES = {
     / "PLAYBOOK_RUNTIME_SEAM.md",
     ROOT / "mechanics" / "federation-seams" / "parts" / "kag-seam" / "docs" / "KAG_RUNTIME_SEAM.md",
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "docs" / "DIAGNOSTIC_SPINE.md",
+    ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "config-sync-boundary"
+    / "docs"
+    / "SOURCE_RUNTIME_PARITY_PACKET.md",
+    ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "start-stop"
+    / "docs"
+    / "LIVE_RUNTIME_CUTOVER_PACKET.md",
     ROOT / "mechanics" / "federation-seams" / "parts" / "tos-graph" / "docs" / "TOS_GRAPH_CURATION.md",
     ROOT
     / "mechanics"
@@ -3582,7 +3598,7 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-        "quests/diagnostics/captured/ABYSS-STACK-Q-0007.yaml",
+        "quests/diagnostics/done/ABYSS-STACK-Q-0007.yaml",
         "scripts/aoa-diagnose",
     ):
         if snippet not in readme:

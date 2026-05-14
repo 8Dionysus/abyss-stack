@@ -10,6 +10,9 @@
 
 ## Next candidates
 
+- decide whether a live runtime consumer should read the materialized RPG
+  file contract, without adding live `/rpg/*` endpoints or source quest
+  mutation by accident
 - add a seam summary matrix if owner routes become hard to scan from `PARTS.md`
 - split route-api specific federation checks if the service grows more
   independent from sync checks

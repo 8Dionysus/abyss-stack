@@ -17,15 +17,13 @@ Do not use it for:
 ## Frontier / human-gated
 - none right now
 
-## Frontier / codex-led
-- `ABYSS-STACK-Q-0002` — track host-profile rollout and adaptation obligations without absorbing source-owned layer meaning
-- `ABYSS-STACK-Q-0005` — land the first runtime and frontend service contracts for the AoA RPG layer without absorbing upstream meaning
-- `ABYSS-STACK-Q-0006` — materialize filesystem-first RPG runtime collections and derived bundles without widening route or quest authority
-- `ABYSS-STACK-Q-0007` — unify the runtime diagnostic spine with session-level diagnosis and repair handoff without widening repair authority
-- `ABYSS-STACK-Q-0008` — land a route-first ToS graph curation surface without turning Neo4j into source truth
+## Frontier / ready
+- none right now
 
-## Near
-- `ABYSS-STACK-Q-0004` — capture Windows bridge, reference-platform, and machine-fit follow-ups as explicit quests instead of doc drift
+## Near / ready
+- `ABYSS-STACK-Q-0009` — restore route-api health and closure before live runtime cutover
+  live-loop cutover; source/deployed parity is green, but service mutation
+  remains operator-gated.
 
 ## Harvest candidates
 - none yet

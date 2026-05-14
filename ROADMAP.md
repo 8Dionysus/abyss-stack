@@ -84,7 +84,17 @@ deployed `/srv/AbyssOS/abyss-stack/Configs` mirror. It names runtime contracts,
 advisory seams, and validation paths without claiming live service mutation or
 meaning-layer authority.
 
-The main remaining work is live runtime-loop consumption, operational cutover choices, platform hardening, and keeping deployed/runtime truth aligned with source-authored posture.
+The main residual quest packets have now been closed as source-side or
+synthetic runtime packets: profile rollout, machine-fit follow-through, RPG
+runtime materialization, and diagnostic runtime packet closeout all have
+package-local evidence routes. The next hard work is live runtime-loop
+consumption, operational cutover choices, platform hardening,
+and keeping deployed/runtime truth aligned with source-authored posture without
+promoting private runtime state into source truth.
+That work now routes through
+`mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`
+and
+`mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`.
 
 Those landings should be read carefully:
 
@@ -131,15 +141,25 @@ Those landings should be read carefully:
 - resist monolith relapse
 - let new capability arrive as modules and profiles rather than as hidden sprawl
 
-## Stage 5: live runtime consumption
+## Live runtime consumption
 
 - decide which federation seams remain advisory-only and which become part of the live loop
 - introduce bounded recall, playbook, eval, and KAG consumption in explicit steps
 - preserve source-owned authority while adding runtime utility
+- decide whether a live consumer should read the already materialized RPG file
+  contract, without adding `/rpg/*` endpoints or quest mutation by accident
+- review diagnostic drift through repair governance only when an operator
+  explicitly chooses a repair packet
+- keep the current route-api health and closure stop-line explicit through
+  `ABYSS-STACK-Q-0009` before promoting any live runtime-loop cutover
 
-## Stage 6: platform and operations hardening
+## Platform and operations hardening
 
 - keep runtime cleanup repeatable and legible
 - validate reboot and cold-start behavior
 - tighten runtime-secret hygiene and stateful-data discipline
 - keep Windows and Fedora rollout paths aligned with the same operational model
+- rerun the profile machine-fit packet before promoting a new host-profile
+  posture
+- rerun the Windows bridge, reference platform, platform adaptation, and fit
+  follow-through packet after platform drift

@@ -9,8 +9,12 @@
 
 ## Next candidates
 
-- add a package-level public fixture index if machine-fit examples multiply
-- extend platform adaptation only when a profile or preset uses the new signal
+- rerun the profile machine-fit packet before promoting any new host-profile
+  posture
+- rerun the machine-fit follow-through packet when Windows bridge,
+  reference-platform, platform-adaptation, or fit-record posture drifts
+- add a package-level public fixture index only if machine-fit examples
+  multiply beyond the current part-local route
 - add focused tests around Windows bridge wrappers if PowerShell behavior grows
 
 ## Stop-lines

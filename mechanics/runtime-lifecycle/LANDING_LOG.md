@@ -23,3 +23,16 @@ verification where available, and `python scripts/validate_stack.py`.
 Added package-local `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and this
 landing log so lifecycle changes keep source/runtime and operator-action
 boundaries explicit.
+
+## 2026-05-13 - Residual frontier alignment
+
+Kept remaining live-runtime work as explicit packets rather than source claims.
+Runtime lifecycle should apply those packet patterns only through explicit
+operator actions after source validation and parity checks are green.
+
+## 2026-05-13 - live runtime cutover and source runtime parity packets
+
+Added package-local packet routes for source/runtime parity and live runtime cutover
+cutover inspection. The parity packet may update the deployed `Configs` mirror;
+the cutover packet remains read-only until an operator explicitly chooses a
+start, stop, restart, systemd, profile, or exposure-changing action.

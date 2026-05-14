@@ -8,7 +8,7 @@ owner_surface: runtime/tos-graph-curation
 theme_ref: ''
 milestone_ref: ''
 kind: rollout
-state: captured
+state: done
 band: frontier
 difficulty: d3_seam
 risk: r2_contract
@@ -41,7 +41,7 @@ evidence:
 harvest:
   target: none
 opened_at: '2026-04-08'
-touched_at: '2026-04-08'
+touched_at: '2026-05-13'
 tags:
   - tos
   - graph
@@ -49,6 +49,10 @@ tags:
   - runtime
   - curation
 notes: >
-  Keep the first landing contract-only and preview-first.
-  Do not enable live writeback, widen host exposure, or let the helper absorb ToS authored meaning in this pass.
+  2026-05-13 source closeout: the route-first ToS graph curation surface is
+  landed as a localhost-only, projection-first source slice with docs, compose
+  module, curation profile, config template, and service implementation. The
+  route remains subordinate to Tree-of-Sophia canonical truth. Live writeback,
+  widened host exposure, and authored-meaning absorption remain explicit
+  non-goals for any future slice.
 public_safe: true

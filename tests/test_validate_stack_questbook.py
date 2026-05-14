@@ -166,19 +166,18 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
 
         self.assertTrue(any("public_safe must be true" in error for error in errors))
 
-    def test_missing_tracked_quest_reference_fails(self) -> None:
+    def test_closed_quest_reference_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
                 repo_root / "QUESTBOOK.md",
-                (repo_root / "QUESTBOOK.md")
-                .read_text(encoding="utf-8")
-                .replace("`ABYSS-STACK-Q-0004`", "`ABYSS-STACK-Q-XXXX`"),
+                (repo_root / "QUESTBOOK.md").read_text(encoding="utf-8")
+                + "\n- `ABYSS-STACK-Q-0004` — stale closed quest reference\n",
             )
             errors = self.validate_surface(repo_root)
 
-        self.assertTrue(any("ABYSS-STACK-Q-0004" in error for error in errors))
+        self.assertTrue(any("QUESTBOOK.md must not list closed quest id 'ABYSS-STACK-Q-0004'" in error for error in errors))
 
     def test_human_gate_posture_drift_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

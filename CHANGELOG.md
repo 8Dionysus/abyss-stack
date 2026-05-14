@@ -112,6 +112,11 @@ Tracking starts with the community-docs baseline for this repository.
 - all mechanics packages now carry the full package-card layer
   `DIRECTION.md`, `PROVENANCE.md`, `ROADMAP.md`, and `LANDING_LOG.md`, with
   `validate_stack.py` enforcing the shared card spine
+- residual quest frontier state now closes the profile machine-fit packet,
+  machine-fit follow-through packet, RPG runtime materialization packet, and
+  diagnostic runtime packet while preserving lane-local `done/` records; the
+  remaining active quest is the operator-gated route-api health and closure
+  stop-line before live runtime-loop cutover
 
 ## [0.2.2] - 2026-04-23
 
