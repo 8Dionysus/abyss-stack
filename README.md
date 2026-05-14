@@ -17,7 +17,7 @@ decision log, runtime receipt, or package-local inventory.
 | Names the runtime owner lane and what must stay elsewhere | [CHARTER](CHARTER.md), [BOUNDARIES](BOUNDARIES.md) |
 | Describes the runtime body this repository should grow toward | [DESIGN](DESIGN.md) |
 | Describes the intended shape of agent-facing guidance | [DESIGN.AGENTS](DESIGN.AGENTS.md) |
-| Maps concrete runtime topology | [docs/ARCHITECTURE](docs/ARCHITECTURE.md), [mechanics](mechanics/README.md) |
+| Maps concrete runtime topology | [runtime/ARCHITECTURE](docs/runtime/ARCHITECTURE.md), [mechanics](mechanics/README.md) |
 | Explains deployment, paths, profiles, presets, and operator flow | [docs](docs/README.md) |
 | Holds current runtime-wide direction and future triggers | [ROADMAP](ROADMAP.md) |
 | Records release-visible history | [CHANGELOG](CHANGELOG.md) |
@@ -36,10 +36,10 @@ Read only what matches your entry need.
 |---|---|
 | Shortest honest overview | this README, then [CHARTER](CHARTER.md), [BOUNDARIES](BOUNDARIES.md), [DESIGN](DESIGN.md), and [mechanics](mechanics/README.md) |
 | Agent editing route | [AGENTS](AGENTS.md), [DESIGN.AGENTS](DESIGN.AGENTS.md), then the nearest nested `AGENTS.md` |
-| Runtime architecture | [docs/ARCHITECTURE](docs/ARCHITECTURE.md), [docs/SERVICE_CATALOG](docs/SERVICE_CATALOG.md), [docs/PROFILES](docs/PROFILES.md), [docs/PRESETS](docs/PRESETS.md) |
-| Source/install bootstrap | [docs/PATHS](docs/PATHS.md), [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [docs/FIRST_RUN](docs/FIRST_RUN.md), [mechanics/config-projection](mechanics/config-projection/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
-| Runtime operation and incidents | [docs/RUNBOOK](docs/RUNBOOK.md), [scripts/README](scripts/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
-| Branch and recurrence posture | [docs/BRANCH_POLICY](docs/BRANCH_POLICY.md), [RECURRENCE_RUNTIME_POLICY](mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md) |
+| Runtime architecture | [runtime/ARCHITECTURE](docs/runtime/ARCHITECTURE.md), [runtime/SERVICE_CATALOG](docs/runtime/SERVICE_CATALOG.md), [profiles/PROFILES](docs/profiles/PROFILES.md), [profiles/PRESETS](docs/profiles/PRESETS.md) |
+| Source/install bootstrap | [runtime/PATHS](docs/runtime/PATHS.md), [install/DEPLOYMENT](docs/install/DEPLOYMENT.md), [install/FIRST_RUN](docs/install/FIRST_RUN.md), [mechanics/config-projection](mechanics/config-projection/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
+| Runtime operation and incidents | [operations/RUNBOOK](docs/operations/RUNBOOK.md), [scripts/README](scripts/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
+| Branch and recurrence posture | [governance/BRANCH_POLICY](docs/governance/BRANCH_POLICY.md), [RECURRENCE_RUNTIME_POLICY](mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md) |
 | Host and machine fit | [REFERENCE_PLATFORM](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md), [REFERENCE_PLATFORM_SPEC](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md), [MACHINE_FIT_POLICY](mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md), [PLATFORM_ADAPTATION_POLICY](mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md) |
 | Windows and WSL bridge | [Windows bridge](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md) |
 | Local worker and model trials | [mechanics/inference-pilots](mechanics/inference-pilots/README.md), [LOCAL_AI_TRIALS](mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md), [LLAMACPP_PILOT](mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md), [MODEL_PROFILES](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_PROFILES.md) |
@@ -49,15 +49,15 @@ Read only what matches your entry need.
 ## Route Modes
 
 The route vocabulary behind this entry surface is governed by
-[START_HERE_ROUTE_CONTRACT](docs/START_HERE_ROUTE_CONTRACT.md).
+[START_HERE_ROUTE_CONTRACT](docs/routes/START_HERE_ROUTE_CONTRACT.md).
 
 | Route mode | Use when | Start surface |
 |---|---|---|
 | `first-reading` | you need the shortest runtime overview | `README.md` |
 | `runtime-design` | the system form, topology, or source/runtime split may move | [DESIGN](DESIGN.md) |
 | `agent-guidance` | root or nested agent guidance may move | [DESIGN.AGENTS](DESIGN.AGENTS.md), [AGENTS](AGENTS.md) |
-| `source-install` | a checkout must create or refresh a runtime layout | [docs/DEPLOYMENT](docs/DEPLOYMENT.md), [mechanics/config-projection](mechanics/config-projection/README.md) |
-| `runtime-operation` | live operation, logs, status, smoke, or incidents are involved | [docs/RUNBOOK](docs/RUNBOOK.md), [scripts/README](scripts/README.md) |
+| `source-install` | a checkout must create or refresh a runtime layout | [install/DEPLOYMENT](docs/install/DEPLOYMENT.md), [mechanics/config-projection](mechanics/config-projection/README.md) |
+| `runtime-operation` | live operation, logs, status, smoke, or incidents are involved | [operations/RUNBOOK](docs/operations/RUNBOOK.md), [scripts/README](scripts/README.md) |
 | `mechanic-change` | a runtime move belongs to a package or part | [mechanics/README](mechanics/README.md) |
 | `machine-fit` | host facts, platform adaptation, Windows, or model fit are involved | [mechanics/machine-fit](mechanics/machine-fit/README.md) |
 | `diagnostics-repair` | diagnosis, degradation receipts, or repair handoff are involved | [mechanics/diagnostic-spine](mechanics/diagnostic-spine/README.md), [mechanics/runtime-repair](mechanics/runtime-repair/README.md) |
@@ -176,7 +176,7 @@ and package-local mechanic cards. Diagnostic catalog checks belong to
 [diagnostic spine](mechanics/diagnostic-spine/README.md) and the scripts
 district, not this front door.
 
-Live runtime checks belong in [docs/RUNBOOK](docs/RUNBOOK.md) and should be run
+Live runtime checks belong in [operations/RUNBOOK](docs/operations/RUNBOOK.md) and should be run
 only when the operator intentionally checks the deployed runtime.
 
 ## Working Rule

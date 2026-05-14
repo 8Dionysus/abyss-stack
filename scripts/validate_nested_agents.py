@@ -40,6 +40,14 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'docs/AGENTS.md': (
         'repo-wide operator and source-checkout documentation',
         'docs/README.md',
+        'docs/routes/START_HERE_ROUTE_CONTRACT.md',
+        'routes/',
+        'runtime/',
+        'install/',
+        'operations/',
+        'profiles/',
+        'governance/',
+        'legacy/',
         'Mechanic-owned runtime doctrine',
         'docs/decisions',
         'python scripts/validate_decision_records.py',
@@ -121,7 +129,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mechanics/runtime-lifecycle/AGENTS.md': (
         'runtime-lifecycle',
         'Runtime activation remains an explicit operator action',
-        'docs/DEPLOYMENT.md',
+        'docs/install/DEPLOYMENT.md',
         'systemd-analyze --user verify',
     ),
     'mechanics/config-projection/AGENTS.md': (

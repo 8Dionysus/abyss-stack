@@ -24,7 +24,7 @@ contracts, and `.agents/` should carry repo-local agent overlays.
 
 ## Decision
 
-Move the audit contract to `docs/AUDIT.md`.
+Move the audit contract to `docs/routes/AUDIT.md`.
 
 Move the Spark fast-loop lane to `.agents/spark/`.
 
@@ -47,7 +47,7 @@ Both surfaces were useful, so deletion would lose signal. Their problem was plac
 
 ## Source surfaces
 
-- `docs/AUDIT.md`
+- `docs/routes/AUDIT.md`
 - `.agents/spark/`
 - `docs/README.md`
 - `.agents/README.md`

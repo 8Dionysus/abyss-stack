@@ -24,14 +24,14 @@ It is not the system design. Read `DESIGN.md` for the intended runtime form and
 4. `DESIGN.md`
 5. `DESIGN.AGENTS.md` when editing `AGENTS.md`, local route cards, or agent
    overlays
-6. `docs/START_HERE_ROUTE_CONTRACT.md`
+6. `docs/routes/START_HERE_ROUTE_CONTRACT.md`
 7. `ROADMAP.md`
-8. `docs/ARCHITECTURE.md`
+8. `docs/runtime/ARCHITECTURE.md`
 9. `mechanics/README.md`
 10. The nearest local `AGENTS.md`, README, and validation notes for every touched
    path
 
-Use `docs/AGENTS_ROOT_REFERENCE.md` only when the short card is not enough.
+Use `docs/legacy/AGENTS_ROOT_REFERENCE.md` only when the short card is not enough.
 
 ## Boundaries
 
@@ -114,18 +114,18 @@ It does not own:
 4. `DESIGN.md`
 5. `DESIGN.AGENTS.md`
 6. `ROADMAP.md`
-7. `docs/ARCHITECTURE.md`
+7. `docs/runtime/ARCHITECTURE.md`
 8. `mechanics/README.md`
-9. `docs/SERVICE_CATALOG.md`
-10. `docs/PROFILES.md`, `docs/PRESETS.md`, `docs/PATHS.md`,
-    `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, and
-    `docs/SECURITY.md`
+9. `docs/runtime/SERVICE_CATALOG.md`
+10. `docs/profiles/PROFILES.md`, `docs/profiles/PRESETS.md`, `docs/runtime/PATHS.md`,
+    `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, `docs/operations/RUNBOOK.md`, and
+    `docs/operations/SECURITY.md`
 11. Host, recurrence, seam, diagnostic, repair, or mechanics docs relevant to
     the changed surface
 
 ## Route Modes
 
-Entry routing is governed by `docs/START_HERE_ROUTE_CONTRACT.md`. This card
+Entry routing is governed by `docs/routes/START_HERE_ROUTE_CONTRACT.md`. This card
 keeps the working agent route; the route contract keeps public route-mode
 meaning synchronized across entry surfaces.
 
@@ -135,7 +135,7 @@ meaning synchronized across entry surfaces.
 | Runtime system form | `DESIGN.md` |
 | Agent guidance form | `DESIGN.AGENTS.md` |
 | Ownership or lane dispute | `CHARTER.md` and `BOUNDARIES.md` |
-| Deployment or bootstrap | `docs/DEPLOYMENT.md`, `docs/PATHS.md`, and `mechanics/config-projection/README.md` |
+| Deployment or bootstrap | `docs/install/DEPLOYMENT.md`, `docs/runtime/PATHS.md`, and `mechanics/config-projection/README.md` |
 | Runtime lifecycle | `mechanics/runtime-lifecycle/README.md` |
 | Machine fit or host bridge | `mechanics/machine-fit/README.md` |
 | Local inference pilots or model trials | `mechanics/inference-pilots/README.md` |
@@ -282,6 +282,6 @@ checks ran.
 
 ## Full Reference
 
-`docs/AGENTS_ROOT_REFERENCE.md` preserves the former detailed root guidance,
+`docs/legacy/AGENTS_ROOT_REFERENCE.md` preserves the former detailed root guidance,
 including runtime posture, host-facts rules, review priorities, and default
 stance.

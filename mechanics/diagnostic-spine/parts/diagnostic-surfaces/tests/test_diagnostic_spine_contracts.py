@@ -49,7 +49,9 @@ class DiagnosticSpineContractTests(unittest.TestCase):
 
     def test_readme_and_runbook_reference_diagnostic_spine_surfaces(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        runbook = (REPO_ROOT / "docs" / "RUNBOOK.md").read_text(encoding="utf-8")
+        runbook = (
+            REPO_ROOT / "docs" / "operations" / "RUNBOOK.md"
+        ).read_text(encoding="utf-8")
         spine_doc = (
             REPO_ROOT
             / "mechanics"

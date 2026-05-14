@@ -7,9 +7,9 @@ Use it after the first reading route:
 1. `README.md`
 2. `CHARTER.md`
 3. `BOUNDARIES.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/SERVICE_CATALOG.md`
-6. `docs/PATHS.md`
+4. `docs/runtime/ARCHITECTURE.md`
+5. `docs/runtime/SERVICE_CATALOG.md`
+6. `docs/runtime/PATHS.md`
 
 When a human or agent asks what kind of runtime move is being made, this atlas
 points to the right package, source surfaces, stop-lines, and validation lane.
@@ -67,7 +67,7 @@ Each package `README.md` is a runtime mechanic card with these sections:
 
 | Package | Runtime question | Start here |
 |---|---|---|
-| [runtime-lifecycle](runtime-lifecycle/README.md) | How is the stack installed, started, stopped, checked, and operated? | `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, `docs/RUNBOOK.md`, `systemd/README.md`, `mechanics/runtime-lifecycle/PROVENANCE.md` |
+| [runtime-lifecycle](runtime-lifecycle/README.md) | How is the stack installed, started, stopped, checked, and operated? | `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, `docs/operations/RUNBOOK.md`, `systemd/README.md`, `mechanics/runtime-lifecycle/PROVENANCE.md` |
 | [config-projection](config-projection/README.md) | How do source templates become deployed runtime config without smuggling secrets? | `config-templates/`, `env/`, `scripts/aoa-bootstrap-configs`, `scripts/aoa-sync-configs`, `mechanics/config-projection/PROVENANCE.md` |
 | [machine-fit](machine-fit/README.md) | How does the runtime read host facts, fit, and machine-local tuning without owning the machine? | `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`, `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`, `scripts/aoa-host-facts`, `scripts/aoa-machine-fit`, `mechanics/machine-fit/PROVENANCE.md` |
 | [inference-pilots](inference-pilots/README.md) | How do local model trials, llama.cpp, Qwen, LangGraph, and benchmark promotion stay bounded? | `mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md`, `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`, `mechanics/inference-pilots/PROVENANCE.md` |

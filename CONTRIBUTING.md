@@ -32,7 +32,7 @@ python scripts/validate_stack.py
 ```
 
 If you touch bootstrap, layout, or lifecycle scripts, also align your validation with the current GitHub workflow in `.github/workflows/validate-stack.yml`.
-If you are opening, merging, or retiring topic branches, follow [docs/BRANCH_POLICY.md](docs/BRANCH_POLICY.md).
+If you are opening, merging, or retiring topic branches, follow [docs/governance/BRANCH_POLICY.md](docs/governance/BRANCH_POLICY.md).
 
 ## Preferred PR scope
 

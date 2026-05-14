@@ -25,7 +25,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
             Path("QUESTBOOK.md"),
-            Path("docs") / "QUESTBOOK_STACK_INTEGRATION.md",
+            Path("docs") / "governance" / "QUESTBOOK_STACK_INTEGRATION.md",
             Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_FRONTEND_POSTURE.md",
             Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_COLLECTIONS.md",
             Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime" / "docs" / "RPG_RUNTIME_BUILDERS.md",
@@ -80,11 +80,11 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
-            (repo_root / "docs" / "QUESTBOOK_STACK_INTEGRATION.md").unlink()
+            (repo_root / "docs" / "governance" / "QUESTBOOK_STACK_INTEGRATION.md").unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any("docs/QUESTBOOK_STACK_INTEGRATION.md" in error for error in errors)
+            any("docs/governance/QUESTBOOK_STACK_INTEGRATION.md" in error for error in errors)
         )
 
     def test_missing_quest_file_fails(self) -> None:

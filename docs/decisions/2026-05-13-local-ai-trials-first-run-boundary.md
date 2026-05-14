@@ -5,7 +5,7 @@ Date: 2026-05-13
 
 ## Context
 
-`docs/FIRST_RUN.md` had grown a local AI qualification step that exposed the
+`docs/install/FIRST_RUN.md` had grown a local AI qualification step that exposed the
 old W0-W4 `aoa-local-ai-trials` flow as if it were part of the ordinary first
 runtime launch. That mixed two different jobs:
 
@@ -57,7 +57,7 @@ First-run bootstrap should prove that a selected runtime profile can start and b
 
 ## Source surfaces
 
-- `docs/FIRST_RUN.md`
+- `docs/install/FIRST_RUN.md`
 - `mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md`
 - `mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md`
 - `mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md`

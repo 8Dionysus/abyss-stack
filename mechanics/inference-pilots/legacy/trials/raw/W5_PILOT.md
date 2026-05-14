@@ -116,7 +116,7 @@ Wave-level outputs:
 - `W5-long-horizon-index.md`
 - `W5_SUMMARY.md`
 
-Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md):
+Each summary should also carry truth-status language from [TRUTH_SURFACES](../../../../diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md):
 
 - `source_authored`
 - `deployed`

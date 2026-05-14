@@ -4,8 +4,8 @@ Applies to `mechanics/runtime-lifecycle/`.
 
 This package owns the route shape for install, layout, start, stop, wait,
 smoke, logs, systemd user units, and operator runbook flow.
-Current lifecycle docs include `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, and
-`docs/RUNBOOK.md`.
+Current lifecycle docs include `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, and
+`docs/operations/RUNBOOK.md`.
 
 Read `mechanics/AGENTS.md`, this package `README.md`, `DIRECTION.md`,
 `PARTS.md`, and `parts/README.md` before editing.

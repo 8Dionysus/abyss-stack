@@ -6,11 +6,11 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 ## Read before editing
 1. `compose/README.md`
 2. `compose/presets/README.md`
-3. `docs/PRESETS.md`
-4. `docs/PROFILE_RECIPES.md`
+3. `docs/profiles/PRESETS.md`
+4. `docs/profiles/PROFILE_RECIPES.md`
 5. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
 6. `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
-7. `docs/PATHS.md`
+7. `docs/runtime/PATHS.md`
 
 ## Directory contract
 - `modules/*.yml` are the atomic runtime pieces.
@@ -38,7 +38,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 - If a module adds or changes host-facing endpoints, update:
   - `scripts/aoa-profile-endpoints`
   - `scripts/aoa-smoke`
-  - `docs/PROFILE_RECIPES.md`
+  - `docs/profiles/PROFILE_RECIPES.md`
 - If a module adds or changes internal-only surfaces, update:
   - `scripts/aoa-internal-probes`
   - `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md`
@@ -48,7 +48,7 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 
 ## When changing profiles or presets
 - Keep activation order meaningful and minimal.
-- Update `compose/README.md` and `docs/PRESETS.md` or `docs/PROFILE_RECIPES.md` when the operating contract changes.
+- Update `compose/README.md` and `docs/profiles/PRESETS.md` or `docs/profiles/PROFILE_RECIPES.md` when the operating contract changes.
 - If a new preset becomes first-class, add or adjust rehearsal coverage in `.github/workflows/validate-stack.yml`.
 
 ## Verify

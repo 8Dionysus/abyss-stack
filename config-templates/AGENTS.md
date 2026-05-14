@@ -5,8 +5,8 @@ This directory stores public-safe runtime config templates that are bootstrapped
 
 ## Read before editing
 1. `config-templates/README.md`
-2. `docs/DEPLOYMENT.md`
-3. `docs/STORAGE_LAYOUT.md`
+2. `docs/install/DEPLOYMENT.md`
+3. `docs/runtime/STORAGE_LAYOUT.md`
 4. `mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`
 5. `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
 

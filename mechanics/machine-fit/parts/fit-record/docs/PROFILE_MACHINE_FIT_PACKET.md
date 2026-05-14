@@ -7,8 +7,8 @@ and preset review to a public-safe machine-fit record. It is a source-checkout
 packet, not a live service-health claim and not a copy of sibling-owned layer
 meaning.
 
-Use it when `docs/PROFILES.md`, `docs/PRESETS.md`, or
-`docs/PROFILE_RECIPES.md` changes in a way that needs current host-fit evidence
+Use it when `docs/profiles/PROFILES.md`, `docs/profiles/PRESETS.md`, or
+`docs/profiles/PROFILE_RECIPES.md` changes in a way that needs current host-fit evidence
 before a runtime rollout.
 
 ## Packet Surface

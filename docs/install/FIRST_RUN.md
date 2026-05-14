@@ -9,7 +9,7 @@ This guide is the shortest careful path from a source checkout to a running loca
 - `rsync` is available
 - the runtime root should be `/srv/AbyssOS/abyss-stack`
 
-If you are starting from Windows, read [WINDOWS_SETUP](../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
+If you are starting from Windows, read [WINDOWS_SETUP](../../mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md) and use `pwsh -File scripts/aoa.ps1 ...` as the host entrypoint.
 
 ## Fast path
 
@@ -41,7 +41,7 @@ pwsh -File scripts/aoa.ps1 first-run --strict
 ## Then do the one thing it cannot do for you
 
 Create the real secret-bearing files described in:
-- [SECRETS_BOOTSTRAP](../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md)
+- [SECRETS_BOOTSTRAP](../../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md)
 
 If the agent API layer is part of the selected profile or preset, verify that `Configs/agent-api/return-policy.yaml` was bootstrapped before launch.
 
@@ -148,9 +148,9 @@ required first-run health gate.
 
 Use these package-owned routes after the runtime path is already healthy:
 
-- [LOCAL_AI_TRIALS](../mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md) for supervised trial routing and compatibility boundaries
-- [RUNTIME_BENCH_POLICY](../mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md) for runtime benchmark packets
-- [MODEL_CARDS](../mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md) for model-family and variant fit notes
+- [LOCAL_AI_TRIALS](../../mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md) for supervised trial routing and compatibility boundaries
+- [RUNTIME_BENCH_POLICY](../../mechanics/inference-pilots/parts/local-trials/docs/RUNTIME_BENCH_POLICY.md) for runtime benchmark packets
+- [MODEL_CARDS](../../mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md) for model-family and variant fit notes
 
 Those flows keep machine-readable runtime truth under
 `${AOA_STACK_ROOT}/Logs/local-ai-trials/` or
@@ -167,7 +167,7 @@ scripts/aoa-llamacpp-pilot run --preset intel-full
 
 That pilot re-verifies the bounded `llama.cpp` launch path, starts the explicit pilot sidecar when needed, exposes `langchain-api-llamacpp` on `127.0.0.1:5403`, and writes comparison artifacts under `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/comparisons/`. If the first locally resolved model candidate is rejected by `llama.cpp` on this machine, the pilot falls back to a locally cached curated `bartowski` candidate when one is already present.
 Use the same bounded lane for additive Intel 285H host-profile checks such as Gemma 4, Vulkan-first validation, or KV-cache candidate screening instead of treating those as instant defaults.
-Use [LLAMACPP_PILOT](../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) for the full contract.
+Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) for the full contract.
 
 ## Compose optional layers manually
 
@@ -203,12 +203,12 @@ scripts/aoa-logs --profile core
 ```
 
 Then read:
-- [RUNBOOK](RUNBOOK.md)
+- [RUNBOOK](../operations/RUNBOOK.md)
 - [DEPLOYMENT](DEPLOYMENT.md)
-- [DOCTOR](../mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md)
-- [REFERENCE_PLATFORM_SPEC](../mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md)
-- [MACHINE_FIT_POLICY](../mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md)
-- [PRESETS](PRESETS.md)
-- [PROFILE_RECIPES](PROFILE_RECIPES.md)
-- [RENDER_TRUTH](../mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md)
-- [INTERNAL_PROBES](../mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md)
+- [DOCTOR](../../mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md)
+- [REFERENCE_PLATFORM_SPEC](../../mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md)
+- [MACHINE_FIT_POLICY](../../mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md)
+- [PRESETS](../profiles/PRESETS.md)
+- [PROFILE_RECIPES](../profiles/PROFILE_RECIPES.md)
+- [RENDER_TRUTH](../../mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md)
+- [INTERNAL_PROBES](../../mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md)

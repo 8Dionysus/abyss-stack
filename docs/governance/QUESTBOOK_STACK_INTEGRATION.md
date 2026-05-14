@@ -24,14 +24,14 @@ This note shows how `QUESTBOOK.md` fits into `abyss-stack` without confusing inf
 Use stable anchors such as:
 - `CHARTER.md`
 - `BOUNDARIES.md`
-- `docs/ARCHITECTURE.md`
-- `docs/PROFILES.md`
-- `docs/PRESETS.md`
-- `docs/PROFILE_RECIPES.md`
+- `docs/runtime/ARCHITECTURE.md`
+- `docs/profiles/PROFILES.md`
+- `docs/profiles/PRESETS.md`
+- `docs/profiles/PROFILE_RECIPES.md`
 - `mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_FRONTEND_POSTURE.md`
 - `mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md`
 - `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`
-- `docs/FIRST_RUN.md`
+- `docs/install/FIRST_RUN.md`
 - `mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md`
 - `mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md`
 - `mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md`

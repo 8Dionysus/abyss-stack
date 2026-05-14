@@ -32,7 +32,7 @@ containment, not trash and not the new active route.
 Before moving an artifact into a package:
 
 1. Confirm the package is the only honest owner.
-2. Update links from `README.md`, `AGENTS.md`, `docs/MECHANICS.md`, package
+2. Update links from `README.md`, `AGENTS.md`, `docs/runtime/MECHANICS.md`, package
    cards, `PARTS.md`, `parts/README.md`, and the part-local `README.md`.
 3. Update `scripts/validate_stack.py` or the narrower validator that names the
    old path.

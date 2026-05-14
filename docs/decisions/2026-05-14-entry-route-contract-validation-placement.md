@@ -29,7 +29,7 @@ diagnostic spine, mechanics packages, tests, or scripts.
 
 Use option 3.
 
-Add `docs/START_HERE_ROUTE_CONTRACT.md` as the route-mode contract for
+Add `docs/routes/START_HERE_ROUTE_CONTRACT.md` as the route-mode contract for
 `abyss-stack` source checkout entry surfaces.
 
 Root `README.md` now points to that route contract and names
@@ -64,7 +64,7 @@ AGENTS.md to stay aligned by memory.
 
 - `README.md`
 - `AGENTS.md`
-- `docs/START_HERE_ROUTE_CONTRACT.md`
+- `docs/routes/START_HERE_ROUTE_CONTRACT.md`
 - `docs/README.md`
 - `docs/AGENTS.md`
 - `scripts/validate_stack.py`

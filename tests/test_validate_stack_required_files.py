@@ -99,7 +99,7 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             doc = repo_root / "docs" / "MODEL_CARD.md"
             doc.parent.mkdir(parents=True, exist_ok=True)
             host_local_root = "/home/dionysus/src/" + "abyss-stack"
-            doc.write_text(f"Bad link: {host_local_root}/docs/PATHS.md\n", encoding="utf-8")
+            doc.write_text(f"Bad link: {host_local_root}/docs/runtime/PATHS.md\n", encoding="utf-8")
 
             errors: list[str] = []
             with patch.object(validate_stack, "ROOT", repo_root):

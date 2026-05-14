@@ -49,7 +49,7 @@ The active workspace root is now `/srv/AbyssOS`, and source defaults should matc
 ## Source surfaces
 
 - `README.md`
-- `docs/PATHS.md`
+- `docs/runtime/PATHS.md`
 - `.agents/skills/`
 - `scripts/validate_stack.py`
 

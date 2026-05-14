@@ -17,6 +17,8 @@ Tracking starts with the community-docs baseline for this repository.
   not remembered as a loose convention from previous refactor passes
 - root `ROADMAP.md` is now a runtime-wide horizon surface instead of a mixed
   landing history, backlog, and release-contour document
+- root `docs/` now uses role-named districts instead of a flat surface list,
+  preserving the AbyssOS source/runtime split in the folder topology itself
 
 ### Added
 
@@ -26,8 +28,12 @@ Tracking starts with the community-docs baseline for this repository.
 - `docs/decisions/2026-05-14-direction-history-decision-surface-roles.md` as
   the rationale for the `ROADMAP.md`, `CHANGELOG.md`, and `docs/decisions/`
   role split
-- `docs/START_HERE_ROUTE_CONTRACT.md` as the source-checkout route-mode
+- `docs/routes/START_HERE_ROUTE_CONTRACT.md` as the source-checkout route-mode
   contract for root entry surfaces
+- `docs/{routes,runtime,install,operations,profiles,governance,legacy}/README.md`
+  as short district maps for repo-wide documentation
+- `docs/decisions/2026-05-14-docs-district-topology.md` as the rationale for
+  the docs district split
 - initial `mechanics/` topology with runtime lifecycle, config projection,
   machine fit, inference pilots, federation seams, governed execution,
   diagnostic spine, and runtime repair package cards
@@ -58,6 +64,11 @@ Tracking starts with the community-docs baseline for this repository.
   passes through runtime design and agent-surface design before local work
 - top-level route docs now point runtime-move work through the mechanics atlas
   before entering package-specific docs, scripts, schemas, or config surfaces
+- flat root docs moved into role-named districts: route contracts under
+  `docs/routes/`, runtime topology under `docs/runtime/`, source install under
+  `docs/install/`, operations under `docs/operations/`, profile selection under
+  `docs/profiles/`, governance under `docs/governance/`, and preserved old
+  references under `docs/legacy/`
 - noisy Agon and experience archival artifacts, including late-found experience
   job/worker/storage-plan docs, moved out of flat root districts into
   package-local `legacy/` homes with validators and tests following the move
@@ -99,7 +110,7 @@ Tracking starts with the community-docs baseline for this repository.
   `mechanics/inference-pilots/legacy/trials/artifacts/scripts/` with active
   compatibility bridge and role-level adapter surfaces in `parts/local-trials/`
 - root residual route surfaces were tightened: the audit contract now lives at
-  `docs/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and
+  `docs/routes/AUDIT.md`, the Spark fast-loop lane lives under `.agents/spark/`, and
   validators block those root-level residual paths from returning
 - LangGraph and llama.cpp promotion surfaces now treat preserved runtime/edit
   gate IDs as compatibility wire IDs behind role-level adapter names, with a
@@ -146,7 +157,7 @@ Tracking starts with the community-docs baseline for this repository.
   mechanic-local landing history or release history as roadmap law
 - root `README.md` now routes by entry need, claim type, mechanics package, and
   technical district while sending detailed current state to `ROADMAP.md`,
-  `CHANGELOG.md`, `docs/decisions/`, mechanic packages, and `docs/RUNBOOK.md`
+  `CHANGELOG.md`, `docs/decisions/`, mechanic packages, and `docs/operations/RUNBOOK.md`
 - root `README.md` now points validation readers to the broad release gate and
   local command authority surfaces instead of carrying package-specific command
   blocks
@@ -285,7 +296,7 @@ Tracking starts with the community-docs baseline for this repository.
   receipt schemas, machine-fit fallback and tuning, and federated advisory
   seams
 - runtime follow-through and operator surfaces under `.agents/`, `.github/`,
-  `docs/AUDIT.md`, `ROADMAP.md`, `QUESTBOOK.md`, `quests/`, `README.md`,
+  `docs/routes/AUDIT.md`, `ROADMAP.md`, `QUESTBOOK.md`, `quests/`, `README.md`,
   `AGENTS.md`, `.agents/spark/`, and `tests/`, including quest-harvest installs,
   runtime closeout receipts, winner promotion, route-first ToS graph UI and
   curation overlays, OVMS text-lab lanes, and parity-safe source and deployed

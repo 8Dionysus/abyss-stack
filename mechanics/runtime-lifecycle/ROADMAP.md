@@ -3,7 +3,7 @@
 ## Current route
 
 - keep lifecycle commands as root wrappers with part-local implementations
-- keep root `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, and `docs/RUNBOOK.md`
+- keep root `docs/install/DEPLOYMENT.md`, `docs/install/FIRST_RUN.md`, and `docs/operations/RUNBOOK.md`
   as repo-wide operator routes
 - keep status readout schemas, examples, and tests under `parts/status-readouts`
 - keep systemd user-unit material explicit and opt-in

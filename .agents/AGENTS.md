@@ -14,7 +14,7 @@ ship with the `abyss-stack` source checkout.
 2. `.agents/skills/AGENTS.md`
 3. `.agents/spark/AGENTS.md` when editing the Spark fast-loop lane
 4. `mechanics/README.md`
-5. `docs/MECHANICS.md`
+5. `docs/runtime/MECHANICS.md`
 6. `scripts/validate_nested_agents.py`
 
 ## Directory Contract
