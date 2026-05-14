@@ -106,6 +106,7 @@ jobs:
 
           scripts/aoa-check-layout --strict --profile substrate
           scripts/aoa-check-layout --strict --profile local-worker
+          scripts/aoa-check-layout --strict --profile intel-worker
           scripts/aoa-check-layout --strict --profile fallback-gateway
           scripts/aoa-check-layout --strict --profile core
           scripts/aoa-check-layout --strict --profile agentic
@@ -119,10 +120,14 @@ jobs:
           scripts/aoa-profile-endpoints --profile substrate
           scripts/aoa-profile-modules --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile local-worker
+          scripts/aoa-profile-modules --profile intel-worker --paths
+          scripts/aoa-profile-endpoints --profile intel-worker
           scripts/aoa-profile-modules --profile fallback-gateway --paths
           scripts/aoa-profile-endpoints --profile fallback-gateway
           scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+          scripts/aoa-profile-modules --profile substrate --profile intel-worker --paths
+          scripts/aoa-profile-endpoints --profile substrate --profile intel-worker
           scripts/aoa-profile-modules --profile substrate --profile fallback-gateway --paths
           scripts/aoa-profile-endpoints --profile substrate --profile fallback-gateway
           scripts/aoa-profile-modules --profile core --paths
@@ -133,8 +138,8 @@ jobs:
           scripts/aoa-profile-endpoints --profile intel
           scripts/aoa-profile-endpoints --profile tools
           scripts/aoa-profile-endpoints --profile observability
-          scripts/aoa-profile-modules --profile agentic --profile tools --profile observability --paths
-          scripts/aoa-profile-endpoints --profile agentic,tools,observability
+          scripts/aoa-profile-modules --profile substrate --profile local-worker --profile tools --profile observability --paths
+          scripts/aoa-profile-endpoints --profile substrate,local-worker,tools,observability
           scripts/aoa-profile-modules --preset agent-full --paths
           scripts/aoa-profile-endpoints --preset agent-full
           scripts/aoa-profile-modules --preset agent-federation --paths
@@ -145,38 +150,42 @@ jobs:
           scripts/aoa-profile-endpoints --preset intel-federation
           scripts/aoa-render-services --profile substrate
           scripts/aoa-render-services --profile local-worker
+          scripts/aoa-render-services --profile intel-worker
           scripts/aoa-render-services --profile fallback-gateway
           scripts/aoa-render-services --profile substrate,local-worker
+          scripts/aoa-render-services --profile substrate,intel-worker
           scripts/aoa-render-services --profile substrate,fallback-gateway
           scripts/aoa-render-services --profile core
           scripts/aoa-render-services --profile agentic
           scripts/aoa-render-services --profile intel
-          scripts/aoa-render-services --profile agentic,tools,observability
+          scripts/aoa-render-services --profile substrate,local-worker,tools,observability
           scripts/aoa-render-services --preset agent-full
           scripts/aoa-render-services --preset agent-federation
           scripts/aoa-render-services --preset intel-full
           scripts/aoa-render-services --preset intel-federation
           scripts/aoa-render-config --profile substrate >/dev/null
           scripts/aoa-render-config --profile local-worker >/dev/null
+          scripts/aoa-render-config --profile intel-worker >/dev/null
           scripts/aoa-render-config --profile fallback-gateway >/dev/null
           scripts/aoa-render-config --profile substrate,local-worker >/dev/null
+          scripts/aoa-render-config --profile substrate,intel-worker >/dev/null
           scripts/aoa-render-config --profile substrate,fallback-gateway >/dev/null
           scripts/aoa-render-config --profile core >/dev/null
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
-          scripts/aoa-render-config --profile agentic --write "$RUNNER_TEMP/abyss-agentic.rendered.yml"
-          grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
-          grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-agentic.rendered.yml"
+          scripts/aoa-render-config --profile substrate --profile local-worker --write "$RUNNER_TEMP/abyss-local-worker.rendered.yml"
+          grep -q "return-policy.yaml" "$RUNNER_TEMP/abyss-local-worker.rendered.yml"
+          grep -q "/app/logs/returns" "$RUNNER_TEMP/abyss-local-worker.rendered.yml"
           test -f "$AOA_STACK_ROOT/Configs/agent-api/governed-execution-policy.yaml"
           python scripts/aoa-governed-run prepare-request --write "$RUNNER_TEMP/governed-request.json"
           test -s "$RUNNER_TEMP/governed-request.json"
           scripts/aoa-render-config --profile intel >/dev/null
-          scripts/aoa-render-config --profile agentic,tools,observability >/dev/null
+          scripts/aoa-render-config --profile substrate,local-worker,tools,observability >/dev/null
           scripts/aoa-render-config --preset agent-full >/dev/null
           scripts/aoa-render-config --preset agent-federation >/dev/null
           scripts/aoa-render-config --preset intel-full >/dev/null
           scripts/aoa-render-config --preset intel-federation >/dev/null
-          scripts/aoa-render-config --profile agentic,tools,observability --write "$RUNNER_TEMP/abyss-combined.rendered.yml"
+          scripts/aoa-render-config --profile substrate,local-worker,tools,observability --write "$RUNNER_TEMP/abyss-combined.rendered.yml"
           test -s "$RUNNER_TEMP/abyss-combined.rendered.yml"
 
       - name: Rehearse extra compose overlay flow

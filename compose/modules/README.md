@@ -10,11 +10,11 @@ a service belongs to the default AbyssOS substrate.
 | `10-storage.yml` | substrate | `substrate` |
 | `20-orchestration.yml` | substrate | `substrate` |
 | `30-local-inference.yml` | retained fallback | `fallback-gateway` |
-| `31-intel-inference.yml` | worker accelerator | `intel` |
-| `32-llamacpp-inference.yml` | local worker | `local-worker`, `agentic`, `intel` |
+| `31-intel-inference.yml` | worker accelerator | `intel-worker` |
+| `32-llamacpp-inference.yml` | local worker | `local-worker`, `intel-worker` |
 | `40-llm-gateway.yml` | retained fallback | `fallback-gateway` |
-| `41-agent-api.yml` | local worker | `local-worker`, `agentic`, `intel` |
-| `42-agent-api-intel.yml` | worker accelerator overlay | `intel` |
+| `41-agent-api.yml` | local worker | `local-worker`, `intel-worker` |
+| `42-agent-api-intel.yml` | worker accelerator overlay | `intel-worker` |
 | `43-federation-router.yml` | advisory seam | `federation` |
 | `44-llamacpp-agent-sidecar.yml` | pilot sidecar | `aoa-llamacpp-pilot` or explicit extra compose |
 | `50-speech.yml` | helper | `tools` |

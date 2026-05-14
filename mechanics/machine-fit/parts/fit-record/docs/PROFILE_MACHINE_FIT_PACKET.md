@@ -22,15 +22,15 @@ source checkout:
 - `scripts/aoa-machine-fit --mode public --write /tmp/<packet>/machine-fit.public.json`
 - `scripts/aoa-profile-modules --profile substrate --profile curation --paths`
 - `scripts/aoa-profile-endpoints --profile substrate --profile curation`
-- `scripts/aoa-profile-modules --profile agentic --profile federation --paths`
-- `scripts/aoa-profile-endpoints --profile agentic --profile federation`
+- `scripts/aoa-profile-modules --profile substrate --profile local-worker --profile federation --paths`
+- `scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile federation`
 
 ## 2026-05-13 Verdict
 
 The 2026-05-13 packet produced public-safe host facts, a ready read-only
 machine-bridge record, a bounded platform-adaptation note, and a qualified
 machine-fit record. The fit record recommended the `intel-full` preset with the
-`intel`, `tools`, and `observability` profile set while keeping conservative
+`substrate`, `intel-worker`, `tools`, and `observability` profile set while keeping conservative
 llama.cpp runtime settings and explicit overlay recommendations.
 
 That is enough to close the source profile-rollout quest: profile and preset

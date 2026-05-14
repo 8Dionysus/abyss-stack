@@ -37,8 +37,8 @@ Examples:
 scripts/aoa-render-services --profile substrate
 scripts/aoa-render-services --profile substrate --profile local-worker
 scripts/aoa-render-services --profile fallback-gateway
-scripts/aoa-render-services --profile agentic
-scripts/aoa-render-services --profile agentic,tools,observability
+scripts/aoa-render-services --profile substrate --profile intel-worker
+scripts/aoa-render-services --profile substrate,local-worker,tools,observability
 ```
 
 ### `aoa-render-config`
@@ -51,8 +51,8 @@ Examples:
 scripts/aoa-render-config --profile substrate
 scripts/aoa-render-config --profile substrate --profile local-worker
 scripts/aoa-render-config --profile fallback-gateway
-scripts/aoa-render-config --profile intel > /tmp/abyss-intel.rendered.yml
-scripts/aoa-render-config --profile agentic,tools,observability --write /tmp/abyss-agentic-tools-observability.rendered.yml
+scripts/aoa-render-config --profile substrate --profile intel-worker > /tmp/abyss-intel-worker.rendered.yml
+scripts/aoa-render-config --profile substrate,local-worker,tools,observability --write /tmp/abyss-worker-tools-observability.rendered.yml
 ```
 
 ## Important caution
@@ -72,16 +72,16 @@ After secrets exist and layout is valid:
 
 ```bash
 scripts/aoa-check-layout --strict
-scripts/aoa-profile-modules --profile agentic --profile tools --profile observability --paths
-scripts/aoa-profile-endpoints --profile agentic --profile tools --profile observability
-scripts/aoa-render-services --profile agentic --profile tools --profile observability
-scripts/aoa-render-config --profile agentic --profile tools --profile observability --write /tmp/abyss.rendered.yml
+scripts/aoa-profile-modules --profile substrate --profile local-worker --profile tools --profile observability --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile tools --profile observability
+scripts/aoa-render-services --profile substrate --profile local-worker --profile tools --profile observability
+scripts/aoa-render-config --profile substrate --profile local-worker --profile tools --profile observability --write /tmp/abyss.rendered.yml
 ```
 
 Only then move to:
 
 ```bash
-scripts/aoa-up --profile agentic --profile tools --profile observability
+scripts/aoa-up --profile substrate --profile local-worker --profile tools --profile observability
 ```
 
 ## What render-truth is good for

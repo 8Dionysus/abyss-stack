@@ -1,3 +1,4 @@
-intel
+substrate
+intel-worker
 tools
 observability

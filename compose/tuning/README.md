@@ -73,14 +73,14 @@ Example on Linux:
 
 ```bash
 export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.intel-285h.cpu-balanced.yml
-scripts/aoa-up --profile agentic
+scripts/aoa-up --profile substrate --profile local-worker
 ```
 
 Stacked cache-screening example:
 
 ```bash
 export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.intel-285h.cpu-balanced.yml,compose/tuning/llamacpp.intel-285h.server-cache.yml
-scripts/aoa-up --profile agentic
+scripts/aoa-up --profile substrate --profile local-worker
 ```
 
 Lab-only Vulkan example:
@@ -104,7 +104,7 @@ podman compose \
   -f /srv/AbyssOS/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
   up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
-scripts/aoa-qwen-bench --profile intel \
+scripts/aoa-qwen-bench --profile intel-worker \
   --url http://127.0.0.1:5404/run \
   --backend-label "langchain-api-intel-text -> ovms-openai" \
   --model-label "OpenVINO/Qwen3-8B-int4-ov" \

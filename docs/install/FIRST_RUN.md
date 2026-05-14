@@ -138,11 +138,11 @@ AOA_OLLAMA_WARMUP_ENABLED=true scripts/aoa-up --profile fallback-gateway
 This is the generic local agent path and defaults to the canonical `llama.cpp` worker path. Embeddings stay disabled unless an explicit backend overlay is added:
 
 ```bash
-scripts/aoa-profile-modules --profile agentic --paths
-scripts/aoa-profile-endpoints --profile agentic
-scripts/aoa-render-services --profile agentic
-scripts/aoa-up --profile agentic
-scripts/aoa-smoke --profile agentic
+scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+scripts/aoa-render-services --profile substrate --profile local-worker
+scripts/aoa-up --profile substrate --profile local-worker
+scripts/aoa-smoke --profile substrate --profile local-worker
 scripts/aoa-qwen-check --case exact-reply
 ```
 
@@ -153,11 +153,11 @@ In the current reviewed posture, OVMS is used for the explicit embeddings lane w
 Broader Intel-serving experiments should stay in benchmark, machine-fit, or rollout lanes until separately reviewed:
 
 ```bash
-scripts/aoa-profile-modules --profile intel --paths
-scripts/aoa-profile-endpoints --profile intel
-scripts/aoa-render-services --profile intel
-scripts/aoa-up --profile intel
-scripts/aoa-smoke --profile intel
+scripts/aoa-profile-modules --profile substrate --profile intel-worker --paths
+scripts/aoa-profile-endpoints --profile substrate --profile intel-worker
+scripts/aoa-render-services --profile substrate --profile intel-worker
+scripts/aoa-up --profile substrate --profile intel-worker
+scripts/aoa-smoke --profile substrate --profile intel-worker
 scripts/aoa-qwen-check --case exact-reply
 ```
 
@@ -207,21 +207,21 @@ Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/
 ### Agent runtime plus tools
 
 ```bash
-scripts/aoa-profile-modules --profile agentic --profile tools --paths
-scripts/aoa-profile-endpoints --profile agentic --profile tools
-scripts/aoa-render-services --profile agentic --profile tools
-scripts/aoa-up --profile agentic --profile tools
-scripts/aoa-smoke --with-internal --profile agentic --profile tools
+scripts/aoa-profile-modules --profile substrate --profile local-worker --profile tools --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile tools
+scripts/aoa-render-services --profile substrate --profile local-worker --profile tools
+scripts/aoa-up --profile substrate --profile local-worker --profile tools
+scripts/aoa-smoke --with-internal --profile substrate --profile local-worker --profile tools
 ```
 
 ### Agent runtime plus tools plus observability
 
 ```bash
-scripts/aoa-profile-modules --profile agentic,tools,observability --paths
-scripts/aoa-profile-endpoints --profile agentic,tools,observability
-scripts/aoa-render-services --profile agentic,tools,observability
-scripts/aoa-up --profile agentic,tools,observability
-scripts/aoa-smoke --with-internal --profile agentic,tools,observability
+scripts/aoa-profile-modules --profile substrate,local-worker,tools,observability --paths
+scripts/aoa-profile-endpoints --profile substrate,local-worker,tools,observability
+scripts/aoa-render-services --profile substrate,local-worker,tools,observability
+scripts/aoa-up --profile substrate,local-worker,tools,observability
+scripts/aoa-smoke --with-internal --profile substrate,local-worker,tools,observability
 ```
 
 ## If something feels wrong

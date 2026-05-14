@@ -1,0 +1,4 @@
+32-llamacpp-inference.yml
+31-intel-inference.yml
+41-agent-api.yml
+42-agent-api-intel.yml

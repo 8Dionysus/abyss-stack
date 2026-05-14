@@ -617,6 +617,7 @@ REQUIRED_FILES = {
     ROOT / "compose" / "profiles" / "README.md",
     ROOT / "compose" / "profiles" / "substrate.txt",
     ROOT / "compose" / "profiles" / "local-worker.txt",
+    ROOT / "compose" / "profiles" / "intel-worker.txt",
     ROOT / "compose" / "profiles" / "fallback-gateway.txt",
     ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
@@ -1705,6 +1706,12 @@ def validate_profiles(errors: list[str]) -> None:
     expected_profiles = {
         "substrate.txt": ["10-storage.yml", "20-orchestration.yml"],
         "local-worker.txt": ["32-llamacpp-inference.yml", "41-agent-api.yml"],
+        "intel-worker.txt": [
+            "32-llamacpp-inference.yml",
+            "31-intel-inference.yml",
+            "41-agent-api.yml",
+            "42-agent-api-intel.yml",
+        ],
         "fallback-gateway.txt": ["30-local-inference.yml", "40-llm-gateway.yml"],
     }
     for profile_name, expected_modules in expected_profiles.items():
@@ -1765,6 +1772,7 @@ def validate_profiles(errors: list[str]) -> None:
     for required_text in (
         "`substrate`",
         "`local-worker`",
+        "`intel-worker`",
         "`fallback-gateway`",
         "`44-llamacpp-agent-sidecar.yml`",
     ):
@@ -1772,6 +1780,44 @@ def validate_profiles(errors: list[str]) -> None:
             errors.append(f"compose/modules/README.md must mention {required_text}")
         if required_text not in profiles_readme:
             errors.append(f"compose/profiles/README.md must mention {required_text}")
+
+    expected_presets = {
+        "agent-federation.txt": ["substrate", "local-worker", "federation"],
+        "agent-tools.txt": ["substrate", "local-worker", "tools"],
+        "agent-observability.txt": ["substrate", "local-worker", "observability"],
+        "agent-full.txt": ["substrate", "local-worker", "tools", "observability"],
+        "intel-federation.txt": ["substrate", "intel-worker", "federation"],
+        "intel-tools.txt": ["substrate", "intel-worker", "tools"],
+        "intel-observability.txt": ["substrate", "intel-worker", "observability"],
+        "intel-full.txt": ["substrate", "intel-worker", "tools", "observability"],
+    }
+    for preset_name, expected_profile_names in expected_presets.items():
+        preset_path = PRESET_DIR / preset_name
+        if not preset_path.exists():
+            errors.append(f"missing required preset: {preset_path.relative_to(ROOT)}")
+            continue
+        preset_profiles = load_names(preset_path)
+        if preset_profiles != expected_profile_names:
+            errors.append(
+                f"preset {preset_name} must resolve to {', '.join(expected_profile_names)}"
+            )
+
+    github_workflow = (
+        ROOT / ".github" / "workflows" / "validate-stack.yml"
+    ).read_text(encoding="utf-8")
+    if "--profile intel-worker" not in github_workflow:
+        errors.append(".github/workflows/validate-stack.yml must rehearse the intel-worker profile")
+    if (
+        "--profile substrate --profile local-worker --profile tools --profile observability"
+        not in github_workflow
+    ):
+        errors.append(
+            ".github/workflows/validate-stack.yml must rehearse the composition-first agent-full profile set"
+        )
+    if "agentic,tools,observability" in github_workflow:
+        errors.append(
+            ".github/workflows/validate-stack.yml must not use agentic as the active combined route"
+        )
 
     sidecar_module = (MODULE_DIR / "44-llamacpp-agent-sidecar.yml").read_text(encoding="utf-8")
     if 'AOA_FEDERATED_RUN_ENABLED: "true"' not in sidecar_module:

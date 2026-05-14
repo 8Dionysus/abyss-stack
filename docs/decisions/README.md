@@ -45,6 +45,7 @@ for new records.
 | [2026-05-14 Machine Evidence Freshness Gates](2026-05-14-machine-evidence-freshness-gates.md) | decision record for stack-side freshness gates over read-only machine evidence |
 | [2026-05-14 Working Substrate Profile](2026-05-14-working-substrate-profile.md) | decision record for making `substrate` the source-owned default runtime base |
 | [2026-05-14 Fallback Gateway Profile](2026-05-14-fallback-gateway-profile.md) | decision record for keeping retained Ollama/LiteLLM behind an explicit profile |
+| [2026-05-14 Composition-First Presets](2026-05-14-composition-first-presets.md) | decision record for making named presets expand through explicit substrate and worker layers |
 
 ## Record Shape
 

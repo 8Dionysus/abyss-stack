@@ -20,14 +20,14 @@ Presets give these combinations stable names, so you do not have to repeat long 
 
 | preset | resolves to | intended use |
 |---|---|---|
-| `agent-federation` | `agentic + federation` | generic local agent runtime plus the opt-in advisory federation and retrieval seam |
-| `agent-tools` | `agentic + tools` | local agent runtime with speech and browser tooling |
-| `agent-observability` | `agentic + observability` | local agent runtime plus dashboards and metrics |
-| `agent-full` | `agentic + tools + observability` | generic local agent runtime with helpers and visibility |
-| `intel-federation` | `intel + federation` | Intel-aware agent runtime plus the opt-in advisory federation and retrieval seam |
-| `intel-tools` | `intel + tools` | Intel-aware agent runtime plus helper tooling |
-| `intel-observability` | `intel + observability` | Intel-aware agent runtime plus dashboards and metrics |
-| `intel-full` | `intel + tools + observability` | Intel-aware runtime with helper tooling and visibility |
+| `agent-federation` | `substrate + local-worker + federation` | generic local agent runtime plus the opt-in advisory federation and retrieval seam |
+| `agent-tools` | `substrate + local-worker + tools` | local agent runtime with speech and browser tooling |
+| `agent-observability` | `substrate + local-worker + observability` | local agent runtime plus dashboards and metrics |
+| `agent-full` | `substrate + local-worker + tools + observability` | generic local agent runtime with helpers and visibility |
+| `intel-federation` | `substrate + intel-worker + federation` | Intel-aware agent runtime plus the opt-in advisory federation and retrieval seam |
+| `intel-tools` | `substrate + intel-worker + tools` | Intel-aware agent runtime plus helper tooling |
+| `intel-observability` | `substrate + intel-worker + observability` | Intel-aware agent runtime plus dashboards and metrics |
+| `intel-full` | `substrate + intel-worker + tools + observability` | Intel-aware runtime with helper tooling and visibility |
 
 The federation presets stay opt-in.
 They do not promote the advisory seam into the default runtime path or the

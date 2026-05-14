@@ -92,7 +92,7 @@ podman compose \
   -f /srv/AbyssOS/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
   up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
-scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-4B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-4b-int4-gpu-lab"
+scripts/aoa-qwen-bench --profile intel-worker --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-4B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-4b-int4-gpu-lab"
 ```
 
 After the first packet, move to a bounded richer-answer packet instead of

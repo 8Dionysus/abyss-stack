@@ -74,7 +74,7 @@ podman compose \
   -f /srv/AbyssOS/abyss-stack/Configs/compose/tuning/intel-text.ovms-qwen3-settings.yml \
   up -d
 scripts/aoa-qwen-check --case exact-reply --url http://127.0.0.1:5404/run
-scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
+scripts/aoa-qwen-bench --profile intel-worker --url http://127.0.0.1:5404/run --backend-label "langchain-api-intel-text -> ovms-openai" --model-label "OpenVINO/Qwen3-8B-int4-ov" --runtime-variant "OVMS text-generation sidecar on GPU" --target-label "intel-text-qwen3-8b-int4-gpu-lab"
 ```
 
 Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) for the full operator contract.
@@ -129,6 +129,32 @@ scripts/aoa-smoke --profile substrate --profile local-worker
 scripts/aoa-qwen-check --case exact-reply
 ```
 
+## `intel-worker`
+
+### What it is for
+
+The canonical local text worker with the reviewed Intel/OVMS embeddings seam.
+Use it with `substrate` when the runtime should keep chat on
+`langchain-api -> llama.cpp` while moving embeddings to OVMS.
+
+### Host-facing endpoints
+
+- `llama-cpp` -> `http://127.0.0.1:11435/health`
+- `ovms rest` -> `http://127.0.0.1:8200/v2/health/live`
+- `ovms grpc` -> `127.0.0.1:9200`
+- `langchain-api` -> `http://127.0.0.1:5403/health`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile substrate --profile intel-worker
+scripts/aoa-render-services --profile substrate --profile intel-worker
+scripts/aoa-up --profile substrate --profile intel-worker
+scripts/aoa-wait --profile substrate --profile intel-worker
+scripts/aoa-smoke --profile substrate --profile intel-worker
+scripts/aoa-qwen-check --case exact-reply
+```
+
 ## `core`
 
 ### What it is for
@@ -136,7 +162,7 @@ scripts/aoa-qwen-check --case exact-reply
 Compatibility bundle for substrate plus local model-serving basics.
 Good for older operator habits and quick storage/orchestration/`llama.cpp`
 checks. For the source-owned OS base, prefer `substrate`; for the full agent API
-path, prefer `substrate + local-worker` or `agentic`.
+path, prefer `substrate + local-worker` or `substrate + intel-worker`.
 
 ### Host-facing endpoints
 
@@ -182,61 +208,32 @@ scripts/aoa-smoke --profile fallback-gateway
 
 ## `agentic`
 
-### What it is for
+### Compatibility bridge
 
-The generic local agent runtime.
-This profile uses `langchain-api -> llama.cpp` as the canonical chat path and does not require OVMS.
+`agentic` is the retained generic local-agent selector for older operator
+habits and scripts. It is not the current recipe owner. Use
+`substrate + local-worker` for normal launch, smoke, and bench flows.
 
-### Host-facing endpoints
-
-Storage/orchestration and local-worker endpoints:
-- `postgres` -> `127.0.0.1:5432`
-- `redis` -> `127.0.0.1:6379`
-- `qdrant` -> `http://127.0.0.1:6333/`
-- `neo4j` -> `http://127.0.0.1:7474/`
-- `n8n` -> `http://127.0.0.1:5678/`
-- `llama-cpp` -> `http://127.0.0.1:11435/health`
-- `langchain-api` -> `http://127.0.0.1:5403/health`
-
-### First checks
+Bridge check:
 
 ```bash
-scripts/aoa-profile-endpoints --profile agentic
+scripts/aoa-profile-modules --profile agentic --paths
 scripts/aoa-render-services --profile agentic
-scripts/aoa-up --profile agentic
-scripts/aoa-wait --profile agentic
-scripts/aoa-smoke --profile agentic
-scripts/aoa-qwen-check --case exact-reply
-scripts/aoa-qwen-bench --profile agentic
 ```
 
 ## `intel`
 
-### What it is for
+### Compatibility bridge
 
-The Intel-aware agent runtime.
-This profile adds OVMS and applies the Intel overlay for the canonical agent API.
-In the current reviewed posture, embeddings move to OVMS while the canonical chat path stays on `llama.cpp`.
-Broader Intel-serving lanes remain additive and separately reviewed rather than silently promoted through this profile.
-If you are screening an explicit Intel-served text lane, point `langchain-api` at it through `LC_BASE_URL`, `LC_API_KEY`, and `LC_MODEL` in the secret `langchain-api.env` file rather than rewriting the profile itself.
+`intel` is the retained Intel-aware selector for older operator habits and
+scripts. It is not the current recipe owner. Use `substrate + intel-worker`
+for normal launch, smoke, bench, and OVMS-embedding flows.
 
-### Host-facing endpoints
-
-All `agentic` endpoints, plus:
-- `ovms rest` -> `http://127.0.0.1:8200/v2/health/live`
-- `ovms grpc` -> `127.0.0.1:9200`
-
-### First checks
+Bridge check:
 
 ```bash
-scripts/aoa-doctor
-scripts/aoa-profile-endpoints --profile intel
+scripts/aoa-profile-modules --profile intel --paths
 scripts/aoa-render-services --profile intel
-scripts/aoa-up --profile intel
-scripts/aoa-wait --profile intel
-scripts/aoa-smoke --profile intel
-scripts/aoa-qwen-check --case exact-reply
-scripts/aoa-qwen-bench --profile intel
 ```
 
 ## `federation`
@@ -379,7 +376,7 @@ scripts/aoa-smoke --profile substrate --profile local-worker
 What it gives you:
 - the working AbyssOS substrate
 - retained Ollama plus LiteLLM fallback/control lane
-- no promoted `langchain-api` worker unless you add `local-worker` or `agentic`
+- no promoted `langchain-api` worker unless you add `local-worker` or `intel-worker`
 
 Try:
 
@@ -391,7 +388,7 @@ scripts/aoa-up --profile substrate --profile fallback-gateway
 scripts/aoa-smoke --profile substrate --profile fallback-gateway
 ```
 
-### `agentic + tools`
+### `substrate + local-worker + tools`
 
 What it gives you:
 - the generic local agent path
@@ -401,11 +398,11 @@ What it gives you:
 Try:
 
 ```bash
-scripts/aoa-profile-modules --profile agentic --profile tools --paths
-scripts/aoa-profile-endpoints --profile agentic --profile tools
-scripts/aoa-render-services --profile agentic --profile tools
-scripts/aoa-up --profile agentic --profile tools
-scripts/aoa-smoke --with-internal --profile agentic --profile tools
+scripts/aoa-profile-modules --profile substrate --profile local-worker --profile tools --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile tools
+scripts/aoa-render-services --profile substrate --profile local-worker --profile tools
+scripts/aoa-up --profile substrate --profile local-worker --profile tools
+scripts/aoa-smoke --with-internal --profile substrate --profile local-worker --profile tools
 ```
 
 Preset form:
@@ -417,7 +414,7 @@ aoa-smoke --with-internal --preset agent-tools
 aoa-qwen-bench --preset agent-tools
 ```
 
-### `agentic + observability`
+### `substrate + local-worker + observability`
 
 What it gives you:
 - the generic local agent path
@@ -427,11 +424,11 @@ What it gives you:
 Try:
 
 ```bash
-scripts/aoa-profile-modules --profile agentic --profile observability --paths
-scripts/aoa-profile-endpoints --profile agentic --profile observability
-scripts/aoa-render-services --profile agentic --profile observability
-scripts/aoa-up --profile agentic --profile observability
-scripts/aoa-smoke --with-internal --profile agentic --profile observability
+scripts/aoa-profile-modules --profile substrate --profile local-worker --profile observability --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile observability
+scripts/aoa-render-services --profile substrate --profile local-worker --profile observability
+scripts/aoa-up --profile substrate --profile local-worker --profile observability
+scripts/aoa-smoke --with-internal --profile substrate --profile local-worker --profile observability
 ```
 
 Preset form:
@@ -443,7 +440,7 @@ aoa-smoke --with-internal --preset agent-observability
 aoa-qwen-bench --preset agent-observability
 ```
 
-### `agentic + federation`
+### `substrate + local-worker + federation`
 
 What it gives you:
 - the generic local agent path
@@ -462,11 +459,11 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
-scripts/aoa-profile-modules --profile agentic --profile federation --paths
-scripts/aoa-profile-endpoints --profile agentic --profile federation
-scripts/aoa-render-services --profile agentic --profile federation
-scripts/aoa-up --profile agentic --profile federation
-scripts/aoa-smoke --profile agentic --profile federation
+scripts/aoa-profile-modules --profile substrate --profile local-worker --profile federation --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker --profile federation
+scripts/aoa-render-services --profile substrate --profile local-worker --profile federation
+scripts/aoa-up --profile substrate --profile local-worker --profile federation
+scripts/aoa-smoke --profile substrate --profile local-worker --profile federation
 scripts/aoa-federated-check
 ```
 
@@ -491,7 +488,7 @@ scripts/aoa-federated-check --require-enabled --inspect-id AOA-K-0011
 scripts/aoa-federated-check --require-enabled --memo-id AOA-M-0001
 ```
 
-### `intel + federation`
+### `substrate + intel-worker + federation`
 
 What it gives you:
 - the Intel-aware agent runtime with OVMS
@@ -510,11 +507,11 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
-scripts/aoa-profile-modules --profile intel --profile federation --paths
-scripts/aoa-profile-endpoints --profile intel --profile federation
-scripts/aoa-render-services --profile intel --profile federation
-scripts/aoa-up --profile intel --profile federation
-scripts/aoa-smoke --profile intel --profile federation
+scripts/aoa-profile-modules --profile substrate --profile intel-worker --profile federation --paths
+scripts/aoa-profile-endpoints --profile substrate --profile intel-worker --profile federation
+scripts/aoa-render-services --profile substrate --profile intel-worker --profile federation
+scripts/aoa-up --profile substrate --profile intel-worker --profile federation
+scripts/aoa-smoke --profile substrate --profile intel-worker --profile federation
 scripts/aoa-federated-check
 ```
 
@@ -539,7 +536,7 @@ scripts/aoa-federated-check --require-enabled --inspect-id AOA-K-0011
 scripts/aoa-federated-check --require-enabled --memo-id AOA-M-0001
 ```
 
-### `intel + tools + observability`
+### `substrate + intel-worker + tools + observability`
 
 What it gives you:
 - Intel-aware agent runtime with OVMS
@@ -550,11 +547,11 @@ What it gives you:
 Try:
 
 ```bash
-scripts/aoa-profile-modules --profile intel,tools,observability --paths
-scripts/aoa-profile-endpoints --profile intel,tools,observability
-scripts/aoa-render-services --profile intel,tools,observability
-scripts/aoa-up --profile intel,tools,observability
-scripts/aoa-smoke --with-internal --profile intel,tools,observability
+scripts/aoa-profile-modules --profile substrate,intel-worker,tools,observability --paths
+scripts/aoa-profile-endpoints --profile substrate,intel-worker,tools,observability
+scripts/aoa-render-services --profile substrate,intel-worker,tools,observability
+scripts/aoa-up --profile substrate,intel-worker,tools,observability
+scripts/aoa-smoke --with-internal --profile substrate,intel-worker,tools,observability
 ```
 
 Preset form:

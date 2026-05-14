@@ -12,8 +12,12 @@ This file maps the first migrated runtime modules to their intended services.
   surfaces; it is explicit and not part of the default substrate.
 - `core` remains a compatibility bundle for storage, orchestration, and
   `llama.cpp` basics; it is not the default substrate law.
-- `agentic`, `intel`, federation, tools, curation, and observability profiles
-  stay explicit runtime choices.
+- `intel-worker` owns the reviewed OVMS embeddings seam over the canonical
+  local worker path.
+- `agentic` and `intel` remain runnable compatibility profiles; current named
+  presets compose `substrate` plus worker layers directly.
+- federation, tools, curation, and observability profiles stay explicit runtime
+  choices.
 
 ## `10-storage.yml`
 
