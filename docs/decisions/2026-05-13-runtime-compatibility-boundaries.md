@@ -1,10 +1,7 @@
 # Runtime Compatibility Boundaries
 
+Status: accepted
 Date: 2026-05-13
-
-## Status
-
-Accepted.
 
 ## Context
 
@@ -16,6 +13,12 @@ filenames, and some are current Dionysus seed-garden handoff paths.
 Blindly renaming those values inside `abyss-stack` would break mirror,
 route-api, or SDK compatibility and would pretend this repository owns sibling
 source truth.
+
+## Options considered
+
+1. Blindly rename every old upstream value in local code and examples.
+2. Keep all old upstream values as active `abyss-stack` topology.
+3. Keep clean local names and isolate old upstream values behind one compatibility bridge.
 
 ## Decision
 
@@ -31,6 +34,10 @@ Detailed upstream IDs, lineage notes, and removal triggers live under
 Code that still accepts those values must isolate them behind compatibility
 config reads, upstream-contract response fields, or explicit historical
 fallbacks.
+
+## Rationale
+
+Some old values are still upstream contracts. Isolating them behind one bridge protects compatibility without letting those values leak back into active route names, docs, or local topology.
 
 ## Consequences
 
@@ -51,3 +58,14 @@ Use the touched package checks plus the root validation stack:
 - `scripts/aoa-rpg-runtime-projection --generated-only --check`
 - `python scripts/validate_stack.py`
 - `python scripts/validate_nested_agents.py`
+
+## Source surfaces
+
+- `mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md`
+- `config-templates/Configs/federation/upstream-compatibility-bridge.json`
+- `mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Retire bridge entries only after upstream owners publish clean replacements and deployed mirrors have moved to them.

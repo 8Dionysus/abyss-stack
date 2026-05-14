@@ -1,8 +1,7 @@
 # 2026-05-13 Root Design And Agent Surfaces
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-13
 
 ## Context
 
@@ -15,6 +14,12 @@ runtime form or for the shape of agent-facing route guidance.
 shape of agent surfaces. The same principle is useful here, but the content must
 stay runtime-specific and must not import AoA constitutional authority into
 `abyss-stack`.
+
+## Options considered
+
+1. Keep runtime form and agent-surface form implicit in root guidance.
+2. Import `Agents-of-Abyss` root design wording directly.
+3. Add runtime-specific `DESIGN.md` and `DESIGN.AGENTS.md` surfaces and route root guidance through them.
 
 ## Decision
 
@@ -29,6 +34,10 @@ Add root `DESIGN.md` and `DESIGN.AGENTS.md` to `abyss-stack`.
   validation surfaces, generated companions, and closeout expectations.
 - Root `AGENTS.md` is reshaped as a route card that points to these design
   surfaces instead of trying to carry all design rationale itself.
+
+## Rationale
+
+The AoA pattern is useful because it separates route law from system form and agent-surface form. Recasting it in runtime terms gives `abyss-stack` the same clarity without importing center constitutional authority.
 
 ## Consequences
 
@@ -48,3 +57,15 @@ machine captures remain outside the GitHub mirror.
 - This does not make generated catalogs authoritative over source surfaces.
 - This does not require every existing local `AGENTS.md` to be rewritten in this
   pass.
+
+## Source surfaces
+
+- `DESIGN.md`
+- `DESIGN.AGENTS.md`
+- `AGENTS.md`
+- `README.md`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Revisit only if the design surfaces start duplicating root route law or importing sibling-owner doctrine into `abyss-stack`.

@@ -61,24 +61,23 @@ class DiagnosticSpineContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for fragment in [
+            "mechanics/diagnostic-spine/README.md",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
             "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
-            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-            "quests/diagnostics/done/ABYSS-STACK-Q-0007.yaml",
             "scripts/aoa-diagnose",
         ]:
             self.assertIn(fragment, readme)
+
+        for fragment in [
+            "Current contract surfaces are",
+            "diagnostic_target.min.example.json",
+            "diagnostic_session.min.example.json",
+            "diagnosis_companion.min.example.json",
+            "diagnostic_anchor_ref.min.example.json",
+            "repair_handoff.min.example.json",
+            "reviewed_diagnosis_ref.min.example.json",
+        ]:
+            self.assertNotIn(fragment, readme)
 
         self.assertIn("Logs/diagnostics/latest/", runbook)
         self.assertIn("diagnostic_target.json", runbook)

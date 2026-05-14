@@ -1,6 +1,7 @@
 # 2026-05-07 Runtime Mechanics Topology
 
-Status: Accepted
+Status: accepted
+Date: 2026-05-07
 
 ## Context
 
@@ -14,6 +15,12 @@ knowing document names.
 The head AoA repository already moved center-level mechanics into a first-class
 `mechanics/` route tree. `abyss-stack` needs the same convex topology pattern,
 but adjusted for runtime ownership instead of center doctrine.
+
+## Options considered
+
+1. Keep the flat source districts and rely on readers knowing file names.
+2. Add a first-class `mechanics/` route tree before moving concrete artifacts.
+3. Move every mechanics-owned artifact immediately in one broad pass.
 
 ## Decision
 
@@ -98,3 +105,14 @@ map repo-local agent overlays. The diagnostic-spine overlay was updated to the
 current part-local diagnostic paths, and the validator now blocks stale moved
 mechanic doc references so hidden overlays cannot keep old package-level docs
 alive.
+
+## Source surfaces
+
+- `mechanics/README.md`
+- `docs/MECHANICS.md`
+- `scripts/validate_nested_agents.py`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Continue topology changes package by package, updating validators, tests, route cards, and deployment sync expectations with every artifact move.

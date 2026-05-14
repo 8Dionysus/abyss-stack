@@ -1,8 +1,7 @@
 # 2026-05-07 Mechanics Legacy Artifact Containment
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-07
 
 ## Context
 
@@ -25,7 +24,7 @@ mechanic package route first, detailed old material under package-local
 `legacy`, and explicit provenance bridges instead of keeping noisy flat names
 as the current route.
 
-## Options
+## Options considered
 
 1. Keep the flat files in root folders until every active name is redesigned.
 2. Move old files directly into active package docs, schemas, scripts, and tests
@@ -67,3 +66,15 @@ validation shape.
 - Legacy files remain reviewable but are not the first active source route.
 - A later distillation pass can promote quiet active names out of `legacy` only
   when one runtime service, storage path, or validator clearly owns the surface.
+
+## Source surfaces
+
+- `mechanics/agon-runtime/legacy/`
+- `mechanics/experience-runtime/legacy/`
+- `mechanics/inference-pilots/legacy/trials/`
+- `mechanics/runtime-repair/legacy/`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Route future promotions through the owning mechanic package. Move a legacy payload into active parts only when one runtime service, storage path, operator route, or validator clearly owns it.

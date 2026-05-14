@@ -24,10 +24,11 @@ It is not the system design. Read `DESIGN.md` for the intended runtime form and
 4. `DESIGN.md`
 5. `DESIGN.AGENTS.md` when editing `AGENTS.md`, local route cards, or agent
    overlays
-6. `ROADMAP.md`
-7. `docs/ARCHITECTURE.md`
-8. `mechanics/README.md`
-9. The nearest local `AGENTS.md`, README, and validation notes for every touched
+6. `docs/START_HERE_ROUTE_CONTRACT.md`
+7. `ROADMAP.md`
+8. `docs/ARCHITECTURE.md`
+9. `mechanics/README.md`
+10. The nearest local `AGENTS.md`, README, and validation notes for every touched
    path
 
 Use `docs/AGENTS_ROOT_REFERENCE.md` only when the short card is not enough.
@@ -123,6 +124,10 @@ It does not own:
     the changed surface
 
 ## Route Modes
+
+Entry routing is governed by `docs/START_HERE_ROUTE_CONTRACT.md`. This card
+keeps the working agent route; the route contract keeps public route-mode
+meaning synchronized across entry surfaces.
 
 | Need | First route |
 |---|---|

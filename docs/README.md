@@ -9,6 +9,7 @@ repository-level entry layer, not a dumping ground for package-local details.
 
 ## Start Here
 
+- [START_HERE_ROUTE_CONTRACT](START_HERE_ROUTE_CONTRACT.md)
 - [root DESIGN](../DESIGN.md)
 - [ARCHITECTURE](ARCHITECTURE.md)
 - [PATHS](PATHS.md)
@@ -32,10 +33,12 @@ repository-level entry layer, not a dumping ground for package-local details.
 ## Governance
 
 - [root DESIGN.AGENTS](../DESIGN.AGENTS.md)
+- [START_HERE_ROUTE_CONTRACT](START_HERE_ROUTE_CONTRACT.md)
 - [AUDIT](AUDIT.md)
 - [BRANCH_POLICY](BRANCH_POLICY.md)
 - [RELEASING](RELEASING.md)
 - [QUESTBOOK_STACK_INTEGRATION](QUESTBOOK_STACK_INTEGRATION.md)
-- [decisions](decisions/README.md)
+- [decisions](decisions/README.md), with local [AGENTS](decisions/AGENTS.md)
+  and [TEMPLATE](decisions/TEMPLATE.md)
 
 See [AGENTS.md](AGENTS.md) for editing rules.

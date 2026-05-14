@@ -1,8 +1,7 @@
 # 2026-05-12 Machine Bridge Under Machine Fit
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-12
 
 ## Context
 
@@ -16,7 +15,7 @@ machine-owner boundaries. Adding a new root `docs/MACHINE_BRIDGE.md` plus
 `docs/machine-bridge/` would make the next machine contract look like another
 flat root district even though the owning mechanic is clear.
 
-## Options
+## Options considered
 
 1. Keep `MACHINE_BRIDGE.md` and `docs/machine-bridge/` in root `docs/`.
 2. Move the entire command and contract under `mechanics/machine-fit/`.
@@ -54,3 +53,14 @@ operator entrypoint.
 - `abyss-machine` remains the stronger owner of host control-plane truth.
 - `abyss-stack` records runtime-local bridge evidence but does not mutate the
   machine, launch policy, storage policy, caches, or process affinity.
+
+## Source surfaces
+
+- `scripts/aoa-machine-bridge`
+- `mechanics/machine-fit/parts/machine-bridge/`
+- `mechanics/machine-fit/README.md`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Route future machine bridge changes through `mechanics/machine-fit/parts/machine-bridge/` and keep `abyss-machine` as the stronger owner of host control-plane truth.

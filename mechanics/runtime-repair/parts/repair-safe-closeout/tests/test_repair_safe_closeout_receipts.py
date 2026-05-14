@@ -76,6 +76,25 @@ class AntifragilityContractTests(unittest.TestCase):
 
     def test_runtime_antifragility_docs_keep_source_vs_runtime_boundary(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        runtime_repair_readme = (
+            REPO_ROOT / "mechanics" / "runtime-repair" / "README.md"
+        ).read_text(encoding="utf-8")
+        degradation_readme = (
+            REPO_ROOT
+            / "mechanics"
+            / "runtime-repair"
+            / "parts"
+            / "degradation-receipts"
+            / "README.md"
+        ).read_text(encoding="utf-8")
+        closeout_readme = (
+            REPO_ROOT
+            / "mechanics"
+            / "runtime-repair"
+            / "parts"
+            / "repair-safe-closeout"
+            / "README.md"
+        ).read_text(encoding="utf-8")
         runtime_doc = (
             REPO_ROOT
             / "mechanics"
@@ -96,11 +115,12 @@ class AntifragilityContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for fragment in [
-            "mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md",
-            "mechanics/runtime-repair/PROVENANCE.md",
-            "mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md",
-            "mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json",
-            "mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json",
+            "mechanics/runtime-repair/README.md",
+            "mechanics/runtime-repair",
+        ]:
+            self.assertIn(fragment, readme)
+
+        for fragment in [
             "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.example.json",
             "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json",
             "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json",
@@ -109,11 +129,21 @@ class AntifragilityContractTests(unittest.TestCase):
             "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json",
             "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json",
         ]:
-            self.assertIn(fragment, readme)
+            self.assertNotIn(fragment, readme)
 
         self.assertNotIn("mechanics/runtime-repair/legacy/artifacts/schemas", readme)
         self.assertNotIn("mechanics/runtime-repair/legacy/artifacts/examples", readme)
 
+        self.assertIn("mechanics/runtime-repair/parts/degradation-receipts/", runtime_repair_readme)
+        self.assertIn("mechanics/runtime-repair/parts/repair-safe-closeout/", runtime_repair_readme)
+        self.assertIn("schemas/service-degradation-receipt.schema.json", degradation_readme)
+        self.assertIn("examples/service-degradation-receipt*.example.json", degradation_readme)
+        self.assertIn(
+            "mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md",
+            closeout_readme,
+        )
+        self.assertIn("schemas/repair-safe-closeout-receipt.schema.json", closeout_readme)
+        self.assertIn("examples/repair-safe-closeout-receipt*.example.json", closeout_readme)
         self.assertIn("`~/src/abyss-stack` is the source checkout.", runtime_doc)
         self.assertIn("`/srv/AbyssOS/abyss-stack` is the deployed runtime mirror.", runtime_doc)
         self.assertIn("Do not patch `/srv/AbyssOS/abyss-stack` and pretend the system learned.", closeout_doc)

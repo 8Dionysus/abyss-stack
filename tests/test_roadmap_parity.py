@@ -24,9 +24,23 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "> Current release: `v0.2.2`" in readme
     assert "## [0.2.2] - 2026-04-23" in changelog
     assert "`v0.2.2`" in roadmap
-    assert "Current release contour" in roadmap
+    assert "## Authority" in roadmap
+    assert "## Update Rule" in roadmap
+    assert "## Current Released Contour" not in roadmap
     assert "runtime-substrate hardening" in roadmap
-    assert "without claiming live service mutation" in roadmap
+    assert "not a claim of live" in roadmap
+    assert "service mutation" in roadmap
+    assert "mechanics/<package>/ROADMAP.md" in roadmap
+    assert "mechanics/<package>/LANDING_LOG.md" in roadmap
+    assert "CHANGELOG.md" in roadmap
+    assert "docs/decisions/" in roadmap
+    assert "Structured bootstrap" not in roadmap
+    assert "Service extraction" not in roadmap
+    assert "Current checked anchors" not in roadmap
+    assert "diagnostic_target.min.example.json" not in roadmap
+    assert "service-degradation-receipt.timeout-chaos.example.json" not in roadmap
+    assert "test_validate_stack_diagnostic_spine.py" not in roadmap
+    assert "RUNTIME_CHAOS_WAVE1.md" not in roadmap
     assert payload["schema_version"] == "abyss_stack_diagnostic_surface_catalog_v1"
     assert payload["authority_ref"] == "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"
     assert "langchain-api" in roadmap
@@ -34,68 +48,3 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "LangGraph" in roadmap
     assert "antifragility repair posture" in roadmap
     assert "diagnostic spine" in roadmap
-    assert "`scripts/aoa-diagnose`" in roadmap
-    assert "`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`" in roadmap
-
-    current_release_surfaces = [
-        "README.md",
-        "CHARTER.md",
-        "BOUNDARIES.md",
-        "docs/PATHS.md",
-        "docs/DEPLOYMENT.md",
-        "scripts/aoa-sync-configs",
-        "scripts/validate_stack.py",
-        "scripts/release_check.py",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
-        "scripts/aoa-diagnose",
-        "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py",
-        "scripts/build_diagnostic_surface_catalog.py",
-        "scripts/validate_diagnostic_surface_catalog.py",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
-        "mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md",
-        "mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md",
-        "mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md",
-        "mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json",
-        "mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json",
-        "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.example.json",
-        "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json",
-        "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json",
-        "mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.retrieval-outage-honesty.example.json",
-        "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.example.json",
-        "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json",
-        "mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json",
-        "mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md",
-        "mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md",
-        "mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md",
-        "compose/tuning/llamacpp.runtime-fallback.yml",
-        "compose/tuning/llamacpp.intel-285h.cpu-safe.yml",
-        "compose/tuning/intel-text.ovms-qwen3-settings.yml",
-        "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md",
-        "scripts/aoa-llamacpp-pilot",
-        "mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md",
-        "mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md",
-        "mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md",
-        "mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
-        "docs/SERVICE_CATALOG.md",
-        "docs/PROFILES.md",
-        "mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md",
-        "scripts/aoa-federated-check",
-        "compose/modules/52-tos-graph.yml",
-        "compose/profiles/curation.txt",
-        "config-templates/Services/tos-graph/app/main.py",
-    ]
-    for surface in current_release_surfaces:
-        assert (REPO_ROOT / surface).exists(), surface
-        assert surface in roadmap
