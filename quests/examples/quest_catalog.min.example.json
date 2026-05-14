@@ -134,13 +134,13 @@
     "lane": "diagnostics",
     "theme_ref": "",
     "milestone_ref": "live-runtime-cutover",
-    "state": "ready",
+    "state": "done",
     "band": "near",
     "kind": "followup",
     "difficulty": "d3_seam",
     "risk": "r3_side_effect",
     "owner_surface": "mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md",
-    "source_path": "quests/diagnostics/ready/ABYSS-STACK-Q-0009.yaml",
+    "source_path": "quests/diagnostics/done/ABYSS-STACK-Q-0009.yaml",
     "public_safe": true
   }
 ]

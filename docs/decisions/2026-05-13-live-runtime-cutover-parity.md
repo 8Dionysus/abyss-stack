@@ -32,7 +32,10 @@ seam into live service authority by itself.
 - Machine/runtime connection is checked through source validation, synthetic
   parity, live `Configs` parity, and runtime Configs mirror validation.
 - Live service health remains a separate truth from source/deployed parity.
-- The current route-api health and closure drift is tracked as
-  `ABYSS-STACK-Q-0009` rather than hidden behind green source parity.
+- The first route-api health and closure drift was tracked as
+  `ABYSS-STACK-Q-0009` rather than hidden behind green source parity; the
+  closed repair keeps the source unit generic and uses a host-local
+  runtime-selection drop-in to preserve `intel-full` while layering
+  `federation`.
 - Future runtime-loop promotion should update the relevant packet or open a new
   bounded quest only when a new obligation survives the packet.
