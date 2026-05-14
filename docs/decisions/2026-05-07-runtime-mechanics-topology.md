@@ -99,12 +99,13 @@ Root `docs/README.md` and `tests/README.md` were added as short indexes. They
 do not create new authority; they make repo-wide docs and repo-level validation
 discoverable while preserving mechanic-owned docs and tests under `mechanics/`.
 
-Hidden source-owned districts now follow the same rule: `.github/README.md`
-maps GitHub-native automation, and `.agents/README.md` plus `.agents/AGENTS.md`
-map repo-local agent overlays. The diagnostic-spine overlay was updated to the
-current part-local diagnostic paths, and the validator now blocks stale moved
-mechanic doc references so hidden overlays cannot keep old package-level docs
-alive.
+Hidden source-owned districts now follow the same rule:
+`.github/GITHUB_SURFACE.md` maps GitHub-native automation without competing
+with the repository homepage README, and `.agents/README.md` plus
+`.agents/AGENTS.md` map repo-local agent overlays. The diagnostic-spine overlay
+was updated to the current part-local diagnostic paths, and the validator now
+blocks stale moved mechanic doc references so hidden overlays cannot keep old
+package-level docs alive.
 
 ## Source surfaces
 

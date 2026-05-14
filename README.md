@@ -160,7 +160,7 @@ storage.
 | [systemd](systemd/README.md) | user-unit source skeletons |
 | [tests](tests/README.md) | repository-level tests and validation routes |
 | [.agents](.agents/README.md) | repo-local agent overlays and fast-loop lanes |
-| [.github](.github/README.md) | GitHub-native validation and landing surfaces |
+| [.github](.github/GITHUB_SURFACE.md) | GitHub-native validation and landing surfaces |
 
 District gates explain local handling. They do not replace root authority,
 mechanic packages, deployed runtime state, or sibling repositories.

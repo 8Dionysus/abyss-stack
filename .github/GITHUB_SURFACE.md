@@ -1,6 +1,9 @@
-# .github
+# GitHub Surface
 
 `.github/` contains the GitHub-native platform surface for this repository.
+This map is intentionally not named `README.md`: GitHub may select
+`.github/README.md` as the repository homepage README and hide the root
+source-checkout front door.
 
 ## Current Surfaces
 

@@ -412,7 +412,7 @@ REQUIRED_FILES = {
     ROOT / ".agents" / "spark" / "AGENTS.md",
     ROOT / ".agents" / "spark" / "README.md",
     ROOT / ".agents" / "spark" / "SWARM.md",
-    ROOT / ".github" / "README.md",
+    ROOT / ".github" / "GITHUB_SURFACE.md",
     ROOT / "mechanics" / "governed-execution" / "parts" / "return-policy" / "docs" / "RECURRENCE_RUNTIME_POLICY.md",
     ROOT / "docs" / "MECHANICS.md",
     ROOT / "mechanics" / "README.md",
@@ -2447,6 +2447,7 @@ def validate_root_residual_topology(errors: list[str]) -> None:
     forbidden_paths = {
         ROOT / "AUDIT.md": "docs/AUDIT.md",
         ROOT / "Spark": ".agents/spark/",
+        ROOT / ".github" / "README.md": ".github/GITHUB_SURFACE.md",
     }
     for path, target in forbidden_paths.items():
         if path.exists():
