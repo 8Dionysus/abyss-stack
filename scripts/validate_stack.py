@@ -613,6 +613,8 @@ REQUIRED_FILES = {
     ROOT / "compose" / "presets" / "intel-tools.txt",
     ROOT / "compose" / "presets" / "intel-observability.txt",
     ROOT / "compose" / "presets" / "intel-full.txt",
+    ROOT / "compose" / "profiles" / "substrate.txt",
+    ROOT / "compose" / "profiles" / "local-worker.txt",
     ROOT / "compose" / "profiles" / "federation.txt",
     ROOT / "compose" / "tuning" / "README.md",
     ROOT / "compose" / "tuning" / "llamacpp.cpu.yml",
@@ -1696,6 +1698,29 @@ def iter_sync_managed_files() -> list[Path]:
 
 
 def validate_profiles(errors: list[str]) -> None:
+    expected_profiles = {
+        "substrate.txt": ["10-storage.yml", "20-orchestration.yml"],
+        "local-worker.txt": ["32-llamacpp-inference.yml", "41-agent-api.yml"],
+    }
+    for profile_name, expected_modules in expected_profiles.items():
+        profile_path = PROFILE_DIR / profile_name
+        if not profile_path.exists():
+            errors.append(f"missing required profile: {profile_path.relative_to(ROOT)}")
+            continue
+        modules = load_names(profile_path)
+        if modules != expected_modules:
+            errors.append(
+                f"profile {profile_name} must be {', '.join(expected_modules)}"
+            )
+
+    aoa_lib = (ROOT / "scripts" / "aoa-lib.sh").read_text(encoding="utf-8")
+    if 'AOA_STACK_DEFAULT_PROFILE="${AOA_STACK_DEFAULT_PROFILE:-substrate}"' not in aoa_lib:
+        errors.append("scripts/aoa-lib.sh default profile must remain substrate")
+
+    unit = (ROOT / "systemd" / "user" / "podman-compose-abyss.service").read_text(encoding="utf-8")
+    if "Environment=AOA_STACK_PROFILE=substrate" not in unit:
+        errors.append("systemd/user/podman-compose-abyss.service must default to substrate")
+
     for profile in sorted(PROFILE_DIR.glob("*.txt")):
         modules = load_names(profile)
         if not modules:

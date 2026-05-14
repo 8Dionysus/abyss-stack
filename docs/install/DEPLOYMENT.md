@@ -76,8 +76,8 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional federation 
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional federation playbook mirror
 scripts/aoa-sync-federation-surfaces --layer aoa-kag      # optional federation KAG mirror
 scripts/aoa-sync-federation-surfaces --layer tos-source   # optional Tree-of-Sophia handoff mirror
-scripts/aoa-profile-modules --profile core
-scripts/aoa-profile-endpoints --profile core
+scripts/aoa-profile-modules --profile substrate
+scripts/aoa-profile-endpoints --profile substrate
 ```
 
 Then bootstrap real secret-bearing files as described in [SECRETS_BOOTSTRAP](../../mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md).
@@ -290,8 +290,8 @@ scripts/aoa-sync-federation-surfaces --layer aoa-evals    # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-playbooks  # optional
 scripts/aoa-sync-federation-surfaces --layer aoa-kag      # optional
 scripts/aoa-sync-federation-surfaces --layer tos-source   # optional
-scripts/aoa-profile-modules --profile core
-scripts/aoa-profile-endpoints --profile core
+scripts/aoa-profile-modules --profile substrate
+scripts/aoa-profile-endpoints --profile substrate
 ```
 
 After that capture, `aoa-up`, `aoa-down`, `aoa-render-services`, and `aoa-render-config` automatically honor the latest machine-fit posture unless you explicitly disable it.
@@ -300,18 +300,20 @@ Then create secrets per [SECRETS_BOOTSTRAP](../../mechanics/config-projection/pa
 
 For claim wording after bootstrap, use [TRUTH_SURFACES](../../mechanics/diagnostic-spine/parts/truth-surfaces/docs/TRUTH_SURFACES.md).
 
-For local-Ollama profiles, `aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model resident for `30m` unless the stack restarts or the model is explicitly evicted.
+When the selected runtime explicitly includes `30-local-inference.yml`,
+`aoa-up` also performs a post-start warmup of `qwen3.5:9b` and keeps the model
+resident for `30m` unless the stack restarts or the model is explicitly evicted.
 
 Then inspect:
 
 ```bash
-aoa-status --profile core
+aoa-status --profile substrate
 ```
 
 Or manually use the deployed scripts:
 
 ```bash
-/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up --profile core
+/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up --profile substrate
 ```
 
 ## Preset example

@@ -50,7 +50,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   - `AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack`
   - `AOA_CONFIGS_ROOT=${AOA_STACK_ROOT}/Configs`
   - `AOA_VAULT_ROOT=/abyss`
-  - default profile `core`
+  - default profile `substrate`
 - Keep the distinction between source checkout and deployed runtime explicit. Bridge with `aoa-sync-configs` and `aoa-bootstrap-configs`; do not blur them.
 - Do not reintroduce stale pre-`/srv/AbyssOS/abyss-stack` paths. `validate_stack.py` intentionally guards against that drift.
 

@@ -79,12 +79,64 @@ scripts/aoa-qwen-bench --profile intel --url http://127.0.0.1:5404/run --backend
 
 Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md) for the full operator contract.
 
+## `substrate`
+
+### What it is for
+
+The conservative working AbyssOS runtime base.
+Good for validating storage, retrieval, orchestration, config projection, and
+root lifecycle without silently selecting a model worker or federation seam.
+
+### Host-facing endpoints
+
+- `postgres` -> `127.0.0.1:5432`
+- `redis` -> `127.0.0.1:6379`
+- `qdrant` -> `http://127.0.0.1:6333/`
+- `neo4j` -> `http://127.0.0.1:7474/`
+- `n8n` -> `http://127.0.0.1:5678/`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile substrate
+scripts/aoa-render-services --profile substrate
+scripts/aoa-up --profile substrate
+scripts/aoa-wait --profile substrate
+scripts/aoa-smoke --profile substrate
+```
+
+## `local-worker`
+
+### What it is for
+
+The canonical local text worker layer.
+Use it with `substrate` when the runtime should expose the promoted
+`langchain-api -> llama.cpp` path without moving to a broader preset.
+
+### Host-facing endpoints
+
+- `llama-cpp` -> `http://127.0.0.1:11435/health`
+- `langchain-api` -> `http://127.0.0.1:5403/health`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+scripts/aoa-render-services --profile substrate --profile local-worker
+scripts/aoa-up --profile substrate --profile local-worker
+scripts/aoa-wait --profile substrate --profile local-worker
+scripts/aoa-smoke --profile substrate --profile local-worker
+scripts/aoa-qwen-check --case exact-reply
+```
+
 ## `core`
 
 ### What it is for
 
-The smallest useful local substrate.
-Good for validating storage, orchestration, and local model-serving basics.
+Compatibility bundle for substrate plus local model-serving basics.
+Good for older operator habits and quick storage/orchestration/`llama.cpp`
+checks. For the source-owned OS base, prefer `substrate`; for the full agent API
+path, prefer `substrate + local-worker` or `agentic`.
 
 ### Host-facing endpoints
 
@@ -275,6 +327,23 @@ scripts/aoa-internal-probes --profile observability
 ```
 
 ## Common combined recipes
+
+### `substrate + local-worker`
+
+What it gives you:
+- the working AbyssOS substrate
+- the canonical local text worker path
+- no federation seam, helper tools, or observability bundle unless added later
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
+scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+scripts/aoa-render-services --profile substrate --profile local-worker
+scripts/aoa-up --profile substrate --profile local-worker
+scripts/aoa-smoke --profile substrate --profile local-worker
+```
 
 ### `agentic + tools`
 

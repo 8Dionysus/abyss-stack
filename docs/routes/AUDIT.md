@@ -138,10 +138,10 @@ The current CI validates a broad script set including:
 Run the smallest relevant render/introspection checks for the affected surface, for example:
 
 ```bash
-scripts/aoa-profile-modules --profile core --paths
-scripts/aoa-profile-endpoints --profile core
-scripts/aoa-render-services --profile core
-scripts/aoa-render-config --profile core >/dev/null
+scripts/aoa-profile-modules --profile substrate --paths
+scripts/aoa-profile-endpoints --profile substrate
+scripts/aoa-render-services --profile substrate
+scripts/aoa-render-config --profile substrate >/dev/null
 ```
 
 For preset changes, use the matching preset:

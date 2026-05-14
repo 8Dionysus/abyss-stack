@@ -6,6 +6,7 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 
 - compose modules
 - runtime profiles
+- working substrate selection and explicit runtime layers
 - systemd user units
 - container and service topology
 - storage and mount contracts

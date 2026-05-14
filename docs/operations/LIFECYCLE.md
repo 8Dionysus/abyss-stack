@@ -64,6 +64,8 @@ You can operate:
 Examples:
 
 ```bash
+aoa-up --profile substrate
+aoa-up --profile substrate --profile local-worker
 aoa-up --profile agentic --profile tools
 aoa-up --profile agentic,tools,observability
 aoa-up --preset agent-full
@@ -93,7 +95,6 @@ cd /srv/AbyssOS/abyss-stack/Configs
 podman compose \
   -f compose/modules/10-storage.yml \
   -f compose/modules/20-orchestration.yml \
-  -f compose/modules/30-local-inference.yml \
   up -d
 ```
 

@@ -8,7 +8,7 @@ Type=oneshot
 RemainAfterExit=yes
 Environment=AOA_STACK_ROOT=/srv/AbyssOS/abyss-stack
 Environment=AOA_CONFIGS_ROOT=/srv/AbyssOS/abyss-stack/Configs
-Environment=AOA_STACK_PROFILE=core
+Environment=AOA_STACK_PROFILE=substrate
 Environment=AOA_COMPOSE_PROJECT_NAME=abyss
 ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-up
 ExecStop=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-down

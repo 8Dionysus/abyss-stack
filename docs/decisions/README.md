@@ -43,6 +43,7 @@ for new records.
 | [2026-05-14 Docs District Topology](2026-05-14-docs-district-topology.md) | decision record for replacing flat root docs with role-named districts |
 | [2026-05-14 Source Component Pinning Posture](2026-05-14-source-component-pinning-posture.md) | decision record for current source component pins without hidden stateful major migration |
 | [2026-05-14 Machine Evidence Freshness Gates](2026-05-14-machine-evidence-freshness-gates.md) | decision record for stack-side freshness gates over read-only machine evidence |
+| [2026-05-14 Working Substrate Profile](2026-05-14-working-substrate-profile.md) | decision record for making `substrate` the source-owned default runtime base |
 
 ## Record Shape
 

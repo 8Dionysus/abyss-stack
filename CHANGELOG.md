@@ -176,6 +176,13 @@ Tracking starts with the community-docs baseline for this repository.
   machine bridge honest after the docs refactor: source-root detection uses
   `docs/install/DEPLOYMENT.md`, and doctor warns on stale or host-mismatched
   machine-fit and machine-bridge records
+- the source-owned default runtime profile is now `substrate`, containing
+  storage plus orchestration only, while `local-worker` carries the canonical
+  `llama.cpp` plus `langchain-api` worker layer and `core` remains a
+  compatibility bundle
+- root docs, profile docs, CI rehearsal, the checked-in user-unit skeleton, and
+  validation now preserve the split between working substrate, local-worker,
+  and richer live runtime selections
 
 ### Validation
 

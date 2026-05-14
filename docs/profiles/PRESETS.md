@@ -7,6 +7,9 @@ They exist one layer above profile composition:
 - profiles are named stacks of modules
 - presets are named stacks of profiles
 
+The default working substrate is a profile, not a preset: use `substrate` for
+the conservative OS base and layer worker or helper profiles explicitly.
+
 ## Why presets exist
 
 Once multi-profile composition became possible, certain combinations turned into common operating modes.

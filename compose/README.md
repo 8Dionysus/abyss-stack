@@ -22,6 +22,8 @@ The new stack uses small compose modules, named profiles, and named presets.
 
 ## Profiles
 
+- `profiles/substrate.txt`
+- `profiles/local-worker.txt`
 - `profiles/core.txt`
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
@@ -31,6 +33,11 @@ The new stack uses small compose modules, named profiles, and named presets.
 - `profiles/observability.txt`
 
 A profile is only a list of module filenames in activation order.
+
+`substrate` is the conservative working service base for AbyssOS runtime
+bring-up: storage plus orchestration. `local-worker` is the canonical
+`llama.cpp` plus `langchain-api` worker layer. `core` is kept as a familiar
+compatibility bundle for substrate plus local `llama.cpp` inference basics.
 
 ## Presets
 
@@ -45,11 +52,13 @@ A profile is only a list of module filenames in activation order.
 
 A preset is a list of profile names in activation order.
 
-## Optional pilot modules
+## Runtime and pilot modules
 
-`32-llamacpp-inference.yml` and `44-llamacpp-agent-sidecar.yml` are not part of the default profiles or presets.
+`32-llamacpp-inference.yml` is the canonical local-worker inference module and
+is used by `local-worker`, `core`, `agentic`, and `intel`.
 
-They exist for the bounded `llama.cpp` sidecar pilot and are typically activated through:
+`44-llamacpp-agent-sidecar.yml` is separate. It exists for the bounded
+`llama.cpp` sidecar pilot and is typically activated through:
 
 - `scripts/aoa-llamacpp-pilot`
 - or `AOA_EXTRA_COMPOSE_FILES` when you intentionally want the sidecar path

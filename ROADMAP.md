@@ -69,6 +69,9 @@ The current direction is:
   provenance, and legacy containment
 - keep root operator commands stable while implementation bodies live beside
   their owning mechanic parts
+- make `abyss-stack` the source owner of the working runtime substrate:
+  `substrate` starts storage plus orchestration, while local-worker,
+  federation, tools, and observability layers remain explicit choices
 - keep source/runtime parity explicit through synthetic and live Configs checks
 - connect to `abyss-machine` through read-only bridge and machine-fit packets,
   not by absorbing machine ownership
@@ -83,14 +86,16 @@ The current direction is:
 ## Horizon: Runtime Topology
 
 - Current posture:
-  mechanics packages are convex and carry route cards, parts, local roadmaps,
-  landing logs, provenance, and package-local legacy containment.
+  mechanics packages are convex, and the compose profile taxonomy now separates
+  the working `substrate` base from local-worker, federation, tools, and
+  observability layers.
 - Next honest move:
-  continue reducing root and district flatness only when a clear owner package
-  or part exists.
+  keep service promotion flowing through named modules, profiles, presets,
+  mechanic owners, and validation rather than through implicit runtime growth.
 - Guardrail:
   root roadmap does not index every package-local future move or landing
-  receipt.
+  receipt, and `core` compatibility must not retake the role of default
+  substrate law.
 
 ## Horizon: Source And Runtime Parity
 

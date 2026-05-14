@@ -2,6 +2,17 @@
 
 This file maps the first migrated runtime modules to their intended services.
 
+## Profile posture
+
+- `substrate` owns the conservative working AbyssOS service base:
+  `10-storage.yml` plus `20-orchestration.yml`.
+- `local-worker` owns the canonical `llama.cpp` plus `langchain-api` worker
+  layer and is meant to compose over `substrate`.
+- `core` remains a compatibility bundle for storage, orchestration, and
+  `llama.cpp` basics; it is not the default substrate law.
+- `agentic`, `intel`, federation, tools, curation, and observability profiles
+  stay explicit runtime choices.
+
 ## `10-storage.yml`
 
 - `postgres` — transactional state

@@ -39,6 +39,7 @@ Read only what matches your entry need.
 | Runtime architecture | [runtime/ARCHITECTURE](docs/runtime/ARCHITECTURE.md), [runtime/SERVICE_CATALOG](docs/runtime/SERVICE_CATALOG.md), [profiles/PROFILES](docs/profiles/PROFILES.md), [profiles/PRESETS](docs/profiles/PRESETS.md) |
 | Source/install bootstrap | [runtime/PATHS](docs/runtime/PATHS.md), [install/DEPLOYMENT](docs/install/DEPLOYMENT.md), [install/FIRST_RUN](docs/install/FIRST_RUN.md), [mechanics/config-projection](mechanics/config-projection/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
 | Runtime operation and incidents | [operations/RUNBOOK](docs/operations/RUNBOOK.md), [scripts/README](scripts/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
+| Working substrate selection | [profiles/PROFILES](docs/profiles/PROFILES.md), [profiles/PROFILE_RECIPES](docs/profiles/PROFILE_RECIPES.md), [compose](compose/README.md) |
 | Branch and recurrence posture | [governance/BRANCH_POLICY](docs/governance/BRANCH_POLICY.md), [RECURRENCE_RUNTIME_POLICY](mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md) |
 | Host and machine fit | [REFERENCE_PLATFORM](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md), [REFERENCE_PLATFORM_SPEC](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md), [MACHINE_FIT_POLICY](mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md), [PLATFORM_ADAPTATION_POLICY](mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md) |
 | Windows and WSL bridge | [Windows bridge](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md) |
@@ -114,6 +115,9 @@ The active source shape is:
   live beside their owning mechanic parts
 - source/runtime parity uses synthetic release checks by default and live
   checks only through explicit operator intent
+- the default source-owned runtime selection is the conservative `substrate`
+  profile: storage plus orchestration under `abyss-stack`; local workers,
+  federation, tools, and observability layer on top explicitly
 - `abyss-machine` is consumed through read-only bridge and machine-fit packets
   without transferring machine ownership into this repo
 - `langchain-api` on `5403`, `llama.cpp`, and LangGraph remain bounded

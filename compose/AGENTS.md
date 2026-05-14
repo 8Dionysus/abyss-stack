@@ -55,10 +55,12 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 Run the smallest set that proves the change:
 ```bash
 python scripts/validate_stack.py
-scripts/aoa-profile-modules --profile core --paths
-scripts/aoa-profile-endpoints --profile core
-scripts/aoa-render-services --profile core
-scripts/aoa-render-config --profile core >/dev/null
+scripts/aoa-profile-modules --profile substrate --paths
+scripts/aoa-profile-endpoints --profile substrate
+scripts/aoa-render-services --profile substrate
+scripts/aoa-render-config --profile substrate >/dev/null
+scripts/aoa-profile-modules --profile local-worker --paths
+scripts/aoa-render-config --profile local-worker >/dev/null
 ```
 
 For preset work, use the matching preset form instead of only testing profiles. Treat rendered config as potentially secret-bearing.
