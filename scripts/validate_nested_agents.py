@@ -42,7 +42,15 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'docs/README.md',
         'Mechanic-owned runtime doctrine',
         'docs/decisions',
+        'python scripts/validate_decision_records.py',
         'python scripts/validate_nested_agents.py',
+    ),
+    'docs/decisions/AGENTS.md': (
+        'decision records',
+        'Decision Review Gate',
+        'TEMPLATE.md',
+        'current source surfaces define what',
+        'python scripts/validate_decision_records.py',
     ),
     '.agents/skills/AGENTS.md': (
         'repo-local skill install and overlay surface',

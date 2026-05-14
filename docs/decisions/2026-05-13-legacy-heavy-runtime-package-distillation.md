@@ -1,8 +1,7 @@
 # 2026-05-13 Legacy-Heavy Runtime Package Distillation
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-13
 
 ## Context
 
@@ -14,6 +13,12 @@ had a clear runtime owner.
 The existing containment rule allows promotion out of `legacy/` only when one
 runtime service, storage path, validator, or operator route clearly owns the
 surface.
+
+## Options considered
+
+1. Keep both Agon and Experience runtime families in `legacy/`.
+2. Promote both families into active parts immediately.
+3. Promote only the Agon runnable runtime substrate and leave Experience archive-bound.
 
 ## Decision
 
@@ -45,3 +50,14 @@ or authority to `Agents-of-Abyss` and `Tree-of-Sophia`.
   `legacy/`.
 - Future Experience promotion must start from one concrete runtime consumer and
   move docs, schemas, examples, tests, validators, and lineage together.
+
+## Source surfaces
+
+- `mechanics/agon-runtime/parts/runtime-kernels/`
+- `mechanics/agon-runtime/legacy/`
+- `mechanics/experience-runtime/legacy/`
+- `mechanics/experience-runtime/parts/experience-records/docs/EXPERIENCE_RECORDS_DISTILLATION.md`
+
+## Follow-up route
+
+Revisit Experience promotion only when a concrete `abyss-stack` runtime consumer appears and can own docs, schemas, examples, tests, and validation together.

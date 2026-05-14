@@ -1,8 +1,7 @@
 # 2026-05-13 Live Runtime Cutover And Machine Parity
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-13
 
 ## Context
 
@@ -13,6 +12,12 @@ freshness.
 
 Keeping those as prose in `ROADMAP.md` would make future passes repeat the same
 argument without a runnable route.
+
+## Options considered
+
+1. Keep runtime-loop and parity work as prose in root `ROADMAP.md`.
+2. Open broad follow-up quests without executable packet surfaces.
+3. Add package-local parity and cutover packets with clear non-promotion boundaries.
 
 ## Decision
 
@@ -25,6 +30,10 @@ The parity packet may sync repo-managed source surfaces into the deployed
 `Configs` mirror, but it does not start services or carry private state. The
 cutover packet may inspect live runtime-loop posture, but it does not promote a
 seam into live service authority by itself.
+
+## Rationale
+
+A packet surface gives future operators a repeatable route that is stronger than roadmap prose and narrower than live service promotion. It keeps source parity, deployed mirror parity, and runtime health as separate truths.
 
 ## Consequences
 
@@ -39,3 +48,14 @@ seam into live service authority by itself.
   `federation`.
 - Future runtime-loop promotion should update the relevant packet or open a new
   bounded quest only when a new obligation survives the packet.
+
+## Source surfaces
+
+- `mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`
+- `mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`
+- `quests/diagnostics/done/ABYSS-STACK-Q-0009.yaml`
+- `ROADMAP.md`
+
+## Follow-up route
+
+Rerun or update the runtime-lifecycle packets when source/runtime parity or live runtime-loop promotion pressure changes.

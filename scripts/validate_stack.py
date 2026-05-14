@@ -400,8 +400,12 @@ REQUIRED_FILES = {
     ROOT / "DESIGN.AGENTS.md",
     ROOT / "docs" / "AGENTS.md",
     ROOT / "docs" / "README.md",
+    ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md",
     ROOT / "docs" / "AUDIT.md",
+    ROOT / "docs" / "decisions" / "AGENTS.md",
+    ROOT / "docs" / "decisions" / "TEMPLATE.md",
     ROOT / "tests" / "README.md",
+    ROOT / "tests" / "test_decision_records.py",
     ROOT / ".agents" / "AGENTS.md",
     ROOT / ".agents" / "README.md",
     ROOT / ".agents" / "skills" / "AGENTS.md",
@@ -433,6 +437,7 @@ REQUIRED_FILES = {
     ROOT / "mechanics" / "diagnostic-spine" / "parts" / "truth-surfaces" / "docs" / "TRUTH_SURFACES.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "langgraph-pilot" / "docs" / "LANGGRAPH_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "parts" / "llamacpp-pilot" / "docs" / "LLAMACPP_PILOT.md",
+    ROOT / "scripts" / "validate_decision_records.py",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W5_PILOT.md",
     ROOT / "mechanics" / "inference-pilots" / "legacy" / "trials" / "raw" / "W6_PILOT.md",
     ROOT
@@ -1800,6 +1805,35 @@ def validate_paths(errors: list[str]) -> None:
         errors.append("README.md must route readers to mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md")
     if "scripts/README.md" not in readme:
         errors.append("README.md must route readers to scripts/README.md")
+    if "docs/START_HERE_ROUTE_CONTRACT.md" not in readme:
+        errors.append("README.md must route readers to docs/START_HERE_ROUTE_CONTRACT.md")
+    for forbidden in (
+        "Current contract surfaces are",
+        "Chaos receipt examples also now include",
+        "To verify the current promoted path",
+        "Configs/scripts/aoa-llamacpp-pilot",
+        "python scripts/validate_stack.py",
+        "python scripts/validate_nested_agents.py",
+        "python -m pytest -q",
+        "python scripts/build_diagnostic_surface_catalog.py --check",
+        "python scripts/validate_diagnostic_surface_catalog.py",
+        "diagnostic_target.min.example.json",
+        "diagnostic_session.min.example.json",
+        "diagnosis_companion.min.example.json",
+        "diagnostic_anchor_ref.min.example.json",
+        "repair_handoff.min.example.json",
+        "reviewed_diagnosis_ref.min.example.json",
+        "service-degradation-receipt.timeout-chaos.example.json",
+        "service-degradation-receipt.honest-degradation.example.json",
+        "service-degradation-receipt.retrieval-outage-honesty.example.json",
+        "repair-safe-closeout-receipt.timeout-chaos.example.json",
+        "repair-safe-closeout-receipt.retrieval-outage-honesty.example.json",
+    ):
+        if forbidden in readme:
+            errors.append(
+                "README.md must stay route-focused; move root inventory detail "
+                f"to the owning surface instead of `{forbidden}`"
+            )
 
     local_ai_trials = (
         ROOT
@@ -2977,6 +3011,96 @@ def validate_root_design_surfaces(errors: list[str]) -> None:
             errors.append(f"docs/README.md must point to `{snippet}`")
 
 
+def validate_entry_route_contract(errors: list[str]) -> None:
+    route_contract = read_text_or_none(ROOT / "docs" / "START_HERE_ROUTE_CONTRACT.md") or ""
+    readme = read_text_or_none(ROOT / "README.md") or ""
+    agents = read_text_or_none(ROOT / "AGENTS.md") or ""
+    docs_readme = read_text_or_none(ROOT / "docs" / "README.md") or ""
+    docs_agents = read_text_or_none(ROOT / "docs" / "AGENTS.md") or ""
+
+    route_modes = (
+        "first-reading",
+        "runtime-design",
+        "agent-guidance",
+        "source-install",
+        "runtime-operation",
+        "mechanic-change",
+        "machine-fit",
+        "diagnostics-repair",
+        "direction-change",
+        "release-history",
+        "decision-rationale",
+    )
+
+    for surface_name, text in (
+        ("README.md", readme),
+        ("AGENTS.md", agents),
+        ("docs/README.md", docs_readme),
+        ("docs/AGENTS.md", docs_agents),
+    ):
+        if "START_HERE_ROUTE_CONTRACT.md" not in text:
+            errors.append(f"{surface_name} must point to docs/START_HERE_ROUTE_CONTRACT.md")
+
+    for mode in route_modes:
+        if mode not in route_contract:
+            errors.append(f"docs/START_HERE_ROUTE_CONTRACT.md must define route mode `{mode}`")
+        if mode not in readme:
+            errors.append(f"README.md must expose route mode `{mode}`")
+
+    for snippet in (
+        "scripts/release_check.py",
+        "Root entry surfaces should point here",
+        "Exact current command lanes live in",
+        "Decision records explain why. Current source surfaces define what.",
+        "Diagnostic and repair surfaces are evidence and handoff routes",
+    ):
+        if snippet not in route_contract:
+            errors.append(f"docs/START_HERE_ROUTE_CONTRACT.md must mention `{snippet}`")
+
+
+def validate_decision_record_surface(errors: list[str]) -> None:
+    decisions_readme = read_text_or_none(ROOT / "docs" / "decisions" / "README.md") or ""
+    decisions_agents = read_text_or_none(ROOT / "docs" / "decisions" / "AGENTS.md") or ""
+    decisions_template = read_text_or_none(ROOT / "docs" / "decisions" / "TEMPLATE.md") or ""
+    docs_agents = read_text_or_none(ROOT / "docs" / "AGENTS.md") or ""
+    scripts_readme = read_text_or_none(ROOT / "scripts" / "README.md") or ""
+    tests_readme = read_text_or_none(ROOT / "tests" / "README.md") or ""
+
+    for snippet in (
+        "Decision records explain why; current source surfaces define what.",
+        "TEMPLATE.md",
+        "AGENTS.md",
+        "validate_decision_records.py",
+    ):
+        if snippet not in decisions_readme:
+            errors.append(f"docs/decisions/README.md must route `{snippet}`")
+
+    for snippet in (
+        "Decision Review Gate",
+        "Decision records must follow [TEMPLATE](TEMPLATE.md)",
+        "python scripts/validate_decision_records.py",
+    ):
+        if snippet not in decisions_agents:
+            errors.append(f"docs/decisions/AGENTS.md must define `{snippet}`")
+
+    for snippet in (
+        "Status: proposed",
+        "Date: YYYY-MM-DD",
+        "## Options considered",
+        "## Source surfaces",
+        "## Follow-up route",
+    ):
+        if snippet not in decisions_template:
+            errors.append(f"docs/decisions/TEMPLATE.md must include `{snippet}`")
+
+    if "python scripts/validate_decision_records.py" not in docs_agents:
+        errors.append("docs/AGENTS.md must include the decision-record validator")
+    if "validate_decision_records.py" not in scripts_readme:
+        errors.append("scripts/README.md must route validate_decision_records.py")
+    if "test_decision_records.py" not in tests_readme:
+        errors.append("tests/README.md must route test_decision_records.py")
+
+
 def validate_sync_managed_items(errors: list[str]) -> None:
     sync_script = read_text_or_none(
         ROOT / "mechanics" / "config-projection" / "parts" / "sync" / "aoa_sync_configs.sh"
@@ -3602,21 +3726,9 @@ def validate_diagnostic_spine_contracts(errors: list[str]) -> None:
 
     readme = read_required_text(Path("README.md"))
     for snippet in (
+        "mechanics/diagnostic-spine/README.md",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_anchor_ref.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_anchor_ref.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json",
-        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json",
-        "quests/diagnostics/done/ABYSS-STACK-Q-0007.yaml",
         "scripts/aoa-diagnose",
     ):
         if snippet not in readme:
@@ -4533,6 +4645,8 @@ def main() -> int:
     validate_federation_upstream_compatibility(errors)
     validate_active_topology_language(errors)
     validate_root_design_surfaces(errors)
+    validate_entry_route_contract(errors)
+    validate_decision_record_surface(errors)
     validate_sync_managed_items(errors)
     validate_federation_required_files(errors)
     validate_questbook_surface(errors)

@@ -1,6 +1,7 @@
 # 2026-05-07 Runtime Root Under AbyssOS
 
-Status: Accepted
+Status: accepted
+Date: 2026-05-07
 
 ## Context
 
@@ -14,7 +15,7 @@ Use `/srv/AbyssOS/abyss-stack` as the canonical deployed runtime root.
 
 Keep the source checkout separate at `~/src/abyss-stack` by default, or `${AOA_SOURCE_ROOT}` when intentionally relocated. Runtime helpers should continue to bridge source-authored changes into `${AOA_CONFIGS_ROOT}` instead of treating the deployed tree as the source repository.
 
-## Alternatives
+## Options considered
 
 - Keep the former standalone deployed root and add compatibility glue from the AbyssOS workspace.
 - Treat the live deployed tree as the editable source.
@@ -34,3 +35,14 @@ It also removes a post-relocation tail that could break user units, parity check
 - Existing user systemd links may need to be refreshed so they point at the deployed unit under the AbyssOS workspace.
 - This decision does not make `abyss-machine` part of `abyss-stack`; machine integration should stay a later read-only bridge unless explicitly redesigned.
 
+## Source surfaces
+
+- `README.md`
+- `docs/PATHS.md`
+- `docs/DEPLOYMENT.md`
+- `scripts/aoa-sync-configs`
+- `systemd/user/`
+
+## Follow-up route
+
+Route future deployed-root changes through `docs/PATHS.md`, deployment docs, systemd surfaces, and parity validation before changing helper defaults.

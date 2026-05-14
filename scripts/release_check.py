@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DEPLOYED_CONFIGS_ROOT = Path("/srv/AbyssOS/abyss-stack/Configs")
 
 COMMANDS = [
+    ("validate decision records", [sys.executable, "scripts/validate_decision_records.py"]),
     ("validate stack", [sys.executable, "scripts/validate_stack.py"]),
     ("check diagnostic surface catalog", [sys.executable, "scripts/build_diagnostic_surface_catalog.py", "--check"]),
     ("validate diagnostic surface catalog", [sys.executable, "scripts/validate_diagnostic_surface_catalog.py"]),

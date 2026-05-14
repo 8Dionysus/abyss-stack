@@ -1,8 +1,7 @@
 # 2026-05-13 Residual Frontier Quest Alignment
 
-## Status
-
-Accepted.
+Status: accepted
+Date: 2026-05-13
 
 ## Context
 
@@ -15,6 +14,12 @@ Leaving everything as `captured` made the frontier look less mature than the
 source tree. Closing everything without packet evidence would have been worse:
 source-ready contracts alone do not prove runtime materialization, private
 machine state, or operator cutover.
+
+## Options considered
+
+1. Keep all residual quest records in `captured` until live runtime proof exists.
+2. Close every residual quest from source prose alone.
+3. Classify each residual quest by the strongest evidence the source checkout or packet can prove.
 
 ## Decision
 
@@ -44,6 +49,10 @@ The resulting packet closeout is:
   `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_RUNTIME_PACKET.md`
 - ToS graph curation: done as a localhost-only source slice
 
+## Rationale
+
+A quest state should reflect what the repository can prove. Source-side contracts, executed packets, and live runtime health are different evidence classes, so the quest frontier needs to move by evidence rather than by optimism or inertia.
+
 ## Consequences
 
 The source checkout now separates three things that previously blended together:
@@ -60,3 +69,15 @@ Future changes that need more work should open a new bounded quest only when a
 new obligation survives this closeout. Repeated packet reruns should update the
 owning packet docs or landing logs instead of reintroducing active root quest
 noise.
+
+## Source surfaces
+
+- `QUESTBOOK.md`
+- `quests/`
+- `mechanics/machine-fit/parts/fit-record/docs/PROFILE_MACHINE_FIT_PACKET.md`
+- `mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_MATERIALIZATION_PACKET.md`
+- `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_RUNTIME_PACKET.md`
+
+## Follow-up route
+
+Open a new bounded quest only when a new obligation survives the packet route; otherwise update the owning packet or landing log.

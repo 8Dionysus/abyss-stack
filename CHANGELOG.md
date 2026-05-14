@@ -7,8 +7,27 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Summary
+
+- root direction, release history, and decision rationale now follow an
+  explicit AoA-style role split adapted to the `abyss-stack` runtime substrate
+- root `README.md` is now a compact source-checkout front door instead of a
+  current-state inventory or package-local surface ledger
+- decision records are now validator-backed and indexed as durable rationale,
+  not remembered as a loose convention from previous refactor passes
+- root `ROADMAP.md` is now a runtime-wide horizon surface instead of a mixed
+  landing history, backlog, and release-contour document
+
 ### Added
 
+- `docs/decisions/AGENTS.md`, `docs/decisions/TEMPLATE.md`,
+  `scripts/validate_decision_records.py`, and `tests/test_decision_records.py`
+  as the local decision-record contract and validation lane
+- `docs/decisions/2026-05-14-direction-history-decision-surface-roles.md` as
+  the rationale for the `ROADMAP.md`, `CHANGELOG.md`, and `docs/decisions/`
+  role split
+- `docs/START_HERE_ROUTE_CONTRACT.md` as the source-checkout route-mode
+  contract for root entry surfaces
 - initial `mechanics/` topology with runtime lifecycle, config projection,
   machine fit, inference pilots, federation seams, governed execution,
   diagnostic spine, and runtime repair package cards
@@ -121,6 +140,35 @@ Tracking starts with the community-docs baseline for this repository.
   drop-ins with `--preset`, `--profile`, and `--restart-now`; the live
   federation repair preserves `intel-full` and layers `federation` instead of
   narrowing the machine to a federation-only preset
+- root `ROADMAP.md` now has explicit authority, update rules, runtime horizons,
+  stronger-surface routing, and future triggers so it no longer carries
+  mechanic-local landing history or release history as roadmap law
+- root `README.md` now routes by entry need, claim type, mechanics package, and
+  technical district while sending detailed current state to `ROADMAP.md`,
+  `CHANGELOG.md`, `docs/decisions/`, mechanic packages, and `docs/RUNBOOK.md`
+- root `README.md` now points validation readers to the broad release gate and
+  local command authority surfaces instead of carrying package-specific command
+  blocks
+- `CHANGELOG.md` now records this role split as release-visible history instead
+  of carrying the rationale itself
+- all existing decision records now use the standard `Status`, `Date`,
+  `Options considered`, `Rationale`, `Source surfaces`, and `Follow-up route`
+  shape, with `scripts/release_check.py` running the decision validator before
+  the wider release audit
+
+### Validation
+
+- `python scripts/validate_decision_records.py`
+- `python scripts/validate_stack.py`
+- `python scripts/validate_nested_agents.py`
+- `python -m pytest tests/test_decision_records.py tests/test_roadmap_parity.py`
+- `python -m pytest -q`
+- `python scripts/release_check.py`
+
+### Notes
+
+- this pass changes source-owned docs, validators, and tests only; it does not
+  mutate live `/srv/AbyssOS/abyss-stack` runtime state or private machine state
 
 ## [0.2.2] - 2026-04-23
 

@@ -1,23 +1,78 @@
-# Decisions
+# Decisions District
 
-Durable decision notes for `abyss-stack` runtime topology, deployment posture, and workflow contracts live here.
+This district holds decision records explaining why a route, owner split,
+runtime topology, validator authority, public contract, or workflow expectation
+was chosen in `abyss-stack`.
 
-Use these notes to understand why a contract exists. Keep operational evidence, generated reports, and live machine captures in their own surfaces.
+Decision records explain why; current source surfaces define what.
 
-## Current notes
+## District Law
 
-- [2026-05-07 Runtime Root Under AbyssOS](2026-05-07-runtime-root-under-abyssos.md)
-- [2026-05-07 Runtime Mechanics Topology](2026-05-07-runtime-mechanics-topology.md)
-- [2026-05-07 Mechanics Legacy Artifact Containment](2026-05-07-mechanics-legacy-artifact-containment.md)
-- [2026-05-12 Machine Bridge Under Machine Fit](2026-05-12-machine-bridge-under-machine-fit.md)
-- [2026-05-12 Operator Wrappers With Part-Local Backends](2026-05-12-operator-wrappers-with-part-local-backends.md)
-- [2026-05-13 Local AI Trials First-Run Boundary](2026-05-13-local-ai-trials-first-run-boundary.md)
-- [2026-05-13 Inference Pilot Compatibility Gates](2026-05-13-inference-pilot-compatibility-gates.md)
-- [2026-05-13 Root Design And Agent Surfaces](2026-05-13-root-design-agent-surfaces.md)
-- [2026-05-13 Root Residual Topology Cleanup](2026-05-13-root-residual-topology-cleanup.md)
-- [2026-05-13 Workspace Sibling Roots Under AbyssOS](2026-05-13-workspace-sibling-roots-under-abyssos.md)
-- [2026-05-13 Legacy-Heavy Runtime Package Distillation](2026-05-13-legacy-heavy-runtime-package-distillation.md)
-- [2026-05-13 Quest And Compatibility Topology](2026-05-13-quest-and-compatibility-topology.md)
-- [2026-05-13 Runtime Compatibility Boundaries](2026-05-13-runtime-compatibility-boundaries.md)
-- [2026-05-13 Residual Frontier Quest Alignment](2026-05-13-residual-frontier-quest-alignment.md)
-- [2026-05-13 Live Runtime Cutover And Machine Parity](2026-05-13-live-runtime-cutover-parity.md)
+Keep this district reviewable and labeled. A reader or agent should know that a
+file here is durable rationale, not current runtime law, generated evidence,
+live machine state, or release history.
+
+Use [AGENTS.md](AGENTS.md) for local editing law and [TEMPLATE.md](TEMPLATE.md)
+for new records.
+
+## Current Surfaces
+
+| Surface | Role |
+|---|---|
+| [AGENTS.md](AGENTS.md) | local decision-record route card |
+| [TEMPLATE.md](TEMPLATE.md) | required record shape for new decisions |
+| [2026-05-07 Runtime Root Under AbyssOS](2026-05-07-runtime-root-under-abyssos.md) | decision record for the deployed runtime root |
+| [2026-05-07 Runtime Mechanics Topology](2026-05-07-runtime-mechanics-topology.md) | decision record for the runtime mechanics tree |
+| [2026-05-07 Mechanics Legacy Artifact Containment](2026-05-07-mechanics-legacy-artifact-containment.md) | decision record for package-local legacy containment |
+| [2026-05-12 Machine Bridge Under Machine Fit](2026-05-12-machine-bridge-under-machine-fit.md) | decision record for the read-only machine bridge home |
+| [2026-05-12 Operator Wrappers With Part-Local Backends](2026-05-12-operator-wrappers-with-part-local-backends.md) | decision record for stable root wrappers and part-local backends |
+| [2026-05-13 Local AI Trials First-Run Boundary](2026-05-13-local-ai-trials-first-run-boundary.md) | decision record for separating first-run bootstrap from model trials |
+| [2026-05-13 Inference Pilot Compatibility Gates](2026-05-13-inference-pilot-compatibility-gates.md) | decision record for inference-pilot compatibility IDs |
+| [2026-05-13 Root Design And Agent Surfaces](2026-05-13-root-design-agent-surfaces.md) | decision record for root design and agent-surface design files |
+| [2026-05-13 Root Residual Topology Cleanup](2026-05-13-root-residual-topology-cleanup.md) | decision record for moving audit and Spark residuals to owning districts |
+| [2026-05-13 Workspace Sibling Roots Under AbyssOS](2026-05-13-workspace-sibling-roots-under-abyssos.md) | decision record for active sibling workspace roots |
+| [2026-05-13 Legacy-Heavy Runtime Package Distillation](2026-05-13-legacy-heavy-runtime-package-distillation.md) | decision record for Agon and Experience runtime package distillation |
+| [2026-05-13 Quest And Compatibility Topology](2026-05-13-quest-and-compatibility-topology.md) | decision record for quest lane/state topology and compatibility routes |
+| [2026-05-13 Runtime Compatibility Boundaries](2026-05-13-runtime-compatibility-boundaries.md) | decision record for upstream compatibility boundary handling |
+| [2026-05-13 Residual Frontier Quest Alignment](2026-05-13-residual-frontier-quest-alignment.md) | decision record for evidence-based quest frontier alignment |
+| [2026-05-13 Mechanics Package Card Completeness](2026-05-13-mechanics-package-card-completeness.md) | decision record for the full mechanics package-card spine |
+| [2026-05-13 Live Runtime Cutover And Machine Parity](2026-05-13-live-runtime-cutover-parity.md) | decision record for parity and cutover packet surfaces |
+| [2026-05-14 Direction, History, And Decision Surface Roles](2026-05-14-direction-history-decision-surface-roles.md) | decision record for the `README.md`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/decisions/` role split |
+| [2026-05-14 Entry Route Contract And Validation Placement](2026-05-14-entry-route-contract-validation-placement.md) | decision record for the root entry route contract and README validation placement |
+
+## Record Shape
+
+New records must use [TEMPLATE.md](TEMPLATE.md). The standard shape is:
+
+- `Status`
+- `Date`
+- `Context`
+- `Options considered`
+- `Decision`
+- `Rationale`
+- `Consequences`
+- `Source surfaces`
+- `Follow-up route`
+
+## Must Not Claim
+
+Decisions explain why; current source surfaces define what.
+
+Do not use this district to absorb:
+
+- current runtime direction that belongs in `ROADMAP.md`
+- release-visible history that belongs in `CHANGELOG.md`
+- mechanic-local direction, provenance, or landings
+- live runtime receipts, private captures, logs, secrets, models, or generated
+  runtime state
+- sibling-owner doctrine from AoA, ToS, skills, techniques, evals, memory,
+  routing, KAG, playbooks, stats, agents, or machine repositories
+
+## Validation
+
+```bash
+python scripts/validate_decision_records.py
+python scripts/validate_stack.py
+python scripts/validate_nested_agents.py
+python -m pytest tests/test_decision_records.py
+```

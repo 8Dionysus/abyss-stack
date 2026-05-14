@@ -1,10 +1,7 @@
 # Inference Pilot Compatibility Gates
 
+Status: accepted
 Date: 2026-05-13
-
-## Status
-
-Accepted.
 
 ## Context
 
@@ -17,6 +14,12 @@ names.
 That made the source tree look flatter than it is: old runner lineage was
 already contained, but active docs and wrappers still carried wave-shaped
 language.
+
+## Options considered
+
+1. Rename every preserved W0/W4/W5/W6 value immediately.
+2. Keep the preserved values visible as active topology names.
+3. Preserve old values only as compatibility IDs behind quiet active bridge names.
 
 ## Decision
 
@@ -44,6 +47,10 @@ The LangGraph dependency manifest belongs with the LangGraph part at
 `mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt`, not under
 the root command wrapper directory.
 
+## Rationale
+
+Compatibility IDs are real runtime contracts, but they should not teach old family labels as the current topology. A quiet bridge keeps existing artifacts usable while letting active docs, wrappers, and validators speak in role-level names.
+
 ## Consequences
 
 - Runtime artifact compatibility remains intact.
@@ -54,3 +61,14 @@ the root command wrapper directory.
   reintroduce old wave-shaped prose outside the preserved legacy runner.
 - The root `scripts/` directory remains a command-wrapper surface, not a
   dependency-manifest home for part-owned pilots.
+
+## Source surfaces
+
+- `mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py`
+- `mechanics/inference-pilots/parts/langgraph-pilot/`
+- `mechanics/inference-pilots/parts/llamacpp-pilot/`
+- `scripts/validate_stack.py`
+
+## Follow-up route
+
+Remove compatibility IDs only after the stronger owner and existing runtime artifacts have clean replacements; until then, keep them behind bridge constants and compatibility docs.

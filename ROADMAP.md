@@ -1,168 +1,207 @@
 # ROADMAP
 
-## Current posture
+This roadmap tracks runtime-wide direction for `abyss-stack`. It is the
+direction surface for the runtime, deployment, storage, lifecycle, machine-fit,
+diagnostic, repair, and federation-consumption substrate beneath AoA and ToS.
 
-The bootstrap-to-federation landing path is largely complete.
-The major source and runtime seams already landed are:
+It is not the roadmap of any one mechanic package and not the release history
+of the repository.
 
-- modular runtime bootstrap
-- service extraction and profile-aware lifecycle wrappers
-- Intel-aware and Windows-usable hardening
-- `aoa-agents`, `aoa-routing`, `aoa-memo`, `aoa-evals`, `aoa-playbooks`, and `aoa-kag` advisory/read-export landings
-- `Tree-of-Sophia` source-owned handoff companion landing
-- bounded promoted local-worker posture through `langchain-api` on `5403`
-  backed by `llama.cpp`, with `LangGraph` as the adopted execution layer for
-  bounded long-horizon and autonomy-focused local-worker flows
-- antifragility repair posture as contract-only runtime doctrine and receipt
-  surfaces, now including bounded legacy chaos example families, without
-  mutating live services or deployment behavior
-- read-only diagnostic spine groundwork through `scripts/aoa-diagnose` and
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`, still weaker than repair
-  authority and live-service mutation
+## Authority
 
-### Current release contour
+Root `ROADMAP.md` owns:
 
-The live `v0.2.2` contour is runtime-substrate hardening, not a new source of
-AoA or ToS meaning. Its current checked surface is:
+- current runtime-wide direction
+- runtime horizon posture
+- source/runtime parity pressure
+- live runtime-loop and cutover pressure
+- machine-fit and platform-adaptation pressure
+- federation-consumption pressure
+- diagnostic and repair posture
+- GitHub mirror portability direction
+- concrete future triggers that belong to the runtime substrate
 
-- source/deployed split and parity posture:
-  `README.md`, `CHARTER.md`, `BOUNDARIES.md`, `docs/PATHS.md`,
-  `docs/DEPLOYMENT.md`, `scripts/aoa-sync-configs`,
-  `scripts/validate_stack.py`, and `scripts/release_check.py`
-- diagnostic spine and repair-safe handoff contracts:
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_target.schema.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnosis_companion.schema.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/reviewed_diagnosis_ref.schema.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/repair_handoff.schema.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_target.min.example.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnostic_session.min.example.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/diagnosis_companion.min.example.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/reviewed_diagnosis_ref.min.example.json`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/examples/repair_handoff.min.example.json`,
-  `scripts/aoa-diagnose`, `mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py`,
-  `scripts/build_diagnostic_surface_catalog.py`,
-  `scripts/validate_diagnostic_surface_catalog.py`,
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py`, and
-  `mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py`
-- antifragility contract-only runtime receipts:
-  `mechanics/runtime-repair/parts/antifragility-posture/docs/ANTIFRAGILITY_RUNTIME.md`, `mechanics/runtime-repair/legacy/raw/RUNTIME_CHAOS_WAVE1.md`,
-  `mechanics/runtime-repair/parts/repair-safe-closeout/docs/REPAIR_SAFE_CLOSEOUT.md`,
-  `mechanics/runtime-repair/parts/degradation-receipts/schemas/service-degradation-receipt.schema.json`,
-  `mechanics/runtime-repair/parts/repair-safe-closeout/schemas/repair-safe-closeout-receipt.schema.json`,
-  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.example.json`,
-  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.timeout-chaos.example.json`,
-  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.honest-degradation.example.json`,
-  `mechanics/runtime-repair/parts/degradation-receipts/examples/service-degradation-receipt.retrieval-outage-honesty.example.json`,
-  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.example.json`,
-  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.timeout-chaos.example.json`, and
-  `mechanics/runtime-repair/parts/repair-safe-closeout/examples/repair-safe-closeout-receipt.retrieval-outage-honesty.example.json`
-- promoted local-worker and Intel serving posture:
-  `mechanics/inference-pilots/parts/promotion-loop/docs/RUNTIME_WINNER_PROMOTION_LOOP.md`, `mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md`,
-  `mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md`,
-  `mechanics/inference-pilots/legacy/trials/raw/W5_PILOT.md`,
-  `mechanics/inference-pilots/legacy/trials/raw/W6_PILOT.md`,
-  `scripts/aoa-long-horizon-pilot`,
-  `scripts/aoa-bounded-autonomy-pilot`,
-  `compose/tuning/llamacpp.runtime-fallback.yml`,
-  `compose/tuning/llamacpp.intel-285h.cpu-safe.yml`,
-  `compose/tuning/intel-text.ovms-qwen3-settings.yml`,
-  `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md`, and
-  `scripts/aoa-llamacpp-pilot`
-- bounded federation, runtime-chat, and ToS graph curation seams:
-  `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md`,
-  `mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md`, `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`,
-  `docs/SERVICE_CATALOG.md`, `docs/PROFILES.md`,
-  `mechanics/federation-seams/parts/tos-graph/docs/TOS_GRAPH_CURATION.md`, `scripts/aoa-federated-check`,
-  `compose/modules/52-tos-graph.yml`, `compose/profiles/curation.txt`, and
-  `config-templates/Services/tos-graph/app/main.py`
+It does not own mechanic-local roadmaps, checked landing history, release
+history, durable quest state, decision rationale, live runtime receipts, private
+machine captures, sibling-repository implementation direction, AoA
+constitutional direction, or ToS authored meaning.
 
-This contour keeps the source checkout `~/src/abyss-stack` separate from the
-deployed `/srv/AbyssOS/abyss-stack/Configs` mirror. It names runtime contracts,
-advisory seams, and validation paths without claiming live service mutation or
-meaning-layer authority.
+Use the stronger surface when the change is narrower:
 
-The main residual quest packets have now been closed as source-side or
-synthetic runtime packets: profile rollout, machine-fit follow-through, RPG
-runtime materialization, and diagnostic runtime packet closeout all have
-package-local evidence routes. The next hard work is live runtime-loop
-consumption, operational cutover choices, platform hardening,
-and keeping deployed/runtime truth aligned with source-authored posture without
-promoting private runtime state into source truth.
-That work now routes through
-`mechanics/runtime-lifecycle/parts/config-sync-boundary/docs/SOURCE_RUNTIME_PARITY_PACKET.md`
-and
-`mechanics/runtime-lifecycle/parts/start-stop/docs/LIVE_RUNTIME_CUTOVER_PACKET.md`.
+- mechanic-local future pressure: `mechanics/<package>/ROADMAP.md`
+- checked mechanic landings: `mechanics/<package>/LANDING_LOG.md`
+- mechanic lineage and legacy bridges: `mechanics/<package>/PROVENANCE.md` and
+  package-local `legacy/`
+- release-visible repository history: `CHANGELOG.md`
+- durable obligations and packet state: `QUESTBOOK.md` and `quests/`
+- durable rationale: `docs/decisions/`
+- operator runbooks: `docs/DEPLOYMENT.md`, `docs/FIRST_RUN.md`, and
+  `docs/RUNBOOK.md`
+- live runtime receipts and private machine state: deployed runtime or machine
+  owner surfaces, not the GitHub source mirror
+- sibling implementation direction: the sibling repository direction surface
 
-Those landings should be read carefully:
+## Update Rule
 
-- landed seams in source and deployed mirrors are not the same thing as a fully green federated control-plane verdict
-- the `federation` profile remains opt-in rather than part of the default promoted presets
-- current operator truth still depends on parity, promoted runtime verify, and `aoa-status --autonomy --json`
+Update this roadmap when a change moves runtime-wide direction, horizon
+posture, source/runtime parity pressure, live cutover posture, machine-fit
+posture, federation-consumption posture, diagnostic or repair posture, mirror
+portability direction, or a concrete future trigger.
 
-## Structured bootstrap
+Do not update this roadmap for a local mechanic landing, release note, quest
+state move, decision record, generated refresh, or compatibility bridge detail
+unless it changes one of those runtime-wide directions. Route those changes to
+their owning surfaces instead.
 
-- establish repository charter and boundaries
-- create modular compose skeleton
-- define first runtime profiles
-- define env and secrets posture
-- write migration notes from `abyss-stack_old`
+Before closeout, ask: did this change move the runtime direction, or did it
+only land a local surface?
 
-## Service extraction
+## Current Runtime Direction
 
-- reintroduce storage services cleanly
-- reintroduce orchestration and local inference
-- reintroduce gateway and agent API modules
-- reintroduce speech, browser, and monitoring modules
+`abyss-stack` is moving from source-topology cleanup into runtime parity and
+operator cutover hardening.
 
-## Operational hardening
+The current direction is:
 
-- add smoke and health routines
-- add profile-aware lifecycle wrappers
-- add backup and restore helpers
-- add validation for compose coherence
-- reduce environment-specific assumptions where possible
-- enforce the new `/srv/AbyssOS/abyss-stack` canonical runtime root
-- make the Fedora-first and Windows-usable path model explicit
-- make deployment from source checkout to runtime tree explicit and repeatable
+- keep the source checkout portable as a GitHub mirror while deployed runtime
+  state remains outside source
+- keep mechanics convex, with package-local parts, roadmaps, landing logs,
+  provenance, and legacy containment
+- keep root operator commands stable while implementation bodies live beside
+  their owning mechanic parts
+- keep source/runtime parity explicit through synthetic and live Configs checks
+- connect to `abyss-machine` through read-only bridge and machine-fit packets,
+  not by absorbing machine ownership
+- let federation seams become useful runtime inputs only through explicit,
+  bounded consumption decisions
+- keep diagnostic spine and antifragility repair posture as evidence and packet
+  routes before live mutation or authority promotion
+- keep release history in `CHANGELOG.md`; the current `v0.2.2` contour remains
+  runtime-substrate hardening, not AoA/ToS meaning and not a claim of live
+  service mutation
 
-## Hybrid growth
+## Horizon: Runtime Topology
 
-- clarify local versus hybrid execution paths
-- refine Intel and OVMS posture
-- define clean bridges to sibling AoA repositories
-- consume the read-only `abyss-machine` bridge through stack-local `Logs/machine-bridge/` records before adding automatic policy action
+- Current posture:
+  mechanics packages are convex and carry route cards, parts, local roadmaps,
+  landing logs, provenance, and package-local legacy containment.
+- Next honest move:
+  continue reducing root and district flatness only when a clear owner package
+  or part exists.
+- Guardrail:
+  root roadmap does not index every package-local future move or landing
+  receipt.
 
-## Mature substrate
+## Horizon: Source And Runtime Parity
 
-- keep the stack legible under growth
-- resist monolith relapse
-- let new capability arrive as modules and profiles rather than as hidden sprawl
+- Current posture:
+  source release checks use synthetic Configs parity by default, while live
+  parity remains an explicit operator choice.
+- Next honest move:
+  keep `SOURCE_RUNTIME_PARITY_PACKET.md` and sync validation current as root and
+  mechanics surfaces move.
+- Guardrail:
+  source parity is not live service health, and live runtime state is not
+  committed to the GitHub mirror.
 
-## Live runtime consumption
+## Horizon: Live Runtime Cutover
 
-- decide which federation seams remain advisory-only and which become part of the live loop
-- introduce bounded recall, playbook, eval, and KAG consumption in explicit steps
-- preserve source-owned authority while adding runtime utility
-- decide whether a live consumer should read the already materialized RPG file
-  contract, without adding `/rpg/*` endpoints or quest mutation by accident
-- review diagnostic drift through repair governance only when an operator
-  explicitly chooses a repair packet
-- rerun the live runtime cutover packet before promotion; the route-api health
-  and closure stop-line was closed once through `ABYSS-STACK-Q-0009` by
-  preserving the host's `intel-full` selection and layering `federation` in a
-  host-local user-unit drop-in, but future live drift must be rechecked instead
-  of assumed green
+- Current posture:
+  live cutover has a packet route, and the first route-api health drift was
+  closed as an operator-gated repair.
+- Next honest move:
+  rerun the live cutover packet before promoting federation seams or
+  runtime-loop consumers into live posture.
+- Guardrail:
+  a green source checkout does not prove deployed service readiness.
 
-## Platform and operations hardening
+## Horizon: Machine Fit
 
-- keep runtime cleanup repeatable and legible
-- validate reboot and cold-start behavior
-- tighten runtime-secret hygiene and stateful-data discipline
-- keep Windows and Fedora rollout paths aligned with the same operational model
-- rerun the profile machine-fit packet before promoting a new host-profile
-  posture
-- rerun the Windows bridge, reference platform, platform adaptation, and fit
-  follow-through packet after platform drift
+- Current posture:
+  machine facts, platform adaptation, Windows bridge, model cards, and fit
+  records live under `mechanics/machine-fit/`.
+- Next honest move:
+  recheck machine-fit packets after host drift, platform drift,
+  model-selection drift, or Windows/WSL path changes.
+- Guardrail:
+  `abyss-machine` remains the stronger owner of machine control-plane truth.
+
+## Horizon: Local Worker And Inference
+
+- Current posture:
+  `langchain-api` on `5403` backed by `llama.cpp` is the bounded promoted
+  local-worker posture, with LangGraph adopted for bounded long-horizon flows.
+- Next honest move:
+  keep old trial IDs behind compatibility bridges while current trial,
+  model-card, benchmark, and promotion surfaces use role-level names.
+- Guardrail:
+  optional model trials are not ordinary first-run bootstrap, and preserved
+  runner IDs are not active topology names.
+
+## Horizon: Federation Consumption
+
+- Current posture:
+  memo, eval, playbook, KAG, RPG runtime, and ToS graph seams are bounded and
+  opt-in.
+- Next honest move:
+  decide seam by seam which advisory surfaces become live runtime inputs, with
+  explicit source-owner and compatibility boundaries.
+- Guardrail:
+  federation consumption does not transfer AoA, ToS, skill, memo, eval,
+  playbook, routing, KAG, stats, or agent authority into `abyss-stack`.
+
+## Horizon: Diagnostics And Repair
+
+- Current posture:
+  diagnostic spine and runtime repair expose read-only diagnostics, companion
+  artifacts, degradation receipts, and repair-safe closeout contracts.
+- Next honest move:
+  use diagnostic drift and repair handoff packets to guide operator choices
+  before introducing live mutation.
+- Guardrail:
+  diagnosis, degradation evidence, and repair-safe closeout are not automatic
+  repair authority.
+
+## Horizon: Mirror Portability
+
+- Current posture:
+  the GitHub mirror is source/install-only and carries docs, templates, schemas,
+  examples, tests, workflows, and scripts, not live state.
+- Next honest move:
+  keep `.gitignore`, hygiene validation, and release checks focused on obvious
+  private/heavy/live tracked artifacts without overfitting local policy.
+- Guardrail:
+  public examples and placeholders stay allowed; secrets, logs, models,
+  rendered private config, databases, and private captures stay out.
+
+## When The Time Comes
+
+Use this block for runtime-wide work that is not useful to land now but has a
+clear future trigger.
+
+- Promote a federation seam from advisory to live consumer only after the seam
+  has an explicit source-owner boundary, compatibility route, runtime input
+  contract, and rollback story.
+- Add stronger live runtime readiness checks only when source parity, deployed
+  Configs parity, and current `aoa-status --autonomy --json` evidence show a
+  stable repeated need.
+- Add shared validator helpers only after repetition across several mechanics
+  makes extraction simpler than local clarity.
+- Add broader machine-readable direction indexes only after another tool
+  consumes the direction data directly.
+
+An item belongs here only when its trigger is concrete and runtime-wide. If the
+future pressure is mechanic-local, use `mechanics/<package>/ROADMAP.md`. If it
+is a durable obligation, use `QUESTBOOK.md` and `quests/`. If it is rationale,
+use `docs/decisions/`.
+
+## Standing Direction
+
+Across all horizons:
+
+- protect source/runtime boundaries
+- keep runtime mechanics modular
+- keep operator commands stable and implementations owner-local
+- keep live mutation explicit and reversible
+- keep sibling-owner meaning out of runtime infrastructure
+- make every new surface easier to route than the one it replaces
