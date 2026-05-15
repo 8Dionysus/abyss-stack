@@ -1,0 +1,19 @@
+[Unit]
+Description=Abyss Machine doctor self-maintenance
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/doctor/AGENTS.md
+After=abyss-nervous-index-build.service abyss-nervous-semantic-maintain.service
+
+[Service]
+Type=oneshot
+Nice=13
+IOSchedulingClass=idle
+CPUWeight=25
+IOWeight=20
+MemoryHigh=768M
+TimeoutStartSec=900s
+Environment=ABYSS_MACHINE_DOCTOR_TRIGGER=timer
+ExecStart=/usr/local/bin/abyss-machine doctor --repair --safe-only --json --no-thermal-sample
+ExecStart=/usr/local/bin/abyss-machine doctor machine-report --json --no-thermal-sample
+StandardOutput=null
+StandardError=journal

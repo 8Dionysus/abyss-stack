@@ -176,8 +176,11 @@ Tracking starts with the community-docs baseline for this repository.
   machine bridge honest after the docs refactor: source-root detection uses
   `docs/install/DEPLOYMENT.md`, and doctor warns on stale or host-mismatched
   machine-fit and machine-bridge records
+- n8n workflow automation now lives behind an explicit `workflows` profile;
+  `substrate` and current presets stay workflows-free until a later operator
+  decision promotes or retires that layer
 - the source-owned default runtime profile is now `substrate`, containing
-  storage plus orchestration only, while `local-worker` carries the canonical
+  storage only, while `local-worker` carries the canonical
   `llama.cpp` plus `langchain-api` worker layer and `core` remains a
   compatibility bundle
 - root docs, profile docs, CI rehearsal, the checked-in user-unit skeleton, and
@@ -185,7 +188,8 @@ Tracking starts with the community-docs baseline for this repository.
   and richer live runtime selections
 - retained Ollama and LiteLLM modules now route through an explicit
   `fallback-gateway` profile, while module/profile README surfaces classify
-  substrate, worker, fallback, projection, helper, visibility, and pilot rings
+  substrate, workflow, worker, fallback, projection, helper, visibility, and
+  pilot rings
 - active render, diagnostic, curation, and machine-fit packet examples now use
   `substrate`, `local-worker`, `fallback-gateway`, or explicit presets instead
   of teaching `core` as the default runtime base
@@ -198,6 +202,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `aoa-machine-fit` now resolves preset membership from the source checkout
   before falling back to deployed `Configs`, so stale live mirrors remain parity
   drift instead of changing the source-owned runtime recommendation
+- source-managed systemd unit skeletons now have explicit user and privileged
+  support allowlists, with install routes that link or copy units without
+  starting, stopping, enabling, disabling, masking, or restarting services
 
 ### Validation
 

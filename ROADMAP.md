@@ -70,7 +70,7 @@ The current direction is:
 - keep root operator commands stable while implementation bodies live beside
   their owning mechanic parts
 - make `abyss-stack` the source owner of the working runtime substrate:
-  `substrate` starts storage plus orchestration, while local-worker,
+  `substrate` starts storage only, while workflows, local-worker,
   fallback-gateway, federation, tools, and observability layers remain explicit
   choices
 - keep source/runtime parity explicit through synthetic and live Configs checks
@@ -88,8 +88,8 @@ The current direction is:
 
 - Current posture:
   mechanics packages are convex, and the compose profile taxonomy now separates
-  the working `substrate` base from local-worker, retained fallback gateway,
-  federation, tools, and observability layers.
+  the working `substrate` base from workflows, local-worker, retained fallback
+  gateway, federation, tools, and observability layers.
 - Next honest move:
   keep service promotion flowing through named modules, profiles, presets,
   mechanic owners, and validation rather than through implicit runtime growth.

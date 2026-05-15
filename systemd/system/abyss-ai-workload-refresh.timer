@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh Abyss AI workload statistics safely
+Documentation=file:/etc/abyss-machine/AGENTS.md
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=2h
+RandomizedDelaySec=20min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

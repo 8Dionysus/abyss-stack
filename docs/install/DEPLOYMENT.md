@@ -236,6 +236,25 @@ drop-in. This is the durable path when the live machine must keep a non-default
 runtime shape after boot or `systemctl --user restart`. Repeated flags and
 comma-separated forms are both accepted.
 
+Use `--all-user-units` after `scripts/aoa-sync-configs` when all allowlisted
+working user services should be sourced from the deployed `abyss-stack` mirror.
+This links every unit in `systemd/user/managed-units.txt` from
+`${AOA_CONFIGS_ROOT}/systemd/user` into `~/.config/systemd/user` and runs
+`systemctl --user daemon-reload`. It intentionally does not start, stop,
+restart, enable, disable, or mask services.
+
+Use `--system-units` only through a privileged route after the Configs mirror is
+synced:
+
+```bash
+pkexec /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --system-units
+```
+
+That installs root-owned copies of every unit in
+`systemd/system/managed-units.txt` into `/etc/systemd/system` and runs
+`systemctl daemon-reload`. It intentionally does not start, stop, restart,
+enable, disable, or mask services or timers.
+
 If `AOA_FEDERATED_RUN_ENABLED=true` is set in the runtime-secret
 `Secrets/Configs/langchain-api.env`, the selected user-unit shape must include
 the `federation` profile. Preserve the host's current preset and layer

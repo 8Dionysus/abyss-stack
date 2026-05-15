@@ -1,0 +1,13 @@
+[Unit]
+Description=Abyss Dictation RightAlt+Copilot tap/hold listener
+After=display-manager.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/abyss-machine/dictation-hotkey.env
+ExecStart=/usr/bin/bash -lc 'user="$${ABYSS_DICTATION_USER:-dionysus}"; uid="$${ABYSS_DICTATION_UID:-$$(id -u "$$user")}"; exec /usr/local/libexec/abyss-dictation-hotkey --user "$$user" --uid "$$uid"'
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+# Source-managed user units that may be linked into ~/.config/systemd/user
+# by scripts/aoa-install-systemd --all-user-units.
+podman-compose-abyss.service
+ydotoold.service
+abyss-dictation-server.service
+abyss-tts-server.service
+abyss-gemma4-spark.service
+abyss-gemma4-spark.timer
+abyss-gemma4-spark-digest.service
+abyss-gemma4-spark-digest.timer
+abyss-gemma4-spark-jobs.service
+abyss-gemma4-spark-jobs.timer
+abyss-gemma4-spark-micro.service
+abyss-gemma4-spark-micro.timer
+abyss-gemma4-spark-monitor.service
+abyss-gemma4-spark-monitor.timer
+abyss-machine-doctor.service
+abyss-machine-doctor.timer
+abyss-nervous-browser-content-capture.service
+abyss-nervous-browser-content-capture.timer
+abyss-nervous-derived-refresh.service
+abyss-nervous-index-build.service
+abyss-nervous-index-build.timer
+abyss-nervous-passive-chronicle.service
+abyss-nervous-passive-chronicle.timer
+abyss-nervous-semantic-maintain.service
+abyss-nervous-semantic-maintain.timer
+abyss-process-snapshot.service
+abyss-process-snapshot.timer
+abyss-storage-monitor.service
+abyss-storage-monitor.timer
+abyss-topology-audit.service
+abyss-topology-audit.timer
+aoa-closeout-inbox.path
+aoa-closeout-inbox.service
+aoa-stats-live-refresh.path
+aoa-stats-live-refresh.service

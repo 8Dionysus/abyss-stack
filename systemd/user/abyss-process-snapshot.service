@@ -1,0 +1,12 @@
+[Unit]
+Description=Abyss Machine lightweight process snapshot
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/processes/AGENTS.md
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/usr/local/bin/abyss-machine processes snapshot --top 60 --json
+StandardOutput=null
+StandardError=journal

@@ -105,6 +105,7 @@ jobs:
             "$AOA_STACK_ROOT/Secrets/Configs/ovms_api_key.txt"
 
           scripts/aoa-check-layout --strict --profile substrate
+          scripts/aoa-check-layout --strict --profile workflows
           scripts/aoa-check-layout --strict --profile local-worker
           scripts/aoa-check-layout --strict --profile intel-worker
           scripts/aoa-check-layout --strict --profile fallback-gateway
@@ -118,6 +119,8 @@ jobs:
           scripts/aoa-preset-profiles --preset intel-federation --paths
           scripts/aoa-profile-modules --profile substrate --paths
           scripts/aoa-profile-endpoints --profile substrate
+          scripts/aoa-profile-modules --profile workflows --paths
+          scripts/aoa-profile-endpoints --profile workflows
           scripts/aoa-profile-modules --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile local-worker
           scripts/aoa-profile-modules --profile intel-worker --paths
@@ -126,6 +129,8 @@ jobs:
           scripts/aoa-profile-endpoints --profile fallback-gateway
           scripts/aoa-profile-modules --profile substrate --profile local-worker --paths
           scripts/aoa-profile-endpoints --profile substrate --profile local-worker
+          scripts/aoa-profile-modules --profile substrate --profile workflows --paths
+          scripts/aoa-profile-endpoints --profile substrate --profile workflows
           scripts/aoa-profile-modules --profile substrate --profile intel-worker --paths
           scripts/aoa-profile-endpoints --profile substrate --profile intel-worker
           scripts/aoa-profile-modules --profile substrate --profile fallback-gateway --paths
@@ -149,10 +154,12 @@ jobs:
           scripts/aoa-profile-modules --preset intel-federation --paths
           scripts/aoa-profile-endpoints --preset intel-federation
           scripts/aoa-render-services --profile substrate
+          scripts/aoa-render-services --profile workflows
           scripts/aoa-render-services --profile local-worker
           scripts/aoa-render-services --profile intel-worker
           scripts/aoa-render-services --profile fallback-gateway
           scripts/aoa-render-services --profile substrate,local-worker
+          scripts/aoa-render-services --profile substrate,workflows
           scripts/aoa-render-services --profile substrate,intel-worker
           scripts/aoa-render-services --profile substrate,fallback-gateway
           scripts/aoa-render-services --profile core
@@ -164,10 +171,12 @@ jobs:
           scripts/aoa-render-services --preset intel-full
           scripts/aoa-render-services --preset intel-federation
           scripts/aoa-render-config --profile substrate >/dev/null
+          scripts/aoa-render-config --profile workflows >/dev/null
           scripts/aoa-render-config --profile local-worker >/dev/null
           scripts/aoa-render-config --profile intel-worker >/dev/null
           scripts/aoa-render-config --profile fallback-gateway >/dev/null
           scripts/aoa-render-config --profile substrate,local-worker >/dev/null
+          scripts/aoa-render-config --profile substrate,workflows >/dev/null
           scripts/aoa-render-config --profile substrate,intel-worker >/dev/null
           scripts/aoa-render-config --profile substrate,fallback-gateway >/dev/null
           scripts/aoa-render-config --profile core >/dev/null

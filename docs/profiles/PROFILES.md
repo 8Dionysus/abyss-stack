@@ -12,11 +12,26 @@ They answer a simple question:
 
 The conservative working service base for the AbyssOS runtime:
 - `10-storage.yml`
-- `20-orchestration.yml`
 
 This is the default source-owned runtime substrate. It brings up persistence,
-retrieval stores, and orchestration without silently choosing a local model
-worker, accelerator lane, federation seam, tools, or observability bundle.
+retrieval stores, and graph storage without silently choosing workflow
+automation, a local model worker, accelerator lane, federation seam, tools, or
+observability bundle.
+
+### `workflows`
+
+Optional workflow automation layer:
+- `10-storage.yml`
+- `20-orchestration.yml`
+
+This profile keeps n8n and its external task runner available without making
+them part of the default substrate or current presets. It includes storage so
+the layer can be inspected on its own, and it deduplicates cleanly when composed
+over `substrate`:
+
+```bash
+aoa-up --profile substrate --profile workflows
+```
 
 ### `local-worker`
 
@@ -25,8 +40,8 @@ The canonical local worker layer:
 - `41-agent-api.yml`
 
 This profile keeps `llama.cpp` and `langchain-api` together without also
-claiming to own storage or orchestration. Use it with `substrate` when the
-machine should run the promoted local text worker path:
+claiming to own storage or workflow automation. Use it with `substrate` when
+the machine should run the promoted local text worker path:
 
 ```bash
 aoa-up --profile substrate --profile local-worker
@@ -61,18 +76,16 @@ operator path is intentionally being checked.
 
 Compatibility bundle for substrate plus local model-serving basics:
 - `10-storage.yml`
-- `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 
 Use `substrate` for the default OS runtime base and `substrate + local-worker`
 when you also want the agent API. `core` remains useful for older operator
-habits and quick storage/orchestration/`llama.cpp` checks.
+habits and quick storage/`llama.cpp` checks.
 
 ### `agentic`
 
 Compatibility bundle for substrate plus the canonical `llama.cpp` chat path:
 - `10-storage.yml`
-- `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 - `41-agent-api.yml`
 
@@ -85,7 +98,6 @@ Its new `POST /run/federated` path stays opt-in and only becomes useful when the
 
 Compatibility bundle for substrate plus the reviewed Intel-oriented serving seam through OVMS:
 - `10-storage.yml`
-- `20-orchestration.yml`
 - `32-llamacpp-inference.yml`
 - `31-intel-inference.yml`
 - `41-agent-api.yml`
@@ -148,8 +160,10 @@ default profile and named presets. Use
 only when you want an explicit alternate benchmark or promotion surface beyond
 the canonical runtime path.
 
-Retained fallback modules should also stay explicit. `30-local-inference.yml`
-and `40-llm-gateway.yml` belong to `fallback-gateway`, not to `substrate`.
+Workflow automation and retained fallback modules should also stay explicit.
+`20-orchestration.yml` belongs to `workflows`, not to `substrate`.
+`30-local-inference.yml` and `40-llm-gateway.yml` belong to
+`fallback-gateway`, not to `substrate`.
 
 ## Dependency note
 
@@ -165,6 +179,7 @@ This is the intended way to layer optional surfaces like `tools` and `observabil
 
 ```bash
 aoa-up --profile substrate --profile local-worker --profile tools --profile observability
+aoa-up --profile substrate --profile workflows
 ```
 
 ### Comma-separated form
@@ -193,6 +208,8 @@ Or use:
 ```bash
 aoa-profile-modules --profile substrate --profile local-worker --paths
 aoa-profile-endpoints --profile substrate --profile local-worker
+aoa-profile-modules --profile substrate --profile workflows --paths
+aoa-profile-endpoints --profile substrate --profile workflows
 aoa-profile-modules --profile substrate --profile intel-worker --paths
 aoa-profile-endpoints --profile substrate --profile intel-worker
 aoa-profile-modules --profile fallback-gateway --paths

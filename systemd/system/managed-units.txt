@@ -1,0 +1,9 @@
+# Source-managed system units that may be installed into /etc/systemd/system
+# by scripts/aoa-install-systemd --system-units.
+abyss-dictation-hotkey.service
+abyss-ai-workload-refresh.service
+abyss-ai-workload-refresh.timer
+abyss-observability-collect.service
+abyss-observability-collect.timer
+abyss-power-profile-auto.service
+abyss-power-profile-auto.timer

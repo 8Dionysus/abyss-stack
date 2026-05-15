@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Abyss Machine doctor self-maintenance
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/doctor/AGENTS.md
+
+[Timer]
+OnBootSec=25min
+OnUnitActiveSec=2h
+AccuracySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

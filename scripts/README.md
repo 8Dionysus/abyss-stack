@@ -34,6 +34,12 @@ still synced into deployed `Configs/` with the wrappers.
 - Keep thin wrappers and part-local backend paths aligned; `validate_stack.py`
   treats this bridge as a required topology contract.
 - Keep source checkout and deployed runtime paths distinct.
+- Use `aoa-install-systemd --all-user-units` when the deployed Configs mirror
+  should become the source path for every allowlisted working user unit without
+  restarting those services.
+- Use `aoa-install-systemd --system-units` only through `pkexec` or an
+  equivalent privileged route, and only for the allowlisted support units under
+  `systemd/system/managed-units.txt`.
 - Keep wrappers public-safe and avoid printing secrets.
 - Keep decision-record shape and indexing validated through
   `validate_decision_records.py` when `docs/decisions/` changes.

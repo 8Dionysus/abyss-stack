@@ -6,10 +6,10 @@
 
 ## Layer model
 
-The default working runtime selection is `substrate`: storage plus
-orchestration. Local workers, retained fallback gateways, Intel lanes,
-federation seams, tools, and observability are explicit profile or preset
-layers over that base.
+The default working runtime selection is `substrate`: storage only. Workflow
+automation, local workers, retained fallback gateways, Intel lanes, federation
+seams, tools, and observability are explicit profile or preset layers over that
+base.
 
 ### 1. Storage layer
 
@@ -19,11 +19,12 @@ Persistent state and retrieval substrate:
 - Qdrant
 - Neo4j
 
-### 2. Orchestration layer
+### 2. Workflow automation layer
 
-Workflow coordination and pipeline surfaces:
-- n8n
-- LangGraph for bounded local-worker execution, pause/resume, and milestone-gated recovery flows
+Optional workflow coordination and pipeline surfaces:
+- n8n under the explicit `workflows` profile
+- LangGraph remains a bounded local-worker execution surface rather than part
+  of the default substrate profile
 
 ### 3. Inference layer
 

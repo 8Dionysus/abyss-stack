@@ -116,7 +116,7 @@ The active source shape is:
 - source/runtime parity uses synthetic release checks by default and live
   checks only through explicit operator intent
 - the default source-owned runtime selection is the conservative `substrate`
-  profile: storage plus orchestration under `abyss-stack`; local workers,
+  profile: storage under `abyss-stack`; workflow automation, local workers,
   retained fallback gateways, federation, tools, and observability layer on top
   explicitly
 - `abyss-machine` is consumed through read-only bridge and machine-fit packets
@@ -162,7 +162,7 @@ storage.
 | [docs](docs/README.md) | repo-level operator, release, path, security, and decision surfaces |
 | [env](env/README.md) | public environment examples |
 | [scripts](scripts/README.md) | stable operator wrappers and repository validators |
-| [systemd](systemd/README.md) | user-unit source skeletons |
+| [systemd](systemd/README.md) | user-unit source skeletons and managed working-service adapters |
 | [tests](tests/README.md) | repository-level tests and validation routes |
 | [.agents](.agents/README.md) | repo-local agent overlays and fast-loop lanes |
 | [.github](.github/GITHUB_SURFACE.md) | GitHub-native validation and landing surfaces |

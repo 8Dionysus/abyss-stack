@@ -26,18 +26,22 @@ and portable checkout contract, not a live service mutation.
 
 ## Decision
 
-`substrate` is the default source-owned runtime profile. It contains storage and
-orchestration only. `local-worker` contains the canonical `llama.cpp` plus
-`langchain-api` worker layer. `core` remains a compatibility bundle for
-storage, orchestration, and `llama.cpp` basics, but it no longer carries the
-default substrate role.
+`substrate` is the default source-owned runtime profile. It contains the
+storage base. `local-worker` contains the canonical `llama.cpp` plus
+`langchain-api` worker layer. `core` remains a compatibility bundle for storage
+and `llama.cpp` basics, but it no longer carries the default substrate role.
+
+The later same-day
+[Workflow Automation Optional Profile](2026-05-14-workflow-automation-optional-profile.md)
+decision moved n8n workflow automation out of `substrate` and into the explicit
+`workflows` profile.
 
 ## Rationale
 
 This keeps the working AbyssOS substrate runnable from `abyss-stack` without
-silently pulling model-serving, federation, tools, or observability into the
-base. It also avoids a brittle rename that would break existing habits before
-the runtime and docs have had time to converge.
+silently pulling workflow automation, model-serving, federation, tools, or
+observability into the base. It also avoids a brittle rename that would break
+existing habits before the runtime and docs have had time to converge.
 
 The split matches the repository boundary: `abyss-stack` owns runtime selection
 and lifecycle, while `abyss-machine` remains the stronger owner of machine
@@ -47,6 +51,7 @@ control-plane truth and host facts.
 
 - Default wrapper and source unit behavior are more conservative.
 - Operators can still use `core`, `agentic`, `intel`, and existing presets.
+- Operators add `workflows` explicitly when n8n is part of the selected run.
 - Documentation and CI must rehearse `substrate` and `local-worker` directly so
   the new split does not decay back into implicit `core` law.
 - Live runtime drop-ins remain host-local and are not overwritten by this source
@@ -55,6 +60,7 @@ control-plane truth and host facts.
 ## Source surfaces
 
 - `compose/profiles/substrate.txt`
+- `compose/profiles/workflows.txt`
 - `compose/profiles/local-worker.txt`
 - `scripts/aoa-lib.sh`
 - `systemd/user/podman-compose-abyss.service`
@@ -67,5 +73,5 @@ control-plane truth and host facts.
 ## Follow-up route
 
 Revisit through `docs/profiles/PROFILES.md`, `mechanics/runtime-lifecycle/`,
-and a new decision record if the working substrate grows beyond storage plus
-orchestration or if a future migration retires `core` compatibility.
+and a new decision record if the working substrate grows beyond storage or if a
+future migration retires `core` compatibility.

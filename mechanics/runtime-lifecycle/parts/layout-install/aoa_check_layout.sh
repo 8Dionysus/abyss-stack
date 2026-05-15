@@ -167,6 +167,12 @@ if ((selection_metadata_ready)) && has_module "41-agent-api.yml"; then
   check_warn_file "agent API governed canary catalog" "${AOA_STACK_ROOT}/Configs/agent-api/governed-canary-catalog.json"
 fi
 
+if ((selection_metadata_ready)) && has_module "20-orchestration.yml"; then
+  aoa_note "selected runtime includes 20-orchestration.yml; checking optional workflow automation layout"
+  check_dir "${AOA_STACK_ROOT}/Services/n8n"
+  check_dir "${AOA_STACK_ROOT}/Knowledge/n8n-docs"
+fi
+
 if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   aoa_note "selected runtime includes 43-federation-router.yml; checking aoa-agents, aoa-routing, aoa-memo, aoa-evals, aoa-playbooks, aoa-kag, and tos-source federation mirrors"
   check_dir "${AOA_STACK_ROOT}/Knowledge/federation/aoa-agents"

@@ -87,9 +87,16 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'systemd-analyze --user verify',
         'do not point units at the source checkout',
     ),
+    'systemd/system/AGENTS.md': (
+        'privileged system unit skeletons',
+        'managed-units.txt',
+        '--system-units',
+        'must not start, stop, restart, enable, disable, or mask system services',
+    ),
     'systemd/AGENTS.md': (
         'source-managed systemd route surfaces',
         'systemd/user/',
+        'systemd/system/',
         'mechanics/runtime-lifecycle',
         'Do not point units at the source checkout',
     ),

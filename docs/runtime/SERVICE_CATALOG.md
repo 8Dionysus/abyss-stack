@@ -5,19 +5,21 @@ This file maps the first migrated runtime modules to their intended services.
 ## Profile posture
 
 - `substrate` owns the conservative working AbyssOS service base:
+  `10-storage.yml`.
+- `workflows` owns optional n8n workflow automation:
   `10-storage.yml` plus `20-orchestration.yml`.
 - `local-worker` owns the canonical `llama.cpp` plus `langchain-api` worker
   layer and is meant to compose over `substrate`.
 - `fallback-gateway` owns retained Ollama plus LiteLLM fallback/control
   surfaces; it is explicit and not part of the default substrate.
-- `core` remains a compatibility bundle for storage, orchestration, and
-  `llama.cpp` basics; it is not the default substrate law.
+- `core` remains a compatibility bundle for storage and `llama.cpp` basics; it
+  is not the default substrate law.
 - `intel-worker` owns the reviewed OVMS embeddings seam over the canonical
   local worker path.
 - `agentic` and `intel` remain runnable compatibility profiles; current named
   presets compose `substrate` plus worker layers directly.
-- federation, tools, curation, and observability profiles stay explicit runtime
-  choices.
+- `workflows`, federation, tools, curation, and observability profiles stay
+  explicit runtime choices.
 
 ## `10-storage.yml`
 
@@ -28,7 +30,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `20-orchestration.yml`
 
-- `n8n` — workflow orchestration
+- `n8n` — optional workflow automation
 - `n8n-task-runners` — external n8n JavaScript/Python task runner sidecar, version-matched to n8n and connected through the internal broker on `5679`
 
 ## `30-local-inference.yml`
@@ -121,7 +123,7 @@ This file maps the first migrated runtime modules to their intended services.
 
 ### Host-facing
 
-Expected localhost-only services include:
+Expected localhost-only services may include, depending on selected profiles:
 - postgres
 - redis
 - qdrant
@@ -145,3 +147,25 @@ Expected internal-only services include:
 - docs-api
 - aoa-browser
 - cadvisor
+
+## User-unit orchestration
+
+`systemd/user/managed-units.txt` is the source-managed allowlist for host-local
+user units that can be linked from the deployed Configs mirror with
+`scripts/aoa-install-systemd --all-user-units`.
+
+The allowlist covers the current working user-service surface: the stack compose
+runner, warm dictation and TTS services, the `gemma4.spark` resident and timers,
+nervous capture/index/semantic maintenance, process/storage/topology/doctor
+readouts, `ydotoold`, and the AoA receipt watcher path units.
+
+These units are orchestration adapters. They may call host-owned commands such
+as `abyss-machine`, but their presence here does not transfer host-layer
+implementation authority into `abyss-stack`.
+
+`systemd/system/managed-units.txt` is the separate privileged support allowlist.
+It covers the dictation hotkey listener and lightweight machine refresh,
+observability, and power-profile timers. Install it with
+`pkexec .../aoa-install-systemd --system-units`; the install path writes
+root-owned unit files and reloads systemd without restarting or enabling
+services.

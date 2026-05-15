@@ -32,8 +32,9 @@ class ProfileCompositionTests(unittest.TestCase):
         self.assertIn("- tools\n", output)
         self.assertIn("- observability\n", output)
         self.assertNotIn("- agentic\n", output)
+        self.assertNotIn("- workflows\n", output)
         self.assertIn("- 10-storage.yml\n", output)
-        self.assertIn("- 20-orchestration.yml\n", output)
+        self.assertNotIn("- 20-orchestration.yml\n", output)
         self.assertIn("- 32-llamacpp-inference.yml\n", output)
         self.assertIn("- 41-agent-api.yml\n", output)
         self.assertIn("- 50-speech.yml\n", output)
@@ -48,8 +49,9 @@ class ProfileCompositionTests(unittest.TestCase):
         self.assertIn("- tools\n", output)
         self.assertIn("- observability\n", output)
         self.assertNotIn("- intel\n", output)
+        self.assertNotIn("- workflows\n", output)
         self.assertIn("- 10-storage.yml\n", output)
-        self.assertIn("- 20-orchestration.yml\n", output)
+        self.assertNotIn("- 20-orchestration.yml\n", output)
         self.assertIn("- 32-llamacpp-inference.yml\n", output)
         self.assertIn("- 31-intel-inference.yml\n", output)
         self.assertIn("- 41-agent-api.yml\n", output)
@@ -63,6 +65,15 @@ class ProfileCompositionTests(unittest.TestCase):
         self.assertIn("- intel\n", intel)
         self.assertIn("- 41-agent-api.yml\n", agentic)
         self.assertIn("- 42-agent-api-intel.yml\n", intel)
+        self.assertNotIn("- 20-orchestration.yml\n", agentic)
+        self.assertNotIn("- 20-orchestration.yml\n", intel)
+
+    def test_workflows_profile_is_optional_n8n_layer(self) -> None:
+        output = self.run_profile_modules("--profile", "workflows")
+
+        self.assertIn("- workflows\n", output)
+        self.assertIn("- 10-storage.yml\n", output)
+        self.assertIn("- 20-orchestration.yml\n", output)
 
 
 if __name__ == "__main__":

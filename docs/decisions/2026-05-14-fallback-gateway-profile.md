@@ -48,7 +48,8 @@ a retained control and rollback lane.
 
 - `fallback-gateway` can be rendered, inspected, waited on, and smoked like
   other normal profiles.
-- `substrate` remains storage plus orchestration only.
+- `substrate` remains storage only; workflow automation has its own explicit
+  `workflows` profile.
 - fallback-gateway startup does not silently warm or pin an Ollama model unless
   the operator opts in.
 - CI and validation must keep the fallback profile and sidecar stop-line from

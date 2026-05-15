@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Abyss Nervous Firefox page-content capture frequently while Firefox is open
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/nervous/AGENTS.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=15s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
