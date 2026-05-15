@@ -25,6 +25,7 @@ Use [modules](modules/README.md) for module rings and
 ## Profiles
 
 - `profiles/substrate.txt`
+- `profiles/workflows.txt`
 - `profiles/local-worker.txt`
 - `profiles/intel-worker.txt`
 - `profiles/fallback-gateway.txt`
@@ -39,12 +40,14 @@ Use [modules](modules/README.md) for module rings and
 A profile is only a list of module filenames in activation order.
 
 `substrate` is the conservative working service base for AbyssOS runtime
-bring-up: storage plus orchestration. `local-worker` is the canonical
-`llama.cpp` plus `langchain-api` worker layer. `intel-worker` is the reviewed
-OVMS embeddings layer over the canonical local worker. `fallback-gateway` keeps
-the retained Ollama plus LiteLLM control path explicit. `core`, `agentic`, and
-`intel` remain compatibility bundles for older operator habits; current presets
-compose `substrate` plus worker layers directly.
+bring-up: storage only. `workflows` is the optional n8n workflow automation
+layer, including its storage dependency so it can run on its own or compose over
+`substrate`. `local-worker` is the canonical `llama.cpp` plus `langchain-api`
+worker layer. `intel-worker` is the reviewed OVMS embeddings layer over the
+canonical local worker. `fallback-gateway` keeps the retained Ollama plus
+LiteLLM control path explicit. `core`, `agentic`, and `intel` remain
+compatibility bundles for older operator habits; current presets compose
+`substrate` plus worker layers directly and do not include `workflows`.
 
 ## Presets
 

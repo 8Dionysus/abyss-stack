@@ -1,0 +1,18 @@
+[Unit]
+Description=Abyss Nervous semantic embedding maintenance
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/nervous/AGENTS.md
+After=abyss-nervous-index-build.service
+
+[Service]
+Type=oneshot
+Nice=13
+IOSchedulingClass=idle
+CPUWeight=25
+IOWeight=20
+MemoryHigh=768M
+TimeoutStartSec=2100s
+Environment=ABYSS_NERVOUS_SEMANTIC_MAINTAIN_TRIGGER=timer
+ExecStart=/usr/local/bin/abyss-machine nervous semantic-maintain --json --no-thermal-sample
+StandardOutput=null
+StandardError=journal

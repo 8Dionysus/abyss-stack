@@ -7,13 +7,14 @@ without turning every module into the default AbyssOS substrate.
 
 | Profile | Ring | Role |
 |---|---|---|
-| `substrate` | base | storage plus orchestration; the source-owned default |
+| `substrate` | base | storage only; the source-owned default |
+| `workflows` | optional workflow automation | n8n plus its storage dependency |
 | `local-worker` | worker | canonical `llama.cpp` plus `langchain-api` path |
 | `intel-worker` | worker accelerator | canonical local worker plus reviewed OVMS embeddings seam |
 | `fallback-gateway` | retained fallback | Ollama plus LiteLLM control and rollback path |
-| `core` | compatibility | storage, orchestration, and `llama.cpp` basics for older habits |
-| `agentic` | compatibility | older name for substrate plus canonical local-worker API |
-| `intel` | compatibility | older name for substrate plus reviewed Intel worker seam |
+| `core` | compatibility | storage and `llama.cpp` basics for older habits |
+| `agentic` | compatibility | older name for storage plus canonical local-worker API |
+| `intel` | compatibility | older name for storage plus reviewed Intel worker seam |
 | `federation` | advisory seam | localhost federation and retrieval reader |
 | `curation` | projection helper | ToS graph helper plus storage substrate |
 | `tools` | helper | speech and browser-like helper services |
@@ -32,3 +33,5 @@ profiles and route it through the owning mechanic.
 Current presets should compose `substrate` plus `local-worker` or
 `intel-worker` directly. The broad `agentic` and `intel` profiles stay runnable
 for compatibility, but they should not become the hidden base for new presets.
+`workflows` stays opt-in until an explicit operator or source decision promotes
+n8n into a common route.

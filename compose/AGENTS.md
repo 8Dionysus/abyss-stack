@@ -63,6 +63,9 @@ scripts/aoa-profile-modules --profile substrate --paths
 scripts/aoa-profile-endpoints --profile substrate
 scripts/aoa-render-services --profile substrate
 scripts/aoa-render-config --profile substrate >/dev/null
+scripts/aoa-profile-modules --profile workflows --paths
+scripts/aoa-profile-endpoints --profile workflows
+scripts/aoa-render-config --profile workflows >/dev/null
 scripts/aoa-profile-modules --profile local-worker --paths
 scripts/aoa-profile-endpoints --profile local-worker
 scripts/aoa-render-config --profile local-worker >/dev/null

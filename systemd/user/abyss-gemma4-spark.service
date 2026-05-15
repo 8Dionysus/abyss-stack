@@ -1,0 +1,31 @@
+[Unit]
+Description=Abyss Machine Gemma4 Spark resident candidate
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/ai/llm/AGENTS.md
+After=default.target
+StartLimitIntervalSec=10min
+StartLimitBurst=4
+
+[Service]
+Type=simple
+Nice=8
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+CPUWeight=40
+IOWeight=40
+MemoryLow=256M
+MemoryHigh=6144M
+Environment=XDG_CACHE_HOME=/srv/abyss-machine/cache/home/%u/cache
+Environment=HF_HOME=/srv/abyss-machine/cache/ai/huggingface
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=OMP_NUM_THREADS=4
+Environment=MKL_NUM_THREADS=4
+Environment=OPENBLAS_NUM_THREADS=4
+Environment=NUMEXPR_NUM_THREADS=4
+ExecStart=/srv/abyss-machine/tools/abyss-gemma4-spark-resident serve
+Restart=on-failure
+RestartSec=30s
+TimeoutStopSec=45s
+
+[Install]
+WantedBy=default.target

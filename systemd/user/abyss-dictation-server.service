@@ -1,0 +1,21 @@
+[Unit]
+Description=Abyss Dictation warm OpenVINO server
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/abyss-dictation-server --socket %t/abyss-machine/dictation/server.sock --preload-model-dir /srv/AbyssOS/abyss-stack/Models/stt/whisper/openvino/whisper-large-v3-turbo --preload-device AUTO:GPU,CPU --preload-language ru --warmup
+Restart=on-failure
+RestartSec=2s
+MemoryLow=768M
+MemoryHigh=4096M
+Environment=OPENVINO_LOG_LEVEL=2
+Environment=ABYSS_OPENVINO_CACHE_DIR=/srv/abyss-machine/cache/ai/openvino
+Environment=HF_HOME=/srv/abyss-machine/cache/ai/huggingface
+Environment=XDG_CACHE_HOME=/srv/abyss-machine/cache/home/%u/cache
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=HF_HUB_OFFLINE=1
+Environment=TOKENIZERS_PARALLELISM=false
+
+[Install]
+WantedBy=default.target

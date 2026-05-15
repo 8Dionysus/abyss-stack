@@ -65,6 +65,7 @@ Examples:
 
 ```bash
 aoa-up --profile substrate
+aoa-up --profile substrate --profile workflows
 aoa-up --profile substrate --profile local-worker
 aoa-up --profile fallback-gateway
 aoa-up --profile substrate --profile local-worker --profile tools
@@ -99,11 +100,12 @@ Until wrappers are installed into the live runtime path, the intended manual sha
 cd /srv/AbyssOS/abyss-stack/Configs
 podman compose \
   -f compose/modules/10-storage.yml \
-  -f compose/modules/20-orchestration.yml \
   up -d
 ```
 
 Optional modules should be layered explicitly rather than assumed.
+Add `-f compose/modules/20-orchestration.yml` only when the optional n8n
+workflow layer is intentionally part of the manual run.
 
 ## Systemd user surface
 
@@ -123,6 +125,31 @@ up the new selection immediately. If the deployed `langchain-api` federated
 consumer is enabled, choose a shape that includes `federation`, such as
 `--preset intel-full --profile federation` when the host should keep its
 current `intel-full` service shape.
+
+The source tree also carries `systemd/user/managed-units.txt` for the host-local
+user services that should be routed through the deployed stack Configs mirror.
+After syncing configs, use:
+
+```bash
+scripts/aoa-install-systemd --all-user-units
+```
+
+That mode links the allowlisted unit files from
+`/srv/AbyssOS/abyss-stack/Configs/systemd/user` into
+`~/.config/systemd/user` and reloads the user daemon. It does not stop, start,
+restart, enable, disable, or mask anything. Existing drop-ins remain host-local
+and continue to carry per-machine memory or runtime-selection overrides.
+
+The privileged support allowlist under `systemd/system/managed-units.txt` is
+installed separately:
+
+```bash
+pkexec /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --system-units
+```
+
+That command installs root-owned copies of the allowlisted files into
+`/etc/systemd/system` and reloads the system daemon. It does not stop, start,
+restart, enable, disable, or mask system services or timers.
 
 ## Path note
 

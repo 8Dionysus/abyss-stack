@@ -35,6 +35,7 @@ Examples:
 
 ```bash
 scripts/aoa-render-services --profile substrate
+scripts/aoa-render-services --profile workflows
 scripts/aoa-render-services --profile substrate --profile local-worker
 scripts/aoa-render-services --profile fallback-gateway
 scripts/aoa-render-services --profile substrate --profile intel-worker
@@ -49,6 +50,7 @@ Examples:
 
 ```bash
 scripts/aoa-render-config --profile substrate
+scripts/aoa-render-config --profile workflows
 scripts/aoa-render-config --profile substrate --profile local-worker
 scripts/aoa-render-config --profile fallback-gateway
 scripts/aoa-render-config --profile substrate --profile intel-worker > /tmp/abyss-intel-worker.rendered.yml

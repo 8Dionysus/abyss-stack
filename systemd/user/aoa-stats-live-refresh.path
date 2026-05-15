@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch owner-local live receipt logs for aoa-stats refresh
+
+[Path]
+PathModified=/srv/AbyssOS/aoa-skills/.aoa/live_receipts/session-harvest-family.jsonl
+PathModified=/srv/AbyssOS/aoa-skills/.aoa/live_receipts/core-skill-applications.jsonl
+PathModified=/srv/AbyssOS/aoa-evals/.aoa/live_receipts/eval-result-receipts.jsonl
+PathModified=/srv/AbyssOS/aoa-playbooks/.aoa/live_receipts/playbook-receipts.jsonl
+PathModified=/srv/AbyssOS/aoa-techniques/.aoa/live_receipts/technique-receipts.jsonl
+PathModified=/srv/AbyssOS/aoa-memo/.aoa/live_receipts/memo-writeback-receipts.jsonl
+PathModified=/srv/AbyssOS/abyss-stack/.aoa/live_receipts/runtime-wave-closeouts.jsonl
+Unit=aoa-stats-live-refresh.service
+
+[Install]
+WantedBy=default.target

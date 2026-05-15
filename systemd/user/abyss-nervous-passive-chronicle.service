@@ -1,0 +1,17 @@
+[Unit]
+Description=Abyss Nervous passive chronicle snapshot
+Documentation=file:/etc/abyss-machine/AGENTS.md
+OnSuccess=abyss-nervous-derived-refresh.service
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=30
+IOWeight=20
+MemoryHigh=256M
+TimeoutStartSec=45s
+Environment=ABYSS_NERVOUS_CAPTURE_TRIGGER=timer
+ExecStart=/usr/local/bin/abyss-machine nervous snapshot --json
+StandardOutput=null
+StandardError=journal

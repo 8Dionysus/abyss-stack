@@ -1,0 +1,15 @@
+[Unit]
+Description=Run Abyss Gemma4 Spark useful dictation digests periodically
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/ai/llm/AGENTS.md
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=30min
+AccuracySec=5min
+RandomizedDelaySec=3min
+Persistent=true
+Unit=abyss-gemma4-spark-digest.service
+
+[Install]
+WantedBy=timers.target

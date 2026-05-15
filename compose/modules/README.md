@@ -8,7 +8,7 @@ a service belongs to the default AbyssOS substrate.
 | Module | Ring | Normal route |
 |---|---|---|
 | `10-storage.yml` | substrate | `substrate` |
-| `20-orchestration.yml` | substrate | `substrate` |
+| `20-orchestration.yml` | workflow automation | `workflows` |
 | `30-local-inference.yml` | retained fallback | `fallback-gateway` |
 | `31-intel-inference.yml` | worker accelerator | `intel-worker` |
 | `32-llamacpp-inference.yml` | local worker | `local-worker`, `intel-worker` |
@@ -25,6 +25,6 @@ a service belongs to the default AbyssOS substrate.
 ## Stop Line
 
 Do not add a module to `substrate` because it is useful. `substrate` is the
-storage and orchestration base. Workers, fallback control paths, advisory seams,
-helpers, projections, and dashboards layer on top through explicit profiles or
-presets.
+storage base. Workflow automation, workers, fallback control paths, advisory
+seams, helpers, projections, and dashboards layer on top through explicit
+profiles or presets.

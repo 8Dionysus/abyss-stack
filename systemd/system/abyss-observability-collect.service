@@ -1,0 +1,11 @@
+[Unit]
+Description=Abyss Machine lightweight thermal/battery observability collector
+Documentation=file:/var/lib/abyss-machine/observability/AGENTS.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/abyss-machine-observe --once
+Nice=10
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+NoNewPrivileges=true

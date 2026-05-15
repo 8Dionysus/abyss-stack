@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Abyss Nervous semantic embedding maintenance
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/nervous/AGENTS.md
+
+[Timer]
+OnBootSec=20min
+OnActiveSec=10min
+OnUnitActiveSec=90min
+AccuracySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

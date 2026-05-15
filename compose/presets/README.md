@@ -8,8 +8,8 @@ They are the layer above composition:
 - presets are named stacks of profiles
 
 The conservative working substrate is `profiles/substrate.txt`. It stays a
-profile so operators can layer local-worker, fallback-gateway, federation,
-tools, or observability deliberately.
+profile so operators can layer workflows, local-worker, fallback-gateway,
+federation, tools, or observability deliberately.
 
 ## Format
 
@@ -39,6 +39,8 @@ observability
 Agent presets resolve through `substrate + local-worker`. Intel presets resolve
 through `substrate + intel-worker`. The older broad `agentic` and `intel`
 profiles remain runnable compatibility routes, not the preset substrate.
+`workflows` is not included in current presets; add it explicitly when n8n is
+part of the run being tested.
 
 ## Usage
 
@@ -48,6 +50,12 @@ aoa-profile-modules --preset agent-full --paths
 aoa-profile-endpoints --preset agent-full
 aoa-up --preset agent-full
 aoa-smoke --with-internal --preset agent-full
+```
+
+To add optional workflow automation to a preset run:
+
+```bash
+aoa-up --preset agent-full --profile workflows
 ```
 
 For the opt-in advisory federation seam:

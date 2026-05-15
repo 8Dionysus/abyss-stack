@@ -394,6 +394,10 @@ REQUIRED_FILES = {
     ROOT / "env" / "AGENTS.md",
     ROOT / "config-templates" / "AGENTS.md",
     ROOT / "systemd" / "user" / "AGENTS.md",
+    ROOT / "systemd" / "user" / "managed-units.txt",
+    ROOT / "systemd" / "system" / "AGENTS.md",
+    ROOT / "systemd" / "system" / "README.md",
+    ROOT / "systemd" / "system" / "managed-units.txt",
     ROOT / "scripts" / "AGENTS.md",
     ROOT / "scripts" / "README.md",
     ROOT / "DESIGN.md",
@@ -616,6 +620,7 @@ REQUIRED_FILES = {
     ROOT / "compose" / "modules" / "README.md",
     ROOT / "compose" / "profiles" / "README.md",
     ROOT / "compose" / "profiles" / "substrate.txt",
+    ROOT / "compose" / "profiles" / "workflows.txt",
     ROOT / "compose" / "profiles" / "local-worker.txt",
     ROOT / "compose" / "profiles" / "intel-worker.txt",
     ROOT / "compose" / "profiles" / "fallback-gateway.txt",
@@ -1704,7 +1709,8 @@ def iter_sync_managed_files() -> list[Path]:
 
 def validate_profiles(errors: list[str]) -> None:
     expected_profiles = {
-        "substrate.txt": ["10-storage.yml", "20-orchestration.yml"],
+        "substrate.txt": ["10-storage.yml"],
+        "workflows.txt": ["10-storage.yml", "20-orchestration.yml"],
         "local-worker.txt": ["32-llamacpp-inference.yml", "41-agent-api.yml"],
         "intel-worker.txt": [
             "32-llamacpp-inference.yml",
@@ -1713,6 +1719,19 @@ def validate_profiles(errors: list[str]) -> None:
             "42-agent-api-intel.yml",
         ],
         "fallback-gateway.txt": ["30-local-inference.yml", "40-llm-gateway.yml"],
+        "core.txt": ["10-storage.yml", "32-llamacpp-inference.yml"],
+        "agentic.txt": [
+            "10-storage.yml",
+            "32-llamacpp-inference.yml",
+            "41-agent-api.yml",
+        ],
+        "intel.txt": [
+            "10-storage.yml",
+            "32-llamacpp-inference.yml",
+            "31-intel-inference.yml",
+            "41-agent-api.yml",
+            "42-agent-api-intel.yml",
+        ],
     }
     for profile_name, expected_modules in expected_profiles.items():
         profile_path = PROFILE_DIR / profile_name
@@ -1771,6 +1790,7 @@ def validate_profiles(errors: list[str]) -> None:
     profiles_readme = (ROOT / "compose" / "profiles" / "README.md").read_text(encoding="utf-8")
     for required_text in (
         "`substrate`",
+        "`workflows`",
         "`local-worker`",
         "`intel-worker`",
         "`fallback-gateway`",
@@ -1807,6 +1827,8 @@ def validate_profiles(errors: list[str]) -> None:
     ).read_text(encoding="utf-8")
     if "--profile intel-worker" not in github_workflow:
         errors.append(".github/workflows/validate-stack.yml must rehearse the intel-worker profile")
+    if "--profile workflows" not in github_workflow:
+        errors.append(".github/workflows/validate-stack.yml must rehearse the optional workflows profile")
     if (
         "--profile substrate --profile local-worker --profile tools --profile observability"
         not in github_workflow
@@ -2600,6 +2622,10 @@ def validate_scripts(errors: list[str]) -> None:
                 "--preset",
                 "--profile",
                 "--restart-now",
+                "--all-user-units",
+                "--system-units",
+                "managed-units.txt",
+                "systemctl daemon-reload",
                 "20-runtime-selection.conf",
                 "aoa_validate_runtime_spec",
                 "aoa_append_runtime_spec",
@@ -2614,6 +2640,22 @@ def validate_required_files(errors: list[str]) -> None:
     for path in sorted(REQUIRED_FILES):
         if not path.exists():
             errors.append(f"missing required file: {path.relative_to(ROOT)}")
+
+    for unit_scope in ("user", "system"):
+        managed_units = ROOT / "systemd" / unit_scope / "managed-units.txt"
+        if managed_units not in REQUIRED_FILES:
+            continue
+        if not managed_units.exists():
+            continue
+        for line in managed_units.read_text(encoding="utf-8").splitlines():
+            unit_name = line.split("#", 1)[0].strip()
+            if not unit_name:
+                continue
+            unit_path = ROOT / "systemd" / unit_scope / unit_name
+            if not unit_path.exists():
+                errors.append(
+                    f"managed {unit_scope} unit is missing source skeleton: systemd/{unit_scope}/{unit_name}"
+                )
 
 
 def validate_root_residual_topology(errors: list[str]) -> None:

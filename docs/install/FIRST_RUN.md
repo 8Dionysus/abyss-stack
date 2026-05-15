@@ -133,6 +133,19 @@ Ollama warmup for this retained fallback lane is opt-in:
 AOA_OLLAMA_WARMUP_ENABLED=true scripts/aoa-up --profile fallback-gateway
 ```
 
+### Optional workflow automation
+
+This keeps n8n out of the default substrate while preserving an explicit route
+for workflow checks:
+
+```bash
+scripts/aoa-profile-modules --profile substrate --profile workflows --paths
+scripts/aoa-profile-endpoints --profile substrate --profile workflows
+scripts/aoa-render-services --profile substrate --profile workflows
+scripts/aoa-up --profile substrate --profile workflows
+scripts/aoa-smoke --profile substrate --profile workflows
+```
+
 ### Agent-facing runtime
 
 This is the generic local agent path and defaults to the canonical `llama.cpp` worker path. Embeddings stay disabled unless an explicit backend overlay is added:

@@ -142,6 +142,8 @@ scripts/aoa-profile-modules --profile substrate --paths
 scripts/aoa-profile-endpoints --profile substrate
 scripts/aoa-render-services --profile substrate
 scripts/aoa-render-config --profile substrate >/dev/null
+scripts/aoa-profile-modules --profile workflows --paths
+scripts/aoa-profile-endpoints --profile workflows
 ```
 
 For preset changes, use the matching preset:

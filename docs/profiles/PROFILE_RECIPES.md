@@ -84,8 +84,35 @@ Use [LLAMACPP_PILOT](../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/
 ### What it is for
 
 The conservative working AbyssOS runtime base.
-Good for validating storage, retrieval, orchestration, config projection, and
-root lifecycle without silently selecting a model worker or federation seam.
+Good for validating storage, retrieval, config projection, and root lifecycle
+without silently selecting workflow automation, a model worker, or a federation
+seam.
+
+### Host-facing endpoints
+
+- `postgres` -> `127.0.0.1:5432`
+- `redis` -> `127.0.0.1:6379`
+- `qdrant` -> `http://127.0.0.1:6333/`
+- `neo4j` -> `http://127.0.0.1:7474/`
+
+### First checks
+
+```bash
+scripts/aoa-profile-endpoints --profile substrate
+scripts/aoa-render-services --profile substrate
+scripts/aoa-up --profile substrate
+scripts/aoa-wait --profile substrate
+scripts/aoa-smoke --profile substrate
+```
+
+## `workflows`
+
+### What it is for
+
+Optional n8n workflow automation and task-runner support.
+Use it only when workflow automation is intentionally part of the run being
+checked. It includes the storage dependency, and it can be composed over
+`substrate` without duplicating modules.
 
 ### Host-facing endpoints
 
@@ -98,11 +125,11 @@ root lifecycle without silently selecting a model worker or federation seam.
 ### First checks
 
 ```bash
-scripts/aoa-profile-endpoints --profile substrate
-scripts/aoa-render-services --profile substrate
-scripts/aoa-up --profile substrate
-scripts/aoa-wait --profile substrate
-scripts/aoa-smoke --profile substrate
+scripts/aoa-profile-endpoints --profile workflows
+scripts/aoa-render-services --profile workflows
+scripts/aoa-up --profile workflows
+scripts/aoa-wait --profile workflows
+scripts/aoa-smoke --profile workflows
 ```
 
 ## `local-worker`
@@ -160,9 +187,10 @@ scripts/aoa-qwen-check --case exact-reply
 ### What it is for
 
 Compatibility bundle for substrate plus local model-serving basics.
-Good for older operator habits and quick storage/orchestration/`llama.cpp`
-checks. For the source-owned OS base, prefer `substrate`; for the full agent API
-path, prefer `substrate + local-worker` or `substrate + intel-worker`.
+Good for older operator habits and quick storage/`llama.cpp` checks. For the
+source-owned OS base, prefer `substrate`; for the full agent API path, prefer
+`substrate + local-worker` or `substrate + intel-worker`. Add `workflows`
+explicitly when n8n is part of the check.
 
 ### Host-facing endpoints
 
@@ -170,7 +198,6 @@ path, prefer `substrate + local-worker` or `substrate + intel-worker`.
 - `redis` -> `127.0.0.1:6379`
 - `qdrant` -> `http://127.0.0.1:6333/`
 - `neo4j` -> `http://127.0.0.1:7474/`
-- `n8n` -> `http://127.0.0.1:5678/`
 - `llama-cpp` -> `http://127.0.0.1:11435/health`
 
 ### First checks

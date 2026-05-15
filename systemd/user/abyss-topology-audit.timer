@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Abyss Machine topology audit periodically
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/etc/abyss-machine/TOPOLOGY.md
+
+[Timer]
+OnBootSec=12min
+OnUnitActiveSec=6h
+AccuracySec=20min
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

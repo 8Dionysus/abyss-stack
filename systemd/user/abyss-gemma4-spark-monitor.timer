@@ -1,0 +1,14 @@
+[Unit]
+Description=Record Abyss Gemma4 Spark resident status every minute
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/ai/llm/AGENTS.md
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+Unit=abyss-gemma4-spark-monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -21,6 +21,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Configs/tos-graph" \
   "${AOA_STACK_ROOT}/Secrets/Configs" \
   "${AOA_STACK_ROOT}/Services" \
+  "${AOA_STACK_ROOT}/Services/n8n" \
   "${AOA_STACK_ROOT}/Services/litellm" \
   "${AOA_STACK_ROOT}/Services/aoa-browser/ms-playwright" \
   "${AOA_STACK_ROOT}/Models" \

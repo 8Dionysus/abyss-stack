@@ -1,0 +1,28 @@
+[Unit]
+Description=Abyss Machine warm TTS server
+Documentation=file:/etc/abyss-machine/AGENTS.md
+After=default.target
+
+[Service]
+Type=simple
+Environment=ABYSS_MACHINE_ROOT=/srv/abyss-machine
+Environment=ABYSS_MACHINE_CACHE_ROOT=/srv/abyss-machine/cache
+Environment=ABYSS_MACHINE_AI_CACHE_ROOT=/srv/abyss-machine/cache/ai
+Environment=ABYSS_MACHINE_RUNTIME_ROOT=/srv/abyss-machine/runtimes
+Environment=ABYSS_AI_HOME=/srv/abyss-machine/runtimes/home/%u/abyss-ai
+Environment=HF_HOME=/srv/abyss-machine/cache/ai/tts/huggingface
+Environment=XDG_CACHE_HOME=/srv/abyss-machine/cache/ai/tts/xdg
+Environment=OPENVINO_LOG_LEVEL=2
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=HF_HUB_OFFLINE=1
+ExecCondition=/usr/bin/bash -lc 'test "$(/usr/local/bin/abyss-machine ai policy --json | /usr/bin/jq -r .can_run_heavy)" = true'
+ExecStart=%h/.local/bin/abyss-qwen3-openvino-python /usr/local/libexec/abyss-machine ai tts server run --profile quality-compact
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+MemoryLow=768M
+MemoryHigh=4096M
+
+[Install]
+WantedBy=default.target

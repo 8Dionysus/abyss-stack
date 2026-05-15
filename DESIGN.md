@@ -54,8 +54,8 @@ The runtime body has these organs:
 - **service topology**: Podman modules, profiles, presets, ports, networks, and
   helper-service build contexts
 - **working substrate selection**: the conservative `substrate` profile owned
-  by this repo, with local workers, federation seams, tools, and observability
-  layered through explicit profiles or presets
+  by this repo, with workflow automation, local workers, federation seams,
+  tools, and observability layered through explicit profiles or presets
 - **lifecycle control**: start, stop, wait, smoke, logs, status, warmup, and
   systemd-user flows
 - **machine fit**: host facts, reference-platform posture, bridge capture,
@@ -94,8 +94,8 @@ what was not checked, and what surface owns the next decision.
 - **Profiles before hidden coupling.** Service selection should be visible in
   profiles, presets, scripts, and docs.
 - **Substrate before workers.** The working AbyssOS base should be runnable
-  from `abyss-stack` without silently pulling model workers, federation seams,
-  tools, or dashboards into every startup.
+  from `abyss-stack` without silently pulling workflow automation, model
+  workers, federation seams, tools, or dashboards into every startup.
 - **Localhost-first exposure.** Network posture should begin narrow and widen
   only through explicit operator intent.
 - **Rootless by default.** Runtime control should prefer rootless Podman and

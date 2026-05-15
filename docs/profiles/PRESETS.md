@@ -8,8 +8,8 @@ They exist one layer above profile composition:
 - presets are named stacks of profiles
 
 The default working substrate is a profile, not a preset: use `substrate` for
-the conservative OS base and layer worker, fallback, or helper profiles
-explicitly.
+the conservative OS base and layer workflows, worker, fallback, or helper
+profiles explicitly.
 
 ## Why presets exist
 
@@ -32,6 +32,9 @@ Presets give these combinations stable names, so you do not have to repeat long 
 The federation presets stay opt-in.
 They do not promote the advisory seam into the default runtime path or the
 default promoted presets.
+The `workflows` profile also stays opt-in. Current presets do not start n8n;
+add `--profile workflows` only when workflow automation is deliberately part of
+the run.
 
 ## How presets interact with profiles
 
@@ -71,6 +74,7 @@ aoa-profile-endpoints --preset agent-full
 
 ```bash
 aoa-up --preset agent-tools --profile observability
+aoa-up --preset agent-full --profile workflows
 ```
 
 ### Use comma-separated preset form

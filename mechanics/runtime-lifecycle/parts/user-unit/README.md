@@ -1,7 +1,7 @@
 # User Unit
 
-Routes `systemd/user/podman-compose-abyss.service` and
-`scripts/aoa-install-systemd`, with the implementation in
+Routes `systemd/user/podman-compose-abyss.service`, the live user-unit
+allowlist at `systemd/user/managed-units.txt`, and `scripts/aoa-install-systemd`, with the implementation in
 `mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh`.
 
 User units must point at runtime paths, not the source checkout.
@@ -18,3 +18,13 @@ selection into the source unit skeleton.
 When `Secrets/Configs/langchain-api.env` enables the federated live consumer,
 the selected user-unit shape must include the `federation` profile so
 `route-api` survives the next systemd start.
+
+Use `aoa-install-systemd --all-user-units` to link every source-managed user
+unit from the deployed Configs mirror into `~/.config/systemd/user`. This is a
+link-and-reload operation only; it preserves enable state, running processes,
+and host-local drop-ins.
+
+Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
+support-unit allowlist under `systemd/system/`. That mode installs root-owned
+copies into `/etc/systemd/system`, reloads the system daemon, and deliberately
+does not start, stop, restart, enable, disable, or mask units.

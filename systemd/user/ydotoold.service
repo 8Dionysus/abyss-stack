@@ -1,0 +1,12 @@
+[Unit]
+Description=User ydotool daemon for Abyss dictation paste
+Documentation=man:ydotoold(8)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ydotoold --socket-path %t/.ydotool_socket --socket-perm 0600
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=default.target

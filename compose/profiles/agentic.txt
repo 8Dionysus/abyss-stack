@@ -1,4 +1,3 @@
 10-storage.yml
-20-orchestration.yml
 32-llamacpp-inference.yml
 41-agent-api.yml

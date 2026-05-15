@@ -1,0 +1,10 @@
+[Unit]
+Description=Abyss AI workload safe refresh
+Documentation=file:/etc/abyss-machine/AGENTS.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/abyss-machine ai workload refresh --json
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

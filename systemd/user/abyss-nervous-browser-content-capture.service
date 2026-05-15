@@ -1,0 +1,16 @@
+[Unit]
+Description=Abyss Nervous Firefox page-content capture tick
+Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:/var/lib/abyss-machine/nervous/AGENTS.md
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=10
+IOWeight=10
+MemoryHigh=256M
+TimeoutStartSec=8s
+ExecStart=%h/.local/bin/abyss-nervous-browser-content-capture-tick
+StandardOutput=null
+StandardError=journal
