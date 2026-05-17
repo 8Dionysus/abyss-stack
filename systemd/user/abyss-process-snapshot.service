@@ -1,7 +1,7 @@
 [Unit]
 Description=Abyss Machine lightweight process snapshot
-Documentation=file:/etc/abyss-machine/AGENTS.md
-Documentation=file:/var/lib/abyss-machine/processes/AGENTS.md
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/processes/AGENTS.md
 
 [Service]
 Type=oneshot

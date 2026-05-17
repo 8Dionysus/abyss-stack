@@ -1,0 +1,18 @@
+[Unit]
+Description=Abyss TTS keep-warm tick
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/memory/AGENTS.md
+ConditionPathExists=%t/abyss-machine/tts/server.sock
+
+[Service]
+Type=oneshot
+Nice=12
+IOSchedulingClass=idle
+CPUWeight=20
+IOWeight=20
+MemoryHigh=768M
+TimeoutStartSec=3min
+ExecStartPre=/usr/bin/mkdir -p /srv/abyss-machine/cache/ai/tts/warmup
+ExecStart=/usr/local/bin/abyss-machine resource launch --class light --kind ai --unattended --timeout 180 --success-on-block --no-thermal-sample --json -- /usr/local/bin/abyss-machine ai tts synth --profile quality-compact --text "Тихий прогрев синтеза речи." --output /srv/abyss-machine/cache/ai/tts/warmup/keepwarm.wav --json
+StandardOutput=null
+StandardError=journal

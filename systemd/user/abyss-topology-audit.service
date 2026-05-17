@@ -1,8 +1,8 @@
 [Unit]
 Description=Abyss Machine topology audit
-Documentation=file:/etc/abyss-machine/AGENTS.md
-Documentation=file:/etc/abyss-machine/TOPOLOGY.md
-Documentation=file:/var/lib/abyss-machine/topology/AGENTS.md
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///etc/abyss-machine/TOPOLOGY.md
+Documentation=file:///var/lib/abyss-machine/topology/AGENTS.md
 
 [Service]
 Type=oneshot

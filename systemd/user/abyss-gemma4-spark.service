@@ -1,7 +1,7 @@
 [Unit]
-Description=Abyss Machine Gemma4 Spark resident candidate
-Documentation=file:/etc/abyss-machine/AGENTS.md
-Documentation=file:/var/lib/abyss-machine/ai/llm/AGENTS.md
+Description=Abyss Gemma4 Spark stack endpoint bridge
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/ai/llm/AGENTS.md
 After=default.target
 StartLimitIntervalSec=10min
 StartLimitBurst=4
@@ -22,6 +22,9 @@ Environment=OMP_NUM_THREADS=4
 Environment=MKL_NUM_THREADS=4
 Environment=OPENBLAS_NUM_THREADS=4
 Environment=NUMEXPR_NUM_THREADS=4
+Environment=ABYSS_GEMMA4_SPARK_SERVING_OWNER=abyss-stack
+Environment=ABYSS_GEMMA4_SPARK_BASE_URL=http://127.0.0.1:11435
+Environment=ABYSS_GEMMA4_SPARK_ALLOW_LOCAL_FALLBACK=0
 ExecStart=/srv/abyss-machine/tools/abyss-gemma4-spark-resident serve
 Restart=on-failure
 RestartSec=30s

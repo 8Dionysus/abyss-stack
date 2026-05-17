@@ -563,6 +563,65 @@ scripts/aoa-federated-check --require-enabled --inspect-id AOA-K-0011
 scripts/aoa-federated-check --require-enabled --memo-id AOA-M-0001
 ```
 
+### `substrate + intel-worker + reranking`
+
+What it gives you:
+- the Intel-aware agent runtime with OVMS embeddings
+- a separate localhost-only OpenVINO Qwen3 rerank API on `5405`
+- lazy model loading, so health checks do not make the reranker resident
+- idle unload by default after `900` seconds, so occasional reranking does not
+  keep the model resident forever
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile substrate,intel-worker,reranking --paths
+scripts/aoa-profile-endpoints --profile substrate,intel-worker,reranking
+scripts/aoa-render-services --profile substrate,intel-worker,reranking
+scripts/aoa-up --profile substrate,intel-worker,reranking
+scripts/aoa-smoke --profile substrate,intel-worker,reranking
+```
+
+The bounded functional check is a small `/v3/rerank` request after startup.
+Keep it separate from the default smoke path because it intentionally loads the
+model:
+
+```bash
+curl -fsS http://127.0.0.1:5405/v3/rerank \
+  -H 'content-type: application/json' \
+  -d '{"query":"zram memory pressure","documents":["zram data and resident memory pressure","browser tab title"],"top_n":1}'
+```
+
+### `rag`
+
+What it gives you:
+- storage substrate (`Postgres`, `Redis`, `Qdrant`, `Neo4j`)
+- Intel-aware embeddings through OVMS and `langchain-api`
+- advisory `route-api`
+- lazy `rerank-api`
+- `rag-api` on `5406` for source registry, ingest, retrieve, answer, agentic
+  trace, and DAG job manifests
+
+Try:
+
+```bash
+scripts/aoa-profile-modules --profile rag --paths
+scripts/aoa-profile-endpoints --profile rag
+scripts/aoa-render-services --profile rag
+scripts/aoa-up --profile rag
+scripts/aoa-smoke --profile rag
+```
+
+The bounded functional smoke is a dry-run ingest followed by a retrieval after
+an intentional ingest:
+
+```bash
+curl -fsS http://127.0.0.1:5406/ingest/source \
+  -H 'content-type: application/json' \
+  -d '{"source_id":"abyss-stack-runtime-docs","limit_files":3,"dry_run":true}'
+curl -fsS http://127.0.0.1:5406/agentic-rag/graph
+```
+
 ### `substrate + intel-worker + tools + observability`
 
 What it gives you:

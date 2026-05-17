@@ -123,6 +123,57 @@ It also enables filesystem-first memo export candidates under `${AOA_STACK_ROOT}
 layered onto a worker path, `langchain-api` may consume it through
 `POST /run/federated`.
 
+### `reranking`
+
+An opt-in retrieval reranker service:
+- `45-rerank-api.yml`
+
+This profile exposes the host-validated OpenVINO Qwen3 reranker as a localhost
+stack service on `5405`. It is intended to layer over `substrate +
+intel-worker` when neural reranking should be resident in the stack, but it can
+also be rendered by itself for service debugging.
+
+The current model artifact is served through a lazy FastAPI wrapper around the
+OpenVINO CausalLM scorer. It is not treated as an OVMS `/v3/rerank` drop-in
+model. `GET /health` does not load the model; the first `POST /v3/rerank`
+request performs the model load.
+
+### `rag`
+
+The first source-linked RAG orchestration profile:
+- `10-storage.yml`
+- `32-llamacpp-inference.yml`
+- `31-intel-inference.yml`
+- `41-agent-api.yml`
+- `42-agent-api-intel.yml`
+- `43-federation-router.yml`
+- `45-rerank-api.yml`
+- `46-rag-api.yml`
+
+This profile prepares a complete local RAG path without adding another vector
+database: Qdrant stores chunks, OVMS embeddings are reached through
+`langchain-api`, `rerank-api` is optional and lazy, `route-api` remains
+advisory, and Gemma/local text generation remains on the canonical
+`langchain-api -> llama.cpp` lane.
+
+`rag-api` exposes ingest, retrieve, answer, agentic trace, and DAG manifest
+endpoints on `5406`. It is a runtime orchestration layer, not a source-of-truth
+owner for AoA or ToS meaning.
+
+### `speech-fast-experimental`
+
+An opt-in Intel speech experiment:
+- `53-babelvox-tts.yml`
+
+This profile exposes BabelVox/OpenVINO through a localhost-only stack API on
+`5102`. It is intended to layer over `substrate + intel-worker` only when
+speech runtime experiments are deliberate. It is not part of `tools`, current
+presets, or the protected host warm TTS route.
+
+`GET /health` does not load the model. The first synthesis request loads
+BabelVox from the host-owned TTS cache, and the service unloads/recycles after
+the configured idle window by default.
+
 ### `curation`
 
 A route-first ToS graph helper surface:
@@ -212,6 +263,8 @@ aoa-profile-modules --profile substrate --profile workflows --paths
 aoa-profile-endpoints --profile substrate --profile workflows
 aoa-profile-modules --profile substrate --profile intel-worker --paths
 aoa-profile-endpoints --profile substrate --profile intel-worker
+aoa-profile-modules --profile rag --paths
+aoa-profile-endpoints --profile rag
 aoa-profile-modules --profile fallback-gateway --paths
 ```
 

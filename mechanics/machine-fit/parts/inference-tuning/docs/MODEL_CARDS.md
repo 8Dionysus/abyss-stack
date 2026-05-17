@@ -82,6 +82,8 @@ Do not let a donor-specific overlay quietly choose the model on your behalf.
 ## Current cards
 
 - [qwen3.5-9b-gguf-llamacpp](model-cards/qwen3.5-9b-gguf-llamacpp.md)
+- [gemma4-e2b-gguf-llamacpp](model-cards/gemma4-e2b-gguf-llamacpp.md)
+- [qwen3-reranker-0.6b-openvino](model-cards/qwen3-reranker-0.6b-openvino.md)
 - [qwen3-openvino-family](model-cards/qwen3-openvino-family.md)
 - [qwen3-4b-int4-ov](model-cards/qwen3-4b-int4-ov.md)
 - [qwen3-8b-int4-ov](model-cards/qwen3-8b-int4-ov.md)

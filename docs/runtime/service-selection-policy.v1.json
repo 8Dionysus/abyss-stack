@@ -1,0 +1,256 @@
+{
+  "schema": "abyss_stack_service_selection_policy_v1",
+  "updated_at": "2026-05-16",
+  "host_class": "intel-core-ultra-9-285h",
+  "current_runtime_shape": {
+    "preset": "intel-full",
+    "profiles": [
+      "federation",
+      "reranking",
+      "rag"
+    ],
+    "overlays": [
+      "compose/tuning/storage.intel-285h.resource-guard.yml",
+      "compose/tuning/intel-worker.thin-host.yml",
+      "compose/tuning/federation.thin-host.yml",
+      "compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml",
+      "compose/tuning/observability.thin-host.yml",
+      "compose/tuning/tools.thin-host.yml",
+      "compose/tuning/rag.thin-host.yml"
+    ]
+  },
+  "policy_terms": {
+    "selected_now": "part of the current staged working shape",
+    "explicit_opt_in": "available only when the matching profile or task needs it",
+    "fallback_control": "retained for rollback or comparison, not default",
+    "lab_only": "available for bounded experiments only",
+    "not_selected": "known service, not part of current working shape"
+  },
+  "services": [
+    {
+      "name": "postgres",
+      "module": "compose/modules/10-storage.yml",
+      "owner_profile": "substrate",
+      "posture": "selected_now",
+      "tier": "working_runtime",
+      "resource_guard": "compose/tuning/storage.intel-285h.resource-guard.yml",
+      "decision": "keep resident as bounded transactional state"
+    },
+    {
+      "name": "redis",
+      "module": "compose/modules/10-storage.yml",
+      "owner_profile": "substrate",
+      "posture": "selected_now",
+      "tier": "working_runtime",
+      "resource_guard": "compose/tuning/storage.intel-285h.resource-guard.yml",
+      "decision": "keep resident as bounded cache and coordination state"
+    },
+    {
+      "name": "qdrant",
+      "module": "compose/modules/10-storage.yml",
+      "owner_profile": "substrate",
+      "posture": "selected_now",
+      "tier": "working_runtime",
+      "resource_guard": "compose/tuning/storage.intel-285h.resource-guard.yml",
+      "decision": "keep resident as vector store, bounded rather than disabled"
+    },
+    {
+      "name": "neo4j",
+      "module": "compose/modules/10-storage.yml",
+      "owner_profile": "substrate",
+      "posture": "selected_now",
+      "tier": "working_runtime",
+      "resource_guard": "compose/tuning/storage.intel-285h.resource-guard.yml",
+      "decision": "keep resident as graph store with explicit heap and page cache"
+    },
+    {
+      "name": "llama-cpp",
+      "module": "compose/modules/32-llamacpp-inference.yml",
+      "owner_profile": "local-worker",
+      "posture": "selected_now",
+      "tier": "primary_text_lane",
+      "resource_guard": "compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml",
+      "decision": "current Gemma 4 E2B text lane; do not force Gemma 4 through OVMS"
+    },
+    {
+      "name": "ovms",
+      "module": "compose/modules/31-intel-inference.yml",
+      "owner_profile": "intel-worker",
+      "posture": "selected_now",
+      "tier": "embedding_lane",
+      "resource_guard": "compose/tuning/intel-worker.thin-host.yml",
+      "decision": "keep as OpenVINO embeddings seam, not as Gemma 4 text serving"
+    },
+    {
+      "name": "langchain-api",
+      "module": "compose/modules/41-agent-api.yml",
+      "owner_profile": "local-worker",
+      "posture": "selected_now",
+      "tier": "agent_runtime_api",
+      "resource_guard": "compose/tuning/intel-worker.thin-host.yml",
+      "decision": "keep as canonical local agent-facing API"
+    },
+    {
+      "name": "route-api",
+      "module": "compose/modules/43-federation-router.yml",
+      "owner_profile": "federation",
+      "posture": "selected_now",
+      "tier": "advisory_federation_facade",
+      "resource_guard": "compose/tuning/federation.thin-host.yml",
+      "decision": "keep as localhost advisory facade, not an execution service"
+    },
+    {
+      "name": "rerank-api",
+      "module": "compose/modules/45-rerank-api.yml",
+      "owner_profile": "reranking",
+      "posture": "selected_now",
+      "tier": "retrieval_addon",
+      "resource_guard": "compose/modules/45-rerank-api.yml",
+      "decision": "keep explicit Qwen3 OpenVINO reranker wrapper with lazy load and idle exit"
+    },
+    {
+      "name": "rag-api",
+      "module": "compose/modules/46-rag-api.yml",
+      "owner_profile": "rag",
+      "posture": "selected_now",
+      "tier": "rag_orchestration",
+      "resource_guard": "compose/tuning/rag.thin-host.yml",
+      "decision": "keep lightweight RAG orchestration API over Qdrant, OVMS embeddings, route-api, rerank-api, and langchain-api"
+    },
+    {
+      "name": "qwen-tts",
+      "module": "compose/modules/50-speech.yml",
+      "owner_profile": "tools",
+      "posture": "selected_now",
+      "tier": "explicit_tools",
+      "resource_guard": "compose/tuning/tools.thin-host.yml",
+      "decision": "keep bounded HTTP speech surface when tools are selected; host TTS remains protected warm route"
+    },
+    {
+      "name": "tts-router",
+      "module": "compose/modules/50-speech.yml",
+      "owner_profile": "tools",
+      "posture": "selected_now",
+      "tier": "explicit_tools",
+      "resource_guard": "compose/tuning/tools.thin-host.yml",
+      "decision": "keep bounded speech router when tools are selected"
+    },
+    {
+      "name": "docs-api",
+      "module": "compose/modules/51-browser-tools.yml",
+      "owner_profile": "tools",
+      "posture": "selected_now",
+      "tier": "explicit_tools",
+      "resource_guard": "compose/tuning/tools.thin-host.yml",
+      "decision": "keep bounded helper when tools are selected"
+    },
+    {
+      "name": "aoa-browser",
+      "module": "compose/modules/51-browser-tools.yml",
+      "owner_profile": "tools",
+      "posture": "selected_now",
+      "tier": "explicit_tools",
+      "resource_guard": "compose/tuning/tools.thin-host.yml",
+      "decision": "keep bounded browser helper when tools are selected"
+    },
+    {
+      "name": "prometheus",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep for diagnostics with short retention and bounded query pressure"
+    },
+    {
+      "name": "grafana",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep dashboard service bounded when observability is selected"
+    },
+    {
+      "name": "alertmanager",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep bounded alert routing when observability is selected"
+    },
+    {
+      "name": "cadvisor",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep bounded container metrics with lower sampling cadence"
+    },
+    {
+      "name": "n8n",
+      "module": "compose/modules/20-orchestration.yml",
+      "owner_profile": "workflows",
+      "posture": "explicit_opt_in",
+      "tier": "workflow_automation",
+      "resource_guard": "compose/tuning/workflows.thin-host.yml",
+      "decision": "do not keep resident for current tasks; enable only for workflow runs"
+    },
+    {
+      "name": "n8n-task-runners",
+      "module": "compose/modules/20-orchestration.yml",
+      "owner_profile": "workflows",
+      "posture": "explicit_opt_in",
+      "tier": "workflow_automation",
+      "resource_guard": "compose/tuning/workflows.thin-host.yml",
+      "decision": "use external runners only with workflows, low concurrency, and idle shutdown"
+    },
+    {
+      "name": "ollama",
+      "module": "compose/modules/30-local-inference.yml",
+      "owner_profile": "fallback-gateway",
+      "posture": "fallback_control",
+      "tier": "fallback",
+      "resource_guard": "",
+      "decision": "retain for fallback and comparison, not current default"
+    },
+    {
+      "name": "litellm",
+      "module": "compose/modules/40-llm-gateway.yml",
+      "owner_profile": "fallback-gateway",
+      "posture": "fallback_control",
+      "tier": "fallback",
+      "resource_guard": "",
+      "decision": "retain gateway fallback, not current default"
+    },
+    {
+      "name": "tos-graph",
+      "module": "compose/modules/52-tos-graph.yml",
+      "owner_profile": "curation",
+      "posture": "explicit_opt_in",
+      "tier": "curation",
+      "resource_guard": "",
+      "decision": "enable for Tree of Sophia graph curation, not current always-on shape"
+    },
+    {
+      "name": "babelvox-tts",
+      "module": "compose/modules/53-babelvox-tts.yml",
+      "owner_profile": "speech-fast-experimental",
+      "posture": "lab_only",
+      "tier": "experimental_speech",
+      "resource_guard": "compose/modules/53-babelvox-tts.yml",
+      "decision": "do not replace protected host TTS until hot-path latency and memory evidence improves"
+    },
+    {
+      "name": "langchain-api-llamacpp",
+      "module": "compose/modules/44-llamacpp-agent-sidecar.yml",
+      "owner_profile": "sidecar",
+      "posture": "lab_only",
+      "tier": "benchmark_sidecar",
+      "resource_guard": "",
+      "decision": "keep as bounded benchmark and promotion sidecar, not default runtime"
+    }
+  ]
+}

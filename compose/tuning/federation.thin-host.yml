@@ -1,0 +1,10 @@
+# Candidate federation facade guard for workstation runs.
+# Use only with the `federation` profile or presets that include it.
+services:
+  route-api:
+    labels:
+      aoa.tuning.overlay: "federation.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_ROUTE_API_CPUS:-0.5}"
+    mem_limit: "${AOA_ROUTE_API_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_ROUTE_API_MEM_RESERVATION:-128m}"

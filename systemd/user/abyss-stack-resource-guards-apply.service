@@ -1,0 +1,16 @@
+[Unit]
+Description=Abyss Stack guarded resource-limit apply
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/docs/runtime/SERVICE_SELECTION.md
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/docs/runtime/SERVICE_OPTIMIZATION_COMPLETION_AUDIT_2026_05_16.md
+After=podman-compose-abyss.service
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+IOWeight=20
+TimeoutStartSec=75min
+ExecStart=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-apply-resource-guards --wait-game-guard-clear --wait-resource-plan-clear --wait-timeout-sec=3600 --wait-poll-sec=60
+StandardOutput=journal
+StandardError=journal

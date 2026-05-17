@@ -17,9 +17,12 @@ a service belongs to the default AbyssOS substrate.
 | `42-agent-api-intel.yml` | worker accelerator overlay | `intel-worker` |
 | `43-federation-router.yml` | advisory seam | `federation` |
 | `44-llamacpp-agent-sidecar.yml` | pilot sidecar | `aoa-llamacpp-pilot` or explicit extra compose |
+| `45-rerank-api.yml` | retrieval reranker | `reranking` |
+| `46-rag-api.yml` | RAG orchestration | `rag` |
 | `50-speech.yml` | helper | `tools` |
 | `51-browser-tools.yml` | helper | `tools` |
 | `52-tos-graph.yml` | projection helper | `curation` |
+| `53-babelvox-tts.yml` | experimental speech helper | `speech-fast-experimental` |
 | `60-monitoring.yml` | visibility | `observability` |
 
 ## Stop Line

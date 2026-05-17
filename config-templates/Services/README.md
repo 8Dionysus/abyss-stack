@@ -14,10 +14,13 @@ Bootstrap behavior:
 Current source-managed service trees:
 
 - `aoa-browser/`
+- `babelvox-tts-api/`
 - `docs-api/`
 - `langchain-api/`
 - `litellm/`
 - `qwen3-tts-api/`
+- `rag-api/`
+- `rerank-api/`
 - `route-api/`
 - `tos-graph/`
 - `tts_router/`

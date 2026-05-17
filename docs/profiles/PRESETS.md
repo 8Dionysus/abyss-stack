@@ -35,6 +35,11 @@ default promoted presets.
 The `workflows` profile also stays opt-in. Current presets do not start n8n;
 add `--profile workflows` only when workflow automation is deliberately part of
 the run.
+The `speech-fast-experimental` profile also stays opt-in. Current presets do
+not start BabelVox TTS; add it only for bounded Intel speech experiments.
+The `rag` profile is also explicit. Add `--profile rag` to an Intel preset when
+you want source-linked ingest/retrieve/answer and Agentic-RAG trace surfaces.
+It reuses the selected storage, embeddings, route, rerank, and text lanes.
 
 ## How presets interact with profiles
 

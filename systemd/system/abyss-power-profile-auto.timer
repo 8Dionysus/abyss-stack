@@ -2,9 +2,10 @@
 Description=Periodically enforce Abyss automatic power profile policy
 
 [Timer]
-OnBootSec=20s
-OnUnitActiveSec=30s
-AccuracySec=5s
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+RandomizedDelaySec=15s
 Unit=abyss-power-profile-auto.service
 
 [Install]

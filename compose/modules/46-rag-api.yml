@@ -1,0 +1,45 @@
+services:
+  rag-api:
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/rag-api"
+    container_name: rag-api
+    restart: unless-stopped
+    environment:
+      AOA_RAG_CONFIG_ROOT: /app/config/rag
+      AOA_RAG_QDRANT_URL: http://qdrant:6333
+      AOA_RAG_LANGCHAIN_URL: http://langchain-api:5401
+      AOA_RAG_ROUTE_API_URL: http://route-api:5402
+      AOA_RAG_RERANK_URL: http://rerank-api:5405
+      AOA_RAG_COLLECTION: "${AOA_RAG_COLLECTION:-abyss_stack_rag_chunks_v1}"
+      AOA_RAG_VECTOR_SIZE: "${AOA_RAG_VECTOR_SIZE:-1024}"
+      AOA_RAG_MAX_CHUNK_CHARS: "${AOA_RAG_MAX_CHUNK_CHARS:-1800}"
+      AOA_RAG_CHUNK_OVERLAP_CHARS: "${AOA_RAG_CHUNK_OVERLAP_CHARS:-180}"
+      AOA_RAG_EMBED_BATCH_SIZE: "${AOA_RAG_EMBED_BATCH_SIZE:-8}"
+      AOA_RAG_DEFAULT_TOP_K: "${AOA_RAG_DEFAULT_TOP_K:-6}"
+      AOA_RAG_HTTP_TIMEOUT_S: "${AOA_RAG_HTTP_TIMEOUT_S:-45}"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/rag:/app/config/rag:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/docs:/sources/abyss-stack-docs:ro,z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Knowledge/federation:/sources/federation:ro,z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/rag-api:/app/logs:Z"
+    depends_on:
+      qdrant:
+        condition: service_started
+      neo4j:
+        condition: service_started
+      langchain-api:
+        condition: service_healthy
+      route-api:
+        condition: service_healthy
+      rerank-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}:5406"
+    mem_limit: "${AOA_RAG_API_MEM_LIMIT:-768m}"
+    mem_reservation: "${AOA_RAG_API_MEM_RESERVATION:-128m}"
+    cpus: "${AOA_RAG_API_CPUS:-1.0}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5406/health', timeout=5).read()"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 10s

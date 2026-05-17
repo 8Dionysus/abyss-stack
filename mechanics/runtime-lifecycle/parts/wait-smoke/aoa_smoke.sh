@@ -90,8 +90,22 @@ if has_module "43-federation-router.yml" && { has_module "41-agent-api.yml" || h
   "${SCRIPTS_DIR}/aoa-federated-check" || failures=$((failures + 1))
 fi
 
+if has_module "45-rerank-api.yml"; then
+  aoa_probe_http "rerank-api" "http://127.0.0.1:${AOA_RERANK_HOST_PORT:-5405}/health" || failures=$((failures + 1))
+fi
+
+if has_module "46-rag-api.yml"; then
+  aoa_probe_http "rag-api" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/health" || failures=$((failures + 1))
+  aoa_probe_http "rag-api sources" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/sources" || failures=$((failures + 1))
+  aoa_probe_http "rag-api dag" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/dag/jobs" || failures=$((failures + 1))
+fi
+
 if has_module "52-tos-graph.yml"; then
   aoa_probe_http "tos-graph" "http://127.0.0.1:5410/health" || failures=$((failures + 1))
+fi
+
+if has_module "53-babelvox-tts.yml"; then
+  aoa_probe_http "babelvox-tts" "http://127.0.0.1:${AOA_BABELVOX_TTS_HOST_PORT:-5102}/health" || failures=$((failures + 1))
 fi
 
 if has_module "50-speech.yml"; then

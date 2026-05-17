@@ -19,6 +19,10 @@ Tracking starts with the community-docs baseline for this repository.
   landing history, backlog, and release-contour document
 - root `docs/` now uses role-named districts instead of a flat surface list,
   preserving the AbyssOS source/runtime split in the folder topology itself
+- the Intel workstation route now has explicit service-selection docs, a Gemma
+  4 E2B `llama.cpp` Vulkan lane, an opt-in Qwen3 rerank API profile, thin-host
+  guard overlays, a protected TTS keep-warm timer, and the first source-linked
+  RAG orchestration profile
 
 ### Added
 
@@ -57,6 +61,31 @@ Tracking starts with the community-docs baseline for this repository.
   mapping that does not compete with the homepage README
 - root `DESIGN.md` and `DESIGN.AGENTS.md` surfaces, adapting the AoA route-card
   pattern to the `abyss-stack` runtime substrate
+- `docs/runtime/SERVICE_SELECTION.md` as the source-level service-selection
+  guide for lean Intel, full Intel, optional workflows, tools, observability,
+  reranking, and protected speech routes
+- `compose/modules/45-rerank-api.yml`, `compose/profiles/reranking.txt`, and
+  `config-templates/Services/rerank-api/` for the explicit localhost-only
+  OpenVINO Qwen3 reranker wrapper
+- `compose/modules/46-rag-api.yml`, `compose/profiles/rag.txt`,
+  `compose/tuning/rag.thin-host.yml`,
+  `config-templates/Configs/rag/`, and
+  `config-templates/Services/rag-api/` for the first lightweight RAG,
+  Agentic-RAG trace, and DAG manifest orchestration layer over existing stack
+  services
+- `compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml` for the candidate
+  Gemma 4 E2B text lane on the Intel 285H class through `llama.cpp` Vulkan
+- `compose/tuning/storage.intel-285h.resource-guard.yml`,
+  `compose/tuning/observability.thin-host.yml`,
+  `compose/tuning/tools.thin-host.yml`, and
+  `compose/tuning/workflows.thin-host.yml` as explicit resource guard overlays
+  for selected services
+- `systemd/user/abyss-tts-keepwarm.service` and
+  `systemd/user/abyss-tts-keepwarm.timer` for bounded TTS warmth through the
+  existing protected host TTS server
+- `docs/decisions/2026-05-15-intel-inference-and-rerank-service-selection.md`
+  as the rationale for the current Gemma, OVMS embeddings, Qwen3 reranking,
+  protected TTS, and optional-service split
 
 ### Changed
 
@@ -205,6 +234,25 @@ Tracking starts with the community-docs baseline for this repository.
 - source-managed systemd unit skeletons now have explicit user and privileged
   support allowlists, with install routes that link or copy units without
   starting, stopping, enabling, disabling, masking, or restarting services
+- profile endpoint rendering, smoke probes, validation, profile docs, runtime
+  storage docs, and model cards now know about the `reranking` add-on and the
+  dedicated `rerank-api` service
+- `rerank-api` now has configurable idle unload
+  (`AOA_RERANK_IDLE_UNLOAD_SEC`, default `900`) plus a localhost
+  `POST /admin/unload` route so occasional reranking does not keep the
+  OpenVINO reranker resident forever
+- `rerank-api` can exit after idle unload
+  (`AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD=true`) so container restart returns
+  allocator-held OpenVINO memory to the host instead of relying only on
+  in-process object deletion
+- `aoa-llamacpp-pilot` can capture a lightweight live tuning snapshot packet
+  from an existing `llama.cpp` service without starting or stopping services
+- source-managed systemd unit skeletons now use normalized `file:///`
+  documentation links, and the automatic power-profile support unit routes
+  through the bounded `abyss-machine mode reconcile --light` command
+- `abyss-nervous-semantic-maintain.timer` no longer uses `OnActiveSec=10min`,
+  so user systemd reloads do not create an extra near-term semantic rebuild
+  trigger outside the intended boot and 90-minute cadence
 
 ### Validation
 
@@ -214,6 +262,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `python -m pytest tests/test_decision_records.py tests/test_roadmap_parity.py`
 - `python -m pytest -q`
 - `python scripts/release_check.py`
+- `systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer systemd/user/*.path`
+- `systemd-analyze verify systemd/system/*.service systemd/system/*.timer`
+- `scripts/aoa-smoke --profile substrate --profile intel-worker --profile federation --profile reranking`
 
 ### Notes
 

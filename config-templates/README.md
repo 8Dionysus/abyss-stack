@@ -24,11 +24,15 @@ scripts/aoa-bootstrap-configs
 - `Configs/tts/`
 - `Configs/ollama/`
 - `Configs/tos-graph/`
+- `Configs/rag/`
 - `Services/docs-api/`
 - `Services/aoa-browser/`
+- `Services/babelvox-tts-api/`
 - `Services/langchain-api/`
 - `Services/litellm/`
 - `Services/qwen3-tts-api/`
+- `Services/rag-api/`
+- `Services/rerank-api/`
 - `Services/route-api/`
 - `Services/tos-graph/`
 - `Services/tts_router/`
@@ -48,6 +52,11 @@ templates for:
 - `return-policy.yaml`
 - `governed-execution-policy.yaml`
 - `governed-canary-catalog.json`
+
+The `Configs/rag/` family carries public-safe RAG source registry, agentic graph,
+and DAG job manifests for the `rag-api` service. It describes where mounted
+runtime source mirrors live inside the container; it does not store embeddings,
+private captures, or generated Qdrant payloads in git.
 
 `aoa-browser` is now source-managed here as a lightweight browser-helper build
 context. The Playwright browser payload under

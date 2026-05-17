@@ -13,7 +13,9 @@ link_all_user_units=0
 link_system_units=0
 preset_spec=""
 profile_spec=""
+overlay_spec=""
 selection_set=0
+overlay_set=0
 
 aoa_validate_runtime_spec() {
   local label="$1"
@@ -34,6 +36,27 @@ aoa_append_runtime_spec() {
   else
     printf '%s,%s\n' "$current" "$value"
   fi
+}
+
+aoa_validate_overlay_spec() {
+  local value="$1"
+  local raw_part trimmed resolved
+
+  [[ -n "$value" ]] || return 0
+
+  while IFS= read -r raw_part; do
+    trimmed="$(aoa_trim "$raw_part")"
+    [[ -n "$trimmed" ]] || aoa_die "overlay must not contain empty entries"
+    if [[ ! "$trimmed" =~ ^[A-Za-z0-9_./-]+$ ]]; then
+      aoa_die "overlay must be a comma-separated list of compose file paths"
+    fi
+    if [[ "$trimmed" == /* ]]; then
+      resolved="$trimmed"
+    else
+      resolved="${AOA_CONFIGS_ROOT}/${trimmed}"
+    fi
+    [[ -f "$resolved" ]] || aoa_die "overlay compose file not found: $resolved"
+  done < <(aoa_expand_specs "$value")
 }
 
 while (($#)); do
@@ -70,6 +93,17 @@ while (($#)); do
       profile_spec="$(aoa_append_runtime_spec "$profile_spec" "${1#*=}")"
       selection_set=1
       ;;
+    --overlay|--extra-compose-file|--extra-compose-files)
+      option_name="$1"
+      shift
+      (($#)) || aoa_die "missing value after ${option_name}"
+      overlay_spec="$(aoa_append_runtime_spec "$overlay_spec" "$1")"
+      overlay_set=1
+      ;;
+    --overlay=*|--extra-compose-file=*|--extra-compose-files=*)
+      overlay_spec="$(aoa_append_runtime_spec "$overlay_spec" "${1#*=}")"
+      overlay_set=1
+      ;;
     *)
       aoa_die "unknown argument: $1"
       ;;
@@ -79,6 +113,13 @@ done
 
 aoa_validate_runtime_spec "preset" "$preset_spec"
 aoa_validate_runtime_spec "profile" "$profile_spec"
+if ((overlay_set)) && [[ -z "$overlay_spec" ]]; then
+  aoa_die "overlay must not be empty"
+fi
+if ((overlay_set && ! selection_set)); then
+  aoa_die "--overlay requires --preset or --profile so the full runtime shape stays explicit"
+fi
+aoa_validate_overlay_spec "$overlay_spec"
 
 unit_source="${AOA_CONFIGS_ROOT}/systemd/user/podman-compose-abyss.service"
 unit_manifest="${AOA_CONFIGS_ROOT}/systemd/user/managed-units.txt"
@@ -183,16 +224,18 @@ else
   aoa_link_user_unit "podman-compose-abyss.service"
 fi
 
-if ((selection_set)); then
+if ((selection_set || overlay_set)); then
   mkdir -p "$selection_dropin_dir"
   {
     printf '[Service]\n'
     printf 'Environment=AOA_STACK_PRESET=%s\n' "$preset_spec"
     printf 'Environment=AOA_STACK_PROFILE=%s\n' "$profile_spec"
+    printf 'Environment=AOA_EXTRA_COMPOSE_FILES=%s\n' "$overlay_spec"
   } > "$selection_dropin"
   aoa_note "runtime selection drop-in: ${selection_dropin}"
   aoa_note "runtime selection preset: ${preset_spec:-(none)}"
   aoa_note "runtime selection profile: ${profile_spec:-(none)}"
+  aoa_note "runtime selection overlays: ${overlay_spec:-(none)}"
 fi
 
 systemctl --user daemon-reload

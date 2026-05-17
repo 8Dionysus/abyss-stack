@@ -235,6 +235,11 @@ Use `--preset` or `--profile` to write an explicit user-unit runtime-selection
 drop-in. This is the durable path when the live machine must keep a non-default
 runtime shape after boot or `systemctl --user restart`. Repeated flags and
 comma-separated forms are both accepted.
+Use `--overlay <compose-file>` when a host-local resource or model overlay must
+survive reboot and unit restarts. The installer validates each overlay against
+the deployed `Configs` tree and writes `AOA_EXTRA_COMPOSE_FILES` into the same
+drop-in. Overlay selection must be paired with `--preset` or `--profile` so the
+drop-in preserves the full runtime shape.
 
 Use `--all-user-units` after `scripts/aoa-sync-configs` when all allowlisted
 working user services should be sourced from the deployed `abyss-stack` mirror.
@@ -390,6 +395,21 @@ the current host preset and layer the federation profile:
 
 ```bash
 scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
+```
+
+For a bounded Intel full-stack route, keep the same preset/profile selection and
+persist only the overlays that match the selected services:
+
+```bash
+scripts/aoa-install-systemd --preset intel-full --profile federation,reranking --overlay compose/tuning/storage.intel-285h.resource-guard.yml,compose/tuning/intel-worker.thin-host.yml,compose/tuning/federation.thin-host.yml,compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml,compose/tuning/observability.thin-host.yml,compose/tuning/tools.thin-host.yml
+```
+
+When the overlays are staged in the user unit, apply them through the guarded
+route instead of restarting the stack by hand:
+
+```bash
+scripts/aoa-apply-resource-guards --dry-run
+scripts/aoa-apply-resource-guards
 ```
 
 Or manually:

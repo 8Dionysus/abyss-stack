@@ -20,6 +20,16 @@ This file maps the first migrated runtime modules to their intended services.
   presets compose `substrate` plus worker layers directly.
 - `workflows`, federation, tools, curation, and observability profiles stay
   explicit runtime choices.
+- `reranking` is an explicit add-on for the OpenVINO Qwen3 reranker API; it is
+  not part of the default Intel worker lane until separately promoted.
+- `rag` is the first RAG orchestration profile. It layers a lightweight
+  localhost API over existing storage, embedding, rerank, route, and text lanes
+  rather than adding another vector DB or making n8n the retrieval brain.
+- Service selection and optimization rules live in
+  [`SERVICE_SELECTION.md`](SERVICE_SELECTION.md). In short, `intel-federation`
+  is the lean Intel-aware agent shape, while `intel-full` intentionally adds
+  helper tools and observability and should not be mistaken for the minimum
+  resident runtime.
 
 ## `10-storage.yml`
 
@@ -95,6 +105,38 @@ This file maps the first migrated runtime modules to their intended services.
 - exposes thin routing metadata, structured advisory routing, bounded memo inspection, structured eval selection, playbook activation/composition inspection, `/kag/*` retrieval/regrounding inspection, and filesystem-first memo/eval export discovery
 - remains an advisory facade; it does not execute the route itself, while `langchain-api` is now the first live consumer of those mirrored seams
 
+## `45-rerank-api.yml`
+
+- `rerank-api` — localhost-only OpenVINO Qwen3 reranker API on `5405`
+- wraps the host-validated CausalLM-style Qwen3 reranker scorer through
+  `POST /v3/rerank` and `POST /rerank`
+- keeps `GET /health` lightweight and loads the model lazily on the first
+  rerank request
+- unloads the model after an idle window by default
+  (`AOA_RERANK_IDLE_UNLOAD_SEC=900`) so occasional reranking does not keep a
+  multi-GB OpenVINO model resident forever; `POST /admin/unload` is available
+  for explicit localhost memory relief
+- exits after idle unload by default (`AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD=true`)
+  so Podman restarts a clean lightweight API process and returns allocator-held
+  memory to the host
+- uses `/srv/abyss-machine/cache/ai` for the model and OpenVINO cache by
+  default, not the limited system root
+
+## `46-rag-api.yml`
+
+- `rag-api` — localhost-only RAG orchestration API on `5406`
+- consumes `Configs/rag/sources.json`, `agentic-graph.v1.json`, and
+  `dag-jobs.v1.json` as public-safe runtime manifests
+- uses Qdrant for source-linked chunk retrieval, OVMS embeddings through
+  `langchain-api`, optional `rerank-api` scoring, `route-api` advisory surfaces,
+  and `langchain-api` answer generation
+- exposes `GET /sources`, `GET /dag/jobs`, `GET /agentic-rag/graph`,
+  `POST /ingest/source`, `POST /retrieve`, `POST /answer`, and
+  `POST /agentic-rag/run`
+- keeps n8n, Dagster, and Temporal out of the resident RAG path; those remain
+  explicit DAG/integration lanes until a later promotion proves they should be
+  always-on
+
 ## `50-speech.yml`
 
 - `qwen-tts` — local speech generation
@@ -111,6 +153,14 @@ This file maps the first migrated runtime modules to their intended services.
 - reads canonical ToS source files from the mounted `AOA_TOS_ROOT`
 - keeps Neo4j in projection-only posture and does not treat mirrored `tos-source` advisory surfaces as canonical edit input
 - current first slice exposes a route-first localhost UI, health and route/tree/graph inspection APIs, and route-scoped Neo4j sync while writeback remains deferred
+
+## `53-babelvox-tts.yml`
+
+- `babelvox-tts` — opt-in BabelVox/OpenVINO TTS API on `5102`
+- mounts the host-owned TTS Hugging Face cache under `/srv/abyss-machine/cache/ai/tts` so offline model lookup does not spill into the system root
+- keeps `GET /health` lightweight and loads BabelVox lazily on the first synthesis request
+- unloads after an idle window by default (`AOA_BABELVOX_TTS_IDLE_UNLOAD_SEC=900`) and can exit after unload so Podman returns allocator-held memory to the host
+- is experimental and must not replace the protected host warm TTS route without separate hot-path latency and memory evidence
 
 ## `60-monitoring.yml`
 
@@ -134,9 +184,12 @@ Expected localhost-only services may include, depending on selected profiles:
 - langchain-api
 - langchain-api-llamacpp
 - route-api
+- rerank-api
+- rag-api
 - tos-graph
 - qwen-tts
 - tts-router
+- babelvox-tts
 - prometheus
 - grafana
 - alertmanager
@@ -155,7 +208,8 @@ user units that can be linked from the deployed Configs mirror with
 `scripts/aoa-install-systemd --all-user-units`.
 
 The allowlist covers the current working user-service surface: the stack compose
-runner, warm dictation and TTS services, the `gemma4.spark` resident and timers,
+runner, warm dictation and TTS services, the TTS keep-warm timer, the
+`gemma4.spark` resident and timers,
 nervous capture/index/semantic maintenance, process/storage/topology/doctor
 readouts, `ydotoold`, and the AoA receipt watcher path units.
 

@@ -80,6 +80,7 @@ scripts/aoa-llamacpp-pilot bench --preset intel-full
 scripts/aoa-llamacpp-pilot run --preset intel-full
 scripts/aoa-llamacpp-pilot promote --preset intel-full
 scripts/aoa-llamacpp-pilot verify --timeout 60
+scripts/aoa-llamacpp-pilot snapshot --with-checks
 scripts/aoa-llamacpp-pilot status
 scripts/aoa-status --autonomy
 scripts/aoa-llamacpp-pilot down
@@ -145,6 +146,17 @@ build instead of trying to force `Vulkan0` through the default
 - returns machine-readable JSON for bounded operator validation
 - should be paired with `aoa-status --autonomy` when you need the full control-loop verdict instead of a sidecar-only check
 
+### `snapshot`
+
+- captures a lightweight E0 tuning baseline without starting, stopping, or
+  restarting services
+- records RAM, zram, memory PSI, container stats, `llama.cpp` props, slots,
+  metrics, `LLAMA_ARG_*` environment, and selected prompt-cache log signatures
+- writes a runtime-local packet under:
+  - `${AOA_STACK_ROOT}/Logs/runtime-benchmarks/tuning-snapshots/llamacpp-tuning-e0/`
+- accepts `--with-checks` to add an `exact-reply` Qwen contract check against
+  the currently selected run URL
+
 ### `down`
 
 - stops and removes only the sidecar services
@@ -165,6 +177,12 @@ The pilot accepts the upstream `llama-server` posture through environment variab
 - `AOA_LLAMACPP_OP_OFFLOAD`
 - `AOA_LLAMACPP_JINJA`
 - `AOA_LLAMACPP_REASONING_FORMAT`
+
+For the current 2026-05 tuning research route, especially around Qwen3.5
+prompt-cache behavior, KV-cache quantization, zram pressure, sleep-idle, and
+slot save/restore, use
+[LLAMACPP_TUNING_RESEARCH_2026_05](LLAMACPP_TUNING_RESEARCH_2026_05.md)
+before promoting a candidate overlay.
 
 Default posture is conservative:
 - official `ghcr.io/ggml-org/llama.cpp:server-openvino`

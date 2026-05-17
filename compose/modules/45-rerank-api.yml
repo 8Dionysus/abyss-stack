@@ -1,0 +1,40 @@
+services:
+  rerank-api:
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/rerank-api"
+    container_name: rerank-api
+    restart: unless-stopped
+    environment:
+      AOA_RERANK_MODEL_NAME: "${AOA_RERANK_MODEL_NAME:-qwen3-reranker-0.6b-int8-ov}"
+      AOA_RERANK_MODEL_DIR: /models/qwen3-reranker
+      AOA_RERANK_CACHE_DIR: /cache/openvino
+      AOA_RERANK_DEVICE: "${AOA_RERANK_DEVICE:-GPU}"
+      AOA_RERANK_MAX_LENGTH: "${AOA_RERANK_MAX_LENGTH:-2048}"
+      AOA_RERANK_BATCH_SIZE: "${AOA_RERANK_BATCH_SIZE:-4}"
+      AOA_RERANK_DEFAULT_TOP_N: "${AOA_RERANK_DEFAULT_TOP_N:-5}"
+      AOA_RERANK_IDLE_UNLOAD_SEC: "${AOA_RERANK_IDLE_UNLOAD_SEC:-900}"
+      AOA_RERANK_IDLE_UNLOAD_CHECK_SEC: "${AOA_RERANK_IDLE_UNLOAD_CHECK_SEC:-60}"
+      AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD: "${AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD:-true}"
+      HF_HOME: /cache/hf
+      TRANSFORMERS_CACHE: /cache/hf/transformers
+      HUGGINGFACE_HUB_CACHE: /cache/hf/hub
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - "${AOA_QWEN3_RERANKER_MODEL_HOST_PATH:-/srv/abyss-machine/cache/ai/qwen3-reranker-0.6b-int8-ov}:/models/qwen3-reranker:ro,Z"
+      - "${AOA_QWEN3_RERANKER_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/openvino/qwen3-reranker-0.6b-int8-ov}:/cache/openvino:Z"
+      - "${AOA_QWEN3_RERANKER_HF_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/huggingface}:/cache/hf:Z"
+    devices:
+      - /dev/dri:/dev/dri
+    ports:
+      - "127.0.0.1:${AOA_RERANK_HOST_PORT:-5405}:5405"
+    mem_limit: "${AOA_RERANK_MEM_LIMIT:-4g}"
+    mem_reservation: "${AOA_RERANK_MEM_RESERVATION:-1g}"
+    cpus: "${AOA_RERANK_CPUS:-2.0}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5405/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

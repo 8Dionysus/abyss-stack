@@ -1,0 +1,38 @@
+# Candidate helper-service guard for explicit tools profile runs.
+# This does not make tools resident; it only bounds them when selected.
+services:
+  qwen-tts:
+    labels:
+      aoa.tuning.overlay: "tools.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_QWEN_TTS_CPUS:-2.0}"
+    mem_limit: "${AOA_QWEN_TTS_MEM_LIMIT:-6g}"
+    mem_reservation: "${AOA_QWEN_TTS_MEM_RESERVATION:-1g}"
+    environment:
+      OMP_NUM_THREADS: "${AOA_QWEN_TTS_OMP_NUM_THREADS:-2}"
+      MKL_NUM_THREADS: "${AOA_QWEN_TTS_MKL_NUM_THREADS:-2}"
+      NUMEXPR_NUM_THREADS: "${AOA_QWEN_TTS_NUMEXPR_NUM_THREADS:-2}"
+
+  tts-router:
+    labels:
+      aoa.tuning.overlay: "tools.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_TTS_ROUTER_CPUS:-0.5}"
+    mem_limit: "${AOA_TTS_ROUTER_MEM_LIMIT:-256m}"
+    mem_reservation: "${AOA_TTS_ROUTER_MEM_RESERVATION:-64m}"
+
+  docs-api:
+    labels:
+      aoa.tuning.overlay: "tools.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_DOCS_API_CPUS:-0.5}"
+    mem_limit: "${AOA_DOCS_API_MEM_LIMIT:-256m}"
+    mem_reservation: "${AOA_DOCS_API_MEM_RESERVATION:-64m}"
+
+  aoa-browser:
+    labels:
+      aoa.tuning.overlay: "tools.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_BROWSER_CPUS:-1.0}"
+    mem_limit: "${AOA_BROWSER_MEM_LIMIT:-1024m}"
+    mem_reservation: "${AOA_BROWSER_MEM_RESERVATION:-256m}"

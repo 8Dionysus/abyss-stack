@@ -1,0 +1,54 @@
+# Candidate low-cadence observability guard for a workstation host.
+# Use only with the `observability` profile or presets that include it.
+services:
+  prometheus:
+    labels:
+      aoa.tuning.overlay: "observability.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_PROMETHEUS_CPUS:-0.75}"
+    mem_limit: "${AOA_PROMETHEUS_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_PROMETHEUS_MEM_RESERVATION:-192m}"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${AOA_PROMETHEUS_RETENTION_TIME:-24h}"
+      - "--storage.tsdb.retention.size=${AOA_PROMETHEUS_RETENTION_SIZE:-1GB}"
+      - "--query.max-concurrency=${AOA_PROMETHEUS_QUERY_MAX_CONCURRENCY:-4}"
+      - "--query.max-samples=${AOA_PROMETHEUS_QUERY_MAX_SAMPLES:-5000000}"
+      - "--web.listen-address=0.0.0.0:9090"
+
+  cadvisor:
+    labels:
+      aoa.tuning.overlay: "observability.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_CADVISOR_CPUS:-0.5}"
+    mem_limit: "${AOA_CADVISOR_MEM_LIMIT:-256m}"
+    mem_reservation: "${AOA_CADVISOR_MEM_RESERVATION:-64m}"
+    command:
+      - "--housekeeping_interval=${AOA_CADVISOR_HOUSEKEEPING_INTERVAL:-30s}"
+      - "--max_housekeeping_interval=${AOA_CADVISOR_MAX_HOUSEKEEPING_INTERVAL:-2m}"
+      - "--global_housekeeping_interval=${AOA_CADVISOR_GLOBAL_HOUSEKEEPING_INTERVAL:-2m}"
+      - "--event_storage_event_limit=default=0"
+      - "--event_storage_age_limit=default=0"
+      - "--disable_metrics=${AOA_CADVISOR_DISABLE_METRICS:-advtcp,cpu_topology,cpuset,hugetlb,memory_numa,network,percpu,process,referenced_memory,resctrl,sched,tcp,udp}"
+
+  alertmanager:
+    labels:
+      aoa.tuning.overlay: "observability.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_ALERTMANAGER_CPUS:-0.25}"
+    mem_limit: "${AOA_ALERTMANAGER_MEM_LIMIT:-128m}"
+    mem_reservation: "${AOA_ALERTMANAGER_MEM_RESERVATION:-64m}"
+
+  grafana:
+    labels:
+      aoa.tuning.overlay: "observability.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_GRAFANA_CPUS:-0.75}"
+    mem_limit: "${AOA_GRAFANA_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_GRAFANA_MEM_RESERVATION:-192m}"
+    environment:
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_LOG_LEVEL: "${AOA_GRAFANA_LOG_LEVEL:-warn}"

@@ -1,0 +1,53 @@
+{
+  "schema": "abyss_stack_agentic_rag_graph_v1",
+  "version": 1,
+  "profile": "rag-local-v0",
+  "nodes": [
+    {
+      "id": "classify_request",
+      "kind": "router",
+      "summary": "Decide whether the request needs retrieval, graph context, or direct abstain."
+    },
+    {
+      "id": "retrieve",
+      "kind": "tool",
+      "summary": "Run dense Qdrant retrieval over source-linked chunks."
+    },
+    {
+      "id": "grade_context",
+      "kind": "guard",
+      "summary": "Check score and payload coverage before answer generation."
+    },
+    {
+      "id": "rewrite_query",
+      "kind": "repair",
+      "summary": "Rewrite low-confidence queries toward source names, route contracts, and service handles."
+    },
+    {
+      "id": "rerank",
+      "kind": "tool",
+      "summary": "Optionally call rerank-api for neural reranking when the caller accepts load cost."
+    },
+    {
+      "id": "answer",
+      "kind": "generation",
+      "summary": "Answer through langchain-api with mandatory citations and abstain on insufficient context."
+    }
+  ],
+  "edges": [
+    ["classify_request", "retrieve"],
+    ["retrieve", "grade_context"],
+    ["grade_context", "rewrite_query"],
+    ["rewrite_query", "retrieve"],
+    ["grade_context", "rerank"],
+    ["rerank", "answer"],
+    ["grade_context", "answer"]
+  ],
+  "state_contract": {
+    "run_id": "required_by_future_persistence",
+    "source_refs": "required",
+    "retrieval_scores": "required",
+    "citations": "required",
+    "writeback": "disabled_by_default"
+  }
+}
