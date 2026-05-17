@@ -12,6 +12,10 @@ roadmap checks.
 
 - `test_validate_stack_required_files.py`: required source files and portable
   mirror hygiene guards.
+- `test_compose_contracts.py`: compose module parsing, loopback host exposure,
+  profile/preset references, and key selector service-map resolution.
+- `test_rag_bridge_contracts.py`: RAG/rerank profile contracts, source/read-only
+  mounts, manifest shape, and machine bridge JSON boundary.
 - `test_validate_stack_parity.py`: source/deployed parity behavior.
 - `test_validate_stack_questbook.py`: questbook schemas, examples, and RPG
   runtime routes.
