@@ -97,14 +97,20 @@ def trim_process_heap() -> bool:
 
 
 def safe_save_path(save_name: str | None) -> Path:
+    out_dir = OUT_DIR.resolve()
     if save_name:
         clean = save_name.replace("\\", "/").lstrip("/")
-        path = OUT_DIR / clean
+        path = out_dir / clean
         if path.suffix.lower() != ".wav":
             path = path.with_suffix(".wav")
     else:
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        path = OUT_DIR / f"{stamp}-babelvox.wav"
+        path = out_dir / f"{stamp}-babelvox.wav"
+    path = path.resolve()
+    try:
+        path.relative_to(out_dir)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="save_name escapes output directory") from exc
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

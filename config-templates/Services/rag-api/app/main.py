@@ -31,6 +31,18 @@ EMBED_BATCH_SIZE = int(os.getenv("AOA_RAG_EMBED_BATCH_SIZE", "8"))
 DEFAULT_TOP_K = int(os.getenv("AOA_RAG_DEFAULT_TOP_K", "6"))
 HTTP_TIMEOUT = float(os.getenv("AOA_RAG_HTTP_TIMEOUT_S", "45"))
 
+
+def validate_chunk_settings(max_chunk_chars: int, overlap_chars: int) -> None:
+    if max_chunk_chars <= 0:
+        raise RuntimeError("AOA_RAG_MAX_CHUNK_CHARS must be greater than 0")
+    if overlap_chars < 0:
+        raise RuntimeError("AOA_RAG_CHUNK_OVERLAP_CHARS must be greater than or equal to 0")
+    if overlap_chars >= max_chunk_chars:
+        raise RuntimeError("AOA_RAG_CHUNK_OVERLAP_CHARS must be less than AOA_RAG_MAX_CHUNK_CHARS")
+
+
+validate_chunk_settings(MAX_CHUNK_CHARS, CHUNK_OVERLAP_CHARS)
+
 app = FastAPI(title="Abyss Stack RAG API", version=APP_VERSION)
 
 
