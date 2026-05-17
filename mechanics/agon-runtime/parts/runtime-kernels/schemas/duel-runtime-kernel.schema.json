@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/agon-runtime/parts/runtime-kernels/schemas/duel-runtime-kernel.schema.json",
   "properties": {
     "event_log_requirements": {
       "type": "array"

@@ -16,6 +16,8 @@ roadmap checks.
   profile/preset references, and key selector service-map resolution.
 - `test_rag_bridge_contracts.py`: RAG/rerank profile contracts, source/read-only
   mounts, manifest shape, and machine bridge JSON boundary.
+- `test_schema_contracts.py`: active JSON Schema meta-validation, schema
+  registry coverage, example validation, and generated artifact validation.
 - `test_validate_stack_parity.py`: source/deployed parity behavior.
 - `test_validate_stack_questbook.py`: questbook schemas, examples, and RPG
   runtime routes.
