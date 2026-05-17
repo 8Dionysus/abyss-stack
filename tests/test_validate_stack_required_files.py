@@ -99,7 +99,17 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             doc = repo_root / "docs" / "MODEL_CARD.md"
             doc.parent.mkdir(parents=True, exist_ok=True)
             host_local_root = "/home/dionysus/src/" + "abyss-stack"
-            doc.write_text(f"Bad link: {host_local_root}/docs/runtime/PATHS.md\n", encoding="utf-8")
+            other_user_root = "/home/alice/src/" + "abyss-stack"
+            doc.write_text(
+                "\n".join(
+                    [
+                        f"Bad link: {host_local_root}/docs/runtime/PATHS.md",
+                        f"Another bad link: {other_user_root}/docs/runtime/PATHS.md",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
             errors: list[str] = []
             with patch.object(validate_stack, "ROOT", repo_root):
@@ -109,7 +119,9 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             errors,
             [
                 "host-local source checkout path found in "
-                f"docs/MODEL_CARD.md: {host_local_root}"
+                f"docs/MODEL_CARD.md: {host_local_root}",
+                "host-local source checkout path found in "
+                f"docs/MODEL_CARD.md: {other_user_root}",
             ],
         )
 
@@ -184,6 +196,24 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
                 "got " + "/srv/" + "aoa-skills/.agents/skills/aoa-source-of-truth-check"
             ],
         )
+
+    def test_skill_projection_accepts_checkout_safe_target_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            skill_root = repo_root / ".agents" / "skills"
+            skill_root.mkdir(parents=True)
+            (skill_root / "AGENTS.md").write_text("# Skill surface\n", encoding="utf-8")
+            overlay = skill_root / "abyss-self-diagnostic-spine"
+            overlay.mkdir()
+            (overlay / "SKILL.md").write_text("# Overlay\n", encoding="utf-8")
+            expected_target = "/srv/AbyssOS/aoa-skills/.agents/skills/aoa-change-protocol"
+            (skill_root / "aoa-change-protocol").write_text(expected_target + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                validate_stack.validate_agent_skill_projection_routes(errors)
+
+        self.assertEqual(errors, [])
 
     def test_missing_operator_backend_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

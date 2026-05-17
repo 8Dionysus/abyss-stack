@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-import yaml
+from tests.compose_yaml_subset import load_compose_services
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ MACHINE_BRIDGE_BACKEND = REPO_ROOT / "mechanics" / "machine-fit" / "parts" / "ma
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data = load_compose_services(path)
     if not isinstance(data, dict):
         raise AssertionError(f"{path} did not parse to a YAML mapping")
     return data

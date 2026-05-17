@@ -483,6 +483,8 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["compatibility_bridge_for"], "/playbooks/automation-plan")
         self.assertEqual(payload["plan"]["name"], "fixture-plan")
+        self.assertEqual(payload["seed"], payload["plan"])
+        self.assertEqual(payload["seed"]["name"], "fixture-plan")
 
     def test_kag_structured_reads_stay_mirror_backed(self) -> None:
         store = self.make_store()

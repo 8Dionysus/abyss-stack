@@ -176,7 +176,10 @@ else:
 machine = payload.get("machine") if isinstance(payload.get("machine"), dict) else {}
 record_kernel = machine.get("kernel_release")
 current_kernel = platform.release()
-if isinstance(record_kernel, str) and record_kernel and record_kernel != current_kernel:
+if not isinstance(record_kernel, str) or not record_kernel:
+    emit("WARN", "machine-fit record is missing machine.kernel_release; refresh machine-fit")
+    warnings += 1
+elif record_kernel != current_kernel:
     emit(
         "WARN",
         f"machine-fit kernel mismatch: record={record_kernel} current={current_kernel}; refresh machine-fit",
@@ -185,7 +188,10 @@ if isinstance(record_kernel, str) and record_kernel and record_kernel != current
 
 record_os = machine.get("os_version_id")
 current_os = os_release_value("VERSION_ID")
-if isinstance(record_os, str) and current_os and record_os != current_os:
+if not isinstance(record_os, str) or not record_os:
+    emit("WARN", "machine-fit record is missing machine.os_version_id; refresh machine-fit")
+    warnings += 1
+elif current_os and record_os != current_os:
     emit(
         "WARN",
         f"machine-fit OS version mismatch: record={record_os} current={current_os}; refresh machine-fit",
@@ -300,6 +306,12 @@ else:
 
 current_bridge = run_json("abyss-machine", "bridge", "--json")
 current_stack_bridge = run_json("abyss-machine", "stack-bridge", "export", "--json")
+if current_bridge is None:
+    emit("WARN", "live abyss-machine bridge probe unavailable; refresh or repair abyss-machine bridge")
+    warnings += 1
+if current_stack_bridge is None:
+    emit("WARN", "live abyss-machine stack-bridge export probe unavailable; refresh or repair abyss-machine stack bridge")
+    warnings += 1
 host_bridge = payload.get("host_bridge") if isinstance(payload.get("host_bridge"), dict) else {}
 record_bridge_version = host_bridge.get("bridge_version")
 current_bridge_version = current_bridge.get("version") if isinstance(current_bridge, dict) else None

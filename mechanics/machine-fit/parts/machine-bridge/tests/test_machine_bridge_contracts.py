@@ -185,3 +185,61 @@ else:
     assert payload["status"] == "ready"
     assert "artifact_index" not in payload
     assert "/etc/abyss-machine/bridge.json" not in completed.stdout
+
+
+def test_machine_bridge_check_stays_ready_when_optional_probes_warn(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "abyss-machine"
+    fake.write_text(
+        """#!/usr/bin/env python3
+import json
+import sys
+
+cmd = sys.argv[1:]
+
+if cmd[:2] == ["stack-bridge", "export"]:
+    print(json.dumps({
+        "schema": "abyss_machine_stack_bridge_v1",
+        "version": "0.test",
+        "generated_at": "2026-05-11T00:00:00Z",
+        "ok": True,
+        "summary": {"layers": 1, "refs": 1, "required_missing": 0, "schema_mismatches": 0},
+        "paths": {"commands": {"export": "abyss-machine stack-bridge export --json"}},
+        "artifacts": {"machine": {"bridge": {"path": "/etc/abyss-machine/bridge.json", "schema": "abyss_machine_bridge_v1", "truth_level": "contract"}}}
+    }))
+elif cmd[:2] == ["stack-bridge", "validate"]:
+    print(json.dumps({
+        "schema": "abyss_machine_stack_bridge_validate_v1",
+        "version": "0.test",
+        "generated_at": "2026-05-11T00:00:00Z",
+        "ok": True,
+        "summary": {"fails": 0, "warnings": 0}
+    }))
+elif cmd[:1] == ["bridge"]:
+    print(json.dumps({"schema": "abyss_machine_bridge_v1", "version": "0.test", "generated_at": "2026-05-11T00:00:00Z", "ok": True}))
+else:
+    print("optional probe unavailable", file=sys.stderr)
+    sys.exit(2)
+""",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/aoa-machine-bridge", "--check"],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "ready"
+    assert payload["summary"]["warnings"] > 0
+    assert any("unavailable" in warning for warning in payload["warnings"])

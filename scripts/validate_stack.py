@@ -45,8 +45,8 @@ WORKSPACE_SIBLING_ROOTS = {
 STALE_ACTIVE_SIBLING_ROOT_PATTERN = re.compile(
     r"/srv/(?:aoa-[A-Za-z0-9_-]+|Agents-of-Abyss|Tree-of-Sophia)"
 )
-HOST_LOCAL_SOURCE_CHECKOUT_ROOTS = (
-    "/home/dionysus/src/" + "abyss-stack",
+HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS = (
+    re.compile(r"/home/[^/\s]+/src/abyss-stack(?:\b|/)"),
 )
 MOVED_MECHANIC_DOC_REFS = (
     "mechanics/config-projection/docs/RENDER_TRUTH.md",
@@ -1246,14 +1246,16 @@ def validate_git_mirror_hygiene(errors: list[str]) -> None:
 
 def validate_no_host_local_source_checkout_paths(errors: list[str]) -> None:
     for path in iter_text_files():
+        if path == ROOT / "scripts" / "validate_stack.py":
+            continue
         text = read_text_or_none(path)
         if text is None:
             continue
-        for forbidden_root in HOST_LOCAL_SOURCE_CHECKOUT_ROOTS:
-            if forbidden_root in text:
+        for pattern in HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS:
+            for match in pattern.finditer(text):
                 errors.append(
                     "host-local source checkout path found in "
-                    f"{path.relative_to(ROOT)}: {forbidden_root}"
+                    f"{path.relative_to(ROOT)}: {match.group(0).rstrip('/')}"
                 )
 
 
@@ -2911,6 +2913,9 @@ def validate_agent_skill_projection_routes(errors: list[str]) -> None:
             if not path.is_dir() or not (path / "SKILL.md").is_file():
                 errors.append(f"{rel_path} must stay as a local overlay directory with SKILL.md")
             continue
+        expected_target = f"{AOA_SKILL_INSTALL_ROOT}/{path.name}"
+        if _matches_checkout_safe_overlay_install(path, expected_target):
+            continue
         if not path.is_symlink():
             errors.append(f"{rel_path} must be a symlink into {AOA_SKILL_INSTALL_ROOT}")
             continue
@@ -2919,7 +2924,6 @@ def validate_agent_skill_projection_routes(errors: list[str]) -> None:
         except OSError:
             errors.append(f"{rel_path} symlink target cannot be read")
             continue
-        expected_target = f"{AOA_SKILL_INSTALL_ROOT}/{path.name}"
         if actual_target != expected_target:
             errors.append(
                 f"{rel_path} must target {expected_target}, got {actual_target}"
@@ -4079,6 +4083,9 @@ def validate_runtime_hygiene_contracts(errors: list[str]) -> None:
             errors.append(f"mechanics/diagnostic-spine/parts/doctor-readiness/docs/DOCTOR.md must mention `{snippet}`")
 
     cache_schema = read_required_json(RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH)
+    if cache_schema and not isinstance(cache_schema, dict):
+        errors.append(f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must contain a JSON object")
+        cache_schema = None
     if cache_schema and cache_schema.get("title") != "abyss-stack runtime gateway cache status":
         errors.append(
             f"{RUNTIME_GATEWAY_CACHE_STATUS_SCHEMA_PATH.as_posix()} must describe abyss-stack runtime gateway cache status"

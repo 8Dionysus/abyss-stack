@@ -239,7 +239,10 @@ PY
         overlay_path="${AOA_CONFIGS_ROOT}/${overlay_spec}"
       fi
 
-      [[ -f "$overlay_path" ]] || aoa_die "machine-fit overlay not found: $overlay_path"
+      if [[ ! -f "$overlay_path" ]]; then
+        AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS+=("$overlay_spec")
+        continue
+      fi
 
       overlay_touches=0
       while IFS= read -r service_name; do
