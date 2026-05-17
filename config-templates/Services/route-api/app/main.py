@@ -2449,6 +2449,7 @@ def playbooks_automation_plan(request: PlaybookAutomationPlanRequest) -> dict[st
 @app.post("/playbooks/automation-seed")
 def playbooks_automation_seed_compatibility(request: PlaybookAutomationPlanRequest) -> dict[str, Any]:
     payload = playbooks_automation_plan(request)
+    payload["seed"] = payload["plan"]
     payload["compatibility_bridge_for"] = "/playbooks/automation-plan"
     return payload
 

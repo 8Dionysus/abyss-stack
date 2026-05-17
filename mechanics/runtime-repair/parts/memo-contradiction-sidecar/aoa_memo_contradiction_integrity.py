@@ -182,11 +182,26 @@ def require_section_contains(
 
 
 def load_runtime_logs(stack_root: Path) -> dict[str, Any]:
+    required_paths = {key: stack_root / rel_path for key, rel_path in REQUIRED_LOG_PATHS.items()}
+    legacy_paths = {key: stack_root / rel_path for key, rel_path in LEGACY_LOG_PATHS.items()}
+    if all(path.exists() for path in required_paths.values()):
+        selected_paths = required_paths
+    elif all(path.exists() for path in legacy_paths.values()):
+        selected_paths = legacy_paths
+    else:
+        missing = [
+            str(path)
+            for paths in (required_paths, legacy_paths)
+            for path in paths.values()
+            if not path.exists()
+        ]
+        raise SystemExit(
+            "error: runtime logs must come from one complete lineage; "
+            f"missing candidates: {', '.join(missing)}"
+        )
+
     logs: dict[str, Any] = {}
-    for key, rel_path in REQUIRED_LOG_PATHS.items():
-        path = stack_root / rel_path
-        if not path.exists():
-            path = stack_root / LEGACY_LOG_PATHS[key]
+    for key, path in selected_paths.items():
         logs[key] = read_text(path) if path.suffix == ".md" else read_json(path)
     return logs
 
@@ -237,6 +252,12 @@ def validate_runtime_selection(evals_root: Path, stack_root: Path, failures: lis
         if ref.startswith("repo:abyss-stack/"):
             local_rel = ref.removeprefix("repo:abyss-stack/")
             require((stack_root / local_rel).exists(), failures, "runtime selection", f"missing local evidence {ref}")
+    require(
+        bool(evidence_refs),
+        failures,
+        "runtime selection",
+        "must include source_manifests or selected_evidence refs",
+    )
 
 
 def validate_runtime_logs(logs: dict[str, Any], failures: list[str]) -> None:
@@ -513,11 +534,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stack-root", default=os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack"))
     parser.add_argument(
         "--memo-root",
-        default=os.environ.get("AOA_MEMO_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack") + "/Knowledge/federation/aoa-memo",
+        default=os.environ.get("AOA_MEMO_ROOT"),
     )
     parser.add_argument(
         "--evals-root",
-        default=os.environ.get("AOA_EVALS_ROOT") or os.environ.get("AOA_STACK_ROOT", "/srv/AbyssOS/abyss-stack") + "/Knowledge/federation/aoa-evals",
+        default=os.environ.get("AOA_EVALS_ROOT"),
     )
     parser.add_argument("--output-file")
     return parser
@@ -526,8 +547,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     stack_root = Path(args.stack_root).expanduser().resolve()
-    memo_root = Path(args.memo_root).expanduser().resolve()
-    evals_root = Path(args.evals_root).expanduser().resolve()
+    memo_root = (
+        Path(args.memo_root).expanduser().resolve()
+        if args.memo_root
+        else stack_root / "Knowledge" / "federation" / "aoa-memo"
+    )
+    evals_root = (
+        Path(args.evals_root).expanduser().resolve()
+        if args.evals_root
+        else stack_root / "Knowledge" / "federation" / "aoa-evals"
+    )
 
     failures: list[str] = []
     validate_runtime_selection(evals_root, stack_root, failures)

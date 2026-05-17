@@ -317,7 +317,7 @@ def build_record(capture_mode: str, stack_root: Path) -> tuple[dict[str, Any], i
         "captured_at": isoformat_z(now),
         "captured_by": CAPTURED_BY,
         "bridge_id": now.strftime("%Y-%m-%dT%H%M%SZ__machine-bridge"),
-        "status": "ready" if required_ok and validate_ok and not warnings else "warning" if required_ok else "unavailable",
+        "status": "ready" if required_ok and validate_ok else "warning" if required_ok else "unavailable",
         "summary": {
             "abyss_machine_available": bool(abyss_machine_path),
             "stack_bridge_export_ok": bool(results["stack_bridge_export"].get("ok")),

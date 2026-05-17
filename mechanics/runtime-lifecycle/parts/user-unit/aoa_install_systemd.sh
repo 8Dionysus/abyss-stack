@@ -14,6 +14,7 @@ link_system_units=0
 preset_spec=""
 profile_spec=""
 overlay_spec=""
+value=""
 selection_set=0
 overlay_set=0
 
@@ -76,21 +77,27 @@ while (($#)); do
     --preset)
       shift
       (($#)) || aoa_die "missing value after --preset"
+      [[ -n "$1" ]] || aoa_die "preset must not be empty"
       preset_spec="$(aoa_append_runtime_spec "$preset_spec" "$1")"
       selection_set=1
       ;;
     --preset=*)
-      preset_spec="$(aoa_append_runtime_spec "$preset_spec" "${1#*=}")"
+      value="${1#*=}"
+      [[ -n "$value" ]] || aoa_die "preset must not be empty"
+      preset_spec="$(aoa_append_runtime_spec "$preset_spec" "$value")"
       selection_set=1
       ;;
     --profile)
       shift
       (($#)) || aoa_die "missing value after --profile"
+      [[ -n "$1" ]] || aoa_die "profile must not be empty"
       profile_spec="$(aoa_append_runtime_spec "$profile_spec" "$1")"
       selection_set=1
       ;;
     --profile=*)
-      profile_spec="$(aoa_append_runtime_spec "$profile_spec" "${1#*=}")"
+      value="${1#*=}"
+      [[ -n "$value" ]] || aoa_die "profile must not be empty"
+      profile_spec="$(aoa_append_runtime_spec "$profile_spec" "$value")"
       selection_set=1
       ;;
     --overlay|--extra-compose-file|--extra-compose-files)

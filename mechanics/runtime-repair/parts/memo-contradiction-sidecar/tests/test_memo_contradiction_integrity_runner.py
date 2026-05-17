@@ -11,11 +11,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-run-memo-contradiction-integrity"
 
-UPSTREAM_MEMO_CONTRADICTION_IDS = json.loads(
+BRIDGE_CONFIG = json.loads(
     (REPO_ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json").read_text(
         encoding="utf-8"
     )
-)["memo_contradiction_sidecar"]["upstream_memo_ids"]
+)["memo_contradiction_sidecar"]
+UPSTREAM_MEMO_CONTRADICTION_IDS = BRIDGE_CONFIG["upstream_memo_ids"]
+LEGACY_LOG_PATHS = {key: Path(value) for key, value in BRIDGE_CONFIG["legacy_log_paths"].items()}
 CLOSURE_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["closure_claim"]
 PENDING_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["pending_claim"]
 RETIRED_OVERREAD_CLAIM = UPSTREAM_MEMO_CONTRADICTION_IDS["retired_overread_claim"]
@@ -239,6 +241,104 @@ class MemoContradictionIntegrityRunnerTests(unittest.TestCase):
         self.assertTrue(
             all("does not prove a live runtime contradiction consumer exists" not in item for item in report["limitations"])
         )
+
+    def test_runner_defaults_memo_and_evals_roots_from_parsed_stack_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stack_root = Path(tmpdir) / "abyss-stack"
+            memo_root = stack_root / "Knowledge" / "federation" / "aoa-memo"
+            evals_root = stack_root / "Knowledge" / "federation" / "aoa-evals"
+            make_stack_root(stack_root)
+            make_memo_root(memo_root)
+            make_evals_root(evals_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--stack-root",
+                    str(stack_root),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["verdict"], "supports bounded claim")
+
+    def test_runner_rejects_empty_runtime_evidence_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "abyss-stack"
+            memo_root = root / "aoa-memo"
+            evals_root = root / "aoa-evals"
+            make_stack_root(stack_root)
+            make_memo_root(memo_root)
+            make_evals_root(evals_root)
+            write_json(
+                evals_root / "examples" / "runtime_evidence_selection.memo-contradiction-rerun.example.json",
+                {
+                    "selection_id": "memo-contradiction-rerun-v1",
+                    "candidate_eval_refs": ["candidate:aoa-memo-contradiction-integrity"],
+                    "source_manifests": [],
+                    "selected_evidence": [],
+                },
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--stack-root",
+                    str(stack_root),
+                    "--memo-root",
+                    str(memo_root),
+                    "--evals-root",
+                    str(evals_root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["verdict"], "does not support bounded claim")
+        self.assertIn(
+            "runtime selection: must include source_manifests or selected_evidence refs",
+            report["limitations"],
+        )
+
+    def test_runner_rejects_mixed_runtime_log_lineage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "abyss-stack"
+            memo_root = root / "aoa-memo"
+            evals_root = root / "aoa-evals"
+            make_stack_root(stack_root)
+            make_memo_root(memo_root)
+            make_evals_root(evals_root)
+            (stack_root / "Logs" / "memo-contradiction-rerun" / "restartable-inquiry-loop" / "memory_delta.json").unlink()
+            write_json(stack_root / LEGACY_LOG_PATHS["memory_delta"], {"artifact_kind": "legacy.memory-delta"})
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--stack-root",
+                    str(stack_root),
+                    "--memo-root",
+                    str(memo_root),
+                    "--evals-root",
+                    str(evals_root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime logs must come from one complete lineage", result.stderr)
 
 
 if __name__ == "__main__":

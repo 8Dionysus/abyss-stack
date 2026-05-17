@@ -57,6 +57,12 @@ def slugify(text: str) -> str:
     return lowered or "candidate"
 
 
+def require_path_safe_closeout_id(closeout_id: str) -> str:
+    if closeout_id != slugify(closeout_id):
+        raise SystemExit("error: closeout_id must be a lowercase repo-safe path segment")
+    return closeout_id
+
+
 def read_json(path: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -160,6 +166,7 @@ def build_artifact(input_path: Path, payload: dict[str, Any], args: argparse.Nam
     closeout_id = payload.get("closeout_id")
     if not isinstance(closeout_id, str) or not closeout_id:
         raise SystemExit("error: closeout payload must include closeout_id")
+    closeout_id = require_path_safe_closeout_id(closeout_id)
 
     a2a_child = ensure_mapping(payload.get("a2a_child"), "a2a_child")
     return_plan = ensure_mapping(payload.get("return_plan"), "return_plan")

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import shlex
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -37,6 +40,40 @@ class AoaLibEnvCompatTests(unittest.TestCase):
             "export AOA_LLAMACPP_OP_OFFLOAD=7; export AOA_LLAMACPP_NO_OP_OFFLOAD=1; source scripts/aoa-lib.sh; printf '%s' \"$AOA_LLAMACPP_OP_OFFLOAD\""
         )
         self.assertEqual(output, "7")
+
+    def test_missing_machine_fit_recommended_overlay_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            module = root / "Configs" / "compose" / "modules" / "41-agent-api.yml"
+            module.parent.mkdir(parents=True)
+            module.write_text("services:\n  langchain-api:\n    image: busybox\n", encoding="utf-8")
+            machine_fit = root / "Logs" / "machine-fit" / "latest" / "latest.private.json"
+            machine_fit.parent.mkdir(parents=True)
+            machine_fit.write_text(
+                json.dumps(
+                    {
+                        "runtime_recommendation": {
+                            "recommended_overlays": ["compose/tuning/missing.yml"],
+                        }
+                    },
+                    ensure_ascii=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            output = run_aoa_lib(
+                "export AOA_MACHINE_FIT_AUTO_APPLY=true; "
+                f"export AOA_MACHINE_FIT_PATH={shlex.quote(str(machine_fit))}; "
+                f"export AOA_STACK_ROOT={shlex.quote(str(root))}; "
+                f"export AOA_CONFIGS_ROOT={shlex.quote(str(root / 'Configs'))}; "
+                "source scripts/aoa-lib.sh; "
+                f"AOA_PROFILE_MODULE_FILES=({shlex.quote(str(module))}); "
+                "aoa_apply_machine_fit_runtime_posture; "
+                "printf '%s|%s' \"${AOA_EXTRA_COMPOSE_FILES:-}\" \"${AOA_MACHINE_FIT_SKIPPED_OVERLAY_SPECS[*]:-}\""
+            )
+
+        self.assertEqual(output, "|compose/tuning/missing.yml")
 
 
 if __name__ == "__main__":

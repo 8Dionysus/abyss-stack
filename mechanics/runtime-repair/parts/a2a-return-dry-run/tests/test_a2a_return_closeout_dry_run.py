@@ -151,6 +151,19 @@ class A2AReturnCloseoutDryRunTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("reviewed=true", result.stderr)
 
+    def test_adapter_rejects_path_unsafe_closeout_id(self) -> None:
+        payload = reviewed_closeout_payload()
+        payload["closeout_id"] = "../owned"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "abyss-stack"
+            result = self.run_adapter(stack_root, payload, "--write")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("lowercase repo-safe path segment", result.stderr)
+            self.assertFalse((stack_root / "Logs").exists())
+            self.assertFalse((root / "owned.private.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
