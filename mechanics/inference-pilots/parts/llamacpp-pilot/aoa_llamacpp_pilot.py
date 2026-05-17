@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -38,6 +39,8 @@ PILOT_ID = "llamacpp-sidecar-pilot-v1"
 PILOT_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "comparisons" / PILOT_ID
 PROMOTION_ID = "llamacpp-promotion-gate-v1"
 PROMOTION_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "promotions" / PROMOTION_ID
+TUNING_SNAPSHOT_ID = "llamacpp-tuning-e0"
+TUNING_SNAPSHOT_ROOT = STACK_ROOT / "Logs" / "runtime-benchmarks" / "tuning-snapshots" / TUNING_SNAPSHOT_ID
 SIDECAR_PROJECT = os.environ.get("AOA_LLAMACPP_COMPOSE_PROJECT", "abyss-llamacpp-pilot")
 PRIMARY_RUNTIME_NETWORK = os.environ.get("AOA_PRIMARY_RUNTIME_NETWORK", "abyss_default")
 MODEL_STORE_ROOT = STACK_ROOT / "Logs" / "llamacpp" / "models" / "bartowski"
@@ -140,6 +143,16 @@ def run_cmd(
     )
 
 
+def capture_cmd(argv: list[str], *, cwd: Path | None = None) -> dict[str, Any]:
+    proc = run_cmd(argv, cwd=cwd, capture_output=True, check=False)
+    return {
+        "argv": argv,
+        "returncode": proc.returncode,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+    }
+
+
 def base_env() -> dict[str, str]:
     env = os.environ.copy()
     env["AOA_STACK_ROOT"] = str(STACK_ROOT)
@@ -228,6 +241,17 @@ def http_get_json(url: str, timeout_s: float = 5.0) -> tuple[int, dict[str, Any]
         return exc.code, payload
 
 
+def http_get_text(url: str, timeout_s: float = 5.0) -> tuple[int | None, str]:
+    req = urllib.request.Request(url=url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", errors="ignore")
+    except urllib.error.URLError:
+        return None, ""
+
+
 def wait_for_url(name: str, url: str, timeout_s: float, accept_503: bool = False) -> dict[str, Any]:
     deadline = time.time() + timeout_s
     last_status: int | None = None
@@ -271,6 +295,64 @@ def container_logs(name: str, tail: int = 80) -> str:
         check=False,
     )
     return (proc.stdout or "") + (proc.stderr or "")
+
+
+def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
+    wanted = {
+        "llamacpp:prompt_tokens_total",
+        "llamacpp:prompt_seconds_total",
+        "llamacpp:tokens_predicted_total",
+        "llamacpp:tokens_predicted_seconds_total",
+        "llamacpp:prompt_tokens_seconds",
+        "llamacpp:predicted_tokens_seconds",
+        "llamacpp:kv_cache_usage_ratio",
+        "llamacpp:kv_cache_tokens",
+        "llamacpp:requests_processing",
+        "llamacpp:requests_deferred",
+        "llamacpp:n_tokens_max",
+    }
+    parsed: dict[str, float] = {}
+    for raw_line in metrics_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2 or parts[0] not in wanted:
+            continue
+        try:
+            parsed[parts[0]] = float(parts[1])
+        except ValueError:
+            continue
+    return parsed
+
+
+def summarize_llama_logs(log_text: str) -> dict[str, Any]:
+    markers = {
+        "restored_context_checkpoint": "restored context checkpoint",
+        "full_prompt_reprocessing": "forcing full prompt re-processing",
+        "prompt_cache_update": "prompt cache update took",
+        "cache_state": "cache state:",
+        "selected_lcp_similarity": "selected slot by LCP similarity",
+    }
+    summary: dict[str, Any] = {}
+    for key, marker in markers.items():
+        lines = [line.strip() for line in log_text.splitlines() if marker in line]
+        summary[key] = {
+            "count": len(lines),
+            "samples": lines[-5:],
+        }
+
+    durations: list[float] = []
+    for match in re.finditer(r"prompt cache update took ([0-9]+(?:\.[0-9]+)?) ms", log_text):
+        durations.append(float(match.group(1)))
+    if durations:
+        summary["prompt_cache_update_ms"] = {
+            "count": len(durations),
+            "min": min(durations),
+            "max": max(durations),
+            "last": durations[-1],
+        }
+    return summary
 
 
 def wait_for_llama(timeout_s: float) -> dict[str, Any]:
@@ -933,6 +1015,139 @@ def write_comparison_run(
     return run_root
 
 
+def build_snapshot_report(payload: dict[str, Any]) -> str:
+    log_summary = payload.get("llama_log_summary", {})
+    metrics = payload.get("metrics", {}).get("parsed", {})
+    checks = payload.get("qwen_checks", {})
+    lines = [
+        f"# {TUNING_SNAPSHOT_ID}",
+        "",
+        "## Snapshot",
+        f"- captured_at: `{payload['captured_at']}`",
+        f"- run_root: `{payload['run_root']}`",
+        f"- llama_cpp_status: `{payload.get('llama_cpp_status')}`",
+        f"- with_checks: `{payload.get('with_checks')}`",
+        "",
+        "## Metrics",
+        f"- prompt_tokens_seconds: `{metrics.get('llamacpp:prompt_tokens_seconds')}`",
+        f"- predicted_tokens_seconds: `{metrics.get('llamacpp:predicted_tokens_seconds')}`",
+        f"- prompt_tokens_total: `{metrics.get('llamacpp:prompt_tokens_total')}`",
+        f"- tokens_predicted_total: `{metrics.get('llamacpp:tokens_predicted_total')}`",
+        f"- requests_processing: `{metrics.get('llamacpp:requests_processing')}`",
+        f"- requests_deferred: `{metrics.get('llamacpp:requests_deferred')}`",
+        "",
+        "## Log Signatures",
+    ]
+    for key in (
+        "restored_context_checkpoint",
+        "full_prompt_reprocessing",
+        "prompt_cache_update",
+        "cache_state",
+        "selected_lcp_similarity",
+    ):
+        item = log_summary.get(key, {})
+        lines.append(f"- {key}: `{item.get('count', 0)}`")
+    if "prompt_cache_update_ms" in log_summary:
+        update = log_summary["prompt_cache_update_ms"]
+        lines.append(
+            f"- prompt_cache_update_ms: min `{update['min']}`, max `{update['max']}`, last `{update['last']}`"
+        )
+    if checks:
+        lines.extend(
+            [
+                "",
+                "## Qwen Checks",
+            ]
+        )
+        for name, result in checks.items():
+            lines.append(f"- {name}: ok=`{result.get('ok')}` returncode=`{result.get('returncode')}`")
+    return "\n".join(lines) + "\n"
+
+
+def snapshot_command(args: argparse.Namespace) -> int:
+    run_root = Path(args.output_root).expanduser().resolve() if args.output_root else TUNING_SNAPSHOT_ROOT / "runs" / timestamp_dir()
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    props_status, props = http_get_json("http://127.0.0.1:11435/props", timeout_s=args.timeout)
+    slots_status, slots_text = http_get_text("http://127.0.0.1:11435/slots", timeout_s=args.timeout)
+    metrics_status, metrics_text = http_get_text("http://127.0.0.1:11435/metrics", timeout_s=args.timeout)
+    logs = container_logs("llama-cpp", tail=args.log_tail)
+
+    commands = {
+        "free": capture_cmd(["free", "-h"]),
+        "zramctl": capture_cmd(["zramctl", "--output-all"]),
+        "memory_psi": {
+            "argv": ["cat", "/proc/pressure/memory"],
+            "returncode": 0,
+            "stdout": Path("/proc/pressure/memory").read_text(encoding="utf-8"),
+            "stderr": "",
+        },
+        "podman_stats": capture_cmd(
+            [
+                "podman",
+                "stats",
+                "--no-stream",
+                "--format",
+                "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}",
+            ]
+        ),
+        "llama_env": capture_cmd(["podman", "exec", "llama-cpp", "env"]),
+    }
+
+    qwen_checks: dict[str, Any] = {}
+    if args.with_checks:
+        qwen_checks["exact-reply"] = run_qwen_check(
+            case_name="exact-reply",
+            url=args.run_url,
+            timeout_s=args.check_timeout,
+        )
+
+    env_lines = [
+        line
+        for line in commands["llama_env"]["stdout"].splitlines()
+        if line.startswith("LLAMA_ARG_")
+    ]
+    payload = {
+        "snapshot_id": TUNING_SNAPSHOT_ID,
+        "captured_at": utc_now(),
+        "run_root": str(run_root),
+        "with_checks": bool(args.with_checks),
+        "llama_cpp_status": props_status,
+        "props": props,
+        "slots": {
+            "status": slots_status,
+            "body": slots_text,
+        },
+        "metrics": {
+            "status": metrics_status,
+            "parsed": parse_prometheus_metrics(metrics_text),
+            "raw_ref": "metrics.prom",
+        },
+        "llama_env": sorted(env_lines),
+        "llama_log_summary": summarize_llama_logs(logs),
+        "commands": commands,
+        "qwen_checks": qwen_checks,
+    }
+
+    write_json(run_root / "snapshot.json", payload)
+    write_text(run_root / "metrics.prom", metrics_text)
+    write_text(run_root / "llama-cpp.log", logs)
+    write_text(run_root / "report.md", build_snapshot_report(payload))
+    write_json(
+        TUNING_SNAPSHOT_ROOT / "latest.json",
+        {
+            "snapshot_id": TUNING_SNAPSHOT_ID,
+            "captured_at": payload["captured_at"],
+            "latest_run_root": str(run_root),
+            "snapshot_ref": str(run_root / "snapshot.json"),
+            "report_ref": str(run_root / "report.md"),
+        },
+    )
+
+    print(json.dumps({"snapshot_id": TUNING_SNAPSHOT_ID, "ok": props_status == 200, "run_root": str(run_root)}, ensure_ascii=True))
+    return 0 if props_status == 200 else 1
+
+
 def screening_artifact_root() -> Path:
     path = PROMOTION_ROOT / "runs" / timestamp_dir()
     path.mkdir(parents=True, exist_ok=True)
@@ -1477,6 +1692,18 @@ def build_parser() -> argparse.ArgumentParser:
     verify = subparsers.add_parser("verify", help="Verify the currently running llama.cpp sidecar without calling up or down.")
     verify.add_argument("--timeout", type=float, default=60.0)
     verify.set_defaults(func=verify_command)
+
+    snapshot = subparsers.add_parser(
+        "snapshot",
+        help="Capture a lightweight llama.cpp tuning baseline packet without starting or stopping services.",
+    )
+    snapshot.add_argument("--timeout", type=float, default=5.0)
+    snapshot.add_argument("--log-tail", type=int, default=500)
+    snapshot.add_argument("--with-checks", action="store_true")
+    snapshot.add_argument("--check-timeout", type=float, default=60.0)
+    snapshot.add_argument("--run-url", default=CANDIDATE_RUN_URL)
+    snapshot.add_argument("--output-root", default=None)
+    snapshot.set_defaults(func=snapshot_command)
 
     status = subparsers.add_parser("status", help="Show current sidecar health and the latest saved comparison ref.")
     status.set_defaults(func=status_command)

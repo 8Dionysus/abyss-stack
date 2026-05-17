@@ -42,16 +42,22 @@
   wider `Qwen3.5` family
 - the family may remain attractive for agentic or multimodal work at a broader
   planning level, but that is separate from the current reviewed runtime lane
+- Qwen3.5 prompt-cache behavior is now a measured tuning risk for the
+  `llama.cpp` GGUF lane because recent upstream reports and current local logs
+  both show hybrid/SWA-style full prompt re-processing signatures; cache changes
+  must go through a bounded packet before promotion
 
 ## Evidence Surfaces
 
 - [LLAMACPP_PILOT](../../../../../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md)
+- [LLAMACPP_TUNING_RESEARCH_2026_05](../../../../../../mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_TUNING_RESEARCH_2026_05.md)
 - [MACHINE_FIT_POLICY](../../../fit-record/docs/MACHINE_FIT_POLICY.md)
 - [compose tuning README](../../../../../../compose/tuning/README.md)
 
 ## Next Test
 
-Keep this card as the canonical control lane while screening Intel-served
-challengers.
-The next useful comparisons are not more random `llama.cpp` churn but explicit
-Qwen3-based Intel text packets on OVMS/OpenVINO.
+Keep this card as the canonical control lane while screening explicit candidate
+lanes.
+The next useful comparisons are bounded `llama.cpp` tuning packets for KV-cache
+quantization and prompt-cache reuse, plus explicit Qwen3-based Intel text
+packets on OVMS/OpenVINO.

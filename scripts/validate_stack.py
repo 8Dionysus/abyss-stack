@@ -331,6 +331,7 @@ REQUIRED_SCRIPTS = {
     "aoa-render-config",
     "aoa-up",
     "aoa-down",
+    "aoa-apply-resource-guards",
     "aoa-status",
     "aoa-logs",
     "aoa-smoke",
@@ -372,6 +373,7 @@ OPERATOR_BACKEND_SCRIPTS = {
     "aoa-long-horizon-pilot": "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh",
     "aoa-machine-bridge": "mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py",
     "aoa-machine-fit": "mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py",
+    "aoa-apply-resource-guards": "mechanics/runtime-lifecycle/parts/start-stop/aoa_apply_resource_guards.sh",
     "aoa-up": "mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh",
     "aoa-down": "mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh",
     "aoa-platform-adaptation": "mechanics/machine-fit/parts/platform-adaptations/aoa_platform_adaptation.py",
@@ -412,6 +414,8 @@ REQUIRED_FILES = {
     ROOT / "docs" / "runtime" / "MECHANICS.md",
     ROOT / "docs" / "runtime" / "PATHS.md",
     ROOT / "docs" / "runtime" / "SERVICE_CATALOG.md",
+    ROOT / "docs" / "runtime" / "SERVICE_SELECTION.md",
+    ROOT / "docs" / "runtime" / "service-selection-policy.v1.json",
     ROOT / "docs" / "runtime" / "STORAGE_LAYOUT.md",
     ROOT / "docs" / "install" / "README.md",
     ROOT / "docs" / "install" / "DEPLOYMENT.md",
@@ -631,8 +635,15 @@ REQUIRED_FILES = {
     ROOT / "compose" / "modules" / "32-llamacpp-inference.yml",
     ROOT / "compose" / "modules" / "43-federation-router.yml",
     ROOT / "compose" / "modules" / "44-llamacpp-agent-sidecar.yml",
+    ROOT / "compose" / "modules" / "45-rerank-api.yml",
+    ROOT / "compose" / "modules" / "46-rag-api.yml",
+    ROOT / "compose" / "modules" / "53-babelvox-tts.yml",
     ROOT / "compose" / "modules" / "52-tos-graph.yml",
     ROOT / "compose" / "profiles" / "curation.txt",
+    ROOT / "compose" / "profiles" / "rag.txt",
+    ROOT / "compose" / "profiles" / "reranking.txt",
+    ROOT / "compose" / "profiles" / "speech-fast-experimental.txt",
+    ROOT / "compose" / "tuning" / "rag.thin-host.yml",
     ROOT / "config-templates" / "README.md",
     ROOT / "config-templates" / "Configs" / "agent-api" / "return-policy.yaml",
     ROOT / "config-templates" / "Configs" / "agent-api" / "governed-execution-policy.yaml",
@@ -647,6 +658,9 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Configs" / "federation" / "aoa-kag.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "tos-source.yaml",
     ROOT / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json",
+    ROOT / "config-templates" / "Configs" / "rag" / "sources.json",
+    ROOT / "config-templates" / "Configs" / "rag" / "agentic-graph.v1.json",
+    ROOT / "config-templates" / "Configs" / "rag" / "dag-jobs.v1.json",
     ROOT / "config-templates" / "Configs" / "monitoring" / "prometheus.yml",
     ROOT / "config-templates" / "Configs" / "tts" / "voices.yaml",
     ROOT / "config-templates" / "Services" / "aoa-browser" / "Dockerfile",
@@ -655,6 +669,15 @@ REQUIRED_FILES = {
     ROOT / "config-templates" / "Services" / "route-api" / "Dockerfile",
     ROOT / "config-templates" / "Services" / "route-api" / "requirements.txt",
     ROOT / "config-templates" / "Services" / "route-api" / "app" / "main.py",
+    ROOT / "config-templates" / "Services" / "rerank-api" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "rerank-api" / "requirements.txt",
+    ROOT / "config-templates" / "Services" / "rerank-api" / "app" / "main.py",
+    ROOT / "config-templates" / "Services" / "rag-api" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "rag-api" / "requirements.txt",
+    ROOT / "config-templates" / "Services" / "rag-api" / "app" / "main.py",
+    ROOT / "config-templates" / "Services" / "babelvox-tts-api" / "Dockerfile",
+    ROOT / "config-templates" / "Services" / "babelvox-tts-api" / "requirements.txt",
+    ROOT / "config-templates" / "Services" / "babelvox-tts-api" / "app" / "main.py",
     ROOT / "config-templates" / "Services" / "tos-graph" / "Dockerfile",
     ROOT / "config-templates" / "Services" / "tos-graph" / "requirements.txt",
     ROOT / "config-templates" / "Services" / "tos-graph" / "app" / "config.py",
@@ -943,6 +966,62 @@ RUNTIME_GATEWAY_CACHE_STATUS_EXAMPLE_PATH = (
 RUNTIME_USAGE_SNAPSHOT_EXAMPLE_PATH = (
     RUNTIME_LIFECYCLE_EXAMPLE_ROOT / "runtime_usage_snapshot.workhorse-local.example.json"
 )
+SERVICE_SELECTION_POLICY_PATH = Path("docs") / "runtime" / "service-selection-policy.v1.json"
+SERVICE_SCREENSHOT_INVENTORY_PATH = Path("docs") / "runtime" / "service-inventory-2026-05-14.v1.json"
+SERVICE_SELECTION_POLICY_REQUIRED_SERVICES = {
+    "postgres",
+    "redis",
+    "qdrant",
+    "neo4j",
+    "llama-cpp",
+    "ovms",
+    "langchain-api",
+    "route-api",
+    "rerank-api",
+    "rag-api",
+    "qwen-tts",
+    "tts-router",
+    "docs-api",
+    "aoa-browser",
+    "prometheus",
+    "grafana",
+    "alertmanager",
+    "cadvisor",
+    "n8n",
+    "n8n-task-runners",
+    "ollama",
+    "litellm",
+    "tos-graph",
+    "babelvox-tts",
+    "langchain-api-llamacpp",
+}
+SERVICE_SELECTION_POLICY_ALLOWED_POSTURES = {
+    "selected_now",
+    "explicit_opt_in",
+    "fallback_control",
+    "lab_only",
+    "not_selected",
+}
+SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES = {
+    "postgres",
+    "redis",
+    "qdrant",
+    "neo4j",
+    "llama-cpp",
+    "langchain-api",
+    "ovms",
+    "route-api",
+    "n8n",
+    "n8n-task-runners",
+    "qwen-tts",
+    "tts-router",
+    "docs-api",
+    "aoa-browser",
+    "prometheus",
+    "grafana",
+    "alertmanager",
+    "cadvisor",
+}
 AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "agent_build_snapshot.example.json"
 REPUTATION_LEDGER_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "reputation_ledger.example.json"
 QUEST_RUN_RESULT_EXAMPLE_PATH = RPG_RUNTIME_EXAMPLE_ROOT / "quest_run_result.example.json"
@@ -1021,6 +1100,13 @@ MODULE_REQUIREMENTS = {
     "40-llm-gateway.yml": {"30-local-inference.yml"},
     "41-agent-api.yml": {"32-llamacpp-inference.yml"},
     "42-agent-api-intel.yml": {"41-agent-api.yml", "31-intel-inference.yml"},
+    "46-rag-api.yml": {
+        "10-storage.yml",
+        "31-intel-inference.yml",
+        "41-agent-api.yml",
+        "43-federation-router.yml",
+        "45-rerank-api.yml",
+    },
     "52-tos-graph.yml": {"10-storage.yml"},
 }
 
@@ -1216,6 +1302,23 @@ def load_names(file_path: Path) -> list[str]:
             names.append(line)
 
     return names
+
+
+def compose_service_names(file_path: Path) -> set[str]:
+    service_names: set[str] = set()
+    in_services = False
+    for raw in file_path.read_text(encoding="utf-8").splitlines():
+        if raw.strip() == "services:":
+            in_services = True
+            continue
+        if not in_services:
+            continue
+        if raw and not raw.startswith(" "):
+            break
+        match = re.match(r"^  ([A-Za-z0-9_.-]+):\s*$", raw)
+        if match:
+            service_names.add(match.group(1))
+    return service_names
 
 
 def load_structured_object(path: Path) -> dict[str, object]:
@@ -2621,18 +2724,101 @@ def validate_scripts(errors: list[str]) -> None:
             for required_snippet in (
                 "--preset",
                 "--profile",
+                "--overlay",
                 "--restart-now",
                 "--all-user-units",
                 "--system-units",
+                "AOA_EXTRA_COMPOSE_FILES",
                 "managed-units.txt",
                 "systemctl daemon-reload",
                 "20-runtime-selection.conf",
                 "aoa_validate_runtime_spec",
+                "aoa_validate_overlay_spec",
                 "aoa_append_runtime_spec",
             ):
                 if required_snippet not in install_systemd:
                     errors.append(
                         f"scripts/aoa-install-systemd must preserve user-unit runtime selection via `{required_snippet}`"
+                    )
+
+    apply_resource_guards_rel = OPERATOR_BACKEND_SCRIPTS.get("aoa-apply-resource-guards")
+    if apply_resource_guards_rel:
+        apply_resource_guards_path = ROOT / apply_resource_guards_rel
+        if apply_resource_guards_path.is_file():
+            apply_resource_guards = apply_resource_guards_path.read_text(encoding="utf-8")
+            for required_snippet in (
+                "--dry-run",
+                "--force",
+                "--wait-game-guard-clear",
+                "--wait-resource-plan-clear",
+                "--wait-timeout-sec",
+                "--wait-poll-sec",
+                "resource plan",
+                "resource plan --class medium --kind generic --unattended --json",
+                "--method",
+                "recreate",
+                "AOA_UP_FORCE_RECREATE",
+                "set-environment",
+                "aoa-status\" --resource-guards --json",
+                "abyss-machine processes game-guard --json",
+                "systemctl --user \"$method\" podman-compose-abyss.service",
+                "post-apply.json",
+                "pre-service-selection.json",
+                "post-service-selection.json",
+                "pre-resource-plan.json",
+                "post-resource-plan.json",
+                "pre-podman-stats.txt",
+                "post-podman-stats.txt",
+                "pre-memory.txt",
+                "post-memory.txt",
+                "pre-protected-units.txt",
+                "post-protected-units.txt",
+                "protected user units degraded after apply",
+                "abyss-tts-server.service",
+                "abyss-dictation-server.service",
+                "abyss-tts-keepwarm.timer",
+                "podman stats --no-stream",
+                "service selection degraded after apply",
+                "resource guards still not fully applied",
+            ):
+                if required_snippet not in apply_resource_guards:
+                    errors.append(
+                        f"scripts/aoa-apply-resource-guards must preserve guarded apply behavior via `{required_snippet}`"
+                    )
+
+    aoa_up_rel = OPERATOR_BACKEND_SCRIPTS.get("aoa-up")
+    if aoa_up_rel:
+        aoa_up_path = ROOT / aoa_up_rel
+        if aoa_up_path.is_file():
+            aoa_up = aoa_up_path.read_text(encoding="utf-8")
+            for required_snippet in (
+                "AOA_UP_FORCE_RECREATE",
+                "--force-recreate",
+            ):
+                if required_snippet not in aoa_up:
+                    errors.append(
+                        f"scripts/aoa-up must preserve force-recreate support via `{required_snippet}`"
+                    )
+
+    status_rel = OPERATOR_BACKEND_SCRIPTS.get("aoa-status")
+    if status_rel:
+        status_path = ROOT / status_rel
+        if status_path.is_file():
+            status_script = status_path.read_text(encoding="utf-8")
+            for required_snippet in (
+                "--resource-guards",
+                "--service-selection",
+                "--optimization",
+                "--optimization-audit",
+                "--require-complete",
+                "aoa_resource_guard_status.py",
+                "aoa_service_selection_status.py",
+                "aoa_optimization_status.py",
+                "aoa_optimization_audit_status.py",
+            ):
+                if required_snippet not in status_script:
+                    errors.append(
+                        f"scripts/aoa-status must preserve runtime status modes via `{required_snippet}`"
                     )
 
 
@@ -4463,6 +4649,312 @@ def _validate_overlay_skill_surface(
     errors.append(f"{skill_path.as_posix()} must be installed as a {description}")
 
 
+def validate_service_selection_policy(errors: list[str]) -> None:
+    policy_path = ROOT / SERVICE_SELECTION_POLICY_PATH
+    if not policy_path.is_file():
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} is required")
+        return
+
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must be valid JSON: {exc}")
+        return
+
+    if not isinstance(policy, dict):
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must contain a JSON object")
+        return
+
+    if policy.get("schema") != "abyss_stack_service_selection_policy_v1":
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must use schema abyss_stack_service_selection_policy_v1")
+
+    runtime_shape = policy.get("current_runtime_shape")
+    if not isinstance(runtime_shape, dict):
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must include current_runtime_shape")
+    else:
+        if runtime_shape.get("preset") != "intel-full":
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime preset must remain intel-full")
+        profiles = runtime_shape.get("profiles")
+        if not isinstance(profiles, list) or not {"federation", "reranking", "rag"}.issubset(set(profiles)):
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime profiles must include federation, reranking, and rag")
+        overlays = runtime_shape.get("overlays")
+        if not isinstance(overlays, list) or not overlays:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime overlays must be a non-empty list")
+        elif "compose/tuning/storage.intel-285h.resource-guard.yml" not in overlays:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime overlays must include the storage resource guard")
+        elif "compose/tuning/rag.thin-host.yml" not in overlays:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime overlays must include the rag thin-host guard")
+        if isinstance(overlays, list):
+            for overlay in overlays:
+                if not isinstance(overlay, str) or not overlay:
+                    errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} overlays must be non-empty strings")
+                    continue
+                if not (ROOT / overlay).is_file():
+                    errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} overlay path is missing: {overlay}")
+
+    services = policy.get("services")
+    if not isinstance(services, list) or not services:
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must include a non-empty services list")
+        return
+
+    seen_names: set[str] = set()
+    selected_now: set[str] = set()
+    for index, entry in enumerate(services):
+        if not isinstance(entry, dict):
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service entry {index} must be an object")
+            continue
+
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service entry {index} must include name")
+            continue
+        if name in seen_names:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} has duplicate service: {name}")
+        seen_names.add(name)
+
+        for field in ("module", "owner_profile", "posture", "tier", "decision"):
+            value = entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} must include non-empty {field}")
+
+        posture = entry.get("posture")
+        if isinstance(posture, str) and posture not in SERVICE_SELECTION_POLICY_ALLOWED_POSTURES:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} has unsupported posture: {posture}")
+        if posture == "selected_now":
+            selected_now.add(name)
+
+        module = entry.get("module")
+        if isinstance(module, str) and module and not (ROOT / module).is_file():
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} module is missing: {module}")
+
+        resource_guard = entry.get("resource_guard")
+        if resource_guard is None:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} must include resource_guard, even when blank")
+        elif not isinstance(resource_guard, str):
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} resource_guard must be a string")
+        elif resource_guard and not (ROOT / resource_guard).is_file():
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} service {name} resource guard is missing: {resource_guard}")
+        elif posture == "selected_now" and not resource_guard:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} selected service {name} must name a resource guard")
+
+    missing_services = sorted(SERVICE_SELECTION_POLICY_REQUIRED_SERVICES - seen_names)
+    if missing_services:
+        errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} missing required services: {', '.join(missing_services)}")
+
+    for unexpected_selected in ("n8n", "n8n-task-runners", "ollama", "litellm", "babelvox-tts"):
+        if unexpected_selected in selected_now:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must not mark {unexpected_selected} as selected_now")
+
+    for expected_selected in ("postgres", "redis", "qdrant", "neo4j", "llama-cpp", "ovms", "langchain-api", "route-api", "rerank-api", "rag-api"):
+        if expected_selected not in selected_now:
+            errors.append(f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} must mark {expected_selected} as selected_now")
+
+    runtime_shape_services: set[str] = set()
+    if isinstance(runtime_shape, dict):
+        profile_names: list[str] = []
+        preset_name = runtime_shape.get("preset")
+        if isinstance(preset_name, str) and preset_name:
+            preset_path = PRESET_DIR / f"{preset_name}.txt"
+            if preset_path.is_file():
+                profile_names.extend(load_names(preset_path))
+        profiles = runtime_shape.get("profiles")
+        if isinstance(profiles, list):
+            profile_names.extend(
+                profile for profile in profiles if isinstance(profile, str) and profile
+            )
+
+        seen_profiles: set[str] = set()
+        module_names: list[str] = []
+        for profile_name in profile_names:
+            if profile_name in seen_profiles:
+                continue
+            seen_profiles.add(profile_name)
+            profile_path = PROFILE_DIR / f"{profile_name}.txt"
+            if not profile_path.is_file():
+                continue
+            module_names.extend(load_names(profile_path))
+
+        seen_modules: set[str] = set()
+        for module_name in module_names:
+            if module_name in seen_modules:
+                continue
+            seen_modules.add(module_name)
+            module_path = MODULE_DIR / module_name
+            if module_path.is_file():
+                runtime_shape_services.update(compose_service_names(module_path))
+
+    if runtime_shape_services:
+        missing_from_runtime_shape = sorted(selected_now - runtime_shape_services)
+        if missing_from_runtime_shape:
+            errors.append(
+                f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} marks services selected_now that are not in the current runtime shape: {', '.join(missing_from_runtime_shape)}"
+            )
+        missing_from_policy_selection = sorted(runtime_shape_services - selected_now)
+        if missing_from_policy_selection:
+            errors.append(
+                f"{SERVICE_SELECTION_POLICY_PATH.as_posix()} current runtime shape services must be marked selected_now: {', '.join(missing_from_policy_selection)}"
+            )
+
+    selection_doc = (ROOT / "docs" / "runtime" / "SERVICE_SELECTION.md").read_text(encoding="utf-8")
+    runtime_readme = (ROOT / "docs" / "runtime" / "README.md").read_text(encoding="utf-8")
+    for path, text in (
+        ("docs/runtime/SERVICE_SELECTION.md", selection_doc),
+        ("docs/runtime/README.md", runtime_readme),
+    ):
+        if "service-selection-policy.v1.json" not in text:
+            errors.append(f"{path} must mention service-selection-policy.v1.json")
+
+
+def validate_service_screenshot_inventory(errors: list[str]) -> None:
+    inventory_path = ROOT / SERVICE_SCREENSHOT_INVENTORY_PATH
+    if not inventory_path.is_file():
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} is required")
+        return
+
+    try:
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must be valid JSON: {exc}")
+        return
+
+    if not isinstance(inventory, dict):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must contain a JSON object")
+        return
+
+    if inventory.get("schema") != "abyss_stack_runtime_service_inventory_v1":
+        errors.append(
+            f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must use schema abyss_stack_runtime_service_inventory_v1"
+        )
+    if inventory.get("policy_companion") != SERVICE_SELECTION_POLICY_PATH.as_posix():
+        errors.append(
+            f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must point policy_companion at {SERVICE_SELECTION_POLICY_PATH.as_posix()}"
+        )
+
+    source = inventory.get("source_screenshot")
+    if not isinstance(source, dict):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must include source_screenshot")
+    else:
+        screenshot_path = source.get("absolute_path")
+        if not isinstance(screenshot_path, str) or "2026-05-14 21-46-49.png" not in screenshot_path:
+            errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must preserve the source screenshot path")
+        if source.get("size_bytes") != 64281:
+            errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must preserve the source screenshot size")
+        if source.get("extraction_method") != "manual_visual_review":
+            errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must declare manual_visual_review extraction")
+
+    services = inventory.get("screenshotted_services")
+    if not isinstance(services, list) or not services:
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must include screenshotted_services")
+        return
+    if not all(isinstance(service, str) and service for service in services):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} screenshotted_services must be non-empty strings")
+        return
+    service_set = set(services)
+    if len(service_set) != len(services):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must not duplicate screenshotted services")
+    if service_set != SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES:
+        missing = sorted(SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES - service_set)
+        extra = sorted(service_set - SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES)
+        if missing:
+            errors.append(
+                f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} missing screenshot services: {', '.join(missing)}"
+            )
+        if extra:
+            errors.append(
+                f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} has unexpected screenshot services: {', '.join(extra)}"
+            )
+
+    grouped_services: list[str] = []
+    groups = inventory.get("screenshotted_groups")
+    if not isinstance(groups, list) or not groups:
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must include screenshotted_groups")
+    else:
+        for index, group in enumerate(groups):
+            if not isinstance(group, dict):
+                errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} group {index} must be an object")
+                continue
+            if not isinstance(group.get("group"), str) or not group.get("group"):
+                errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} group {index} must include group")
+            group_services = group.get("services")
+            if not isinstance(group_services, list) or not group_services:
+                errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} group {index} must include services")
+                continue
+            for service in group_services:
+                if isinstance(service, str) and service:
+                    grouped_services.append(service)
+                else:
+                    errors.append(
+                        f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} group {index} contains an invalid service"
+                    )
+        if set(grouped_services) != service_set:
+            errors.append(
+                f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} screenshotted_groups must match screenshotted_services"
+            )
+
+    policy_path = ROOT / SERVICE_SELECTION_POLICY_PATH
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    policy_services = policy.get("services")
+    if not isinstance(policy_services, list):
+        return
+
+    policy_service_names = {
+        entry.get("name")
+        for entry in policy_services
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+    }
+    missing_from_policy = sorted(service_set - policy_service_names)
+    if missing_from_policy:
+        errors.append(
+            f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} services must all be covered by {SERVICE_SELECTION_POLICY_PATH.as_posix()}: {', '.join(missing_from_policy)}"
+        )
+
+    addon_entries = inventory.get("current_selected_addons")
+    addon_services: set[str] = set()
+    if not isinstance(addon_entries, list):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must include current_selected_addons")
+    else:
+        for index, addon in enumerate(addon_entries):
+            if not isinstance(addon, dict) or not isinstance(addon.get("service"), str):
+                errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} addon {index} must include service")
+                continue
+            addon_services.add(addon["service"])
+        if addon_services != {"rerank-api", "rag-api"}:
+            errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} current_selected_addons must contain rerank-api and rag-api")
+
+    selected_now = {
+        entry.get("name")
+        for entry in policy_services
+        if isinstance(entry, dict) and entry.get("posture") == "selected_now"
+    }
+    selected_not_in_screenshot = selected_now - service_set
+    if selected_not_in_screenshot != addon_services:
+        errors.append(
+            f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} current_selected_addons must explain selected policy services absent from the screenshot"
+        )
+
+    known_not_in_screenshot = inventory.get("known_policy_services_not_in_screenshot")
+    if not isinstance(known_not_in_screenshot, list) or not all(isinstance(item, str) for item in known_not_in_screenshot):
+        errors.append(f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} must include known_policy_services_not_in_screenshot")
+    else:
+        expected_known = policy_service_names - service_set - addon_services
+        if set(known_not_in_screenshot) != expected_known:
+            errors.append(
+                f"{SERVICE_SCREENSHOT_INVENTORY_PATH.as_posix()} known_policy_services_not_in_screenshot must match policy services absent from the screenshot"
+            )
+
+    selection_doc = (ROOT / "docs" / "runtime" / "SERVICE_SELECTION.md").read_text(encoding="utf-8")
+    runtime_readme = (ROOT / "docs" / "runtime" / "README.md").read_text(encoding="utf-8")
+    for path, text in (
+        ("docs/runtime/SERVICE_SELECTION.md", selection_doc),
+        ("docs/runtime/README.md", runtime_readme),
+    ):
+        if SERVICE_SCREENSHOT_INVENTORY_PATH.name not in text:
+            errors.append(f"{path} must mention {SERVICE_SCREENSHOT_INVENTORY_PATH.name}")
+
+
 def validate_federation_landing(errors: list[str]) -> None:
     templates_readme = (ROOT / "config-templates" / "README.md").read_text(encoding="utf-8")
     if "Configs/federation/" not in templates_readme:
@@ -4993,6 +5485,8 @@ def main() -> int:
     validate_return_runtime_contract(errors)
     validate_runtime_hygiene_contracts(errors)
     validate_diagnostic_spine_contracts(errors)
+    validate_service_selection_policy(errors)
+    validate_service_screenshot_inventory(errors)
     validate_federation_landing(errors)
     if args.parity_check:
         validate_deployed_parity(errors, Path(args.deployed_configs_root))

@@ -10,5 +10,11 @@ source "${SCRIPTS_DIR}/aoa-lib.sh"
 aoa_parse_profile_args "$@"
 aoa_resolve_modules "${AOA_STACK_PROFILE}"
 aoa_print_profile_summary
-aoa_compose up -d "${AOA_FORWARD_ARGS[@]}"
+up_args=(up -d)
+case "${AOA_UP_FORCE_RECREATE:-}" in
+  1|true|yes|on)
+    up_args+=(--force-recreate)
+    ;;
+esac
+aoa_compose "${up_args[@]}" "${AOA_FORWARD_ARGS[@]}"
 AOA_STACK_PRESET="$AOA_STACK_PRESET" AOA_STACK_PROFILE="$AOA_STACK_PROFILE" "${SCRIPTS_DIR}/aoa-warmup" || true

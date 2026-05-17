@@ -1,0 +1,11 @@
+services:
+  rag-api:
+    labels:
+      aoa.tuning.overlay: "rag.thin-host"
+      aoa.tuning.reason: "Bound RAG orchestration API on thin Intel host."
+    mem_limit: "${AOA_RAG_API_MEM_LIMIT:-768m}"
+    mem_reservation: "${AOA_RAG_API_MEM_RESERVATION:-128m}"
+    cpus: "${AOA_RAG_API_CPUS:-1.0}"
+    environment:
+      AOA_RAG_EMBED_BATCH_SIZE: "${AOA_RAG_EMBED_BATCH_SIZE:-6}"
+      AOA_RAG_DEFAULT_TOP_K: "${AOA_RAG_DEFAULT_TOP_K:-6}"

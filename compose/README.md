@@ -14,10 +14,14 @@ Use [modules](modules/README.md) for module rings and
 - `modules/40-llm-gateway.yml`
 - `modules/41-agent-api.yml`
 - `modules/42-agent-api-intel.yml`
+- `modules/43-federation-router.yml`
 - `modules/44-llamacpp-agent-sidecar.yml`
+- `modules/45-rerank-api.yml`
+- `modules/46-rag-api.yml`
 - `modules/50-speech.yml`
 - `modules/51-browser-tools.yml`
 - `modules/52-tos-graph.yml`
+- `modules/53-babelvox-tts.yml`
 - `modules/60-monitoring.yml`
 
 `41-agent-api.yml` may consume a public-safe return policy file from `Configs/agent-api/return-policy.yaml`.
@@ -33,6 +37,9 @@ Use [modules](modules/README.md) for module rings and
 - `profiles/agentic.txt`
 - `profiles/intel.txt`
 - `profiles/federation.txt`
+- `profiles/reranking.txt`
+- `profiles/rag.txt`
+- `profiles/speech-fast-experimental.txt`
 - `profiles/curation.txt`
 - `profiles/tools.txt`
 - `profiles/observability.txt`
@@ -48,6 +55,15 @@ canonical local worker. `fallback-gateway` keeps the retained Ollama plus
 LiteLLM control path explicit. `core`, `agentic`, and `intel` remain
 compatibility bundles for older operator habits; current presets compose
 `substrate` plus worker layers directly and do not include `workflows`.
+`reranking` is an explicit add-on for the source-owned OpenVINO Qwen3 reranker
+API; keep it opt-in until stack-level rerank usage has its own promotion record.
+`rag` is the first lightweight RAG orchestration profile. It layers a localhost
+`rag-api` over Qdrant, Neo4j, OVMS embeddings, `rerank-api`, `route-api`, and
+`langchain-api` without adding another vector store or making workflow tools
+the retrieval brain.
+`speech-fast-experimental` is an explicit BabelVox/OpenVINO TTS lane for
+Intel speech experiments; keep it opt-in until latency and memory evidence
+justify promotion.
 
 ## Presets
 

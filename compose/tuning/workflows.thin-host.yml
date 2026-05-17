@@ -1,0 +1,29 @@
+# Candidate workflow automation guard for explicit n8n runs.
+# Use only with the `workflows` profile.
+services:
+  n8n:
+    labels:
+      aoa.tuning.overlay: "workflows.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_N8N_CPUS:-1.0}"
+    mem_limit: "${AOA_N8N_MEM_LIMIT:-1024m}"
+    mem_reservation: "${AOA_N8N_MEM_RESERVATION:-256m}"
+    environment:
+      NODE_OPTIONS: "${AOA_N8N_NODE_OPTIONS:---max-old-space-size=512}"
+      N8N_RUNNERS_MAX_CONCURRENCY: "${AOA_N8N_RUNNERS_MAX_CONCURRENCY:-1}"
+      N8N_RUNNERS_MAX_PAYLOAD: "${AOA_N8N_RUNNERS_MAX_PAYLOAD:-67108864}"
+      N8N_RUNNERS_TASK_TIMEOUT: "${AOA_N8N_RUNNERS_TASK_TIMEOUT:-300}"
+
+  n8n-task-runners:
+    labels:
+      aoa.tuning.overlay: "workflows.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_N8N_RUNNERS_CPUS:-1.0}"
+    mem_limit: "${AOA_N8N_RUNNERS_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_N8N_RUNNERS_MEM_RESERVATION:-128m}"
+    environment:
+      NODE_OPTIONS: "${AOA_N8N_RUNNERS_NODE_OPTIONS:---max-old-space-size=384}"
+      N8N_RUNNERS_MAX_CONCURRENCY: "${AOA_N8N_RUNNERS_MAX_CONCURRENCY:-1}"
+      N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "${AOA_N8N_RUNNERS_MAX_OLD_SPACE_SIZE:-384}"
+      N8N_RUNNERS_MAX_PAYLOAD: "${AOA_N8N_RUNNERS_MAX_PAYLOAD:-67108864}"
+      N8N_RUNNERS_TASK_TIMEOUT: "${AOA_N8N_RUNNERS_TASK_TIMEOUT:-300}"

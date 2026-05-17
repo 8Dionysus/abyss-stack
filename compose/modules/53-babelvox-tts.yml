@@ -1,0 +1,50 @@
+services:
+  babelvox-tts:
+    build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/babelvox-tts-api"
+    container_name: babelvox-tts
+    restart: unless-stopped
+    environment:
+      AOA_BABELVOX_TTS_DEVICE: "${AOA_BABELVOX_TTS_DEVICE:-NPU}"
+      AOA_BABELVOX_TTS_PRECISION: "${AOA_BABELVOX_TTS_PRECISION:-int8}"
+      AOA_BABELVOX_TTS_CACHE_DIR: /cache/babelvox
+      AOA_BABELVOX_TTS_OUT_DIR: /out
+      AOA_BABELVOX_TTS_LANGUAGE: "${AOA_BABELVOX_TTS_LANGUAGE:-Russian}"
+      AOA_BABELVOX_TTS_USE_KV_CACHE: "${AOA_BABELVOX_TTS_USE_KV_CACHE:-true}"
+      AOA_BABELVOX_TTS_USE_CP_KV_CACHE: "${AOA_BABELVOX_TTS_USE_CP_KV_CACHE:-true}"
+      AOA_BABELVOX_TTS_MAX_KV_LEN: "${AOA_BABELVOX_TTS_MAX_KV_LEN:-64}"
+      AOA_BABELVOX_TTS_MAX_SPEAKER_FRAMES: "${AOA_BABELVOX_TTS_MAX_SPEAKER_FRAMES:-128}"
+      AOA_BABELVOX_TTS_MAX_DECODER_FRAMES: "${AOA_BABELVOX_TTS_MAX_DECODER_FRAMES:-64}"
+      AOA_BABELVOX_TTS_MAX_NEW_TOKENS: "${AOA_BABELVOX_TTS_MAX_NEW_TOKENS:-44}"
+      AOA_BABELVOX_TTS_TEMPERATURE: "${AOA_BABELVOX_TTS_TEMPERATURE:-0.8}"
+      AOA_BABELVOX_TTS_TOP_K: "${AOA_BABELVOX_TTS_TOP_K:-30}"
+      AOA_BABELVOX_TTS_IDLE_UNLOAD_SEC: "${AOA_BABELVOX_TTS_IDLE_UNLOAD_SEC:-900}"
+      AOA_BABELVOX_TTS_IDLE_UNLOAD_CHECK_SEC: "${AOA_BABELVOX_TTS_IDLE_UNLOAD_CHECK_SEC:-60}"
+      AOA_BABELVOX_TTS_EXIT_AFTER_IDLE_UNLOAD: "${AOA_BABELVOX_TTS_EXIT_AFTER_IDLE_UNLOAD:-true}"
+      HF_HOME: /cache/hf
+      TRANSFORMERS_CACHE: /cache/hf/transformers
+      HUGGINGFACE_HUB_CACHE: /cache/hf/hub
+      HF_XET_CACHE: /cache/hf/xet
+      XDG_CACHE_HOME: /cache/xdg
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - "${AOA_BABELVOX_TTS_HF_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/tts/huggingface}:/cache/hf:Z"
+      - "${AOA_BABELVOX_TTS_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/tts/babelvox-stack}:/cache/babelvox:Z"
+      - "${AOA_BABELVOX_TTS_XDG_CACHE_HOST_PATH:-/srv/abyss-machine/cache/ai/tts/xdg}:/cache/xdg:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/tts/babelvox:/out:z,U"
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/accel:/dev/accel
+    ports:
+      - "127.0.0.1:${AOA_BABELVOX_TTS_HOST_PORT:-5102}:5102"
+    mem_limit: "${AOA_BABELVOX_TTS_MEM_LIMIT:-8g}"
+    mem_reservation: "${AOA_BABELVOX_TTS_MEM_RESERVATION:-1g}"
+    cpus: "${AOA_BABELVOX_TTS_CPUS:-4.0}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5102/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

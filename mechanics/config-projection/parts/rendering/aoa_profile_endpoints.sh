@@ -68,8 +68,22 @@ if has_module "43-federation-router.yml"; then
   aoa_note "- route-api tos    http://127.0.0.1:5402/kag/tos-export"
 fi
 
+if has_module "45-rerank-api.yml"; then
+  aoa_note "- rerank-api       http://127.0.0.1:${AOA_RERANK_HOST_PORT:-5405}/health"
+fi
+
+if has_module "46-rag-api.yml"; then
+  aoa_note "- rag-api          http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/health"
+  aoa_note "- rag-api sources  http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/sources"
+  aoa_note "- rag-api dag      http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/dag/jobs"
+fi
+
 if has_module "52-tos-graph.yml"; then
   aoa_note "- tos-graph        http://127.0.0.1:5410/health"
+fi
+
+if has_module "53-babelvox-tts.yml"; then
+  aoa_note "- babelvox-tts     http://127.0.0.1:${AOA_BABELVOX_TTS_HOST_PORT:-5102}/health"
 fi
 
 if has_module "50-speech.yml"; then

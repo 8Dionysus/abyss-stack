@@ -1,6 +1,6 @@
 [Unit]
 Description=Abyss Machine lightweight thermal/battery observability collector
-Documentation=file:/var/lib/abyss-machine/observability/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/observability/AGENTS.md
 
 [Service]
 Type=oneshot

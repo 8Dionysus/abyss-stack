@@ -112,3 +112,43 @@ class LlamacppPilotTests(unittest.TestCase):
         self.assertEqual(trace[0]["reuse_strategy"], "resident_ollama_gguf_blob")
         self.assertEqual(trace[1]["reuse_strategy"], "curated_bartowski_fallback")
         stop_sidecars.assert_called_once()
+
+    def test_parse_prometheus_metrics_keeps_llamacpp_values(self) -> None:
+        payload = self.module.parse_prometheus_metrics(
+            "\n".join(
+                [
+                    "# HELP ignored",
+                    "llamacpp:prompt_tokens_total 895",
+                    "llamacpp:prompt_tokens_seconds 12.3872",
+                    "other_metric 99",
+                    "llamacpp:requests_deferred not-a-number",
+                ]
+            )
+        )
+
+        self.assertEqual(payload["llamacpp:prompt_tokens_total"], 895.0)
+        self.assertEqual(payload["llamacpp:prompt_tokens_seconds"], 12.3872)
+        self.assertNotIn("other_metric", payload)
+        self.assertNotIn("llamacpp:requests_deferred", payload)
+
+    def test_summarize_llama_logs_counts_cache_signatures(self) -> None:
+        summary = self.module.summarize_llama_logs(
+            "\n".join(
+                [
+                    "slot update_slots: restored context checkpoint (pos_min = 118)",
+                    "slot update_slots: forcing full prompt re-processing due to lack of cache data",
+                    "srv update: - cache state: 2 prompts",
+                    "srv get_availabl: prompt cache update took 73.91 ms",
+                    "slot get_availabl: selected slot by LCP similarity, sim_best = 1.000",
+                    "srv get_availabl: prompt cache update took 349.11 ms",
+                ]
+            )
+        )
+
+        self.assertEqual(summary["restored_context_checkpoint"]["count"], 1)
+        self.assertEqual(summary["full_prompt_reprocessing"]["count"], 1)
+        self.assertEqual(summary["cache_state"]["count"], 1)
+        self.assertEqual(summary["selected_lcp_similarity"]["count"], 1)
+        self.assertEqual(summary["prompt_cache_update_ms"]["count"], 2)
+        self.assertEqual(summary["prompt_cache_update_ms"]["min"], 73.91)
+        self.assertEqual(summary["prompt_cache_update_ms"]["max"], 349.11)

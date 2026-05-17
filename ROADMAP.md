@@ -83,6 +83,13 @@ The current direction is:
 - keep release history in `CHANGELOG.md`; the current `v0.2.2` contour remains
   runtime-substrate hardening, not AoA/ToS meaning and not a claim of live
   service mutation
+- keep the current Intel inference route explicit: Gemma 4 E2B is a measured
+  `llama.cpp` Vulkan candidate lane, embeddings stay on OVMS, reranking is a
+  separate opt-in wrapper profile, and helper tools, workflows, and dashboards
+  stay selected service layers rather than implicit resident growth
+- promote RAG through a bounded `rag` profile that composes existing Qdrant,
+  Neo4j, OVMS embeddings, reranking, route, and local text lanes before adding
+  heavier DAG engines or more resident model services
 
 ## Horizon: Runtime Topology
 
@@ -137,12 +144,19 @@ The current direction is:
 - Current posture:
   `langchain-api` on `5403` backed by `llama.cpp` is the bounded promoted
   local-worker posture, with LangGraph adopted for bounded long-horizon flows.
+  On the Intel reference route, Gemma 4 E2B is an explicit `llama.cpp` Vulkan
+  candidate lane, OVMS remains the embeddings seam, and Qwen3 reranking is an
+  opt-in `reranking` profile through a dedicated OpenVINO wrapper.
 - Next honest move:
   keep old trial IDs behind compatibility bridges while current trial,
-  model-card, benchmark, and promotion surfaces use role-level names.
+  model-card, benchmark, service-selection, and promotion surfaces use
+  role-level names. Promote or replace a serving lane only after a measured
+  packet proves the new route.
 - Guardrail:
   optional model trials are not ordinary first-run bootstrap, and preserved
-  runner IDs are not active topology names.
+  runner IDs are not active topology names. Do not treat the current reranker
+  wrapper as proof that the same Qwen3 artifact is an OVMS `/v3/rerank`
+  drop-in.
 
 ## Horizon: Federation Consumption
 

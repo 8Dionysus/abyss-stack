@@ -55,8 +55,16 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 - `llamacpp.intel-285h.server-cache.yml`
 - `llamacpp.intel-285h.kv-iq4nl-lab.yml`
 - `llamacpp.intel-285h.vulkan-lab.yml`
+- `llamacpp.gemma4-e2b.intel-285h.vulkan.yml`
 - `intel-text.ovms-gpu-lab.yml`
 - `intel-text.ovms-qwen3-settings.yml`
+- `storage.intel-285h.resource-guard.yml`
+- `intel-worker.thin-host.yml`
+- `federation.thin-host.yml`
+- `observability.thin-host.yml`
+- `rag.thin-host.yml`
+- `tools.thin-host.yml`
+- `workflows.thin-host.yml`
 
 These overlays land the current Fedora Intel baseline as runnable, explicit host-fit candidates for the `Intel Core Ultra 9 285H` class.
 They are intentionally additive:
@@ -66,8 +74,31 @@ They are intentionally additive:
 - `server-cache` extends a candidate lane with 8K context and prompt-cache reuse screening
 - `kv-iq4nl-lab` is a lab-only cache-quant overlay to stack onto another candidate lane
 - `vulkan-lab` is the first GPU validation lane, maps `/dev/dri` explicitly, swaps `llama-cpp` to the official `ghcr.io/ggml-org/llama.cpp:server-vulkan` image seam for that packet, and carries the current best-known lab posture for this host
+- `gemma4-e2b.intel-285h.vulkan` is the candidate text-only Gemma 4
+  E2B lane for the Intel-aware stack; it keeps chat/jobs on `llama.cpp`
+  Vulkan, keeps OVMS as the embeddings seam when used with `intel-worker`,
+  uses one parallel slot, disables OpenAI literal-completions for the
+  Gemma chat-template path, and points at a host-provided GGUF through
+  `AOA_GEMMA4_E2B_MODEL_HOST_PATH`
 - `intel-text.ovms-gpu-lab` is a standalone OVMS text-generation sidecar harness for explicit model-card-driven Intel text screening, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
 - `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
+- `storage.intel-285h.resource-guard` bounds Postgres, Redis, Qdrant, and
+  Neo4j for this workstation class while keeping the `substrate` service
+  selection unchanged
+- `intel-worker.thin-host` caps the promoted OVMS embeddings seam and
+  `langchain-api` without changing the selected worker lane
+- `federation.thin-host` caps the advisory `route-api` facade when the
+  `federation` profile is selected
+- `observability.thin-host` shortens Prometheus retention, lowers cAdvisor
+  sampling/event retention, and caps dashboard services for explicit
+  observability runs
+- `tools.thin-host` caps helper services when the `tools` layer is selected;
+  it does not make speech/browser helpers resident
+- `workflows.thin-host` caps n8n and external task runners for explicit
+  workflow runs; it does not add workflows to current presets
+- `rag.thin-host` caps the lightweight RAG orchestration API and keeps
+  embedding batch size conservative so ingestion does not become a new memory
+  pressure source
 
 Example on Linux:
 
@@ -90,8 +121,44 @@ export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
 scripts/aoa-llamacpp-pilot run --preset intel-full --overlay compose/tuning/llamacpp.intel-285h.vulkan-lab.yml
 ```
 
+Gemma 4 E2B Intel-aware text-lane example:
+
+```bash
+scripts/aoa-sync-configs
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml
+scripts/aoa-render-config --preset intel-federation >/dev/null
+scripts/aoa-up --preset intel-federation
+```
+
+Thin-host full-stack example:
+
+```bash
+scripts/aoa-sync-configs
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/storage.intel-285h.resource-guard.yml,compose/tuning/intel-worker.thin-host.yml,compose/tuning/federation.thin-host.yml,compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml,compose/tuning/tools.thin-host.yml,compose/tuning/observability.thin-host.yml
+scripts/aoa-render-config --preset intel-full >/dev/null
+scripts/aoa-up --preset intel-full
+```
+
+RAG orchestration adds the RAG thin-host overlay to the current Intel route:
+
+```bash
+scripts/aoa-sync-configs
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/storage.intel-285h.resource-guard.yml,compose/tuning/intel-worker.thin-host.yml,compose/tuning/federation.thin-host.yml,compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml,compose/tuning/tools.thin-host.yml,compose/tuning/observability.thin-host.yml,compose/tuning/rag.thin-host.yml
+scripts/aoa-render-config --preset intel-full --profile federation,reranking,rag >/dev/null
+```
+
+n8n remains opt-in:
+
+```bash
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/storage.intel-285h.resource-guard.yml,compose/tuning/workflows.thin-host.yml
+scripts/aoa-render-config --profile workflows >/dev/null
+```
+
 Keep these overlays in explicit benchmark or pilot use until machine-fit and reviewed runtime docs promote one of them.
-At the moment, that promotion still belongs to `cpu-safe`; `vulkan-lab` is working but remains a lab-only candidate.
+At the moment, that promotion still belongs to `cpu-safe`; `vulkan-lab` is
+working but remains a lab-only candidate, and
+`gemma4-e2b.intel-285h.vulkan` is a candidate stack route backed by host
+resident trials rather than a default profile choice.
 
 Standalone Intel text lab example:
 

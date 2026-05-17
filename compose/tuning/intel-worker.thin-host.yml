@@ -1,0 +1,22 @@
+# Candidate Intel worker guard for workstation runs.
+# Use only with `intel-worker` or presets that include it.
+services:
+  ovms:
+    labels:
+      aoa.tuning.overlay: "intel-worker.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_OVMS_CPUS:-2.0}"
+    mem_limit: "${AOA_OVMS_MEM_LIMIT:-4g}"
+    mem_reservation: "${AOA_OVMS_MEM_RESERVATION:-1g}"
+    environment:
+      OMP_NUM_THREADS: "${AOA_OVMS_OMP_NUM_THREADS:-2}"
+      MKL_NUM_THREADS: "${AOA_OVMS_MKL_NUM_THREADS:-2}"
+      NUMEXPR_NUM_THREADS: "${AOA_OVMS_NUMEXPR_NUM_THREADS:-2}"
+
+  langchain-api:
+    labels:
+      aoa.tuning.overlay: "intel-worker.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_LANGCHAIN_CPUS:-1.0}"
+    mem_limit: "${AOA_LANGCHAIN_MEM_LIMIT:-768m}"
+    mem_reservation: "${AOA_LANGCHAIN_MEM_RESERVATION:-192m}"

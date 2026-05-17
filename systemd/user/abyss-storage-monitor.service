@@ -1,7 +1,7 @@
 [Unit]
 Description=Abyss Machine read-only storage monitor
-Documentation=file:/etc/abyss-machine/AGENTS.md
-Documentation=file:/var/lib/abyss-machine/storage/AGENTS.md
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/storage/AGENTS.md
 
 [Service]
 Type=oneshot

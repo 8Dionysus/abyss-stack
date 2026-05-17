@@ -48,6 +48,9 @@ for new records.
 | [2026-05-14 Composition-First Presets](2026-05-14-composition-first-presets.md) | decision record for making named presets expand through explicit substrate and worker layers |
 | [2026-05-14 Workflow Automation Optional Profile](2026-05-14-workflow-automation-optional-profile.md) | decision record for keeping n8n behind an explicit `workflows` profile |
 | [2026-05-14 Managed Systemd Unit Sources](2026-05-14-managed-systemd-unit-sources.md) | decision record for source-managed user and system unit skeleton allowlists |
+| [2026-05-15 Intel Inference And Rerank Service Selection](2026-05-15-intel-inference-and-rerank-service-selection.md) | decision record for Gemma 4 E2B, OVMS embeddings, Qwen3 reranking, and protected TTS service selection |
+| [2026-05-15 BabelVox TTS Experimental Lane](2026-05-15-babelvox-tts-experimental-lane.md) | decision record for keeping BabelVox as an opt-in Intel speech experiment |
+| [2026-05-16 RAG Orchestration Profile](2026-05-16-rag-orchestration-profile.md) | decision record for the lightweight RAG orchestration profile over existing stack stores and model lanes |
 
 ## Record Shape
 

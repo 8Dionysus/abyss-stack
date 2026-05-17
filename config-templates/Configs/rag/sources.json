@@ -1,0 +1,37 @@
+{
+  "schema": "abyss_stack_rag_sources_v1",
+  "version": 1,
+  "default_collection": "abyss_stack_rag_chunks_v1",
+  "sources": [
+    {
+      "id": "abyss-stack-runtime-docs",
+      "owner": "abyss-stack",
+      "root": "/sources/abyss-stack-docs",
+      "collection": "abyss_stack_rag_chunks_v1",
+      "include_globs": [
+        "**/*.md"
+      ],
+      "exclude_globs": [
+        "legacy/**",
+        "**/legacy/**"
+      ],
+      "provenance": "strict_source_linked",
+      "purpose": "Runtime-owned stack documentation corpus for local RAG smoke, retrieval eval, and operator questions."
+    },
+    {
+      "id": "federation-public-surfaces",
+      "owner": "abyss-stack-runtime",
+      "root": "/sources/federation",
+      "collection": "abyss_stack_rag_chunks_v1",
+      "include_globs": [
+        "**/*.json",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.md"
+      ],
+      "exclude_globs": [],
+      "provenance": "runtime_mirror_public_safe",
+      "purpose": "Public-safe mirrored advisory surfaces for route-api/KAG/memo/playbook retrieval smoke."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 [Unit]
 Description=Ensure Abyss Gemma4 Spark resident candidate is started when gates allow
-Documentation=file:/etc/abyss-machine/AGENTS.md
-Documentation=file:/var/lib/abyss-machine/ai/llm/AGENTS.md
+Documentation=file:///etc/abyss-machine/AGENTS.md
+Documentation=file:///var/lib/abyss-machine/ai/llm/AGENTS.md
 
 [Timer]
 OnBootSec=2min

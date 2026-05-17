@@ -1,0 +1,47 @@
+{
+  "schema": "abyss_stack_rag_dag_jobs_v1",
+  "version": 1,
+  "jobs": [
+    {
+      "id": "rag_ingest_abyss_stack_runtime_docs",
+      "kind": "ingestion",
+      "entrypoint": "POST /ingest/source",
+      "payload": {
+        "source_id": "abyss-stack-runtime-docs"
+      },
+      "resource_class": "medium",
+      "freshness_gate": "rerun when source docs or source registry hash changes"
+    },
+    {
+      "id": "rag_retrieve_smoke",
+      "kind": "retrieval_smoke",
+      "entrypoint": "POST /retrieve",
+      "payload": {
+        "query": "What does abyss-stack own?",
+        "source_id": "abyss-stack-runtime-docs",
+        "top_k": 4,
+        "rerank": false
+      },
+      "resource_class": "light",
+      "freshness_gate": "after ingestion and after embedding model changes"
+    },
+    {
+      "id": "agentic_rag_grounded_answer_smoke",
+      "kind": "agentic_rag_smoke",
+      "entrypoint": "POST /agentic-rag/run",
+      "payload": {
+        "query": "Which services form the RAG substrate?",
+        "source_id": "abyss-stack-runtime-docs",
+        "top_k": 6,
+        "rerank": false
+      },
+      "resource_class": "medium",
+      "freshness_gate": "after retrieval smoke passes"
+    }
+  ],
+  "runner_policy": {
+    "n8n": "optional integration/workflow runner, not the retrieval brain",
+    "dagster": "future asset checks and lineage if ingestion grows beyond local v0",
+    "temporal": "future durable long-running agents only after persistence pressure is proven"
+  }
+}

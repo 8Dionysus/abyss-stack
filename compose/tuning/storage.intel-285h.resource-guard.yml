@@ -1,0 +1,65 @@
+# Candidate storage resource guard for the Intel Core Ultra 9 285H host class.
+# This overlay bounds persistent substrate services without changing which
+# services are selected by a profile or preset.
+services:
+  neo4j:
+    labels:
+      aoa.tuning.overlay: "storage.intel-285h.resource-guard"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_NEO4J_CPUS:-2.0}"
+    mem_limit: "${AOA_NEO4J_MEM_LIMIT:-1536m}"
+    mem_reservation: "${AOA_NEO4J_MEM_RESERVATION:-768m}"
+    environment:
+      NEO4J_server_memory_heap_initial__size: "${AOA_NEO4J_HEAP_INITIAL:-409m}"
+      NEO4J_server_memory_heap_max__size: "${AOA_NEO4J_HEAP_MAX:-409m}"
+      NEO4J_server_memory_pagecache_size: "${AOA_NEO4J_PAGECACHE:-283m}"
+      NEO4J_server_jvm_additional: "-XX:+ExitOnOutOfMemoryError"
+
+  qdrant:
+    labels:
+      aoa.tuning.overlay: "storage.intel-285h.resource-guard"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_QDRANT_CPUS:-2.0}"
+    mem_limit: "${AOA_QDRANT_MEM_LIMIT:-1536m}"
+    mem_reservation: "${AOA_QDRANT_MEM_RESERVATION:-512m}"
+    command: ["./qdrant", "--disable-telemetry"]
+
+  postgres:
+    labels:
+      aoa.tuning.overlay: "storage.intel-285h.resource-guard"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_POSTGRES_CPUS:-1.5}"
+    mem_limit: "${AOA_POSTGRES_MEM_LIMIT:-768m}"
+    mem_reservation: "${AOA_POSTGRES_MEM_RESERVATION:-256m}"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=${AOA_POSTGRES_SHARED_BUFFERS:-256MB}"
+      - "-c"
+      - "work_mem=${AOA_POSTGRES_WORK_MEM:-8MB}"
+      - "-c"
+      - "maintenance_work_mem=${AOA_POSTGRES_MAINTENANCE_WORK_MEM:-128MB}"
+      - "-c"
+      - "effective_cache_size=${AOA_POSTGRES_EFFECTIVE_CACHE_SIZE:-4GB}"
+      - "-c"
+      - "max_connections=${AOA_POSTGRES_MAX_CONNECTIONS:-40}"
+
+  redis:
+    labels:
+      aoa.tuning.overlay: "storage.intel-285h.resource-guard"
+      aoa.tuning.host_class: "intel-core-ultra-9-285h"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_REDIS_CPUS:-0.5}"
+    mem_limit: "${AOA_REDIS_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_REDIS_MEM_RESERVATION:-128m}"
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "${AOA_REDIS_MAXMEMORY:-384mb}"
+      - "--maxmemory-policy"
+      - "${AOA_REDIS_MAXMEMORY_POLICY:-noeviction}"

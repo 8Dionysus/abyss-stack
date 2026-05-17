@@ -1,6 +1,6 @@
 [Unit]
 Description=Run Abyss Nervous passive chronicle snapshots periodically
-Documentation=file:/etc/abyss-machine/AGENTS.md
+Documentation=file:///etc/abyss-machine/AGENTS.md
 
 [Timer]
 OnBootSec=5min

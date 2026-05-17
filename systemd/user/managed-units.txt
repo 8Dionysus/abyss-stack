@@ -1,9 +1,12 @@
 # Source-managed user units that may be linked into ~/.config/systemd/user
 # by scripts/aoa-install-systemd --all-user-units.
 podman-compose-abyss.service
+abyss-stack-resource-guards-apply.service
 ydotoold.service
 abyss-dictation-server.service
 abyss-tts-server.service
+abyss-tts-keepwarm.service
+abyss-tts-keepwarm.timer
 abyss-gemma4-spark.service
 abyss-gemma4-spark.timer
 abyss-gemma4-spark-digest.service

@@ -1,0 +1,449 @@
+from __future__ import annotations
+
+import ctypes
+import gc
+import math
+import os
+import re
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field, model_validator
+
+
+DEFAULT_INSTRUCTION = (
+    "Given a local machine memory search query, retrieve relevant evidence "
+    "chunks that answer the query"
+)
+PROMPT_PREFIX = (
+    "<|im_start|>system\n"
+    "Judge whether the Document meets the requirements based on the Query and "
+    "the Instruct provided. Note that the answer can only be \"yes\" or \"no\"."
+    "<|im_end|>\n<|im_start|>user\n"
+)
+PROMPT_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+
+
+def env_str(primary: str, fallback: str, default: str) -> str:
+    return os.environ.get(primary) or os.environ.get(fallback) or default
+
+
+def env_int(primary: str, fallback: str, default: int) -> int:
+    value = os.environ.get(primary) or os.environ.get(fallback)
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{primary} must be an integer") from exc
+
+
+def env_bool(primary: str, fallback: str, default: bool = False) -> bool:
+    value = os.environ.get(primary) or os.environ.get(fallback)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+MODEL_NAME = env_str("AOA_RERANK_MODEL_NAME", "RERANK_MODEL_NAME", "qwen3-reranker-0.6b-int8-ov")
+MODEL_DIR = Path(env_str("AOA_RERANK_MODEL_DIR", "RERANK_MODEL_DIR", "/models/qwen3-reranker"))
+CACHE_DIR = Path(env_str("AOA_RERANK_CACHE_DIR", "RERANK_CACHE_DIR", "/cache/openvino"))
+DEVICE = env_str("AOA_RERANK_DEVICE", "RERANK_DEVICE", "GPU")
+MAX_LENGTH = env_int("AOA_RERANK_MAX_LENGTH", "RERANK_MAX_LENGTH", 2048)
+BATCH_SIZE = env_int("AOA_RERANK_BATCH_SIZE", "RERANK_BATCH_SIZE", 4)
+DEFAULT_TOP_N = env_int("AOA_RERANK_DEFAULT_TOP_N", "RERANK_DEFAULT_TOP_N", 5)
+IDLE_UNLOAD_SEC = env_int("AOA_RERANK_IDLE_UNLOAD_SEC", "RERANK_IDLE_UNLOAD_SEC", 900)
+IDLE_UNLOAD_CHECK_SEC = env_int("AOA_RERANK_IDLE_UNLOAD_CHECK_SEC", "RERANK_IDLE_UNLOAD_CHECK_SEC", 60)
+EXIT_AFTER_IDLE_UNLOAD = env_bool("AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD", "RERANK_EXIT_AFTER_IDLE_UNLOAD", True)
+FAKE_MODE = env_bool("AOA_RERANK_FAKE", "RERANK_FAKE", False)
+
+
+def now_ms() -> float:
+    return time.perf_counter() * 1000.0
+
+
+def trim_process_heap() -> bool:
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        return bool(libc.malloc_trim(0))
+    except Exception:
+        return False
+
+
+def format_pair(instruction: str | None, query: str, document: str) -> str:
+    return (
+        f"<Instruct>: {instruction or DEFAULT_INSTRUCTION}\n"
+        f"<Query>: {query}\n"
+        f"<Document>: {document}"
+    )
+
+
+def lexical_score(query: str, document: str) -> float:
+    query_tokens = set(re.findall(r"[\w.-]+", query.lower()))
+    if not query_tokens:
+        return 0.0
+    document_tokens = set(re.findall(r"[\w.-]+", document.lower()))
+    overlap = len(query_tokens & document_tokens)
+    return min(1.0, overlap / math.sqrt(len(query_tokens) * max(len(document_tokens), 1)))
+
+
+class RerankRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
+    model: str | None = None
+    query: str = Field(min_length=1)
+    documents: list[str | dict[str, Any]]
+    top_n: int | None = Field(default=None, ge=1)
+    return_documents: bool = True
+    instruction: str | None = None
+
+    @model_validator(mode="after")
+    def validate_documents(self) -> "RerankRequest":
+        if not self.documents:
+            raise ValueError("documents must not be empty")
+        return self
+
+
+@dataclass(frozen=True)
+class DocumentEnvelope:
+    index: int
+    text: str
+    original: str | dict[str, Any]
+
+
+def document_text(value: str | dict[str, Any]) -> str:
+    if isinstance(value, str):
+        return value
+    parts = []
+    for key in ("title", "text", "snippet", "body", "body_preview", "content"):
+        item = value.get(key)
+        if isinstance(item, str) and item.strip():
+            parts.append(item.strip())
+    if parts:
+        return "\n".join(parts)
+    return str(value)
+
+
+class Qwen3OpenVINOReranker:
+    def __init__(self, model_dir: Path, device: str, cache_dir: Path, max_length: int, batch_size: int) -> None:
+        self.model_dir = model_dir
+        self.device = device
+        self.cache_dir = cache_dir
+        self.max_length = max_length
+        self.batch_size = max(1, batch_size)
+        self.load_ms = 0.0
+
+    def load(self) -> None:
+        started = now_ms()
+        import torch
+        from optimum.intel.openvino import OVModelForCausalLM
+        from transformers import AutoTokenizer
+
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_dir,
+            padding_side="left",
+            local_files_only=True,
+            fix_mistral_regex=True,
+        )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model = OVModelForCausalLM.from_pretrained(
+            self.model_dir,
+            device=self.device,
+            ov_config={"CACHE_DIR": str(self.cache_dir)},
+            use_cache=False,
+            export=False,
+            local_files_only=True,
+        )
+        self.model.eval()
+        self.torch = torch
+        self.token_false_id = self.tokenizer.convert_tokens_to_ids("no")
+        self.token_true_id = self.tokenizer.convert_tokens_to_ids("yes")
+        if self.token_false_id is None or self.token_true_id is None:
+            raise RuntimeError("tokenizer must resolve yes/no token ids")
+        self.prefix_tokens = self.tokenizer.encode(PROMPT_PREFIX, add_special_tokens=False)
+        self.suffix_tokens = self.tokenizer.encode(PROMPT_SUFFIX, add_special_tokens=False)
+        self.load_ms = round(now_ms() - started, 3)
+
+    def _process(self, pairs: list[str]) -> dict[str, Any]:
+        budget = max(16, self.max_length - len(self.prefix_tokens) - len(self.suffix_tokens))
+        inputs = self.tokenizer(
+            pairs,
+            padding=False,
+            truncation="longest_first",
+            return_attention_mask=False,
+            max_length=budget,
+        )
+        for index, item in enumerate(inputs["input_ids"]):
+            inputs["input_ids"][index] = self.prefix_tokens + item + self.suffix_tokens
+        return self.tokenizer.pad(inputs, padding=True, return_tensors="pt", max_length=self.max_length)
+
+    def score(self, query: str, documents: list[str], instruction: str | None) -> dict[str, Any]:
+        scores: list[float] = []
+        raw_scores: list[float] = []
+        tokenize_ms = 0.0
+        infer_ms = 0.0
+        for offset in range(0, len(documents), self.batch_size):
+            batch = documents[offset : offset + self.batch_size]
+            pairs = [format_pair(instruction, query, doc) for doc in batch]
+            tokenize_started = now_ms()
+            inputs = self._process(pairs)
+            tokenize_ms += now_ms() - tokenize_started
+            infer_started = now_ms()
+            with self.torch.no_grad():
+                logits = self.model(**inputs).logits[:, -1, :]
+                true_vector = logits[:, self.token_true_id]
+                false_vector = logits[:, self.token_false_id]
+                two = self.torch.stack([false_vector, true_vector], dim=1)
+                log_probs = self.torch.nn.functional.log_softmax(two, dim=1)
+                batch_scores = log_probs[:, 1].exp().detach().cpu().tolist()
+                raw = (true_vector - false_vector).detach().cpu().tolist()
+            infer_ms += now_ms() - infer_started
+            scores.extend(float(item) for item in batch_scores)
+            raw_scores.extend(float(item) for item in raw)
+        return {
+            "scores": scores,
+            "raw_logit_diff": raw_scores,
+            "tokenize_ms": round(tokenize_ms, 3),
+            "infer_ms": round(infer_ms, 3),
+        }
+
+
+class LazyScorer:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._scorer: Qwen3OpenVINOReranker | None = None
+        self._loaded_at_epoch: float | None = None
+        self._last_used_epoch: float | None = None
+        self._last_used_monotonic: float | None = None
+        self._last_unload_epoch: float | None = None
+        self._last_unload_reason: str | None = None
+        self._active_requests = 0
+
+    @property
+    def loaded(self) -> bool:
+        return self._scorer is not None
+
+    @property
+    def load_ms(self) -> float | None:
+        if self._scorer is None:
+            return None
+        return self._scorer.load_ms
+
+    @property
+    def loaded_at_epoch(self) -> float | None:
+        return self._loaded_at_epoch
+
+    @property
+    def last_used_epoch(self) -> float | None:
+        return self._last_used_epoch
+
+    @property
+    def last_unload_epoch(self) -> float | None:
+        return self._last_unload_epoch
+
+    @property
+    def last_unload_reason(self) -> str | None:
+        return self._last_unload_reason
+
+    @property
+    def idle_for_sec(self) -> float | None:
+        if self._scorer is None or self._last_used_monotonic is None:
+            return None
+        return round(max(0.0, time.monotonic() - self._last_used_monotonic), 3)
+
+    @property
+    def active_requests(self) -> int:
+        return self._active_requests
+
+    def begin_request(self) -> None:
+        with self._lock:
+            self._active_requests += 1
+
+    def end_request(self) -> None:
+        with self._lock:
+            self._active_requests = max(0, self._active_requests - 1)
+
+    def _mark_used(self) -> None:
+        self._last_used_epoch = time.time()
+        self._last_used_monotonic = time.monotonic()
+
+    def unload(self, reason: str, *, exit_process: bool = False) -> dict[str, Any]:
+        with self._lock:
+            was_loaded = self._scorer is not None
+            load_ms = self.load_ms
+            self._scorer = None
+            self._loaded_at_epoch = None
+            self._last_unload_epoch = time.time()
+            self._last_unload_reason = reason
+        if was_loaded:
+            gc.collect()
+            heap_trimmed = trim_process_heap()
+        else:
+            heap_trimmed = False
+        response = {
+            "ok": True,
+            "unloaded": was_loaded,
+            "reason": reason,
+            "load_ms": load_ms,
+            "loaded": self.loaded,
+            "heap_trimmed": heap_trimmed,
+            "exit_process": exit_process and was_loaded,
+        }
+        if exit_process and was_loaded:
+            threading.Timer(0.2, lambda: os._exit(0)).start()
+        return response
+
+    def unload_if_idle(self, idle_unload_sec: int) -> dict[str, Any]:
+        if idle_unload_sec <= 0:
+            return {"ok": True, "unloaded": False, "reason": "disabled", "loaded": self.loaded}
+        with self._lock:
+            if self._active_requests > 0:
+                return {
+                    "ok": True,
+                    "unloaded": False,
+                    "reason": "active_requests",
+                    "active_requests": self._active_requests,
+                    "loaded": self.loaded,
+                }
+            if self._scorer is None or self._last_used_monotonic is None:
+                return {"ok": True, "unloaded": False, "reason": "not_loaded", "loaded": self.loaded}
+            idle_for = time.monotonic() - self._last_used_monotonic
+            if idle_for < idle_unload_sec:
+                return {
+                    "ok": True,
+                    "unloaded": False,
+                    "reason": "not_idle",
+                    "idle_for_sec": round(idle_for, 3),
+                    "loaded": self.loaded,
+                }
+        return self.unload(f"idle_for_{int(idle_unload_sec)}s", exit_process=EXIT_AFTER_IDLE_UNLOAD)
+
+    def score(self, query: str, documents: list[str], instruction: str | None) -> dict[str, Any]:
+        if FAKE_MODE:
+            self._mark_used()
+            return {
+                "scores": [lexical_score(query, document) for document in documents],
+                "raw_logit_diff": [],
+                "tokenize_ms": 0.0,
+                "infer_ms": 0.0,
+            }
+        if not MODEL_DIR.is_dir():
+            raise RuntimeError(f"model directory is missing: {MODEL_DIR}")
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            if self._scorer is None:
+                scorer = Qwen3OpenVINOReranker(MODEL_DIR, DEVICE, CACHE_DIR, MAX_LENGTH, BATCH_SIZE)
+                scorer.load()
+                self._scorer = scorer
+                self._loaded_at_epoch = time.time()
+            self._mark_used()
+            return self._scorer.score(query, documents, instruction)
+
+
+scorer = LazyScorer()
+app = FastAPI(title="Abyss Stack Rerank API", version="0.1.0")
+
+
+def idle_unload_loop() -> None:
+    interval = max(5, IDLE_UNLOAD_CHECK_SEC)
+    while True:
+        time.sleep(interval)
+        scorer.unload_if_idle(IDLE_UNLOAD_SEC)
+
+
+if IDLE_UNLOAD_SEC > 0 and not FAKE_MODE:
+    threading.Thread(target=idle_unload_loop, name="rerank-idle-unloader", daemon=True).start()
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "service": "rerank-api",
+        "model": MODEL_NAME,
+        "backend": "openvino_qwen3_reranker",
+        "device": DEVICE,
+        "model_dir": str(MODEL_DIR),
+        "model_dir_exists": MODEL_DIR.is_dir(),
+        "cache_dir": str(CACHE_DIR),
+        "cache_dir_exists": CACHE_DIR.is_dir(),
+        "max_length": MAX_LENGTH,
+        "batch_size": BATCH_SIZE,
+        "loaded": scorer.loaded,
+        "load_ms": scorer.load_ms,
+        "loaded_at_epoch": scorer.loaded_at_epoch,
+        "last_used_epoch": scorer.last_used_epoch,
+        "idle_for_sec": scorer.idle_for_sec,
+        "idle_unload_sec": IDLE_UNLOAD_SEC,
+        "idle_unload_check_sec": IDLE_UNLOAD_CHECK_SEC,
+        "exit_after_idle_unload": EXIT_AFTER_IDLE_UNLOAD,
+        "active_requests": scorer.active_requests,
+        "last_unload_epoch": scorer.last_unload_epoch,
+        "last_unload_reason": scorer.last_unload_reason,
+        "fake_mode": FAKE_MODE,
+    }
+
+
+@app.post("/admin/unload")
+def unload(exit_process: bool = False) -> dict[str, Any]:
+    return scorer.unload("admin_request", exit_process=exit_process)
+
+
+@app.post("/v3/rerank")
+def rerank(req: RerankRequest) -> dict[str, Any]:
+    scorer.begin_request()
+    started = now_ms()
+    try:
+        envelopes = [
+            DocumentEnvelope(index=index, text=document_text(document), original=document)
+            for index, document in enumerate(req.documents)
+        ]
+        try:
+            result = scorer.score(req.query, [item.text for item in envelopes], req.instruction)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"rerank failed: {type(exc).__name__}: {exc}") from exc
+
+        raw_scores = result.get("raw_logit_diff") or []
+        ranked = []
+        for index, envelope in enumerate(envelopes):
+            item: dict[str, Any] = {
+                "index": envelope.index,
+                "relevance_score": result["scores"][index],
+            }
+            if index < len(raw_scores):
+                item["raw_logit_diff"] = raw_scores[index]
+            if req.return_documents:
+                item["document"] = envelope.original
+            ranked.append(item)
+        ranked.sort(key=lambda item: item["relevance_score"], reverse=True)
+        top_n = req.top_n or DEFAULT_TOP_N
+        return {
+            "id": f"rerank-{time.time_ns()}",
+            "model": req.model or MODEL_NAME,
+            "results": ranked[:top_n],
+            "meta": {
+                "backend": "openvino_qwen3_reranker",
+                "device": DEVICE,
+                "documents": len(envelopes),
+                "returned": min(top_n, len(ranked)),
+                "loaded": scorer.loaded,
+                "load_ms": scorer.load_ms,
+                "tokenize_ms": result.get("tokenize_ms"),
+                "infer_ms": result.get("infer_ms"),
+                "total_ms": round(now_ms() - started, 3),
+                "active_requests": scorer.active_requests,
+                "fake_mode": FAKE_MODE,
+            },
+        }
+    finally:
+        scorer.end_request()
+
+
+@app.post("/rerank")
+def rerank_alias(req: RerankRequest) -> dict[str, Any]:
+    return rerank(req)
