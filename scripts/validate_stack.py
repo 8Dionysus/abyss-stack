@@ -46,7 +46,7 @@ STALE_ACTIVE_SIBLING_ROOT_PATTERN = re.compile(
     r"/srv/(?:aoa-[A-Za-z0-9_-]+|Agents-of-Abyss|Tree-of-Sophia)"
 )
 HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS = (
-    re.compile(r"/home/[^/\s]+/src/abyss-stack(?:\b|/)"),
+    re.compile(r"/home/[^/\s]+/src/abyss-stack(?=/|\s|$)"),
 )
 MOVED_MECHANIC_DOC_REFS = (
     "mechanics/config-projection/docs/RENDER_TRUTH.md",

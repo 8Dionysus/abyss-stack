@@ -253,6 +253,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `abyss-nervous-semantic-maintain.timer` no longer uses `OnActiveSec=10min`,
   so user systemd reloads do not create an extra near-term semantic rebuild
   trigger outside the intended boot and 90-minute cadence
+- host-local source-checkout validation now matches only the exact
+  `/home/<user>/src/abyss-stack` path segment, avoiding false positives for
+  sibling paths such as `abyss-stack-docs`
 
 ### Validation
 
