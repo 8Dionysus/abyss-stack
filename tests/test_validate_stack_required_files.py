@@ -125,6 +125,22 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             ],
         )
 
+    def test_host_local_source_checkout_path_allows_prefix_sibling_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            doc = repo_root / "docs" / "MODEL_CARD.md"
+            doc.parent.mkdir(parents=True, exist_ok=True)
+            doc.write_text(
+                "Allowed sibling: /home/alice/src/abyss-stack-docs/README.md\n",
+                encoding="utf-8",
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                validate_stack.validate_no_host_local_source_checkout_paths(errors)
+
+        self.assertEqual(errors, [])
+
     def test_moved_mechanic_doc_ref_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
