@@ -141,6 +141,38 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_host_local_source_checkout_path_matches_sentence_punctuation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            doc = repo_root / "docs" / "MODEL_CARD.md"
+            doc.parent.mkdir(parents=True, exist_ok=True)
+            dotted_root = "/home/alice/src/" + "abyss-stack"
+            parenthesized_root = "/home/bob/src/" + "abyss-stack"
+            doc.write_text(
+                "\n".join(
+                    [
+                        f"Bad sentence path: {dotted_root}.",
+                        f"Bad parenthesized path: ({parenthesized_root})",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            errors: list[str] = []
+            with patch.object(validate_stack, "ROOT", repo_root):
+                validate_stack.validate_no_host_local_source_checkout_paths(errors)
+
+        self.assertEqual(
+            errors,
+            [
+                "host-local source checkout path found in "
+                f"docs/MODEL_CARD.md: {dotted_root}",
+                "host-local source checkout path found in "
+                f"docs/MODEL_CARD.md: {parenthesized_root}",
+            ],
+        )
+
     def test_moved_mechanic_doc_ref_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
