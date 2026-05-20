@@ -1,0 +1,63 @@
+# AoA Memo MCP Design
+
+## Thesis
+
+Memory should work from any place in OS Abyss without copying all memory into
+every prompt or repository.
+
+The stable form is a federation:
+
+```text
+local work -> repo/memo candidate -> aoa-memo-mcp access -> aoa-memo review -> generated recall/eval/KAG handoff
+```
+
+MCP is the access layer. It is intentionally weaker than authored memory
+contracts and raw evidence.
+
+## Contexts
+
+`aoa-memo` owns durable reviewed memory.
+`.aoa` owns raw session evidence and compaction-derived archive surfaces.
+Local `memo/` ports own repo-local candidate intake and receipts.
+`aoa-memo-mcp` owns just-in-time access, candidate helpers, and route prompts.
+
+## Operation
+
+An agent should be able to enter any pilot root and run a brief:
+
+```text
+aoa_memo_brief(repo, intent)
+```
+
+The brief returns:
+
+- local port status;
+- default memory operation mode;
+- relevant central memory contracts;
+- allowed next route;
+- validation commands.
+
+Candidate creation is local-first. A candidate may be written under the local
+port, validated, and exported for reviewed intake. It does not become durable
+memory just because the MCP tool wrote a file.
+
+## Pilot Roots
+
+The first pilot roots are:
+
+- `Agents-of-Abyss/memo/`
+- `~/src/abyss-stack/memo/`
+- `/var/lib/abyss-machine/memo/`
+
+`abyss-machine` uses `/var/lib/abyss-machine/memo/` for the writable host-local
+port because `/etc/abyss-machine` is source-policy owned and root-controlled.
+The host route card still owns the policy boundary.
+
+## Readiness
+
+The first layer is ready when:
+
+- MCP resources/tools/prompts exist and are smoke-tested;
+- each pilot port has `AGENTS.md`, `README.md`, and candidate directories;
+- untrusted candidate material cannot validate as direct durable memory;
+- another repo can obtain a memory brief through the access plane.

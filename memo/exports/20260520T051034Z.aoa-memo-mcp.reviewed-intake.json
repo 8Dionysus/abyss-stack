@@ -1,0 +1,33 @@
+{
+  "contract_type": "reviewed_memory_intake_packet_v1",
+  "packet_id": "reviewed-memory-intake.abyss-stack.aoa-memo-mcp.v1",
+  "producer": {
+    "repo": "abyss-stack",
+    "surface": "MCP/aoa-memo-mcp"
+  },
+  "candidate_refs": [
+    "candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first",
+    "memo/candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json"
+  ],
+  "export_refs": [
+    "MCP/aoa-memo-mcp/DESIGN.md",
+    "MCP/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+    "memo/receipts/20260520T051034Z.aoa-memo-mcp.validation-receipt.json",
+    "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
+  ],
+  "operation_mode_ref": "/srv/AbyssOS/aoa-memo/docs/posture/MEMORY_OPERATION_MODES.md#write_candidate_only",
+  "write_path_guard_ref": "/srv/AbyssOS/aoa-memo/docs/boundaries/MEMORY_WRITE_PATH_GUARDRAILS.md",
+  "review_route": {
+    "owner_repo": "abyss-stack",
+    "reviewer_ref": "memo/AGENTS.md",
+    "decision_ref": "docs/decisions/2026-05-20-aoa-memo-mcp-under-stack-mcp.md"
+  },
+  "sanitization": {
+    "raw_runtime_stream_excluded": true,
+    "private_material_excluded": true,
+    "instructions_treated_as_data": true,
+    "evidence_refs_preserved": true
+  },
+  "allowed_result": "candidate_only",
+  "notes": "First pilot packet proving aoa-memo-mcp can create a local candidate and route it toward aoa-memo review without durable promotion."
+}

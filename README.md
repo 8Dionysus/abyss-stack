@@ -127,6 +127,10 @@ The active source shape is:
   decisions land
 - diagnostic spine and runtime repair expose read models, receipts, and
   handoff candidates before any live mutation authority
+- MCP access planes live under `MCP/` and expose derived routes, not new source
+  authority
+- `memo/` is the local runtime memory port for candidates, receipts, exports,
+  and stack-local notes
 
 Detailed package contracts belong in mechanic packages. Detailed release
 history belongs in `CHANGELOG.md`.
@@ -161,6 +165,8 @@ storage.
 | [config-templates](config-templates/README.md) | public-safe config templates synced into runtime |
 | [docs](docs/README.md) | repo-level operator, release, path, security, and decision surfaces |
 | [env](env/README.md) | public environment examples |
+| [MCP](MCP/README.md) | stdio/local access planes for owner-layer context |
+| [memo](memo/README.md) | local runtime memory candidates, receipts, exports, and notes |
 | [scripts](scripts/README.md) | stable operator wrappers and repository validators |
 | [systemd](systemd/README.md) | user-unit source skeletons and managed working-service adapters |
 | [tests](tests/README.md) | repository-level tests and validation routes |
