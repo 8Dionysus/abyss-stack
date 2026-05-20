@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 REQUIRED_PORT_DIRS = ("candidates", "receipts", "exports", "local")
 TEXT_SUFFIXES = {".md", ".json", ".txt", ".toml", ".yaml", ".yml"}
@@ -180,9 +181,10 @@ class AoAMemoMCPState:
             raise ValueError(f"unknown repo or missing source root: {repo}")
         candidates_dir = route.memo_port / "candidates"
         candidates_dir.mkdir(parents=True, exist_ok=True)
-        stamp = _now().replace(":", "").replace("-", "")
-        candidate_id = f"candidate:{route.name}:{stamp}:{_slug(claim, 32)}"
-        path = candidates_dir / f"{stamp}.{_slug(claim)}.candidate.json"
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        nonce = uuid4().hex[:8]
+        candidate_id = f"candidate:{route.name}:{stamp}:{nonce}:{_slug(claim, 32)}"
+        path = candidates_dir / f"{stamp}.{nonce}.{_slug(claim)}.candidate.json"
         payload = {
             "schema": "aoa_memo_candidate_v1",
             "candidate_id": candidate_id,
@@ -300,7 +302,9 @@ class AoAMemoMCPState:
         session = None
         if isinstance(registry, dict):
             for item in registry.get("sessions", []):
-                label = ((item.get("display") or {}).get("label")) if isinstance(item, dict) else None
+                if not isinstance(item, dict):
+                    continue
+                label = (item.get("display") or {}).get("label")
                 if item.get("session_id") == session_id or label == session_id:
                     session = item
                     break

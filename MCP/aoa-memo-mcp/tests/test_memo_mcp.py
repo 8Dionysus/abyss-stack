@@ -96,6 +96,18 @@ def test_candidate_creation_and_guardrail_validation(tmp_path: Path) -> None:
     assert any("durable_memory" in error for error in invalid["errors"])
 
 
+def test_candidate_creation_does_not_overwrite_same_claim(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    first = state.create_candidate("Agents-of-Abyss", ["docs/FEDERATION_RULES.md"], "same claim")
+    second = state.create_candidate("Agents-of-Abyss", ["docs/FEDERATION_RULES.md"], "same claim")
+
+    assert first["path"] != second["path"]
+    assert Path(first["path"]).exists()
+    assert Path(second["path"]).exists()
+
+
 def test_resources_and_search(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = AoAMemoMCPState.discover(tmp_path)
@@ -106,6 +118,18 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert session["found"] is True
     search = state.search("poisoning", scope="central")
     assert search["hits"]
+
+
+def test_session_rehydrate_ignores_malformed_registry_items(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    registry = tmp_path / ".aoa/session-registry.json"
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    data["sessions"].insert(0, "malformed")
+    registry.write_text(json.dumps(data), encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    assert state.build_session_rehydrate("missing")["found"] is False
+    assert state.build_session_rehydrate("session-1")["found"] is True
 
 
 def test_server_builds(tmp_path: Path) -> None:
