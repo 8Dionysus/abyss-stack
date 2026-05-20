@@ -4,3 +4,4 @@ pytest
 fastapi
 httpx
 jsonschema
+mcp
