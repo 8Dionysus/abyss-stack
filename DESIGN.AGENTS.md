@@ -28,8 +28,8 @@ The agent route mesh has these layers:
 - **design cards**: `DESIGN.md` for runtime form and this file for agent-surface
   form
 - **district cards**: local cards for `compose/`, `config-templates/`, `env/`,
-  `systemd/`, `scripts/`, `docs/`, `tests/`, `.agents/`, `.github/`, and other
-  root districts
+  `systemd/`, `scripts/`, `MCP/`, `memo/`, `docs/`, `tests/`, `.agents/`,
+  `.github/`, and other root districts
 - **mechanic package cards**: `mechanics/<package>/AGENTS.md` cards for runtime
   move families
 - **part cards**: `mechanics/<package>/parts/<part>/AGENTS.md` cards when a part

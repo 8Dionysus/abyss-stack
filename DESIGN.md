@@ -31,7 +31,8 @@ A healthy `abyss-stack` looks like a working runtime map:
   secrets, models, logs, or private captures
 - an explicit deployed runtime root under `/srv/AbyssOS/abyss-stack`
 - clear districts for compose modules, config templates, env examples, systemd
-  units, scripts, mechanics, docs, tests, and local agent overlays
+  units, scripts, mechanics, MCP access planes, local memo ports, docs, tests,
+  and local agent overlays
 - profile and preset surfaces that make service selection visible
 - mechanic packages that describe runtime moves as packages and parts, not as a
   flat pile of historical files
@@ -64,6 +65,10 @@ The runtime body has these organs:
   that stay runtime-owned rather than proof-owned
 - **federation seams**: opt-in runtime bridges to sibling repositories that
   consume or mirror surfaces without stealing their authority
+- **MCP access planes**: stdio or local-access adapters that expose live or
+  derived context while keeping owner-layer authority outside the prompt
+- **local memo port**: runtime-side memory candidates, receipts, exports, and
+  local notes that route durable review to `aoa-memo`
 - **diagnostics and repair**: read models, receipts, closeout contracts, and
   repair posture that support honest operation without claiming autonomous
   healing

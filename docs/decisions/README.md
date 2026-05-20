@@ -51,6 +51,7 @@ for new records.
 | [2026-05-15 Intel Inference And Rerank Service Selection](2026-05-15-intel-inference-and-rerank-service-selection.md) | decision record for Gemma 4 E2B, OVMS embeddings, Qwen3 reranking, and protected TTS service selection |
 | [2026-05-15 BabelVox TTS Experimental Lane](2026-05-15-babelvox-tts-experimental-lane.md) | decision record for keeping BabelVox as an opt-in Intel speech experiment |
 | [2026-05-16 RAG Orchestration Profile](2026-05-16-rag-orchestration-profile.md) | decision record for the lightweight RAG orchestration profile over existing stack stores and model lanes |
+| [2026-05-20 AoA Memo MCP Under Stack MCP](2026-05-20-aoa-memo-mcp-under-stack-mcp.md) | decision record for placing the memory MCP access plane under `MCP/` |
 
 ## Record Shape
 

@@ -14,6 +14,8 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - secrets handling rules for infrastructure
 - backup, restore, smoke, and incident procedures
 - infra helper services and adapters
+- runtime-owned MCP access planes and adapters
+- local memory ports for runtime candidates, receipts, exports, and local notes
 - platform-aware path contracts for Fedora-first deployment and Windows-usable workflows
 - normative host posture and public-safe/private host-facts contracts
 - runtime benchmark policies, schemas, normalized manifests, and raw runtime evidence

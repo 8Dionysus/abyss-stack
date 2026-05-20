@@ -1,0 +1,20 @@
+{
+  "schema": "aoa_memo_candidate_v1",
+  "candidate_id": "candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first",
+  "repo": "abyss-stack",
+  "claim": "aoa-memo-mcp provides the first stack-owned MCP access route for OS Abyss memory briefs and reviewed local candidates.",
+  "evidence_refs": [
+    "MCP/aoa-memo-mcp/DESIGN.md",
+    "MCP/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+    "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
+  ],
+  "source_trust": "review_required",
+  "desired_route": "reviewed_intake",
+  "operation_mode": "write_candidate_only",
+  "review_status": "candidate",
+  "created_at": "2026-05-20T05:10:34Z",
+  "guardrails": {
+    "direct_durable_write": false,
+    "requires_reviewed_intake": true
+  }
+}
