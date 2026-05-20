@@ -19,20 +19,15 @@ Copy or symlink the unit into:
 
 Then reload and enable:
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now podman-compose-abyss.service
-```
+Use the route in [AGENTS](AGENTS.md#install-routes).
 
 The checked-in unit defaults to the conservative `substrate` profile. Host-local
 drop-ins should carry richer runtime selection rather than editing the source
 skeleton for one machine.
 
-Prefer `scripts/aoa-install-systemd` when you need a durable runtime selection:
+Prefer the installer route when you need a durable runtime selection:
 
-```bash
-scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
-```
+Use the installer route in [AGENTS](AGENTS.md#install-routes).
 
 That command keeps the checked-in unit generic and writes a host-local drop-in
 for the selected preset/profile. It can also persist bounded compose overlays
@@ -46,9 +41,7 @@ the full intended runtime shape.
 
 The same installer can also link every unit named in `managed-units.txt`:
 
-```bash
-scripts/aoa-install-systemd --all-user-units
-```
+Use the all-user-units route in [AGENTS](AGENTS.md#install-routes).
 
 That mode only links unit files and reloads the user daemon. It does not start,
 stop, restart, enable, disable, or mask services. Existing user-unit drop-ins

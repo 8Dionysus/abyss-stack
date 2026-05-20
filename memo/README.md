@@ -19,17 +19,6 @@ is exposed through `mcp/services/aoa-memo-mcp/`.
 
 Default write mode: `write_candidate_only`.
 
-To create a candidate through the MCP helper:
-
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli create-candidate \
-  --repo abyss-stack \
-  --evidence-ref mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md \
-  --claim "Runtime memory access should route through reviewed local candidates."
-```
-
-Then validate the emitted candidate path with:
-
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
-```
+Executable candidate and validation routes live in
+[`AGENTS.md`](AGENTS.md#candidate-route). This README describes the local port
+shape; `AGENTS.md` owns the operational route for agents.

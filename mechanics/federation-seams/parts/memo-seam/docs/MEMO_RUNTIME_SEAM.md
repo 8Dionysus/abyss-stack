@@ -77,31 +77,11 @@ This landing does not:
 - turn `abyss-stack` into the live memory store
 - override `aoa-memo` object canon, review posture, or recall meaning
 
-## Operational usage
+## Operational route
 
-To refresh the public-safe memo mirror:
-
-```bash
-scripts/aoa-sync-federation-surfaces --layer aoa-memo
-```
-
-To inspect the memo seam after the `federation` profile is up:
-
-```bash
-curl http://127.0.0.1:5402/memo/registry
-curl http://127.0.0.1:5402/memo/catalog
-curl http://127.0.0.1:5402/memo/object-catalog
-curl -X POST http://127.0.0.1:5402/memo/capsule -H 'content-type: application/json' -d '{"family":"doctrine","id":"AOA-M-0002"}'
-```
-
-To emit a bounded memo export candidate:
-
-```bash
-scripts/aoa-export-memo-candidate \
-  --runtime-surface checkpoint_export \
-  --input-file /tmp/checkpoint-export.json \
-  --write
-```
+Executable mirror refresh, route-api inspection, and candidate export commands
+live in `../AGENTS.md`. This document owns the seam contract; the route card
+owns agent-facing operation.
 
 ## One-line rule
 

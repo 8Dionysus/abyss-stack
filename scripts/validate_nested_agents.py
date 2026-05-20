@@ -224,6 +224,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-sync-federation-surfaces',
         'mirrored owner surfaces',
     ),
+    'mechanics/federation-seams/parts/memo-seam/AGENTS.md': (
+        'runtime seam for bounded `aoa-memo` federation',
+        'public-safe memo mirror',
+        'route-api inspection',
+        'scripts/aoa-export-memo-candidate',
+    ),
     'mechanics/governed-execution/AGENTS.md': (
         'governed-execution',
         'governed local-worker execution',

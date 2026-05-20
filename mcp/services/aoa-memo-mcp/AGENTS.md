@@ -56,6 +56,31 @@ It does not own:
 - `.aoa` raw/session material remains evidence and is never flattened into MCP
   summaries as authority.
 
+## Run
+
+In the shared AoA Codex plane this service is registered as `aoa_memo` through
+`8Dionysus:config/codex_plane/runtime_manifest.v1.json`. Use the workspace
+launcher from the shared root when testing the registered route:
+
+```bash
+/srv/AbyssOS/.codex/bin/aoa-memo-mcp-server.py
+```
+
+For source-local service execution from the `abyss-stack` repo root, run:
+
+```bash
+python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
+```
+
+## Smoke
+
+```bash
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-port --repo abyss-stack
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli build-port-index --repo abyss-stack --check
+```
+
 ## Verify
 
 ```bash

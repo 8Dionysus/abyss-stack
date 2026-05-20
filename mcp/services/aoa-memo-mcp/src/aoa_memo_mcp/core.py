@@ -809,12 +809,10 @@ class AoAMemoMCPState:
         lines.extend(
             [
                 "",
-                "## Validate",
+                "## Agent Route",
                 "",
-                "```bash",
-                "python scripts/memory/validate_local_memo_port.py --path <memo>",
-                "python scripts/memory/build_local_memo_port_index.py --path <memo> --check",
-                "```",
+                "Executable validation and rebuild commands live in the nearest `AGENTS.md` for this memo port.",
+                "This generated index is a read model; it does not own the operational route.",
                 "",
             ]
         )

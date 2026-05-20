@@ -23,9 +23,7 @@ Generated from `PORT.yaml` and local memo packets.
 |---|---|---|---|
 | `candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first-stack-owned-mcp` | `candidate` | `reviewed_intake` | `candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json` |
 
-## Validate
+## Agent Route
 
-```bash
-python scripts/memory/validate_local_memo_port.py --path <memo>
-python scripts/memory/build_local_memo_port_index.py --path <memo> --check
-```
+Executable validation and rebuild commands live in the nearest `AGENTS.md` for this memo port.
+This generated index is a read model; it does not own the operational route.

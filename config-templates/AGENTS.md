@@ -16,6 +16,18 @@ This directory stores public-safe runtime config templates that are bootstrapped
 - `scripts/aoa-bootstrap-configs` copies these trees into the deployed runtime. Keep structure compatible with that contract.
 - Current template families include monitoring, TTS, Ollama, and `Services/litellm`.
 
+## Bootstrap route
+
+When an operator explicitly wants to copy public-safe templates into the
+deployed runtime tree, use:
+
+```bash
+scripts/aoa-bootstrap-configs
+```
+
+For verification or rehearsals, prefer the temporary-root route below before
+touching the deployed runtime.
+
 ## Template rules
 - Stay public-safe. No real secrets, private tokens, or machine-specific hostnames belong here.
 - Use Linux runtime paths and container-local paths, not source-checkout paths.

@@ -84,9 +84,6 @@ Do not use this district to absorb:
 
 ## Validation
 
-```bash
-python scripts/validate_decision_records.py
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-python -m pytest tests/test_decision_records.py
-```
+Executable validation commands live in [AGENTS](AGENTS.md#validation),
+including the `validate_decision_records.py` route. This README describes the
+decision-record district; the route card owns the operational command list.

@@ -60,8 +60,6 @@ path so this root district stays current.
 
 ## Checks
 
-```bash
-python scripts/validate_stack.py
-python quests/scripts/build_quest_examples.py --check
-python -m pytest tests/test_validate_stack_questbook.py
-```
+Executable quest checks live in [AGENTS](AGENTS.md#validate). This README keeps
+the source layout and quest topology readable; the route card owns the
+operational command list.

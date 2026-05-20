@@ -3,11 +3,8 @@
 This directory stores public-safe runtime config templates.
 
 These files are not the live runtime configs themselves.
-They are source-managed templates that can be copied into the deployed runtime tree with:
-
-```bash
-scripts/aoa-bootstrap-configs
-```
+They are source-managed templates that can be copied into the deployed runtime
+tree through the bootstrap route in [AGENTS](AGENTS.md#bootstrap-route).
 
 ## Intent
 
@@ -38,8 +35,8 @@ scripts/aoa-bootstrap-configs
 - `Services/tts_router/`
 
 These `Services/*` entries are source-managed build contexts for lightweight
-runtime helper services. They are bootstrapped into the deployed runtime tree by
-`scripts/aoa-bootstrap-configs`.
+runtime helper services. They are bootstrapped into the deployed runtime tree
+through the bootstrap route named in [AGENTS](AGENTS.md#bootstrap-route).
 
 `Configs/federation/upstream-compatibility-bridge.json` is the public-safe
 runtime bridge data file for sibling-owner names that still need compatibility
