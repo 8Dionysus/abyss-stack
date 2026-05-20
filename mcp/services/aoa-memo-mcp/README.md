@@ -49,6 +49,11 @@ Prompts:
 python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
 ```
 
+In the shared AoA Codex plane this service is registered as `aoa_memo` through
+`8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
+is `<workspace-root>/.codex/bin/aoa-memo-mcp-server.py`; it resolves this
+stack-owned service without making `8Dionysus` the service authority.
+
 For direct smoke checks:
 
 ```bash
