@@ -46,20 +46,20 @@ Prompts:
 ## Run
 
 ```bash
-python MCP/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
+python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
 ```
 
 For direct smoke checks:
 
 ```bash
-PYTHONPATH=MCP/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
-PYTHONPATH=MCP/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
 ```
 
 ## Validate
 
 ```bash
-python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest MCP/aoa-memo-mcp/tests -q
-python MCP/aoa-memo-mcp/scripts/release_check.py
+python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
+python -m pytest mcp/services/aoa-memo-mcp/tests -q
+python mcp/services/aoa-memo-mcp/scripts/release_check.py
 ```

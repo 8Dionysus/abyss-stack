@@ -133,8 +133,8 @@ class AoAMemoMCPState:
             "central_memory_contracts": self._central_contracts(),
             "recommended_route": self._recommended_route(port),
             "validation": [
-                "python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py",
-                "python -m pytest MCP/aoa-memo-mcp/tests -q",
+                "python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
+                "python -m pytest mcp/services/aoa-memo-mcp/tests -q",
                 "python /srv/AbyssOS/aoa-memo/scripts/memory/validate_memory_operations.py",
             ],
         }

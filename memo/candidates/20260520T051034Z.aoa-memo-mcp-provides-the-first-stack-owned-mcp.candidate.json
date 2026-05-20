@@ -4,8 +4,8 @@
   "repo": "abyss-stack",
   "claim": "aoa-memo-mcp provides the first stack-owned MCP access route for OS Abyss memory briefs and reviewed local candidates.",
   "evidence_refs": [
-    "MCP/aoa-memo-mcp/DESIGN.md",
-    "MCP/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
     "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
   ],
   "source_trust": "review_required",

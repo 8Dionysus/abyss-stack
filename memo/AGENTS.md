@@ -17,7 +17,7 @@ candidates, receipts, exports, and local notes before any reviewed landing in
 2. `BOUNDARIES.md`
 3. `mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md`
 4. This `README.md`
-5. `MCP/aoa-memo-mcp/AGENTS.md`
+5. `mcp/services/aoa-memo-mcp/AGENTS.md`
 
 ## Boundaries
 
@@ -30,8 +30,8 @@ Use `candidates/` for proposed memory, `receipts/` for review or handoff traces,
 ## Validation
 
 ```bash
-python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest MCP/aoa-memo-mcp/tests -q
+python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
+python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ```
 
 ## Closeout
