@@ -13,6 +13,8 @@
 
 - Candidate validation requires evidence refs and rejects direct durable writes
   from untrusted or review-required sources.
+- Port validation requires `PORT.yaml`, packet shape, generated index parity,
+  and local review/export routes before durable landing is proposed.
 - Briefs report operation mode and owner hierarchy before suggesting a write.
 - MCP resources expose pointers and compact route data, not full raw archives.
 - Local ports default to `write_candidate_only`.

@@ -7,13 +7,14 @@
 | `aoa-memo` | reviewed memory truth and memory operation contracts | raw session archive or live host facts |
 | `.aoa` | raw session evidence, compaction intervals, indexes, rehydration evidence | reviewed memory truth |
 | local `memo/` ports | candidates, receipts, exports, local notes | central promotion |
-| `aoa-memo-mcp` | access, search, brief, candidate helper, validation helper | authority to promote durable memory |
+| `aoa-memo-mcp` | access, search, brief, candidate helper, local port index helper, intake export helper, validation helper | authority to promote durable memory |
 
 ## Interface
 
 Local ports send candidates forward through reviewed intake.
-`aoa-memo-mcp` can create and validate a candidate, but the reviewed landing
-belongs to `aoa-memo`.
+`aoa-memo-mcp` can create and validate a candidate, build or check the local
+port index, prepare reviewed-intake exports, and write local review receipts.
+The reviewed landing belongs to `aoa-memo`.
 
 Session resources expose rehydration pointers, not raw transcript replacement.
 Agents may use them to find evidence and then inspect the owning archive.
@@ -24,6 +25,9 @@ Agents may use them to find evidence and then inspect the owning archive.
 memo/
   AGENTS.md
   README.md
+  PORT.yaml
+  INDEX.md
+  index.min.json
   candidates/
   receipts/
   exports/

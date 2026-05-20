@@ -10,6 +10,8 @@ is exposed through `mcp/services/aoa-memo-mcp/`.
 
 | Path | Use |
 |---|---|
+| `PORT.yaml` | local port contract for owner, mode, routes, validators, and vocabulary extensions |
+| `INDEX.md` / `index.min.json` | generated local read model over packets |
 | `candidates/` | proposed memory claims with evidence refs |
 | `receipts/` | review, validation, accept, reject, or forward traces |
 | `exports/` | reviewed-intake packets for `aoa-memo` |

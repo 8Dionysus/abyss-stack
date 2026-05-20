@@ -16,8 +16,8 @@ This stack-owned MCP surface owns:
 - MCP resources, tools, prompts, and smoke tests for memory access.
 - The access-plane boundary between `aoa-memo`, `.aoa`, repo-local `memo/`
   ports, and host-local memory evidence.
-- Candidate creation and validation helpers that remain subordinate to
-  `aoa-memo` contracts.
+- Candidate, local port index, reviewed-intake export, and review receipt
+  helpers that remain subordinate to `aoa-memo` contracts.
 
 It does not own:
 
@@ -43,6 +43,7 @@ It does not own:
 | MCP resource, tool, or prompt shape | `src/aoa_memo_mcp/server.py` |
 | memory route semantics | `DESIGN.md` and `docs/BOUNDARIES.md` |
 | candidate validation | `src/aoa_memo_mcp/core.py` |
+| local port index or reviewed-intake packet | `src/aoa_memo_mcp/core.py` and target `memo/PORT.yaml` |
 | pilot local port posture | target repo `memo/AGENTS.md` |
 | session archive access | `.aoa/AGENTS.md` and `.aoa/DESIGN.md` |
 
@@ -50,7 +51,8 @@ It does not own:
 
 - Start with this card, then follow the nearest nested `AGENTS.md`.
 - MCP exposes access; it does not promote memory to truth.
-- Local ports store candidates and receipts; `aoa-memo` decides durable memory.
+- Local ports store candidates, receipts, exports, and generated indexes;
+  `aoa-memo` decides durable memory.
 - `.aoa` raw/session material remains evidence and is never flattened into MCP
   summaries as authority.
 

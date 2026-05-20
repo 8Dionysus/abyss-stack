@@ -152,6 +152,21 @@ meaning synchronized across entry surfaces.
 | Repo-local agent overlays | `.agents/README.md` and the nearest `.agents/**/AGENTS.md` |
 | CI or GitHub route | `.github/GITHUB_SURFACE.md` and `.github/AGENTS.md` |
 
+## Memory Route
+
+Use `aoa_memo` when the task asks to recall, continue, preserve, compare with
+past work, recover after compaction, create a memory candidate, inspect local
+memo state, or route runtime evidence toward reviewed memory.
+
+- Need continuity or context: call `aoa_memo_brief` with `repo=abyss-stack` and
+  the current intent.
+- Need to preserve stack-local memory: write a packet under `memo/candidates/`
+  and validate the port.
+- Need durable reviewed memory: prepare reviewed intake for `aoa-memo`; MCP is
+  an access plane and does not land durable truth directly.
+- Need runtime truth: keep source and host evidence in `abyss-stack`; memo only
+  carries recall, provenance, and candidate handoff.
+
 ## AGENTS Stack Law
 
 - Start with this root card, then follow the nearest nested `AGENTS.md` for

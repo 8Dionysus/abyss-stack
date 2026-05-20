@@ -24,13 +24,17 @@ candidates, receipts, exports, and local notes before any reviewed landing in
 Write locally as `write_candidate_only` unless a stronger reviewed route is
 named by `aoa-memo`.
 
-Use `candidates/` for proposed memory, `receipts/` for review or handoff traces,
-`exports/` for packets meant for `aoa-memo`, and `local/` for stack-local notes.
+Use `PORT.yaml` for the local port contract and `INDEX.md` / `index.min.json`
+as generated read models. Use `candidates/` for proposed memory, `receipts/`
+for review or handoff traces, `exports/` for packets meant for `aoa-memo`, and
+`local/` for stack-local notes.
 
 ## Validation
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
+python /srv/AbyssOS/aoa-memo/scripts/memory/validate_local_memo_port.py --path memo
+python /srv/AbyssOS/aoa-memo/scripts/memory/build_local_memo_port_index.py --path memo --check
 python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ```
 

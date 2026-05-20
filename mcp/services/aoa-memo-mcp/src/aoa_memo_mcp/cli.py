@@ -30,10 +30,30 @@ def main() -> None:
     create.add_argument("--repo", required=True)
     create.add_argument("--claim", required=True)
     create.add_argument("--evidence-ref", action="append", required=True)
+    create.add_argument("--source-ref", action="append")
     create.add_argument("--source-trust", default="review_required")
+    create.add_argument("--kind", default="route")
+    create.add_argument("--family", default="memory-access")
+    create.add_argument("--scope", default="repo")
 
     validate = sub.add_parser("validate-candidate")
     validate.add_argument("path")
+
+    build_index = sub.add_parser("build-port-index")
+    build_index.add_argument("--repo", required=True)
+    build_index.add_argument("--write", action="store_true")
+    build_index.add_argument("--check", action="store_true")
+
+    validate_port = sub.add_parser("validate-port")
+    validate_port.add_argument("--repo", required=True)
+
+    prepare = sub.add_parser("prepare-intake")
+    prepare.add_argument("--repo", required=True)
+    prepare.add_argument("--candidate-ref", action="append", required=True)
+    prepare.add_argument("--receipt-ref", action="append")
+
+    review = sub.add_parser("review-intake")
+    review.add_argument("path")
 
     resource = sub.add_parser("read-resource")
     resource.add_argument("uri")
@@ -46,9 +66,28 @@ def main() -> None:
     elif args.command == "search":
         _print(state.search(args.query, args.scope, args.mode))
     elif args.command == "create-candidate":
-        _print(state.create_candidate(args.repo, args.evidence_ref, args.claim, source_trust=args.source_trust))
+        _print(
+            state.create_candidate(
+                args.repo,
+                args.evidence_ref,
+                args.claim,
+                source_trust=args.source_trust,
+                kind=args.kind,
+                family=args.family,
+                scope=args.scope,
+                source_refs=args.source_ref,
+            )
+        )
     elif args.command == "validate-candidate":
         _print(state.validate_candidate(Path(args.path)))
+    elif args.command == "build-port-index":
+        _print(state.build_port_index(args.repo, write=args.write, check=args.check))
+    elif args.command == "validate-port":
+        _print(state.validate_port(args.repo))
+    elif args.command == "prepare-intake":
+        _print(state.prepare_intake_packet(args.repo, args.candidate_ref, args.receipt_ref))
+    elif args.command == "review-intake":
+        _print(state.review_intake(args.path))
     elif args.command == "read-resource":
         _print(state.read_resource(args.uri))
 
