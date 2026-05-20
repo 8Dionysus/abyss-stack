@@ -4,6 +4,8 @@ import json
 import asyncio
 from pathlib import Path
 
+import pytest
+
 from aoa_memo_mcp.core import AoAMemoMCPState
 from aoa_memo_mcp.server import build_server
 
@@ -108,6 +110,15 @@ def test_candidate_creation_does_not_overwrite_same_claim(tmp_path: Path) -> Non
     assert Path(second["path"]).exists()
 
 
+def test_path_like_repo_values_are_rejected(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    for repo in ("../../tmp", "/tmp", "nested/repo", r"nested\repo", ".", ".."):
+        with pytest.raises(ValueError, match="not a path|repository name"):
+            state.create_candidate(repo, ["docs/FEDERATION_RULES.md"], "must stay in managed memo ports")
+
+
 def test_resources_and_search(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = AoAMemoMCPState.discover(tmp_path)
@@ -130,6 +141,25 @@ def test_session_rehydrate_ignores_malformed_registry_items(tmp_path: Path) -> N
 
     assert state.build_session_rehydrate("missing")["found"] is False
     assert state.build_session_rehydrate("session-1")["found"] is True
+
+
+def test_session_rehydrate_missing_archive_path_is_not_found(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    registry = tmp_path / ".aoa/session-registry.json"
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    data["sessions"].append(
+        {
+            "session_id": "session-without-path",
+            "display": {"label": "missing-path"},
+        }
+    )
+    registry.write_text(json.dumps(data), encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.build_session_rehydrate("session-without-path")
+    assert result["found"] is False
+    assert result["reason"] == "session archive path is missing"
+    assert "agents" not in result
 
 
 def test_server_builds(tmp_path: Path) -> None:

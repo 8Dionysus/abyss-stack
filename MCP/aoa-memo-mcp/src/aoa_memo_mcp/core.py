@@ -316,7 +316,21 @@ class AoAMemoMCPState:
                 "registry": str(registry_path),
             }
         display = session.get("display") or {}
-        path = Path(display.get("path") or display.get("archive_path") or "")
+        raw_path = display.get("path") or display.get("archive_path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            return {
+                "schema": "aoa_session_rehydrate_pointer_v1",
+                "session_id": session.get("session_id"),
+                "label": display.get("label"),
+                "found": False,
+                "registry": str(registry_path),
+                "reason": "session archive path is missing",
+            }
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            path = (self.aoa_archive_root / path).resolve()
+        else:
+            path = path.resolve()
         return {
             "schema": "aoa_session_rehydrate_pointer_v1",
             "session_id": session.get("session_id"),
@@ -376,6 +390,11 @@ class AoAMemoMCPState:
                 yield path
 
     def _normalize_repo(self, repo: str) -> str:
+        if not isinstance(repo, str):
+            raise ValueError("repo must be a repository name or approved alias")
+        candidate = repo.strip()
+        if not candidate:
+            raise ValueError("repo must be a repository name or approved alias")
         aliases = {
             "agents": "Agents-of-Abyss",
             "agents-of-abyss": "Agents-of-Abyss",
@@ -383,4 +402,7 @@ class AoAMemoMCPState:
             "stack": "abyss-stack",
             "machine": "abyss-machine",
         }
-        return aliases.get(repo, repo)
+        normalized = aliases.get(candidate, candidate)
+        if normalized in {".", ".."} or "/" in normalized or "\\" in normalized:
+            raise ValueError("repo must be a repository name or approved alias, not a path")
+        return normalized
