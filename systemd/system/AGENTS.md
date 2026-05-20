@@ -20,6 +20,20 @@ before rootless user services can work correctly on this host.
 - Do not put secrets, live state, generated logs, or machine-private captures in
   this source directory.
 
+## Privileged install route
+
+Only when an operator explicitly intends to install the allowlisted system
+units, use the deployed Configs mirror route:
+
+```bash
+pkexec /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --system-units
+```
+
+That route backs up existing regular files under `/etc/systemd/system`,
+installs root-owned copies of the allowlisted units, and runs
+`systemctl daemon-reload`. It does not start, stop, restart, enable, disable,
+or mask services.
+
 ## Verify
 
 ```bash

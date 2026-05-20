@@ -233,6 +233,9 @@ def test_port_index_validation_and_intake_review(tmp_path: Path, monkeypatch) ->
     assert created["validation"]["ok"] is True
     index = state.build_port_index("abyss-stack", write=True)
     assert index["written"] is True
+    index_markdown = (tmp_path / "stack-source/memo/INDEX.md").read_text(encoding="utf-8")
+    assert "## Agent Route" in index_markdown
+    assert "## Validate" not in index_markdown
     assert state.validate_port("abyss-stack")["ok"] is True
 
     export = state.prepare_intake_packet("abyss-stack", [created["path"]])

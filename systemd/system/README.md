@@ -16,11 +16,8 @@ working stack.
 `/etc/abyss-machine/dictation-hotkey.env`, for example
 `ABYSS_DICTATION_USER` and `ABYSS_DICTATION_UID`.
 
-Install them only through an explicit privileged route:
-
-```bash
-pkexec /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --system-units
-```
+Install them only through the explicit privileged route in
+[AGENTS](AGENTS.md#privileged-install-route).
 
 That mode backs up existing regular files under `/etc/systemd/system`, installs
 root-owned copies of the allowlisted units from the deployed Configs mirror, and runs

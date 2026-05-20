@@ -50,30 +50,13 @@ Prompts:
 Index and intake tools operate only on local `memo/` port packet state. They do
 not land durable reviewed memory into `aoa-memo`.
 
-## Run
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
-```
-
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
 is `<workspace-root>/.codex/bin/aoa-memo-mcp-server.py`; it resolves this
 stack-owned service without making `8Dionysus` the service authority.
 
-For direct smoke checks:
+## Agent Route
 
-```bash
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-port --repo abyss-stack
-PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli build-port-index --repo abyss-stack --check
-```
-
-## Validate
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-python mcp/services/aoa-memo-mcp/scripts/release_check.py
-```
+Executable run, smoke, and validation commands live in
+[`AGENTS.md`](AGENTS.md#run). This README describes the service surface;
+`AGENTS.md` owns the operational route for agents.

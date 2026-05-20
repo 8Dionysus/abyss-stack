@@ -103,11 +103,6 @@ root districts and mechanic homes.
 
 ## Validation
 
-For topology and package route checks:
-
-```bash
-python scripts/validate_nested_agents.py
-python scripts/validate_stack.py
-```
-
-Package-local future work should add the narrow checks named by that package.
+Executable topology and package route checks live in
+[AGENTS](AGENTS.md#validation). This README describes the mechanics atlas; the
+route card owns the operational command list.

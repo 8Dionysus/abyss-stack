@@ -32,6 +32,28 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 - If lifecycle semantics change, update `docs/operations/LIFECYCLE.md` and `docs/install/DEPLOYMENT.md`.
 - Keep the deployed-path assumption explicit. The unit should continue to run from the deployed runtime tree, not from a working checkout.
 
+## Install routes
+
+For a direct manual user-unit reload and enablement test:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now podman-compose-abyss.service
+```
+
+Prefer the installer when a durable runtime selection should be recorded:
+
+```bash
+scripts/aoa-install-systemd --preset intel-full --profile federation --enable-now --restart-now
+```
+
+To link every user unit named in `managed-units.txt` without starting or
+enabling services:
+
+```bash
+scripts/aoa-install-systemd --all-user-units
+```
+
 ## Verify
 When the host supports systemd user tooling:
 ```bash
