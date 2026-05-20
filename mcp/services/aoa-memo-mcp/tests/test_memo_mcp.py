@@ -54,18 +54,51 @@ def seed_workspace(root: Path) -> None:
         (port / rel).mkdir(parents=True, exist_ok=True)
     (port / "AGENTS.md").write_text("# Memo port\n", encoding="utf-8")
     (port / "README.md").write_text("# Memo\n", encoding="utf-8")
+    write_port_contract(port, "Agents-of-Abyss", "ecosystem")
 
     stack_port = root / "stack-source/memo"
     for rel in ["candidates", "receipts", "exports", "local"]:
         (stack_port / rel).mkdir(parents=True, exist_ok=True)
     (stack_port / "AGENTS.md").write_text("# Stack memo port\n", encoding="utf-8")
     (stack_port / "README.md").write_text("# Stack memo\n", encoding="utf-8")
+    write_port_contract(stack_port, "abyss-stack", "repo")
 
     machine_port = root / "machine-state/memo"
     for rel in ["candidates", "receipts", "exports", "local"]:
         (machine_port / rel).mkdir(parents=True, exist_ok=True)
     (machine_port / "AGENTS.md").write_text("# Machine memo port\n", encoding="utf-8")
     (machine_port / "README.md").write_text("# Machine memo\n", encoding="utf-8")
+    write_port_contract(machine_port, "abyss-machine", "host")
+
+
+def write_port_contract(port: Path, repo: str, scope: str) -> None:
+    (port / "PORT.yaml").write_text(
+        "\n".join(
+            [
+                "schema: aoa_local_memo_port_v1",
+                f"repo: {repo}",
+                f"owner: {repo}",
+                "stronger_memory_owner: aoa-memo",
+                "default_mode: write_candidate_only",
+                f"port_scope: {scope}",
+                "allowed_routes:",
+                "  - local_only",
+                "  - reviewed_intake",
+                "  - owner_handoff",
+                "  - quarantine",
+                "candidate_dir: candidates",
+                "receipt_dir: receipts",
+                "export_dir: exports",
+                "local_dir: local",
+                "validators:",
+                "  - aoa_memo_validate_candidate",
+                "  - validate_local_memo_port",
+                "return_receipts: true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_brief_reports_ready_port_and_contracts(tmp_path: Path) -> None:
@@ -91,7 +124,7 @@ def test_candidate_creation_and_guardrail_validation(tmp_path: Path) -> None:
     assert result["validation"]["ok"] is True
     candidate = Path(result["path"])
     data = json.loads(candidate.read_text(encoding="utf-8"))
-    data["desired_route"] = "durable_memory"
+    data["route"] = "durable_memory"
     candidate.write_text(json.dumps(data), encoding="utf-8")
     invalid = state.validate_candidate(candidate)
     assert invalid["ok"] is False
@@ -129,6 +162,8 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert session["found"] is True
     search = state.search("poisoning", scope="central")
     assert search["hits"]
+    index = state.read_resource("aoa-memo://repo/Agents-of-Abyss/memo-port-index")
+    assert index["index"]["repo"] == "Agents-of-Abyss"
 
 
 def test_session_rehydrate_ignores_malformed_registry_items(tmp_path: Path) -> None:
@@ -176,12 +211,35 @@ def test_pilot_port_topology(tmp_path: Path, monkeypatch) -> None:
     for repo in ("Agents-of-Abyss", "abyss-stack", "abyss-machine"):
         status = state.build_local_port_status(repo)
         assert status["ready"] is True
+        assert status["port_contract_exists"] is True
         assert {item["path"] for item in status["required_dirs"]} == {
             "candidates",
             "receipts",
             "exports",
             "local",
         }
+
+
+def test_port_index_validation_and_intake_review(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "MCP should prepare local intake packets before aoa-memo landing",
+    )
+    assert created["validation"]["ok"] is True
+    index = state.build_port_index("abyss-stack", write=True)
+    assert index["written"] is True
+    assert state.validate_port("abyss-stack")["ok"] is True
+
+    export = state.prepare_intake_packet("abyss-stack", [created["path"]])
+    assert export["ok"] is True
+    reviewed = state.review_intake(export["path"])
+    assert reviewed["ok"] is True
+    assert Path(reviewed["receipt_path"]).exists()
 
 
 def test_mcp_surface_contracts(tmp_path: Path) -> None:
@@ -196,10 +254,14 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
 
     tools, prompts, templates = asyncio.run(inspect())
     assert tools == {
+        "aoa_memo_build_port_index",
         "aoa_memo_brief",
         "aoa_memo_search",
         "aoa_memo_create_candidate",
+        "aoa_memo_prepare_intake_packet",
+        "aoa_memo_review_intake",
         "aoa_memo_validate_candidate",
+        "aoa_memo_validate_port",
     }
     assert prompts == {"memo-brief", "memo-intake", "memo-review", "session-rehydrate"}
     assert templates == {
@@ -207,4 +269,8 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         "aoa-memo://memory/object/{object_id}",
         "aoa-memo://session/{session_id}/rehydrate",
         "aoa-memo://repo/{repo}/local-port-status",
+        "aoa-memo://repo/{repo}/memo-port-index",
+        "aoa-memo://repo/{repo}/memo-open-items",
+        "aoa-memo://repo/{repo}/memo-vocabulary",
+        "aoa-memo://intake/{packet_id}/review",
     }

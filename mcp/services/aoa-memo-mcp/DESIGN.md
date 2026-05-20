@@ -41,6 +41,19 @@ Candidate creation is local-first. A candidate may be written under the local
 port, validated, and exported for reviewed intake. It does not become durable
 memory just because the MCP tool wrote a file.
 
+Local port indexing is also local-first. `PORT.yaml` is the local contract,
+`INDEX.md` and `index.min.json` are generated read models, and MCP may rebuild
+or validate them as access-plane helpers.
+
+Reviewed intake is a three-step route:
+
+```text
+candidate -> prepared export packet -> review receipt -> aoa-memo source patch
+```
+
+This MCP server owns the first three local packet steps. The final durable
+landing remains an `aoa-memo` source change with validators and review.
+
 ## Pilot Roots
 
 The first pilot roots are:

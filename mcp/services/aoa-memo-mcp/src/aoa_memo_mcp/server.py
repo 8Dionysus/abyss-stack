@@ -37,6 +37,10 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         evidence_refs: list[str],
         claim: str,
         source_trust: str = "review_required",
+        kind: str = "route",
+        family: str = "memory-access",
+        scope: str = "repo",
+        source_refs: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a local memory candidate under the repo memo port."""
         return current_state().create_candidate(
@@ -44,12 +48,40 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
             evidence_refs=evidence_refs,
             claim=claim,
             source_trust=source_trust,
+            kind=kind,
+            family=family,
+            scope=scope,
+            source_refs=source_refs,
         )
 
     @mcp.tool()
     def aoa_memo_validate_candidate(path: str) -> dict[str, Any]:
         """Validate a local memory candidate before reviewed intake."""
         return current_state().validate_candidate(path)
+
+    @mcp.tool()
+    def aoa_memo_build_port_index(repo: str, write: bool = False, check: bool = False) -> dict[str, Any]:
+        """Build or check the generated local memo port index."""
+        return current_state().build_port_index(repo=repo, write=write, check=check)
+
+    @mcp.tool()
+    def aoa_memo_validate_port(repo: str) -> dict[str, Any]:
+        """Validate a local memo port contract, packets, and generated index."""
+        return current_state().validate_port(repo)
+
+    @mcp.tool()
+    def aoa_memo_prepare_intake_packet(
+        repo: str,
+        candidate_refs: list[str],
+        receipt_refs: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Prepare a reviewed-intake export packet from local candidates."""
+        return current_state().prepare_intake_packet(repo=repo, candidate_refs=candidate_refs, receipt_refs=receipt_refs)
+
+    @mcp.tool()
+    def aoa_memo_review_intake(path: str) -> dict[str, Any]:
+        """Review a local reviewed-intake export and write a local receipt."""
+        return current_state().review_intake(path)
 
     @mcp.resource("aoa-memo://brief/repo/{repo}")
     def brief_resource(repo: str) -> str:
@@ -67,6 +99,22 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
     def local_port_status_resource(repo: str) -> str:
         return json.dumps(current_state().build_local_port_status(repo), ensure_ascii=False, indent=2)
 
+    @mcp.resource("aoa-memo://repo/{repo}/memo-port-index")
+    def memo_port_index_resource(repo: str) -> str:
+        return json.dumps(current_state().build_port_index(repo), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-memo://repo/{repo}/memo-open-items")
+    def memo_open_items_resource(repo: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-memo://repo/{repo}/memo-open-items"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-memo://repo/{repo}/memo-vocabulary")
+    def memo_vocabulary_resource(repo: str) -> str:
+        return json.dumps(current_state().build_memo_port_vocabulary(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-memo://intake/{packet_id}/review")
+    def intake_review_resource(packet_id: str) -> str:
+        return json.dumps(current_state().find_intake_review(packet_id), ensure_ascii=False, indent=2)
+
     @mcp.prompt(name="memo-brief")
     def memo_brief(repo: str, intent: str = "") -> str:
         """Prompt route for obtaining a memory brief."""
@@ -81,7 +129,7 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         return (
             f"Create a local candidate for {repo!r} with claim {claim!r}. "
             "Use evidence refs from current files or session archive pointers. "
-            "Run aoa_memo_validate_candidate before proposing reviewed intake."
+            "Run aoa_memo_validate_candidate, aoa_memo_prepare_intake_packet, and aoa_memo_review_intake before proposing durable aoa-memo landing."
         )
 
     @mcp.prompt(name="memo-review")
@@ -89,7 +137,7 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         """Prompt route for reviewing a memory candidate."""
         return (
             f"Validate {candidate_path!r}; compare evidence refs against current owner files; "
-            "then route to aoa-memo reviewed intake, keep local, or reject."
+            "then prepare/review an intake packet, keep local, or reject. MCP review is not durable memory landing."
         )
 
     @mcp.prompt(name="session-rehydrate")

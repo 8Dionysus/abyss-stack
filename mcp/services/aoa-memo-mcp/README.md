@@ -35,6 +35,10 @@ Tools:
 - `aoa_memo_search(query, scope, mode)`
 - `aoa_memo_create_candidate(repo, evidence_refs, claim)`
 - `aoa_memo_validate_candidate(path)`
+- `aoa_memo_build_port_index(repo, write, check)`
+- `aoa_memo_validate_port(repo)`
+- `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
+- `aoa_memo_review_intake(path)`
 
 Prompts:
 
@@ -42,6 +46,9 @@ Prompts:
 - `memo-intake`
 - `memo-review`
 - `session-rehydrate`
+
+Index and intake tools operate only on local `memo/` port packet state. They do
+not land durable reviewed memory into `aoa-memo`.
 
 ## Run
 
@@ -59,6 +66,8 @@ For direct smoke checks:
 ```bash
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo Agents-of-Abyss --intent "route memory"
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-port --repo abyss-stack
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli build-port-index --repo abyss-stack --check
 ```
 
 ## Validate
