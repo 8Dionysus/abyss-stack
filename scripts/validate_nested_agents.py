@@ -107,23 +107,29 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'Repo Validation',
         'root route card',
     ),
-    'MCP/AGENTS.md': (
+    'mcp/AGENTS.md': (
         'Model Context Protocol',
         'access planes',
-        'MCP/aoa-memo-mcp/',
-        'python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py',
+        'mcp/services/aoa-memo-mcp/',
+        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
     ),
-    'MCP/aoa-memo-mcp/AGENTS.md': (
+    'mcp/services/AGENTS.md': (
+        'service-package district',
+        'Model Context Protocol',
+        'aoa-memo-mcp',
+        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
+    ),
+    'mcp/services/aoa-memo-mcp/AGENTS.md': (
         'thin MCP access plane',
         'aoa-memo',
         'repo-local `memo/`',
-        'python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py',
+        'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
     ),
     'memo/AGENTS.md': (
         'abyss-stack local memory port',
         'write_candidate_only',
         'candidates/',
-        'MCP/aoa-memo-mcp/AGENTS.md',
+        'mcp/services/aoa-memo-mcp/AGENTS.md',
     ),
     '.agents/spark/AGENTS.md': (
         'fast-loop lane',

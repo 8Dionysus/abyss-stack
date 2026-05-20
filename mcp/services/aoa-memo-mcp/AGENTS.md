@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Local route card for `MCP/aoa-memo-mcp/`.
+Local route card for `mcp/services/aoa-memo-mcp/`.
 
 ## Purpose
 
@@ -57,9 +57,9 @@ It does not own:
 ## Verify
 
 ```bash
-python MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest MCP/aoa-memo-mcp/tests -q
-python MCP/aoa-memo-mcp/scripts/release_check.py
+python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
+python -m pytest mcp/services/aoa-memo-mcp/tests -q
+python mcp/services/aoa-memo-mcp/scripts/release_check.py
 ```
 
 ## Report

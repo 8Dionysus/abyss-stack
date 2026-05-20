@@ -2,7 +2,7 @@
   "receipt_type": "aoa_memo_mcp_candidate_validation_v1",
   "candidate_ref": "memo/candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json",
   "candidate_id": "candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first",
-  "validated_by": "PYTHONPATH=MCP/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate",
+  "validated_by": "PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate",
   "validated_at": "2026-05-20T05:10:34Z",
   "result": {
     "ok": true,

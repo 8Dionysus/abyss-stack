@@ -1,6 +1,7 @@
 # Decision: Place `aoa-memo-mcp` Under `abyss-stack/MCP`
 
-Status: accepted
+Status: superseded
+Superseded by: `docs/decisions/2026-05-20-mcp-services-topology.md`
 Date: 2026-05-19
 
 ## Context
@@ -48,5 +49,5 @@ memory contracts in `aoa-memo`.
 
 ## Follow-up route
 
-Use `MCP/aoa-memo-mcp/scripts/validate_memo_mcp.py` and the stack release gate
-when changing the access plane.
+For the current active path, use `mcp/services/aoa-memo-mcp/` and the stack
+release gate when changing the access plane.

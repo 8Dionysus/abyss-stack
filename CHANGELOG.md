@@ -61,6 +61,9 @@ Tracking starts with the community-docs baseline for this repository.
   mapping that does not compete with the homepage README
 - root `DESIGN.md` and `DESIGN.AGENTS.md` surfaces, adapting the AoA route-card
   pattern to the `abyss-stack` runtime substrate
+- `mcp/services/AGENTS.md`, `mcp/services/README.md`, and
+  `docs/decisions/2026-05-20-mcp-services-topology.md` as the canonical MCP
+  service-package topology for `aoa-memo-mcp`
 - `docs/runtime/SERVICE_SELECTION.md` as the source-level service-selection
   guide for lean Intel, full Intel, optional workflows, tools, observability,
   reranking, and protected speech routes
@@ -256,6 +259,10 @@ Tracking starts with the community-docs baseline for this repository.
 - host-local source-checkout validation now matches only the exact
   `/home/<user>/src/abyss-stack` path segment, avoiding false positives for
   sibling paths such as `abyss-stack-docs`
+- the memory MCP access plane now lives under
+  `mcp/services/aoa-memo-mcp/`, with route cards, validators, local memo
+  receipts, and sibling memory-port references following the canonical service
+  path
 
 ### Validation
 

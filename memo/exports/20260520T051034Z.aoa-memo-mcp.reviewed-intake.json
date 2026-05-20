@@ -3,15 +3,15 @@
   "packet_id": "reviewed-memory-intake.abyss-stack.aoa-memo-mcp.v1",
   "producer": {
     "repo": "abyss-stack",
-    "surface": "MCP/aoa-memo-mcp"
+    "surface": "mcp/services/aoa-memo-mcp"
   },
   "candidate_refs": [
     "candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first",
     "memo/candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json"
   ],
   "export_refs": [
-    "MCP/aoa-memo-mcp/DESIGN.md",
-    "MCP/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
     "memo/receipts/20260520T051034Z.aoa-memo-mcp.validation-receipt.json",
     "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
   ],

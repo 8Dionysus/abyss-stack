@@ -101,7 +101,7 @@ This repository owns:
 - source-to-runtime install, config projection, bootstrap, and parity contracts
 - runtime-side diagnostics and repair-safe closeout seams subordinate to owner
   repositories
-- runtime access-plane adapters such as `MCP/`, plus local candidate ports such
+- runtime access-plane adapters such as `mcp/`, plus local candidate ports such
   as `memo/`, when they preserve sibling-owner authority
 
 It does not own:
@@ -146,7 +146,7 @@ meaning synchronized across entry surfaces.
 | Governed execution or return posture | `mechanics/governed-execution/README.md` |
 | Diagnostics | `mechanics/diagnostic-spine/README.md` |
 | Repair posture | `mechanics/runtime-repair/README.md` |
-| MCP access plane | `MCP/AGENTS.md` and the package-local card |
+| MCP access plane | `mcp/AGENTS.md` and the package-local card |
 | Local memory port | `memo/AGENTS.md` |
 | Scripts | `scripts/README.md` and the owning mechanic part |
 | Repo-local agent overlays | `.agents/README.md` and the nearest `.agents/**/AGENTS.md` |
@@ -222,7 +222,7 @@ Update only the ones that moved; otherwise say no update was needed.
   overlays, or closeout expectations change
 - `README.md`, `CHARTER.md`, and `BOUNDARIES.md` when entry routing or owner
   boundaries change
-- `MCP/README.md`, `memo/README.md`, and their local `AGENTS.md` cards when
+- `mcp/README.md`, `memo/README.md`, and their local `AGENTS.md` cards when
   memory access-plane or local-port routes change
 - `ROADMAP.md` when runtime direction, lifecycle posture, deployment topology,
   profile support, repair posture, or a concrete future trigger changed
