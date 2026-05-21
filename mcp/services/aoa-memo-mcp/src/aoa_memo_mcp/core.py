@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import yaml
+from jsonschema import Draft202012Validator, FormatChecker
 
 REQUIRED_PORT_DIRS = ("candidates", "receipts", "exports", "local")
 TEXT_SUFFIXES = {".md", ".json", ".txt", ".toml", ".yaml", ".yml"}
@@ -31,6 +32,13 @@ CENTRAL_VOCABULARY = "config/memory-ports/indexing_vocabulary.json"
 LOCAL_PORT_INDEX = "index.min.json"
 LOCAL_PORT_INDEX_MD = "INDEX.md"
 LOCAL_PORT_CONTRACT = "PORT.yaml"
+MEMORY_PORT_SCHEMA_DIR = "schemas/memory-ports"
+LOCAL_MEMO_CANDIDATE_SCHEMA = "local_memo_candidate.schema.json"
+LOCAL_MEMO_EXPORT_SCHEMA = "local_memo_export.schema.json"
+LOCAL_MEMO_PORT_SCHEMA = "local_memo_port.schema.json"
+LOCAL_MEMO_PORT_INDEX_SCHEMA = "local_memo_port_index.schema.json"
+LOCAL_MEMO_RECEIPT_SCHEMA = "local_memo_receipt.schema.json"
+FORMAT_CHECKER = FormatChecker()
 OPEN_REVIEW_STATES = {"candidate", "validated", "forwarded", "reviewed"}
 TERMINAL_REVIEW_STATES = {"rejected", "landed", "superseded", "archived"}
 FALLBACK_VOCABULARY_TERMS = {
@@ -60,10 +68,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _slug(text: str, limit: int = 48) -> str:
+def _id_slug(text: str, limit: int = 48) -> str:
     lowered = text.lower()
-    slug = re.sub(r"[^a-z0-9а-яё]+", "-", lowered, flags=re.IGNORECASE).strip("-")
-    return (slug or "candidate")[:limit].strip("-") or "candidate"
+    slug = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
+    return (slug or "memo")[:limit].strip("-") or "memo"
 
 
 def _read_json(path: Path) -> Any | None:
@@ -181,7 +189,7 @@ class AoAMemoMCPState:
                 "candidate": "repo memo/candidates",
                 "validate": "aoa_memo_validate_candidate and aoa_memo_validate_port",
                 "export": "aoa_memo_prepare_intake_packet",
-                "review": "aoa_memo_review_intake",
+                "forwarding_check": "aoa_memo_review_intake writes a local check receipt only",
                 "durable_landing": "reviewed source patch in aoa-memo, not MCP direct write",
             },
             "central_memory_contracts": self._central_contracts(),
@@ -246,9 +254,9 @@ class AoAMemoMCPState:
         candidates_dir.mkdir(parents=True, exist_ok=True)
         stamp = _utc_stamp()
         nonce = uuid4().hex[:8]
-        slug = _slug(claim, 32)
+        slug = _id_slug(claim, 32)
         candidate_id = f"candidate:{route.name}:{stamp}:{nonce}-{slug}"
-        path = candidates_dir / f"{stamp}.{nonce}.{_slug(claim)}.candidate.json"
+        path = candidates_dir / f"{stamp}.{nonce}.{_id_slug(claim)}.candidate.json"
         payload = {
             "schema": "aoa_local_memo_candidate_v1",
             "id": candidate_id,
@@ -271,16 +279,57 @@ class AoAMemoMCPState:
                 "requires_reviewed_intake": True,
             },
         }
+        validation = self._validate_candidate_payload(payload, path, route.memo_port)
+        result = {
+            "path": str(path),
+            "local_ref": self._local_packet_ref(route.memo_port, path),
+            "candidate": payload,
+            "validation": validation,
+        }
+        if not validation["ok"]:
+            return result
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         validation = self.validate_candidate(path)
-        return {"path": str(path), "candidate": payload, "validation": validation}
+        result["validation"] = validation
+        return result
 
     def validate_candidate(self, path: str | Path) -> dict[str, Any]:
         candidate_path = Path(path).expanduser().resolve()
+        try:
+            _, port, candidate_path = self._known_port_for_path(candidate_path, required_dir="candidates")
+        except ValueError as exc:
+            return {
+                "ok": False,
+                "path": str(candidate_path),
+                "repo": None,
+                "candidate_id": None,
+                "errors": [str(exc)],
+                "warnings": self._vocabulary_warnings(),
+            }
         data = _read_json(candidate_path)
+        return self._validate_candidate_payload(data, candidate_path, port)
+
+    def _validate_candidate_payload(
+        self,
+        data: Any,
+        candidate_path: Path,
+        port: Path,
+    ) -> dict[str, Any]:
         errors: list[str] = []
+        warnings = self._vocabulary_warnings()
         if not isinstance(data, dict):
-            return {"ok": False, "path": str(candidate_path), "errors": ["candidate is not valid JSON object"]}
+            return {
+                "ok": False,
+                "path": str(candidate_path),
+                "repo": None,
+                "candidate_id": None,
+                "errors": ["candidate is not valid JSON object"],
+                "warnings": warnings,
+            }
+        errors.extend(self._schema_errors(LOCAL_MEMO_CANDIDATE_SCHEMA, data, "candidate"))
+        port_payload = self._port_payload(port)
+        if port_payload.get("repo") and data.get("repo") != port_payload.get("repo"):
+            errors.append("candidate repo must match containing PORT.yaml repo")
         required = (
             "schema",
             "id",
@@ -322,7 +371,7 @@ class AoAMemoMCPState:
             errors.append("unreviewed or untrusted candidates cannot claim current or frozen lifecycle")
         if desired_route == "durable_memory":
             errors.append("local candidates must not route directly to durable_memory")
-        vocab_errors = self._validate_candidate_vocabulary(data)
+        vocab_errors = self._validate_candidate_vocabulary(data, port_payload)
         errors.extend(vocab_errors)
         return {
             "ok": not errors,
@@ -330,6 +379,7 @@ class AoAMemoMCPState:
             "repo": data.get("repo"),
             "candidate_id": data.get("id"),
             "errors": errors,
+            "warnings": warnings,
         }
 
     def build_port_index(self, repo: str, *, write: bool = False, check: bool = False) -> dict[str, Any]:
@@ -376,6 +426,8 @@ class AoAMemoMCPState:
         if not isinstance(port_payload, dict):
             errors.append("PORT.yaml is missing or invalid")
             port_payload = {}
+        else:
+            errors.extend(self._schema_errors(LOCAL_MEMO_PORT_SCHEMA, port_payload, "PORT.yaml"))
         for directory in REQUIRED_PORT_DIRS:
             if not (port / directory).is_dir():
                 errors.append(f"missing directory: {directory}")
@@ -390,6 +442,21 @@ class AoAMemoMCPState:
             result = self.validate_candidate(candidate)
             if not result["ok"]:
                 errors.extend(f"{candidate}: {error}" for error in result["errors"])
+        for export in sorted((port / "exports").glob("*.json")):
+            payload = _read_json(export)
+            if not isinstance(payload, dict):
+                errors.append(f"{export}: export is not a JSON object")
+            else:
+                errors.extend(f"{export}: {error}" for error in self._schema_errors(LOCAL_MEMO_EXPORT_SCHEMA, payload, "export"))
+        for receipt in sorted((port / "receipts").glob("*.json")):
+            payload = _read_json(receipt)
+            if not isinstance(payload, dict):
+                errors.append(f"{receipt}: receipt is not a JSON object")
+            else:
+                errors.extend(f"{receipt}: {error}" for error in self._schema_errors(LOCAL_MEMO_RECEIPT_SCHEMA, payload, "receipt"))
+        index_payload = _read_json(port / LOCAL_PORT_INDEX)
+        if isinstance(index_payload, dict):
+            errors.extend(self._schema_errors(LOCAL_MEMO_PORT_INDEX_SCHEMA, index_payload, "port index"))
         check = self.build_port_index(repo, check=True)
         if not check["ok"]:
             errors.extend(check["errors"])
@@ -412,15 +479,40 @@ class AoAMemoMCPState:
             raise ValueError(f"unknown repo or missing source root: {repo}")
         if not candidate_refs:
             raise ValueError("candidate_refs must not be empty")
-        candidates = [self._resolve_local_ref(route.memo_port, ref, "candidates") for ref in candidate_refs]
-        missing = [candidate_refs[index] for index, path in enumerate(candidates) if path is None or not path.exists()]
-        if missing:
-            return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": False, "errors": [f"missing candidate ref: {ref}" for ref in missing]}
-        candidate_payloads = [self._read_required_json(path) for path in candidates if path is not None]
         errors: list[str] = []
+        candidates: list[Path] = []
+        for ref in candidate_refs:
+            try:
+                candidate = self._resolve_local_ref(route.memo_port, ref, "candidates")
+            except ValueError as exc:
+                errors.append(f"{ref}: {exc}")
+                continue
+            if candidate is None or not candidate.exists():
+                errors.append(f"missing candidate ref: {ref}")
+            else:
+                candidates.append(candidate)
+        receipts: list[Path] = []
+        for ref in receipt_refs or []:
+            try:
+                receipt = self._resolve_local_ref(route.memo_port, ref, "receipts")
+            except ValueError as exc:
+                errors.append(f"{ref}: {exc}")
+                continue
+            if receipt is None or not receipt.exists():
+                errors.append(f"missing receipt ref: {ref}")
+            else:
+                receipts.append(receipt)
+        if errors:
+            return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": False, "errors": errors}
+        candidate_payloads: list[dict[str, Any]] = []
         source_refs: list[str] = []
         evidence_refs: list[str] = []
-        for path, payload in zip(candidates, candidate_payloads, strict=False):
+        for path in candidates:
+            payload = _read_json(path)
+            if not isinstance(payload, dict):
+                errors.append(f"{self._local_packet_ref(route.memo_port, path)} is not a JSON object")
+                continue
+            candidate_payloads.append(payload)
             validation = self.validate_candidate(path)
             if not validation["ok"]:
                 errors.extend(validation["errors"])
@@ -430,7 +522,7 @@ class AoAMemoMCPState:
             return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": False, "errors": errors}
 
         stamp = _utc_stamp()
-        slug = _slug(str(candidate_payloads[0].get("claim", "memo-intake")), 48)
+        slug = _id_slug(str(candidate_payloads[0].get("claim", "memo-intake")), 48)
         export_path = route.memo_port / "exports" / f"{stamp}.{slug}.aoa-memo-intake.json"
         payload = {
             "schema": "aoa_local_memo_export_v1",
@@ -439,35 +531,51 @@ class AoAMemoMCPState:
             "target_owner": "aoa-memo",
             "target_route": "reviewed_intake",
             "candidate_refs": [self._local_packet_ref(route.memo_port, path) for path in candidates if path is not None],
-            "receipt_refs": receipt_refs or [],
+            "receipt_refs": [self._local_packet_ref(route.memo_port, path) for path in receipts],
             "source_refs": sorted(set(source_refs)),
             "evidence_refs": sorted(set(evidence_refs)),
             "allowed_result": "candidate_only",
             "created_at": _now(),
             "notes": "Prepared by aoa-memo-mcp. This is not durable memory landing.",
         }
+        errors = self._schema_errors(LOCAL_MEMO_EXPORT_SCHEMA, payload, "export")
+        if errors:
+            return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": False, "errors": errors}
         export_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.build_port_index(repo, write=True)
         return {"schema": "aoa_local_memo_intake_prepare_v1", "repo": route.name, "ok": True, "path": str(export_path), "export": payload, "errors": []}
 
     def review_intake(self, path: str | Path) -> dict[str, Any]:
         export_path = Path(path).expanduser().resolve()
+        try:
+            repo_from_path, port, export_path = self._known_port_for_path(export_path, required_dir="exports")
+        except ValueError as exc:
+            return {"schema": "aoa_local_memo_intake_review_v1", "ok": False, "path": str(export_path), "errors": [str(exc)]}
         payload = _read_json(export_path)
         errors: list[str] = []
         if not isinstance(payload, dict):
             return {"schema": "aoa_local_memo_intake_review_v1", "ok": False, "path": str(export_path), "errors": ["export packet is not a JSON object"]}
+        errors.extend(self._schema_errors(LOCAL_MEMO_EXPORT_SCHEMA, payload, "export"))
         repo = str(payload.get("repo") or "")
-        route = self.repo_route(repo)
-        port = route.memo_port
-        if port is None:
+        try:
+            route = self.repo_route(repo)
+        except ValueError as exc:
+            route = None
+            errors.append(str(exc))
+        if route is None or route.memo_port is None:
             errors.append("export repo does not resolve to a known memo port")
-            port = export_path.parents[1]
+        elif route.memo_port.resolve() != port.resolve():
+            errors.append(f"export repo must match containing memo port: {repo_from_path}")
         if payload.get("schema") != "aoa_local_memo_export_v1":
             errors.append("export schema must be aoa_local_memo_export_v1")
         if payload.get("target_owner") != "aoa-memo" or payload.get("target_route") != "reviewed_intake":
             errors.append("export must target aoa-memo reviewed_intake")
         for ref in payload.get("candidate_refs", []):
-            candidate = self._resolve_local_ref(port, str(ref), "candidates")
+            try:
+                candidate = self._resolve_local_ref(port, str(ref), "candidates")
+            except ValueError as exc:
+                errors.append(f"{ref}: {exc}")
+                continue
             if candidate is None or not candidate.exists():
                 errors.append(f"missing candidate ref: {ref}")
             else:
@@ -480,22 +588,35 @@ class AoAMemoMCPState:
             errors.append("export must preserve evidence_refs")
 
         stamp = _utc_stamp()
-        slug = _slug(str(payload.get("id") or "intake-review"), 48)
-        receipt_path = port / "receipts" / f"{stamp}.{slug}.review-receipt.json"
+        slug = _id_slug(str(payload.get("id") or "intake-review"), 48)
+        receipt_path = port / "receipts" / f"{stamp}.{slug}.forwarding-receipt.json"
         receipt = {
             "schema": "aoa_local_memo_receipt_v1",
             "id": f"receipt:{repo}:{stamp}:{slug}",
             "repo": repo,
             "candidate_ref": str((payload.get("candidate_refs") or [""])[0]),
             "export_ref": self._local_packet_ref(port, export_path),
-            "result": "reviewed" if not errors else "rejected",
+            "result": "forwarded" if not errors else "rejected",
             "route": "reviewed_intake",
             "checks": ["schema", "candidate_refs", "source_refs", "evidence_refs", "guardrails"],
             "errors": errors,
             "created_at": _now(),
-            "reviewed_by": "aoa-memo-mcp",
-            "notes": "Review receipt only. Durable landing remains an aoa-memo source patch.",
+            "checked_by": "aoa-memo-mcp",
+            "notes": "Forwarding check receipt only. Durable landing remains an aoa-memo source patch.",
         }
+        receipt_errors = self._schema_errors(LOCAL_MEMO_RECEIPT_SCHEMA, receipt, "receipt")
+        if receipt_errors:
+            errors.extend(receipt_errors)
+            receipt["errors"] = errors
+            return {
+                "schema": "aoa_local_memo_intake_review_v1",
+                "repo": repo,
+                "ok": False,
+                "path": str(export_path),
+                "receipt_path": None,
+                "receipt": receipt,
+                "errors": errors,
+            }
         receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         if repo:
             self.build_port_index(repo, write=True)
@@ -670,6 +791,29 @@ class AoAMemoMCPState:
         payload = _read_yaml(port / LOCAL_PORT_CONTRACT)
         return payload if isinstance(payload, dict) else {}
 
+    def _schema_path(self, schema_name: str) -> Path:
+        return self.aoa_memo_root / MEMORY_PORT_SCHEMA_DIR / schema_name
+
+    def _schema_errors(self, schema_name: str, payload: Any, label: str) -> list[str]:
+        schema_path = self._schema_path(schema_name)
+        schema = _read_json(schema_path)
+        if not isinstance(schema, dict):
+            return [f"{label} schema file is missing or invalid: {schema_path}"]
+        validator = Draft202012Validator(schema, format_checker=FORMAT_CHECKER)
+        errors = sorted(validator.iter_errors(payload), key=lambda error: list(error.absolute_path))
+        rendered: list[str] = []
+        for error in errors:
+            location = "/".join(str(part) for part in error.absolute_path) or "$"
+            rendered.append(f"{label} schema error at {location}: {error.message}")
+        return rendered
+
+    def _vocabulary_warnings(self) -> list[str]:
+        payload = _read_json(self.aoa_memo_root / CENTRAL_VOCABULARY)
+        terms_payload = payload.get("terms", {}) if isinstance(payload, dict) else {}
+        if not isinstance(terms_payload, dict) or not terms_payload:
+            return ["central memo port vocabulary is missing; fallback terms were used"]
+        return []
+
     def _vocabulary_terms(self, port_payload: dict[str, Any] | None = None) -> dict[str, set[str]]:
         payload = _read_json(self.aoa_memo_root / CENTRAL_VOCABULARY)
         terms_payload = payload.get("terms", {}) if isinstance(payload, dict) else {}
@@ -687,13 +831,18 @@ class AoAMemoMCPState:
                     terms.setdefault(str(key), set()).update(str(value) for value in values)
         return terms
 
-    def _validate_candidate_vocabulary(self, payload: dict[str, Any]) -> list[str]:
+    def _validate_candidate_vocabulary(
+        self,
+        payload: dict[str, Any],
+        port_payload: dict[str, Any] | None = None,
+    ) -> list[str]:
         repo = str(payload.get("repo") or "")
-        try:
-            route = self.repo_route(repo)
-        except ValueError:
-            return []
-        port_payload = self._port_payload(route.memo_port) if route.memo_port else {}
+        if port_payload is None:
+            try:
+                route = self.repo_route(repo)
+            except ValueError:
+                return []
+            port_payload = self._port_payload(route.memo_port) if route.memo_port else {}
         terms = self._vocabulary_terms(port_payload)
         field_map = {
             "kind": "kind",
@@ -818,31 +967,60 @@ class AoAMemoMCPState:
         )
         return "\n".join(lines)
 
+    def _known_memo_ports(self) -> dict[str, Path]:
+        ports: dict[str, Path] = {}
+        for repo in ("Agents-of-Abyss", "abyss-stack", "abyss-machine"):
+            route = self.repo_route(repo)
+            if route.memo_port is not None and route.memo_port.exists():
+                ports[route.name] = route.memo_port.resolve()
+        return ports
+
+    def _assert_under_port(self, port: Path, path: Path, required_dir: str | None = None) -> Path:
+        resolved_port = port.expanduser().resolve()
+        resolved_path = path.expanduser().resolve()
+        try:
+            relative = resolved_path.relative_to(resolved_port)
+        except ValueError as exc:
+            raise ValueError(f"path must stay inside memo port: {resolved_port}") from exc
+        if required_dir and (not relative.parts or relative.parts[0] != required_dir):
+            raise ValueError(f"path must stay inside memo/{required_dir}")
+        return resolved_path
+
+    def _known_port_for_path(self, path: Path, required_dir: str | None = None) -> tuple[str, Path, Path]:
+        known_ports = self._known_memo_ports()
+        for repo, port in known_ports.items():
+            try:
+                return repo, port, self._assert_under_port(port, path, required_dir)
+            except ValueError:
+                continue
+        known = ", ".join(str(port) for port in known_ports.values()) or "none"
+        raise ValueError(f"path must resolve under a known local memo port ({known})")
+
     def _resolve_local_ref(self, port: Path, ref: str, preferred_dir: str) -> Path | None:
+        ref = str(ref).strip()
+        if not ref:
+            raise ValueError("packet ref must be non-empty")
         if ref.startswith(("candidate:", "receipt:", "export:")):
             for path in sorted((port / preferred_dir).glob("*.json")):
                 payload = _read_json(path)
                 if isinstance(payload, dict) and payload.get("id") == ref:
-                    return path
+                    return self._assert_under_port(port, path, preferred_dir)
             return None
         path = Path(ref.split("#", 1)[0])
         if path.is_absolute():
-            return path
+            raise ValueError("packet refs must be relative to the memo port")
         if ref.startswith("memo/"):
-            return port.parent / path
+            return self._assert_under_port(port, port.parent / path, preferred_dir)
         candidate = port / path
         if candidate.exists():
-            return candidate
+            return self._assert_under_port(port, candidate, preferred_dir)
         candidate = port / preferred_dir / path.name
         if candidate.exists():
-            return candidate
-        return port / path
+            return self._assert_under_port(port, candidate, preferred_dir)
+        return self._assert_under_port(port, port / path, preferred_dir)
 
     def _local_packet_ref(self, port: Path, path: Path) -> str:
-        try:
-            return path.resolve().relative_to(port.resolve()).as_posix()
-        except ValueError:
-            return str(path)
+        return self._assert_under_port(port, path).relative_to(port.resolve()).as_posix()
 
     def _read_required_json(self, path: Path | None) -> dict[str, Any]:
         if path is None:

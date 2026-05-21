@@ -5,7 +5,7 @@ Local route card for `mcp/services/aoa-memo-mcp/`.
 ## Purpose
 
 `aoa-memo-mcp` is the thin MCP access plane for OS Abyss memory.
-It lets agents read memory briefs, inspect local memo ports, create reviewed
+It lets agents read memory briefs, inspect local memo ports, create local
 memory candidates, validate candidates, and route session rehydration without
 turning MCP into memory authority.
 
@@ -16,7 +16,7 @@ This stack-owned MCP surface owns:
 - MCP resources, tools, prompts, and smoke tests for memory access.
 - The access-plane boundary between `aoa-memo`, `.aoa`, repo-local `memo/`
   ports, and host-local memory evidence.
-- Candidate, local port index, reviewed-intake export, and review receipt
+- Candidate, local port index, reviewed-intake export, and forwarding receipt
   helpers that remain subordinate to `aoa-memo` contracts.
 
 It does not own:
@@ -42,8 +42,8 @@ It does not own:
 |---|---|
 | MCP resource, tool, or prompt shape | `src/aoa_memo_mcp/server.py` |
 | memory route semantics | `DESIGN.md` and `docs/BOUNDARIES.md` |
-| candidate validation | `src/aoa_memo_mcp/core.py` |
-| local port index or reviewed-intake packet | `src/aoa_memo_mcp/core.py` and target `memo/PORT.yaml` |
+| candidate validation | `src/aoa_memo_mcp/core.py` plus `aoa-memo/schemas/memory-ports/` |
+| local port index or reviewed-intake packet | `src/aoa_memo_mcp/core.py`, `aoa-memo` schemas, and target `memo/PORT.yaml` |
 | pilot local port posture | target repo `memo/AGENTS.md` |
 | session archive access | `.aoa/AGENTS.md` and `.aoa/DESIGN.md` |
 
@@ -70,6 +70,12 @@ For source-local service execution from the `abyss-stack` repo root, run:
 
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py
+```
+
+If the package is installed, the server entry point is:
+
+```bash
+aoa-memo-mcp-server
 ```
 
 ## Smoke

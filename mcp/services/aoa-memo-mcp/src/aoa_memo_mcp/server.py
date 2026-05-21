@@ -80,7 +80,7 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
 
     @mcp.tool()
     def aoa_memo_review_intake(path: str) -> dict[str, Any]:
-        """Review a local reviewed-intake export and write a local receipt."""
+        """Check a local reviewed-intake export and write a forwarding receipt."""
         return current_state().review_intake(path)
 
     @mcp.resource("aoa-memo://brief/repo/{repo}")
@@ -129,15 +129,15 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         return (
             f"Create a local candidate for {repo!r} with claim {claim!r}. "
             "Use evidence refs from current files or session archive pointers. "
-            "Run aoa_memo_validate_candidate, aoa_memo_prepare_intake_packet, and aoa_memo_review_intake before proposing durable aoa-memo landing."
+            "Run aoa_memo_validate_candidate, aoa_memo_prepare_intake_packet, and aoa_memo_review_intake as a forwarding check before proposing durable aoa-memo landing."
         )
 
     @mcp.prompt(name="memo-review")
     def memo_review(candidate_path: str) -> str:
-        """Prompt route for reviewing a memory candidate."""
+        """Prompt route for checking a memory candidate before forwarding."""
         return (
             f"Validate {candidate_path!r}; compare evidence refs against current owner files; "
-            "then prepare/review an intake packet, keep local, or reject. MCP review is not durable memory landing."
+            "then prepare/check an intake packet, keep local, or reject. MCP forwarding checks are not durable memory review."
         )
 
     @mcp.prompt(name="session-rehydrate")

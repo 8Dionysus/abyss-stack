@@ -9,12 +9,14 @@ description = "MCP access plane for OS Abyss memory"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "jsonschema>=4.0",
   "mcp>=1.0",
   "PyYAML>=6.0",
 ]
 
 [project.scripts]
 aoa-memo-mcp = "aoa_memo_mcp.cli:main"
+aoa-memo-mcp-server = "aoa_memo_mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

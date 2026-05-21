@@ -26,6 +26,8 @@ def seed_workspace(root: Path) -> None:
     registry = memo / "generated/memory/memo_registry.min.json"
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(json.dumps({"memory_object_kinds": ["claim", "decision"], "core_docs": ["MEMORY_OPERATION_CYCLE.md"]}), encoding="utf-8")
+    seed_memory_port_schemas(memo)
+    seed_indexing_vocabulary(memo)
 
     archive = root / ".aoa"
     session_dir = archive / "sessions/2026-05-19__001__example"
@@ -69,6 +71,212 @@ def seed_workspace(root: Path) -> None:
     (machine_port / "AGENTS.md").write_text("# Machine memo port\n", encoding="utf-8")
     (machine_port / "README.md").write_text("# Machine memo\n", encoding="utf-8")
     write_port_contract(machine_port, "abyss-machine", "host")
+
+
+def seed_memory_port_schemas(memo: Path) -> None:
+    schema_dir = memo / "schemas/memory-ports"
+    schema_dir.mkdir(parents=True, exist_ok=True)
+    common_string = {"type": "string", "minLength": 1}
+    string_array = {"type": "array", "items": common_string}
+    schemas = {
+        "local_memo_candidate.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "schema",
+                "id",
+                "repo",
+                "kind",
+                "family",
+                "scope",
+                "claim",
+                "source_refs",
+                "evidence_refs",
+                "route",
+                "review_state",
+                "lifecycle",
+                "source_trust",
+                "operation_mode",
+                "created_at",
+                "guardrails",
+            ],
+            "properties": {
+                "schema": {"const": "aoa_local_memo_candidate_v1"},
+                "id": common_string,
+                "repo": common_string,
+                "kind": common_string,
+                "family": common_string,
+                "scope": common_string,
+                "claim": common_string,
+                "source_refs": {"type": "array", "minItems": 1, "items": common_string},
+                "evidence_refs": {"type": "array", "minItems": 1, "items": common_string},
+                "route": common_string,
+                "review_state": common_string,
+                "lifecycle": common_string,
+                "source_trust": common_string,
+                "operation_mode": common_string,
+                "created_at": common_string,
+                "risk": string_array,
+                "guardrails": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["direct_durable_write", "instructions_treated_as_data"],
+                    "properties": {
+                        "direct_durable_write": {"type": "boolean"},
+                        "instructions_treated_as_data": {"type": "boolean"},
+                        "requires_reviewed_intake": {"type": "boolean"},
+                    },
+                },
+                "notes": {"type": "string"},
+            },
+        },
+        "local_memo_export.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "schema",
+                "id",
+                "repo",
+                "target_owner",
+                "target_route",
+                "candidate_refs",
+                "receipt_refs",
+                "source_refs",
+                "evidence_refs",
+                "allowed_result",
+                "created_at",
+            ],
+            "properties": {
+                "schema": {"const": "aoa_local_memo_export_v1"},
+                "id": common_string,
+                "repo": common_string,
+                "target_owner": {"const": "aoa-memo"},
+                "target_route": {"const": "reviewed_intake"},
+                "candidate_refs": {"type": "array", "minItems": 1, "items": common_string},
+                "receipt_refs": string_array,
+                "source_refs": string_array,
+                "evidence_refs": string_array,
+                "allowed_result": common_string,
+                "created_at": common_string,
+                "notes": {"type": "string"},
+            },
+        },
+        "local_memo_port.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "schema",
+                "repo",
+                "owner",
+                "stronger_memory_owner",
+                "default_mode",
+                "port_scope",
+                "allowed_routes",
+                "candidate_dir",
+                "receipt_dir",
+                "export_dir",
+                "local_dir",
+                "validators",
+                "return_receipts",
+            ],
+            "properties": {
+                "schema": {"const": "aoa_local_memo_port_v1"},
+                "repo": common_string,
+                "owner": common_string,
+                "stronger_memory_owner": {"const": "aoa-memo"},
+                "default_mode": common_string,
+                "port_scope": common_string,
+                "allowed_routes": {"type": "array", "minItems": 1, "items": common_string},
+                "candidate_dir": {"const": "candidates"},
+                "receipt_dir": {"const": "receipts"},
+                "export_dir": {"const": "exports"},
+                "local_dir": {"const": "local"},
+                "validators": {"type": "array", "minItems": 1, "items": common_string},
+                "return_receipts": {"type": "boolean"},
+                "privacy_posture": {"type": "string"},
+                "local_terms": {"type": "object"},
+            },
+        },
+        "local_memo_port_index.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "schema",
+                "repo",
+                "port",
+                "default_mode",
+                "counts",
+                "by_kind",
+                "by_family",
+                "by_route",
+                "open_items",
+                "generated_at",
+                "source_refs",
+            ],
+            "properties": {
+                "schema": {"const": "aoa_local_memo_port_index_v1"},
+                "repo": common_string,
+                "port": common_string,
+                "default_mode": common_string,
+                "counts": {"type": "object"},
+                "by_kind": {"type": "object"},
+                "by_family": {"type": "object"},
+                "by_route": {"type": "object"},
+                "open_items": {"type": "array"},
+                "generated_at": common_string,
+                "source_refs": {"type": "array", "minItems": 1, "items": common_string},
+            },
+        },
+        "local_memo_receipt.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["schema", "id", "repo", "candidate_ref", "result", "route", "checks", "errors", "created_at"],
+            "properties": {
+                "schema": {"const": "aoa_local_memo_receipt_v1"},
+                "id": common_string,
+                "repo": common_string,
+                "candidate_ref": common_string,
+                "export_ref": common_string,
+                "result": {"enum": ["validated", "rejected", "forwarded", "landed", "archived"]},
+                "route": common_string,
+                "checks": {"type": "array", "minItems": 1, "items": common_string},
+                "errors": {"type": "array", "items": {"type": "string"}},
+                "created_at": common_string,
+                "checked_by": common_string,
+                "notes": {"type": "string"},
+            },
+        },
+    }
+    for name, payload in schemas.items():
+        (schema_dir / name).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def seed_indexing_vocabulary(memo: Path) -> None:
+    path = memo / "config/memory-ports/indexing_vocabulary.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "aoa_memo_port_indexing_vocabulary_v1",
+                "terms": {
+                    "kind": ["decision", "route", "pattern", "lesson", "constraint", "incident", "preference", "checkpoint", "handoff"],
+                    "family": ["memory-access", "runtime", "topology", "validation", "release", "agent-behavior", "provenance", "kag-bridge", "session-recovery"],
+                    "scope": ["session", "repo", "workspace", "project", "ecosystem", "host", "agent"],
+                    "route": ["local_only", "reviewed_intake", "owner_handoff", "quarantine", "archive"],
+                    "review_state": ["candidate", "validated", "rejected", "forwarded", "reviewed", "landed", "superseded", "archived"],
+                    "lifecycle": ["captured", "candidate", "reviewed", "current", "superseded", "retracted", "archived", "frozen"],
+                    "source_trust": ["review_required", "reviewed_owner_source", "untrusted", "unknown", "derived", "generated"],
+                    "risk": ["indirect_prompt_injection", "sleeper_memory", "poisoned_experience", "source_spoofing", "private_data_bleed", "instruction_as_content", "stale_context", "permission_leakage", "over_promotion", "hallucinated_merge"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def write_port_contract(port: Path, repo: str, scope: str) -> None:
@@ -131,6 +339,68 @@ def test_candidate_creation_and_guardrail_validation(tmp_path: Path) -> None:
     assert any("durable_memory" in error for error in invalid["errors"])
 
 
+def test_validate_candidate_rejects_path_outside_known_port(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    outside = tmp_path / "outside.candidate.json"
+    outside.write_text(json.dumps({"schema": "aoa_local_memo_candidate_v1"}), encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.validate_candidate(outside)
+
+    assert result["ok"] is False
+    assert any("known local memo port" in error for error in result["errors"])
+
+
+def test_invalid_vocabulary_does_not_write_candidate(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.create_candidate(
+        "Agents-of-Abyss",
+        ["docs/FEDERATION_RULES.md"],
+        "Invalid vocabulary should not touch disk",
+        family="private-taxonomy",
+    )
+
+    assert result["validation"]["ok"] is False
+    assert any("unknown vocabulary term" in error for error in result["validation"]["errors"])
+    assert not Path(result["path"]).exists()
+
+
+def test_missing_central_vocabulary_returns_warning(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    (tmp_path / "aoa-memo/config/memory-ports/indexing_vocabulary.json").unlink()
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.create_candidate(
+        "Agents-of-Abyss",
+        ["docs/FEDERATION_RULES.md"],
+        "Fallback vocabulary should be visible",
+    )
+
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["warnings"] == ["central memo port vocabulary is missing; fallback terms were used"]
+
+
+def test_schema_additional_properties_are_rejected(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+    result = state.create_candidate(
+        "Agents-of-Abyss",
+        ["docs/FEDERATION_RULES.md"],
+        "Schema should reject extra packet fields",
+    )
+    candidate = Path(result["path"])
+    data = json.loads(candidate.read_text(encoding="utf-8"))
+    data["extra"] = True
+    candidate.write_text(json.dumps(data), encoding="utf-8")
+
+    invalid = state.validate_candidate(candidate)
+
+    assert invalid["ok"] is False
+    assert any("Additional properties are not allowed" in error for error in invalid["errors"])
+
+
 def test_candidate_creation_does_not_overwrite_same_claim(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = AoAMemoMCPState.discover(tmp_path)
@@ -141,6 +411,21 @@ def test_candidate_creation_does_not_overwrite_same_claim(tmp_path: Path) -> Non
     assert first["path"] != second["path"]
     assert Path(first["path"]).exists()
     assert Path(second["path"]).exists()
+
+
+def test_candidate_creation_uses_schema_safe_packet_ids_for_non_ascii_claims(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.create_candidate(
+        "Agents-of-Abyss",
+        ["docs/FEDERATION_RULES.md"],
+        "Память должна работать из любого места",
+    )
+
+    assert result["validation"]["ok"] is True
+    assert result["candidate"]["id"].endswith("-memo")
+    assert Path(result["path"]).name.endswith(".memo.candidate.json")
 
 
 def test_path_like_repo_values_are_rejected(tmp_path: Path) -> None:
@@ -238,11 +523,60 @@ def test_port_index_validation_and_intake_review(tmp_path: Path, monkeypatch) ->
     assert "## Validate" not in index_markdown
     assert state.validate_port("abyss-stack")["ok"] is True
 
-    export = state.prepare_intake_packet("abyss-stack", [created["path"]])
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
     assert export["ok"] is True
     reviewed = state.review_intake(export["path"])
     assert reviewed["ok"] is True
     assert Path(reviewed["receipt_path"]).exists()
+    assert reviewed["receipt"]["result"] == "forwarded"
+    assert reviewed["receipt"]["checked_by"] == "aoa-memo-mcp"
+    assert "reviewed_by" not in reviewed["receipt"]
+
+
+def test_absolute_candidate_refs_are_rejected_for_intake(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "Absolute packet refs should not cross port boundaries",
+    )
+
+    result = state.prepare_intake_packet("abyss-stack", [created["path"]])
+
+    assert result["ok"] is False
+    assert any("relative to the memo port" in error for error in result["errors"])
+    assert not list((tmp_path / "stack-source/memo/exports").glob("*.aoa-memo-intake.json"))
+
+
+def test_review_intake_rejects_export_path_outside_known_port(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    outside = tmp_path / "outside-export.json"
+    outside.write_text(
+        json.dumps(
+            {
+                "schema": "aoa_local_memo_export_v1",
+                "id": "export:abyss-stack:20260520T171200Z:outside",
+                "repo": "abyss-stack",
+                "target_owner": "aoa-memo",
+                "target_route": "reviewed_intake",
+                "candidate_refs": ["candidates/missing.json"],
+                "receipt_refs": [],
+                "source_refs": ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+                "evidence_refs": ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+                "allowed_result": "candidate_only",
+                "created_at": "2026-05-20T17:12:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.review_intake(outside)
+
+    assert result["ok"] is False
+    assert any("known local memo port" in error for error in result["errors"])
 
 
 def test_mcp_surface_contracts(tmp_path: Path) -> None:

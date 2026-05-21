@@ -14,7 +14,9 @@
 - Candidate validation requires evidence refs and rejects direct durable writes
   from untrusted or review-required sources.
 - Port validation requires `PORT.yaml`, packet shape, generated index parity,
-  and local review/export routes before durable landing is proposed.
+  and local check/export routes before durable landing is proposed.
+- Packet validation uses `aoa-memo` memory-port schemas and confines
+  candidate/export/receipt paths to known local `memo/` ports.
 - Briefs report operation mode and owner hierarchy before suggesting a write.
 - MCP resources expose pointers and compact route data, not full raw archives.
 - Local ports default to `write_candidate_only`.

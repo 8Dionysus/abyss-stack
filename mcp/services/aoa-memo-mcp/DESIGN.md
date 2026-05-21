@@ -45,14 +45,16 @@ Local port indexing is also local-first. `PORT.yaml` is the local contract,
 `INDEX.md` and `index.min.json` are generated read models, and MCP may rebuild
 or validate them as access-plane helpers.
 
-Reviewed intake is a three-step route:
+Reviewed intake is a three-step local route:
 
 ```text
-candidate -> prepared export packet -> review receipt -> aoa-memo source patch
+candidate -> prepared export packet -> forwarding check receipt -> aoa-memo source patch
 ```
 
-This MCP server owns the first three local packet steps. The final durable
-landing remains an `aoa-memo` source change with validators and review.
+This MCP server owns the first three local packet steps. Each packet must stay
+inside a known local `memo/` port and pass the corresponding
+`aoa-memo/schemas/memory-ports/` schema. The final durable landing remains an
+`aoa-memo` source change with validators and review.
 
 ## Pilot Roots
 

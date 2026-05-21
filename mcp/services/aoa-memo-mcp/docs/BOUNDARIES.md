@@ -13,8 +13,13 @@
 
 Local ports send candidates forward through reviewed intake.
 `aoa-memo-mcp` can create and validate a candidate, build or check the local
-port index, prepare reviewed-intake exports, and write local review receipts.
+port index, prepare reviewed-intake exports, and write local forwarding-check
+receipts.
 The reviewed landing belongs to `aoa-memo`.
+
+Packet tools are confined to known local `memo/` ports. Candidate, export, and
+receipt references are local packet refs, not arbitrary absolute paths, and
+their shapes are checked against `aoa-memo/schemas/memory-ports/`.
 
 Session resources expose rehydration pointers, not raw transcript replacement.
 Agents may use them to find evidence and then inspect the owning archive.

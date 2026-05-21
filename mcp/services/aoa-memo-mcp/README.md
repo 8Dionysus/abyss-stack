@@ -28,6 +28,10 @@ Resources:
 - `aoa-memo://memory/object/{id}`
 - `aoa-memo://session/{session_id}/rehydrate`
 - `aoa-memo://repo/{repo}/local-port-status`
+- `aoa-memo://repo/{repo}/memo-port-index`
+- `aoa-memo://repo/{repo}/memo-open-items`
+- `aoa-memo://repo/{repo}/memo-vocabulary`
+- `aoa-memo://intake/{packet_id}/review`
 
 Tools:
 
@@ -38,7 +42,7 @@ Tools:
 - `aoa_memo_build_port_index(repo, write, check)`
 - `aoa_memo_validate_port(repo)`
 - `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
-- `aoa_memo_review_intake(path)`
+- `aoa_memo_review_intake(path)` as a local forwarding check, not durable review
 
 Prompts:
 
@@ -48,12 +52,16 @@ Prompts:
 - `session-rehydrate`
 
 Index and intake tools operate only on local `memo/` port packet state. They do
-not land durable reviewed memory into `aoa-memo`.
+not land durable reviewed memory into `aoa-memo`. Candidate, export, receipt,
+port, and port-index packets are validated against `aoa-memo` memory-port
+schemas, and packet paths must resolve under a known local `memo/` port.
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
 is `<workspace-root>/.codex/bin/aoa-memo-mcp-server.py`; it resolves this
 stack-owned service without making `8Dionysus` the service authority.
+When installed as a package, the direct server entry point is
+`aoa-memo-mcp-server`; `aoa-memo-mcp` remains the CLI entry point.
 
 ## Agent Route
 
