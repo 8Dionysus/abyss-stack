@@ -71,6 +71,74 @@ def seed_workspace(root: Path) -> None:
     (machine_port / "AGENTS.md").write_text("# Machine memo port\n", encoding="utf-8")
     (machine_port / "README.md").write_text("# Machine memo\n", encoding="utf-8")
     write_port_contract(machine_port, "abyss-machine", "host")
+    seed_workspace_memory_map(root)
+
+
+def seed_workspace_memory_map(root: Path) -> None:
+    generated = root / "8Dionysus/generated"
+    docs = root / "8Dionysus/docs"
+    generated.mkdir(parents=True, exist_ok=True)
+    docs.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "8dionysus_workspace_memory_map_v1",
+        "places": [
+            {
+                "name": "8Dionysus",
+                "memory_role": "workspace-route-map-owner",
+                "memory_route_status": "root_memory_route",
+                "current_port_level": "route_only",
+                "recommended_port_level": "route_only",
+                "reviewed_memory_route": "aoa-memo:reviewed-intake",
+                "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+                "issues": [],
+            },
+            {
+                "name": "aoa-memo",
+                "memory_role": "reviewed-memory-owner",
+                "memory_route_status": "root_memory_route",
+                "current_port_level": "route_only",
+                "recommended_port_level": "route_only",
+                "reviewed_memory_route": "aoa-memo:reviewed-intake",
+                "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+                "issues": [],
+            },
+            {
+                "name": ".aoa",
+                "memory_role": "session-evidence-kernel",
+                "memory_route_status": "session_evidence_route",
+                "current_port_level": "route_only",
+                "recommended_port_level": "route_only",
+                "reviewed_memory_route": "aoa-memo:reviewed-intake",
+                "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+                "issues": [],
+            },
+            {
+                "name": "Tree-of-Sophia",
+                "memory_role": "local-memory-port-candidate",
+                "memory_route_status": "root_memory_route",
+                "current_port_level": "route_only",
+                "recommended_port_level": "full_port",
+                "reviewed_memory_route": "aoa-memo:reviewed-intake",
+                "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+                "issues": ["recommended full memo port not yet present"],
+            },
+            {
+                "name": "Agents-of-Abyss",
+                "memory_role": "local-memory-port-candidate",
+                "memory_route_status": "local_port_route",
+                "current_port_level": "full_port",
+                "recommended_port_level": "full_port",
+                "reviewed_memory_route": "aoa-memo:reviewed-intake",
+                "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+                "issues": [],
+            },
+        ],
+    }
+    generated.joinpath("workspace_memory_map.min.json").write_text(json.dumps(payload), encoding="utf-8")
+    docs.joinpath("WORKSPACE_MEMORY_MAP.md").write_text(
+        "# Workspace memory map\n\n.aoa session_evidence_route\nTree-of-Sophia route_only\n",
+        encoding="utf-8",
+    )
 
 
 def seed_memory_port_schemas(memo: Path) -> None:
@@ -318,6 +386,31 @@ def test_brief_reports_ready_port_and_contracts(tmp_path: Path) -> None:
     assert brief["local_port"]["ready"] is True
     assert all(item["exists"] for item in brief["central_memory_contracts"])
     assert brief["operation_mode"] == "write_candidate_only"
+    assert brief["workspace_memory_map"]["current_port_level"] == "full_port"
+
+
+def test_brief_uses_workspace_memory_map_for_route_only_and_authority(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    route_only = state.build_brief("Tree-of-Sophia", "continuity")
+    authority = state.build_brief("aoa-memo", "durable landing")
+    session = state.build_brief(".aoa", "rehydrate")
+
+    assert route_only["operation_mode"] == "read_only"
+    assert route_only["workspace_memory_map"]["recommended_port_level"] == "full_port"
+    assert route_only["memory_route"]["candidate"] == "no local candidate route until this place has a memo port"
+    assert any("repo-local topology pass" in item for item in route_only["recommended_route"])
+    assert "create or repair local memo port" not in route_only["recommended_route"]
+    assert authority["operation_mode"] == "read_write_under_review"
+    assert authority["owner_note"].startswith("reviewed memory authority")
+    assert authority["memory_route"]["candidate"] == "aoa-memo source patch/review path; no repo-local candidate shortcut"
+    assert authority["source_hierarchy"][1] == "aoa-memo authored reviewed memory contracts and generated read models"
+    assert any("source patches" in item for item in authority["recommended_route"])
+    assert session["operation_mode"] == "read_only"
+    assert session["workspace_memory_map"]["memory_route_status"] == "session_evidence_route"
+    assert session["memory_route"]["candidate"].startswith(".aoa carries session evidence")
+    assert session["source_hierarchy"][1] == ".aoa session evidence and rehydration pointers, not a local memo port"
 
 
 def test_candidate_creation_and_guardrail_validation(tmp_path: Path) -> None:
@@ -447,6 +540,8 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert session["found"] is True
     search = state.search("poisoning", scope="central")
     assert search["hits"]
+    route_search = state.search("session_evidence_route", scope="all")
+    assert route_search["hits"]
     index = state.read_resource("aoa-memo://repo/Agents-of-Abyss/memo-port-index")
     assert index["index"]["repo"] == "Agents-of-Abyss"
 

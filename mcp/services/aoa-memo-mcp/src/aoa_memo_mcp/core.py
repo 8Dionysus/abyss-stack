@@ -32,6 +32,7 @@ CENTRAL_VOCABULARY = "config/memory-ports/indexing_vocabulary.json"
 LOCAL_PORT_INDEX = "index.min.json"
 LOCAL_PORT_INDEX_MD = "INDEX.md"
 LOCAL_PORT_CONTRACT = "PORT.yaml"
+WORKSPACE_MEMORY_MAP = "generated/workspace_memory_map.min.json"
 MEMORY_PORT_SCHEMA_DIR = "schemas/memory-ports"
 LOCAL_MEMO_CANDIDATE_SCHEMA = "local_memo_candidate.schema.json"
 LOCAL_MEMO_EXPORT_SCHEMA = "local_memo_export.schema.json"
@@ -132,6 +133,15 @@ class AoAMemoMCPState:
 
     def repo_route(self, repo: str) -> RepoRoute:
         normalized = self._normalize_repo(repo)
+        if normalized == ".aoa":
+            source = self.aoa_archive_root
+            return RepoRoute(
+                name=".aoa",
+                source_root=source.resolve() if source.exists() else None,
+                memo_port=None,
+                default_mode="read_only",
+                owner_note="session evidence kernel; use rehydrate/retrieve routes before reviewed memory intake",
+            )
         if normalized == "abyss-stack":
             source = Path(os.environ.get("AOA_ABYSS_STACK_ROOT", DEFAULT_ABYSS_STACK_SOURCE)).expanduser()
             if not source.exists():
@@ -159,12 +169,24 @@ class AoAMemoMCPState:
                 owner_note="host-local memory port; policy remains under /etc/abyss-machine",
             )
         source = self.workspace_root / normalized
+        place = self._workspace_memory_place(normalized)
+        default_mode = "write_candidate_only"
+        owner_note = "repo-local memory candidate port"
+        if place:
+            memory_role = str(place.get("memory_role") or "")
+            current_level = str(place.get("current_port_level") or "")
+            if memory_role == "reviewed-memory-owner":
+                default_mode = "read_write_under_review"
+                owner_note = "reviewed memory authority; durable memory lands here through source changes and validators"
+            elif current_level == "route_only":
+                default_mode = "read_only"
+                owner_note = "route-only workspace surface; use aoa_memo for recall and the workspace memory map for local-port status"
         return RepoRoute(
             name=normalized,
             source_root=source.resolve() if source.exists() else None,
             memo_port=(source / "memo").resolve() if source.exists() else None,
-            default_mode="write_candidate_only",
-            owner_note="repo-local memory candidate port",
+            default_mode=default_mode,
+            owner_note=owner_note,
         )
 
     def build_brief(self, repo: str, intent: str = "") -> dict[str, Any]:
@@ -178,7 +200,7 @@ class AoAMemoMCPState:
             "owner_note": route.owner_note,
             "source_hierarchy": [
                 "current repository evidence",
-                "repo-local memo port candidates and receipts",
+                self._local_port_hierarchy_note(port),
                 "aoa-memo reviewed memory contracts",
                 ".aoa raw session archive evidence",
                 "derived MCP brief/search output",
@@ -186,14 +208,15 @@ class AoAMemoMCPState:
             "local_port": port,
             "memory_route": {
                 "brief": "aoa_memo_brief",
-                "candidate": "repo memo/candidates",
+                "candidate": self._candidate_route_note(route, port),
                 "validate": "aoa_memo_validate_candidate and aoa_memo_validate_port",
                 "export": "aoa_memo_prepare_intake_packet",
                 "forwarding_check": "aoa_memo_review_intake writes a local check receipt only",
                 "durable_landing": "reviewed source patch in aoa-memo, not MCP direct write",
             },
+            "workspace_memory_map": self._workspace_memory_summary(route.name),
             "central_memory_contracts": self._central_contracts(),
-            "recommended_route": self._recommended_route(port),
+            "recommended_route": self._recommended_route(route, port),
             "validation": [
                 "python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
                 "python -m pytest mcp/services/aoa-memo-mcp/tests -q",
@@ -213,6 +236,9 @@ class AoAMemoMCPState:
         return {
             "schema": "aoa_local_memo_port_status_v1",
             "repo": route.name,
+            "memory_role": self._workspace_memory_summary(route.name).get("memory_role", ""),
+            "memory_route_status": self._workspace_memory_summary(route.name).get("memory_route_status", ""),
+            "recommended_port_level": self._workspace_memory_summary(route.name).get("recommended_port_level", ""),
             "source_root": str(route.source_root) if route.source_root else None,
             "memo_port": str(port) if port else None,
             "present": bool(port and port.exists()),
@@ -1030,9 +1056,87 @@ class AoAMemoMCPState:
             raise ValueError(f"{path} is not a JSON object")
         return payload
 
-    def _recommended_route(self, port: dict[str, Any]) -> list[str]:
+    def _workspace_memory_map(self) -> dict[str, Any]:
+        payload = _read_json(self.workspace_root / "8Dionysus" / WORKSPACE_MEMORY_MAP)
+        return payload if isinstance(payload, dict) else {}
+
+    def _workspace_memory_place(self, repo: str) -> dict[str, Any]:
+        payload = self._workspace_memory_map()
+        places = payload.get("places", [])
+        if not isinstance(places, list):
+            return {}
+        for place in places:
+            if isinstance(place, dict) and place.get("name") == repo:
+                return place
+        return {}
+
+    def _workspace_memory_summary(self, repo: str) -> dict[str, Any]:
+        place = self._workspace_memory_place(repo)
+        if not place:
+            return {"found": False}
+        keys = (
+            "memory_role",
+            "memory_route_status",
+            "current_port_level",
+            "recommended_port_level",
+            "reviewed_memory_route",
+            "evidence_route",
+            "issues",
+        )
+        return {"found": True, **{key: place.get(key) for key in keys}}
+
+    def _local_port_hierarchy_note(self, port: dict[str, Any]) -> str:
+        if port.get("repo") == "aoa-memo":
+            return "aoa-memo authored reviewed memory contracts and generated read models"
+        if port.get("memory_route_status") == "session_evidence_route":
+            return ".aoa session evidence and rehydration pointers, not a local memo port"
+        if port["ready"]:
+            return "repo-local memo port candidates, receipts, exports, and local records"
+        return "workspace route-only status unless a repo-local memo port exists"
+
+    def _candidate_route_note(self, route: RepoRoute, port: dict[str, Any]) -> str:
+        route_status = str(port.get("memory_route_status") or "")
+        memory_role = str(port.get("memory_role") or "")
+        if memory_role == "reviewed-memory-owner":
+            return "aoa-memo source patch/review path; no repo-local candidate shortcut"
+        if route_status == "session_evidence_route":
+            return ".aoa carries session evidence; candidate creation routes through a repo memo port or aoa-memo intake"
+        if port["ready"]:
+            return "repo memo/candidates"
+        return "no local candidate route until this place has a memo port"
+
+    def _recommended_route(self, route: RepoRoute, port: dict[str, Any]) -> list[str]:
+        place = self._workspace_memory_place(route.name)
+        memory_role = str(place.get("memory_role") or "")
+        route_status = str(place.get("memory_route_status") or "")
+        recommended_level = str(place.get("recommended_port_level") or "")
+        current_level = str(place.get("current_port_level") or "")
+        if memory_role == "reviewed-memory-owner":
+            return [
+                "read aoa-memo root AGENTS.md and memory contracts",
+                "use MCP for brief/search/access only",
+                "land durable memory through aoa-memo source patches, validators, and review",
+            ]
+        if route_status == "session_evidence_route":
+            return [
+                "read .aoa owner guidance for session evidence",
+                "use session rehydrate or retrieve routes for raw grounding",
+                "send reviewed memory candidates through a repo memo port or aoa-memo intake route",
+            ]
         if not port["ready"]:
-            return ["read central contracts", "create or repair local memo port", "write no durable memory"]
+            if recommended_level == "full_port" and current_level == "route_only":
+                return [
+                    "read the workspace memory map for current route-only status",
+                    "use aoa_memo_brief and .aoa evidence routes for recall now",
+                    "add this repo's memo port only through a repo-local topology pass",
+                    "land durable memory through aoa-memo reviewed intake",
+                ]
+            return [
+                "read the workspace memory map for current route-only status",
+                "use aoa_memo for reviewed recall and .aoa for session evidence",
+                "write local candidates only after a memo port exists",
+                "land durable memory through aoa-memo reviewed intake",
+            ]
         return [
             "read local memo/AGENTS.md",
             "create local candidate under memo/candidates",
@@ -1043,6 +1147,13 @@ class AoAMemoMCPState:
 
     def _search_roots(self, scope: str) -> list[Path]:
         roots: list[Path] = []
+        if scope in ("all", "workspace", "routes", "contracts"):
+            roots.extend(
+                [
+                    self.workspace_root / "8Dionysus" / "docs" / "WORKSPACE_MEMORY_MAP.md",
+                    self.workspace_root / "8Dionysus" / WORKSPACE_MEMORY_MAP,
+                ]
+            )
         if scope in ("all", "central", "aoa-memo"):
             roots.extend([self.aoa_memo_root / "docs", self.aoa_memo_root / "mechanics", self.aoa_memo_root / "generated/memory"])
         if scope in ("all", "local", "ports"):
