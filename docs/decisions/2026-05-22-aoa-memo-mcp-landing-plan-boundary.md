@@ -26,6 +26,11 @@ local memo ports. It may run the `aoa-memo` landing script in dry-run mode, but
 the reviewed memory object lands only through an explicit `aoa-memo` write,
 generated read-model refresh, validation, and repository review.
 
+Landing-plan readiness follows the same local source/evidence-ref posture as
+the `aoa-memo` landing route: unresolved local refs block readiness before a
+dry-run can claim that an export is ready to land. Symbolic refs such as
+`repo:`, `web:`, or `operator:` remain route handles, not MCP-owned truth.
+
 ## Rationale
 
 The service belongs to `abyss-stack` as an MCP access plane. It should make the
@@ -37,6 +42,8 @@ split while still giving agents a practical readiness path.
 
 - Agents can see blocked, ready, and landed exports without manual packet
   archaeology.
+- Missing local source/evidence refs surface as blocked readiness in MCP before
+  an `aoa-memo` dry-run or source patch.
 - The MCP can prepare commands and dry-run them, but cannot silently promote
   local memory into reviewed truth.
 - Pilot local ports can be operated through one access-plane shape.

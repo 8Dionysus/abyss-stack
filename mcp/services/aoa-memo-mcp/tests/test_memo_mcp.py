@@ -93,6 +93,9 @@ def seed_workspace(root: Path) -> None:
     (port / "AGENTS.md").write_text("# Memo port\n", encoding="utf-8")
     (port / "README.md").write_text("# Memo\n", encoding="utf-8")
     write_port_contract(port, "Agents-of-Abyss", "ecosystem")
+    federation_rules = root / "Agents-of-Abyss/docs/FEDERATION_RULES.md"
+    federation_rules.parent.mkdir(parents=True, exist_ok=True)
+    federation_rules.write_text("# Federation rules\n", encoding="utf-8")
 
     stack_port = root / "stack-source/memo"
     for rel in ["candidates", "receipts", "exports", "local"]:
@@ -100,6 +103,9 @@ def seed_workspace(root: Path) -> None:
     (stack_port / "AGENTS.md").write_text("# Stack memo port\n", encoding="utf-8")
     (stack_port / "README.md").write_text("# Stack memo\n", encoding="utf-8")
     write_port_contract(stack_port, "abyss-stack", "repo")
+    stack_design = root / "stack-source/mcp/services/aoa-memo-mcp/DESIGN.md"
+    stack_design.parent.mkdir(parents=True, exist_ok=True)
+    stack_design.write_text("# aoa-memo-mcp design\n", encoding="utf-8")
 
     machine_port = root / "machine-state/memo"
     for rel in ["candidates", "receipts", "exports", "local"]:
@@ -705,6 +711,50 @@ def test_pending_exports_and_landing_plan(tmp_path: Path, monkeypatch) -> None:
     assert plan["ok"] is True
     assert plan["dry_run_command"][0:2] == ["python", "scripts/memory/land_reviewed_memo_intake.py"]
     assert plan["authority_note"].startswith("MCP prepares")
+
+
+def test_landing_plan_blocks_missing_export_evidence_ref(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "MCP should block landing readiness when export evidence refs disappear",
+    )
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
+    reviewed = state.review_intake(export["path"])
+    export_path = Path(export["path"])
+    payload = json.loads(export_path.read_text(encoding="utf-8"))
+    payload["allowed_result"] = "reviewed_write"
+    payload["receipt_refs"] = [Path(reviewed["receipt_path"]).relative_to(tmp_path / "stack-source/memo").as_posix()]
+    payload["evidence_refs"] = ["mcp/services/aoa-memo-mcp/MISSING.md"]
+    export_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    plan = state.build_landing_plan("abyss-stack", export_path.relative_to(tmp_path / "stack-source/memo").as_posix())
+
+    assert plan["ok"] is False
+    assert plan["readiness"]["landing_state"] == "blocked"
+    assert any("evidence_refs[0] points to missing ref" in error for error in plan["errors"])
+
+
+def test_landing_plan_blocks_missing_candidate_source_ref(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "MCP should block landing readiness when candidate source refs disappear",
+    )
+    candidate_path = Path(created["path"])
+    candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+    candidate["source_refs"] = ["mcp/services/aoa-memo-mcp/MISSING.md"]
+    candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
+
+    assert export["ok"] is False
+    assert any("source_refs[0] points to missing ref" in error for error in export["errors"])
 
 
 def test_absolute_candidate_refs_are_rejected_for_intake(tmp_path: Path, monkeypatch) -> None:

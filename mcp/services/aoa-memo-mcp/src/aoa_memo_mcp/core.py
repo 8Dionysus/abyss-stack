@@ -42,6 +42,23 @@ LOCAL_MEMO_PORT_SCHEMA = "local_memo_port.schema.json"
 LOCAL_MEMO_PORT_INDEX_SCHEMA = "local_memo_port_index.schema.json"
 LOCAL_MEMO_RECEIPT_SCHEMA = "local_memo_receipt.schema.json"
 FORMAT_CHECKER = FormatChecker()
+SYMBOLIC_REF_PREFIXES = (
+    "repo:",
+    "http://",
+    "https://",
+    "web:",
+    "operator:",
+    "state_capsule:",
+    "audit_event:",
+    "claim:",
+    "bridge:",
+    "episode:",
+    "memory:",
+    "candidate:",
+    "receipt:",
+    "export:",
+    "landing-receipt:",
+)
 OPEN_REVIEW_STATES = {"candidate", "validated", "forwarded", "reviewed"}
 TERMINAL_REVIEW_STATES = {"rejected", "landed", "superseded", "archived"}
 FALLBACK_VOCABULARY_TERMS = {
@@ -390,6 +407,8 @@ class AoAMemoMCPState:
             errors.append("source_refs must be a non-empty list")
         if not isinstance(data.get("evidence_refs"), list) or not data.get("evidence_refs"):
             errors.append("evidence_refs must be a non-empty list")
+        self._check_payload_refs(errors, port, candidate_path, "source_refs", data.get("source_refs"))
+        self._check_payload_refs(errors, port, candidate_path, "evidence_refs", data.get("evidence_refs"))
         source_trust = data.get("source_trust")
         desired_route = data.get("route")
         direct_write = bool((data.get("guardrails") or {}).get("direct_durable_write"))
@@ -617,6 +636,8 @@ class AoAMemoMCPState:
             errors.append("export must preserve source_refs")
         if not payload.get("evidence_refs"):
             errors.append("export must preserve evidence_refs")
+        self._check_payload_refs(errors, port, export_path, "source_refs", payload.get("source_refs"))
+        self._check_payload_refs(errors, port, export_path, "evidence_refs", payload.get("evidence_refs"))
 
         stamp = _utc_stamp()
         slug = _id_slug(str(payload.get("id") or "intake-review"), 48)
@@ -1213,6 +1234,8 @@ class AoAMemoMCPState:
             errors.append("source_refs must not be empty")
         if not payload.get("evidence_refs"):
             errors.append("evidence_refs must not be empty")
+        self._check_payload_refs(errors, port, export_path, "source_refs", payload.get("source_refs"))
+        self._check_payload_refs(errors, port, export_path, "evidence_refs", payload.get("evidence_refs"))
 
         for ref in payload.get("candidate_refs", []):
             try:
@@ -1242,6 +1265,7 @@ class AoAMemoMCPState:
                 errors.append(f"{ref}: receipt result must be validated, forwarded, or landed")
             if receipt.get("errors"):
                 errors.append(f"{ref}: receipt has errors")
+            self._check_payload_refs(errors, port, receipt_path, "candidate_ref", [receipt.get("candidate_ref")])
 
         copied_intake = self._copied_intake_path(str(payload.get("repo") or ""), export_path)
         landing_state = "landed" if copied_intake.exists() else ("ready" if not errors else "blocked")
@@ -1257,6 +1281,54 @@ class AoAMemoMCPState:
 
     def _copied_intake_path(self, repo: str, export_path: Path) -> Path:
         return self.aoa_memo_root / "memo/intake/reviewed" / f"{_id_slug(repo, 80)}.{export_path.name}"
+
+    def _repo_root_for_port(self, port: Path) -> Path:
+        return port.parent if port.name == "memo" else port
+
+    def _resolve_payload_ref(self, port: Path, ref: str) -> Path | None:
+        if ref.startswith(SYMBOLIC_REF_PREFIXES):
+            return None
+        text = ref.split("#", 1)[0].strip()
+        if not text:
+            return None
+        path = Path(text)
+        if path.is_absolute():
+            raise ValueError("local refs must be relative or symbolic")
+        repo_root = self._repo_root_for_port(port).resolve()
+        if text.startswith("memo/"):
+            target = repo_root / path
+        else:
+            port_relative = port / path
+            target = port_relative if port_relative.exists() else repo_root / path
+        resolved = target.resolve()
+        try:
+            resolved.relative_to(repo_root)
+        except ValueError as exc:
+            raise ValueError("local refs must stay under the repo owning the memo port") from exc
+        return resolved
+
+    def _check_payload_refs(
+        self,
+        errors: list[str],
+        port: Path,
+        packet_path: Path,
+        label: str,
+        refs: Any,
+    ) -> None:
+        if not isinstance(refs, list):
+            errors.append(f"{packet_path}:{label} must be a list")
+            return
+        for index, ref in enumerate(refs):
+            if not isinstance(ref, str) or not ref:
+                errors.append(f"{packet_path}:{label}[{index}] must be a non-empty string")
+                continue
+            try:
+                target = self._resolve_payload_ref(port, ref)
+            except ValueError as exc:
+                errors.append(f"{packet_path}:{label}[{index}] {exc}")
+                continue
+            if target is not None and not target.exists():
+                errors.append(f"{packet_path}:{label}[{index}] points to missing ref {ref}")
 
     def _resolve_local_ref(self, port: Path, ref: str, preferred_dir: str) -> Path | None:
         ref = str(ref).strip()
