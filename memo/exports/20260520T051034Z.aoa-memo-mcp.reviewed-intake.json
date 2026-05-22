@@ -17,7 +17,7 @@
   ],
   "evidence_refs": [
     "memo/receipts/20260520T051034Z.aoa-memo-mcp.validation-receipt.json",
-    "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
+    "repo:aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
   ],
   "allowed_result": "candidate_only",
   "created_at": "2026-05-20T05:10:34Z",
