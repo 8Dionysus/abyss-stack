@@ -816,11 +816,14 @@ class AoAMemoMCPState:
         return result
 
     def search(self, query: str, scope: str = "all", mode: str = "brief", limit: int = 20) -> dict[str, Any]:
-        needle = query.lower().strip()
+        terms, filters = self._parse_search_query(query)
+        needle = " ".join(terms).lower().strip()
         roots = self._search_roots(scope)
-        hits: list[dict[str, Any]] = []
-        if not needle:
-            return {"query": query, "scope": scope, "mode": mode, "hits": hits}
+        hits = self._search_memory_objects(terms, filters, scope, limit)
+        if not needle and not filters:
+            return self._search_result(query, scope, mode, hits)
+        if len(hits) >= limit:
+            return self._search_result(query, scope, mode, hits[:limit])
         for root in roots:
             if not root.exists():
                 continue
@@ -839,8 +842,134 @@ class AoAMemoMCPState:
                     }
                 )
                 if len(hits) >= limit:
-                    return {"query": query, "scope": scope, "mode": mode, "hits": hits}
-        return {"query": query, "scope": scope, "mode": mode, "hits": hits}
+                    return self._search_result(query, scope, mode, hits)
+        return self._search_result(query, scope, mode, hits)
+
+    def _search_result(self, query: str, scope: str, mode: str, hits: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "schema": "aoa_memo_search_v1",
+            "query": query,
+            "scope": scope,
+            "mode": mode,
+            "hits": hits,
+            "low_confidence": not hits,
+            "authority_note": "Search is retrieval over reviewed read models and local files; source truth remains in the owning repo.",
+        }
+
+    def _parse_search_query(self, query: str) -> tuple[list[str], dict[str, str]]:
+        filter_aliases = {
+            "repo": "repo",
+            "kind": "kind",
+            "family": "family",
+            "scope": "scope",
+            "lifecycle": "lifecycle",
+            "recall": "recall_status",
+            "recall_status": "recall_status",
+            "source": "source_ref",
+            "source_ref": "source_ref",
+            "source_kind": "source_kind",
+            "temperature": "temperature",
+            "review": "review_state",
+            "review_state": "review_state",
+        }
+        terms: list[str] = []
+        filters: dict[str, str] = {}
+        for token in query.split():
+            key, separator, value = token.partition(":")
+            normalized_key = filter_aliases.get(key.lower())
+            if separator and normalized_key and value:
+                filters[normalized_key] = value.lower()
+            else:
+                terms.append(token.lower())
+        return terms, filters
+
+    def _search_memory_objects(
+        self,
+        terms: list[str],
+        filters: dict[str, str],
+        scope: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        if scope not in {"all", "central", "aoa-memo", "corpus", "reviewed", "memory-objects"}:
+            return []
+        catalog_path = self.aoa_memo_root / MEMORY_OBJECT_CATALOG
+        catalog = _read_json(catalog_path)
+        if not isinstance(catalog, dict):
+            return []
+        reviewed_only = scope in {"corpus", "reviewed"}
+        hits: list[dict[str, Any]] = []
+        for item in catalog.get("memory_objects", []):
+            if not isinstance(item, dict):
+                continue
+            if reviewed_only and item.get("source_kind") != "reviewed_corpus":
+                continue
+            source_object = self._catalog_source_object(item)
+            if not self._memory_object_filters_match(item, source_object, filters):
+                continue
+            haystack = json.dumps({"catalog": item, "object": source_object}, ensure_ascii=False).lower()
+            if terms and not all(term in haystack for term in terms):
+                continue
+            hits.append(
+                {
+                    "type": "memory_object",
+                    "id": item.get("id"),
+                    "kind": item.get("kind"),
+                    "title": item.get("title"),
+                    "summary": item.get("summary"),
+                    "source_kind": item.get("source_kind"),
+                    "current_recall_status": item.get("current_recall_status"),
+                    "temperature": item.get("temperature"),
+                    "review_state": item.get("review_state"),
+                    "source_path": item.get("source_path"),
+                    "snippet": str(item.get("summary") or item.get("title") or item.get("id") or ""),
+                }
+            )
+            if len(hits) >= limit:
+                break
+        return sorted(hits, key=lambda hit: hit.get("source_kind") != "reviewed_corpus")
+
+    def _catalog_source_object(self, item: dict[str, Any]) -> dict[str, Any]:
+        source_path = item.get("source_path")
+        if not isinstance(source_path, str):
+            return {}
+        payload = _read_json(self.aoa_memo_root / source_path)
+        return payload if isinstance(payload, dict) else {}
+
+    def _memory_object_filters_match(
+        self,
+        item: dict[str, Any],
+        source_object: dict[str, Any],
+        filters: dict[str, str],
+    ) -> bool:
+        if not filters:
+            return True
+        filter_values = {
+            "repo": json.dumps(source_object.get("scope", []), ensure_ascii=False).lower()
+            + " "
+            + json.dumps(source_object.get("owner_refs", []), ensure_ascii=False).lower()
+            + " "
+            + json.dumps(item, ensure_ascii=False).lower(),
+            "kind": str(item.get("kind") or source_object.get("kind") or "").lower(),
+            "family": json.dumps(source_object.get("tags", []), ensure_ascii=False).lower()
+            + " "
+            + json.dumps(item, ensure_ascii=False).lower(),
+            "scope": json.dumps(item.get("scope_classes", []), ensure_ascii=False).lower()
+            + " "
+            + json.dumps(source_object.get("scope", []), ensure_ascii=False).lower(),
+            "lifecycle": json.dumps(source_object.get("lifecycle", {}), ensure_ascii=False).lower(),
+            "recall_status": str(
+                item.get("current_recall_status")
+                or ((source_object.get("lifecycle") or {}).get("current_recall") or {}).get("status")
+                or ""
+            ).lower(),
+            "source_ref": json.dumps((source_object.get("provenance") or {}).get("source_refs", []), ensure_ascii=False).lower()
+            + " "
+            + str(item.get("source_path") or "").lower(),
+            "source_kind": str(item.get("source_kind") or "").lower(),
+            "temperature": str(item.get("temperature") or ((source_object.get("trust") or {}).get("temperature")) or "").lower(),
+            "review_state": str(item.get("review_state") or ((source_object.get("lifecycle") or {}).get("review_state")) or "").lower(),
+        }
+        return all(value in filter_values.get(key, "") for key, value in filters.items())
 
     def read_resource(self, uri: str) -> dict[str, Any]:
         parsed = urlparse(uri)

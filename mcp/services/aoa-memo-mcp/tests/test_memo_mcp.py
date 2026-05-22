@@ -595,6 +595,15 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert search["hits"]
     route_search = state.search("session_evidence_route", scope="all")
     assert route_search["hits"]
+    corpus_search = state.search("access repo:abyss-stack kind:decision", scope="corpus")
+    assert corpus_search["schema"] == "aoa_memo_search_v1"
+    assert corpus_search["low_confidence"] is False
+    assert corpus_search["hits"][0]["type"] == "memory_object"
+    assert corpus_search["hits"][0]["source_kind"] == "reviewed_corpus"
+    assert corpus_search["hits"][0]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
+    mismatch = state.search("access repo:abyss-stack kind:pattern", scope="corpus")
+    assert mismatch["hits"] == []
+    assert mismatch["low_confidence"] is True
     index = state.read_resource("aoa-memo://repo/Agents-of-Abyss/memo-port-index")
     assert index["index"]["repo"] == "Agents-of-Abyss"
     pending = state.read_resource("aoa-memo://repo/Agents-of-Abyss/pending-exports")
