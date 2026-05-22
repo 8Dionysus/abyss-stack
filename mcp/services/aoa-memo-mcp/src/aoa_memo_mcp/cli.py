@@ -55,6 +55,19 @@ def main() -> None:
     review = sub.add_parser("review-intake")
     review.add_argument("path")
 
+    pending = sub.add_parser("pending-exports")
+    pending.add_argument("--repo", required=True)
+
+    landing_plan = sub.add_parser("landing-plan")
+    landing_plan.add_argument("--repo", required=True)
+    landing_plan.add_argument("--export-ref", required=True)
+    landing_plan.add_argument("--object-kind", default="decision")
+    landing_plan.add_argument("--slug")
+    landing_plan.add_argument("--title")
+    landing_plan.add_argument("--summary")
+    landing_plan.add_argument("--reviewed-at")
+    landing_plan.add_argument("--run-dry-run", action="store_true")
+
     resource = sub.add_parser("read-resource")
     resource.add_argument("uri")
 
@@ -88,6 +101,21 @@ def main() -> None:
         _print(state.prepare_intake_packet(args.repo, args.candidate_ref, args.receipt_ref))
     elif args.command == "review-intake":
         _print(state.review_intake(args.path))
+    elif args.command == "pending-exports":
+        _print(state.list_pending_exports(args.repo))
+    elif args.command == "landing-plan":
+        _print(
+            state.build_landing_plan(
+                args.repo,
+                args.export_ref,
+                object_kind=args.object_kind,
+                slug=args.slug,
+                title=args.title,
+                summary=args.summary,
+                reviewed_at=args.reviewed_at,
+                run_dry_run=args.run_dry_run,
+            )
+        )
     elif args.command == "read-resource":
         _print(state.read_resource(args.uri))
 

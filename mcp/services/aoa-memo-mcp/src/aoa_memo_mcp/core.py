@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +34,7 @@ LOCAL_PORT_INDEX = "index.min.json"
 LOCAL_PORT_INDEX_MD = "INDEX.md"
 LOCAL_PORT_CONTRACT = "PORT.yaml"
 WORKSPACE_MEMORY_MAP = "generated/workspace_memory_map.min.json"
+MEMORY_OBJECT_CATALOG = "generated/memory-objects/memory_object_catalog.min.json"
 MEMORY_PORT_SCHEMA_DIR = "schemas/memory-ports"
 LOCAL_MEMO_CANDIDATE_SCHEMA = "local_memo_candidate.schema.json"
 LOCAL_MEMO_EXPORT_SCHEMA = "local_memo_export.schema.json"
@@ -215,6 +217,8 @@ class AoAMemoMCPState:
                 "durable_landing": "reviewed source patch in aoa-memo, not MCP direct write",
             },
             "workspace_memory_map": self._workspace_memory_summary(route.name),
+            "reviewed_memory": self._reviewed_memory_for_repo(route.name, intent),
+            "local_intake": self._local_intake_summary(route.name, port),
             "central_memory_contracts": self._central_contracts(),
             "recommended_route": self._recommended_route(route, port),
             "validation": [
@@ -258,6 +262,7 @@ class AoAMemoMCPState:
                 and all((port / name).is_dir() for name in REQUIRED_PORT_DIRS)
             ),
             "default_mode": route.default_mode,
+            "pending_exports": self._pending_export_counts(route.name, port),
         }
 
     def create_candidate(
@@ -656,6 +661,139 @@ class AoAMemoMCPState:
             "errors": errors,
         }
 
+    def list_pending_exports(self, repo: str) -> dict[str, Any]:
+        route = self.repo_route(repo)
+        port = route.memo_port
+        if port is None or not port.exists():
+            return {
+                "schema": "aoa_local_memo_pending_exports_v1",
+                "repo": route.name,
+                "ok": False,
+                "exports": [],
+                "counts": {"total": 0, "pending": 0, "ready": 0, "landed": 0},
+                "errors": ["memo port is missing"],
+            }
+        exports: list[dict[str, Any]] = []
+        for path in sorted((port / "exports").glob("*.json")):
+            payload = _read_json(path)
+            readiness = self._export_landing_readiness(port, path, payload)
+            exports.append(
+                {
+                    "path": self._local_packet_ref(port, path),
+                    "id": payload.get("id") if isinstance(payload, dict) else path.stem,
+                    "allowed_result": payload.get("allowed_result") if isinstance(payload, dict) else None,
+                    "created_at": payload.get("created_at") if isinstance(payload, dict) else None,
+                    "landing_state": readiness["landing_state"],
+                    "ready_for_landing": readiness["ready_for_landing"],
+                    "errors": readiness["errors"],
+                    "candidate_refs": payload.get("candidate_refs", []) if isinstance(payload, dict) else [],
+                    "receipt_refs": payload.get("receipt_refs", []) if isinstance(payload, dict) else [],
+                }
+            )
+        counts = {
+            "total": len(exports),
+            "pending": sum(1 for item in exports if item["landing_state"] != "landed"),
+            "ready": sum(1 for item in exports if item["ready_for_landing"]),
+            "landed": sum(1 for item in exports if item["landing_state"] == "landed"),
+        }
+        return {
+            "schema": "aoa_local_memo_pending_exports_v1",
+            "repo": route.name,
+            "ok": True,
+            "exports": exports,
+            "counts": counts,
+            "errors": [],
+        }
+
+    def build_landing_plan(
+        self,
+        repo: str,
+        export_ref: str,
+        *,
+        object_kind: str = "decision",
+        slug: str | None = None,
+        title: str | None = None,
+        summary: str | None = None,
+        reviewed_at: str | None = None,
+        run_dry_run: bool = False,
+    ) -> dict[str, Any]:
+        route = self.repo_route(repo)
+        port = route.memo_port
+        if port is None or not port.exists():
+            return {
+                "schema": "aoa_memo_landing_plan_v1",
+                "repo": route.name,
+                "ok": False,
+                "errors": ["memo port is missing"],
+            }
+        try:
+            export_path = self._resolve_local_ref(port, export_ref, "exports")
+        except ValueError as exc:
+            return {
+                "schema": "aoa_memo_landing_plan_v1",
+                "repo": route.name,
+                "ok": False,
+                "errors": [str(exc)],
+            }
+        payload = _read_json(export_path) if export_path else None
+        readiness = self._export_landing_readiness(port, export_path, payload)
+        export_slug = _id_slug(str((payload or {}).get("id") or export_path.stem), 64).replace("export-", "")
+        slug = slug or export_slug
+        reviewed_at = reviewed_at or _now()
+        title_args = ["--title", title] if title else []
+        summary_args = ["--summary", summary] if summary else []
+        command = [
+            "python",
+            "scripts/memory/land_reviewed_memo_intake.py",
+            "--port",
+            str(port),
+            "--export",
+            self._local_packet_ref(port, export_path),
+            "--object-kind",
+            object_kind,
+            "--slug",
+            slug,
+            "--reviewed-at",
+            reviewed_at,
+            *title_args,
+            *summary_args,
+        ]
+        result: dict[str, Any] = {
+            "schema": "aoa_memo_landing_plan_v1",
+            "repo": route.name,
+            "ok": readiness["ok"],
+            "export_ref": self._local_packet_ref(port, export_path),
+            "readiness": readiness,
+            "authority_note": "MCP prepares or dry-runs the plan only; durable memory lands through aoa-memo source change, validators, and review.",
+            "dry_run_command": command,
+            "write_command": [*command, "--write"],
+            "errors": readiness["errors"],
+        }
+        if run_dry_run:
+            script = self.aoa_memo_root / "scripts/memory/land_reviewed_memo_intake.py"
+            if not script.exists():
+                result["ok"] = False
+                result["errors"] = [*result["errors"], f"landing script is missing: {script}"]
+            else:
+                completed = subprocess.run(
+                    command,
+                    cwd=self.aoa_memo_root,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                result["dry_run"] = {
+                    "returncode": completed.returncode,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                    "ok": completed.returncode == 0,
+                }
+                result["ok"] = result["ok"] and completed.returncode == 0
+                if completed.returncode != 0:
+                    result["errors"] = [*result["errors"], completed.stderr.strip() or "dry-run failed"]
+        return result
+
     def search(self, query: str, scope: str = "all", mode: str = "brief", limit: int = 20) -> dict[str, Any]:
         needle = query.lower().strip()
         roots = self._search_roots(scope)
@@ -700,6 +838,8 @@ class AoAMemoMCPState:
                 "repo": path_parts[0],
                 "open_items": self.build_port_index(path_parts[0])["index"]["open_items"],
             }
+        if parsed.netloc == "repo" and len(path_parts) == 2 and path_parts[1] == "pending-exports":
+            return self.list_pending_exports(path_parts[0])
         if parsed.netloc == "repo" and len(path_parts) == 2 and path_parts[1] == "memo-vocabulary":
             return self.build_memo_port_vocabulary()
         if parsed.netloc == "intake" and len(path_parts) == 2 and path_parts[1] == "review":
@@ -738,9 +878,37 @@ class AoAMemoMCPState:
         }
 
     def build_memory_object(self, object_id: str) -> dict[str, Any]:
+        catalog_path = self.aoa_memo_root / MEMORY_OBJECT_CATALOG
+        catalog = _read_json(catalog_path)
+        matches: list[dict[str, Any]] = []
+        if isinstance(catalog, dict):
+            for item in catalog.get("memory_objects", []):
+                if not isinstance(item, dict):
+                    continue
+                values = {
+                    str(item.get("id") or ""),
+                    str(item.get("inspect_key") or ""),
+                    str(item.get("expand_key") or ""),
+                }
+                if object_id in values or object_id in str(item.get("id") or ""):
+                    item_copy = dict(item)
+                    source_path = item.get("source_path")
+                    if isinstance(source_path, str):
+                        source_payload = _read_json(self.aoa_memo_root / source_path)
+                        if isinstance(source_payload, dict):
+                            item_copy["object"] = source_payload
+                    matches.append(item_copy)
+        if matches:
+            return {
+                "schema": "aoa_memo_object_lookup_v1",
+                "object_id": object_id,
+                "catalog": str(catalog_path),
+                "found": True,
+                "matches": matches,
+            }
+
         registry_path = self.aoa_memo_root / "generated/memory/memo_registry.min.json"
         registry = _read_json(registry_path)
-        matches: list[dict[str, Any]] = []
         if isinstance(registry, dict):
             for key in ("memory_object_kinds", "supporting_objects", "recall_modes", "core_docs", "schemas"):
                 value = registry.get(key)
@@ -751,7 +919,8 @@ class AoAMemoMCPState:
         return {
             "schema": "aoa_memo_object_lookup_v1",
             "object_id": object_id,
-            "registry": str(registry_path),
+            "catalog": str(catalog_path),
+            "fallback_registry": str(registry_path),
             "found": bool(matches),
             "matches": matches,
         }
@@ -1022,6 +1191,73 @@ class AoAMemoMCPState:
         known = ", ".join(str(port) for port in known_ports.values()) or "none"
         raise ValueError(f"path must resolve under a known local memo port ({known})")
 
+    def _export_landing_readiness(self, port: Path, export_path: Path, payload: Any) -> dict[str, Any]:
+        errors: list[str] = []
+        if not isinstance(payload, dict):
+            return {
+                "schema": "aoa_memo_export_landing_readiness_v1",
+                "ok": False,
+                "landing_state": "invalid",
+                "errors": ["export packet is not a JSON object"],
+            }
+        errors.extend(self._schema_errors(LOCAL_MEMO_EXPORT_SCHEMA, payload, "export"))
+        if payload.get("target_owner") != "aoa-memo" or payload.get("target_route") != "reviewed_intake":
+            errors.append("export must target aoa-memo reviewed_intake")
+        if payload.get("allowed_result") != "reviewed_write":
+            errors.append("allowed_result must be reviewed_write for landing")
+        if not payload.get("candidate_refs"):
+            errors.append("candidate_refs must not be empty")
+        if not payload.get("receipt_refs"):
+            errors.append("receipt_refs must not be empty for landing readiness")
+        if not payload.get("source_refs"):
+            errors.append("source_refs must not be empty")
+        if not payload.get("evidence_refs"):
+            errors.append("evidence_refs must not be empty")
+
+        for ref in payload.get("candidate_refs", []):
+            try:
+                candidate = self._resolve_local_ref(port, str(ref), "candidates")
+            except ValueError as exc:
+                errors.append(f"{ref}: {exc}")
+                continue
+            if candidate is None or not candidate.exists():
+                errors.append(f"missing candidate ref: {ref}")
+                continue
+            validation = self.validate_candidate(candidate)
+            if not validation["ok"]:
+                errors.extend(f"{ref}: {error}" for error in validation["errors"])
+
+        for ref in payload.get("receipt_refs", []):
+            try:
+                receipt_path = self._resolve_local_ref(port, str(ref), "receipts")
+            except ValueError as exc:
+                errors.append(f"{ref}: {exc}")
+                continue
+            receipt = _read_json(receipt_path) if receipt_path else None
+            if not isinstance(receipt, dict):
+                errors.append(f"{ref}: receipt packet is missing or invalid")
+                continue
+            errors.extend(f"{ref}: {error}" for error in self._schema_errors(LOCAL_MEMO_RECEIPT_SCHEMA, receipt, "receipt"))
+            if receipt.get("result") not in {"validated", "forwarded", "landed"}:
+                errors.append(f"{ref}: receipt result must be validated, forwarded, or landed")
+            if receipt.get("errors"):
+                errors.append(f"{ref}: receipt has errors")
+
+        copied_intake = self._copied_intake_path(str(payload.get("repo") or ""), export_path)
+        landing_state = "landed" if copied_intake.exists() else ("ready" if not errors else "blocked")
+        ready_for_landing = not errors and landing_state == "ready"
+        return {
+            "schema": "aoa_memo_export_landing_readiness_v1",
+            "ok": not errors,
+            "ready_for_landing": ready_for_landing,
+            "landing_state": landing_state,
+            "copied_intake": str(copied_intake),
+            "errors": errors,
+        }
+
+    def _copied_intake_path(self, repo: str, export_path: Path) -> Path:
+        return self.aoa_memo_root / "memo/intake/reviewed" / f"{_id_slug(repo, 80)}.{export_path.name}"
+
     def _resolve_local_ref(self, port: Path, ref: str, preferred_dir: str) -> Path | None:
         ref = str(ref).strip()
         if not ref:
@@ -1047,6 +1283,61 @@ class AoAMemoMCPState:
 
     def _local_packet_ref(self, port: Path, path: Path) -> str:
         return self._assert_under_port(port, path).relative_to(port.resolve()).as_posix()
+
+    def _pending_export_counts(self, repo: str, port_status: dict[str, Any] | Path | None) -> dict[str, int]:
+        if isinstance(port_status, dict):
+            ready = bool(port_status.get("ready"))
+        elif isinstance(port_status, Path):
+            ready = bool(
+                port_status.exists()
+                and (port_status / "AGENTS.md").exists()
+                and (port_status / "README.md").exists()
+                and (port_status / LOCAL_PORT_CONTRACT).exists()
+                and all((port_status / name).is_dir() for name in REQUIRED_PORT_DIRS)
+            )
+        else:
+            ready = False
+        if not ready:
+            return {"total": 0, "pending": 0, "ready": 0, "landed": 0}
+        return self.list_pending_exports(repo)["counts"]
+
+    def _local_intake_summary(self, repo: str, port_status: dict[str, Any]) -> dict[str, Any]:
+        if not port_status.get("ready"):
+            return {"enabled": False, "pending_exports": 0, "ready_exports": 0, "landed_exports": 0}
+        counts = self.list_pending_exports(repo)["counts"]
+        return {
+            "enabled": True,
+            "pending_exports": counts["pending"],
+            "ready_exports": counts["ready"],
+            "landed_exports": counts["landed"],
+            "route": "repo/memo candidate -> receipt -> export -> aoa-memo reviewed landing",
+        }
+
+    def _reviewed_memory_for_repo(self, repo: str, intent: str = "", limit: int = 5) -> list[dict[str, Any]]:
+        catalog = _read_json(self.aoa_memo_root / MEMORY_OBJECT_CATALOG)
+        if not isinstance(catalog, dict):
+            return []
+        terms = {repo.lower(), *[part.lower() for part in re.findall(r"[a-zA-Z0-9-]+", intent) if len(part) > 2]}
+        hits: list[dict[str, Any]] = []
+        for item in catalog.get("memory_objects", []):
+            if not isinstance(item, dict) or item.get("source_kind") != "reviewed_corpus":
+                continue
+            haystack = json.dumps(item, ensure_ascii=False).lower()
+            if any(term and term in haystack for term in terms):
+                hits.append(
+                    {
+                        "id": item.get("id"),
+                        "kind": item.get("kind"),
+                        "title": item.get("title"),
+                        "summary": item.get("summary"),
+                        "current_recall_status": item.get("current_recall_status"),
+                        "source_kind": item.get("source_kind"),
+                        "source_path": item.get("source_path"),
+                    }
+                )
+            if len(hits) >= limit:
+                break
+        return hits
 
     def _read_required_json(self, path: Path | None) -> dict[str, Any]:
         if path is None:

@@ -30,6 +30,7 @@ Resources:
 - `aoa-memo://repo/{repo}/local-port-status`
 - `aoa-memo://repo/{repo}/memo-port-index`
 - `aoa-memo://repo/{repo}/memo-open-items`
+- `aoa-memo://repo/{repo}/pending-exports`
 - `aoa-memo://repo/{repo}/memo-vocabulary`
 - `aoa-memo://intake/{packet_id}/review`
 
@@ -43,18 +44,26 @@ Tools:
 - `aoa_memo_validate_port(repo)`
 - `aoa_memo_prepare_intake_packet(repo, candidate_refs, receipt_refs)`
 - `aoa_memo_review_intake(path)` as a local forwarding check, not durable review
+- `aoa_memo_pending_exports(repo)`
+- `aoa_memo_landing_plan(repo, export_ref, ...)` as a readiness and dry-run
+  helper, not durable landing
 
 Prompts:
 
 - `memo-brief`
 - `memo-intake`
 - `memo-review`
+- `memo-landing-plan`
 - `session-rehydrate`
 
 Index and intake tools operate only on local `memo/` port packet state. They do
-not land durable reviewed memory into `aoa-memo`. Candidate, export, receipt,
-port, and port-index packets are validated against `aoa-memo` memory-port
-schemas, and packet paths must resolve under a known local `memo/` port.
+not land durable reviewed memory into `aoa-memo`. Landing-plan helpers may
+prepare or run the `aoa-memo` dry-run command so agents can see whether an
+export is blocked, ready, or already landed, but the durable write still happens
+as an `aoa-memo` source patch with validators and review. Candidate, export,
+receipt, port, and port-index packets are validated against `aoa-memo`
+memory-port schemas, and packet paths must resolve under a known local
+`memo/` port.
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher

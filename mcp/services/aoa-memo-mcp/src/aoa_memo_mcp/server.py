@@ -83,6 +83,34 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         """Check a local reviewed-intake export and write a forwarding receipt."""
         return current_state().review_intake(path)
 
+    @mcp.tool()
+    def aoa_memo_pending_exports(repo: str) -> dict[str, Any]:
+        """List local reviewed-intake exports and their landing readiness."""
+        return current_state().list_pending_exports(repo)
+
+    @mcp.tool()
+    def aoa_memo_landing_plan(
+        repo: str,
+        export_ref: str,
+        object_kind: str = "decision",
+        slug: str | None = None,
+        title: str | None = None,
+        summary: str | None = None,
+        reviewed_at: str | None = None,
+        run_dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Prepare or dry-run an aoa-memo landing plan without durable write."""
+        return current_state().build_landing_plan(
+            repo=repo,
+            export_ref=export_ref,
+            object_kind=object_kind,
+            slug=slug,
+            title=title,
+            summary=summary,
+            reviewed_at=reviewed_at,
+            run_dry_run=run_dry_run,
+        )
+
     @mcp.resource("aoa-memo://brief/repo/{repo}")
     def brief_resource(repo: str) -> str:
         return json.dumps(current_state().build_brief(repo), ensure_ascii=False, indent=2)
@@ -106,6 +134,10 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
     @mcp.resource("aoa-memo://repo/{repo}/memo-open-items")
     def memo_open_items_resource(repo: str) -> str:
         return json.dumps(current_state().read_resource(f"aoa-memo://repo/{repo}/memo-open-items"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-memo://repo/{repo}/pending-exports")
+    def pending_exports_resource(repo: str) -> str:
+        return json.dumps(current_state().list_pending_exports(repo), ensure_ascii=False, indent=2)
 
     @mcp.resource("aoa-memo://repo/{repo}/memo-vocabulary")
     def memo_vocabulary_resource(repo: str) -> str:
@@ -138,6 +170,15 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
         return (
             f"Validate {candidate_path!r}; compare evidence refs against current owner files; "
             "then prepare/check an intake packet, keep local, or reject. MCP forwarding checks are not durable memory review."
+        )
+
+    @mcp.prompt(name="memo-landing-plan")
+    def memo_landing_plan(repo: str, export_ref: str) -> str:
+        """Prompt route for planning reviewed aoa-memo landing."""
+        return (
+            f"Use aoa_memo_pending_exports(repo={repo!r}), then "
+            f"aoa_memo_landing_plan(repo={repo!r}, export_ref={export_ref!r}, run_dry_run=True). "
+            "Inspect readiness and dry-run output; durable landing still requires an aoa-memo source patch and validators."
         )
 
     @mcp.prompt(name="session-rehydrate")

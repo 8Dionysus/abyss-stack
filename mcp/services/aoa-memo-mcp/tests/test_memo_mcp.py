@@ -26,6 +26,42 @@ def seed_workspace(root: Path) -> None:
     registry = memo / "generated/memory/memo_registry.min.json"
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(json.dumps({"memory_object_kinds": ["claim", "decision"], "core_docs": ["MEMORY_OPERATION_CYCLE.md"]}), encoding="utf-8")
+    object_path = memo / "memo/objects/decisions/2026/abyss-stack-aoa-memo-mcp-access-plane/object.json"
+    object_path.parent.mkdir(parents=True, exist_ok=True)
+    object_payload = {
+        "id": "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane",
+        "kind": "decision",
+        "title": "abyss-stack aoa-memo-mcp access plane route",
+        "summary": "abyss-stack owns aoa-memo-mcp as an MCP access plane while aoa-memo remains durable authority.",
+    }
+    object_path.write_text(json.dumps(object_payload), encoding="utf-8")
+    catalog = memo / "generated/memory-objects/memory_object_catalog.min.json"
+    catalog.parent.mkdir(parents=True, exist_ok=True)
+    catalog.write_text(
+        json.dumps(
+            {
+                "catalog_version": "test",
+                "catalog_kind": "memory_object_catalog",
+                "source_of_truth": ["memo/objects", "examples"],
+                "memory_objects": [
+                    {
+                        **object_payload,
+                        "scope_classes": ["repo", "workspace"],
+                        "temperature": "cool",
+                        "review_state": "confirmed",
+                        "current_recall_status": "allowed",
+                        "authority_kind": "human_reviewed",
+                        "source_kind": "reviewed_corpus",
+                        "primary_recall_modes": ["semantic", "source_route"],
+                        "source_path": "memo/objects/decisions/2026/abyss-stack-aoa-memo-mcp-access-plane/object.json",
+                        "inspect_key": object_payload["id"],
+                        "expand_key": object_payload["id"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     seed_memory_port_schemas(memo)
     seed_indexing_vocabulary(memo)
 
@@ -389,6 +425,17 @@ def test_brief_reports_ready_port_and_contracts(tmp_path: Path) -> None:
     assert brief["workspace_memory_map"]["current_port_level"] == "full_port"
 
 
+def test_brief_returns_reviewed_memory_for_repo(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    brief = state.build_brief("abyss-stack", "aoa-memo-mcp access plane")
+
+    assert brief["reviewed_memory"]
+    assert brief["reviewed_memory"][0]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
+
+
 def test_brief_uses_workspace_memory_map_for_route_only_and_authority(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = AoAMemoMCPState.discover(tmp_path)
@@ -544,6 +591,11 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert route_search["hits"]
     index = state.read_resource("aoa-memo://repo/Agents-of-Abyss/memo-port-index")
     assert index["index"]["repo"] == "Agents-of-Abyss"
+    pending = state.read_resource("aoa-memo://repo/Agents-of-Abyss/pending-exports")
+    assert pending["schema"] == "aoa_local_memo_pending_exports_v1"
+    memory_object = state.read_resource("aoa-memo://memory/object/memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane")
+    assert memory_object["found"] is True
+    assert memory_object["matches"][0]["object"]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
 
 
 def test_session_rehydrate_ignores_malformed_registry_items(tmp_path: Path) -> None:
@@ -628,6 +680,33 @@ def test_port_index_validation_and_intake_review(tmp_path: Path, monkeypatch) ->
     assert "reviewed_by" not in reviewed["receipt"]
 
 
+def test_pending_exports_and_landing_plan(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "MCP should expose landing readiness without durable writes",
+    )
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
+    reviewed = state.review_intake(export["path"])
+    export_path = Path(export["path"])
+    payload = json.loads(export_path.read_text(encoding="utf-8"))
+    payload["allowed_result"] = "reviewed_write"
+    payload["receipt_refs"] = [Path(reviewed["receipt_path"]).relative_to(tmp_path / "stack-source/memo").as_posix()]
+    export_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    pending = state.list_pending_exports("abyss-stack")
+    plan = state.build_landing_plan("abyss-stack", export_path.relative_to(tmp_path / "stack-source/memo").as_posix())
+
+    assert pending["counts"]["ready"] == 1
+    assert pending["exports"][0]["landing_state"] == "ready"
+    assert plan["ok"] is True
+    assert plan["dry_run_command"][0:2] == ["python", "scripts/memory/land_reviewed_memo_intake.py"]
+    assert plan["authority_note"].startswith("MCP prepares")
+
+
 def test_absolute_candidate_refs_are_rejected_for_intake(tmp_path: Path, monkeypatch) -> None:
     seed_workspace(tmp_path)
     monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
@@ -690,12 +769,14 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         "aoa_memo_brief",
         "aoa_memo_search",
         "aoa_memo_create_candidate",
+        "aoa_memo_landing_plan",
+        "aoa_memo_pending_exports",
         "aoa_memo_prepare_intake_packet",
         "aoa_memo_review_intake",
         "aoa_memo_validate_candidate",
         "aoa_memo_validate_port",
     }
-    assert prompts == {"memo-brief", "memo-intake", "memo-review", "session-rehydrate"}
+    assert prompts == {"memo-brief", "memo-intake", "memo-landing-plan", "memo-review", "session-rehydrate"}
     assert templates == {
         "aoa-memo://brief/repo/{repo}",
         "aoa-memo://memory/object/{object_id}",
@@ -703,6 +784,7 @@ def test_mcp_surface_contracts(tmp_path: Path) -> None:
         "aoa-memo://repo/{repo}/local-port-status",
         "aoa-memo://repo/{repo}/memo-port-index",
         "aoa-memo://repo/{repo}/memo-open-items",
+        "aoa-memo://repo/{repo}/pending-exports",
         "aoa-memo://repo/{repo}/memo-vocabulary",
         "aoa-memo://intake/{packet_id}/review",
     }
