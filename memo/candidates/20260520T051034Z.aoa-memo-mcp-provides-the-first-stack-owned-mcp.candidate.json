@@ -13,7 +13,7 @@
   "evidence_refs": [
     "mcp/services/aoa-memo-mcp/DESIGN.md",
     "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py",
-    "/srv/AbyssOS/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
+    "repo:aoa-memo/mechanics/writeback/parts/runtime-and-temperature/examples/reviewed_memory_intake_packet.abyss-stack.example.json"
   ],
   "route": "reviewed_intake",
   "review_state": "candidate",
