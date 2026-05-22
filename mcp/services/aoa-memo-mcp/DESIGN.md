@@ -39,6 +39,13 @@ The brief returns:
 - allowed next route;
 - validation commands.
 
+Search uses the same authority split. It starts from
+`aoa-memo/generated/memory-objects/memory_object_catalog.min.json` for
+corpus/reviewed/central scopes and returns typed `memory_object` hits before
+file snippets. Query filters such as `repo:`, `kind:`, `scope:`,
+`recall:`, `source_kind:`, `temperature:`, and `source:` narrow retrieval
+without making the MCP result stronger than the reviewed object.
+
 Candidate creation is local-first. A candidate may be written under the local
 port, validated, and exported for reviewed intake. It does not become durable
 memory just because the MCP tool wrote a file.

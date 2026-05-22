@@ -9,6 +9,7 @@ one repeatable route to ask:
 - whether this place has a local memo port;
 - how to create a candidate;
 - how to validate that candidate before any durable memory landing;
+- how to search reviewed corpus read models before falling back to file search;
 - where session rehydration evidence lives.
 
 ## Source Hierarchy
@@ -64,6 +65,13 @@ as an `aoa-memo` source patch with validators and review. Candidate, export,
 receipt, port, and port-index packets are validated against `aoa-memo`
 memory-port schemas, and packet paths must resolve under a known local
 `memo/` port.
+
+Search starts with `aoa-memo` generated memory-object read models when the
+scope is `corpus`, `reviewed`, `central`, `aoa-memo`, or `all`. Use compact
+field filters such as `repo:abyss-stack`, `kind:decision`,
+`recall:allowed`, `source_kind:reviewed_corpus`, or `source:PORT.yaml` to keep
+retrieval bounded. File hits remain supporting retrieval; source truth stays in
+the reviewed object or owning repository.
 
 In the shared AoA Codex plane this service is registered as `aoa_memo` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher
