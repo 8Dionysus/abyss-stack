@@ -32,6 +32,8 @@ aoa_memo_brief(repo, intent)
 The brief returns:
 
 - local port status;
+- pending export counts and landed export counts;
+- reviewed corpus memory hits from `aoa-memo` read models;
 - default memory operation mode;
 - relevant central memory contracts;
 - allowed next route;
@@ -56,6 +58,11 @@ inside a known local `memo/` port and pass the corresponding
 `aoa-memo/schemas/memory-ports/` schema. The final durable landing remains an
 `aoa-memo` source change with validators and review.
 
+The MCP can also list pending exports and prepare a landing plan. A landing plan
+may run the `aoa-memo` dry-run command to show the target object bundle, copied
+intake packet, and landing receipt. It does not write the durable object; the
+write route stays in `aoa-memo`.
+
 ## Pilot Roots
 
 The first pilot roots are:
@@ -75,4 +82,6 @@ The first layer is ready when:
 - MCP resources/tools/prompts exist and are smoke-tested;
 - each pilot port has `AGENTS.md`, `README.md`, and candidate directories;
 - untrusted candidate material cannot validate as direct durable memory;
-- another repo can obtain a memory brief through the access plane.
+- another repo can obtain a memory brief through the access plane;
+- landed reviewed memory can be returned from the `aoa-memo` corpus-backed
+  read models through the same brief/object lookup route.

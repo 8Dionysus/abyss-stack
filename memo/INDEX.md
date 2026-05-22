@@ -6,22 +6,23 @@ Generated from `PORT.yaml` and local memo packets.
 
 | District | Count |
 |---|---:|
-| candidates | 1 |
-| receipts | 1 |
-| exports | 1 |
+| candidates | 2 |
+| receipts | 2 |
+| exports | 2 |
 | local | 0 |
 
 ## Routes
 
 | Route | Count |
 |---|---:|
-| `reviewed_intake` | 1 |
+| `reviewed_intake` | 2 |
 
 ## Open Items
 
 | ID | State | Route | Path |
 |---|---|---|---|
 | `candidate:abyss-stack:20260520T051034Z:aoa-memo-mcp-provides-the-first-stack-owned-mcp` | `candidate` | `reviewed_intake` | `candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json` |
+| `candidate:abyss-stack:20260522T021004Z:aoa-memo-mcp-access-plane-reviewed-route` | `reviewed` | `reviewed_intake` | `candidates/20260522T021004Z.aoa-memo-mcp-access-plane-reviewed-route.candidate.json` |
 
 ## Agent Route
 

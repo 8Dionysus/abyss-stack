@@ -18,6 +18,8 @@ This stack-owned MCP surface owns:
   ports, and host-local memory evidence.
 - Candidate, local port index, reviewed-intake export, and forwarding receipt
   helpers that remain subordinate to `aoa-memo` contracts.
+- Pending-export and landing-plan helpers that expose readiness and dry-run
+  evidence without landing durable memory.
 
 It does not own:
 
@@ -44,6 +46,7 @@ It does not own:
 | memory route semantics | `DESIGN.md` and `docs/BOUNDARIES.md` |
 | candidate validation | `src/aoa_memo_mcp/core.py` plus `aoa-memo/schemas/memory-ports/` |
 | local port index or reviewed-intake packet | `src/aoa_memo_mcp/core.py`, `aoa-memo` schemas, and target `memo/PORT.yaml` |
+| pending exports or landing plan | `src/aoa_memo_mcp/core.py`, origin `memo/exports/`, and `aoa-memo/scripts/memory/land_reviewed_memo_intake.py` |
 | pilot local port posture | target repo `memo/AGENTS.md` |
 | session archive access | `.aoa/AGENTS.md` and `.aoa/DESIGN.md` |
 
@@ -85,6 +88,8 @@ PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli brief --repo
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-port --repo abyss-stack
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli build-port-index --repo abyss-stack --check
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/example.reviewed-intake.json --run-dry-run
 ```
 
 ## Verify

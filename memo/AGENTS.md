@@ -45,6 +45,20 @@ Then validate the emitted candidate path:
 PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli validate-candidate path/to/candidate.json
 ```
 
+## Reviewed Landing Route
+
+Use this route when a local export is meant to become reviewed `aoa-memo`
+memory:
+
+```bash
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli pending-exports --repo abyss-stack
+PYTHONPATH=mcp/services/aoa-memo-mcp/src python -m aoa_memo_mcp.cli landing-plan --repo abyss-stack --export-ref exports/path.reviewed-intake.json --run-dry-run
+```
+
+`landing-plan` is still an access-plane check. The durable write happens in
+`aoa-memo` through `scripts/memory/land_reviewed_memo_intake.py`, generated
+read-model refresh, validators, and review.
+
 ## Validation
 
 ```bash
@@ -57,4 +71,4 @@ python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ## Closeout
 
 Report candidate path, evidence refs, validation result, and whether the item
-stayed local or was exported for reviewed intake.
+stayed local, was exported for reviewed intake, or was landed in `aoa-memo`.

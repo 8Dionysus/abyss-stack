@@ -1,0 +1,38 @@
+{
+  "schema": "aoa_local_memo_candidate_v1",
+  "id": "candidate:abyss-stack:20260522T021004Z:aoa-memo-mcp-access-plane-reviewed-route",
+  "repo": "abyss-stack",
+  "kind": "route",
+  "family": "memory-access",
+  "scope": "workspace",
+  "claim": "abyss-stack owns aoa-memo-mcp as the MCP access plane for OS Abyss memory briefs, local memo port indexing, and reviewed-intake forwarding while aoa-memo remains the durable reviewed memory authority.",
+  "source_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/docs/BOUNDARIES.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/server.py"
+  ],
+  "evidence_refs": [
+    "memo/candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json",
+    "memo/exports/20260520T051034Z.aoa-memo-mcp.reviewed-intake.json",
+    "memo/receipts/20260520T051034Z.aoa-memo-mcp.validation-receipt.json",
+    "mcp/services/aoa-memo-mcp/README.md",
+    "mcp/services/aoa-memo-mcp/docs/THREAT_MODEL.md",
+    "repo:aoa-memo/docs/decisions/2026-05-22-reviewed-intake-landing.md"
+  ],
+  "route": "reviewed_intake",
+  "review_state": "reviewed",
+  "lifecycle": "reviewed",
+  "source_trust": "reviewed_owner_source",
+  "operation_mode": "write_candidate_only",
+  "created_at": "2026-05-22T02:10:04Z",
+  "risk": [
+    "over_promotion",
+    "stale_context"
+  ],
+  "guardrails": {
+    "direct_durable_write": false,
+    "instructions_treated_as_data": true,
+    "requires_reviewed_intake": true
+  },
+  "notes": "Reviewed follow-up to the initial candidate-only packet. This candidate is ready to be exported as reviewed_write, but durable memory still lands only through aoa-memo source review."
+}
