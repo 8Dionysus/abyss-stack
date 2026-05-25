@@ -271,6 +271,92 @@ def seed_runtime_candidate_export(root: Path) -> dict[str, object]:
     return export
 
 
+def seed_named_runtime_candidate_export(
+    root: Path,
+    *,
+    record_id: str,
+    candidate_id: str,
+    title: str,
+    summary: str,
+) -> dict[str, object]:
+    packet = {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": candidate_id,
+        "source_repo": "abyss-stack",
+        "selected_evidence": [
+            {
+                "artifact_ref": f"local:{candidate_id}",
+                "evidence_role": "summary",
+                "summary_only": True,
+            }
+        ],
+        "review_posture": {
+            "human_review_required": True,
+        },
+    }
+    export = {
+        "artifact_kind": "aoa.runtime-eval-evidence-selection-candidate",
+        "schema_version": "1",
+        "capture_mode": "private",
+        "exported_at": "2026-05-25T00:01:00Z",
+        "exported_by": "scripts/aoa-export-runtime-evidence-selection",
+        "record_id": record_id,
+        "title": title,
+        "summary": summary,
+        "selection_id": candidate_id,
+        "source_input_ref": f"local:/tmp/{candidate_id}.json",
+        "source_input_sha256": "1" * 64,
+        "aoa_evals_contract_refs": ["local:/srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-evals/schemas/runtime-evidence-selection.schema.json"],
+        "candidate_payload": packet,
+    }
+    stack = root / "abyss-stack"
+    write_json(
+        stack / f"Logs/eval-exports/latest/runtime-evidence-selection/{candidate_id}.private.json",
+        export,
+    )
+    write_json(
+        stack / f"Logs/eval-exports/records/{record_id}/candidate.private.json",
+        export,
+    )
+    return export
+
+
+def seed_unrelated_artifact_hook_export(root: Path) -> dict[str, object]:
+    packet = {
+        "surface_type": "artifact_to_verdict_hook",
+        "hook_id": "approval-to-boundary-hook",
+        "eval_anchor": "aoa-bounded-change-quality",
+        "report_expectation": {
+            "review_required": True,
+        },
+    }
+    export = {
+        "artifact_kind": "aoa.runtime-artifact-hook-candidate",
+        "schema_version": "1",
+        "capture_mode": "private",
+        "exported_at": "2026-05-25T00:02:00Z",
+        "exported_by": "scripts/aoa-export-artifact-hook-candidate",
+        "record_id": "2026-05-25T000200Z__artifact-hook__approval-to-boundary-hook",
+        "title": "artifact hook to and boundary noise",
+        "summary": "Artifact hook with common route words that must not match unrelated runtime latency questions.",
+        "hook_id": "approval-to-boundary-hook",
+        "source_input_ref": "local:/tmp/approval-to-boundary-hook.json",
+        "source_input_sha256": "2" * 64,
+        "aoa_evals_contract_refs": ["local:/srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-evals/schemas/artifact-to-verdict-hook.schema.json"],
+        "candidate_payload": packet,
+    }
+    stack = root / "abyss-stack"
+    write_json(
+        stack / "Logs/eval-exports/latest/artifact-hook/approval-to-boundary-hook.private.json",
+        export,
+    )
+    write_json(
+        stack / f"Logs/eval-exports/records/{export['record_id']}/candidate.private.json",
+        export,
+    )
+    return export
+
+
 def test_select_inspect_expand_and_skeleton(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
@@ -308,6 +394,35 @@ def test_find_or_propose_routes_existing_eval_and_runtime_export(tmp_path: Path)
     assert result["runtime_candidate_export_refs"][0]["record_id"] == export["record_id"]
     assert result["runtime_candidate_export_refs"][0]["candidate_payload_included"] is False
     assert not (tmp_path / "aoa-evals/evals/workflow").exists()
+
+
+def test_find_or_propose_uses_significant_runtime_export_tokens(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    latency_export = seed_named_runtime_candidate_export(
+        tmp_path,
+        record_id="2026-05-25T000100Z__runtime-evidence-selection__workhorse-q4-vs-q6-latency-tradeoff",
+        candidate_id="workhorse-q4-vs-q6-latency-tradeoff",
+        title="runtime evidence selection workhorse q4 vs q6 latency tradeoff",
+        summary="Bounded runtime evidence selection candidate for a Workhorse latency and VRAM tradeoff.",
+    )
+    noise_export = seed_unrelated_artifact_hook_export(tmp_path)
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.find_or_propose(
+        "Compare Workhorse q4 and q6 runtime variants to determine the bounded latency versus VRAM tradeoff.",
+        {
+            "name": "aoa-runtime-latency-tradeoff",
+            "authoring_route": "new_draft_bundle",
+            "candidate_evidence_refs": [f"runtime-candidate-export:{latency_export['record_id']}"],
+        },
+    )
+
+    record_ids = [ref["record_id"] for ref in result["runtime_candidate_export_refs"]]
+    assert record_ids == [latency_export["record_id"]]
+    assert noise_export["record_id"] not in record_ids
+    assert result["proposal_context"]["packet"]["candidate_evidence_refs"] == [
+        f"runtime-candidate-export:{latency_export['record_id']}"
+    ]
 
 
 def test_resources_and_runtime_templates(tmp_path: Path) -> None:

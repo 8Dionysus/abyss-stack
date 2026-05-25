@@ -95,6 +95,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- `aoa-evals-mcp` now treats explicit `runtime-candidate-export:<id>` refs as
+  strict runtime export selectors and filters weak route tokens, preventing
+  unrelated runtime candidate exports from being attached to eval-need
+  proposals.
 - root `AGENTS.md` now follows the canonical route-card shape and routes future
   passes through runtime design and agent-surface design before local work
 - top-level route docs now point runtime-move work through the mechanics atlas
