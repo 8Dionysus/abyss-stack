@@ -31,6 +31,14 @@ def build_server(
         return current_state().select(proof_question=proof_question, filters=filters)
 
     @mcp.tool()
+    def aoa_evals_find_or_propose(
+        proof_question: str = "",
+        proposal: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Find existing eval routes or shape a read-only eval_need_v1 proposal context."""
+        return current_state().find_or_propose(proof_question=proof_question, proposal=proposal)
+
+    @mcp.tool()
     def aoa_evals_inspect(name: str) -> dict[str, Any]:
         """Inspect one eval bundle through catalog, capsule, reports, and source refs."""
         return current_state().inspect_bundle(name)
@@ -49,6 +57,29 @@ def build_server(
     def aoa_evals_runtime_evidence_template(name: str) -> dict[str, Any]:
         """Return candidate-only runtime evidence or artifact hook templates."""
         return current_state().runtime_evidence_template(name)
+
+    @mcp.tool()
+    def aoa_evals_runtime_status() -> dict[str, Any]:
+        """Report source/mirror freshness and required reader presence."""
+        return current_state().runtime_status()
+
+    @mcp.tool()
+    def aoa_evals_validate_evidence_candidate(packet: dict[str, Any]) -> dict[str, Any]:
+        """Validate a candidate evidence packet without ingesting or accepting it."""
+        return current_state().validate_evidence_candidate(packet)
+
+    @mcp.tool()
+    def aoa_evals_runtime_candidate_exports(limit: int = 20) -> dict[str, Any]:
+        """List stack-owned private runtime candidate exports without accepting evidence."""
+        return current_state().runtime_candidate_exports(limit=limit)
+
+    @mcp.tool()
+    def aoa_evals_read_runtime_candidate_export(
+        record_id: str,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        """Read one stack-owned runtime candidate export as candidate-only evidence."""
+        return current_state().read_runtime_candidate_export(record_id=record_id, include_payload=include_payload)
 
     @mcp.tool()
     def aoa_evals_report_skeleton(name: str, evidence_refs: list[str] | None = None) -> dict[str, Any]:
@@ -75,6 +106,22 @@ def build_server(
     def runtime_candidate_templates_resource() -> str:
         return json.dumps(current_state().runtime_candidate_templates_resource(), ensure_ascii=False, indent=2)
 
+    @mcp.resource("aoa-evals://runtime-status")
+    def runtime_status_resource() -> str:
+        return json.dumps(current_state().runtime_status(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://runtime-evidence/schema")
+    def runtime_evidence_schema_resource() -> str:
+        return json.dumps(current_state().runtime_evidence_schema_resource(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://runtime-candidate-exports")
+    def runtime_candidate_exports_resource() -> str:
+        return json.dumps(current_state().runtime_candidate_exports(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://runtime-candidate-export/{record_id}")
+    def runtime_candidate_export_resource(record_id: str) -> str:
+        return json.dumps(current_state().read_runtime_candidate_export(record_id), ensure_ascii=False, indent=2)
+
     @mcp.resource("aoa-evals://reports")
     def reports_resource() -> str:
         return json.dumps(current_state().reports(), ensure_ascii=False, indent=2)
@@ -85,6 +132,15 @@ def build_server(
         return (
             f"Use aoa_evals_select(proof_question={proof_question!r}, filters={{}}), "
             "then inspect the selected bundle before interpreting evidence."
+        )
+
+    @mcp.prompt(name="eval-find-or-propose")
+    def eval_find_or_propose(proof_question: str) -> str:
+        """Prompt route for route-first eval growth."""
+        return (
+            f"Use aoa_evals_find_or_propose(proof_question={proof_question!r}, proposal={{}}). "
+            "Inspect existing matches first. If a new eval is still needed, carry only the returned "
+            "eval_need_v1 packet into the repo-local scaffold helper; MCP must not write source."
         )
 
     @mcp.prompt(name="eval-review")
@@ -99,8 +155,10 @@ def build_server(
     def evidence_packet(name: str) -> str:
         """Prompt route for shaping candidate evidence."""
         return (
-            f"Use aoa_evals_runtime_evidence_template(name={name!r}). "
-            "Treat the result as candidate evidence until bundle-local review accepts it."
+            f"Use aoa_evals_runtime_evidence_template(name={name!r}), then "
+            "aoa_evals_validate_evidence_candidate(packet={...}). "
+            "Use aoa_evals_runtime_candidate_exports(limit=...) when stack-owned runtime exports already exist. "
+            "Treat every result as candidate evidence until bundle-local review accepts it."
         )
 
     @mcp.prompt(name="report-skeleton")

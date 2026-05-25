@@ -18,3 +18,8 @@ IDs are routed through the single federation compatibility bridge at
 
 Runtime config templates remain under `config-templates/` because they are
 deployment inputs, not package-local documentation artifacts.
+
+`aoa-evals-mcp` may read the private runtime exports under
+`Logs/eval-exports/` as candidate records. That read-model is for review
+routing only; it does not accept evidence, compute a verdict, or publish into
+`aoa-evals`.

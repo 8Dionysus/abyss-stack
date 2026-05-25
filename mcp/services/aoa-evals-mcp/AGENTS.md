@@ -5,8 +5,10 @@ Local route card for `mcp/services/aoa-evals-mcp/`.
 ## Purpose
 
 `aoa-evals-mcp` is the thin MCP access plane for OS Abyss bounded proof
-surfaces. It lets agents select, inspect, expand, compare, and prepare
-candidate evidence/report skeletons without turning MCP into proof authority.
+surfaces. It lets agents select, inspect, expand, compare, check runtime
+freshness, find-or-propose eval-need routes, validate candidate evidence packet
+shape, read stack-owned runtime candidate exports, and prepare candidate
+evidence/report skeletons without turning MCP into proof authority.
 
 ## Owner Lane
 
@@ -16,7 +18,12 @@ This stack-owned MCP surface owns:
   packaging for `aoa_evals`.
 - The adapter boundary between `aoa-evals` generated readers, runtime-candidate
   readers, and Codex/OS Abyss access.
+- Read-only find-or-propose routing into `aoa-evals` `eval_need_v1` authoring
+  protocol.
 - Candidate-only report skeleton and runtime evidence template helpers.
+- Read-only runtime status and schema-backed candidate packet validation.
+- Read-only metadata/detail access for private stack-owned runtime candidate
+  exports under `Logs/eval-exports/`.
 
 It does not own:
 
@@ -42,7 +49,10 @@ It does not own:
 | MCP resource, tool, or prompt shape | `src/aoa_evals_mcp/server.py` |
 | source/generated reader access | `src/aoa_evals_mcp/core.py` |
 | proof authority or stop-lines | `aoa-evals:docs/architecture/AOA_EVALS_MCP_CONTRACT.md` |
+| eval birth proposal routing | `src/aoa_evals_mcp/core.py` and `aoa-evals:mechanics/proof-object/parts/eval-authoring/` |
 | candidate runtime evidence posture | `aoa-evals:mechanics/audit/parts/candidate-readers/` |
+| stack runtime candidate exports | `abyss-stack:mechanics/governed-execution/parts/candidate-exports/` and `Logs/eval-exports/` |
+| source/mirror freshness | `src/aoa_evals_mcp/core.py` and `mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh` |
 | report skeleton behavior | `src/aoa_evals_mcp/core.py` and source bundle report contract |
 | Codex-plane registration | `8Dionysus:config/codex_plane/runtime_manifest.v1.json` |
 
@@ -81,9 +91,13 @@ aoa-evals-mcp-server
 ```bash
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli catalog
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli select --proof-question "bounded change verification"
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli find-or-propose --proof-question "bounded change verification"
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli inspect aoa-bounded-change-quality
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli expand aoa-bounded-change-quality --section-key intent
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-evidence-template aoa-bounded-change-quality
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-status
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli validate-evidence-candidate --candidate-file /tmp/runtime-evidence-selection.json
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-candidate-exports --limit 5
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli report-skeleton aoa-bounded-change-quality --evidence-ref artifact:example
 ```
 
@@ -99,4 +113,5 @@ python mcp/services/aoa-evals-mcp/scripts/release_check.py
 
 State which MCP surface changed, which `aoa-evals` contract or reader it
 exposes, what validation ran, and whether runtime exposure, source mutation,
-verdict computation, receipt publication, or proof authority changed.
+proposal approval, verdict computation, receipt publication, or proof authority
+changed.

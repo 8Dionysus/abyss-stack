@@ -109,9 +109,159 @@ for rel_path in required_files:
 PY
 }
 
+resolve_layer_source_rel() {
+  local layer="$1"
+  local rel_path="$2"
+  if [[ "$layer" == "aoa-evals" ]]; then
+    case "$rel_path" in
+      docs/TRACE_EVAL_BRIDGE.md)
+        printf '%s\n' "mechanics/audit/parts/artifact-verdict-hooks/docs/TRACE_EVAL_BRIDGE.md"
+        return 0
+        ;;
+      docs/RUNTIME_BENCH_PROMOTION_GUIDE.md)
+        printf '%s\n' "mechanics/audit/parts/selected-evidence-packets/docs/RUNTIME_BENCH_PROMOTION_GUIDE.md"
+        return 0
+        ;;
+      docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md)
+        printf '%s\n' "mechanics/checkpoint/parts/self-agent-posture/docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md"
+        return 0
+        ;;
+      docs/RECURRENCE_PROOF_PROGRAM.md)
+        printf '%s\n' "mechanics/recurrence/docs/RECURRENCE_PROOF_PROGRAM.md"
+        return 0
+        ;;
+      generated/runtime_candidate_template_index.min.json)
+        printf '%s\n' "mechanics/audit/parts/candidate-readers/generated/runtime_candidate_template_index.min.json"
+        return 0
+        ;;
+      generated/runtime_candidate_intake.min.json)
+        printf '%s\n' "mechanics/audit/parts/candidate-readers/generated/runtime_candidate_intake.min.json"
+        return 0
+        ;;
+      examples/runtime_evidence_selection.*.example.json)
+        printf '%s\n' "mechanics/audit/parts/selected-evidence-packets/examples/${rel_path#examples/}"
+        return 0
+        ;;
+      examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json)
+        printf '%s\n' "mechanics/audit/parts/artifact-verdict-hooks/examples/${rel_path#examples/}"
+        return 0
+        ;;
+      examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json)
+        printf '%s\n' "mechanics/checkpoint/parts/self-agent-posture/examples/${rel_path#examples/}"
+        return 0
+        ;;
+      examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json)
+        printf '%s\n' "mechanics/checkpoint/parts/restartable-inquiry/examples/${rel_path#examples/}"
+        return 0
+        ;;
+      schemas/runtime-evidence-selection.schema.json)
+        printf '%s\n' "mechanics/audit/parts/selected-evidence-packets/schemas/${rel_path#schemas/}"
+        return 0
+        ;;
+      schemas/artifact-to-verdict-hook.schema.json)
+        printf '%s\n' "mechanics/audit/parts/artifact-verdict-hooks/schemas/${rel_path#schemas/}"
+        return 0
+        ;;
+      schemas/runtime-candidate-template-index.schema.json)
+        printf '%s\n' "mechanics/audit/parts/candidate-readers/schemas/${rel_path#schemas/}"
+        return 0
+        ;;
+    esac
+  fi
+  printf '%s\n' "$rel_path"
+}
+
+write_mirror_manifest() {
+  local layer="$1"
+  local source_root="$2"
+  local target_root="$3"
+  local tmp_root="$4"
+  shift 4
+  python3 - "$layer" "$source_root" "$target_root" "$tmp_root" "$@" <<'PY'
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+import hashlib
+import json
+import subprocess
+import sys
+
+
+layer = sys.argv[1]
+source_root = Path(sys.argv[2])
+target_root = Path(sys.argv[3])
+tmp_root = Path(sys.argv[4])
+required_files = [Path(item).as_posix() for item in sys.argv[5:]]
+
+
+def read_json(rel: str) -> object | None:
+    path = tmp_root / rel
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def count_records(payload: object, key: str) -> int | None:
+    if isinstance(payload, dict) and isinstance(payload.get(key), list):
+        return len(payload[key])
+    if isinstance(payload, list):
+        return len(payload)
+    return None
+
+
+def git_commit(root: Path) -> str | None:
+    if not (root / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", root.as_posix(), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+file_digests: dict[str, str] = {}
+for rel in required_files:
+    path = tmp_root / rel
+    if path.is_file():
+        file_digests[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+
+catalog = read_json("generated/eval_catalog.min.json")
+template_index = read_json("generated/runtime_candidate_template_index.min.json")
+intake = read_json("generated/runtime_candidate_intake.min.json")
+manifest = {
+    "schema": "abyss_stack_federation_mirror_manifest_v1",
+    "layer": layer,
+    "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    "source_root": source_root.as_posix(),
+    "target_root": target_root.as_posix(),
+    "source_git_commit": git_commit(source_root),
+    "required_file_count": len(required_files),
+    "required_files": required_files,
+    "file_sha256": file_digests,
+    "catalog_count": count_records(catalog, "evals"),
+    "runtime_candidate_template_count": count_records(template_index, "templates"),
+    "runtime_candidate_intake_count": count_records(intake, "templates"),
+    "mirror_is_authority": False,
+    "refresh_command": "scripts/aoa-sync-federation-surfaces --layer " + layer,
+}
+manifest_path = tmp_root / "manifest" / "federation_mirror_manifest.json"
+manifest_path.parent.mkdir(parents=True, exist_ok=True)
+manifest_path.write_text(json.dumps(manifest, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 sync_layer() {
   local layer="$1"
-  local source_root target_root tmp_root src_path rel_path config_dir config_path
+  local source_root target_root tmp_root src_path rel_path source_rel_path config_dir config_path
   local -a required_paths=()
 
   command -v rsync >/dev/null 2>&1 || aoa_die "rsync is required"
@@ -178,11 +328,13 @@ sync_layer() {
   trap 'rm -rf "${tmp_root}"' RETURN
 
   for rel_path in "${required_paths[@]}"; do
-    src_path="${source_root}/${rel_path}"
+    source_rel_path="$(resolve_layer_source_rel "${layer}" "${rel_path}")"
+    src_path="${source_root}/${source_rel_path}"
     [[ -f "$src_path" ]] || aoa_die "required source file missing: ${src_path}"
     mkdir -p "${tmp_root}/$(dirname -- "${rel_path}")"
     cp -a "${src_path}" "${tmp_root}/${rel_path}"
   done
+  write_mirror_manifest "${layer}" "${source_root}" "${target_root}" "${tmp_root}" "${required_paths[@]}"
 
   mkdir -p "$(dirname -- "${target_root}")"
   rsync -a --delete "${tmp_root}/" "${target_root}/"
@@ -194,7 +346,7 @@ sync_layer() {
 
 check_layer() {
   local layer="$1"
-  local source_root target_root rel_path config_dir config_path
+  local source_root target_root rel_path source_rel_path config_dir config_path
   local -a required_paths=()
   local -a missing_paths=()
 
@@ -249,7 +401,8 @@ check_layer() {
   fi
 
   for rel_path in "${required_paths[@]}"; do
-    [[ -f "${source_root}/${rel_path}" ]] || aoa_die "required source file missing: ${source_root}/${rel_path}"
+    source_rel_path="$(resolve_layer_source_rel "${layer}" "${rel_path}")"
+    [[ -f "${source_root}/${source_rel_path}" ]] || aoa_die "required source file missing: ${source_root}/${source_rel_path}"
     if [[ ! -f "${target_root}/${rel_path}" ]]; then
       missing_paths+=("${target_root}/${rel_path}")
     fi

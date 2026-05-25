@@ -56,6 +56,7 @@ for new records.
 | [2026-05-21 AoA Memo MCP Port Confinement](2026-05-21-aoa-memo-mcp-port-confinement.md) | decision record for schema-backed, port-confined MCP packet handling |
 | [2026-05-22 AoA Memo MCP Landing Plan Boundary](2026-05-22-aoa-memo-mcp-landing-plan-boundary.md) | decision record for exposing pending-export and landing-plan helpers without making MCP a durable memory writer |
 | [2026-05-25 AoA Evals MCP Access Plane](2026-05-25-aoa-evals-mcp-access-plane.md) | decision record for the stack-owned, read-only `aoa_evals` MCP service over `aoa-evals` proof surfaces |
+| [2026-05-25 Abyss Machine MCP Access Plane](2026-05-25-abyss-machine-mcp-access-plane.md) | decision record for the stack-owned, read-only `abyss_machine` MCP service over `abyss-machine` host read models |
 
 ## Record Shape
 

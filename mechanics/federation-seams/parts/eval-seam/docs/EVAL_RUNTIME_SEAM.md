@@ -23,9 +23,17 @@ That mirror is created with:
 scripts/aoa-sync-federation-surfaces --layer aoa-evals
 ```
 
+The sync wrapper writes a runtime-local manifest at:
+
+- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/manifest/federation_mirror_manifest.json`
+
+The manifest records source commit when available, generated time, required
+files, compact counts, and file digests. It is freshness evidence only; the
+mirror remains a read cache below `aoa-evals` source truth.
+
 The current allowlist includes:
 - selected docs such as `TRACE_EVAL_BRIDGE.md` and `RUNTIME_BENCH_PROMOTION_GUIDE.md`
-- generated eval catalog, capsules, sections, and comparison spine surfaces
+- generated eval catalog, capsules, sections, comparison spine, and report index surfaces
 - public-safe example payloads for runtime evidence selection, including the
   workhorse, return-anchor, memo recall rerun, and memo contradiction evidence
   templates
@@ -79,6 +87,13 @@ These scripts read candidate payloads from `--input-file`, attach mirrored `aoa-
 
 The outputs are not `aoa-evals` objects.
 They are bounded runtime candidates waiting for later review or export.
+MCP candidate validation is even earlier: it only confirms that a proposed
+packet is schema-shaped and review-routed before any filesystem export or
+bundle-local review.
+The `aoa_evals` MCP service may now list these private export records and read
+one record for review routing. Listings omit nested private candidate payloads
+by default. Reading or validating a record still does not accept evidence,
+compute a verdict, or create an `aoa-evals` report.
 The memo contradiction sidecar is narrower: it reads log-backed selected memo evidence plus generated `aoa-memo` object surfaces and emits a schema-shaped report for review; it does not publish or promote that report.
 The A2A return dry-run wrapper is similarly narrow: it reads a reviewed
 `aoa-sdk` closeout payload, exposes the clean local `a2a-return-closeout`

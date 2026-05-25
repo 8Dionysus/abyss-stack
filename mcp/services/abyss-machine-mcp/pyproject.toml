@@ -3,19 +3,18 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aoa-evals-mcp"
+name = "abyss-machine-mcp"
 version = "0.1.0"
-description = "MCP access plane for OS Abyss bounded eval proof surfaces"
+description = "MCP access plane for Abyss Machine host read models"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "jsonschema>=4.0",
   "mcp>=1.0",
 ]
 
 [project.scripts]
-aoa-evals-mcp = "aoa_evals_mcp.cli:main"
-aoa-evals-mcp-server = "aoa_evals_mcp.server:main"
+abyss-machine-mcp = "abyss_machine_mcp.cli:main"
+abyss-machine-mcp-server = "abyss_machine_mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

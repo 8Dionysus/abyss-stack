@@ -7,7 +7,7 @@
 | `aoa-evals` | bounded proof bundles, verdict logic, generated reader contracts, runtime-candidate posture | runtime service execution |
 | generated readers | deterministic catalog, capsule, section, comparison, and report read models | proof interpretation stronger than source bundles |
 | runtime-candidate readers | candidate evidence and artifact hook templates | accepted proof or verdicts |
-| `aoa-evals-mcp` | read-only access, selection, inspection, expansion, comparison, template lookup, report skeletons | eval running, verdict computation, receipt publication, bundle promotion, source mutation |
+| `aoa-evals-mcp` | read-only access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, candidate packet validation, runtime candidate export read-model, report skeletons | eval running, verdict computation, receipt publication, bundle promotion, source mutation, proposal approval, evidence acceptance |
 | `abyss-stack` | runnable MCP package and stdio service topology | proof meaning |
 
 ## Interface
@@ -20,6 +20,21 @@ Report skeletons are candidates. Runtime evidence templates are candidates.
 The bundle-local source files and review guides decide whether evidence can
 support a bounded report.
 
+Runtime status is below source truth. It may reveal missing, stale, or
+unmanifested mirrors, but a fresh mirror never becomes proof authority.
+
+Candidate validation is below ingestion. It means a packet is schema-shaped and
+review-routed, not accepted evidence.
+
+Find-or-propose is below authoring. It means the service found likely existing
+routes or shaped a candidate `eval_need_v1` context. It does not create source
+files, approve the proposal, or make duplicate-fit truth.
+
+Runtime candidate export listing is below review. It reads stack-owned private
+records under `Logs/eval-exports/`, omits private payloads by default, and
+validates nested candidate packet shape for routing only. A readable export is
+not accepted proof.
+
 ## Stop Lines
 
 - No general eval runner.
@@ -27,5 +42,6 @@ support a bounded report.
 - No receipt publication.
 - No bundle promotion.
 - No `aoa-evals` source mutation.
+- No proposal approval or source bundle creation.
 - No treating MCP/generated/runtime output as stronger than source bundles.
 - No moving proof authority into `abyss-stack`.

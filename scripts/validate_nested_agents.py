@@ -112,16 +112,20 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'access planes',
         'mcp/services/aoa-memo-mcp/',
         'mcp/services/aoa-evals-mcp/',
+        'mcp/services/abyss-machine-mcp/',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
+        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
     ),
     'mcp/services/AGENTS.md': (
         'service-package district',
         'Model Context Protocol',
         'aoa-memo-mcp',
         'aoa-evals-mcp',
+        'abyss-machine-mcp',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
+        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
     ),
     'mcp/services/aoa-memo-mcp/AGENTS.md': (
         'thin MCP access plane',
@@ -134,6 +138,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-evals',
         'candidate-only',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
+    ),
+    'mcp/services/abyss-machine-mcp/AGENTS.md': (
+        'thin MCP access plane',
+        'abyss-machine',
+        'owner-aware',
+        'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
     ),
     'memo/AGENTS.md': (
         'abyss-stack local memory port',
