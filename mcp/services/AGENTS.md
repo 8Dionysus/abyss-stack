@@ -32,6 +32,13 @@ python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
 python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ```
 
+For `aoa-evals-mcp`, run:
+
+```bash
+python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
+python -m pytest mcp/services/aoa-evals-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash
