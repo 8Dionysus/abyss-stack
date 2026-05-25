@@ -31,6 +31,10 @@ helpers. They may not promote sibling-owned truth by themselves.
 For memory work, `mcp/services/aoa-memo-mcp/` exposes `aoa-memo`, `.aoa`, and
 local `memo/` routes while keeping durable memory review in `aoa-memo`.
 
+For bounded proof work, `mcp/services/aoa-evals-mcp/` exposes `aoa-evals`
+catalog, bundle, comparison, runtime-candidate, and report-skeleton routes
+while keeping proof authority in `aoa-evals`.
+
 ## Validation
 
 For `aoa-memo-mcp` changes, run:
@@ -38,6 +42,13 @@ For `aoa-memo-mcp` changes, run:
 ```bash
 python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
 python -m pytest mcp/services/aoa-memo-mcp/tests -q
+```
+
+For `aoa-evals-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
+python -m pytest mcp/services/aoa-evals-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:
