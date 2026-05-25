@@ -73,16 +73,28 @@ STOP_LINES = [
 ]
 
 ROUTE_TOKEN_STOPWORDS = {
+    "a",
+    "an",
+    "and",
     "artifact",
     "bounded",
     "candidate",
+    "compare",
     "eval",
     "evidence",
+    "for",
+    "in",
+    "of",
+    "on",
+    "or",
     "proof",
     "route",
     "runtime",
+    "the",
+    "to",
     "selection",
     "surface",
+    "with",
 }
 
 
@@ -119,6 +131,25 @@ def _lower(value: Any) -> str:
 
 def _tokens(text: str) -> list[str]:
     return [token for token in re.split(r"[^a-zA-Z0-9_.:/-]+", text.casefold()) if token]
+
+
+def _runtime_export_match_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    for token in _tokens(text):
+        if token in ROUTE_TOKEN_STOPWORDS:
+            continue
+        if len(token) < 4 and not any(char.isdigit() for char in token):
+            continue
+        tokens.add(token)
+    return tokens
+
+
+def _runtime_export_ref_id(value: str) -> str:
+    text = value.casefold().strip()
+    prefix = "runtime-candidate-export:"
+    if text.startswith(prefix):
+        text = text[len(prefix) :]
+    return text
 
 
 def _text_blob(record: dict[str, Any]) -> str:
@@ -563,8 +594,8 @@ class AoAEvalsMCPState:
         match_names: set[str],
         explicit_refs: list[str],
     ) -> list[dict[str, Any]]:
-        tokens = {token for token in _tokens(proof_question) if token not in ROUTE_TOKEN_STOPWORDS}
-        explicit_ref_set = {ref.casefold() for ref in explicit_refs}
+        tokens = _runtime_export_match_tokens(proof_question)
+        explicit_ref_set = {_runtime_export_ref_id(ref) for ref in explicit_refs}
         refs: list[dict[str, Any]] = []
         for entry in self.runtime_candidate_exports(limit=25).get("candidates", []):
             validation = entry.get("validation") if isinstance(entry.get("validation"), dict) else {}
@@ -592,7 +623,10 @@ class AoAEvalsMCPState:
             explicit_match = bool(explicit_ref_set & identifiers)
             eval_match = bool(match_names & matched_eval_refs)
             token_match = bool(tokens and token_hits >= min(2, len(tokens)))
-            if not (explicit_match or eval_match or token_match):
+            if explicit_ref_set:
+                if not explicit_match:
+                    continue
+            elif not (eval_match or token_match):
                 continue
             refs.append(
                 {
