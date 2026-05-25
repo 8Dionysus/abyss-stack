@@ -257,6 +257,7 @@ if ((selection_metadata_ready)) && has_module "43-federation-router.yml"; then
   check_warn_file "aoa-evals capsules" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/eval_capsules.json"
   check_warn_file "aoa-evals sections" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/eval_sections.full.json"
   check_warn_file "aoa-evals comparison spine" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/comparison_spine.json"
+  check_warn_file "aoa-evals report index" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/eval_report_index.min.json"
   check_file "aoa-evals runtime candidate template index" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/runtime_candidate_template_index.min.json"
   check_file "aoa-evals runtime candidate intake" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/generated/runtime_candidate_intake.min.json"
   check_file "aoa-evals workhorse evidence template" "${AOA_STACK_ROOT}/Knowledge/federation/aoa-evals/examples/runtime_evidence_selection.workhorse-local.example.json"

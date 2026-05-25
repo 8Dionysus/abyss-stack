@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
+
+from jsonschema import Draft202012Validator
 
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
@@ -20,9 +24,43 @@ REPORT_INDEX = Path("generated/eval_report_index.min.json")
 RUNTIME_TEMPLATE_INDEX = Path(
     "mechanics/audit/parts/candidate-readers/generated/runtime_candidate_template_index.min.json"
 )
+RUNTIME_TEMPLATE_INDEX_MIRROR = Path("generated/runtime_candidate_template_index.min.json")
 RUNTIME_INTAKE = Path(
     "mechanics/audit/parts/candidate-readers/generated/runtime_candidate_intake.min.json"
 )
+RUNTIME_INTAKE_MIRROR = Path("generated/runtime_candidate_intake.min.json")
+RUNTIME_EVIDENCE_SCHEMA = Path(
+    "mechanics/audit/parts/selected-evidence-packets/schemas/runtime-evidence-selection.schema.json"
+)
+RUNTIME_EVIDENCE_SCHEMA_MIRROR = Path("schemas/runtime-evidence-selection.schema.json")
+ARTIFACT_HOOK_SCHEMA = Path(
+    "mechanics/audit/parts/artifact-verdict-hooks/schemas/artifact-to-verdict-hook.schema.json"
+)
+ARTIFACT_HOOK_SCHEMA_MIRROR = Path("schemas/artifact-to-verdict-hook.schema.json")
+RUNTIME_TEMPLATE_SCHEMA = Path(
+    "mechanics/audit/parts/candidate-readers/schemas/runtime-candidate-template-index.schema.json"
+)
+RUNTIME_TEMPLATE_SCHEMA_MIRROR = Path("schemas/runtime-candidate-template-index.schema.json")
+EVAL_NEED_SCHEMA = Path("mechanics/proof-object/parts/eval-authoring/schemas/eval-need.schema.json")
+EVAL_NEED_SCHEMA_MIRROR = Path("schemas/eval-need.schema.json")
+MIRROR_MANIFEST = Path("manifest/federation_mirror_manifest.json")
+RUNTIME_CANDIDATE_EXPORT_ROOT = Path("Logs/eval-exports")
+RUNTIME_CANDIDATE_LATEST_DIRS = (
+    "runtime-evidence-selection",
+    "artifact-hook",
+)
+
+READER_GROUPS: dict[str, tuple[Path, ...]] = {
+    "catalog": (CATALOG_MIN, CATALOG_FULL),
+    "capsules": (CAPSULES,),
+    "sections": (SECTIONS,),
+    "comparison_spine": (COMPARISON_SPINE,),
+    "report_index": (REPORT_INDEX,),
+    "runtime_candidate_template_index": (RUNTIME_TEMPLATE_INDEX, RUNTIME_TEMPLATE_INDEX_MIRROR),
+    "runtime_candidate_intake": (RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR),
+    "runtime_evidence_schema": (RUNTIME_EVIDENCE_SCHEMA, RUNTIME_EVIDENCE_SCHEMA_MIRROR),
+    "artifact_hook_schema": (ARTIFACT_HOOK_SCHEMA, ARTIFACT_HOOK_SCHEMA_MIRROR),
+}
 
 STOP_LINES = [
     "Do not run general evals.",
@@ -34,6 +72,19 @@ STOP_LINES = [
     "Do not move proof authority into abyss-stack.",
 ]
 
+ROUTE_TOKEN_STOPWORDS = {
+    "artifact",
+    "bounded",
+    "candidate",
+    "eval",
+    "evidence",
+    "proof",
+    "route",
+    "runtime",
+    "selection",
+    "surface",
+}
+
 
 def _read_json(path: Path) -> Any:
     if not path.exists():
@@ -42,6 +93,14 @@ def _read_json(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid JSON reader: {path}") from exc
+
+
+def _read_json_first(root: Path, rels: tuple[Path, ...]) -> tuple[Any, Path | None]:
+    for rel in rels:
+        path = root / rel
+        if path.is_file():
+            return _read_json(path), rel
+    return None, None
 
 
 def _list_from(payload: Any, key: str) -> list[dict[str, Any]]:
@@ -114,11 +173,65 @@ def _source_ref(evals_root: Path, rel: str | None) -> str | None:
     return (evals_root / rel).as_posix()
 
 
+def _utc_from_timestamp(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _git_commit(root: Path) -> str | None:
+    if not (root / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", root.as_posix(), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def _slug(value: Any) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", str(value or "").casefold()).strip("-")
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _bounded_text(value: Any, fallback: str) -> str:
+    text = str(value or "").strip()
+    return text if len(text) >= 12 else fallback
+
+
+def _enum_value(value: Any, allowed: set[str], fallback: str) -> str:
+    text = str(value or "").strip()
+    return text if text in allowed else fallback
+
+
+def _eval_need_name(proof_question: str, proposal: dict[str, Any], matches: list[dict[str, Any]]) -> str:
+    explicit = str(proposal.get("name") or "").strip()
+    if re.fullmatch(r"aoa-[a-z0-9-]+", explicit):
+        return explicit
+    if matches:
+        match_name = str(matches[0].get("name") or "").strip()
+        if re.fullmatch(r"aoa-[a-z0-9-]+", match_name):
+            return match_name
+    slug = _slug(proof_question)[:80].strip("-")
+    return f"aoa-{slug or 'eval-need'}"
+
+
 @dataclass(slots=True)
 class AoAEvalsMCPState:
     workspace_root: Path
     evals_root: Path
     root_kind: str = "source"
+    source_root: Path | None = None
+    mirror_root: Path | None = None
+    stack_runtime_root: Path | None = None
 
     @classmethod
     def discover(
@@ -131,12 +244,22 @@ class AoAEvalsMCPState:
             or os.environ.get("AOA_WORKSPACE_ROOT")
             or DEFAULT_WORKSPACE_ROOT
         ).expanduser().resolve()
+        source_root = cls._resolve_source_root(root, evals_root)
+        mirror_root = cls._resolve_mirror_root(root)
+        stack_runtime_root = cls._resolve_stack_runtime_root(root)
         selected = cls._resolve_evals_root(root, evals_root)
         root_kind = "approved_mirror" if "Knowledge/federation/aoa-evals" in selected.as_posix() else "source"
-        return cls(workspace_root=root, evals_root=selected, root_kind=root_kind)
+        return cls(
+            workspace_root=root,
+            evals_root=selected,
+            root_kind=root_kind,
+            source_root=source_root,
+            mirror_root=mirror_root,
+            stack_runtime_root=stack_runtime_root,
+        )
 
     @staticmethod
-    def _resolve_evals_root(workspace_root: Path, evals_root: str | Path | None = None) -> Path:
+    def _source_candidates(workspace_root: Path, evals_root: str | Path | None = None) -> list[Path]:
         candidates: list[Path] = []
         if evals_root:
             candidates.append(Path(evals_root).expanduser())
@@ -151,11 +274,80 @@ class AoAEvalsMCPState:
                 Path.home() / "src" / "aoa-evals",
             ]
         )
-        for env_name in ("AOA_ABYSS_STACK_RUNTIME_ROOT", "AOA_ABYSS_STACK_ROOT"):
+        return candidates
+
+    @staticmethod
+    def _mirror_candidates(workspace_root: Path) -> list[Path]:
+        candidates: list[Path] = []
+        for env_name in ("AOA_EVALS_MIRROR_ROOT", "AOA_EVALS_RUNTIME_MIRROR_ROOT"):
+            value = os.environ.get(env_name)
+            if value:
+                candidates.append(Path(value).expanduser())
+        for env_name in ("AOA_STACK_ROOT", "AOA_ABYSS_STACK_RUNTIME_ROOT", "AOA_ABYSS_STACK_ROOT"):
             value = os.environ.get(env_name)
             if value:
                 candidates.append(Path(value).expanduser() / "Knowledge" / "federation" / "aoa-evals")
-        candidates.append(DEFAULT_WORKSPACE_ROOT / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals")
+        candidates.extend(
+            [
+                workspace_root / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals",
+                DEFAULT_WORKSPACE_ROOT / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals",
+            ]
+        )
+        return candidates
+
+    @staticmethod
+    def _stack_runtime_candidates(workspace_root: Path) -> list[Path]:
+        candidates: list[Path] = []
+        for env_name in ("AOA_STACK_ROOT", "AOA_ABYSS_STACK_RUNTIME_ROOT", "AOA_ABYSS_STACK_ROOT"):
+            value = os.environ.get(env_name)
+            if value:
+                candidates.append(Path(value).expanduser())
+        candidates.extend(
+            [
+                workspace_root / "abyss-stack",
+                DEFAULT_WORKSPACE_ROOT / "abyss-stack",
+            ]
+        )
+        return candidates
+
+    @classmethod
+    def _resolve_source_root(
+        cls,
+        workspace_root: Path,
+        evals_root: str | Path | None = None,
+    ) -> Path | None:
+        for candidate in cls._source_candidates(workspace_root, evals_root):
+            resolved = candidate.resolve()
+            if (resolved / CATALOG_MIN).is_file() or (resolved / CATALOG_FULL).is_file():
+                return resolved
+        return None
+
+    @classmethod
+    def _resolve_mirror_root(cls, workspace_root: Path) -> Path | None:
+        first: Path | None = None
+        for candidate in cls._mirror_candidates(workspace_root):
+            resolved = candidate.resolve()
+            first = first or resolved
+            if (resolved / CATALOG_MIN).is_file() or (resolved / CATALOG_FULL).is_file():
+                return resolved
+        return first
+
+    @classmethod
+    def _resolve_stack_runtime_root(cls, workspace_root: Path) -> Path | None:
+        first: Path | None = None
+        for candidate in cls._stack_runtime_candidates(workspace_root):
+            resolved = candidate.resolve()
+            first = first or resolved
+            if (resolved / RUNTIME_CANDIDATE_EXPORT_ROOT).exists() or (
+                resolved / "Knowledge" / "federation" / "aoa-evals"
+            ).exists():
+                return resolved
+        return first
+
+    @staticmethod
+    def _resolve_evals_root(workspace_root: Path, evals_root: str | Path | None = None) -> Path:
+        candidates = AoAEvalsMCPState._source_candidates(workspace_root, evals_root)
+        candidates.extend(AoAEvalsMCPState._mirror_candidates(workspace_root))
 
         for candidate in candidates:
             resolved = candidate.resolve()
@@ -180,6 +372,9 @@ class AoAEvalsMCPState:
     def _payload(self, rel: Path) -> Any:
         return _read_json(self.evals_root / rel)
 
+    def _payload_first(self, *rels: Path) -> tuple[Any, Path | None]:
+        return _read_json_first(self.evals_root, tuple(rels))
+
     def catalog_payload(self) -> dict[str, Any]:
         payload = self._payload(CATALOG_MIN) or self._payload(CATALOG_FULL) or {}
         return payload if isinstance(payload, dict) else {"evals": payload}
@@ -200,10 +395,12 @@ class AoAEvalsMCPState:
         return _list_from(self._payload(REPORT_INDEX), "reports")
 
     def runtime_templates(self) -> list[dict[str, Any]]:
-        return _list_from(self._payload(RUNTIME_TEMPLATE_INDEX), "templates")
+        payload, _ = self._payload_first(RUNTIME_TEMPLATE_INDEX, RUNTIME_TEMPLATE_INDEX_MIRROR)
+        return _list_from(payload, "templates")
 
     def runtime_intake_templates(self) -> list[dict[str, Any]]:
-        return _list_from(self._payload(RUNTIME_INTAKE), "templates")
+        payload, _ = self._payload_first(RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR)
+        return _list_from(payload, "templates")
 
     def build_catalog(self) -> dict[str, Any]:
         catalog = self.catalog_payload()
@@ -335,6 +532,276 @@ class AoAEvalsMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def _eval_need_schema(self) -> tuple[dict[str, Any] | None, Path | None]:
+        payload, rel = self._payload_first(EVAL_NEED_SCHEMA, EVAL_NEED_SCHEMA_MIRROR)
+        return (payload if isinstance(payload, dict) else None), rel
+
+    def _validate_eval_need(self, proposal: dict[str, Any]) -> dict[str, Any]:
+        schema_payload, schema_rel = self._eval_need_schema()
+        if schema_payload is None:
+            return {
+                "valid": False,
+                "schema_reader": None,
+                "issues": ["eval_need_v1 schema is unavailable from selected aoa-evals root"],
+                "warnings": [],
+            }
+        validator = Draft202012Validator(schema_payload)
+        issues: list[str] = []
+        for error in sorted(validator.iter_errors(proposal), key=lambda item: (list(item.path), item.message)):
+            location = "/".join(str(part) for part in error.path) or "<root>"
+            issues.append(f"{location}: {error.message}")
+        return {
+            "valid": not issues,
+            "schema_reader": (self.evals_root / schema_rel).as_posix() if schema_rel else None,
+            "issues": issues,
+            "warnings": [],
+        }
+
+    def _runtime_export_refs_for_proposal(
+        self,
+        proof_question: str,
+        match_names: set[str],
+        explicit_refs: list[str],
+    ) -> list[dict[str, Any]]:
+        tokens = {token for token in _tokens(proof_question) if token not in ROUTE_TOKEN_STOPWORDS}
+        explicit_ref_set = {ref.casefold() for ref in explicit_refs}
+        refs: list[dict[str, Any]] = []
+        for entry in self.runtime_candidate_exports(limit=25).get("candidates", []):
+            validation = entry.get("validation") if isinstance(entry.get("validation"), dict) else {}
+            matched_eval_refs = {
+                str(ref)
+                for ref in validation.get("matched_eval_refs", [])
+                if isinstance(ref, str)
+            }
+            identifiers = {
+                str(entry.get("record_id") or "").casefold(),
+                str(entry.get("candidate_id") or "").casefold(),
+            }
+            haystack = " ".join(
+                str(value or "")
+                for value in (
+                    entry.get("record_id"),
+                    entry.get("candidate_id"),
+                    entry.get("title"),
+                    entry.get("summary"),
+                    entry.get("surface_type"),
+                    " ".join(sorted(matched_eval_refs)),
+                )
+            ).casefold()
+            token_hits = sum(1 for token in tokens if token in haystack)
+            explicit_match = bool(explicit_ref_set & identifiers)
+            eval_match = bool(match_names & matched_eval_refs)
+            token_match = bool(tokens and token_hits >= min(2, len(tokens)))
+            if not (explicit_match or eval_match or token_match):
+                continue
+            refs.append(
+                {
+                    "record_id": entry.get("record_id"),
+                    "candidate_id": entry.get("candidate_id"),
+                    "surface_type": entry.get("surface_type"),
+                    "validation_valid": validation.get("valid"),
+                    "matched_eval_refs": sorted(matched_eval_refs),
+                    "candidate_payload_included": False,
+                    "read_route": (
+                        "aoa_evals_read_runtime_candidate_export"
+                        f"(record_id={str(entry.get('record_id') or '')!r}, include_payload=False)"
+                    ),
+                }
+            )
+        return refs
+
+    def _draft_eval_need_proposal(
+        self,
+        *,
+        proof_question: str,
+        input_proposal: dict[str, Any],
+        existing_matches: list[dict[str, Any]],
+        runtime_export_refs: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        top_match = existing_matches[0] if existing_matches else {}
+        related_eval_refs = _string_list(input_proposal.get("related_eval_refs"))
+        if not related_eval_refs and existing_matches:
+            related_eval_refs = [
+                str(match.get("name"))
+                for match in existing_matches[:3]
+                if str(match.get("name") or "").startswith("aoa-")
+            ]
+
+        candidate_evidence_refs = _string_list(input_proposal.get("candidate_evidence_refs"))
+        for ref in runtime_export_refs:
+            record_id = str(ref.get("record_id") or "")
+            if record_id:
+                candidate_evidence_refs.append(f"runtime-candidate-export:{record_id}")
+        candidate_evidence_refs = sorted(set(candidate_evidence_refs))
+
+        quest_refs = _string_list(input_proposal.get("quest_refs"))
+        authoring_route = str(input_proposal.get("authoring_route") or "").strip()
+        if authoring_route not in {
+            "existing_eval_route",
+            "candidate_evidence_packet",
+            "quest_record",
+            "new_draft_bundle",
+        }:
+            if related_eval_refs:
+                authoring_route = "existing_eval_route"
+            elif candidate_evidence_refs:
+                authoring_route = "candidate_evidence_packet"
+            elif quest_refs:
+                authoring_route = "quest_record"
+            else:
+                authoring_route = "new_draft_bundle"
+
+        category = _enum_value(
+            input_proposal.get("category") or top_match.get("category"),
+            {"capability", "workflow", "boundary", "artifact", "regression", "comparative", "longitudinal", "stress"},
+            "workflow",
+        )
+        claim_type = _enum_value(
+            input_proposal.get("claim_type") or top_match.get("claim_type"),
+            {"bounded", "comparative", "regression", "longitudinal"},
+            "bounded",
+        )
+        baseline_mode = _enum_value(
+            input_proposal.get("baseline_mode") or top_match.get("baseline_mode"),
+            {"none", "fixed-baseline", "previous-version", "peer-compare", "longitudinal-window"},
+            "none",
+        )
+        report_format = _enum_value(
+            input_proposal.get("report_format") or top_match.get("report_format"),
+            {"summary", "summary-with-breakdown", "comparative-summary"},
+            "summary-with-breakdown",
+        )
+
+        proposal: dict[str, Any] = {
+            "schema_version": "eval_need_v1",
+            "name": _eval_need_name(proof_question, input_proposal, existing_matches),
+            "proof_question": _bounded_text(proof_question, "Unspecified proof question needs scoped eval routing."),
+            "origin_need": _bounded_text(
+                input_proposal.get("origin_need"),
+                f"OS Abyss needs a bounded eval route for: {proof_question or 'unspecified proof pressure'}",
+            ),
+            "summary": _bounded_text(
+                input_proposal.get("summary") or top_match.get("summary"),
+                f"Route and evaluate only the bounded claim named by: {proof_question or 'this proof pressure'}",
+            ),
+            "object_under_evaluation": _bounded_text(
+                input_proposal.get("object_under_evaluation") or top_match.get("object_under_evaluation"),
+                "bounded OS Abyss proof surface",
+            ),
+            "category": category,
+            "claim_type": claim_type,
+            "baseline_mode": baseline_mode,
+            "report_format": report_format,
+            "authoring_route": authoring_route,
+            "expected_use_when": _string_list(input_proposal.get("expected_use_when"))
+            or [_bounded_text(proof_question, "a bounded OS Abyss proof question needs routing")],
+            "blind_spot_notes": _string_list(input_proposal.get("blind_spot_notes"))
+            or [
+                "does not prove broad agent competence",
+                "does not accept runtime evidence without bundle-local review",
+            ],
+        }
+        for optional_key in ("verdict_shape", "technique_dependencies", "skill_dependencies"):
+            if optional_key in input_proposal:
+                proposal[optional_key] = input_proposal[optional_key]
+        if related_eval_refs:
+            proposal["related_eval_refs"] = sorted(set(related_eval_refs))
+        if candidate_evidence_refs:
+            proposal["candidate_evidence_refs"] = candidate_evidence_refs
+        if quest_refs:
+            proposal["quest_refs"] = sorted(set(quest_refs))
+
+        source_refs = _string_list(input_proposal.get("source_refs"))
+        for match in existing_matches[:3]:
+            eval_path = str(match.get("eval_path") or "")
+            if eval_path:
+                source_refs.append(f"repo:aoa-evals/{eval_path}")
+        if source_refs:
+            proposal["source_refs"] = sorted(set(source_refs))
+
+        comparison_surface = input_proposal.get("comparison_surface")
+        if baseline_mode == "none":
+            proposal["comparison_surface"] = None
+        elif comparison_surface is not None:
+            proposal["comparison_surface"] = comparison_surface
+        else:
+            proposal["comparison_surface"] = {
+                "baseline_mode": baseline_mode,
+                "status": "proposal_only_requires_bundle_local_review",
+            }
+        return proposal
+
+    def find_or_propose(
+        self,
+        proof_question: str = "",
+        proposal: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        input_proposal = proposal if isinstance(proposal, dict) else {}
+        effective_question = str(input_proposal.get("proof_question") or proof_question or "").strip()
+        filters = {
+            key: input_proposal[key]
+            for key in ("category", "claim_type", "baseline_mode")
+            if input_proposal.get(key)
+        }
+        selection = self.select(effective_question, {**filters, "limit": 8} if filters else {"limit": 8})
+        existing_matches = selection["matches"]
+        match_names = {str(match.get("name") or "") for match in existing_matches}
+        runtime_export_refs = self._runtime_export_refs_for_proposal(
+            effective_question,
+            match_names,
+            _string_list(input_proposal.get("candidate_evidence_refs")),
+        )
+        proposal_packet = self._draft_eval_need_proposal(
+            proof_question=effective_question,
+            input_proposal=input_proposal,
+            existing_matches=existing_matches,
+            runtime_export_refs=runtime_export_refs,
+        )
+        proposal_validation = self._validate_eval_need(proposal_packet)
+        authoring_route = proposal_packet["authoring_route"]
+        outcome_by_route = {
+            "existing_eval_route": "existing_route_required",
+            "candidate_evidence_packet": "candidate_evidence_route",
+            "quest_record": "quest_route",
+            "new_draft_bundle": "new_draft_candidate",
+        }
+        route_notes: list[str] = []
+        if existing_matches:
+            route_notes.append("inspect likely existing source eval routes before authoring a parallel bundle")
+        if runtime_export_refs:
+            route_notes.append("stack-owned runtime candidate exports can be routed as candidate evidence only")
+        if authoring_route == "new_draft_bundle":
+            route_notes.append("new draft creation remains repo-local and requires scaffold helper review gates")
+        if not proposal_validation["valid"]:
+            route_notes.append("fix the candidate eval_need_v1 packet before any repo-local scaffold attempt")
+
+        return {
+            "schema": "aoa_evals_find_or_propose_v1",
+            "read_only": True,
+            "source_mutation_allowed": False,
+            "candidate_only": True,
+            "proof_question": effective_question,
+            "outcome": outcome_by_route[authoring_route],
+            "existing_matches": existing_matches,
+            "runtime_candidate_export_refs": runtime_export_refs,
+            "proposal_context": {
+                "schema_version": "eval_need_v1",
+                "schema_reader": proposal_validation.get("schema_reader"),
+                "packet": proposal_packet,
+                "repo_local_scaffold_route": (
+                    "python mechanics/proof-object/parts/eval-authoring/scripts/"
+                    "scaffold_eval_bundle.py --proposal <eval_need.json> --json"
+                ),
+            },
+            "proposal_validation": proposal_validation,
+            "route_notes": route_notes,
+            "next_route": (
+                "inspect existing bundle refs or run the repo-local eval-authoring scaffold helper; "
+                "MCP must not write source"
+            ),
+            "authority_boundary": self.authority_boundary(),
+        }
+
     def comparison(self, baseline_mode: str | None = None) -> dict[str, Any]:
         records = self.comparison_records()
         if baseline_mode:
@@ -350,6 +817,8 @@ class AoAEvalsMCPState:
 
     def runtime_evidence_template(self, name: str = "") -> dict[str, Any]:
         all_templates = self.runtime_intake_templates() or self.runtime_templates()
+        _, intake_rel = self._payload_first(RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR)
+        _, template_rel = self._payload_first(RUNTIME_TEMPLATE_INDEX, RUNTIME_TEMPLATE_INDEX_MIRROR)
         target = name.casefold()
         direct: list[dict[str, Any]] = []
         generic: list[dict[str, Any]] = []
@@ -371,9 +840,7 @@ class AoAEvalsMCPState:
             "count": len(direct),
             "templates": direct,
             "generic_runtime_selection_templates": generic[:6],
-            "source_reader": (self.evals_root / RUNTIME_INTAKE).as_posix()
-            if self.runtime_intake_templates()
-            else (self.evals_root / RUNTIME_TEMPLATE_INDEX).as_posix(),
+            "source_reader": (self.evals_root / (intake_rel or template_rel or RUNTIME_INTAKE)).as_posix(),
             "candidate_posture": "candidate_until_eval_review",
             "authority_boundary": self.authority_boundary(),
         }
@@ -415,14 +882,382 @@ class AoAEvalsMCPState:
 
     def runtime_candidate_templates_resource(self) -> dict[str, Any]:
         templates = self.runtime_intake_templates() or self.runtime_templates()
+        _, intake_rel = self._payload_first(RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR)
+        _, template_rel = self._payload_first(RUNTIME_TEMPLATE_INDEX, RUNTIME_TEMPLATE_INDEX_MIRROR)
         return {
             "schema": "aoa_evals_runtime_candidate_templates_v1",
             "count": len(templates),
             "templates": templates,
-            "source_reader": (self.evals_root / RUNTIME_INTAKE).as_posix()
-            if self.runtime_intake_templates()
-            else (self.evals_root / RUNTIME_TEMPLATE_INDEX).as_posix(),
+            "source_reader": (self.evals_root / (intake_rel or template_rel or RUNTIME_INTAKE)).as_posix(),
             "candidate_posture": "candidate_until_eval_review",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _root_reader_status(self, root: Path | None) -> dict[str, Any]:
+        if root is None:
+            return {"exists": False, "path": None, "readers": {}, "missing_groups": list(READER_GROUPS)}
+        readers: dict[str, Any] = {}
+        missing: list[str] = []
+        max_mtime = 0.0
+        for group, rels in READER_GROUPS.items():
+            found = next((rel for rel in rels if (root / rel).is_file()), None)
+            if found is None:
+                missing.append(group)
+                readers[group] = {"present": False, "path": None}
+                continue
+            path = root / found
+            stat = path.stat()
+            max_mtime = max(max_mtime, stat.st_mtime)
+            readers[group] = {
+                "present": True,
+                "path": path.as_posix(),
+                "mtime_utc": _utc_from_timestamp(stat.st_mtime),
+            }
+        return {
+            "exists": root.exists(),
+            "path": root.as_posix(),
+            "git_commit": _git_commit(root),
+            "latest_reader_mtime_utc": _utc_from_timestamp(max_mtime) if max_mtime else None,
+            "readers": readers,
+            "missing_groups": missing,
+        }
+
+    def runtime_status(self) -> dict[str, Any]:
+        selected = self._root_reader_status(self.evals_root)
+        source = self._root_reader_status(self.source_root)
+        mirror = self._root_reader_status(self.mirror_root)
+        manifest = _read_json(self.mirror_root / MIRROR_MANIFEST) if self.mirror_root and (self.mirror_root / MIRROR_MANIFEST).is_file() else None
+        candidate_exports = self.runtime_candidate_exports(limit=0)
+
+        freshness_status = "source"
+        freshness_notes: list[str] = []
+        if self.root_kind == "approved_mirror":
+            if not self.mirror_root or not self.mirror_root.exists():
+                freshness_status = "mirror_missing"
+                freshness_notes.append("approved mirror path is missing")
+            elif not manifest:
+                freshness_status = "mirror_missing_manifest"
+                freshness_notes.append("approved mirror lacks manifest/federation_mirror_manifest.json")
+            elif source.get("git_commit") and manifest.get("source_git_commit") != source.get("git_commit"):
+                freshness_status = "mirror_source_mismatch"
+                freshness_notes.append("mirror manifest source_git_commit differs from source checkout")
+            else:
+                freshness_status = "mirror_manifest_ok"
+        elif self.mirror_root and self.mirror_root.exists():
+            freshness_status = "source_with_mirror_available" if manifest else "source_with_unmanifested_mirror"
+            if not manifest:
+                freshness_notes.append("mirror exists but lacks provenance manifest")
+
+        return {
+            "schema": "aoa_evals_runtime_status_v1",
+            "workspace_root": self.workspace_root.as_posix(),
+            "selected_root": self.evals_root.as_posix(),
+            "root_kind": self.root_kind,
+            "source_root": self.source_root.as_posix() if self.source_root else None,
+            "mirror_root": self.mirror_root.as_posix() if self.mirror_root else None,
+            "selected": selected,
+            "source": source,
+            "mirror": mirror,
+            "mirror_manifest": manifest,
+            "catalog_count": len(self.catalog_records()),
+            "runtime_candidate_template_count": len(self.runtime_intake_templates() or self.runtime_templates()),
+            "runtime_candidate_export_count": candidate_exports["count"],
+            "runtime_candidate_export_root": candidate_exports["export_root"],
+            "freshness": {
+                "status": freshness_status,
+                "notes": freshness_notes,
+                "refresh_command": "scripts/aoa-sync-federation-surfaces --layer aoa-evals",
+                "mirror_is_authority": False,
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _runtime_candidate_export_root(self) -> Path | None:
+        if self.stack_runtime_root is None:
+            return None
+        return self.stack_runtime_root / RUNTIME_CANDIDATE_EXPORT_ROOT
+
+    def _runtime_candidate_export_files(self, include_archived: bool = True) -> list[tuple[str, Path]]:
+        export_root = self._runtime_candidate_export_root()
+        if export_root is None or not export_root.exists():
+            return []
+        files: list[tuple[str, Path]] = []
+        latest_root = export_root / "latest"
+        for dir_name in RUNTIME_CANDIDATE_LATEST_DIRS:
+            directory = latest_root / dir_name
+            if not directory.is_dir():
+                continue
+            try:
+                files.extend(("latest", path) for path in sorted(directory.glob("*.private.json")) if path.is_file())
+            except OSError:
+                continue
+        if include_archived:
+            records_root = export_root / "records"
+            if records_root.is_dir():
+                try:
+                    files.extend(
+                        ("record", path)
+                        for path in sorted(records_root.glob("*/candidate.private.json"))
+                        if path.is_file()
+                    )
+                except OSError:
+                    pass
+        return files
+
+    def _candidate_validation_summary(self, candidate_payload: Any) -> dict[str, Any]:
+        if not isinstance(candidate_payload, dict):
+            return {
+                "valid": False,
+                "surface_type": None,
+                "candidate_id": None,
+                "issues": ["candidate_payload must be an object"],
+                "warnings": [],
+            }
+        validation = self.validate_evidence_candidate(candidate_payload)
+        return {
+            "valid": validation["valid"],
+            "surface_type": validation.get("surface_type"),
+            "candidate_id": validation.get("candidate_id"),
+            "matched_eval_refs": validation.get("matched_eval_refs", []),
+            "unknown_eval_refs": validation.get("unknown_eval_refs", []),
+            "issues": validation.get("issues", []),
+            "warnings": validation.get("warnings", []),
+        }
+
+    def _runtime_candidate_export_summary(
+        self,
+        path: Path,
+        location: str,
+        *,
+        include_payload: bool = False,
+        detail: bool = False,
+    ) -> dict[str, Any]:
+        payload = _read_json(path)
+        if not isinstance(payload, dict):
+            raise ValueError(f"candidate export must be a JSON object: {path}")
+        candidate_payload = payload.get("candidate_payload")
+        validation = self._candidate_validation_summary(candidate_payload)
+        candidate_id = (
+            validation.get("candidate_id")
+            or payload.get("selection_id")
+            or payload.get("hook_id")
+            or payload.get("record_id")
+        )
+        result: dict[str, Any] = {
+            "record_id": str(payload.get("record_id") or path.stem),
+            "artifact_kind": payload.get("artifact_kind"),
+            "capture_mode": payload.get("capture_mode"),
+            "exported_at": payload.get("exported_at"),
+            "exported_by": payload.get("exported_by"),
+            "title": payload.get("title"),
+            "summary": payload.get("summary"),
+            "candidate_id": str(candidate_id or ""),
+            "surface_type": validation.get("surface_type"),
+            "location": location,
+            "path": path.as_posix(),
+            "validation": validation,
+            "candidate_payload_included": include_payload,
+            "candidate_posture": "runtime_export_is_private_candidate_not_accepted_proof",
+        }
+        if detail:
+            result.update(
+                {
+                    "source_input_ref": payload.get("source_input_ref"),
+                    "source_input_sha256": payload.get("source_input_sha256"),
+                    "aoa_evals_contract_refs": payload.get("aoa_evals_contract_refs", []),
+                }
+            )
+        if include_payload:
+            result["candidate_payload"] = candidate_payload
+        return result
+
+    @staticmethod
+    def _dedupe_candidate_exports(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        by_record: dict[str, dict[str, Any]] = {}
+        for entry in entries:
+            key = str(entry.get("record_id") or entry.get("path") or "")
+            current = by_record.get(key)
+            if current is None:
+                entry["locations"] = [entry["location"]]
+                entry["paths"] = [entry["path"]]
+                by_record[key] = entry
+                continue
+            current.setdefault("locations", []).append(entry["location"])
+            current.setdefault("paths", []).append(entry["path"])
+            if current.get("location") != "record" and entry.get("location") == "record":
+                entry["locations"] = current["locations"]
+                entry["paths"] = current["paths"]
+                by_record[key] = entry
+        return list(by_record.values())
+
+    def runtime_candidate_exports(self, limit: int | None = 20, include_archived: bool = True) -> dict[str, Any]:
+        export_root = self._runtime_candidate_export_root()
+        entries: list[dict[str, Any]] = []
+        invalid_exports: list[dict[str, str]] = []
+        for location, path in self._runtime_candidate_export_files(include_archived=include_archived):
+            try:
+                entries.append(self._runtime_candidate_export_summary(path, location))
+            except ValueError as exc:
+                invalid_exports.append({"path": path.as_posix(), "error": str(exc)})
+        entries = self._dedupe_candidate_exports(entries)
+        entries.sort(key=lambda item: (str(item.get("exported_at") or ""), str(item.get("record_id") or "")), reverse=True)
+        limit_value = max(0, min(int(limit if limit is not None else 20), 100))
+        visible = entries[:limit_value] if limit_value else []
+        return {
+            "schema": "aoa_evals_runtime_candidate_exports_v1",
+            "stack_runtime_root": self.stack_runtime_root.as_posix() if self.stack_runtime_root else None,
+            "export_root": export_root.as_posix() if export_root else None,
+            "count": len(entries),
+            "invalid_count": len(invalid_exports),
+            "invalid_exports": invalid_exports,
+            "limit": limit_value,
+            "candidates": visible,
+            "private_payloads_included": False,
+            "read_only": True,
+            "candidate_posture": "stack_owned_private_exports_require_bundle_local_review",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def read_runtime_candidate_export(self, record_id: str, include_payload: bool = False) -> dict[str, Any]:
+        target = str(record_id or "").casefold()
+        if not target:
+            raise ValueError("record_id is required")
+        matches: list[dict[str, Any]] = []
+        for location, path in self._runtime_candidate_export_files(include_archived=True):
+            try:
+                entry = self._runtime_candidate_export_summary(
+                    path,
+                    location,
+                    include_payload=include_payload,
+                    detail=True,
+                )
+            except ValueError:
+                continue
+            identifiers = {
+                str(entry.get("record_id") or "").casefold(),
+                str(entry.get("candidate_id") or "").casefold(),
+                path.stem.casefold(),
+                path.parent.name.casefold(),
+            }
+            if target in identifiers:
+                matches.append(entry)
+        if not matches:
+            raise ValueError(f"unknown runtime candidate export: {record_id}")
+        matches.sort(key=lambda item: (item.get("location") != "record", str(item.get("exported_at") or "")))
+        selected = matches[0]
+        selected["schema"] = "aoa_evals_runtime_candidate_export_v1"
+        selected["matched_locations"] = [entry["location"] for entry in matches]
+        selected["matched_paths"] = [entry["path"] for entry in matches]
+        selected["read_only"] = True
+        selected["authority_boundary"] = self.authority_boundary()
+        return selected
+
+    def runtime_evidence_schema_resource(self) -> dict[str, Any]:
+        schemas: dict[str, Any] = {}
+        for surface_type, rels in {
+            "runtime_evidence_selection": (RUNTIME_EVIDENCE_SCHEMA, RUNTIME_EVIDENCE_SCHEMA_MIRROR),
+            "artifact_to_verdict_hook": (ARTIFACT_HOOK_SCHEMA, ARTIFACT_HOOK_SCHEMA_MIRROR),
+            "runtime_candidate_template_index": (RUNTIME_TEMPLATE_SCHEMA, RUNTIME_TEMPLATE_SCHEMA_MIRROR),
+        }.items():
+            payload, rel = self._payload_first(*rels)
+            schemas[surface_type] = {
+                "present": payload is not None,
+                "source_reader": (self.evals_root / rel).as_posix() if rel else None,
+                "schema_id": payload.get("$id") if isinstance(payload, dict) else None,
+            }
+        return {
+            "schema": "aoa_evals_runtime_evidence_schema_resource_v1",
+            "schemas": schemas,
+            "candidate_posture": "schema_validity_is_not_evidence_acceptance",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _schema_for_candidate(self, surface_type: str) -> tuple[dict[str, Any] | None, Path | None]:
+        rels_by_type = {
+            "runtime_evidence_selection": (RUNTIME_EVIDENCE_SCHEMA, RUNTIME_EVIDENCE_SCHEMA_MIRROR),
+            "artifact_to_verdict_hook": (ARTIFACT_HOOK_SCHEMA, ARTIFACT_HOOK_SCHEMA_MIRROR),
+        }
+        rels = rels_by_type.get(surface_type)
+        if not rels:
+            return None, None
+        payload, rel = self._payload_first(*rels)
+        return (payload if isinstance(payload, dict) else None), rel
+
+    def validate_evidence_candidate(self, packet: dict[str, Any]) -> dict[str, Any]:
+        issues: list[str] = []
+        warnings: list[str] = []
+        if not isinstance(packet, dict):
+            return {
+                "schema": "aoa_evals_evidence_candidate_validation_v1",
+                "valid": False,
+                "issues": ["packet must be an object"],
+                "warnings": [],
+                "authority_boundary": self.authority_boundary(),
+            }
+
+        surface_type = str(packet.get("surface_type") or "")
+        candidate_id = str(packet.get("selection_id") or packet.get("hook_id") or "")
+        candidate_id_slug = _slug(candidate_id)
+        schema_payload, schema_rel = self._schema_for_candidate(surface_type)
+        if schema_payload is None:
+            issues.append(f"unsupported or missing schema for surface_type {surface_type!r}")
+        else:
+            validator = Draft202012Validator(schema_payload)
+            for error in sorted(validator.iter_errors(packet), key=lambda item: list(item.path)):
+                location = "/".join(str(part) for part in error.path) or "<root>"
+                issues.append(f"{location}: {error.message}")
+
+        known_eval_names = {str(record.get("name") or "") for record in self.catalog_records()}
+        template_names = {str(template.get("template_name") or "") for template in self.runtime_intake_templates() or self.runtime_templates()}
+        template_eval_anchors = {str(template.get("eval_anchor") or "") for template in self.runtime_intake_templates() or self.runtime_templates()}
+
+        eval_refs: list[str] = []
+        if isinstance(packet.get("target_eval"), str):
+            eval_refs.append(str(packet["target_eval"]))
+        if isinstance(packet.get("eval_anchor"), str):
+            eval_refs.append(str(packet["eval_anchor"]))
+        if isinstance(packet.get("candidate_eval_refs"), list):
+            eval_refs.extend(str(item) for item in packet["candidate_eval_refs"] if isinstance(item, str))
+
+        matched_eval_refs = [
+            ref for ref in eval_refs if ref in known_eval_names or ref in template_eval_anchors
+        ]
+        unknown_eval_refs = [
+            ref
+            for ref in eval_refs
+            if ref.startswith("aoa-") and ref not in known_eval_names and ref not in template_eval_anchors
+        ]
+        if unknown_eval_refs:
+            warnings.append("unknown eval refs require bundle-local review: " + ", ".join(sorted(set(unknown_eval_refs))))
+
+        if surface_type == "runtime_evidence_selection":
+            review_posture = packet.get("review_posture") if isinstance(packet.get("review_posture"), dict) else {}
+            if review_posture.get("human_review_required") is not True:
+                issues.append("review_posture/human_review_required must be true")
+        elif surface_type == "artifact_to_verdict_hook":
+            report_expectation = packet.get("report_expectation") if isinstance(packet.get("report_expectation"), dict) else {}
+            if report_expectation.get("review_required") is not True:
+                issues.append("report_expectation/review_required must be true")
+
+        matched_templates = [
+            name
+            for name in template_names
+            if candidate_id_slug and candidate_id_slug in _slug(name)
+        ]
+
+        return {
+            "schema": "aoa_evals_evidence_candidate_validation_v1",
+            "valid": not issues,
+            "surface_type": surface_type,
+            "candidate_id": candidate_id,
+            "schema_reader": (self.evals_root / schema_rel).as_posix() if schema_rel else None,
+            "matched_eval_refs": sorted(set(matched_eval_refs)),
+            "unknown_eval_refs": sorted(set(unknown_eval_refs)),
+            "matched_templates": sorted(set(matched_templates)),
+            "issues": issues,
+            "warnings": warnings,
+            "candidate_posture": "valid_shape_only_until_bundle_local_review",
+            "next_route": "bundle-local review before bounded report or optional receipt",
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -438,6 +1273,14 @@ class AoAEvalsMCPState:
             return self.comparison()
         if parts == ["runtime-candidate-templates"]:
             return self.runtime_candidate_templates_resource()
+        if parts == ["runtime-status"]:
+            return self.runtime_status()
+        if parts == ["runtime-evidence", "schema"]:
+            return self.runtime_evidence_schema_resource()
+        if parts == ["runtime-candidate-exports"]:
+            return self.runtime_candidate_exports()
+        if len(parts) == 2 and parts[0] == "runtime-candidate-export":
+            return self.read_runtime_candidate_export(parts[1])
         if parts == ["reports"]:
             return self.reports()
         if len(parts) == 2 and parts[0] == "bundle":

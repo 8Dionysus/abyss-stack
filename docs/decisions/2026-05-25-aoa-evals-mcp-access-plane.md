@@ -32,6 +32,17 @@ configured approved mirror. It exposes resources, tools, and prompts for
 selection, inspection, expansion, comparison, runtime evidence templates, and
 candidate-only report skeletons.
 
+It may also expose read-only runtime status, candidate packet validation, and a
+read-model over stack-owned private runtime candidate exports under
+`Logs/eval-exports/`. Those surfaces preflight mirror freshness, candidate
+shape, and existing candidate-export records. They do not ingest into
+`aoa-evals`, persist new exports, accept, score, compare, or publish evidence.
+
+It may expose read-only find-or-propose routing that returns likely existing
+eval matches and a candidate `eval_need_v1` proposal context. That route does
+not approve the proposal, create source bundles, or bypass the repo-local
+`aoa-evals` scaffold helper.
+
 ## Rationale
 
 This preserves the owner split. `abyss-stack` owns the runtime adapter and MCP
@@ -44,8 +55,16 @@ readers, runtime-candidate posture, report boundaries, and verdict authority.
 - The service stays stdio-only and read-only.
 - Report skeletons leave verdict unset.
 - Runtime evidence remains candidate-only until `aoa-evals` bundle-local review.
-- Future non-stdio exposure, write tools, eval execution, verdict computation,
-  receipt publication, or bundle promotion require a new decision.
+- Runtime status may flag missing/stale mirrors without making mirrors
+  authoritative.
+- Candidate validation is a pre-ingestion gate, not evidence acceptance.
+- Runtime candidate export reads are private candidate routing, not review
+  acceptance or proof publication.
+- Find-or-propose makes eval growth easier from OS surfaces without turning MCP
+  into a source writer.
+- Future non-stdio exposure, write tools, proposal approval, source bundle
+  creation, eval execution, verdict computation, receipt publication, or bundle
+  promotion require a new decision.
 
 ## Source surfaces
 

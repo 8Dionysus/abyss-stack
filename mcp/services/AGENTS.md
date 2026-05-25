@@ -39,6 +39,13 @@ python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
 python -m pytest mcp/services/aoa-evals-mcp/tests -q
 ```
 
+For `abyss-machine-mcp`, run:
+
+```bash
+python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
+python -m pytest mcp/services/abyss-machine-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash

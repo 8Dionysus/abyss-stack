@@ -64,6 +64,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `mcp/services/AGENTS.md`, `mcp/services/README.md`, and
   `docs/decisions/2026-05-20-mcp-services-topology.md` as the canonical MCP
   service-package topology for `aoa-memo-mcp`
+- `mcp/services/abyss-machine-mcp/` and
+  `docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md` as the
+  stack-owned, read-only MCP access plane over `abyss-machine` host read models
 - `docs/runtime/SERVICE_SELECTION.md` as the source-level service-selection
   guide for lean Intel, full Intel, optional workflows, tools, observability,
   reranking, and protected speech routes

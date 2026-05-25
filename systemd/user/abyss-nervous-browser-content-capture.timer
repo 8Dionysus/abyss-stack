@@ -5,8 +5,9 @@ Documentation=file:///var/lib/abyss-machine/nervous/AGENTS.md
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=60s
-AccuracySec=15s
+OnStartupSec=2min
+OnUnitActiveSec=120s
+AccuracySec=30s
 Persistent=false
 
 [Install]

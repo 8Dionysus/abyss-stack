@@ -19,6 +19,8 @@ generated reader builders, and bundle-local report contracts.
 `aoa-evals` owns proof meaning.
 Generated readers own deterministic read models.
 Runtime-candidate readers own candidate evidence shapes.
+Stack runtime exports own private candidate records under
+`Logs/eval-exports/`.
 `aoa-evals-mcp` owns just-in-time access, selection helpers, and route prompts.
 `abyss-stack` owns the runnable MCP service package.
 
@@ -28,6 +30,7 @@ An agent should be able to start from a proof question:
 
 ```text
 aoa_evals_select(proof_question, filters)
+aoa_evals_find_or_propose(proof_question, proposal)
 ```
 
 Then the agent can inspect a candidate:
@@ -42,11 +45,34 @@ Comparison and runtime evidence use separate bounded routes:
 ```text
 aoa_evals_comparison(baseline_mode)
 aoa_evals_runtime_evidence_template(name)
+aoa_evals_runtime_status()
+aoa_evals_validate_evidence_candidate(packet)
+aoa_evals_runtime_candidate_exports(limit)
+aoa_evals_read_runtime_candidate_export(record_id, include_payload=false)
 aoa_evals_report_skeleton(name, evidence_refs)
 ```
 
 The skeleton route leaves the verdict unset. It exists to preserve report shape
 and source refs before a reviewer reads the source bundle.
+
+Find-or-propose is the eval birth access route. It searches existing evals,
+optionally attaches stack-owned runtime candidate export refs, and returns a
+candidate `eval_need_v1` packet for the `aoa-evals` repo-local scaffold helper.
+It does not approve the packet, create a bundle, or bypass the scaffold
+helper's review gates.
+
+Candidate validation is a pre-ingestion gate. It checks schema shape,
+provenance refs, review posture, and known eval/template routing. It does not
+persist, accept, score, compare, publish, or turn a packet into a verdict.
+
+Runtime status reports which root is selected, whether an approved mirror is
+present, which generated readers and candidate schemas are available, and which
+refresh command owns the mirror.
+
+Runtime candidate exports are stack-owned private records produced by governed
+execution. MCP can list compact metadata, validate the nested candidate packet,
+and read one export for review routing. It does not write the export, mark it
+accepted, or move it into `aoa-evals`.
 
 ## Source Discovery
 
@@ -60,6 +86,16 @@ The server resolves `aoa-evals` in this order:
 
 The mirror path is read-only support. Source authority stays with `aoa-evals`.
 
+The server resolves the stack runtime root from `AOA_STACK_ROOT`,
+`AOA_ABYSS_STACK_RUNTIME_ROOT`, `AOA_ABYSS_STACK_ROOT`, or
+`<workspace-root>/abyss-stack`, then reads `Logs/eval-exports/` as a private
+candidate lane.
+
+When the stack federation sync wrapper refreshes the mirror, it writes
+`manifest/federation_mirror_manifest.json` with source commit, generated time,
+required files, and compact counts. MCP treats the manifest as freshness
+evidence, not proof authority.
+
 ## Readiness
 
 The first layer is ready when:
@@ -67,7 +103,11 @@ The first layer is ready when:
 - resources, tools, and prompts exist and are smoke-tested;
 - catalog, capsule, section, comparison, report, and runtime-candidate readers
   can be read;
+- find-or-propose returns valid `eval_need_v1` context without source mutation;
 - report skeletons keep verdict unset;
+- candidate validation keeps `human_review_required`/`review_required` true;
+- runtime candidate export listing does not include private payloads by default;
+- runtime status exposes missing or unmanifested mirrors;
 - the Codex plane can resolve `aoa_evals`;
 - validation proves the service did not become a runner, publisher, promoter,
   or source writer.

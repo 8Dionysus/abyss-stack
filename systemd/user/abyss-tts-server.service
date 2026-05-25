@@ -16,7 +16,7 @@ Environment=OPENVINO_LOG_LEVEL=2
 Environment=TOKENIZERS_PARALLELISM=false
 Environment=TRANSFORMERS_OFFLINE=1
 Environment=HF_HUB_OFFLINE=1
-ExecCondition=/usr/bin/bash -lc 'test "$(/usr/local/bin/abyss-machine ai policy --json | /usr/bin/jq -r .can_run_heavy)" = true'
+ExecCondition=/usr/bin/bash -lc 'class=$(/usr/local/bin/abyss-machine memory plan --json | /usr/bin/jq -r .class); test "$class" = green -o "$class" = watch'
 ExecStart=%h/.local/bin/abyss-qwen3-openvino-python /usr/local/libexec/abyss-machine ai tts server run --profile quality-compact
 Restart=on-failure
 RestartSec=5
