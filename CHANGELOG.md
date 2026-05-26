@@ -67,6 +67,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `mcp/services/abyss-machine-mcp/` and
   `docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md` as the
   stack-owned, read-only MCP access plane over `abyss-machine` host read models
+- `memo/` reviewed-intake packet for the post-2026-05-22 MCP access-plane
+  expansion, preserving that `abyss-stack` owns service packaging while
+  `aoa-evals`, `abyss-machine`, and `aoa-memo` keep their respective authority
 - `docs/runtime/SERVICE_SELECTION.md` as the source-level service-selection
   guide for lean Intel, full Intel, optional workflows, tools, observability,
   reranking, and protected speech routes
