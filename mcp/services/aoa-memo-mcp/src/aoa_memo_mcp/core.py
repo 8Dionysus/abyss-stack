@@ -16,6 +16,8 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 REQUIRED_PORT_DIRS = ("candidates", "receipts", "exports", "local")
 TEXT_SUFFIXES = {".md", ".json", ".txt", ".toml", ".yaml", ".yml"}
+LOCAL_MEMO_PORT_LEVELS = {"stub_port", "full_port", "mature_port"}
+LEGACY_MEMO_PORT_REPOS = ("Agents-of-Abyss", "abyss-stack", "abyss-machine")
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_ABYSS_STACK_SOURCE = Path.home() / "src" / "abyss-stack"
 DEFAULT_ABYSS_MACHINE_PORT = Path("/var/lib/abyss-machine/memo")
@@ -1012,14 +1014,14 @@ class AoAMemoMCPState:
 
     def find_intake_review(self, packet_id: str) -> dict[str, Any]:
         matches: list[dict[str, Any]] = []
-        for repo in ("Agents-of-Abyss", "abyss-stack", "abyss-machine"):
-            port = self.repo_route(repo).memo_port
+        for route in self._known_memo_port_routes():
+            port = route.memo_port
             if port is None or not port.exists():
                 continue
             for path in sorted((port / "exports").glob("*.json")):
                 payload = _read_json(path)
                 if isinstance(payload, dict) and packet_id in {str(payload.get("id")), path.stem}:
-                    matches.append({"repo": repo, "path": str(path), "packet": payload})
+                    matches.append({"repo": route.name, "path": str(path), "packet": payload})
         return {
             "schema": "aoa_local_memo_intake_review_pointer_v1",
             "packet_id": packet_id,
@@ -1314,11 +1316,43 @@ class AoAMemoMCPState:
 
     def _known_memo_ports(self) -> dict[str, Path]:
         ports: dict[str, Path] = {}
-        for repo in ("Agents-of-Abyss", "abyss-stack", "abyss-machine"):
-            route = self.repo_route(repo)
+        for route in self._known_memo_port_routes():
             if route.memo_port is not None and route.memo_port.exists():
                 ports[route.name] = route.memo_port.resolve()
         return ports
+
+    def _known_memo_port_routes(self) -> list[RepoRoute]:
+        routes: list[RepoRoute] = []
+        seen: set[str] = set()
+        for repo in self._workspace_memo_port_repo_names():
+            try:
+                route = self.repo_route(repo)
+            except ValueError:
+                continue
+            if route.name in seen:
+                continue
+            seen.add(route.name)
+            routes.append(route)
+        return routes
+
+    def _workspace_memo_port_repo_names(self) -> list[str]:
+        names: list[str] = []
+        places = self._workspace_memory_map().get("places", [])
+        if isinstance(places, list):
+            for place in places:
+                if not isinstance(place, dict):
+                    continue
+                name = place.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                current_level = str(place.get("current_port_level") or "")
+                route_status = str(place.get("memory_route_status") or "")
+                if current_level in LOCAL_MEMO_PORT_LEVELS or route_status == "local_port_route":
+                    names.append(name)
+        for repo in LEGACY_MEMO_PORT_REPOS:
+            if repo not in names:
+                names.append(repo)
+        return names
 
     def _assert_under_port(self, port: Path, path: Path, required_dir: str | None = None) -> Path:
         resolved_port = port.expanduser().resolve()
@@ -1649,8 +1683,8 @@ class AoAMemoMCPState:
         if scope in ("all", "central", "aoa-memo"):
             roots.extend([self.aoa_memo_root / "docs", self.aoa_memo_root / "mechanics", self.aoa_memo_root / "generated/memory"])
         if scope in ("all", "local", "ports"):
-            for repo in ("Agents-of-Abyss", "abyss-stack", "abyss-machine"):
-                port = self.repo_route(repo).memo_port
+            for route in self._known_memo_port_routes():
+                port = route.memo_port
                 if port is not None:
                     roots.append(port)
         if scope in ("all", "session", ".aoa"):
