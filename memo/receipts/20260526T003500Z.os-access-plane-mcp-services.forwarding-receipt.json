@@ -1,0 +1,22 @@
+{
+  "schema": "aoa_local_memo_receipt_v1",
+  "id": "receipt:abyss-stack:20260526T003500Z:os-access-plane-mcp-services-forwarding",
+  "repo": "abyss-stack",
+  "candidate_ref": "candidates/20260526T003500Z.os-access-plane-mcp-services-owner-split.candidate.json",
+  "export_ref": "exports/20260526T003500Z.os-access-plane-mcp-services.reviewed-intake.json",
+  "result": "forwarded",
+  "route": "reviewed_intake",
+  "checks": [
+    "schema",
+    "source_refs",
+    "evidence_refs",
+    "guardrails",
+    "operation_mode",
+    "authority_split",
+    "reviewed_write_allowed"
+  ],
+  "errors": [],
+  "created_at": "2026-05-26T00:35:00Z",
+  "checked_by": "aoa-memo-writeback",
+  "notes": "Forwarding receipt for the post-2026-05-22 MCP access-plane expansion writeback. Durable landing remains an aoa-memo source change."
+}

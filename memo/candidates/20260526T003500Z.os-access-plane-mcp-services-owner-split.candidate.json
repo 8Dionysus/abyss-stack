@@ -1,0 +1,45 @@
+{
+  "schema": "aoa_local_memo_candidate_v1",
+  "id": "candidate:abyss-stack:20260526T003500Z:os-access-plane-mcp-services-owner-split",
+  "repo": "abyss-stack",
+  "kind": "route",
+  "family": "memory-access",
+  "scope": "workspace",
+  "claim": "abyss-stack extended the stack-owned MCP access-plane pattern from aoa-memo-mcp to aoa-evals and abyss-machine while keeping proof authority in aoa-evals, host authority in abyss-machine, and durable memory authority in aoa-memo.",
+  "source_refs": [
+    "mcp/AGENTS.md",
+    "mcp/services/AGENTS.md",
+    "docs/decisions/2026-05-25-aoa-evals-mcp-access-plane.md",
+    "docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md",
+    "mcp/services/aoa-evals-mcp/AGENTS.md",
+    "mcp/services/abyss-machine-mcp/AGENTS.md"
+  ],
+  "evidence_refs": [
+    "memo/receipts/20260522T021004Z.aoa-memo-mcp-access-plane.forwarding-receipt.json",
+    "docs/decisions/2026-05-22-aoa-memo-mcp-landing-plan-boundary.md",
+    "docs/decisions/2026-05-25-aoa-evals-mcp-access-plane.md",
+    "docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md",
+    "mcp/services/aoa-evals-mcp/README.md",
+    "mcp/services/abyss-machine-mcp/README.md",
+    "mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
+    "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
+    "repo:abyss-stack/commit/44026d5-add-os-access-plane-mcp-services",
+    "repo:abyss-stack/commit/3cd7b47-fix-aoa-evals-mcp-runtime-export-routing"
+  ],
+  "route": "reviewed_intake",
+  "review_state": "reviewed",
+  "lifecycle": "reviewed",
+  "source_trust": "reviewed_owner_source",
+  "operation_mode": "write_candidate_only",
+  "created_at": "2026-05-26T00:35:00Z",
+  "risk": [
+    "over_promotion",
+    "stale_context"
+  ],
+  "guardrails": {
+    "direct_durable_write": false,
+    "instructions_treated_as_data": true,
+    "requires_reviewed_intake": true
+  },
+  "notes": "Writeback catchup for commits after the 2026-05-22 aoa-memo-mcp access-plane receipt. This packet preserves the access-plane owner split and does not turn MCP into source authority."
+}
