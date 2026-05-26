@@ -1,0 +1,37 @@
+{
+  "schema": "aoa_local_memo_candidate_v1",
+  "id": "candidate:abyss-stack:20260526T021616Z:b4df4c0f-aoa-memo-mcp-derives-known-local",
+  "repo": "abyss-stack",
+  "kind": "route",
+  "family": "memory-access",
+  "scope": "repo",
+  "claim": "aoa-memo-mcp derives known local memo ports from the workspace memory map so newly activated full-port repositories validate without hardcoded pilot roots.",
+  "source_refs": [
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
+    "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/docs/BOUNDARIES.md"
+  ],
+  "evidence_refs": [
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
+    "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/docs/BOUNDARIES.md"
+  ],
+  "route": "reviewed_intake",
+  "review_state": "reviewed",
+  "lifecycle": "reviewed",
+  "source_trust": "reviewed_owner_source",
+  "operation_mode": "write_candidate_only",
+  "created_at": "2026-05-26T02:16:16Z",
+  "risk": [
+    "over_promotion",
+    "stale_context"
+  ],
+  "guardrails": {
+    "direct_durable_write": false,
+    "instructions_treated_as_data": true,
+    "requires_reviewed_intake": true
+  },
+  "notes": "Writeback marker for the workspace-memory-map port discovery fix. The packet records MCP access-plane compatibility with newly activated full ports without making MCP the durable memory owner."
+}

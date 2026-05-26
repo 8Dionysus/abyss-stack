@@ -1,0 +1,28 @@
+{
+  "schema": "aoa_local_memo_export_v1",
+  "id": "export:abyss-stack:20260526T021621Z:aoa-memo-mcp-derives-known-local-memo-ports-from",
+  "repo": "abyss-stack",
+  "target_owner": "aoa-memo",
+  "target_route": "reviewed_intake",
+  "candidate_refs": [
+    "candidates/20260526T021616Z.b4df4c0f.aoa-memo-mcp-derives-known-local-memo-ports-from.candidate.json"
+  ],
+  "receipt_refs": [
+    "receipts/20260526T021627Z.export-abyss-stack-20260526t021621z-aoa-memo-mcp.forwarding-receipt.json"
+  ],
+  "source_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/docs/BOUNDARIES.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
+    "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py"
+  ],
+  "evidence_refs": [
+    "mcp/services/aoa-memo-mcp/DESIGN.md",
+    "mcp/services/aoa-memo-mcp/docs/BOUNDARIES.md",
+    "mcp/services/aoa-memo-mcp/src/aoa_memo_mcp/core.py",
+    "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py"
+  ],
+  "allowed_result": "reviewed_write",
+  "created_at": "2026-05-26T02:16:21Z",
+  "notes": "Reviewed owner-source export for aoa-memo durable intake. The exported memory should preserve that aoa-memo-mcp discovers local ports through the workspace memory map while durable memory landing remains an aoa-memo source change."
+}

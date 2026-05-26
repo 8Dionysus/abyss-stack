@@ -20,6 +20,8 @@ The reviewed landing belongs to `aoa-memo`.
 Packet tools are confined to known local `memo/` ports. Candidate, export, and
 receipt references are local packet refs, not arbitrary absolute paths, and
 their shapes are checked against `aoa-memo/schemas/memory-ports/`.
+The known-port set is derived from the `8Dionysus` workspace memory map when
+available, with the original pilot ports kept only as bootstrap fallback.
 
 Session resources expose rehydration pointers, not raw transcript replacement.
 Agents may use them to find evidence and then inspect the owning archive.

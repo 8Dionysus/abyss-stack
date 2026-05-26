@@ -183,6 +183,37 @@ def seed_workspace_memory_map(root: Path) -> None:
     )
 
 
+def add_workspace_full_port(root: Path, repo: str) -> None:
+    map_path = root / "8Dionysus/generated/workspace_memory_map.min.json"
+    payload = json.loads(map_path.read_text(encoding="utf-8"))
+    payload["places"].append(
+        {
+            "name": repo,
+            "memory_role": "local-memory-port-candidate",
+            "memory_route_status": "local_port_route",
+            "current_port_level": "full_port",
+            "recommended_port_level": "full_port",
+            "reviewed_memory_route": "aoa-memo:reviewed-intake",
+            "evidence_route": ".aoa:retrieve/rehydrate/review-packet",
+            "issues": [],
+        }
+    )
+    map_path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def seed_local_memo_port(root: Path, repo: str, source_ref: str) -> Path:
+    port = root / repo / "memo"
+    for rel in ["candidates", "receipts", "exports", "local"]:
+        (port / rel).mkdir(parents=True, exist_ok=True)
+    (port / "AGENTS.md").write_text(f"# {repo} memo port\n", encoding="utf-8")
+    (port / "README.md").write_text(f"# {repo} memo\n", encoding="utf-8")
+    write_port_contract(port, repo, "repo")
+    source = root / repo / source_ref
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(f"# {repo} source\nrole memory handoff route\n", encoding="utf-8")
+    return port
+
+
 def seed_memory_port_schemas(memo: Path) -> None:
     schema_dir = memo / "schemas/memory-ports"
     schema_dir.mkdir(parents=True, exist_ok=True)
@@ -572,6 +603,26 @@ def test_candidate_creation_uses_schema_safe_packet_ids_for_non_ascii_claims(tmp
     assert result["validation"]["ok"] is True
     assert result["candidate"]["id"].endswith("-memo")
     assert Path(result["path"]).name.endswith(".memo.candidate.json")
+
+
+def test_workspace_map_full_ports_are_known_for_candidate_validation(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    source_ref = "docs/AGENT_MEMORY_POSTURE.md"
+    seed_local_memo_port(tmp_path, "aoa-agents", source_ref)
+    add_workspace_full_port(tmp_path, "aoa-agents")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    created = state.create_candidate(
+        "aoa-agents",
+        [source_ref],
+        "aoa-agents owns role-layer memory handoff posture",
+        family="agent-behavior",
+    )
+
+    assert created["validation"]["ok"] is True
+    assert state.validate_candidate(created["path"])["ok"] is True
+    ports_search = state.search("role-layer", scope="ports")
+    assert any("aoa-agents" in hit["path"] for hit in ports_search["hits"])
 
 
 def test_path_like_repo_values_are_rejected(tmp_path: Path) -> None:
