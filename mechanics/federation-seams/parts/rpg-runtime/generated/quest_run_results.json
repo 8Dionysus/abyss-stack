@@ -51,7 +51,7 @@
         "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
       ],
       "chronicle_refs": [
-        "aoa-memo/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
+        "aoa-memo/mechanics/writeback/parts/quest-and-chronicle/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
       ],
       "progression_effects": {
         "evidence_refs": [

@@ -129,7 +129,7 @@ EVAL_RUNTIME_TEMPLATE_INDEX_PATH = Path(
     "Knowledge/federation/aoa-evals/generated/runtime_candidate_template_index.min.json"
 )
 MEMO_RUNTIME_WRITEBACK_TARGETS_PATH = Path(
-    "Knowledge/federation/aoa-memo/generated/runtime_writeback_targets.min.json"
+    "Knowledge/federation/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json"
 )
 PLAYBOOK_REVIEW_INTAKE_PATH = Path(
     "Knowledge/federation/aoa-playbooks/generated/playbook_review_intake.min.json"
@@ -138,7 +138,7 @@ EVAL_RUNTIME_CANDIDATE_INTAKE_PATH = Path(
     "Knowledge/federation/aoa-evals/generated/runtime_candidate_intake.min.json"
 )
 MEMO_RUNTIME_WRITEBACK_INTAKE_PATH = Path(
-    "Knowledge/federation/aoa-memo/generated/runtime_writeback_intake.min.json"
+    "Knowledge/federation/aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_intake.min.json"
 )
 PLAYBOOK_REVIEW_PACKET_CONTRACTS_SOURCE_REF = (
     "aoa-playbooks/generated/playbook_review_packet_contracts.min.json"
@@ -147,11 +147,13 @@ EVAL_RUNTIME_TEMPLATE_INDEX_SOURCE_REF = (
     "aoa-evals/generated/runtime_candidate_template_index.min.json"
 )
 MEMO_RUNTIME_WRITEBACK_TARGETS_SOURCE_REF = (
-    "aoa-memo/generated/runtime_writeback_targets.min.json"
+    "aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json"
 )
 PLAYBOOK_REVIEW_INTAKE_SOURCE_REF = "aoa-playbooks/generated/playbook_review_intake.min.json"
 EVAL_RUNTIME_CANDIDATE_INTAKE_SOURCE_REF = "aoa-evals/generated/runtime_candidate_intake.min.json"
-MEMO_RUNTIME_WRITEBACK_INTAKE_SOURCE_REF = "aoa-memo/generated/runtime_writeback_intake.min.json"
+MEMO_RUNTIME_WRITEBACK_INTAKE_SOURCE_REF = (
+    "aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_intake.min.json"
+)
 
 
 def load_trials_module() -> Any:
@@ -3026,7 +3028,7 @@ def audit_review_packets(
                 if isinstance(ref, str) and ref and not ref.startswith("repo:")
             ]
             if not local_runtime_refs:
-                local_runtime_refs = ["docs/RUNTIME_WRITEBACK_SEAM.md"]
+                local_runtime_refs = ["mechanics/writeback/docs/RUNTIME_WRITEBACK_SEAM.md"]
             for ref in local_runtime_refs:
                 append_review_target(
                     recommended_review_targets,

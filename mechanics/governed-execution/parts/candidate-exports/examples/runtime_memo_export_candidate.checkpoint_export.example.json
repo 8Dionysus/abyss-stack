@@ -22,15 +22,15 @@
     "checkpoint_export_kind": "state_capsule",
     "distillation_review_posture": "review_required",
     "review_boundary_refs": [
-      "docs/WRITEBACK_TEMPERATURE_POLICY.md#writeback-classes",
-      "docs/MEMORY_MODEL.md#checkpoint-route-writeback",
+      "mechanics/writeback/docs/WRITEBACK_TEMPERATURE_POLICY.md#writeback-classes",
+      "docs/memory/MEMORY_MODEL.md#checkpoint-route-writeback",
       "repo:aoa-agents/docs/AGENT_MEMORY_POSTURE.md"
     ]
   },
   "memo_contract_refs": [
-    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/examples/checkpoint_to_memory_contract.example.json",
-    "schemas/inquiry_checkpoint.schema.json",
-    "docs/WRITEBACK_TEMPERATURE_POLICY.md#inquiry-checkpoint-packs"
+    "local:${AOA_STACK_ROOT}/Knowledge/federation/aoa-memo/mechanics/checkpoint/parts/checkpoint-to-memory-mapping/examples/checkpoint_to_memory_contract.example.json",
+    "mechanics/checkpoint/parts/checkpoint-carry-contract/schemas/inquiry_checkpoint.schema.json",
+    "mechanics/writeback/docs/WRITEBACK_TEMPERATURE_POLICY.md#inquiry-checkpoint-packs"
   ],
   "candidate_payload": {
     "checkpoint_id": "chk.runtime.2026-03-28.demo",

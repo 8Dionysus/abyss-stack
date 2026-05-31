@@ -34,7 +34,10 @@ GENERATED_COLLECTIONS = (
 UNLOCK_PROOF_REF = "aoa-evals/generated/unlock_proof_cards.min.example.json#UP-2026-04-04-0001"
 ROUTING_REF = "aoa-routing/generated/rpg_navigation.min.example.json#nav.AOA-P-0011.safe-change-pair"
 CAMPAIGN_REF = "aoa-playbooks/examples/questline_outline.example.yaml#AOA-PB-CAMP-0001"
-CHRONICLE_REF = "aoa-memo/examples/quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
+CHRONICLE_REF = (
+    "aoa-memo/mechanics/writeback/parts/quest-and-chronicle/examples/"
+    "quest_chronicle.example.json#AOA-MEM-CHRON-EXAMPLE-0001"
+)
 OVERLAY_REF = "Agents-of-Abyss/generated/dual_vocabulary_overlay.json"
 BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
 

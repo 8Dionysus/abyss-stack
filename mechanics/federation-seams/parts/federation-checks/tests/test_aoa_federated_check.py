@@ -312,7 +312,7 @@ class FederatedCheckTests(unittest.TestCase):
                             },
                             "sequence": ["recall_contract", "inspect", "capsule"],
                             "resolution": "capsule",
-                            "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                            "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                         },
                     },
                 }
@@ -485,7 +485,7 @@ class FederatedCheckTests(unittest.TestCase):
                             },
                             "sequence": ["recall_contract"],
                             "resolution": "contract_only",
-                            "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                            "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                         }
                     },
                 }

@@ -117,12 +117,12 @@ class LangchainFederatedRunTests(unittest.TestCase):
                     "ok": True,
                     "contract": {
                         "mode": "semantic",
-                        "inspect_surface": "generated/memory_catalog.min.json",
-                        "capsule_surface": "generated/memory_capsules.json",
-                        "expand_surface": "generated/memory_sections.full.json",
+                        "inspect_surface": "generated/memory/memory_catalog.min.json",
+                        "capsule_surface": "generated/memory/memory_capsules.json",
+                        "expand_surface": "generated/memory/memory_sections.full.json",
                         "source_route_required": True,
                     },
-                    "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                 }
             if path == "/memo/inspect":
                 return {"ok": True, "entry": {"id": "claim-1", "kind": "claim", "summary": "Inspect card"}}
@@ -176,11 +176,11 @@ class LangchainFederatedRunTests(unittest.TestCase):
                     "ok": True,
                     "contract": {
                         "mode": "semantic",
-                        "inspect_surface": "generated/memory_catalog.min.json",
-                        "capsule_surface": "generated/memory_capsules.json",
-                        "expand_surface": "generated/memory_sections.full.json",
+                        "inspect_surface": "generated/memory/memory_catalog.min.json",
+                        "capsule_surface": "generated/memory/memory_capsules.json",
+                        "expand_surface": "generated/memory/memory_sections.full.json",
                     },
-                    "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                 }
             raise AssertionError(f"unexpected route-api call: {path}")
 
@@ -220,8 +220,8 @@ class LangchainFederatedRunTests(unittest.TestCase):
             if path == "/memo/recall-contract":
                 return {
                     "ok": True,
-                    "contract": {"mode": "semantic", "inspect_surface": "generated/memory_catalog.min.json"},
-                    "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                    "contract": {"mode": "semantic", "inspect_surface": "generated/memory/memory_catalog.min.json"},
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                 }
             raise AssertionError(f"unexpected route-api call: {path}")
 
@@ -270,10 +270,10 @@ class LangchainFederatedRunTests(unittest.TestCase):
                     "ok": True,
                     "contract": {
                         "mode": "working",
-                        "inspect_surface": "generated/memory_object_catalog.min.json",
-                        "expand_surface": "generated/memory_object_sections.full.json",
+                        "inspect_surface": "generated/memory-objects/memory_object_catalog.min.json",
+                        "expand_surface": "generated/memory-objects/memory_object_sections.full.json",
                     },
-                    "source_files": ["aoa-memo/examples/recall_contract.object.working.return.json"],
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.object.working.return.json"],
                 }
             if path == "/memo/writeback-map":
                 return {
@@ -287,7 +287,9 @@ class LangchainFederatedRunTests(unittest.TestCase):
                         "review_state_default": "captured",
                         "requires_human_review": False,
                     },
-                    "source_files": ["aoa-memo/examples/checkpoint_to_memory_contract.example.json"],
+                    "source_files": [
+                        "aoa-memo/mechanics/checkpoint/parts/checkpoint-to-memory-mapping/examples/checkpoint_to_memory_contract.example.json"
+                    ],
                 }
             raise AssertionError(f"unexpected route-api call: {path}")
 
@@ -340,10 +342,10 @@ class LangchainFederatedRunTests(unittest.TestCase):
                     "ok": True,
                     "contract": {
                         "mode": "working",
-                        "inspect_surface": "generated/memory_object_catalog.min.json",
-                        "expand_surface": "generated/memory_object_sections.full.json",
+                        "inspect_surface": "generated/memory-objects/memory_object_catalog.min.json",
+                        "expand_surface": "generated/memory-objects/memory_object_sections.full.json",
                     },
-                    "source_files": ["aoa-memo/examples/recall_contract.object.working.return.json"],
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.object.working.return.json"],
                 }
             if path == "/memo/inspect":
                 return {"ok": True, "entry": {"id": "checkpoint-1", "kind": "state_capsule", "summary": "Inspect"}}
@@ -361,7 +363,9 @@ class LangchainFederatedRunTests(unittest.TestCase):
                         "review_state_default": "captured",
                         "requires_human_review": False,
                     },
-                    "source_files": ["aoa-memo/examples/checkpoint_to_memory_contract.example.json"],
+                    "source_files": [
+                        "aoa-memo/mechanics/checkpoint/parts/checkpoint-to-memory-mapping/examples/checkpoint_to_memory_contract.example.json"
+                    ],
                 }
             raise AssertionError(f"unexpected route-api call: {path}")
 
@@ -429,8 +433,8 @@ class LangchainFederatedRunTests(unittest.TestCase):
             if path == "/memo/recall-contract":
                 return {
                     "ok": True,
-                    "contract": {"mode": "semantic", "inspect_surface": "generated/memory_catalog.min.json"},
-                    "source_files": ["aoa-memo/examples/recall_contract.router.semantic.json"],
+                    "contract": {"mode": "semantic", "inspect_surface": "generated/memory/memory_catalog.min.json"},
+                    "source_files": ["aoa-memo/examples/recall/recall_contract.router.semantic.json"],
                 }
             if path == "/kag/inspect":
                 return {

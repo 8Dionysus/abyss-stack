@@ -229,25 +229,33 @@ def load_routing_layer(config_path: Path, config: dict[str, Any], mirror_root: P
 def load_memo_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
     required_files = validated_required_files(config, mirror_root)
     payloads = {
-        "registry": load_json(mirror_root / "generated/memo_registry.min.json"),
-        "catalog": load_json(mirror_root / "generated/memory_catalog.min.json"),
-        "capsules": load_json(mirror_root / "generated/memory_capsules.json"),
-        "sections": load_json(mirror_root / "generated/memory_sections.full.json"),
-        "object_catalog": load_json(mirror_root / "generated/memory_object_catalog.min.json"),
-        "object_capsules": load_json(mirror_root / "generated/memory_object_capsules.json"),
-        "object_sections": load_json(mirror_root / "generated/memory_object_sections.full.json"),
-        "checkpoint_contract": load_json(mirror_root / "examples/checkpoint_to_memory_contract.example.json"),
-        "runtime_writeback_targets": load_json(mirror_root / "generated/runtime_writeback_targets.min.json"),
+        "registry": load_json(mirror_root / "generated/memory/memo_registry.min.json"),
+        "catalog": load_json(mirror_root / "generated/memory/memory_catalog.min.json"),
+        "capsules": load_json(mirror_root / "generated/memory/memory_capsules.json"),
+        "sections": load_json(mirror_root / "generated/memory/memory_sections.full.json"),
+        "object_catalog": load_json(mirror_root / "generated/memory-objects/memory_object_catalog.min.json"),
+        "object_capsules": load_json(mirror_root / "generated/memory-objects/memory_object_capsules.json"),
+        "object_sections": load_json(mirror_root / "generated/memory-objects/memory_object_sections.full.json"),
+        "checkpoint_contract": load_json(
+            mirror_root
+            / "mechanics/checkpoint/parts/checkpoint-to-memory-mapping/examples/checkpoint_to_memory_contract.example.json"
+        ),
+        "runtime_writeback_targets": load_json(
+            mirror_root
+            / "mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json"
+        ),
         "recall_contracts": {
             "router": {
-                "semantic": load_json(mirror_root / "examples/recall_contract.router.semantic.json"),
-                "lineage": load_json(mirror_root / "examples/recall_contract.router.lineage.json"),
+                "semantic": load_json(mirror_root / "examples/recall/recall_contract.router.semantic.json"),
+                "lineage": load_json(mirror_root / "examples/recall/recall_contract.router.lineage.json"),
             },
             "object": {
-                "working": load_json(mirror_root / "examples/recall_contract.object.working.json"),
-                "semantic": load_json(mirror_root / "examples/recall_contract.object.semantic.json"),
-                "lineage": load_json(mirror_root / "examples/recall_contract.object.lineage.json"),
-                "working_return": load_json(mirror_root / "examples/recall_contract.object.working.return.json"),
+                "working": load_json(mirror_root / "examples/recall/recall_contract.object.working.json"),
+                "semantic": load_json(mirror_root / "examples/recall/recall_contract.object.semantic.json"),
+                "lineage": load_json(mirror_root / "examples/recall/recall_contract.object.lineage.json"),
+                "working_return": load_json(
+                    mirror_root / "examples/recall/recall_contract.object.working.return.json"
+                ),
             },
         },
     }
@@ -1336,12 +1344,12 @@ def memo_source_file(
     surface: Literal["catalog", "capsules", "sections"],
 ) -> str:
     return {
-        ("doctrine", "catalog"): "aoa-memo/generated/memory_catalog.min.json",
-        ("doctrine", "capsules"): "aoa-memo/generated/memory_capsules.json",
-        ("doctrine", "sections"): "aoa-memo/generated/memory_sections.full.json",
-        ("object", "catalog"): "aoa-memo/generated/memory_object_catalog.min.json",
-        ("object", "capsules"): "aoa-memo/generated/memory_object_capsules.json",
-        ("object", "sections"): "aoa-memo/generated/memory_object_sections.full.json",
+        ("doctrine", "catalog"): "aoa-memo/generated/memory/memory_catalog.min.json",
+        ("doctrine", "capsules"): "aoa-memo/generated/memory/memory_capsules.json",
+        ("doctrine", "sections"): "aoa-memo/generated/memory/memory_sections.full.json",
+        ("object", "catalog"): "aoa-memo/generated/memory-objects/memory_object_catalog.min.json",
+        ("object", "capsules"): "aoa-memo/generated/memory-objects/memory_object_capsules.json",
+        ("object", "sections"): "aoa-memo/generated/memory-objects/memory_object_sections.full.json",
     }[(family, surface)]
 
 
@@ -1392,7 +1400,7 @@ def resolve_memo_recall_contract(
             raise HTTPException(status_code=400, detail="return_ready is only supported for family=object and mode=working")
         if mode not in {"semantic", "lineage"}:
             raise HTTPException(status_code=400, detail="router family supports only semantic or lineage modes")
-        rel_path = f"examples/recall_contract.router.{mode}.json"
+        rel_path = f"examples/recall/recall_contract.router.{mode}.json"
         contract = payloads[mode]
     else:
         if mode not in {"working", "semantic", "lineage"}:
@@ -1400,10 +1408,10 @@ def resolve_memo_recall_contract(
         if return_ready:
             if mode != "working":
                 raise HTTPException(status_code=400, detail="return_ready requires family=object and mode=working")
-            rel_path = "examples/recall_contract.object.working.return.json"
+            rel_path = "examples/recall/recall_contract.object.working.return.json"
             contract = payloads["working_return"]
         else:
-            rel_path = f"examples/recall_contract.object.{mode}.json"
+            rel_path = f"examples/recall/recall_contract.object.{mode}.json"
             contract = payloads[mode]
 
     return {
@@ -1429,9 +1437,9 @@ def resolve_writeback_map(store: AppStore, runtime_surface: str) -> dict[str, An
             "runtime_boundary": checkpoint_contract["runtime_boundary"],
             "mapping": mapping,
             "source_files": [
-                "aoa-memo/generated/runtime_writeback_targets.min.json",
-                "aoa-memo/examples/checkpoint_to_memory_contract.example.json",
-                "aoa-memo/docs/RUNTIME_WRITEBACK_SEAM.md",
+                "aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json",
+                "aoa-memo/mechanics/checkpoint/parts/checkpoint-to-memory-mapping/examples/checkpoint_to_memory_contract.example.json",
+                "aoa-memo/mechanics/writeback/docs/RUNTIME_WRITEBACK_SEAM.md",
             ],
         }
     raise HTTPException(status_code=404, detail=f"no aoa-memo writeback mapping found for runtime_surface={runtime_surface}")

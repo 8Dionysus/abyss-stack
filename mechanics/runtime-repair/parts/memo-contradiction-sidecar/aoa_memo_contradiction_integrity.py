@@ -87,10 +87,12 @@ def read_text(path: Path) -> str:
 
 
 def object_catalog_by_id(memo_root: Path) -> dict[str, dict[str, Any]]:
-    catalog = read_json(memo_root / "generated" / "memory_object_catalog.min.json")
+    catalog = read_json(memo_root / "generated" / "memory-objects" / "memory_object_catalog.min.json")
     objects = catalog.get("memory_objects")
     if not isinstance(objects, list):
-        raise SystemExit("error: memo generated/memory_object_catalog.min.json must contain memory_objects")
+        raise SystemExit(
+            "error: memo generated/memory-objects/memory_object_catalog.min.json must contain memory_objects"
+        )
     by_id: dict[str, dict[str, Any]] = {}
     for item in objects:
         if isinstance(item, dict) and isinstance(item.get("id"), str):
@@ -99,10 +101,12 @@ def object_catalog_by_id(memo_root: Path) -> dict[str, dict[str, Any]]:
 
 
 def object_sections_by_id(memo_root: Path) -> dict[str, dict[str, str]]:
-    payload = read_json(memo_root / "generated" / "memory_object_sections.full.json")
+    payload = read_json(memo_root / "generated" / "memory-objects" / "memory_object_sections.full.json")
     objects = payload.get("memory_objects")
     if not isinstance(objects, list):
-        raise SystemExit("error: memo generated/memory_object_sections.full.json must contain memory_objects")
+        raise SystemExit(
+            "error: memo generated/memory-objects/memory_object_sections.full.json must contain memory_objects"
+        )
     by_id: dict[str, dict[str, str]] = {}
     for item in objects:
         if not isinstance(item, dict) or not isinstance(item.get("id"), str):
@@ -285,7 +289,7 @@ def validate_runtime_logs(logs: dict[str, Any], failures: list[str]) -> None:
     require(failure_map.get("recall_mode") == "memo-only", failures, "failure_map.json", "recall_mode mismatch")
     require(failure_map.get("escalation_required") is False, failures, "failure_map.json", "unexpected escalation")
     require(
-        "repo:aoa-memo/generated/memory_object_sections.full.json" in refs,
+        "repo:aoa-memo/generated/memory-objects/memory_object_sections.full.json" in refs,
         failures,
         "failure_map.json",
         "must include expand surface",

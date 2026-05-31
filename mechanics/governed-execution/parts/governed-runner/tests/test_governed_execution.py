@@ -706,7 +706,7 @@ class GovernedExecutionTests(unittest.TestCase):
                         "writeback_class": "memo_surviving_event",
                         "requires_human_review": True,
                         "review_state_default": "proposed",
-                        "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                        "runtime_refs": ["docs/memory/MEMORY_MODEL.md#approval-record"],
                         "notes": "Fixture approval writeback.",
                     }
                 ]
@@ -719,6 +719,10 @@ class GovernedExecutionTests(unittest.TestCase):
             / "Knowledge"
             / "federation"
             / "aoa-memo"
+            / "mechanics"
+            / "writeback"
+            / "parts"
+            / "runtime-and-temperature"
             / "generated"
             / "runtime_writeback_targets.min.json",
             memo_targets,
@@ -728,6 +732,10 @@ class GovernedExecutionTests(unittest.TestCase):
             / "Knowledge"
             / "federation"
             / "aoa-memo"
+            / "mechanics"
+            / "writeback"
+            / "parts"
+            / "runtime-and-temperature"
             / "generated"
             / "runtime_writeback_intake.min.json",
             {
@@ -740,11 +748,11 @@ class GovernedExecutionTests(unittest.TestCase):
                             "writeback_class": "memo_surviving_event",
                             "requires_human_review": True,
                             "review_state_default": "proposed",
-                            "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                            "runtime_refs": ["docs/memory/MEMORY_MODEL.md#approval-record"],
                             "owner_review_refs": [
-                                "docs/MEMORY_MODEL.md#approval-record",
-                                "docs/RUNTIME_WRITEBACK_SEAM.md",
-                                "docs/QUEST_EVIDENCE_WRITEBACK.md",
+                                "docs/memory/MEMORY_MODEL.md#approval-record",
+                                "mechanics/writeback/docs/RUNTIME_WRITEBACK_SEAM.md",
+                                "mechanics/writeback/docs/QUEST_EVIDENCE_WRITEBACK.md",
                             ],
                             "intake_posture": "review_before_writeback",
                         }
@@ -759,6 +767,10 @@ class GovernedExecutionTests(unittest.TestCase):
             / "Knowledge"
             / "federation"
             / "aoa-memo"
+            / "mechanics"
+            / "checkpoint"
+            / "parts"
+            / "checkpoint-to-memory-mapping"
             / "examples"
             / "checkpoint_to_memory_contract.example.json",
             {
@@ -774,7 +786,7 @@ class GovernedExecutionTests(unittest.TestCase):
                             "temperature_hint": "warm",
                             "review_state_default": "proposed",
                             "requires_human_review": True,
-                            "runtime_refs": ["docs/MEMORY_MODEL.md#approval-record"],
+                            "runtime_refs": ["docs/memory/MEMORY_MODEL.md#approval-record"],
                             "notes": "Fixture approval writeback.",
                         }
                     ]
@@ -2339,7 +2351,7 @@ class GovernedExecutionTests(unittest.TestCase):
             [
                 "aoa-playbooks/generated/playbook_review_packet_contracts.min.json",
                 "aoa-evals/generated/runtime_candidate_template_index.min.json",
-                "aoa-memo/generated/runtime_writeback_targets.min.json",
+                "aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json",
             ],
         )
         recommended_targets = {(item["owner_repo"], item["ref"]) for item in audit["recommended_review_targets"]}
@@ -2348,7 +2360,7 @@ class GovernedExecutionTests(unittest.TestCase):
             ("aoa-evals", "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json"),
             recommended_targets,
         )
-        self.assertIn(("aoa-memo", "docs/MEMORY_MODEL.md#approval-record"), recommended_targets)
+        self.assertIn(("aoa-memo", "docs/memory/MEMORY_MODEL.md#approval-record"), recommended_targets)
 
     def test_audit_review_packets_blocks_when_emitted_artifact_is_missing(self) -> None:
         stack_root = self.install_review_packet_runtime_surfaces()
@@ -2603,6 +2615,10 @@ class GovernedExecutionTests(unittest.TestCase):
             / "Knowledge"
             / "federation"
             / "aoa-memo"
+            / "mechanics"
+            / "writeback"
+            / "parts"
+            / "runtime-and-temperature"
             / "generated"
             / "runtime_writeback_intake.min.json"
         ).unlink()
@@ -2753,7 +2769,7 @@ class GovernedExecutionTests(unittest.TestCase):
         self.assertIn("review_handoff_bundle.json", rendered)
         self.assertIn("handoff_readiness", rendered)
         self.assertIn("grouped_review_targets", rendered)
-        self.assertIn("docs/RUNTIME_WRITEBACK_SEAM.md", rendered)
+        self.assertIn("mechanics/writeback/docs/RUNTIME_WRITEBACK_SEAM.md", rendered)
 
     def test_render_status_explain_uses_handoff_bundle_readiness_fallback(self) -> None:
         rendered = self.module.render_status_explain(
