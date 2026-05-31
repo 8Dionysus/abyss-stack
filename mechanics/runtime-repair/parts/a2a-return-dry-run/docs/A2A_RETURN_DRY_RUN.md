@@ -91,4 +91,4 @@ Use `--write` only when a private runtime-local candidate file is wanted.
 - `repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json`
 - `repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md`
 - `repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json`
-- `repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md`
+- `repo:aoa-memo/mechanics/writeback/docs/A2A_CHILD_RETURN_WRITEBACK.md`

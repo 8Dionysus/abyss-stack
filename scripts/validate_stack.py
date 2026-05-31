@@ -911,8 +911,8 @@ REQUIRED_FILES = {
 
 FEDERATION_REQUIRED_RUNTIME_INPUTS = {
     Path("config-templates") / "Configs" / "federation" / "aoa-memo.yaml": {
-        "generated/runtime_writeback_targets.min.json",
-        "generated/runtime_writeback_intake.min.json",
+        "mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_targets.min.json",
+        "mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_intake.min.json",
     },
     Path("config-templates") / "Configs" / "federation" / "aoa-evals.yaml": {
         "generated/runtime_candidate_template_index.min.json",

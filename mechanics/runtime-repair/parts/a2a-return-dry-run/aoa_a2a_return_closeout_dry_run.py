@@ -17,7 +17,7 @@ BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream
 RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH = Path("Configs/federation/upstream-compatibility-bridge.json")
 PLAYBOOK_REF = "repo:aoa-playbooks/playbooks/a2a-summon-return-checkpoint/PLAYBOOK.md"
 EVAL_HOOK_REF = "repo:aoa-evals/examples/artifact_to_verdict_hook.a2a-summon-return-checkpoint.example.json"
-MEMO_WRITEBACK_REF = "repo:aoa-memo/docs/A2A_CHILD_RETURN_WRITEBACK.md"
+MEMO_WRITEBACK_REF = "repo:aoa-memo/mechanics/writeback/docs/A2A_CHILD_RETURN_WRITEBACK.md"
 SDK_REVIEWED_CLOSEOUT_REF = "repo:aoa-sdk/examples/a2a/reviewed_closeout_request.example.json"
 SDK_E2E_FIXTURE_REF = "repo:aoa-sdk/examples/a2a/summon_return_checkpoint_e2e.fixture.json"
 

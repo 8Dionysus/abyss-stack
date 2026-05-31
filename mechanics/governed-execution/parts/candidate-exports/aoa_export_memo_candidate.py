@@ -51,6 +51,10 @@ def load_mapping(stack_root: Path, runtime_surface: str) -> tuple[Path, dict, di
         / "Knowledge"
         / "federation"
         / "aoa-memo"
+        / "mechanics"
+        / "checkpoint"
+        / "parts"
+        / "checkpoint-to-memory-mapping"
         / "examples"
         / "checkpoint_to_memory_contract.example.json"
     )

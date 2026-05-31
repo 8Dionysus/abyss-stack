@@ -61,7 +61,7 @@ def section_object(object_id: str, kind: str, status: str, review_state: str, tr
 
 def make_memo_root(root: Path) -> None:
     write_json(
-        root / "generated" / "memory_object_catalog.min.json",
+        root / "generated" / "memory-objects" / "memory_object_catalog.min.json",
         {
             "memory_objects": [
                 {
@@ -80,7 +80,7 @@ def make_memo_root(root: Path) -> None:
         },
     )
     write_json(
-        root / "generated" / "memory_object_sections.full.json",
+        root / "generated" / "memory-objects" / "memory_object_sections.full.json",
         {
             "memory_objects": [
                 section_object(
@@ -185,7 +185,9 @@ def make_stack_root(root: Path) -> None:
         root / "Logs" / "memo-contradiction-rerun" / "validation-remediation-recall-rerun" / "failure_map.json",
         {
             "recall_mode": "memo-only",
-            "inspect_capsule_expand_refs": ["repo:aoa-memo/generated/memory_object_sections.full.json"],
+            "inspect_capsule_expand_refs": [
+                "repo:aoa-memo/generated/memory-objects/memory_object_sections.full.json"
+            ],
             "escalation_required": False,
         },
     )
