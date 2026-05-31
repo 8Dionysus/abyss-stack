@@ -29,6 +29,10 @@ def main() -> None:
     surface.add_argument("--kind", default="ai")
     surface.add_argument("--scope", default="now")
     surface.add_argument("--mode", default="hybrid")
+    surface.add_argument("--axis", default="")
+    surface.add_argument("--reader-profile", default="agent")
+    surface.add_argument("--limit", type=int, default=20)
+    surface.add_argument("--evidence-limit", type=int, default=12)
 
     evidence = sub.add_parser("evidence-map")
     evidence.add_argument("--layer")
@@ -42,6 +46,24 @@ def main() -> None:
     recall = sub.add_parser("recall")
     recall.add_argument("query")
     recall.add_argument("--mode", default="hybrid")
+
+    maps = sub.add_parser("maps")
+    maps.add_argument("--axis")
+    maps.add_argument("--query", default="")
+    maps.add_argument("--limit", type=int, default=40)
+
+    packet = sub.add_parser("context-packet")
+    packet.add_argument("--axis")
+    packet.add_argument("--query", default="")
+    packet.add_argument("--reader-profile", default="agent")
+    packet.add_argument("--limit", type=int, default=20)
+
+    rag = sub.add_parser("rag-trace")
+    rag.add_argument("--query", required=True)
+    rag.add_argument("--axis", default="by-rag-run")
+    rag.add_argument("--reader-profile", default="retrieval-context")
+    rag.add_argument("--limit", type=int, default=8)
+    rag.add_argument("--evidence-limit", type=int, default=12)
 
     resource = sub.add_parser("read-resource")
     resource.add_argument("uri")
@@ -67,6 +89,10 @@ def main() -> None:
                 kind=args.kind,
                 scope=args.scope,
                 mode=args.mode,
+                axis=args.axis,
+                reader_profile=args.reader_profile,
+                limit=args.limit,
+                evidence_limit=args.evidence_limit,
             )
         )
     elif args.command == "evidence-map":
@@ -75,6 +101,20 @@ def main() -> None:
         _print(state.machine_route(intent=args.intent, work_class=args.work_class, kind=args.kind))
     elif args.command == "recall":
         _print(state.recall(query=args.query, mode=args.mode))
+    elif args.command == "maps":
+        _print(state.machine_maps(axis=args.axis, query=args.query, limit=args.limit))
+    elif args.command == "context-packet":
+        _print(state.machine_context_packet(axis=args.axis, query=args.query, reader_profile=args.reader_profile, limit=args.limit))
+    elif args.command == "rag-trace":
+        _print(
+            state.machine_rag_trace(
+                query=args.query,
+                axis=args.axis,
+                reader_profile=args.reader_profile,
+                limit=args.limit,
+                evidence_limit=args.evidence_limit,
+            )
+        )
     elif args.command == "read-resource":
         _print(state.read_resource(args.uri))
     elif args.command == "surfaces":

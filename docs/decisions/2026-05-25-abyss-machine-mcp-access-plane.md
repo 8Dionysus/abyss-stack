@@ -30,8 +30,9 @@ for the stable Codex server name `abyss_machine`.
 
 The service exposes compact resources, tools, and prompts for machine briefs,
 owner boundaries, evidence maps, selected safe read surfaces, focused nervous
-recall, and non-mutating route preflight. It reads only allowlisted
-`abyss-machine ... --json` commands.
+recall, machine atlas context, read-only machine RAG traces, and non-mutating
+route preflight. It reads only allowlisted `abyss-machine ... --json`
+commands.
 
 ## Rationale
 
@@ -47,6 +48,15 @@ the entire host bridge archive into context.
 ## Consequences
 
 - Agents can ask `abyss_machine` for the current compact machine map.
+- Read-only machine atlas map queries and host-owned reader-profile context
+  packets may be exposed through the same MCP access plane as route signals,
+  while atlas and packet authority remain in `abyss-machine`.
+- Context packets are not destinations and do not deliver machine moments into
+  AoA organs.
+- Read-only machine RAG traces may be exposed as generated
+  maps-to-evidence trace results with local trace evals. They are not proof
+  verdicts, reviewed memory, KAG truth, operator authorization, or AoA organ
+  delivery.
 - Host evidence refs and truth owners stay visible in every response.
 - The service stays stdio-only and read-only.
 - Route planning remains preflight-only and does not launch, repair, restart,

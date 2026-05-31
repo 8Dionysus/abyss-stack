@@ -34,15 +34,23 @@ Resources:
 - `abyss-machine://resource-status`
 - `abyss-machine://memory-pressure`
 - `abyss-machine://typing-status`
+- `abyss-machine://maps`
+- `abyss-machine://maps/{axis}`
+- `abyss-machine://context-packet/{reader_profile}`
+- `abyss-machine://rag`
+- `abyss-machine://rag-validate`
 - `abyss-machine://surface/{name}`
 
 Tools:
 
 - `abyss_machine_brief(profile, evidence_limit)`
-- `abyss_machine_surface(name, query, work_class, kind, scope, mode)`
+- `abyss_machine_surface(name, query, work_class, kind, scope, mode, axis, reader_profile, limit, evidence_limit)`
 - `abyss_machine_evidence_map(layer, limit)`
 - `abyss_machine_route(intent, work_class, kind)`
 - `abyss_machine_recall(query, mode)`
+- `abyss_machine_maps(axis, query, limit)`
+- `abyss_machine_context_packet(axis, query, reader_profile, limit)`
+- `abyss_machine_rag_trace(query, axis, reader_profile, limit, evidence_limit)`
 
 Prompts:
 
@@ -50,6 +58,8 @@ Prompts:
 - `before-heavy-work`
 - `typing-context`
 - `nervous-recall`
+- `machine-atlas`
+- `machine-rag-trace`
 - `host-incident-triage`
 
 Every response carries an authority boundary and keeps source refs visible.

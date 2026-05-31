@@ -39,6 +39,11 @@ For host-machine context work, `mcp/services/abyss-machine-mcp/` exposes
 `abyss-machine` bridge, evidence, resource, memory, typing, nervous, heartbeat,
 and change-ledger read models while keeping host authority in `abyss-machine`.
 
+For session-evidence context work, `mcp/services/aoa-session-memory-mcp/`
+exposes `.aoa` search, route traces, atlas maps, session briefs, retrieval
+packets, freshness checks, and diagnostics while keeping raw/session authority
+in `.aoa`.
+
 ## Validation
 
 For `aoa-memo-mcp` changes, run:
@@ -60,6 +65,13 @@ For `abyss-machine-mcp` changes, run:
 ```bash
 python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
 python -m pytest mcp/services/abyss-machine-mcp/tests -q
+```
+
+For `aoa-session-memory-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
+python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:

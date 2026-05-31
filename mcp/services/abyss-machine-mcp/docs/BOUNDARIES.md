@@ -19,9 +19,10 @@ authority boundaries.
 The fast brief reads `stack-bridge`, which is an owner-routed bridge contract
 and evidence map. Targeted surfaces read one live command at a time.
 
-Generated latest files and bridge refs are evidence. They help agents route
-work, but they are weaker than source contracts under `/etc/abyss-machine` and
-operator intent.
+Generated latest files, bridge refs, machine atlas map entries, context
+packets, and machine RAG traces are evidence. They help agents route work, but
+they are weaker than source contracts under `/etc/abyss-machine` and operator
+intent.
 
 ## Stop Lines
 
@@ -32,4 +33,5 @@ operator intent.
   or game roots.
 - No private raw capture reads by default.
 - No memory landing, proof verdict, or evidence acceptance.
+- No KAG publication or delivery into AoA organs.
 - No non-stdio exposure without a later decision.

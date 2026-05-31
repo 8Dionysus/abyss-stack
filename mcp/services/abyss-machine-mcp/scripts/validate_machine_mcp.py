@@ -46,6 +46,27 @@ def main() -> None:
     typing = state.surface("typing-status")
     if not typing["ok"]:
         raise SystemExit(f"typing status surface failed: {typing}")
+    maps = state.machine_maps(axis="by-freshness", query="semantic", limit=4)
+    if not maps["ok"]:
+        raise SystemExit(f"machine maps surface failed: {maps}")
+    packet = state.machine_context_packet(axis="by-eval-packet", reader_profile="proof-context", limit=4)
+    if not packet["ok"]:
+        raise SystemExit(f"machine context packet surface failed: {packet}")
+    if packet.get("packet_schema") not in {"abyss_machine_maps_context_packet_v1", "abyss_machine_maps_packet_v1"}:
+        raise SystemExit(f"machine context packet schema drifted: {packet}")
+    maps_validate = state.surface("maps-validate")
+    if not maps_validate["ok"]:
+        raise SystemExit(f"machine maps validator surface failed: {maps_validate}")
+    rag = state.machine_rag_trace("validate abyss-machine MCP RAG trace", limit=4, evidence_limit=6)
+    if not rag["ok"]:
+        raise SystemExit(f"machine RAG trace surface failed: {rag}")
+    if rag.get("trace_schema") != "abyss_machine_rag_trace_v1":
+        raise SystemExit(f"machine RAG trace schema drifted: {rag}")
+    if rag.get("eval", {}).get("ok") is not True:
+        raise SystemExit(f"machine RAG trace eval failed: {rag}")
+    rag_validate = state.surface("rag-validate")
+    if not rag_validate["ok"]:
+        raise SystemExit(f"machine RAG validator surface failed: {rag_validate}")
     route = state.machine_route("validate abyss-machine MCP route posture", work_class="heavy", kind="ai")
     if route["mutates"]:
         raise SystemExit("route tool must remain non-mutating")
@@ -65,6 +86,13 @@ def main() -> None:
                 "evidence_count": brief["evidence"]["count"],
                 "memory_surface_ok": memory["ok"],
                 "typing_surface_ok": typing["ok"],
+                "maps_surface_ok": maps["ok"],
+                "maps_result_count": maps["result_count"],
+                "context_packet_ok": packet["ok"],
+                "context_packet_schema": packet.get("packet_schema"),
+                "rag_trace_ok": rag["ok"],
+                "rag_trace_schema": rag.get("trace_schema"),
+                "rag_eval_ok": rag.get("eval", {}).get("ok"),
                 "route_posture": route["route_posture"],
             },
             indent=2,
