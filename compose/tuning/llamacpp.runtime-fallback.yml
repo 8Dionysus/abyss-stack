@@ -1,5 +1,5 @@
 services:
   llama-cpp:
-    image: ghcr.io/ggml-org/llama.cpp:server@sha256:bdf0f32d2a5f941674b03ce21d40624221553f4e6869931e07391c6174c88eb4
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:1c2e5802addaaf61684532d828664027b5daaf2e2b29943cf338b7005e4ea9ca
     security_opt:
       - label=disable
