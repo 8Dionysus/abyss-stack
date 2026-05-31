@@ -174,9 +174,10 @@ def load_agents_layer(config_path: Path, config: dict[str, Any], mirror_root: Pa
 
     artifact_contracts: dict[str, dict[str, Any]] = {}
     for rel_path in required_files:
-        if not rel_path.startswith("schemas/artifact.") or not rel_path.endswith(".schema.json"):
+        schema_name = Path(rel_path).name
+        if not schema_name.startswith("artifact.") or not schema_name.endswith(".schema.json"):
             continue
-        artifact_type = rel_path.removeprefix("schemas/artifact.").removesuffix(".schema.json")
+        artifact_type = schema_name.removeprefix("artifact.").removesuffix(".schema.json")
         artifact_contracts[artifact_type] = {
             "artifact_type": artifact_type,
             "schema_file": rel_path,

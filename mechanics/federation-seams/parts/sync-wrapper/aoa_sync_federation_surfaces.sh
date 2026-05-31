@@ -340,11 +340,11 @@ sync_layer() {
   if [[ "$layer" == "aoa-agents" ]]; then
     local artifact_schema_count=0
     for rel_path in "${required_paths[@]}"; do
-      if [[ "$rel_path" == schemas/artifact.*.schema.json ]]; then
+      if [[ "$(basename -- "$rel_path")" == artifact.*.schema.json ]]; then
         artifact_schema_count=$((artifact_schema_count + 1))
       fi
     done
-    ((artifact_schema_count > 0)) || aoa_die "no artifact schemas found under ${source_root}/schemas"
+    ((artifact_schema_count > 0)) || aoa_die "no artifact schemas found in aoa-agents federation required paths"
   fi
 
   aoa_note "layer: ${layer}"
@@ -444,7 +444,7 @@ check_layer() {
     if (( json_mode )); then
       emit_check_json "${layer}" "missing" "${source_root}" "${target_root}" "${missing_paths[@]}"
     else
-      aoa_warn "missing mirrored files for ${layer}:"
+      printf 'warning: missing mirrored files for %s:\n' "${layer}" >&2
       for rel_path in "${missing_paths[@]}"; do
         printf '  %s\n' "${rel_path}"
       done
