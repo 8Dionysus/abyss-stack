@@ -109,6 +109,28 @@ for rel_path in required_files:
 PY
 }
 
+load_bridge_runtime_evidence_refs() {
+  local config_dir="$1"
+  python3 - "$config_dir/upstream-compatibility-bridge.json" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+bridge_path = Path(sys.argv[1])
+payload = json.loads(bridge_path.read_text(encoding="utf-8"))
+templates = payload.get("runtime_evidence_templates")
+if not isinstance(templates, dict):
+    raise SystemExit(f"runtime_evidence_templates missing or invalid in {bridge_path}")
+for name, template in templates.items():
+    if not isinstance(template, dict):
+        raise SystemExit(f"invalid runtime evidence template bridge entry: {name!r}")
+    upstream_ref = template.get("upstream_source_ref")
+    if not isinstance(upstream_ref, str) or not upstream_ref:
+        raise SystemExit(f"upstream_source_ref missing for runtime evidence template bridge entry: {name}")
+    print(upstream_ref)
+PY
+}
+
 resolve_layer_source_rel() {
   local layer="$1"
   local rel_path="$2"
@@ -308,6 +330,11 @@ sync_layer() {
   while IFS= read -r rel_path; do
     required_paths+=("${rel_path}")
   done < <(load_required_paths "${config_path}")
+  if [[ "$layer" == "aoa-evals" ]]; then
+    while IFS= read -r rel_path; do
+      required_paths+=("${rel_path}")
+    done < <(load_bridge_runtime_evidence_refs "${config_dir}")
+  fi
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
   if [[ "$layer" == "aoa-agents" ]]; then
@@ -392,6 +419,11 @@ check_layer() {
   while IFS= read -r rel_path; do
     required_paths+=("${rel_path}")
   done < <(load_required_paths "${config_path}")
+  if [[ "$layer" == "aoa-evals" ]]; then
+    while IFS= read -r rel_path; do
+      required_paths+=("${rel_path}")
+    done < <(load_bridge_runtime_evidence_refs "${config_dir}")
+  fi
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
   if (( ! json_mode )); then
