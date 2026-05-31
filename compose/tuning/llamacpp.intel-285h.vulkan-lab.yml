@@ -5,7 +5,7 @@
 # server-vulkan build on this host.
 services:
   llama-cpp:
-    image: ghcr.io/ggml-org/llama.cpp:server-vulkan@sha256:c05a008e7da3061acd8951520959d97ab0c692e3041f78206978a54579a66f9e
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan@sha256:dca559dd886b415b4ced54f09197a2d84b55c432736a3a3fccca82359444f50c
     labels:
       aoa.tuning.overlay: "llamacpp.intel-285h.vulkan-lab"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
