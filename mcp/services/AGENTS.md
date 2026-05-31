@@ -46,6 +46,13 @@ python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py
 python -m pytest mcp/services/abyss-machine-mcp/tests -q
 ```
 
+For `aoa-session-memory-mcp`, run:
+
+```bash
+python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
+python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash

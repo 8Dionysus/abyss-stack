@@ -1,0 +1,325 @@
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from .core import AoASessionMemoryMCPState
+
+
+LOGGER = logging.getLogger(__name__)
+
+
+def build_server(
+    workspace_root: str | Path | None = None,
+    aoa_root: str | Path | None = None,
+    script_path: str | Path | None = None,
+) -> Any:
+    try:
+        from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
+
+    mcp = FastMCP("aoa-session-memory-mcp", json_response=True)
+
+    def current_state() -> AoASessionMemoryMCPState:
+        return AoASessionMemoryMCPState.discover(
+            workspace_root=workspace_root,
+            aoa_root=aoa_root,
+            script_path=script_path,
+        )
+
+    @mcp.tool()
+    def aoa_session_memory_status(include_live: bool = False) -> dict[str, Any]:
+        """Report .aoa search, atlas, route-readiness, and freshness posture."""
+        return current_state().session_memory_status(include_live=include_live)
+
+    @mcp.tool()
+    def aoa_session_search(query: str, filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
+        """Search .aoa session evidence and return route refs plus freshness data."""
+        return current_state().session_search(query=query, filters=filters, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_trace(
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 20,
+        per_route_limit: int = 10,
+        session: str = "",
+        doc_type: str = "session",
+    ) -> dict[str, Any]:
+        """Resolve an anchor into route candidates and evidence hits."""
+        return current_state().session_trace(
+            anchor=anchor,
+            kind=kind,
+            limit=limit,
+            per_route_limit=per_route_limit,
+            session=session,
+            doc_type=doc_type,
+        )
+
+    @mcp.tool()
+    def aoa_session_route(
+        axis: str,
+        key: str = "",
+        limit: int = 20,
+        include_entry_payloads: bool = False,
+    ) -> dict[str, Any]:
+        """Read a generated atlas map axis without replacing its evidence refs."""
+        return current_state().session_route(
+            axis=axis,
+            key=key,
+            limit=limit,
+            include_entry_payloads=include_entry_payloads,
+        )
+
+    @mcp.tool()
+    def aoa_session_brief(session: str = "latest", max_segments: int = 5) -> dict[str, Any]:
+        """Return a compact session brief with manifest/index/raw refs."""
+        return current_state().session_brief(session=session, max_segments=max_segments)
+
+    @mcp.tool()
+    def aoa_session_retrieve(
+        recipe: str = "continue-session",
+        query: str = "",
+        session: str = "",
+        limit: int = 8,
+        event_limit: int = 12,
+    ) -> dict[str, Any]:
+        """Build a compact .aoa retrieval packet for review."""
+        return current_state().session_retrieve(
+            recipe=recipe,
+            query=query,
+            session=session,
+            limit=limit,
+            event_limit=event_limit,
+        )
+
+    @mcp.tool()
+    def aoa_session_evidence_packet(
+        intent: str,
+        query: str = "",
+        anchors: list[str] | None = None,
+        refs: list[str] | None = None,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Collect candidate evidence refs for a decision, writeback, debug, or review intent."""
+        return current_state().session_evidence_packet(
+            intent=intent,
+            query=query,
+            anchors=anchors,
+            refs=refs,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def aoa_session_freshness_check(refs: list[str] | None = None) -> dict[str, Any]:
+        """Check whether evidence refs are present and whether the search provider is ready."""
+        return current_state().session_freshness_check(refs=refs)
+
+    @mcp.tool()
+    def aoa_session_pattern_scan(pattern: str, filters: dict[str, Any] | None = None, limit: int = 50) -> dict[str, Any]:
+        """Aggregate recurring session-event patterns from .aoa search hits."""
+        return current_state().session_pattern_scan(pattern=pattern, filters=filters, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_latest_diagnostics(
+        kind: str = "route-layer-readiness",
+        limit: int = 5,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        """Read latest .aoa diagnostics summaries without mutating the archive."""
+        return current_state().latest_diagnostics(kind=kind, limit=limit, include_payload=include_payload)
+
+    @mcp.tool()
+    def aoa_session_maintenance_plan() -> dict[str, Any]:
+        """Return a non-mutating maintenance plan for stale search/atlas/readiness surfaces."""
+        return current_state().maintenance_plan()
+
+    @mcp.tool()
+    def aoa_session_graph_neighborhood(anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
+        """Return graph nodes, edges, evidence refs, and freshness around an operational anchor."""
+        return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_graph_timeline(anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
+        """Return event timeline nodes near a skill, MCP, hook, tool, path, or route anchor."""
+        return current_state().graph_timeline(anchor=anchor, kind=kind, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_graph_shortest_path(source: str, target: str, kind: str = "auto", max_depth: int = 4) -> dict[str, Any]:
+        """Find a bounded evidence graph path between two operational anchors."""
+        return current_state().graph_shortest_path(source=source, target=target, kind=kind, max_depth=max_depth)
+
+    @mcp.tool()
+    def aoa_session_graph_cooccurrence(anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
+        """Aggregate route-signal cooccurrences around an anchor with evidence samples."""
+        return current_state().graph_cooccurrence(anchor=anchor, kind=kind, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_graphrag_packet(
+        query: str,
+        anchor: str = "",
+        mode: str = "hybrid",
+        limit: int = 8,
+        include_semantic_context: bool = False,
+        rerank_local: bool = False,
+    ) -> dict[str, Any]:
+        """Build a GraphRAG evidence packet: lexical hits, graph expansion, cooccurrence, refs, freshness."""
+        return current_state().graphrag_packet(
+            query=query,
+            anchor=anchor,
+            mode=mode,
+            limit=limit,
+            include_semantic_context=include_semantic_context,
+            rerank_local=rerank_local,
+        )
+
+    @mcp.tool()
+    def aoa_session_explain_graph_packet(
+        intent: str,
+        anchor: str = "",
+        query: str = "",
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Explain how a graph/GraphRAG evidence packet was assembled and which refs bound it."""
+        return current_state().explain_graph_packet(intent=intent, anchor=anchor, query=query, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_graph_eval(
+        limit: int = 6,
+        include_semantic_context: bool = False,
+        rerank_local: bool = False,
+    ) -> dict[str, Any]:
+        """Compare lexical, vector, graph, hybrid, and GraphRAG surfaces on known debug anchors."""
+        return current_state().graph_eval(
+            limit=limit,
+            include_semantic_context=include_semantic_context,
+            rerank_local=rerank_local,
+        )
+
+    @mcp.tool()
+    def aoa_session_graph_quality_audit(
+        limit: int = 4,
+        sample_ref_limit: int = 2,
+        anchors: list[Any] | None = None,
+        full_graphrag: bool = False,
+    ) -> dict[str, Any]:
+        """Sample graph/RAG anchor quality for refs, freshness, and manual verdict readiness."""
+        return current_state().graph_quality_audit(
+            limit=limit,
+            sample_ref_limit=sample_ref_limit,
+            anchors=anchors,
+            full_graphrag=full_graphrag,
+        )
+
+    @mcp.resource("aoa-session-memory://status")
+    def status_resource() -> str:
+        return json.dumps(current_state().session_memory_status(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://surfaces")
+    def surfaces_resource() -> str:
+        return json.dumps(current_state().available_surfaces(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://provider/status")
+    def provider_status_resource() -> str:
+        return json.dumps(current_state().read_resource("aoa-session-memory://provider/status"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://readiness/route-layer")
+    def readiness_resource() -> str:
+        return json.dumps(current_state().read_resource("aoa-session-memory://readiness/route-layer"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://diagnostics/latest/{kind}")
+    def diagnostics_resource(kind: str) -> str:
+        return json.dumps(current_state().latest_diagnostics(kind=kind), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://session/{session}/brief")
+    def session_brief_resource(session: str) -> str:
+        return json.dumps(current_state().session_brief(session), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://session/{session}/manifest")
+    def session_manifest_resource(session: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-session-memory://session/{session}/manifest"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://session/{session}/index")
+    def session_index_resource(session: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-session-memory://session/{session}/index"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://session/{session}/rehydrate")
+    def session_rehydrate_resource(session: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-session-memory://session/{session}/rehydrate"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://route/{axis}/{key}")
+    def route_resource(axis: str, key: str) -> str:
+        return json.dumps(current_state().session_route(axis=axis, key=key), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://trace/{anchor}")
+    def trace_resource(anchor: str) -> str:
+        return json.dumps(current_state().session_trace(anchor=anchor, limit=12, per_route_limit=5), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://graph/status")
+    def graph_status_resource() -> str:
+        return json.dumps(current_state().read_resource("aoa-session-memory://graph/status"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://graph/neighborhood/{anchor}")
+    def graph_neighborhood_resource(anchor: str) -> str:
+        return json.dumps(current_state().graph_neighborhood(anchor=anchor, limit=30), ensure_ascii=False, indent=2)
+
+    @mcp.prompt(name="session-rehydrate")
+    def session_rehydrate_prompt(session: str = "latest") -> str:
+        """Prompt route for rehydrating a session without flattening raw evidence."""
+        return (
+            f"Use aoa_session_brief(session={session!r}) first, then "
+            f"aoa_session_retrieve(recipe='continue-session', session={session!r}) if a compact packet is needed. "
+            "Follow returned manifest, segment, and raw refs before making claims."
+        )
+
+    @mcp.prompt(name="trace-agent-process")
+    def trace_agent_process(anchor: str) -> str:
+        """Prompt route for tracing a stable agent-process anchor."""
+        return (
+            f"Use aoa_session_trace(anchor={anchor!r}, kind='auto'), then inspect matched route candidates. "
+            "Treat entity, MCP, tool, hook, path, and goal matches as route coordinates, not truth."
+        )
+
+    @mcp.prompt(name="debug-operational-anchor")
+    def debug_operational_anchor(anchor: str) -> str:
+        """Prompt route for debugging a skill, MCP, hook, tool, path, or similar anchor."""
+        return (
+            f"Start with aoa_session_graph_neighborhood(anchor={anchor!r}), then aoa_session_trace(anchor={anchor!r}) "
+            f"and aoa_session_search(query={anchor!r}, filters={{'explain': True}}). "
+            "Use aoa_session_freshness_check on returned refs before relying on them."
+        )
+
+    @mcp.prompt(name="writeback-evidence-check")
+    def writeback_evidence_check(intent: str) -> str:
+        """Prompt route for checking evidence before memory writeback."""
+        return (
+            f"Use aoa_session_evidence_packet(intent={intent!r}, query={intent!r}). "
+            "Carry only checked refs into aoa-memo candidate or reviewed-intake work; this MCP does not write memory."
+        )
+
+    @mcp.prompt(name="stale-ref-repair-plan")
+    def stale_ref_repair_plan(ref: str) -> str:
+        """Prompt route for handling stale evidence refs."""
+        return (
+            f"Use aoa_session_freshness_check(refs=[{ref!r}]) and aoa_session_maintenance_plan(). "
+            "If repair is needed, run .aoa maintenance outside MCP with explicit operator intent."
+        )
+
+    @mcp.prompt(name="promotion-candidate-review")
+    def promotion_candidate_review(anchor: str) -> str:
+        """Prompt route for reviewing whether a recurring pattern deserves promotion."""
+        return (
+            f"Use aoa_session_graphrag_packet(query={anchor!r}) and aoa_session_pattern_scan(pattern={anchor!r}); inspect returned raw/segment refs. "
+            "Promotion still requires reviewed distillation or owner-repo change outside MCP."
+        )
+
+    LOGGER.info("AoA session-memory MCP server ready")
+    return mcp
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    build_server().run(transport="stdio")

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aoa-session-memory-mcp"
+version = "0.1.0"
+description = "MCP access plane for AoA session evidence and route intelligence"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.0",
+]
+
+[project.scripts]
+aoa-session-memory-mcp = "aoa_session_memory_mcp.cli:main"
+aoa-session-memory-mcp-server = "aoa_session_memory_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

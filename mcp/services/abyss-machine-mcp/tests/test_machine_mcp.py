@@ -109,6 +109,144 @@ PAYLOADS: dict[tuple[str, ...], dict[str, Any]] = {
         "ok": True,
         "summary": {"evidence_items": 2},
     },
+    ("maps", "paths", "--json"): {
+        "schema": "abyss_machine_maps_paths_v1",
+        "ok": True,
+        "root": "/var/lib/abyss-machine/maps",
+        "axes": [{"axis": "by-freshness"}, {"axis": "by-eval-packet"}],
+    },
+    ("maps", "policy", "--json"): {
+        "schema": "abyss_machine_maps_policy_v1",
+        "version": "0.8.83",
+        "axes": [{"axis": "by-freshness"}, {"axis": "by-eval-packet"}],
+        "policy": {"automatic_action": False, "automatic_response": False},
+    },
+    ("maps", "query", "--axis", "by-freshness", "--query", "semantic", "--json"): {
+        "schema": "abyss_machine_maps_query_v1",
+        "ok": True,
+        "summary": {"results": 2, "axes_searched": 1},
+        "truth_status": "generated_route_signal_not_source_truth",
+        "results": [
+            {
+                "id": "by-freshness:semantic-ready",
+                "axis": "by-freshness",
+                "label": "semantic_ready",
+                "route": "Open nervous semantic readiness",
+                "truth_status": "generated_route_signal_not_source_truth",
+                "evidence_refs": [{"path": "/var/lib/abyss-machine/nervous/indexes/semantic/latest.json"}],
+            },
+            {
+                "id": "by-freshness:semantic-stale",
+                "axis": "by-freshness",
+                "label": "semantic_stale",
+                "route": "Run semantic maintenance",
+                "truth_status": "generated_route_signal_not_source_truth",
+                "evidence_refs": [{"path": "/var/lib/abyss-machine/nervous/indexes/semantic/maintain/latest.json"}],
+            },
+        ],
+    },
+    ("maps", "query", "--axis", "by-eval-packet", "--json"): {
+        "schema": "abyss_machine_maps_query_v1",
+        "ok": True,
+        "summary": {"results": 1, "axes_searched": 1},
+        "truth_status": "generated_route_signal_not_source_truth",
+        "results": [
+            {
+                "id": "by-eval-packet:proof-context-route",
+                "axis": "by-eval-packet",
+                "label": "proof-context route",
+                "route": "Boundary context only",
+                "truth_status": "generated_route_signal_not_source_truth",
+                "evidence_refs": [{"path": "/etc/abyss-machine/MAPS.md"}],
+            }
+        ],
+    },
+    ("maps", "packet", "--axis", "by-eval-packet", "--reader-profile", "proof-context", "--limit", "4", "--json"): {
+        "schema": "abyss_machine_maps_context_packet_v1",
+        "ok": True,
+        "packet_id": "maps-packet:test",
+        "truth_status": "generated_route_signal_not_source_truth",
+        "reader_profile": "proof-context",
+        "profile_route": {
+            "reader_role": "agent using bounded proof context",
+            "purpose": "host/runtime evidence lens",
+            "acceptance": "boundary context only",
+        },
+        "summary": {
+            "entries": 1,
+            "available_results": 1,
+            "evidence_refs": 1,
+            "automatic_action": False,
+            "proof_verdict": False,
+        },
+        "entries": [
+            {
+                "id": "by-eval-packet:proof-context-route",
+                "axis": "by-eval-packet",
+                "label": "proof-context route",
+                "truth_status": "generated_route_signal_not_source_truth",
+                "evidence_refs": [{"path": "/etc/abyss-machine/MAPS.md"}],
+            }
+        ],
+        "evidence_refs": [{"path": "/etc/abyss-machine/MAPS.md"}],
+    },
+    ("maps", "validate", "--json"): {
+        "schema": "abyss_machine_maps_validate_v1",
+        "ok": True,
+        "summary": {"status": "ok", "fails": 0, "warnings": 0, "checks": 12},
+    },
+    (
+        "rag",
+        "trace",
+        "--query",
+        "machine RAG trace loop",
+        "--axis",
+        "by-rag-run",
+        "--reader-profile",
+        "retrieval-context",
+        "--limit",
+        "4",
+        "--evidence-limit",
+        "6",
+        "--json",
+    ): {
+        "schema": "abyss_machine_rag_trace_v1",
+        "ok": True,
+        "trace_id": "rag-trace:test",
+        "truth_status": "generated_trace_not_source_truth",
+        "summary": {
+            "packet_entries": 2,
+            "evidence_opened": 2,
+            "automatic_action": False,
+            "memory_writeback": False,
+            "proof_verdict": False,
+        },
+        "answer": {
+            "schema": "abyss_machine_rag_answer_v1",
+            "answer_type": "deterministic_evidence_route_trace",
+            "non_claims": ["not a proof verdict", "not reviewed memory", "not KAG truth", "not delivery into AoA organs"],
+        },
+        "eval": {
+            "schema": "abyss_machine_rag_eval_v1",
+            "ok": True,
+            "summary": {"status": "ok", "fails": 0, "warnings": 0, "checks": 6},
+        },
+        "evidence_snapshots": [
+            {"path": "/var/lib/abyss-machine/nervous/retrieval/latest.json", "status": "json_summary"},
+            {"path": "/var/lib/abyss-machine/rag/traces/latest.json", "status": "json_summary"},
+        ],
+    },
+    ("rag", "latest", "--json"): {
+        "schema": "abyss_machine_rag_trace_v1",
+        "ok": True,
+        "trace_id": "rag-trace:test",
+        "summary": {"packet_entries": 2, "evidence_opened": 2},
+    },
+    ("rag", "validate", "--json"): {
+        "schema": "abyss_machine_rag_validate_v1",
+        "ok": True,
+        "summary": {"status": "ok", "fails": 0, "warnings": 0, "checks": 9},
+    },
 }
 
 
@@ -177,6 +315,71 @@ def test_read_resource_and_recall() -> None:
     recall = state.recall("swap pressure")
     assert recall["surface"] == "nervous-recall"
     assert recall["payload_schema"] == "abyss_machine_nervous_retrieval_pack_v1"
+
+
+def test_maps_tool_queries_axis_as_route_signals() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
+    maps = state.machine_maps(axis="by-freshness", query="semantic", limit=1)
+
+    assert maps["schema"] == "abyss_machine_mcp_maps_v1"
+    assert maps["ok"] is True
+    assert maps["truth_status"] == "generated_route_signal_not_source_truth"
+    assert maps["result_count"] == 2
+    assert len(maps["results"]) == 1
+    assert maps["results"][0]["label"] == "semantic_ready"
+    assert ("maps", "query", "--axis", "by-freshness", "--query", "semantic", "--json") in runner.calls
+
+
+def test_maps_resource_and_surfaces_are_allowlisted() -> None:
+    state = state_with_fake()
+
+    paths = state.surface("maps-paths")
+    assert paths["payload_schema"] == "abyss_machine_maps_paths_v1"
+
+    policy = state.surface("maps-policy")
+    assert policy["payload_schema"] == "abyss_machine_maps_policy_v1"
+
+    validate = state.surface("maps-validate")
+    assert validate["payload_summary"]["status"] == "ok"
+
+    resource = state.read_resource("abyss-machine://maps/by-eval-packet")
+    assert resource["axis"] == "by-eval-packet"
+    assert resource["result_count"] == 1
+
+
+def test_context_packet_wraps_host_owned_packet() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
+    packet = state.machine_context_packet(axis="by-eval-packet", reader_profile="proof-context", limit=4)
+
+    assert packet["schema"] == "abyss_machine_mcp_context_packet_v1"
+    assert packet["ok"] is True
+    assert packet["packet_schema"] == "abyss_machine_maps_context_packet_v1"
+    assert packet["packet_truth_status"] == "generated_route_signal_not_source_truth"
+    assert packet["summary"]["entries"] == 1
+    assert packet["profile_route"]["reader_role"] == "agent using bounded proof context"
+    assert ("maps", "packet", "--axis", "by-eval-packet", "--reader-profile", "proof-context", "--limit", "4", "--json") in runner.calls
+
+
+def test_rag_trace_wraps_host_owned_trace_loop() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
+    trace = state.machine_rag_trace("machine RAG trace loop", limit=4, evidence_limit=6)
+
+    assert trace["schema"] == "abyss_machine_mcp_rag_trace_v1"
+    assert trace["ok"] is True
+    assert trace["trace_schema"] == "abyss_machine_rag_trace_v1"
+    assert trace["trace_truth_status"] == "generated_trace_not_source_truth"
+    assert trace["summary"]["packet_entries"] == 2
+    assert trace["eval"]["ok"] is True
+    assert ("rag", "trace", "--query", "machine RAG trace loop", "--axis", "by-rag-run", "--reader-profile", "retrieval-context", "--limit", "4", "--evidence-limit", "6", "--json") in runner.calls
+
+    resource = state.read_resource("abyss-machine://rag")
+    assert resource["payload_schema"] == "abyss_machine_rag_trace_v1"
+
+    validate = state.surface("rag-validate")
+    assert validate["payload_summary"]["status"] == "ok"
 
 
 def test_server_builds_with_fake_runner() -> None:

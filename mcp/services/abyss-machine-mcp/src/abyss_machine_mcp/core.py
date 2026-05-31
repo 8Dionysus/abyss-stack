@@ -144,6 +144,61 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "evidence_pack",
         "description": "focused nervous recall evidence pack",
     },
+    "maps-paths": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_atlas_paths",
+        "description": "generated machine atlas paths, commands, and refresh automation",
+    },
+    "maps-policy": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_atlas_policy",
+        "description": "source policy for generated machine atlas maps",
+    },
+    "maps-query": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_atlas_route_signal",
+        "description": "focused query over generated machine atlas axes and route entries",
+    },
+    "maps-packet": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_atlas_context_packet",
+        "description": "bounded reader-profile context packet over machine atlas route entries",
+    },
+    "maps-validate": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_atlas_validation",
+        "description": "validator result for generated machine atlas maps and refresh route",
+    },
+    "rag-paths": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_paths",
+        "description": "generated machine RAG trace paths and commands",
+    },
+    "rag-policy": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_policy",
+        "description": "read-only machine RAG trace policy derived from maps source law",
+    },
+    "rag-trace": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_trace",
+        "description": "read-only maps-to-evidence trace with local trace eval",
+    },
+    "rag-latest": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_trace_latest",
+        "description": "latest generated machine RAG trace",
+    },
+    "rag-eval": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_trace_eval",
+        "description": "latest/local machine RAG trace quality eval",
+    },
+    "rag-validate": {
+        "owner": "abyss-machine",
+        "truth_level": "machine_rag_validation",
+        "description": "validator result for the machine RAG trace loop",
+    },
     "ai-llm-registry": {
         "owner": "abyss-machine",
         "truth_level": "llm_registry",
@@ -475,6 +530,10 @@ class AbyssMachineMCPState:
         kind: str = "ai",
         scope: str = "now",
         mode: str = "hybrid",
+        axis: str = "",
+        reader_profile: str = "agent",
+        limit: int = 20,
+        evidence_limit: int = 12,
     ) -> list[str]:
         if name == "stack-bridge":
             return ["stack-bridge", "--json"]
@@ -522,6 +581,58 @@ class AbyssMachineMCPState:
                 _safe_query(query),
                 "--json",
             ]
+        if name == "maps-paths":
+            return ["maps", "paths", "--json"]
+        if name == "maps-policy":
+            return ["maps", "policy", "--json"]
+        if name == "maps-query":
+            args = ["maps", "query"]
+            if axis:
+                args.extend(["--axis", _safe_token(axis, "axis")])
+            if query:
+                args.extend(["--query", _safe_query(query)])
+            args.append("--json")
+            return args
+        if name == "maps-packet":
+            args = ["maps", "packet"]
+            if axis:
+                args.extend(["--axis", _safe_token(axis, "axis")])
+            if query:
+                args.extend(["--query", _safe_query(query)])
+            args.extend([
+                "--reader-profile",
+                _safe_token(reader_profile, "reader_profile"),
+                "--limit",
+                str(_bounded_limit(limit, default=20, maximum=50)),
+                "--json",
+            ])
+            return args
+        if name == "maps-validate":
+            return ["maps", "validate", "--json"]
+        if name == "rag-paths":
+            return ["rag", "paths", "--json"]
+        if name == "rag-policy":
+            return ["rag", "policy", "--json"]
+        if name == "rag-trace":
+            args = ["rag", "trace", "--query", _safe_query(query or "machine RAG trace")]
+            if axis:
+                args.extend(["--axis", _safe_token(axis, "axis")])
+            if reader_profile:
+                args.extend(["--reader-profile", _safe_token(reader_profile, "reader_profile")])
+            args.extend([
+                "--limit",
+                str(_bounded_limit(limit, default=8, maximum=50)),
+                "--evidence-limit",
+                str(_bounded_limit(evidence_limit, default=12, maximum=40)),
+                "--json",
+            ])
+            return args
+        if name == "rag-latest":
+            return ["rag", "latest", "--json"]
+        if name == "rag-eval":
+            return ["rag", "eval", "--json"]
+        if name == "rag-validate":
+            return ["rag", "validate", "--json"]
         if name == "ai-llm-registry":
             return ["ai", "llm", "registry", "--json"]
         if name == "ai-llm-resident-status":
@@ -587,12 +698,27 @@ class AbyssMachineMCPState:
         kind: str = "ai",
         scope: str = "now",
         mode: str = "hybrid",
+        axis: str = "",
+        reader_profile: str = "agent",
+        limit: int = 20,
+        evidence_limit: int = 12,
         include_payload: bool = True,
         timeout: float | None = None,
     ) -> dict[str, Any]:
         if name not in SURFACE_META:
             raise ValueError(f"unknown or disallowed abyss-machine surface: {name}")
-        args = self._surface_args(name, query=query, work_class=work_class, kind=kind, scope=scope, mode=mode)
+        args = self._surface_args(
+            name,
+            query=query,
+            work_class=work_class,
+            kind=kind,
+            scope=scope,
+            mode=mode,
+            axis=axis,
+            reader_profile=reader_profile,
+            limit=limit,
+            evidence_limit=evidence_limit,
+        )
         run = self._run_json(name, args, timeout=timeout)
         return self._public_command_result(run, include_payload=include_payload)
 
@@ -726,6 +852,98 @@ class AbyssMachineMCPState:
     def recall(self, query: str, mode: str = "hybrid") -> dict[str, Any]:
         return self.surface("nervous-recall", query=query, mode=mode, include_payload=True)
 
+    def machine_maps(self, axis: str | None = None, query: str = "", limit: int = 40) -> dict[str, Any]:
+        limit = _bounded_limit(limit, default=40, maximum=100)
+        args = self._surface_args("maps-query", axis=axis or "", query=query)
+        run = self._run_json("maps-query", args, timeout=max(self.timeout_seconds, 20.0))
+        payload = run.get("payload") if isinstance(run.get("payload"), dict) else {}
+        results = payload.get("results") if isinstance(payload.get("results"), list) else []
+        return {
+            "schema": "abyss_machine_mcp_maps_v1",
+            "ok": run["ok"],
+            "axis": axis,
+            "query": query,
+            "limit": limit,
+            "surface": self._public_command_result(run, include_payload=False),
+            "summary": _compact(payload.get("summary"), max_depth=3, max_items=8),
+            "truth_status": payload.get("truth_status"),
+            "result_count": len(results),
+            "results": _compact(results[:limit], max_depth=5, max_items=12),
+            "evidence_paths": _collect_paths(payload, limit=24),
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def machine_context_packet(
+        self,
+        axis: str | None = None,
+        query: str = "",
+        reader_profile: str = "agent",
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        limit = _bounded_limit(limit, default=20, maximum=50)
+        args = self._surface_args("maps-packet", axis=axis or "", query=query, reader_profile=reader_profile, limit=limit)
+        run = self._run_json("maps-packet", args, timeout=max(self.timeout_seconds, 20.0))
+        packet = run.get("payload") if isinstance(run.get("payload"), dict) else {}
+        return {
+            "schema": "abyss_machine_mcp_context_packet_v1",
+            "ok": run["ok"],
+            "reader_profile": reader_profile,
+            "axis": axis,
+            "query": query,
+            "limit": limit,
+            "surface": self._public_command_result(run, include_payload=False),
+            "packet_schema": packet.get("schema"),
+            "packet_id": packet.get("packet_id"),
+            "packet_truth_status": packet.get("truth_status"),
+            "summary": _compact(packet.get("summary"), max_depth=3, max_items=12),
+            "profile_route": _compact(packet.get("profile_route"), max_depth=4, max_items=12),
+            "entries": _compact(packet.get("entries", []), max_depth=5, max_items=12),
+            "evidence_refs": _compact(packet.get("evidence_refs", []), max_depth=4, max_items=20),
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def machine_rag_trace(
+        self,
+        query: str,
+        axis: str | None = "by-rag-run",
+        reader_profile: str = "retrieval-context",
+        limit: int = 8,
+        evidence_limit: int = 12,
+    ) -> dict[str, Any]:
+        query = query.strip()
+        if not query:
+            query = "machine RAG trace"
+        limit = _bounded_limit(limit, default=8, maximum=50)
+        evidence_limit = _bounded_limit(evidence_limit, default=12, maximum=40)
+        args = self._surface_args(
+            "rag-trace",
+            query=query,
+            axis=axis or "",
+            reader_profile=reader_profile,
+            limit=limit,
+            evidence_limit=evidence_limit,
+        )
+        run = self._run_json("rag-trace", args, timeout=max(self.timeout_seconds, 20.0))
+        trace = run.get("payload") if isinstance(run.get("payload"), dict) else {}
+        return {
+            "schema": "abyss_machine_mcp_rag_trace_v1",
+            "ok": run["ok"],
+            "query": query,
+            "axis": axis,
+            "reader_profile": reader_profile,
+            "limit": limit,
+            "evidence_limit": evidence_limit,
+            "surface": self._public_command_result(run, include_payload=False),
+            "trace_schema": trace.get("schema"),
+            "trace_id": trace.get("trace_id"),
+            "trace_truth_status": trace.get("truth_status"),
+            "summary": _compact(trace.get("summary"), max_depth=3, max_items=12),
+            "answer": _compact(trace.get("answer"), max_depth=4, max_items=12),
+            "eval": _compact(trace.get("eval"), max_depth=4, max_items=12),
+            "evidence_snapshots": _compact(trace.get("evidence_snapshots", []), max_depth=4, max_items=16),
+            "authority_boundary": self.authority_boundary(),
+        }
+
     def read_resource(self, uri: str) -> dict[str, Any]:
         parsed = urlparse(uri)
         if parsed.scheme != "abyss-machine":
@@ -738,6 +956,14 @@ class AbyssMachineMCPState:
             return self.authority_boundary()
         if name == "evidence-map" and not path:
             return self.evidence_map()
+        if name == "maps":
+            return self.machine_maps(axis=path or None, limit=20)
+        if name == "context-packet":
+            return self.machine_context_packet(reader_profile=path or "agent", limit=20)
+        if name == "rag" and not path:
+            return self.surface("rag-latest")
+        if name == "rag-validate" and not path:
+            return self.surface("rag-validate")
         if name == "surface" and path:
             return self.surface(path)
         resource_surface = {
@@ -745,6 +971,15 @@ class AbyssMachineMCPState:
             "resource-status": "resource-status",
             "memory-pressure": "memory-pressure",
             "typing-status": "typing-status",
+            "maps-paths": "maps-paths",
+            "maps-policy": "maps-policy",
+            "maps-packet": "maps-packet",
+            "maps-validate": "maps-validate",
+            "rag-paths": "rag-paths",
+            "rag-policy": "rag-policy",
+            "rag-latest": "rag-latest",
+            "rag-eval": "rag-eval",
+            "rag-validate": "rag-validate",
         }.get(name)
         if resource_surface and not path:
             return self.surface(resource_surface)

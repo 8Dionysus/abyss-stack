@@ -57,6 +57,7 @@ for new records.
 | [2026-05-22 AoA Memo MCP Landing Plan Boundary](2026-05-22-aoa-memo-mcp-landing-plan-boundary.md) | decision record for exposing pending-export and landing-plan helpers without making MCP a durable memory writer |
 | [2026-05-25 AoA Evals MCP Access Plane](2026-05-25-aoa-evals-mcp-access-plane.md) | decision record for the stack-owned, read-only `aoa_evals` MCP service over `aoa-evals` proof surfaces |
 | [2026-05-25 Abyss Machine MCP Access Plane](2026-05-25-abyss-machine-mcp-access-plane.md) | decision record for the stack-owned, read-only `abyss_machine` MCP service over `abyss-machine` host read models |
+| [2026-05-26 AoA Session Memory MCP Access Plane](2026-05-26-aoa-session-memory-mcp-access-plane.md) | decision record for the stack-owned, read-only `aoa_session_memory` MCP service over `.aoa` session evidence and route intelligence |
 
 ## Record Shape
 

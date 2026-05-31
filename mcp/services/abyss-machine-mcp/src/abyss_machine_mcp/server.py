@@ -45,6 +45,10 @@ def build_server(
         kind: str = "ai",
         scope: str = "now",
         mode: str = "hybrid",
+        axis: str = "",
+        reader_profile: str = "agent",
+        limit: int = 20,
+        evidence_limit: int = 12,
     ) -> dict[str, Any]:
         """Read one allowlisted abyss-machine surface as compact typed JSON."""
         return current_state().surface(
@@ -54,6 +58,10 @@ def build_server(
             kind=kind,
             scope=scope,
             mode=mode,
+            axis=axis,
+            reader_profile=reader_profile,
+            limit=limit,
+            evidence_limit=evidence_limit,
         )
 
     @mcp.tool()
@@ -70,6 +78,38 @@ def build_server(
     def abyss_machine_recall(query: str, mode: str = "hybrid") -> dict[str, Any]:
         """Run focused nervous recall as evidence, not operator intent."""
         return current_state().recall(query=query, mode=mode)
+
+    @mcp.tool()
+    def abyss_machine_maps(axis: str = "", query: str = "", limit: int = 40) -> dict[str, Any]:
+        """Query the generated machine atlas maps as route signals."""
+        return current_state().machine_maps(axis=axis or None, query=query, limit=limit)
+
+    @mcp.tool()
+    def abyss_machine_context_packet(
+        axis: str = "",
+        query: str = "",
+        reader_profile: str = "agent",
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return a bounded machine atlas context packet for a reader profile."""
+        return current_state().machine_context_packet(axis=axis or None, query=query, reader_profile=reader_profile, limit=limit)
+
+    @mcp.tool()
+    def abyss_machine_rag_trace(
+        query: str,
+        axis: str = "by-rag-run",
+        reader_profile: str = "retrieval-context",
+        limit: int = 8,
+        evidence_limit: int = 12,
+    ) -> dict[str, Any]:
+        """Run a read-only maps-to-evidence machine RAG trace with local trace eval."""
+        return current_state().machine_rag_trace(
+            query=query,
+            axis=axis or None,
+            reader_profile=reader_profile,
+            limit=limit,
+            evidence_limit=evidence_limit,
+        )
 
     @mcp.resource("abyss-machine://brief")
     def brief_resource() -> str:
@@ -98,6 +138,26 @@ def build_server(
     @mcp.resource("abyss-machine://typing-status")
     def typing_status_resource() -> str:
         return json.dumps(current_state().surface("typing-status"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://maps")
+    def maps_resource() -> str:
+        return json.dumps(current_state().machine_maps(limit=20), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://maps/{axis}")
+    def maps_axis_resource(axis: str) -> str:
+        return json.dumps(current_state().machine_maps(axis=axis, limit=20), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://context-packet/{reader_profile}")
+    def context_packet_resource(reader_profile: str) -> str:
+        return json.dumps(current_state().machine_context_packet(reader_profile=reader_profile, limit=20), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://rag")
+    def rag_resource() -> str:
+        return json.dumps(current_state().surface("rag-latest"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("abyss-machine://rag-validate")
+    def rag_validate_resource() -> str:
+        return json.dumps(current_state().surface("rag-validate"), ensure_ascii=False, indent=2)
 
     @mcp.resource("abyss-machine://surface/{name}")
     def surface_resource(name: str) -> str:
@@ -135,6 +195,25 @@ def build_server(
         return (
             f"Use abyss_machine_recall(query={query!r}, mode='hybrid'). "
             "Treat returned items as evidence and verify source refs before making claims."
+        )
+
+    @mcp.prompt(name="machine-atlas")
+    def machine_atlas(intent: str) -> str:
+        """Prompt route for using machine atlas maps."""
+        return (
+            f"For intent {intent!r}, use abyss_machine_maps(axis='', query=<focused term>, limit=20) first. "
+            "For boundary context, inspect axes by-eval-packet, by-memory-candidate, by-rag-run, and by-kag-export. "
+            "Use abyss_machine_context_packet(axis=<axis>, reader_profile=<profile>, limit=20). "
+            "Treat entries and packets as route signals, not destinations, source truth, or permission to act."
+        )
+
+    @mcp.prompt(name="machine-rag-trace")
+    def machine_rag_trace(query: str) -> str:
+        """Prompt route for read-only machine RAG traces."""
+        return (
+            f"Use abyss_machine_rag_trace(query={query!r}, axis='by-rag-run', reader_profile='retrieval-context'). "
+            "Treat the result as a generated evidence trace with local trace eval. It is not proof, reviewed memory, "
+            "KAG truth, action approval, or delivery into an AoA organ."
         )
 
     @mcp.prompt(name="host-incident-triage")

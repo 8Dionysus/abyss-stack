@@ -83,6 +83,30 @@ The recall route wraps `abyss-machine nervous recall --json` and keeps the
 result as evidence. It does not interpret raw private captures as operator
 intent.
 
+For machine self-atlas orientation:
+
+```text
+abyss_machine_maps(axis="by-freshness", query="semantic")
+abyss_machine_context_packet(axis="by-eval-packet", reader_profile="proof-context")
+abyss_machine_rag_trace(query="machine RAG trace loop")
+```
+
+The maps route wraps `abyss-machine maps query --json` and returns bounded
+route entries from the generated atlas. It is a navigation surface for
+freshness, owner routes, RAG/eval/memo/KAG boundary context, and causal
+correlation; it does not promote entries into source truth, proof verdicts,
+durable memory, or permission to act. The context-packet route wraps
+`abyss-machine maps packet --json`; packet shape and authority stay host-owned,
+while MCP only transports a bounded reader-profile lens for the current agent.
+Reader profiles are not destinations and do not deliver machine moments into
+AoA organs.
+
+The RAG trace route wraps `abyss-machine rag trace --json`. It runs the
+host-owned read-only loop from maps context packet to bounded evidence
+summaries, deterministic answer trace, and local trace eval. MCP transports the
+compact result; it does not become proof authority, reviewed memory, KAG truth,
+operator authorization, or a repository mutation route.
+
 ## Command Policy
 
 The service has a fixed allowlist of `abyss-machine ... --json` read-model
@@ -105,6 +129,17 @@ Allowed surfaces are read-only or preflight-only:
 - `nervous-status`
 - `nervous-brief`
 - `nervous-recall`
+- `maps-paths`
+- `maps-policy`
+- `maps-query`
+- `maps-packet`
+- `maps-validate`
+- `rag-paths`
+- `rag-policy`
+- `rag-trace`
+- `rag-latest`
+- `rag-eval`
+- `rag-validate`
 - `ai-llm-registry`
 - `ai-llm-resident-status`
 - `heartbeats-pulse`

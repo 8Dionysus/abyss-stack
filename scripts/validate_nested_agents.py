@@ -113,9 +113,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'mcp/services/aoa-memo-mcp/',
         'mcp/services/aoa-evals-mcp/',
         'mcp/services/abyss-machine-mcp/',
+        'mcp/services/aoa-session-memory-mcp/',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
         'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
+        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
     ),
     'mcp/services/AGENTS.md': (
         'service-package district',
@@ -123,9 +125,11 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-memo-mcp',
         'aoa-evals-mcp',
         'abyss-machine-mcp',
+        'aoa-session-memory-mcp',
         'python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py',
         'python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py',
         'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
+        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
     ),
     'mcp/services/aoa-memo-mcp/AGENTS.md': (
         'thin MCP access plane',
@@ -144,6 +148,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'abyss-machine',
         'owner-aware',
         'python mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py',
+    ),
+    'mcp/services/aoa-session-memory-mcp/AGENTS.md': (
+        'thin MCP access plane',
+        '.aoa',
+        'session evidence',
+        'python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py',
     ),
     'memo/AGENTS.md': (
         'abyss-stack local memory port',
