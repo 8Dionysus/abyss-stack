@@ -51,7 +51,7 @@ It does not own:
 | `.aoa` archive semantics | `.aoa/AGENTS.md`, `.aoa/DESIGN.md`, `.aoa/DESIGN.AGENTS.md` |
 | route maps or atlas axes | `.aoa/maps/README.md` and generated `maps/by-*/index.json` |
 | session brief shape | `.aoa` session manifest and index |
-| stack package rationale | `docs/decisions/2026-05-26-aoa-session-memory-mcp-access-plane.md` |
+| stack package rationale | `docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md` |
 
 ## AGENTS Stack Law
 

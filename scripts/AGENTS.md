@@ -27,6 +27,9 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 - Shared env defaults, selector parsing, compose resolution, and probe helpers live in `scripts/aoa-lib.sh`.
 - `scripts/validate_stack.py` is the repo-structure validator. Keep it stdlib-only unless the repo explicitly changes policy.
 - `scripts/validate_stack.py` may parse repo-local quest YAML in the validation workflow. If you touch that path, keep the workflow PyYAML install, validator logic, and questbook tests aligned.
+- `scripts/decision_indexes.py` and `scripts/generate_decision_indexes.py`
+  own generated decision-index read models. Keep them stdlib-only and aligned
+  with `docs/decisions/`.
 - `scripts/validate_decision_records.py` is the decision-rationale shape and
   index validator. Keep it stdlib-only and aligned with `docs/decisions/`.
 - `scripts/aoa-host-facts` routes to `mechanics/machine-fit/parts/host-facts/aoa_host_facts.py`. Keep it stdlib-only and secret-safe.
@@ -71,6 +74,7 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
 For shell work, run the smallest useful set:
 ```bash
 python scripts/validate_stack.py
+python scripts/generate_decision_indexes.py --check
 python scripts/validate_decision_records.py
 python -m py_compile scripts/validate_stack.py mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py mechanics/machine-fit/parts/host-facts/aoa_host_facts.py mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py
 shellcheck scripts/aoa-lib.sh scripts/aoa-diagnose scripts/<touched-script>

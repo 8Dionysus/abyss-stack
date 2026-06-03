@@ -27,16 +27,17 @@ Tracking starts with the community-docs baseline for this repository.
 ### Added
 
 - `docs/decisions/AGENTS.md`, `docs/decisions/TEMPLATE.md`,
+  `scripts/decision_indexes.py`, `scripts/generate_decision_indexes.py`,
   `scripts/validate_decision_records.py`, and `tests/test_decision_records.py`
-  as the local decision-record contract and validation lane
-- `docs/decisions/2026-05-14-direction-history-decision-surface-roles.md` as
+  as the local canonical decision-record contract and validation lane
+- `docs/decisions/ABYSS-STACK-D-0017-direction-history-decision-surface-roles.md` as
   the rationale for the `ROADMAP.md`, `CHANGELOG.md`, and `docs/decisions/`
   role split
 - `docs/routes/START_HERE_ROUTE_CONTRACT.md` as the source-checkout route-mode
   contract for root entry surfaces
 - `docs/{routes,runtime,install,operations,profiles,governance,legacy}/README.md`
   as short district maps for repo-wide documentation
-- `docs/decisions/2026-05-14-docs-district-topology.md` as the rationale for
+- `docs/decisions/ABYSS-STACK-D-0020-docs-district-topology.md` as the rationale for
   the docs district split
 - initial `mechanics/` topology with runtime lifecycle, config projection,
   machine fit, inference pilots, federation seams, governed execution,
@@ -62,10 +63,10 @@ Tracking starts with the community-docs baseline for this repository.
 - root `DESIGN.md` and `DESIGN.AGENTS.md` surfaces, adapting the AoA route-card
   pattern to the `abyss-stack` runtime substrate
 - `mcp/services/AGENTS.md`, `mcp/services/README.md`, and
-  `docs/decisions/2026-05-20-mcp-services-topology.md` as the canonical MCP
+  `docs/decisions/ABYSS-STACK-D-0032-mcp-services-topology.md` as the canonical MCP
   service-package topology for `aoa-memo-mcp`
 - `mcp/services/abyss-machine-mcp/` and
-  `docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md` as the
+  `docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md` as the
   stack-owned, read-only MCP access plane over `abyss-machine` host read models
 - `memo/` reviewed-intake packet for the post-2026-05-22 MCP access-plane
   expansion, preserving that `abyss-stack` owns service packaging while
@@ -92,9 +93,12 @@ Tracking starts with the community-docs baseline for this repository.
 - `systemd/user/abyss-tts-keepwarm.service` and
   `systemd/user/abyss-tts-keepwarm.timer` for bounded TTS warmth through the
   existing protected host TTS server
-- `docs/decisions/2026-05-15-intel-inference-and-rerank-service-selection.md`
+- `docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`
   as the rationale for the current Gemma, OVMS embeddings, Qwen3 reranking,
   protected TTS, and optional-service split
+- `docs/decisions/ABYSS-STACK-D-0038-canonical-decision-ids-and-indexes.md`
+  and generated `docs/decisions/indexes/` read models for stable
+  `ABYSS-STACK-D-####` decision lookup
 
 ### Changed
 
@@ -210,9 +214,9 @@ Tracking starts with the community-docs baseline for this repository.
   blocks
 - `CHANGELOG.md` now records this role split as release-visible history instead
   of carrying the rationale itself
-- all existing decision records now use the standard `Status`, `Date`,
-  `Options considered`, `Rationale`, `Source surfaces`, and `Follow-up route`
-  shape, with `scripts/release_check.py` running the decision validator before
+- all existing decision records now use full canonical `ABYSS-STACK-D-####`
+  filenames, in-file decision IDs, `Index Metadata`, and generated lookup
+  indexes, with `scripts/release_check.py` running the decision validator before
   the wider release audit
 - `aoa-doctor`, `aoa-status --autonomy`, and `aoa-diagnose` now keep the
   machine bridge honest after the docs refactor: source-root detection uses

@@ -1,29 +1,44 @@
 # Decision Title
 
-Status: proposed
-Date: YYYY-MM-DD
+- Decision ID: ABYSS-STACK-D-NNNN
+- Status: proposed
+- Date: YYYY-MM-DD
+- Owner surface: `path/or/surface`
+
+## Index Metadata
+
+- Original date: YYYY-MM-DD
+- Surface classes: root/topology
+- Stack lanes: decision lane
+- Mechanic parents: none
+- Guard families: none
+- Posture: proposed rationale
 
 ## Context
 
-Name the problem or repeated fork this decision resolves.
+What problem, drift, topology pressure, validation failure, workflow need, or
+owner-boundary question made this decision necessary?
 
 ## Options considered
 
-1. Keep the current route.
-2. Change the route in the chosen way.
+- Option A:
+- Option B:
+- Option C:
 
 ## Decision
 
-State the chosen path in present-tense, bounded language.
+State the chosen route in present-tense language.
 
 ## Rationale
 
-Explain why this path is better than the alternatives for future agents.
+Why does this route preserve runtime clarity, owner boundaries, reviewability,
+public-safe source shape, and future repair better than the alternatives?
 
 ## Consequences
 
-- Name what becomes easier.
-- Name the tradeoff or residual risk.
+- Positive:
+- Tradeoff:
+- Follow-up:
 
 ## Source surfaces
 
