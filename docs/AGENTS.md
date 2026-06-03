@@ -43,6 +43,7 @@ Use the root validation path after documentation topology changes:
 
 ```bash
 python scripts/validate_decision_records.py
+python scripts/generate_decision_indexes.py --check
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 python -m pytest tests/test_roadmap_parity.py tests/test_decision_records.py tests/test_validate_stack_required_files.py

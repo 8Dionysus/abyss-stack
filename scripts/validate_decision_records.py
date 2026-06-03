@@ -5,19 +5,20 @@ import re
 import sys
 from pathlib import Path
 
+import decision_indexes
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DECISIONS_DIR = REPO_ROOT / "docs" / "decisions"
 README_PATH = DECISIONS_DIR / "README.md"
 
-RECORD_NAME_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
-DATE_RE = re.compile(r"^Date:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
-STATUS_RE = re.compile(r"^Status:\s*(?P<status>[a-z][a-z0-9_-]*)\s*$", re.MULTILINE)
-README_LINK_RE = re.compile(r"\((?P<path>\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md)\)")
+DATE_RE = re.compile(r"^- Date:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
+STATUS_RE = re.compile(r"^- Status:\s*(?P<status>[A-Za-z][A-Za-z0-9_-]*)\s*$", re.MULTILINE)
 
 EXEMPT_FILES = {"AGENTS.md", "README.md", "TEMPLATE.md"}
 STATUS_VALUES = {"accepted", "proposed", "superseded", "amended"}
 REQUIRED_SECTIONS = (
+    "## Index Metadata",
     "## Context",
     "## Options considered",
     "## Decision",
@@ -42,10 +43,6 @@ def decision_record_paths(decisions_dir: Path = DECISIONS_DIR) -> list[Path]:
 def validate_record(path: Path) -> list[str]:
     problems: list[str] = []
     rel = repo_rel(path)
-    match = RECORD_NAME_RE.fullmatch(path.name)
-    if not match:
-        return [f"{rel}: decision record filename must be YYYY-MM-DD-kebab.md"]
-
     text = path.read_text(encoding="utf-8")
     if not text.endswith("\n"):
         problems.append(f"{rel}: missing final newline")
@@ -54,45 +51,54 @@ def validate_record(path: Path) -> list[str]:
 
     status_match = STATUS_RE.search(text)
     if not status_match:
-        problems.append(f"{rel}: missing top-level Status: <value>")
-    elif status_match.group("status") not in STATUS_VALUES:
-        allowed = ", ".join(sorted(STATUS_VALUES))
-        problems.append(f"{rel}: unsupported status {status_match.group('status')!r}; allowed: {allowed}")
+        problems.append(f"{rel}: missing top metadata '- Status: <value>'")
+    else:
+        status = status_match.group("status").lower()
+        if status not in STATUS_VALUES:
+            allowed = ", ".join(sorted(STATUS_VALUES))
+            problems.append(f"{rel}: unsupported status {status_match.group('status')!r}; allowed: {allowed}")
 
     date_match = DATE_RE.search(text)
     if not date_match:
-        problems.append(f"{rel}: missing top-level Date: YYYY-MM-DD")
-    elif date_match.group("date") != match.group("date"):
-        problems.append(
-            f"{rel}: Date {date_match.group('date')} does not match filename date {match.group('date')}"
-        )
+        problems.append(f"{rel}: missing top metadata '- Date: YYYY-MM-DD'")
 
     for section in REQUIRED_SECTIONS:
         if section not in text:
             problems.append(f"{rel}: missing section {section}")
 
+    try:
+        record_repo_root = REPO_ROOT if path.is_relative_to(REPO_ROOT) else path.parent
+        record = decision_indexes.load_decision_record(path, repo_root=record_repo_root)
+    except ValueError as exc:
+        problems.append(f"{rel}: {exc}")
+        return problems
+
+    filename_match = decision_indexes.FULL_ID_FILENAME_RE.match(path.name)
+    if not filename_match:
+        problems.append(f"{rel}: decision record filename must be ABYSS-STACK-D-####-kebab.md")
+    elif filename_match.group(1) != record.decision_id:
+        problems.append(f"{rel}: filename ID does not match note Decision ID {record.decision_id}")
+
+    if date_match and date_match.group("date") != record.date:
+        problems.append(
+            f"{rel}: Date {date_match.group('date')} does not match Index Metadata Original date {record.date}"
+        )
+
     return problems
 
 
-def validate_readme_index(records: list[Path]) -> list[str]:
+def validate_readme_route() -> list[str]:
     problems: list[str] = []
     text = README_PATH.read_text(encoding="utf-8")
-    linked = README_LINK_RE.findall(text)
-    linked_set = set(linked)
-    expected = {path.name for path in records}
-
-    for name in sorted(expected - linked_set):
-        problems.append(f"{repo_rel(README_PATH)}: missing decision record link {name}")
-    for name in sorted(linked_set - expected):
-        problems.append(f"{repo_rel(README_PATH)}: links unknown decision record {name}")
-    for name in sorted(linked_set):
-        if linked.count(name) != 1:
-            problems.append(f"{repo_rel(README_PATH)}: decision record link {name} appears {linked.count(name)} times")
-
-    if "Decision records explain why; current source surfaces define what." not in text:
-        problems.append(f"{repo_rel(README_PATH)}: missing district law sentence")
-    if "TEMPLATE.md" not in text:
-        problems.append(f"{repo_rel(README_PATH)}: missing template route")
+    for snippet in (
+        "Decision records explain why; current source surfaces define what.",
+        "ABYSS-STACK-D-####",
+        "indexes/",
+        "TEMPLATE.md",
+        "validate_decision_records.py",
+    ):
+        if snippet not in text:
+            problems.append(f"{repo_rel(README_PATH)}: missing decisions route snippet {snippet!r}")
     return problems
 
 
@@ -111,13 +117,16 @@ def validate_all() -> list[str]:
     for path in sorted(DECISIONS_DIR.glob("*.md")):
         if path.name in EXEMPT_FILES:
             continue
-        if not RECORD_NAME_RE.fullmatch(path.name):
+        if not decision_indexes.FULL_ID_FILENAME_RE.fullmatch(path.name):
             problems.append(f"{repo_rel(path)}: unexpected Markdown file in decisions district")
 
-    records = decision_record_paths()
-    for path in records:
+    for path in decision_record_paths():
         problems.extend(validate_record(path))
-    problems.extend(validate_readme_index(records))
+    problems.extend(validate_readme_route())
+    problems.extend(
+        f"{location}: {message}"
+        for location, message in decision_indexes.validate_decision_index_surfaces(REPO_ROOT)
+    )
     return problems
 
 

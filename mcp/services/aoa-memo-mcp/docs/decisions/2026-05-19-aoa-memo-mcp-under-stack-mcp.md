@@ -1,7 +1,7 @@
 # Decision: Place `aoa-memo-mcp` Under `abyss-stack/MCP`
 
 Status: superseded
-Superseded by: `docs/decisions/2026-05-20-mcp-services-topology.md`
+Superseded by: `docs/decisions/ABYSS-STACK-D-0032-mcp-services-topology.md`
 Date: 2026-05-19
 
 ## Context

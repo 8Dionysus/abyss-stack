@@ -50,7 +50,7 @@ It does not own:
 | safe launch/mutation posture | `machine_route()` and `abyss-machine changes preflight` refs |
 | live host truth | `abyss-machine` source contracts and validators |
 | durable host rationale | `/etc/abyss-machine/decisions/` |
-| stack package rationale | `docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md` |
+| stack package rationale | `docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md` |
 
 ## AGENTS Stack Law
 

@@ -1,0 +1,19 @@
+schema: abyss_stack_decision_index_contract_v1
+decision_id_prefix: ABYSS-STACK-D
+path_policy: full_canonical_id_filename
+source_glob: docs/decisions/ABYSS-STACK-D-*.md
+generated_indexes:
+  - docs/decisions/indexes/README.md
+  - docs/decisions/indexes/by-number.md
+  - docs/decisions/indexes/by-date.md
+  - docs/decisions/indexes/by-surface.md
+  - docs/decisions/indexes/by-stack-lane.md
+  - docs/decisions/indexes/by-mechanic.md
+  - docs/decisions/indexes/by-guard.md
+required_metadata:
+  - Original date
+  - Surface classes
+  - Stack lanes
+  - Mechanic parents
+  - Guard families
+  - Posture

@@ -60,7 +60,7 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 The source checkout path is a Fedora-first default, not a universal host constant.
 If the repository is intentionally relocated on another machine, set `AOA_SOURCE_ROOT` to the actual source checkout path.
 
-The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](../decisions/2026-05-07-runtime-root-under-abyssos.md).
+The runtime-root decision is recorded in [2026-05-07 Runtime Root Under AbyssOS](../decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md).
 
 Sibling repository defaults live under the same `/srv/AbyssOS` workspace root.
 The older `/srv/<repo>` shape is historical compatibility only; active source

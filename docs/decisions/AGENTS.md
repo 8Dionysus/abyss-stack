@@ -49,11 +49,22 @@ should say `Decision review: no record needed` with a short reason.
 Decision records must follow [TEMPLATE](TEMPLATE.md). They explain why; current
 source surfaces define what.
 
+Use canonical `ABYSS-STACK-D-####` decision IDs and full canonical-ID filenames:
+
+```text
+docs/decisions/ABYSS-STACK-D-####-kebab-title.md
+```
+
+Each record owns its `## Index Metadata`; generated lookup indexes under
+`docs/decisions/indexes/` are read models, not rationale authority. Previous
+date-prefixed paths are historical git/PR addresses only.
+
 ## Validation
 
 Use the docs and release validation lane:
 
 ```bash
+python scripts/generate_decision_indexes.py --check
 python scripts/validate_decision_records.py
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py

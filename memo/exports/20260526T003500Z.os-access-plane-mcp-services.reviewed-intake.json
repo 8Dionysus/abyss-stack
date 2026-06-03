@@ -14,16 +14,16 @@
   "source_refs": [
     "mcp/AGENTS.md",
     "mcp/services/AGENTS.md",
-    "docs/decisions/2026-05-25-aoa-evals-mcp-access-plane.md",
-    "docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md",
+    "docs/decisions/ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md",
+    "docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md",
     "mcp/services/aoa-evals-mcp/AGENTS.md",
     "mcp/services/abyss-machine-mcp/AGENTS.md"
   ],
   "evidence_refs": [
     "memo/receipts/20260522T021004Z.aoa-memo-mcp-access-plane.forwarding-receipt.json",
-    "docs/decisions/2026-05-22-aoa-memo-mcp-landing-plan-boundary.md",
-    "docs/decisions/2026-05-25-aoa-evals-mcp-access-plane.md",
-    "docs/decisions/2026-05-25-abyss-machine-mcp-access-plane.md",
+    "docs/decisions/ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md",
+    "docs/decisions/ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md",
+    "docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md",
     "mcp/services/aoa-evals-mcp/README.md",
     "mcp/services/abyss-machine-mcp/README.md",
     "mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",

@@ -23,7 +23,8 @@ roadmap checks.
   runtime routes.
 - `test_validate_stack_federation.py`: federation template requirements.
 - `test_validate_nested_agents.py`: nested AGENTS coverage.
-- `test_decision_records.py`: decision-record shape and index validation.
+- `test_decision_records.py`: canonical decision-record shape and generated
+  index validation.
 - `test_roadmap_parity.py`: release-contour route parity.
 - `test_current_direction_routes.py`: root entrypoint direction.
 - `test_aoa_lib_env_compat.py`: shared shell env compatibility.

@@ -3545,6 +3545,8 @@ def validate_decision_record_surface(errors: list[str]) -> None:
 
     for snippet in (
         "Decision records explain why; current source surfaces define what.",
+        "ABYSS-STACK-D-####",
+        "indexes/",
         "TEMPLATE.md",
         "AGENTS.md",
         "validate_decision_records.py",
@@ -3554,6 +3556,9 @@ def validate_decision_record_surface(errors: list[str]) -> None:
 
     for snippet in (
         "Decision Review Gate",
+        "ABYSS-STACK-D-####",
+        "docs/decisions/indexes/",
+        "python scripts/generate_decision_indexes.py --check",
         "Decision records must follow [TEMPLATE](TEMPLATE.md)",
         "python scripts/validate_decision_records.py",
     ):
@@ -3561,8 +3566,10 @@ def validate_decision_record_surface(errors: list[str]) -> None:
             errors.append(f"docs/decisions/AGENTS.md must define `{snippet}`")
 
     for snippet in (
-        "Status: proposed",
-        "Date: YYYY-MM-DD",
+        "- Decision ID: ABYSS-STACK-D-NNNN",
+        "- Status: proposed",
+        "- Date: YYYY-MM-DD",
+        "## Index Metadata",
         "## Options considered",
         "## Source surfaces",
         "## Follow-up route",
@@ -3572,8 +3579,12 @@ def validate_decision_record_surface(errors: list[str]) -> None:
 
     if "python scripts/validate_decision_records.py" not in docs_agents:
         errors.append("docs/AGENTS.md must include the decision-record validator")
+    if "python scripts/generate_decision_indexes.py --check" not in docs_agents:
+        errors.append("docs/AGENTS.md must include the decision-index generator check")
     if "validate_decision_records.py" not in scripts_readme:
         errors.append("scripts/README.md must route validate_decision_records.py")
+    if "generate_decision_indexes.py" not in scripts_readme:
+        errors.append("scripts/README.md must route generate_decision_indexes.py")
     if "test_decision_records.py" not in tests_readme:
         errors.append("tests/README.md must route test_decision_records.py")
 
