@@ -8,7 +8,7 @@ owner-published names through this bridge. The machine-readable runtime bridge
 data lives at
 [`config-templates/Configs/federation/upstream-compatibility-bridge.json`](../../../../../config-templates/Configs/federation/upstream-compatibility-bridge.json).
 Detailed upstream identifiers, lineage notes, and removal triggers live in
-[`../legacy/upstream-compatibility/INDEX.md`](../legacy/upstream-compatibility/INDEX.md).
+[`UPSTREAM_COMPATIBILITY_DETAIL.md`](UPSTREAM_COMPATIBILITY_DETAIL.md).
 
 ## Active Bridge
 

@@ -18,7 +18,7 @@ handoffs to benchmark, model-card, scenario, and governed-execution surfaces.
 
 It does not keep the old step-by-step qualification narrative inline. The
 historical command surface is preserved as a compatibility baseline routed
-through [legacy/INDEX](../../../legacy/INDEX.md).
+through the part-local compatibility runner.
 
 Use role language for new work:
 
@@ -64,7 +64,7 @@ Durable program roots now in use:
 - `bounded-autonomy-langgraph-llamacpp-v1`
 
 Old program ids for the same long-horizon and bounded-autonomy trial families
-are retained only through the legacy trial route. Active docs should describe
+are retained only through the preserved trial compatibility route. Active docs should describe
 those routes by role, not by old program numbering.
 
 ## Dual-surface reporting
@@ -98,9 +98,9 @@ Each executed case must own one packet with:
 - `result.summary.json`
 - `report.md`
 
-Compatibility baseline index and closeout artifact names are documented under
-[legacy/INDEX](../../../legacy/INDEX.md). The current owner-local runtime
-receipt log for local-trial closeouts is:
+Compatibility baseline index and closeout artifact names stay in the active
+compatibility runner. The current owner-local runtime receipt log for
+local-trial closeouts is:
 
 - `/srv/AbyssOS/abyss-stack/.aoa/live_receipts/runtime-trial-closeouts.jsonl`
 
@@ -123,10 +123,11 @@ the preserved baseline because existing runtime logs, closeout packets, and
 compatibility checks still refer to that command surface.
 The active part-local Python file is only a compatibility bridge; the preserved
 runner implementation lives under
-`mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials`.
+`mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials`.
 
 For the old command sequence, stage details, and preserved mutation-safety
-contract, start from [legacy/INDEX](../../../legacy/INDEX.md).
+contract, use the active compatibility runner. The legacy index remains
+provenance, not an execution backend.
 
 The bridge does not:
 

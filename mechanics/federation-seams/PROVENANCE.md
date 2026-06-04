@@ -24,8 +24,8 @@ repositories own the meaning of their source surfaces.
 - [PARTS.md](PARTS.md) maps sibling seams to package parts.
 - [parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md](parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md)
   owns active compatibility routing.
-- [parts/federation-checks/legacy/upstream-compatibility/INDEX.md](parts/federation-checks/legacy/upstream-compatibility/INDEX.md)
-  contains detailed legacy/upstream identifier accounting.
+- [parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md](parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md)
+  contains active detailed upstream identifier accounting.
 - [parts/rpg-runtime/README.md](parts/rpg-runtime/README.md) owns RPG runtime
   projection as a read model.
 - [../config-projection/README.md](../config-projection/README.md) owns

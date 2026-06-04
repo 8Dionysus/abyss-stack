@@ -55,16 +55,6 @@ def write_valid_mechanics_surface(repo_root: Path) -> None:
             for required_file in mechanics_topology.MECHANIC_PART_REQUIRED_FILES.get((package, part), ()):
                 write_text(part_root / required_file, f"{package}/{part}/{required_file}\n")
 
-        if package in mechanics_topology.ARCHIVE_MECHANIC_PACKAGES:
-            required_files = (
-                *mechanics_topology.ARCHIVE_MECHANIC_REQUIRED_FILES,
-                *mechanics_topology.ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES.get(package, ()),
-            )
-            for required_file in required_files:
-                write_text(package_root / required_file, f"{package} archive {required_file}\n")
-            for required_dir in mechanics_topology.ARCHIVE_MECHANIC_ARTIFACT_DIRS.get(package, ()):
-                (package_root / required_dir).mkdir(parents=True, exist_ok=True)
-
 
 def run_validator(repo_root: Path) -> list[str]:
     errors: list[str] = []
@@ -128,16 +118,11 @@ def test_active_part_names_must_not_look_archived(tmp_path: Path) -> None:
     assert "mechanics package runtime-lifecycle has archived/noisy active part name: parts/legacy-shadow" in errors
 
 
-def test_marker_only_archive_artifacts_stay_empty_except_readme(tmp_path: Path) -> None:
+def test_mechanics_validator_does_not_require_archive_payloads(tmp_path: Path) -> None:
+    assert not any(
+        name.startswith("ARCHIVE_MECHANIC")
+        for name in vars(mechanics_topology)
+    )
     write_valid_mechanics_surface(tmp_path)
-    write_text(
-        tmp_path / "mechanics" / "agon-runtime" / "legacy" / "artifacts" / "leak.txt",
-        "not marker-only\n",
-    )
 
-    errors = run_validator(tmp_path)
-
-    assert any(
-        "mechanics archive package agon-runtime legacy/artifacts must stay marker-only" in error
-        for error in errors
-    )
+    assert run_validator(tmp_path) == []

@@ -36,7 +36,7 @@
       "posture": "blocking",
       "command_sequence": "mechanics_part_local",
       "owner_surface": "mechanics/AGENTS.md",
-      "purpose": "Mechanic part-local tests, including currently active legacy provenance tests."
+      "purpose": "Mechanic part-local tests for active source-checkout contracts."
     },
     "mcp-services": {
       "posture": "blocking",

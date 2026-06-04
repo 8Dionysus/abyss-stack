@@ -6,5 +6,5 @@ Routes `scripts/aoa-langgraph-pilot`,
 The part-local dependency manifest is `requirements.txt`.
 
 This part keeps local worker pilots governed and bounded.
-The old edit-gate ID appears here only through the legacy trial compatibility
-route under `../../legacy/trials/`.
+The preserved edit-gate ID appears here only through the local-trials
+compatibility runner.

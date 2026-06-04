@@ -49,7 +49,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'governance/',
         'validation/',
         'testing/',
-        'legacy/',
         'Mechanic-owned runtime doctrine',
         'docs/decisions',
         'docs/validation',
@@ -68,7 +67,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'test topology',
         'test_inventory.json',
         'docs/validation/validation_lanes.json',
-        'legacy tests labeled',
+        'Keep legacy paths out of default pytest discovery',
         'python scripts/ci_gate.py --mode tests',
     ),
     'docs/decisions/AGENTS.md': (
@@ -230,12 +229,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-long-horizon-pilot',
         'mechanics/agon-runtime',
     ),
-    'mechanics/inference-pilots/legacy/AGENTS.md': (
-        'archived pilot docs',
-        'legacy/trials',
-        'legacy/trials/artifacts/scripts',
-        'aoa-bounded-autonomy-pilot',
-    ),
     'mechanics/agon-runtime/AGENTS.md': (
         'agon-runtime',
         'dry-run kernel',
@@ -243,28 +236,13 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'parts/runtime-kernels',
         'validate_mechanical_trial_runs.py',
     ),
-    'mechanics/agon-runtime/legacy/AGENTS.md': (
-        'Agon runtime surfaces',
-        'legacy/raw',
-        'legacy/artifacts/',
-        'parts/runtime-kernels',
-        'build_mechanical_trial_run_registry.py --check',
-    ),
     'mechanics/experience-runtime/AGENTS.md': (
         'experience-runtime',
         'experience contract family',
         'legacy/ARCHIVE_CLASSIFICATION.md',
         'PROVENANCE.md',
         'EXPERIENCE_RECORDS_DISTILLATION.md',
-        'test_experience_wave',
-    ),
-    'mechanics/experience-runtime/legacy/AGENTS.md': (
-        'experience runtime archive surfaces',
-        'ARCHIVE_CLASSIFICATION.md',
-        '_v1',
-        'EXPERIENCE_RECORDS_DISTILLATION.md',
-        'legacy/artifacts/tests',
-        'python -m pytest',
+        'not active runtime contracts',
     ),
     'mechanics/federation-seams/AGENTS.md': (
         'federation-seams',
@@ -281,7 +259,7 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
     'mechanics/governed-execution/AGENTS.md': (
         'governed-execution',
         'governed local-worker execution',
-        'mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py',
+        'mechanics/governed-execution/parts/governed-runner/tests',
         'Do not turn advisory execution into autonomous authority',
     ),
     'mechanics/diagnostic-spine/AGENTS.md': (
@@ -295,12 +273,6 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'degradation receipts',
         'repair-safe closeout',
         'Do not perform repair',
-    ),
-    'mechanics/runtime-repair/legacy/AGENTS.md': (
-        'runtime repair archive',
-        '_v1',
-        'legacy/artifacts',
-        'python -m pytest',
     ),
     'tests/AGENTS.md': (
         'runtime validation gate',

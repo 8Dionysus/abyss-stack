@@ -7,5 +7,5 @@ Routes `scripts/aoa-llamacpp-pilot`,
 `tests/test_aoa_llamacpp_pilot.py`.
 
 This part keeps llama.cpp sidecar experiments bounded and explicit.
-Old runtime/edit gate IDs appear here only through the legacy trial
-compatibility route under `../../legacy/trials/`.
+Preserved runtime/edit gate IDs appear here only through the local-trials
+compatibility runner.

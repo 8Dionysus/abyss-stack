@@ -120,5 +120,5 @@
   ],
   "registry_id": "agon.duel_runtime_kernel_registry.v1",
   "runtime_status": "bounded_local_event_log_substrate_candidate",
-  "lineage_ref": "legacy/raw/AGON_WAVE12_RUNTIME_LANDING.md"
+  "lineage_ref": "PROVENANCE.md"
 }

@@ -96,7 +96,12 @@
         "mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py",
         "mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py",
         "mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py",
-        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_paths.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_policy_scope.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py",
         "mechanics/inference-pilots/parts/llamacpp-pilot/tests/test_aoa_llamacpp_pilot.py",
         "mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py",
         "mechanics/inference-pilots/parts/qwen-routes/tests/test_aoa_qwen_check.py",
@@ -123,24 +128,6 @@
       "focused_target": "mechanics/*/parts/*/tests",
       "failure_route": "Fix the owning mechanic part before changing root validators or workflow lanes.",
       "disposition": "keep"
-    },
-    {
-      "family": "legacy-provenance-tests",
-      "paths": [
-        "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave2_seed_contracts.py",
-        "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave3_seed_contracts.py",
-        "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave4_seed_contracts.py",
-        "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave5_seed_contracts.py"
-      ],
-      "home_scope": "mechanic-legacy",
-      "protects": "preserved experience-runtime archive schema/example provenance currently collected by default pytest",
-      "owner_surface": "mechanics/experience-runtime/legacy/AGENTS.md",
-      "lane": "tests/release",
-      "mode": "blocking-provenance-current-default",
-      "runtime_cost": "fast",
-      "focused_target": "mechanics/experience-runtime/legacy/artifacts/tests",
-      "failure_route": "Either keep archive examples valid or make a separate decision to remove legacy tests from default pytest discovery.",
-      "disposition": "legacy-provenance-active"
     },
     {
       "family": "mcp-service-tests",

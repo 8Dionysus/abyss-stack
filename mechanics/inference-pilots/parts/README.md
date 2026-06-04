@@ -8,6 +8,5 @@ promotion loops, quiet bridge commands, and preserved pilot lineage.
 - [langgraph-pilot](langgraph-pilot/README.md)
 - [local-trials](local-trials/README.md)
 - [promotion-loop](promotion-loop/README.md)
-- [pilot-archive-bridge](pilot-archive-bridge/README.md)
 - [quiet-bridge-commands](quiet-bridge-commands/README.md)
 - [agon-dry-run-handoff](agon-dry-run-handoff/README.md)

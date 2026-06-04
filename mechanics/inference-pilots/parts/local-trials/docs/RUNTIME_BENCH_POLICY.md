@@ -166,7 +166,7 @@ Cohort layer:
 If you need a supervised per-case trial program rather than a standalone
 benchmark run, route through [LOCAL_AI_TRIALS](LOCAL_AI_TRIALS.md). The old
 step-gated command sequence is preserved only as a compatibility baseline
-routed through `../../../legacy/INDEX.md`.
+routed through the local-trials compatibility runner.
 
 That helper may reuse runtime benchmark artifacts as evidence inside case packets, but it does not change the benchmark boundary:
 

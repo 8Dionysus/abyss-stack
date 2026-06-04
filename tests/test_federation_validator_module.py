@@ -137,7 +137,7 @@ def test_federation_required_files_requires_playbook_automation_bridge_fields(tm
     )
 
 
-def test_federation_upstream_compatibility_keeps_detailed_values_in_legacy_index(
+def test_federation_upstream_compatibility_keeps_detailed_values_in_detail_inventory(
     tmp_path: Path,
 ) -> None:
     bridge_path = tmp_path / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json"
@@ -168,7 +168,7 @@ def test_federation_upstream_compatibility_keeps_detailed_values_in_legacy_index
         "\n".join(
             [
                 "single active bridge",
-                "legacy/upstream-compatibility/INDEX.md",
+                "UPSTREAM_COMPATIBILITY_DETAIL.md",
                 "upstream-compatibility-bridge.json",
                 "memo-recall-rerun",
                 "automation-plans",
@@ -195,9 +195,8 @@ def test_federation_upstream_compatibility_keeps_detailed_values_in_legacy_index
         / "federation-seams"
         / "parts"
         / "federation-checks"
-        / "legacy"
-        / "upstream-compatibility"
-        / "INDEX.md",
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY_DETAIL.md",
         "\n".join(
             [
                 "memo-recall-rerun",
@@ -224,12 +223,12 @@ def test_federation_upstream_compatibility_keeps_detailed_values_in_legacy_index
     )
 
     assert (
-        "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+        "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md "
         "must classify bridge value `phase-alpha-runtime-evidence`"
     ) in errors
     assert (
         "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-        "must keep detailed legacy value `phase-alpha-runtime-evidence` in legacy/upstream-compatibility/INDEX.md"
+        "must keep detailed upstream value `phase-alpha-runtime-evidence` in UPSTREAM_COMPATIBILITY_DETAIL.md"
     ) in errors
 
 

@@ -228,27 +228,27 @@
       "disposition": "keep"
     },
     {
-      "family": "legacy-inference-pilot-artifact-scripts",
+      "family": "inference-pilot-compatibility-runners",
       "paths": [
-        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials",
-        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot",
-        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot"
+        "mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+        "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+        "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot"
       ],
-      "organ_lane": "legacy/provenance",
-      "owner_surface": "mechanics/inference-pilots/legacy/AGENTS.md",
+      "organ_lane": "mechanic/package-local",
+      "owner_surface": "mechanics/inference-pilots/AGENTS.md",
       "source_truth": [
         "mechanics/inference-pilots/PROVENANCE.md",
-        "mechanics/inference-pilots/legacy/"
+        "mechanics/inference-pilots/PARTS.md"
       ],
       "reads": [
-        "preserved legacy artifact context"
+        "preserved compatibility runner behavior"
       ],
       "writes": [],
-      "side_effects": "preserved script evidence; not a promoted active command",
-      "validation_lane": "advisory/provenance",
-      "ci_inclusion": "covered by script topology as explicitly legacy, not by a hard command lane",
+      "side_effects": "preserved runner behavior behind active package-local bridges",
+      "validation_lane": "source-fast/release",
+      "ci_inclusion": "covered by inference pilot compatibility and script topology checks",
       "test_target": "tests/test_script_topology.py",
-      "disposition": "legacy-provenance"
+      "disposition": "keep"
     }
   ]
 }

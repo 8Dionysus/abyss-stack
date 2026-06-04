@@ -26,7 +26,7 @@ def digest_obj(obj):
 def expected_registry(data, runs):
     return {
         'registry_id': data.get('registry_id', 'agon.mechanical_trial_run.registry.v0'),
-        'lineage_ref': data.get('lineage_ref', 'legacy/raw/AGON_WAVE13_RUNTIME_LANDING.md'),
+        'lineage_ref': data.get('lineage_ref', 'PROVENANCE.md'),
         'runtime_posture': data.get('runtime_posture', 'candidate_only'),
         'count': len(runs),
         'runs': runs,

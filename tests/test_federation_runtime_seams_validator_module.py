@@ -99,7 +99,7 @@ def test_eval_runtime_seam_requires_a2a_dry_run_true(tmp_path: Path) -> None:
         / "federation-checks"
         / "docs"
         / "UPSTREAM_COMPATIBILITY.md",
-        "single active bridge\nlegacy/upstream-compatibility/INDEX.md\nupstream-compatibility-bridge.json\nClean local route\n",
+        "single active bridge\nUPSTREAM_COMPATIBILITY_DETAIL.md\nupstream-compatibility-bridge.json\nClean local route\n",
     )
     write_text(
         tmp_path
@@ -107,9 +107,8 @@ def test_eval_runtime_seam_requires_a2a_dry_run_true(tmp_path: Path) -> None:
         / "federation-seams"
         / "parts"
         / "federation-checks"
-        / "legacy"
-        / "upstream-compatibility"
-        / "INDEX.md",
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY_DETAIL.md",
         "phase-alpha-id\n",
     )
     write_json(

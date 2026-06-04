@@ -16,7 +16,7 @@ SRC = PART_ROOT / "definitions" / "mechanical-trial-runs.json"
 OUT = PART_ROOT / "generated" / "mechanical-trial-run-registry.min.json"
 ITEM_KEY = 'runs'
 REGISTRY_ID = 'agon.mechanical_trial_run.registry.v0'
-LINEAGE_REF = 'legacy/raw/AGON_WAVE13_RUNTIME_LANDING.md'
+LINEAGE_REF = 'PROVENANCE.md'
 
 def digest_obj(obj):
     return hashlib.sha256(json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()

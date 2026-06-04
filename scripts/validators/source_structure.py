@@ -105,9 +105,6 @@ REQUIRED_FILE_PATHS = tuple(
         "docs/install/DEPLOYMENT.md",
         "docs/install/FIRST_RUN.md",
         "docs/install/README.md",
-        "docs/legacy/AGENTS_ROOT_REFERENCE.md",
-        "docs/legacy/MIGRATION_FROM_OLD.md",
-        "docs/legacy/README.md",
         "docs/operations/BACKUP_RESTORE.md",
         "docs/operations/LIFECYCLE.md",
         "docs/operations/README.md",
@@ -245,7 +242,12 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py",
         "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
         "mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md",
-        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_paths.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_policy_scope.py",
+        "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py",
         "mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md",
         "mechanics/governed-execution/parts/return-policy/examples/runtime_return_event.workhorse-local.example.json",
         "mechanics/governed-execution/parts/return-policy/examples/runtime_return_policy.agentic-local.example.json",
@@ -254,9 +256,9 @@ REQUIRED_FILE_PATHS = tuple(
         "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-canary-catalog.schema.json",
         "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-policy.schema.json",
         "mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-request.schema.json",
-        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials",
-        "mechanics/inference-pilots/legacy/trials/raw/W5_PILOT.md",
-        "mechanics/inference-pilots/legacy/trials/raw/W6_PILOT.md",
+        "mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+        "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+        "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot",
         "mechanics/inference-pilots/parts/langgraph-pilot/docs/LANGGRAPH_PILOT.md",
         "mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt",
         "mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md",
@@ -411,8 +413,6 @@ def validate_root_residual_topology(
         root / "docs" / "BRANCH_POLICY.md": "docs/governance/BRANCH_POLICY.md",
         root / "docs" / "QUESTBOOK_STACK_INTEGRATION.md": "docs/governance/QUESTBOOK_STACK_INTEGRATION.md",
         root / "docs" / "RELEASING.md": "docs/governance/RELEASING.md",
-        root / "docs" / "AGENTS_ROOT_REFERENCE.md": "docs/legacy/AGENTS_ROOT_REFERENCE.md",
-        root / "docs" / "MIGRATION_FROM_OLD.md": "docs/legacy/MIGRATION_FROM_OLD.md",
     }
     for path, target in forbidden_paths.items():
         if path.exists():
@@ -437,7 +437,6 @@ def validate_root_residual_topology(
         "validation/",
         "testing/",
         "decisions/",
-        "legacy/",
     ):
         if district not in docs_readme:
             errors.append(f"docs/README.md must route docs/{district}")

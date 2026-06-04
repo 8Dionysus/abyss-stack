@@ -275,7 +275,7 @@ def validate_inference_and_governance_route_docs(errors: list[str], *, root: Pat
         snippets=(
             "TRUTH_SURFACES.md",
             "GOVERNED_EXECUTION.md",
-            "legacy/INDEX.md",
+            "compatibility-runners/aoa-local-ai-trials",
             "scripts/aoa-governed-run prepare-canary",
             "scripts/aoa-governed-run materialize-canaries",
             "scripts/aoa-governed-run prepare-request",
