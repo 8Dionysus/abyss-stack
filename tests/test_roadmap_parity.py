@@ -39,7 +39,7 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     assert "Current checked anchors" not in roadmap
     assert "diagnostic_target.min.example.json" not in roadmap
     assert "service-degradation-receipt.timeout-chaos.example.json" not in roadmap
-    assert "test_validate_stack_diagnostic_spine.py" not in roadmap
+    assert "test_diagnostic_spine_surface_validator.py" not in roadmap
     assert "RUNTIME_CHAOS_WAVE1.md" not in roadmap
     assert payload["schema_version"] == "abyss_stack_diagnostic_surface_catalog_v1"
     assert payload["authority_ref"] == "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"

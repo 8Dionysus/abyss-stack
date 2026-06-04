@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "owner": "docs/validation/VALIDATOR_TOPOLOGY.md",
+  "command_authority": "docs/validation/validation_lanes.json",
+  "required_fields": [
+    "family",
+    "paths",
+    "protects",
+    "owner_surface",
+    "layer",
+    "lane",
+    "mode",
+    "callers",
+    "failure_route",
+    "status"
+  ],
+  "entries": [
+    {
+      "family": "command-authority",
+      "paths": [
+        "docs/validation/validation_lanes.json",
+        "scripts/validation_lanes.py",
+        "scripts/ci_gate.py",
+        "scripts/release_check.py"
+      ],
+      "protects": "manifest-backed lane command storage, CI lane execution, and release stabilization routing",
+      "owner_surface": "docs/validation/COMMAND_AUTHORITY.md",
+      "layer": "release/tooling",
+      "lane": "source-fast/release",
+      "mode": "blocking-orchestrator",
+      "callers": [
+        ".github/workflows/validate-stack.yml",
+        "scripts/release_check.py",
+        "tests/test_validation_command_authority.py"
+      ],
+      "failure_route": "Fix the lane manifest, loader, or failing lane owner before editing workflow YAML.",
+      "status": "active"
+    },
+    {
+      "family": "root-stack-validator",
+      "paths": [
+        "scripts/validate_stack.py"
+      ],
+      "protects": "repo-wide validation orchestration, source-fast/release owner-module execution order, runtime Configs mirror mode, deployed parity CLI routing, and private glue callbacks for focused validator modules",
+      "owner_surface": "scripts/AGENTS.md",
+      "layer": "source/topology",
+      "lane": "source-fast/release",
+      "mode": "blocking-orchestrator",
+      "callers": [
+        "scripts/ci_gate.py --mode source-fast",
+        "scripts/release_check.py",
+        ".github/workflows/validate-stack.yml"
+      ],
+      "failure_route": "Fix the named owner module or root orchestration glue; do not reintroduce validate_stack wrapper APIs.",
+      "status": "active"
+    },
+    {
+      "family": "script-surface-validator-module",
+      "paths": [
+        "scripts/validators/__init__.py",
+        "scripts/validators/script_surface.py"
+      ],
+      "protects": "operator wrapper presence, wrapper/backend route parity, executable backend posture, and selected high-risk runtime wrapper snippets",
+      "owner_surface": "docs/validation/SCRIPT_TOPOLOGY.md",
+      "layer": "script surface",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_source_topology_validator_modules.py"
+      ],
+      "failure_route": "Fix the owning script route, operator backend map, or script_surface module before widening validate_stack.",
+      "status": "active"
+    },
+    {
+      "family": "source-hygiene-validator-module",
+      "paths": [
+        "scripts/validators/source_hygiene.py"
+      ],
+      "protects": "public-safe GitHub mirror policy, host-local checkout path bans, moved mechanic doc reference bans, and stale active sibling root bans",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "layer": "source/runtime boundary",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_source_topology_validator_modules.py"
+      ],
+      "failure_route": "Fix the source hygiene rule, public mirror policy, or focused module test seam before widening validate_stack.",
+      "status": "active"
+    },
+    {
+      "family": "source-structure-validator-module",
+      "paths": [
+        "scripts/validators/source_structure.py"
+      ],
+      "protects": "required source file presence, managed systemd source skeletons, and residual root/doc district topology",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "layer": "source/topology",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_source_topology_validator_modules.py"
+      ],
+      "failure_route": "Fix the required source surface, managed unit skeleton, docs district route, or source_structure module inputs.",
+      "status": "active"
+    },
+    {
+      "family": "mechanics-topology-validator-module",
+      "paths": [
+        "scripts/validators/mechanics_topology.py"
+      ],
+      "protects": "mechanics atlas route coverage, package card headings, package and part required files, active part naming, archive route requirements, and marker-only artifact posture",
+      "owner_surface": "mechanics/README.md",
+      "layer": "mechanics/topology",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_mechanics_topology_validator_module.py"
+      ],
+      "failure_route": "Fix mechanics atlas routes, package cards, part required files, archive route posture, marker-only artifacts, or mechanics_topology module contract.",
+      "status": "active"
+    },
+    {
+      "family": "profile-topology-validator-module",
+      "paths": [
+        "scripts/validators/profile_topology.py"
+      ],
+      "protects": "composition-first profile and preset contents, compose module dependency guards, profile docs, GitHub profile rehearsal, llama.cpp sidecar routing, n8n external runner posture, warmup posture, and active route profile language",
+      "owner_surface": "compose/",
+      "layer": "runtime/profile-topology",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_profile_topology_validator_module.py"
+      ],
+      "failure_route": "Fix profile/preset contents, compose module requirements, profile docs, workflow rehearsal, sidecar/n8n/warmup posture, active profile route language, or profile_topology module contract.",
+      "status": "active"
+    },
+    {
+      "family": "runtime-route-contracts-validator-module",
+      "paths": [
+        "scripts/validators/runtime_route_contracts.py"
+      ],
+      "protects": "stale deployed-root bans, root README route focus, source/deployed/trial wording in runtime docs, federation handoff docs, and governed execution policy/catalog envelope",
+      "owner_surface": "docs/runtime/PATHS.md",
+      "layer": "runtime/route-contracts",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_runtime_route_contracts_validator_module.py"
+      ],
+      "failure_route": "Fix stale runtime-root references, root README route focus, runtime/federation docs, governed policy/catalog envelope, or runtime_route_contracts module contract.",
+      "status": "active"
+    },
+    {
+      "family": "inference-pilot-compatibility-validator-module",
+      "paths": [
+        "scripts/validators/inference_pilot_compatibility.py"
+      ],
+      "protects": "active local-trials compatibility bridge posture, preserved gate IDs, legacy W0-W4 metadata containment, LangGraph and llama.cpp compatibility gate language, and autonomy status legacy-pilot routes",
+      "owner_surface": "mechanics/inference-pilots/",
+      "layer": "runtime/inference-pilot-compatibility",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_inference_pilot_compatibility_validator_module.py"
+      ],
+      "failure_route": "Fix local-trials compatibility bridge posture, preserved gate IDs, legacy metadata containment, pilot docs/code language, autonomy status legacy routes, or inference_pilot_compatibility module contract.",
+      "status": "active"
+    },
+    {
+      "family": "active-topology-language-validator-module",
+      "paths": [
+        "scripts/validators/active_topology_language.py"
+      ],
+      "protects": "retired phase, wave, and seed wording guards, RPG runtime projection language, playbook activation allowlist drift, and route-api active plus compatibility bridge language",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "layer": "source/active-topology-language",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_active_topology_language_validator_module.py"
+      ],
+      "failure_route": "Fix retired phase/wave/seed wording, RPG runtime projection language, playbook activation allowlists, route-api bridge language, or active_topology_language module contract.",
+      "status": "active"
+    },
+    {
+      "family": "agent-skill-projection-validator-module",
+      "paths": [
+        "scripts/validators/agent_skill_projection.py"
+      ],
+      "protects": "repo-local .agents/skills projection, sibling aoa-skills symlink targets, checkout-safe target files, local overlay directories, and diagnostic overlay skill install posture",
+      "owner_surface": ".agents/skills/AGENTS.md",
+      "layer": "agent/skill-projection",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_agent_skill_projection_validator_module.py",
+        "scripts/validators/diagnostic_spine.py"
+      ],
+      "failure_route": "Fix .agents/skills symlink projection, checkout-safe target files, local overlay directories, diagnostic overlay skill installs, or agent_skill_projection module contract.",
+      "status": "active"
+    },
+    {
+      "family": "service-selection-validator-module",
+      "paths": [
+        "scripts/validators/service_selection.py"
+      ],
+      "protects": "source-level service-selection policy, screenshot inventory, selected runtime shape parity, and selected-service resource guard posture",
+      "owner_surface": "docs/runtime/SERVICE_SELECTION.md",
+      "layer": "runtime/service-selection",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_service_selection_validator_module.py",
+        "mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_policy_validation.py"
+      ],
+      "failure_route": "Fix the service-selection policy, screenshot inventory, runtime shape profile/module mapping, or service_selection module inputs.",
+      "status": "active"
+    },
+    {
+      "family": "sync-parity-validator-module",
+      "paths": [
+        "scripts/validators/sync_parity.py"
+      ],
+      "protects": "sync-managed source enumeration, config-projection sync coverage, runtime Configs mirror posture, and source/deployed parity checks",
+      "owner_surface": "mechanics/config-projection/parts/sync/",
+      "layer": "source/runtime parity",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "scripts/release_check.py",
+        "tests/test_sync_parity_validator_module.py",
+        "tests/test_sync_parity_entrypoint_contracts.py"
+      ],
+      "failure_route": "Fix sync-managed item coverage, runtime Configs mirror route text, deployed parity, or sync_parity module contract.",
+      "status": "active"
+    },
+    {
+      "family": "questbook-surface-validator-module",
+      "paths": [
+        "scripts/validators/questbook_surface.py"
+      ],
+      "protects": "questbook source topology, quest schema envelopes, generated quest catalog/dispatch examples, and RPG runtime read-model schemas/examples",
+      "owner_surface": "quests/AGENTS.md",
+      "layer": "questbook/generated read-model",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_questbook_validator_module.py",
+        "tests/test_questbook_surface_contracts.py"
+      ],
+      "failure_route": "Fix quest source files, generated examples, RPG runtime read-model schemas, or questbook_surface module contract.",
+      "status": "active"
+    },
+    {
+      "family": "federation-surface-validator-module",
+      "paths": [
+        "scripts/validators/federation_surface.py"
+      ],
+      "protects": "runtime-loaded federation config required_files coverage, upstream compatibility bridge runtime template posture, active-vs-legacy bridge language, and federation landing docs",
+      "owner_surface": "mechanics/federation-seams/parts/federation-checks/",
+      "layer": "federation/source-runtime seam",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_federation_validator_module.py",
+        "tests/test_federation_required_files_validator_module.py"
+      ],
+      "failure_route": "Fix federation required_files coverage, upstream compatibility bridge templates, active-vs-legacy bridge language, landing docs, or federation_surface module contract.",
+      "status": "active"
+    },
+    {
+      "family": "federation-runtime-seams-validator-module",
+      "paths": [
+        "scripts/validators/federation_runtime_seams.py"
+      ],
+      "protects": "memo, eval, playbook, and KAG runtime seam docs plus bounded export candidate schemas/examples and A2A return dry-run handoff posture",
+      "owner_surface": "mechanics/federation-seams/",
+      "layer": "federation/runtime seam exports",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_federation_runtime_seams_validator_module.py"
+      ],
+      "failure_route": "Fix federation runtime seam docs, candidate export examples, A2A handoff examples, or federation_runtime_seams module contract.",
+      "status": "active"
+    },
+    {
+      "family": "diagnostic-spine-validator-module",
+      "paths": [
+        "scripts/validators/diagnostic_spine.py"
+      ],
+      "protects": "diagnostic surface route docs, schemas, examples, generated catalog validation refs, and repo-local diagnostic overlay skill posture",
+      "owner_surface": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/",
+      "layer": "diagnostic/runtime read-model",
+      "lane": "source-fast/generated/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_diagnostic_spine_validator_module.py",
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py"
+      ],
+      "failure_route": "Fix diagnostic docs, schemas, examples, generated catalog refs, overlay skill posture, or diagnostic_spine module contract.",
+      "status": "active"
+    },
+    {
+      "family": "runtime-hygiene-validator-module",
+      "paths": [
+        "scripts/validators/runtime_hygiene.py"
+      ],
+      "protects": "runtime gateway cache and usage status readout docs, schemas, examples, and readiness-only doctor split posture",
+      "owner_surface": "mechanics/runtime-lifecycle/parts/status-readouts/",
+      "layer": "runtime-lifecycle/status readout",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_runtime_hygiene_validator_module.py",
+        "mechanics/runtime-lifecycle/parts/status-readouts/tests/test_runtime_hygiene.py"
+      ],
+      "failure_route": "Fix runtime status readout docs, schemas, examples, doctor split posture, or runtime_hygiene module contract.",
+      "status": "active"
+    },
+    {
+      "family": "machine-fit-validator-module",
+      "paths": [
+        "scripts/validators/machine_fit.py"
+      ],
+      "protects": "reference platform docs, host-facts public contract, machine bridge read-only posture, machine-fit record profile posture, freshness gates, and platform adaptation public contract",
+      "owner_surface": "mechanics/machine-fit/",
+      "layer": "machine-fit/evidence posture",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_machine_fit_validator_module.py",
+        "mechanics/machine-fit/parts/machine-bridge/tests/test_machine_bridge_contracts.py",
+        "mechanics/machine-fit/parts/fit-record/tests/test_aoa_machine_fit.py"
+      ],
+      "failure_route": "Fix machine-fit docs, host facts, bridge read-only posture, fit record profile posture, freshness gates, platform adaptation examples, or machine_fit module contract.",
+      "status": "active"
+    },
+    {
+      "family": "return-policy-validator-module",
+      "paths": [
+        "scripts/validators/return_policy.py"
+      ],
+      "protects": "return-policy config routes, render-truth autonomy route refs, runtime return policy schema identity, and runtime return event schema identity",
+      "owner_surface": "mechanics/governed-execution/parts/return-policy/",
+      "layer": "governed-execution/return-policy",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_return_policy_validator_module.py",
+        "tests/test_schema_contracts.py"
+      ],
+      "failure_route": "Fix return-policy config docs, render-truth autonomy refs, runtime return schemas, or return_policy module contract.",
+      "status": "active"
+    },
+    {
+      "family": "branch-policy-validator-module",
+      "paths": [
+        "scripts/validators/branch_policy.py"
+      ],
+      "protects": "CONTRIBUTING branch-policy route, canonical main-only branch posture, branch retirement language, and source/runtime checkout distinction",
+      "owner_surface": "docs/governance/BRANCH_POLICY.md",
+      "layer": "governance/branch-policy",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_branch_policy_validator_module.py"
+      ],
+      "failure_route": "Fix CONTRIBUTING branch routing, branch-policy main/retirement language, source/runtime checkout refs, or branch_policy module contract.",
+      "status": "active"
+    },
+    {
+      "family": "root-routes-validator-module",
+      "paths": [
+        "scripts/validators/root_routes.py"
+      ],
+      "protects": "root design cards, start-here route exposure, front-door route modes, and command-authority handoff language",
+      "owner_surface": "docs/routes/START_HERE_ROUTE_CONTRACT.md",
+      "layer": "root/routes",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_root_routes_validator_module.py"
+      ],
+      "failure_route": "Fix root design cards, start-here route contract exposure, README route modes, command-authority handoff text, or root_routes module contract.",
+      "status": "active"
+    },
+    {
+      "family": "decision-surface-validator-module",
+      "paths": [
+        "scripts/validators/decision_surface.py"
+      ],
+      "protects": "docs/decisions route cards, decision template route requirements, validator/generator handoff text, and decision test route exposure",
+      "owner_surface": "docs/decisions/",
+      "layer": "decision/routes",
+      "lane": "source-fast/release",
+      "mode": "blocking-owner-module",
+      "callers": [
+        "scripts/validate_stack.py",
+        "tests/test_decision_surface_validator_module.py"
+      ],
+      "failure_route": "Fix decision route cards, TEMPLATE route shape, docs/scripts/tests validator handoffs, or decision_surface module contract.",
+      "status": "active"
+    },
+    {
+      "family": "agent-route-validator",
+      "paths": [
+        "scripts/validate_nested_agents.py"
+      ],
+      "protects": "nested AGENTS route coverage and required route snippets",
+      "owner_surface": "AGENTS.md",
+      "layer": "agent-route/topology",
+      "lane": "source-fast/release",
+      "mode": "blocking",
+      "callers": [
+        "scripts/ci_gate.py --mode source-fast",
+        "root AGENTS validation route"
+      ],
+      "failure_route": "Fix the nearest AGENTS card or required owner route.",
+      "status": "active"
+    },
+    {
+      "family": "decision-rationale-validators",
+      "paths": [
+        "scripts/validate_decision_records.py",
+        "scripts/generate_decision_indexes.py",
+        "scripts/decision_indexes.py"
+      ],
+      "protects": "canonical decision IDs, decision metadata, and generated decision index freshness",
+      "owner_surface": "docs/decisions/",
+      "layer": "decision/read-model",
+      "lane": "source-fast/generated/release",
+      "mode": "blocking",
+      "callers": [
+        "scripts/ci_gate.py --mode source-fast",
+        "scripts/ci_gate.py --mode generated",
+        "scripts/release_check.py"
+      ],
+      "failure_route": "Fix decision metadata or regenerate decision indexes.",
+      "status": "active"
+    },
+    {
+      "family": "diagnostic-generated-validators",
+      "paths": [
+        "scripts/build_diagnostic_surface_catalog.py",
+        "scripts/validate_diagnostic_surface_catalog.py"
+      ],
+      "protects": "diagnostic surface generated catalog and catalog schema contract",
+      "owner_surface": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/",
+      "layer": "generated/read-model",
+      "lane": "generated/release",
+      "mode": "blocking",
+      "callers": [
+        "scripts/ci_gate.py --mode generated",
+        "scripts/release_check.py"
+      ],
+      "failure_route": "Fix diagnostic surface source, generated catalog, or catalog validator.",
+      "status": "active"
+    },
+    {
+      "family": "mechanic-part-validators",
+      "paths": [
+        "mechanics/agon-runtime/parts/runtime-kernels/validate_duel_runtime_kernels.py",
+        "mechanics/agon-runtime/parts/runtime-kernels/validate_mechanical_trial_runs.py"
+      ],
+      "protects": "Agon runtime kernel registry and mechanical trial run contracts",
+      "owner_surface": "mechanics/agon-runtime/parts/runtime-kernels/",
+      "layer": "mechanic part-local",
+      "lane": "mechanics-part-local/tests",
+      "mode": "blocking-part-local",
+      "callers": [
+        "mechanics/agon-runtime/parts/runtime-kernels/tests/"
+      ],
+      "failure_route": "Fix the owning mechanic part before changing root validation.",
+      "status": "active"
+    },
+    {
+      "family": "mcp-service-validators",
+      "paths": [
+        "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
+        "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+        "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
+        "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+        "mcp/services/aoa-memo-mcp/scripts/release_check.py",
+        "mcp/services/aoa-evals-mcp/scripts/release_check.py",
+        "mcp/services/abyss-machine-mcp/scripts/release_check.py",
+        "mcp/services/aoa-session-memory-mcp/scripts/release_check.py"
+      ],
+      "protects": "MCP package-local access-plane validation and release smoke checks",
+      "owner_surface": "mcp/services/AGENTS.md",
+      "layer": "MCP access plane",
+      "lane": "mcp-services/tests/release",
+      "mode": "blocking-package-local",
+      "callers": [
+        "mcp/AGENTS.md",
+        "scripts/ci_gate.py --mode mcp-services"
+      ],
+      "failure_route": "Fix the service-local package route and owner-boundary docs.",
+      "status": "active"
+    }
+  ]
+}

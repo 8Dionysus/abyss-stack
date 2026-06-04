@@ -14,6 +14,16 @@
 - [ABYSS-STACK-D-0025 Composition-First Presets](../ABYSS-STACK-D-0025-composition-first-presets.md) (`docs/decisions/ABYSS-STACK-D-0025-composition-first-presets.md`)
 - [ABYSS-STACK-D-0026 Workflow Automation Optional Profile](../ABYSS-STACK-D-0026-workflow-automation-optional-profile.md) (`docs/decisions/ABYSS-STACK-D-0026-workflow-automation-optional-profile.md`)
 - [ABYSS-STACK-D-0030 RAG Orchestration Profile](../ABYSS-STACK-D-0030-rag-orchestration-profile.md) (`docs/decisions/ABYSS-STACK-D-0030-rag-orchestration-profile.md`)
+- [ABYSS-STACK-D-0044 Sync Parity Validator Module](../ABYSS-STACK-D-0044-sync-parity-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0044-sync-parity-validator-module.md`)
+- [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
+- [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
+
+## diagnostic-spine
+
+- [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
+- [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
+- [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
+- [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 
 ## experience-runtime
 
@@ -24,10 +34,21 @@
 - [ABYSS-STACK-D-0030 RAG Orchestration Profile](../ABYSS-STACK-D-0030-rag-orchestration-profile.md) (`docs/decisions/ABYSS-STACK-D-0030-rag-orchestration-profile.md`)
 - [ABYSS-STACK-D-0035 AoA Evals MCP Access Plane](../ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0037 AoA Session Memory MCP Access Plane](../ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0045 Questbook Surface Validator Module](../ABYSS-STACK-D-0045-questbook-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0045-questbook-surface-validator-module.md`)
+- [ABYSS-STACK-D-0046 Federation Surface Validator Module](../ABYSS-STACK-D-0046-federation-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0046-federation-surface-validator-module.md`)
+- [ABYSS-STACK-D-0047 Federation Upstream Compatibility Language Split](../ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md) (`docs/decisions/ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md`)
+- [ABYSS-STACK-D-0048 Federation Landing Validator Split](../ABYSS-STACK-D-0048-federation-landing-validator-split.md) (`docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md`)
+- [ABYSS-STACK-D-0049 Federation Runtime Seams Validator Module](../ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md`)
+- [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
+- [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
+- [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 
 ## governed-execution
 
 - [ABYSS-STACK-D-0034 AoA Memo MCP Landing Plan Boundary](../ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md) (`docs/decisions/ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md`)
+- [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
+- [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
+- [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
 
 ## inference-pilots
 
@@ -35,6 +56,10 @@
 - [ABYSS-STACK-D-0007 Inference Pilot Compatibility Gates](../ABYSS-STACK-D-0007-inference-pilot-compatibility-gates.md) (`docs/decisions/ABYSS-STACK-D-0007-inference-pilot-compatibility-gates.md`)
 - [ABYSS-STACK-D-0028 Intel Inference And Rerank Service Selection](../ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md) (`docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`)
 - [ABYSS-STACK-D-0029 BabelVox TTS Experimental Lane](../ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md) (`docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md`)
+- [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
+- [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
+- [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
+- [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
 
 ## machine-fit
 
@@ -42,10 +67,16 @@
 - [ABYSS-STACK-D-0022 Machine Evidence Freshness Gates](../ABYSS-STACK-D-0022-machine-evidence-freshness-gates.md) (`docs/decisions/ABYSS-STACK-D-0022-machine-evidence-freshness-gates.md`)
 - [ABYSS-STACK-D-0028 Intel Inference And Rerank Service Selection](../ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md) (`docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`)
 - [ABYSS-STACK-D-0036 Abyss Machine MCP Access Plane](../ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0052 Machine Fit Validator Module](../ABYSS-STACK-D-0052-machine-fit-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0052-machine-fit-validator-module.md`)
 
 ## runtime-lifecycle
 
 - [ABYSS-STACK-D-0027 Managed Systemd Unit Sources](../ABYSS-STACK-D-0027-managed-systemd-unit-sources.md) (`docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md`)
+- [ABYSS-STACK-D-0043 Service Selection Validator Module](../ABYSS-STACK-D-0043-service-selection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0043-service-selection-validator-module.md`)
+- [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
+- [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
+- [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
+- [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 
 ## cross-mechanic
 
@@ -56,3 +87,11 @@
 - [ABYSS-STACK-D-0013 Runtime Compatibility Boundaries](../ABYSS-STACK-D-0013-runtime-compatibility-boundaries.md) (`docs/decisions/ABYSS-STACK-D-0013-runtime-compatibility-boundaries.md`)
 - [ABYSS-STACK-D-0014 Residual Frontier Quest Alignment](../ABYSS-STACK-D-0014-residual-frontier-quest-alignment.md) (`docs/decisions/ABYSS-STACK-D-0014-residual-frontier-quest-alignment.md`)
 - [ABYSS-STACK-D-0015 Mechanics Package Card Completeness](../ABYSS-STACK-D-0015-mechanics-package-card-completeness.md) (`docs/decisions/ABYSS-STACK-D-0015-mechanics-package-card-completeness.md`)
+- [ABYSS-STACK-D-0039 Validation Command Authority And Technical Topology](../ABYSS-STACK-D-0039-validation-command-authority-and-technical-topology.md) (`docs/decisions/ABYSS-STACK-D-0039-validation-command-authority-and-technical-topology.md`)
+- [ABYSS-STACK-D-0040 Script Surface Validator Module](../ABYSS-STACK-D-0040-script-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0040-script-surface-validator-module.md`)
+- [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
+- [ABYSS-STACK-D-0042 Source Structure Validator Module](../ABYSS-STACK-D-0042-source-structure-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0042-source-structure-validator-module.md`)
+- [ABYSS-STACK-D-0054 Branch Policy Validator Module](../ABYSS-STACK-D-0054-branch-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0054-branch-policy-validator-module.md`)
+- [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
+- [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
+- [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)

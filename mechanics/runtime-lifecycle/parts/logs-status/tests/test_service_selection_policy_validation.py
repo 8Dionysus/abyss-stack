@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import scripts.validate_stack as validate_stack
+from scripts.validators import service_selection
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -17,6 +17,32 @@ INVENTORY_PATH = Path("docs") / "runtime" / "service-inventory-2026-05-14.v1.jso
 def write_text(path: Path, content: str = "") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def load_names(file_path: Path) -> list[str]:
+    names: list[str] = []
+    for raw in file_path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            names.append(line)
+    return names
+
+
+def compose_service_names(file_path: Path) -> set[str]:
+    service_names: set[str] = set()
+    in_services = False
+    for raw in file_path.read_text(encoding="utf-8").splitlines():
+        if raw.strip() == "services:":
+            in_services = True
+            continue
+        if not in_services:
+            continue
+        if raw and not raw.startswith(" "):
+            break
+        match = re.match(r"^  ([A-Za-z0-9_.-]+):\s*$", raw)
+        if match:
+            service_names.add(match.group(1))
+    return service_names
 
 
 class ServiceSelectionPolicyValidationTests(unittest.TestCase):
@@ -33,10 +59,23 @@ class ServiceSelectionPolicyValidationTests(unittest.TestCase):
         )
         for overlay in policy["current_runtime_shape"]["overlays"]:
             write_text(repo_root / overlay)
+        for source_dir in (REPO_ROOT / "compose" / "presets", REPO_ROOT / "compose" / "profiles"):
+            for source_path in source_dir.glob("*.txt"):
+                write_text(
+                    repo_root / source_path.relative_to(REPO_ROOT),
+                    source_path.read_text(encoding="utf-8"),
+                )
         for entry in policy["services"]:
-            write_text(repo_root / entry["module"])
+            write_text(
+                repo_root / entry["module"],
+                (REPO_ROOT / entry["module"]).read_text(encoding="utf-8"),
+            )
             if entry["resource_guard"]:
-                write_text(repo_root / entry["resource_guard"])
+                resource_guard = REPO_ROOT / entry["resource_guard"]
+                write_text(
+                    repo_root / entry["resource_guard"],
+                    resource_guard.read_text(encoding="utf-8") if resource_guard.is_file() else "",
+                )
         return repo_root / POLICY_PATH
 
     def build_inventory_fixture(self, repo_root: Path) -> Path:
@@ -47,19 +86,94 @@ class ServiceSelectionPolicyValidationTests(unittest.TestCase):
 
     def validate_fixture(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
-        with patch.object(validate_stack, "ROOT", repo_root):
-            validate_stack.validate_service_selection_policy(errors)
+        service_selection.validate_service_selection_policy(
+            errors,
+            root=repo_root,
+            policy_path=service_selection.SERVICE_SELECTION_POLICY_PATH,
+            required_services=service_selection.SERVICE_SELECTION_POLICY_REQUIRED_SERVICES,
+            allowed_postures=service_selection.SERVICE_SELECTION_POLICY_ALLOWED_POSTURES,
+            preset_dir=repo_root / "compose" / "presets",
+            profile_dir=repo_root / "compose" / "profiles",
+            module_dir=repo_root / "compose" / "modules",
+            load_names_func=load_names,
+            compose_service_names_func=compose_service_names,
+            required_runtime_profiles={"federation", "reranking", "rag"},
+            required_runtime_overlays=(
+                "compose/tuning/storage.intel-285h.resource-guard.yml",
+                "compose/tuning/rag.thin-host.yml",
+            ),
+            unexpected_selected_services={"n8n", "n8n-task-runners", "ollama", "litellm", "babelvox-tts"},
+            expected_selected_services={
+                "postgres",
+                "redis",
+                "qdrant",
+                "neo4j",
+                "llama-cpp",
+                "ovms",
+                "langchain-api",
+                "route-api",
+                "rerank-api",
+                "rag-api",
+            },
+            selection_doc_paths=(
+                Path("docs") / "runtime" / "SERVICE_SELECTION.md",
+                Path("docs") / "runtime" / "README.md",
+            ),
+        )
         return errors
 
     def validate_inventory_fixture(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
-        with patch.object(validate_stack, "ROOT", repo_root):
-            validate_stack.validate_service_screenshot_inventory(errors)
+        service_selection.validate_service_screenshot_inventory(
+            errors,
+            root=repo_root,
+            inventory_path=service_selection.SERVICE_SCREENSHOT_INVENTORY_PATH,
+            policy_path=service_selection.SERVICE_SELECTION_POLICY_PATH,
+            required_screenshot_services=service_selection.SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES,
+            expected_addon_services=("rerank-api", "rag-api"),
+            selection_doc_paths=(
+                Path("docs") / "runtime" / "SERVICE_SELECTION.md",
+                Path("docs") / "runtime" / "README.md",
+            ),
+        )
         return errors
 
     def test_current_policy_contract_passes(self) -> None:
         errors: list[str] = []
-        validate_stack.validate_service_selection_policy(errors)
+        service_selection.validate_service_selection_policy(
+            errors,
+            root=REPO_ROOT,
+            policy_path=service_selection.SERVICE_SELECTION_POLICY_PATH,
+            required_services=service_selection.SERVICE_SELECTION_POLICY_REQUIRED_SERVICES,
+            allowed_postures=service_selection.SERVICE_SELECTION_POLICY_ALLOWED_POSTURES,
+            preset_dir=REPO_ROOT / "compose" / "presets",
+            profile_dir=REPO_ROOT / "compose" / "profiles",
+            module_dir=REPO_ROOT / "compose" / "modules",
+            load_names_func=load_names,
+            compose_service_names_func=compose_service_names,
+            required_runtime_profiles={"federation", "reranking", "rag"},
+            required_runtime_overlays=(
+                "compose/tuning/storage.intel-285h.resource-guard.yml",
+                "compose/tuning/rag.thin-host.yml",
+            ),
+            unexpected_selected_services={"n8n", "n8n-task-runners", "ollama", "litellm", "babelvox-tts"},
+            expected_selected_services={
+                "postgres",
+                "redis",
+                "qdrant",
+                "neo4j",
+                "llama-cpp",
+                "ovms",
+                "langchain-api",
+                "route-api",
+                "rerank-api",
+                "rag-api",
+            },
+            selection_doc_paths=(
+                Path("docs") / "runtime" / "SERVICE_SELECTION.md",
+                Path("docs") / "runtime" / "README.md",
+            ),
+        )
         self.assertEqual(errors, [])
 
     def test_missing_required_service_fails(self) -> None:
@@ -108,7 +222,18 @@ class ServiceSelectionPolicyValidationTests(unittest.TestCase):
 
     def test_current_screenshot_inventory_contract_passes(self) -> None:
         errors: list[str] = []
-        validate_stack.validate_service_screenshot_inventory(errors)
+        service_selection.validate_service_screenshot_inventory(
+            errors,
+            root=REPO_ROOT,
+            inventory_path=service_selection.SERVICE_SCREENSHOT_INVENTORY_PATH,
+            policy_path=service_selection.SERVICE_SELECTION_POLICY_PATH,
+            required_screenshot_services=service_selection.SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES,
+            expected_addon_services=("rerank-api", "rag-api"),
+            selection_doc_paths=(
+                Path("docs") / "runtime" / "SERVICE_SELECTION.md",
+                Path("docs") / "runtime" / "README.md",
+            ),
+        )
         self.assertEqual(errors, [])
 
     def test_screenshot_inventory_requires_baseline_services(self) -> None:

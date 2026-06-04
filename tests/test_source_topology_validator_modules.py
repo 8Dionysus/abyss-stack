@@ -3,12 +3,22 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import scripts.validate_stack as validate_stack
+from scripts.validators import agent_skill_projection
+from scripts.validators import script_surface
+from scripts.validators import source_hygiene
+from scripts.validators import source_structure
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-class ValidateStackRequiredFilesTests(unittest.TestCase):
+class SourceTopologyValidatorModulesTests(unittest.TestCase):
+    def iter_text_files(self, repo_root: Path) -> list[Path]:
+        return source_hygiene.iter_text_files(
+            repo_root,
+            binary_suffixes=source_hygiene.BINARY_SUFFIXES,
+        )
+
     def write_operator_backend_fixture(
         self,
         repo_root: Path,
@@ -37,6 +47,7 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
         repo_root: Path,
         backend_rel: str,
         errors: list[str],
+        git_index_mode_func: script_surface.GitIndexMode | None = None,
     ) -> None:
         scripts_dir = repo_root / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -58,20 +69,31 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             "aoa-check-layout": backend_rel,
             "aoa-llamacpp-pilot": pilot_backend_rel,
         }
-        with patch.object(validate_stack, "ROOT", repo_root):
-            with patch.object(validate_stack, "REQUIRED_SCRIPTS", required_scripts):
-                with patch.object(validate_stack, "OPERATOR_BACKEND_SCRIPTS", backend_scripts):
-                    validate_stack.validate_scripts(errors)
+        script_surface.validate_scripts(
+            errors,
+            root=repo_root,
+            required_scripts=required_scripts,
+            operator_backend_scripts=backend_scripts,
+            executable_source_path_func=lambda candidate: script_surface.is_executable_source_path(
+                candidate,
+                repo_root,
+                git_index_mode_func=git_index_mode_func,
+            ),
+        )
 
     def test_current_repo_required_files_pass(self) -> None:
         errors: list[str] = []
-        validate_stack.validate_required_files(errors)
+        source_structure.validate_required_files(
+            errors,
+            root=REPO_ROOT,
+            required_files=source_structure.required_files(REPO_ROOT),
+        )
         self.assertEqual(errors, [])
 
     def test_required_operator_scripts_have_backend_routes(self) -> None:
         self.assertEqual(
-            validate_stack.REQUIRED_SCRIPTS,
-            set(validate_stack.OPERATOR_BACKEND_SCRIPTS),
+            script_surface.REQUIRED_SCRIPTS,
+            set(script_surface.OPERATOR_BACKEND_SCRIPTS),
         )
 
     def test_missing_aoa_browser_template_files_fail(self) -> None:
@@ -84,9 +106,11 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
 
             required_files = {existing, missing}
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                with patch.object(validate_stack, "REQUIRED_FILES", required_files):
-                    validate_stack.validate_required_files(errors)
+            source_structure.validate_required_files(
+                errors,
+                root=repo_root,
+                required_files=required_files,
+            )
 
         self.assertEqual(
             errors,
@@ -112,8 +136,13 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_no_host_local_source_checkout_paths(errors)
+            source_hygiene.validate_no_host_local_source_checkout_paths(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                host_local_source_checkout_patterns=source_hygiene.HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS,
+                skip_paths=(),
+            )
 
         self.assertEqual(
             errors,
@@ -136,8 +165,13 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_no_host_local_source_checkout_paths(errors)
+            source_hygiene.validate_no_host_local_source_checkout_paths(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                host_local_source_checkout_patterns=source_hygiene.HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS,
+                skip_paths=(),
+            )
 
         self.assertEqual(errors, [])
 
@@ -160,8 +194,13 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_no_host_local_source_checkout_paths(errors)
+            source_hygiene.validate_no_host_local_source_checkout_paths(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                host_local_source_checkout_patterns=source_hygiene.HOST_LOCAL_SOURCE_CHECKOUT_PATTERNS,
+                skip_paths=(),
+            )
 
         self.assertEqual(
             errors,
@@ -182,8 +221,13 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             doc.write_text(f"Old ref: {moved_ref}\n", encoding="utf-8")
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_no_moved_mechanic_doc_refs(errors)
+            source_hygiene.validate_no_moved_mechanic_doc_refs(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                moved_mechanic_doc_refs=source_hygiene.MOVED_MECHANIC_DOC_REFS,
+                skip_paths=(),
+            )
 
         self.assertEqual(
             errors,
@@ -192,6 +236,25 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
                 f".agents/skills/overlay.md: {moved_ref}"
             ],
         )
+
+    def test_moved_mechanic_doc_ref_owner_manifest_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            owner_manifest = repo_root / source_hygiene.SOURCE_HYGIENE_VALIDATOR_PATH
+            owner_manifest.parent.mkdir(parents=True, exist_ok=True)
+            moved_ref = source_hygiene.MOVED_MECHANIC_DOC_REFS[0]
+            owner_manifest.write_text(f'"{moved_ref}",\n', encoding="utf-8")
+
+            errors: list[str] = []
+            source_hygiene.validate_no_moved_mechanic_doc_refs(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                moved_mechanic_doc_refs=source_hygiene.MOVED_MECHANIC_DOC_REFS,
+                skip_paths=(owner_manifest,),
+            )
+
+        self.assertEqual(errors, [])
 
     def test_stale_active_sibling_root_fails_outside_legacy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -205,8 +268,12 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             legacy_doc.write_text(f"Preserved lineage route: {stale_root}\n", encoding="utf-8")
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_no_stale_active_sibling_roots(errors)
+            source_hygiene.validate_no_stale_active_sibling_roots(
+                errors,
+                root=repo_root,
+                text_file_iter_func=lambda: self.iter_text_files(repo_root),
+                stale_active_sibling_root_pattern=source_hygiene.STALE_ACTIVE_SIBLING_ROOT_PATTERN,
+            )
 
         self.assertEqual(
             errors,
@@ -233,8 +300,10 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_agent_skill_projection_routes(errors)
+            agent_skill_projection.validate_agent_skill_projection_routes(
+                errors,
+                root=repo_root,
+            )
 
         self.assertEqual(
             errors,
@@ -258,8 +327,10 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             (skill_root / "aoa-change-protocol").write_text(expected_target + "\n", encoding="utf-8")
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                validate_stack.validate_agent_skill_projection_routes(errors)
+            agent_skill_projection.validate_agent_skill_projection_routes(
+                errors,
+                root=repo_root,
+            )
 
         self.assertEqual(errors, [])
 
@@ -295,11 +366,21 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "git_index_mode", return_value="100755") as git_index_mode:
-                self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
+            git_index_mode_calls: list[Path] = []
+
+            def git_index_mode(path: Path) -> str:
+                git_index_mode_calls.append(path)
+                return "100755"
+
+            self.validate_operator_backend_fixture(
+                repo_root,
+                backend_rel,
+                errors,
+                git_index_mode_func=git_index_mode,
+            )
 
         self.assertEqual(errors, [])
-        git_index_mode.assert_called_once_with(backend)
+        self.assertEqual(git_index_mode_calls, [backend])
 
     def test_operator_backend_nonexecutable_index_mode_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -310,8 +391,12 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             )
 
             errors: list[str] = []
-            with patch.object(validate_stack, "git_index_mode", return_value="100644"):
-                self.validate_operator_backend_fixture(repo_root, backend_rel, errors)
+            self.validate_operator_backend_fixture(
+                repo_root,
+                backend_rel,
+                errors,
+                git_index_mode_func=lambda _path: "100644",
+            )
 
         self.assertIn(
             "operator backend is not executable: "
@@ -348,17 +433,19 @@ class ValidateStackRequiredFilesTests(unittest.TestCase):
             (scripts_dir / "aoa-llamacpp-pilot").chmod(0o755)
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root):
-                with patch.object(validate_stack, "REQUIRED_SCRIPTS", {"aoa-doctor-win.ps1", "aoa-llamacpp-pilot"}):
-                    with patch.object(
-                        validate_stack,
-                        "OPERATOR_BACKEND_SCRIPTS",
-                        {
-                            "aoa-doctor-win.ps1": backend_rel,
-                            "aoa-llamacpp-pilot": pilot_backend_rel,
-                        },
-                    ):
-                        validate_stack.validate_scripts(errors)
+            script_surface.validate_scripts(
+                errors,
+                root=repo_root,
+                required_scripts={"aoa-doctor-win.ps1", "aoa-llamacpp-pilot"},
+                operator_backend_scripts={
+                    "aoa-doctor-win.ps1": backend_rel,
+                    "aoa-llamacpp-pilot": pilot_backend_rel,
+                },
+                executable_source_path_func=lambda candidate: script_surface.is_executable_source_path(
+                    candidate,
+                    repo_root,
+                ),
+            )
 
         self.assertEqual(errors, [])
 

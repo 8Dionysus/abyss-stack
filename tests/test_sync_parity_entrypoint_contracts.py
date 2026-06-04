@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import scripts.validate_stack as validate_stack
+from scripts.validators import sync_parity
 
 
 def write_text(path: Path, content: str) -> None:
@@ -16,7 +17,7 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-class ValidateStackParityTests(unittest.TestCase):
+class SyncParityEntrypointContractsTests(unittest.TestCase):
     def test_validate_deployed_parity_accepts_matching_synced_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -29,12 +30,17 @@ class ValidateStackParityTests(unittest.TestCase):
             write_text(deployed_root / "docs" / "DEPLOYMENT.md", "# deployment\n")
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root), patch.object(
-                validate_stack,
-                "SYNC_MANAGED_ITEMS",
-                ("README.md", "docs"),
-            ):
-                validate_stack.validate_deployed_parity(errors, deployed_root)
+            sync_parity.validate_deployed_parity(
+                errors,
+                root=repo_root,
+                deployed_root=deployed_root,
+                sync_file_iter_func=lambda: sync_parity.iter_sync_managed_files(
+                    root=repo_root,
+                    sync_managed_items=("README.md", "docs"),
+                    ignored_parts=sync_parity.PARITY_IGNORED_PARTS,
+                    ignored_suffixes=sync_parity.PARITY_IGNORED_SUFFIXES,
+                ),
+            )
 
         self.assertEqual(errors, [])
 
@@ -48,12 +54,17 @@ class ValidateStackParityTests(unittest.TestCase):
             write_text(deployed_root / "README.md", "# drifted\n")
 
             errors: list[str] = []
-            with patch.object(validate_stack, "ROOT", repo_root), patch.object(
-                validate_stack,
-                "SYNC_MANAGED_ITEMS",
-                ("README.md",),
-            ):
-                validate_stack.validate_deployed_parity(errors, deployed_root)
+            sync_parity.validate_deployed_parity(
+                errors,
+                root=repo_root,
+                deployed_root=deployed_root,
+                sync_file_iter_func=lambda: sync_parity.iter_sync_managed_files(
+                    root=repo_root,
+                    sync_managed_items=("README.md",),
+                    ignored_parts=sync_parity.PARITY_IGNORED_PARTS,
+                    ignored_suffixes=sync_parity.PARITY_IGNORED_SUFFIXES,
+                ),
+            )
 
         self.assertEqual(errors, ["source/deployed drift for synced path: README.md"])
 

@@ -60,6 +60,7 @@ For root docs, topology, validators, mechanics, or sync-managed source surfaces,
 start with:
 
 ```bash
+python scripts/ci_gate.py --mode source-fast
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 python -m pytest -q

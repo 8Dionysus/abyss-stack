@@ -18,6 +18,8 @@ under `/srv/AbyssOS/abyss-stack`, not in this source checkout.
 | [operations](operations/README.md) | lifecycle, runbook, backup/restore, security posture | [RUNBOOK](operations/RUNBOOK.md) |
 | [profiles](profiles/README.md) | profiles, presets, profile recipes | [PROFILES](profiles/PROFILES.md) |
 | [governance](governance/README.md) | branch, release, and questbook integration routes | [BRANCH_POLICY](governance/BRANCH_POLICY.md) |
+| [validation](validation/README.md) | validation lane command authority, validator topology, script topology | [COMMAND_AUTHORITY](validation/COMMAND_AUTHORITY.md) |
+| [testing](testing/README.md) | test topology and test inventory | [TEST_TOPOLOGY](testing/TEST_TOPOLOGY.md) |
 | [decisions](decisions/README.md) | durable rationale for topology and workflow choices | [TEMPLATE](decisions/TEMPLATE.md) |
 | [legacy](legacy/README.md) | preserved old guidance and migration references | [MIGRATION_FROM_OLD](legacy/MIGRATION_FROM_OLD.md) |
 
@@ -35,7 +37,8 @@ under `/srv/AbyssOS/abyss-stack`, not in this source checkout.
   [profiles/PRESETS](profiles/PRESETS.md), then
   [profiles/PROFILE_RECIPES](profiles/PROFILE_RECIPES.md).
 - Review and release: [routes/AUDIT](routes/AUDIT.md),
-  [governance/RELEASING](governance/RELEASING.md), and
+  [governance/RELEASING](governance/RELEASING.md),
+  [validation/COMMAND_AUTHORITY](validation/COMMAND_AUTHORITY.md), and
   [decisions](decisions/README.md).
 
 See [AGENTS.md](AGENTS.md) for editing rules.

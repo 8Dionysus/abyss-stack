@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "owner": "docs/validation/COMMAND_AUTHORITY.md",
+  "command_authority": "This manifest owns reusable validation lane command sequences. Inventories are descriptive and do not execute commands.",
+  "notes": [
+    "source-fast is growth-safe and does not run synthetic Configs parity.",
+    "release_check adds synthetic/live Configs parity after the manifest-backed release sequence.",
+    "GitHub workflow platform rehearsal steps remain in .github while reusable repo commands route through ci_gate."
+  ],
+  "lanes": {
+    "source-fast": {
+      "posture": "blocking",
+      "command_sequence": "source_fast",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "purpose": "Growth-safe source route, decision, AGENTS, and stack topology gate.",
+      "does_not_own": [
+        "source/runtime parity",
+        "shellcheck availability",
+        "platform rehearsal",
+        "live deployed runtime state"
+      ]
+    },
+    "generated": {
+      "posture": "blocking-on-generated-surfaces",
+      "command_sequence": "generated",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "purpose": "Generated decision and diagnostic read-model freshness."
+    },
+    "tests": {
+      "posture": "blocking",
+      "command_sequence": "tests",
+      "owner_surface": "docs/testing/TEST_TOPOLOGY.md",
+      "purpose": "Default deterministic pytest collection for source-checkout contracts."
+    },
+    "mechanics-part-local": {
+      "posture": "blocking",
+      "command_sequence": "mechanics_part_local",
+      "owner_surface": "mechanics/AGENTS.md",
+      "purpose": "Mechanic part-local tests, including currently active legacy provenance tests."
+    },
+    "mcp-services": {
+      "posture": "blocking",
+      "command_sequence": "mcp_services",
+      "owner_surface": "mcp/services/AGENTS.md",
+      "purpose": "MCP package validators and tests."
+    },
+    "shellcheck": {
+      "posture": "blocking-when-shellcheck-installed",
+      "command_sequence": "shellcheck",
+      "owner_surface": "scripts/AGENTS.md",
+      "purpose": "Shell wrapper and backend syntax hygiene."
+    },
+    "release": {
+      "posture": "blocking-release",
+      "command_sequence": "release_gate",
+      "owner_surface": "scripts/release_check.py",
+      "purpose": "Full source release gate, including manifest-backed release commands and Configs parity stabilization."
+    }
+  },
+  "command_sequences": {
+    "source_fast": [
+      {
+        "label": "validate decision records",
+        "command": ["python", "scripts/validate_decision_records.py"]
+      },
+      {
+        "label": "check decision indexes",
+        "command": ["python", "scripts/generate_decision_indexes.py", "--check"]
+      },
+      {
+        "label": "validate nested AGENTS",
+        "command": ["python", "scripts/validate_nested_agents.py"]
+      },
+      {
+        "label": "validate stack",
+        "command": ["python", "scripts/validate_stack.py"]
+      },
+      {
+        "label": "validate command authority",
+        "command": ["python", "-m", "pytest", "-q", "tests/test_validation_command_authority.py", "tests/test_validation_topology.py", "tests/test_script_topology.py", "tests/test_test_topology.py"]
+      }
+    ],
+    "generated": [
+      {
+        "label": "check decision indexes",
+        "command": ["python", "scripts/generate_decision_indexes.py", "--check"]
+      },
+      {
+        "label": "check diagnostic surface catalog",
+        "command": ["python", "scripts/build_diagnostic_surface_catalog.py", "--check"]
+      },
+      {
+        "label": "validate diagnostic surface catalog",
+        "command": ["python", "scripts/validate_diagnostic_surface_catalog.py"]
+      }
+    ],
+    "tests": [
+      {
+        "label": "run tests",
+        "command": ["python", "-m", "pytest", "-q"]
+      }
+    ],
+    "mechanics_part_local": [
+      {
+        "label": "run mechanics tests",
+        "command": ["python", "-m", "pytest", "-q", "mechanics"]
+      }
+    ],
+    "mcp_services": [
+      {
+        "label": "validate aoa memo mcp",
+        "command": ["python", "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py"]
+      },
+      {
+        "label": "test aoa memo mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-memo-mcp/tests"]
+      },
+      {
+        "label": "validate aoa evals mcp",
+        "command": ["python", "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py"]
+      },
+      {
+        "label": "test aoa evals mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-evals-mcp/tests"]
+      },
+      {
+        "label": "validate abyss machine mcp",
+        "command": ["python", "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py"]
+      },
+      {
+        "label": "test abyss machine mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/abyss-machine-mcp/tests"]
+      },
+      {
+        "label": "validate session memory mcp",
+        "command": ["python", "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py"]
+      },
+      {
+        "label": "test session memory mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-session-memory-mcp/tests"]
+      }
+    ],
+    "shellcheck": [
+      {
+        "label": "shellcheck operator wrappers",
+        "command": [
+          "shellcheck",
+          "scripts/aoa-lib.sh",
+          "scripts/aoa-diagnose",
+          "scripts/aoa-doctor",
+          "scripts/aoa-install-layout",
+          "scripts/aoa-sync-federation-surfaces",
+          "scripts/aoa-sync-configs",
+          "scripts/aoa-bootstrap-configs",
+          "scripts/aoa-check-layout",
+          "scripts/aoa-install-systemd",
+          "scripts/aoa-first-run",
+          "scripts/aoa-warmup",
+          "scripts/aoa-preset-profiles",
+          "scripts/aoa-profile-modules",
+          "scripts/aoa-profile-endpoints",
+          "scripts/aoa-internal-probes",
+          "scripts/aoa-qwen-bench",
+          "scripts/aoa-long-horizon-pilot",
+          "scripts/aoa-bounded-autonomy-pilot",
+          "scripts/aoa-render-services",
+          "scripts/aoa-render-config",
+          "scripts/aoa-up",
+          "scripts/aoa-down",
+          "scripts/aoa-status",
+          "scripts/aoa-logs",
+          "scripts/aoa-smoke",
+          "scripts/aoa-wait",
+          "mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh",
+          "mechanics/config-projection/parts/sync/aoa_sync_configs.sh",
+          "mechanics/config-projection/parts/rendering/aoa_preset_profiles.sh",
+          "mechanics/config-projection/parts/rendering/aoa_profile_modules.sh",
+          "mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh",
+          "mechanics/config-projection/parts/rendering/aoa_render_services.sh",
+          "mechanics/config-projection/parts/rendering/aoa_render_config.sh",
+          "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh",
+          "mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh",
+          "mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh",
+          "mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh",
+          "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh",
+          "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh",
+          "mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
+          "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+          "mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh",
+          "mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh",
+          "mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh",
+          "mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh",
+          "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh",
+          "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh",
+          "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_internal_probes.sh",
+          "mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh",
+          "mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh",
+          "mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh"
+        ]
+      }
+    ],
+    "release_gate": [
+      {
+        "label": "run release check",
+        "command": ["python", "scripts/release_check.py"]
+      }
+    ],
+    "release_check": [
+      {
+        "label": "validate decision records",
+        "command": ["python", "scripts/validate_decision_records.py"]
+      },
+      {
+        "label": "validate stack",
+        "command": ["python", "scripts/validate_stack.py"]
+      },
+      {
+        "label": "check diagnostic surface catalog",
+        "command": ["python", "scripts/build_diagnostic_surface_catalog.py", "--check"]
+      },
+      {
+        "label": "validate diagnostic surface catalog",
+        "command": ["python", "scripts/validate_diagnostic_surface_catalog.py"]
+      },
+      {
+        "label": "run tests",
+        "command": ["python", "-m", "pytest", "-q"]
+      }
+    ]
+  }
+}

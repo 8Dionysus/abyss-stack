@@ -39,5 +39,5 @@ Use the narrowest checks that cover the touched quest surface:
 python scripts/validate_stack.py
 python quests/scripts/build_quest_examples.py --check
 python -m py_compile quests/scripts/quest_surface.py quests/scripts/build_quest_examples.py
-python -m pytest tests/test_validate_stack_questbook.py
+python -m pytest tests/test_questbook_surface_contracts.py
 ```

@@ -71,7 +71,9 @@ SURFACE_SPECS = (
 
 VALIDATION_REFS = [
     "scripts/validate_stack.py",
-    "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_validate_stack_diagnostic_spine.py",
+    "scripts/validators/diagnostic_spine.py",
+    "tests/test_diagnostic_spine_validator_module.py",
+    "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py",
     "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
 ]
 

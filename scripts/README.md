@@ -24,7 +24,7 @@ still synced into deployed `Configs/` with the wrappers.
 | Governed execution | `aoa-governed-run`, `aoa-export-memo-candidate`, `aoa-export-runtime-evidence-selection`, `aoa-export-artifact-hook-candidate`, `aoa-run-memo-contradiction-integrity` | [governed execution](../mechanics/governed-execution/README.md); command backends under governed-execution and runtime-repair parts |
 | Federation and RPG seams | `aoa-federated-check`, `aoa-sync-federation-surfaces`, `aoa-rpg-runtime-projection` | [federation seams](../mechanics/federation-seams/README.md); command backends under `mechanics/federation-seams/parts/` |
 | Repair adapters | `aoa-a2a-return-closeout-dry-run` | [runtime repair](../mechanics/runtime-repair/README.md); command backend under `mechanics/runtime-repair/parts/` |
-| Repository validation | `validate_stack.py`, `validate_nested_agents.py`, `validate_decision_records.py`, `generate_decision_indexes.py`, `release_check.py` | root `AGENTS.md`, [mechanics artifact topology](../mechanics/ARTIFACT_TOPOLOGY.md), [decision records](../docs/decisions/README.md) |
+| Repository validation | `ci_gate.py`, `validation_lanes.py`, `validate_stack.py`, `validate_nested_agents.py`, `validate_decision_records.py`, `generate_decision_indexes.py`, `release_check.py` | root `AGENTS.md`, [validation command authority](../docs/validation/COMMAND_AUTHORITY.md), [mechanics artifact topology](../mechanics/ARTIFACT_TOPOLOGY.md), [decision records](../docs/decisions/README.md) |
 | Windows bridge | `aoa.ps1`, `aoa-doctor-win.ps1`, `aoa-bootstrap-wsl.ps1` | [machine-fit windows bridge](../mechanics/machine-fit/parts/windows-bridge/README.md) |
 
 ## Contract
@@ -44,6 +44,9 @@ still synced into deployed `Configs/` with the wrappers.
 - Keep decision-record shape and indexing validated through
   `generate_decision_indexes.py --check` and `validate_decision_records.py`
   when `docs/decisions/` changes.
+- Keep lane command sequences in
+  `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
+  read that manifest instead of owning duplicate command lists.
 - Put mechanic-specific implementation logic under the owning
   `mechanics/<package>/parts/<part>/` route when it can move without breaking
   operator command stability.

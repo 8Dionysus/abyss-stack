@@ -8,19 +8,20 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:
+    from scripts import validation_lanes
+except ImportError:  # pragma: no cover - direct script execution fallback
+    import validation_lanes  # type: ignore
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DEPLOYED_CONFIGS_ROOT = Path("/srv/AbyssOS/abyss-stack/Configs")
 
-COMMANDS = [
-    ("validate decision records", [sys.executable, "scripts/validate_decision_records.py"]),
-    ("validate stack", [sys.executable, "scripts/validate_stack.py"]),
-    ("check diagnostic surface catalog", [sys.executable, "scripts/build_diagnostic_surface_catalog.py", "--check"]),
-    ("validate diagnostic surface catalog", [sys.executable, "scripts/validate_diagnostic_surface_catalog.py"]),
-    ("run tests", [sys.executable, "-m", "pytest", "-q"]),
-]
+
+def release_command_sequence() -> tuple[validation_lanes.CommandStep, ...]:
+    return validation_lanes.command_sequence("release_check")
 
 
-def run_step(label: str, command: list[str]) -> int:
+def run_step(label: str, command: tuple[str, ...]) -> int:
     print(f"[run] {label}: {subprocess.list2cmdline(command)}", flush=True)
     completed = subprocess.run(command, cwd=REPO_ROOT, env=os.environ.copy(), check=False)
     if completed.returncode != 0:
@@ -33,7 +34,7 @@ def run_step(label: str, command: list[str]) -> int:
 def run_live_parity_step() -> int:
     label = "check configs parity"
     env = os.environ.copy()
-    command = [sys.executable, "scripts/validate_stack.py", "--parity-check"]
+    command = (sys.executable, "scripts/validate_stack.py", "--parity-check")
     print(f"[run] {label}: {subprocess.list2cmdline(command)}", flush=True)
     completed = subprocess.run(command, cwd=REPO_ROOT, env=env, check=False)
     if completed.returncode != 0:
@@ -46,13 +47,13 @@ def run_live_parity_step() -> int:
 def run_synthetic_parity_step() -> int:
     label = "check synthetic configs parity"
     env = os.environ.copy()
-    command = [sys.executable, "scripts/validate_stack.py", "--parity-check"]
+    command = (sys.executable, "scripts/validate_stack.py", "--parity-check")
     with tempfile.TemporaryDirectory(prefix="abyss-stack-configs-") as temp_root:
         stack_root = Path(temp_root)
         configs_root = stack_root / "Configs"
         env["AOA_STACK_ROOT"] = str(stack_root)
         env["AOA_CONFIGS_ROOT"] = str(configs_root)
-        sync_command = [str(REPO_ROOT / "scripts" / "aoa-sync-configs")]
+        sync_command = (str(REPO_ROOT / "scripts" / "aoa-sync-configs"),)
         print(f"[run] prepare synthetic configs parity root: {subprocess.list2cmdline(sync_command)}", flush=True)
         sync_completed = subprocess.run(sync_command, cwd=REPO_ROOT, env=env, check=False)
         if sync_completed.returncode != 0:
@@ -61,7 +62,7 @@ def run_synthetic_parity_step() -> int:
                 flush=True,
             )
             return sync_completed.returncode
-        parity_command = command + ["--deployed-configs-root", str(configs_root)]
+        parity_command = command + ("--deployed-configs-root", str(configs_root))
         print(f"[run] {label}: {subprocess.list2cmdline(parity_command)}", flush=True)
         completed = subprocess.run(parity_command, cwd=REPO_ROOT, env=env, check=False)
         if completed.returncode != 0:
@@ -98,8 +99,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    for label, command in COMMANDS:
-        exit_code = run_step(label, command)
+    try:
+        steps = release_command_sequence()
+    except validation_lanes.ManifestError as exc:
+        print(f"[error] release lane failed to load: {exc}", flush=True)
+        return 1
+    for step in steps:
+        exit_code = run_step(step.label, step.command)
         if exit_code != 0:
             return exit_code
     parity_exit_code = run_parity_step(args.parity_mode)

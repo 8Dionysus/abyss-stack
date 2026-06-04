@@ -15,6 +15,8 @@ Tracking starts with the community-docs baseline for this repository.
   current-state inventory or package-local surface ledger
 - decision records are now validator-backed and indexed as durable rationale,
   not remembered as a loose convention from previous refactor passes
+- validation, script, and test topology now have explicit command authority,
+  inventories, and lane guards before the large stack validator is split
 - root `ROADMAP.md` is now a runtime-wide horizon surface instead of a mixed
   landing history, backlog, and release-contour document
 - root `docs/` now uses role-named districts instead of a flat surface list,
@@ -99,9 +101,78 @@ Tracking starts with the community-docs baseline for this repository.
 - `docs/decisions/ABYSS-STACK-D-0038-canonical-decision-ids-and-indexes.md`
   and generated `docs/decisions/indexes/` read models for stable
   `ABYSS-STACK-D-####` decision lookup
+- `docs/validation/` and `docs/testing/` as the source-owned districts for
+  validation command authority, validator topology, script topology, test
+  topology, lane manifests, and machine-readable inventories
+- `scripts/validation_lanes.py`, `scripts/ci_gate.py`, and topology tests for
+  manifest-backed validation lanes, script surfaces, validator surfaces, and
+  test inventory coverage
+- `scripts/validators/script_surface.py` as the first focused owner module
+  extracted from `scripts/validate_stack.py`
+- `scripts/validators/source_hygiene.py` as the focused source/runtime hygiene
+  module extracted from `scripts/validate_stack.py`
+- `scripts/validators/source_structure.py` as the focused required-file and
+  root residual topology module extracted from `scripts/validate_stack.py`
+- `scripts/validators/service_selection.py` and focused tests for the runtime
+  service-selection policy and screenshot inventory validator split
+- `scripts/validators/sync_parity.py` and focused tests for sync-managed
+  source enumeration and source/deployed Configs parity
+- `scripts/validators/questbook_surface.py` and focused tests for quest schema
+  envelopes, quest source topology, generated quest examples, and RPG runtime
+  read-model guards
+- `scripts/validators/federation_surface.py` and focused tests for federation
+  runtime-loaded config input coverage, upstream bridge template posture, and
+  active-vs-legacy bridge language, and federation landing docs
+- `scripts/validators/federation_runtime_seams.py` and focused tests for
+  memo/eval/playbook/KAG runtime seam docs, bounded export examples, and A2A
+  handoff posture
+- `scripts/validators/diagnostic_spine.py` and focused tests for diagnostic
+  surface docs, schemas, examples, generated catalog refs, overlay skill
+  posture, and repair handoff readiness
+- `scripts/validators/runtime_hygiene.py` and focused tests for runtime
+  gateway cache/usage status-readout docs, schemas, examples, and
+  readiness-only doctor split posture
+- `scripts/validators/machine_fit.py` and focused tests for reference-platform,
+  host-facts, machine bridge, machine-fit record, freshness gate, and
+  platform-adaptation posture
+- `scripts/validators/return_policy.py` and focused tests for return-policy
+  config routes, render-truth autonomy route refs, and runtime return schema
+  identity
+- `scripts/validators/branch_policy.py` and focused tests for CONTRIBUTING
+  branch-policy routing, canonical `main` posture, branch retirement language,
+  and source/runtime checkout distinction
+- `scripts/validators/root_routes.py` and focused tests for root design cards,
+  start-here route exposure, front-door route modes, and command-authority
+  handoff language
+- `scripts/validators/decision_surface.py` and focused tests for decision
+  route cards, template shape, validator/generator handoffs, and
+  `test_decision_records.py` route exposure
+- `scripts/validators/mechanics_topology.py` and focused tests for mechanics
+  atlas routes, package card headings, part required files, active part names,
+  archive routes, and marker-only artifact posture
+- `scripts/validators/profile_topology.py` and focused tests for
+  composition-first profiles and presets, compose module dependency guards,
+  profile workflow rehearsal, sidecar/n8n/warmup posture, and active profile
+  route language
+- `scripts/validators/runtime_route_contracts.py` and focused tests for stale
+  deployed-root bans, root README route focus, runtime/federation route docs,
+  and governed policy/catalog envelope checks
+- `scripts/validators/inference_pilot_compatibility.py` and focused tests for
+  active local-trials bridge posture, preserved gate IDs, legacy W0-W4 metadata
+  containment, and active LangGraph/llama.cpp compatibility language
+- `scripts/validators/active_topology_language.py` and focused tests for
+  retired phase/wave/seed wording, RPG runtime projection language, playbook
+  activation allowlist drift, and route-api bridge language
+- `scripts/validators/agent_skill_projection.py` and focused tests for
+  repo-local `.agents/skills` projection, sibling `aoa-skills` targets,
+  checkout-safe target files, local overlays, and diagnostic overlay installs
 
 ### Changed
 
+- `scripts/validate_stack.py` is now a root validation orchestrator instead of
+  a public compatibility-wrapper API; focused tests call validator modules
+  directly and legacy root-named test routes were replaced with
+  owner-shaped test names.
 - `aoa-evals-mcp` now treats explicit `runtime-candidate-export:<id>` refs as
   strict runtime export selectors and filters weak route tokens, preventing
   unrelated runtime candidate exports from being attached to eval-need
@@ -143,6 +214,61 @@ Tracking starts with the community-docs baseline for this repository.
 - `release_check.py` now uses synthetic Configs parity by default, keeping
   source release audits independent from stale live runtime mirrors unless
   `--parity-mode live` is requested
+- `release_check.py` now reads the release command sequence from
+  `docs/validation/validation_lanes.json`, and GitHub `Repo Validation` routes
+  reusable release and shellcheck commands through `scripts/ci_gate.py`
+- `validate_stack.py` now delegates script/operator-wrapper validation to the
+  focused `scripts/validators/script_surface.py` module while keeping root API
+  compatibility for existing tests and callers
+- `validate_stack.py` now delegates public mirror hygiene, host-local checkout
+  path bans, moved mechanic doc refs, and stale active sibling root checks to
+  `scripts/validators/source_hygiene.py`
+- `validate_stack.py` now delegates required source-file checks, managed unit
+  skeleton checks, and residual root/doc district topology guards to
+  `scripts/validators/source_structure.py`
+- `validate_stack.py` now delegates service-selection policy and screenshot
+  inventory checks to `scripts/validators/service_selection.py`
+- `validate_stack.py` now delegates sync-managed item coverage, runtime
+  Configs mirror checks, and source/deployed parity to
+  `scripts/validators/sync_parity.py`
+- `validate_stack.py` now delegates questbook, quest source, generated quest
+  example, and RPG runtime read-model checks to
+  `scripts/validators/questbook_surface.py`
+- `validate_stack.py` now delegates federation required runtime input coverage
+  upstream compatibility bridge template/language checks, and federation
+  landing-doc guards to
+  `scripts/validators/federation_surface.py`
+- `validate_stack.py` now delegates memo/eval/playbook/KAG runtime seam export
+  and advisory-route guards to `scripts/validators/federation_runtime_seams.py`
+- `validate_stack.py` now delegates diagnostic-spine surface contracts to
+  `scripts/validators/diagnostic_spine.py`, while the generated diagnostic
+  catalog lists the focused module and test in its validation refs
+- `validate_stack.py` now delegates runtime gateway cache and usage
+  status-readout contracts to `scripts/validators/runtime_hygiene.py`
+- `validate_stack.py` now delegates machine-fit evidence posture checks to
+  `scripts/validators/machine_fit.py`
+- `validate_stack.py` now delegates return-policy runtime contract checks to
+  `scripts/validators/return_policy.py`
+- `validate_stack.py` now delegates branch-governance policy checks to
+  `scripts/validators/branch_policy.py`
+- `validate_stack.py` now delegates root design and entry-route checks to
+  `scripts/validators/root_routes.py`
+- `validate_stack.py` now delegates decision-surface route checks to
+  `scripts/validators/decision_surface.py`
+- `validate_stack.py` now delegates mechanics topology checks to
+  `scripts/validators/mechanics_topology.py`
+- `validate_stack.py` now delegates runtime profile topology checks to
+  `scripts/validators/profile_topology.py`
+- `validate_stack.py` now delegates runtime route contract checks to
+  `scripts/validators/runtime_route_contracts.py`
+- `validate_stack.py` now delegates inference-pilot compatibility checks to
+  `scripts/validators/inference_pilot_compatibility.py`
+- `validate_stack.py` now delegates active-topology language checks to
+  `scripts/validators/active_topology_language.py`
+- `validate_stack.py` now delegates agent skill projection checks to
+  `scripts/validators/agent_skill_projection.py`
+- `compose/AGENTS.md` now routes module dependency contract changes to
+  `scripts/validators/profile_topology.py`
 - model-card docs no longer carry host-local source checkout links, and
   `validate_stack.py` now blocks that portability drift while still allowing
   the canonical deployed runtime root references
