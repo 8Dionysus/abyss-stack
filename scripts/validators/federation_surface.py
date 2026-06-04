@@ -20,8 +20,17 @@ FEDERATION_REQUIRED_RUNTIME_INPUTS = {
         "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
     },
     Path("config-templates") / "Configs" / "federation" / "aoa-playbooks.yaml": {
+        "generated/playbook_registry.min.json",
+        "generated/playbook_activation_surfaces.min.json",
+        "generated/playbook_federation_surfaces.min.json",
+        "generated/playbook_review_status.min.json",
         "generated/playbook_review_packet_contracts.min.json",
         "generated/playbook_review_intake.min.json",
+        "generated/playbook_handoff_contracts.json",
+        "generated/playbook_failure_catalog.json",
+        "generated/playbook_subagent_recipes.json",
+        "generated/playbook_composition_manifest.json",
+        "schemas/playbook-registry.schema.json",
     },
 }
 UPSTREAM_COMPATIBILITY_BRIDGE_PATH = (
@@ -310,5 +319,25 @@ def _validate_playbook_bridge(
     bridge: dict[str, Any],
 ) -> None:
     playbook_bridge = bridge.get("playbook_automation_plans")
-    if not isinstance(playbook_bridge, dict) or not playbook_bridge.get("upstream_rel_path"):
-        errors.append("upstream compatibility bridge must list playbook automation upstream_rel_path")
+    if not isinstance(playbook_bridge, dict):
+        errors.append("upstream compatibility bridge must list playbook automation plan bridge")
+        return
+    for key in (
+        "owner_repo",
+        "local_collection_route",
+        "local_item_route",
+        "upstream_source_ref",
+        "upstream_rel_path",
+        "compatibility_collection_route",
+        "compatibility_item_route",
+    ):
+        if not isinstance(playbook_bridge.get(key), str) or not playbook_bridge.get(key):
+            errors.append(f"upstream compatibility bridge playbook automation plan bridge must include {key}")
+    upstream_source_ref = playbook_bridge.get("upstream_source_ref")
+    upstream_rel_path = playbook_bridge.get("upstream_rel_path")
+    if (
+        isinstance(upstream_source_ref, str)
+        and isinstance(upstream_rel_path, str)
+        and not upstream_source_ref.endswith(upstream_rel_path)
+    ):
+        errors.append("upstream compatibility bridge playbook automation upstream_source_ref must end with upstream_rel_path")

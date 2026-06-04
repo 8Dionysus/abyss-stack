@@ -131,6 +131,25 @@ for name, template in templates.items():
 PY
 }
 
+load_bridge_playbook_automation_ref() {
+  local config_dir="$1"
+  python3 - "$config_dir/upstream-compatibility-bridge.json" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+bridge_path = Path(sys.argv[1])
+payload = json.loads(bridge_path.read_text(encoding="utf-8"))
+bridge = payload.get("playbook_automation_plans")
+if not isinstance(bridge, dict):
+    raise SystemExit(f"playbook_automation_plans missing or invalid in {bridge_path}")
+upstream_rel_path = bridge.get("upstream_rel_path")
+if not isinstance(upstream_rel_path, str) or not upstream_rel_path:
+    raise SystemExit(f"playbook automation upstream_rel_path missing in {bridge_path}")
+print(upstream_rel_path)
+PY
+}
+
 resolve_layer_source_rel() {
   local layer="$1"
   local rel_path="$2"
@@ -335,6 +354,11 @@ sync_layer() {
       required_paths+=("${rel_path}")
     done < <(load_bridge_runtime_evidence_refs "${config_dir}")
   fi
+  if [[ "$layer" == "aoa-playbooks" ]]; then
+    while IFS= read -r rel_path; do
+      required_paths+=("${rel_path}")
+    done < <(load_bridge_playbook_automation_ref "${config_dir}")
+  fi
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
   if [[ "$layer" == "aoa-agents" ]]; then
@@ -423,6 +447,11 @@ check_layer() {
     while IFS= read -r rel_path; do
       required_paths+=("${rel_path}")
     done < <(load_bridge_runtime_evidence_refs "${config_dir}")
+  fi
+  if [[ "$layer" == "aoa-playbooks" ]]; then
+    while IFS= read -r rel_path; do
+      required_paths+=("${rel_path}")
+    done < <(load_bridge_playbook_automation_ref "${config_dir}")
   fi
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 

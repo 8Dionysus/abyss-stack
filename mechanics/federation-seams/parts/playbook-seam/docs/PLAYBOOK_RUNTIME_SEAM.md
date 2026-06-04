@@ -21,14 +21,13 @@ scripts/aoa-sync-federation-surfaces --layer aoa-playbooks
 ```
 
 The current allowlist includes:
-- selected docs such as `PLAYBOOK_EXECUTION_SEAM.md` and `PLAYBOOK_LIFECYCLE.md`
-- generated registry, activation, federation, review-status, handoff, failure, subagent-recipe, automation-plan, and composition surfaces
-- public-safe schemas for the mirrored registry and activation/federation surfaces
-- a public-safe schema for the mirrored review-status surface
-- public-safe example activation payloads
+- generated registry, activation, federation, review-status, review-packet, review-intake, handoff, failure, subagent-recipe, and composition surfaces
+- the bridge-managed upstream automation-plan surface named by `upstream-compatibility-bridge.json`
+- the public-safe registry schema used to identify the mirrored registry shape
 
 Authored `playbooks/*/PLAYBOOK.md` bundles are intentionally not mirrored in this landing.
-The runtime reads only derived public-safe surfaces, not the authored playbook canon.
+Source-home docs, activation examples, and internal schemas are also not required by this runtime mirror.
+The runtime reads only derived public-safe read models, not the authored playbook canon.
 
 ## What `/playbooks/*` exposes
 

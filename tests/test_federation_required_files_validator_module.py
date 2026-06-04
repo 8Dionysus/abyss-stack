@@ -82,6 +82,23 @@ class FederationRequiredFilesValidatorTests(unittest.TestCase):
             any("generated/runtime_candidate_template_index.min.json" in error for error in errors)
         )
 
+    def test_missing_playbook_runtime_surface_contract_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            aoa_playbooks_path = (
+                repo_root / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml"
+            )
+            write_text(
+                aoa_playbooks_path,
+                aoa_playbooks_path
+                .read_text(encoding="utf-8")
+                .replace("  - generated/playbook_registry.min.json\n", ""),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(any("generated/playbook_registry.min.json" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
