@@ -90,6 +90,11 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         path.write_text("{}\n", encoding="utf-8")
         return [rel_path]
 
+    def write_json(self, root: Path, rel_path: str, payload: object) -> None:
+        path = root / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
     def make_store(self):
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
@@ -378,6 +383,103 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         closure = payload["layers_status"]["aoa-playbooks"]["closure_status"]
         self.assertFalse(closure["consumer_ready"])
         self.assertIn("playbook registry missing entries", closure["reasons"])
+
+    def test_evals_layer_status_includes_bridge_managed_runtime_evidence_files(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
+        mirror_root = root / "aoa-evals"
+        required_files = [
+            "generated/eval_catalog.min.json",
+            "generated/eval_capsules.json",
+            "generated/eval_sections.full.json",
+            "generated/comparison_spine.json",
+            "generated/runtime_candidate_template_index.min.json",
+            "examples/runtime_evidence_selection.workhorse-local.example.json",
+            "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
+            "examples/artifact_to_verdict_hook.self-agent-checkpoint-rollout.example.json",
+            "examples/artifact_to_verdict_hook.long-horizon-model-tier-orchestra.example.json",
+            "examples/artifact_to_verdict_hook.restartable-inquiry-loop.example.json",
+        ]
+        for rel_path in required_files:
+            payload: object = {"templates": []} if rel_path.endswith("runtime_candidate_template_index.min.json") else {}
+            self.write_json(mirror_root, rel_path, payload)
+        bridge_refs = [
+            entry["upstream_source_ref"]
+            for entry in BRIDGE_CONFIG["runtime_evidence_templates"].values()
+        ]
+        for rel_path in bridge_refs:
+            self.write_json(mirror_root, rel_path, {})
+
+        layer = self.module.load_evals_layer(
+            root / "aoa-evals.yaml",
+            {
+                "required_files": required_files,
+                "read_only": True,
+                "export_only_evidence": True,
+                "allow_free_text_eval_selection": False,
+            },
+            mirror_root,
+            BRIDGE_CONFIG,
+        )
+        status = self.module.layer_status(layer)
+
+        for rel_path in bridge_refs:
+            self.assertIn(rel_path, layer.required_files)
+            self.assertTrue(status["required_files"][rel_path]["present"])
+
+    def test_playbooks_layer_status_includes_bridge_managed_automation_file(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        root = Path(temp_dir.name)
+        mirror_root = root / "aoa-playbooks"
+        required_files = [
+            "generated/playbook_registry.min.json",
+            "generated/playbook_activation_surfaces.min.json",
+            "generated/playbook_federation_surfaces.min.json",
+            "generated/playbook_review_status.min.json",
+            "generated/playbook_review_packet_contracts.min.json",
+            "generated/playbook_review_intake.min.json",
+            "generated/playbook_handoff_contracts.json",
+            "generated/playbook_failure_catalog.json",
+            "generated/playbook_subagent_recipes.json",
+            "generated/playbook_composition_manifest.json",
+            "schemas/playbook-registry.schema.json",
+        ]
+        payloads: dict[str, object] = {
+            "generated/playbook_registry.min.json": {"playbooks": []},
+            "generated/playbook_activation_surfaces.min.json": [],
+            "generated/playbook_federation_surfaces.min.json": [],
+            "generated/playbook_review_status.min.json": {"playbooks": []},
+            "generated/playbook_review_packet_contracts.min.json": {"playbooks": []},
+            "generated/playbook_review_intake.min.json": {"playbooks": []},
+            "generated/playbook_handoff_contracts.json": {"playbooks": []},
+            "generated/playbook_failure_catalog.json": {"failures": []},
+            "generated/playbook_subagent_recipes.json": {"recipes": []},
+            "generated/playbook_composition_manifest.json": {"manifest_version": "1"},
+            "schemas/playbook-registry.schema.json": {},
+        }
+        for rel_path, payload in payloads.items():
+            self.write_json(mirror_root, rel_path, payload)
+        automation_ref = BRIDGE_CONFIG["playbook_automation_plans"]["upstream_rel_path"]
+        self.write_json(mirror_root, automation_ref, {"seeds": []})
+
+        layer = self.module.load_playbooks_layer(
+            root / "aoa-playbooks.yaml",
+            {
+                "required_files": required_files,
+                "read_only": True,
+                "advisory_only": True,
+                "allow_runtime_execution": False,
+                "include_composition_surfaces": True,
+            },
+            mirror_root,
+            BRIDGE_CONFIG,
+        )
+        status = self.module.layer_status(layer)
+
+        self.assertIn(automation_ref, layer.required_files)
+        self.assertTrue(status["required_files"][automation_ref]["present"])
 
     def test_memo_recall_runtime_evidence_template_resolves_source_files(self) -> None:
         store = self.make_store()
