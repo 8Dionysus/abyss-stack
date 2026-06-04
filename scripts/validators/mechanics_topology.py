@@ -68,7 +68,6 @@ MECHANIC_PACKAGE_PARTS = {
         "langgraph-pilot",
         "local-trials",
         "promotion-loop",
-        "pilot-archive-bridge",
         "quiet-bridge-commands",
         "agon-dry-run-handoff",
     ),
@@ -137,55 +136,6 @@ MECHANIC_PART_REQUIRED_FILES = {
     ("experience-runtime", "experience-records"): (
         "docs/EXPERIENCE_RECORDS_DISTILLATION.md",
     ),
-}
-ARCHIVE_MECHANIC_PACKAGES = (
-    "agon-runtime",
-    "experience-runtime",
-    "inference-pilots",
-    "runtime-repair",
-)
-ARCHIVE_MECHANIC_REQUIRED_FILES = (
-    "PROVENANCE.md",
-    "legacy/AGENTS.md",
-    "legacy/README.md",
-    "legacy/INDEX.md",
-    "legacy/DISTILLATION_LOG.md",
-)
-ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES = {
-    "agon-runtime": (
-        "legacy/raw/README.md",
-        "legacy/artifacts/README.md",
-        "legacy/ARCHIVE_CLASSIFICATION.md",
-    ),
-    "experience-runtime": (
-        "legacy/raw/README.md",
-        "legacy/artifacts/README.md",
-        "legacy/ARCHIVE_CLASSIFICATION.md",
-    ),
-    "inference-pilots": (
-        "legacy/trials/README.md",
-        "legacy/trials/raw/README.md",
-        "legacy/trials/artifacts/README.md",
-    ),
-    "runtime-repair": (
-        "legacy/raw/README.md",
-        "legacy/artifacts/README.md",
-    ),
-}
-ARCHIVE_MECHANIC_ARTIFACT_DIRS = {
-    "agon-runtime": (),
-    "experience-runtime": (
-        "legacy/artifacts/examples",
-        "legacy/artifacts/schemas",
-        "legacy/artifacts/tests",
-    ),
-    "inference-pilots": (
-        "legacy/trials/artifacts/scripts",
-    ),
-    "runtime-repair": (),
-}
-MARKER_ONLY_ARCHIVE_ARTIFACT_PACKAGES = {
-    "agon-runtime",
 }
 MECHANIC_CARD_HEADINGS = (
     "## Mechanic card",
@@ -264,7 +214,7 @@ def validate_mechanics_topology(
             route_text = read_text_func(route_file) or ""
             if "legacy/raw" in route_text:
                 errors.append(
-                    f"{route_file.relative_to(root)} should route through PROVENANCE.md or legacy/INDEX.md instead of legacy/raw"
+                    f"{route_file.relative_to(root)} should route through PROVENANCE.md instead of legacy/raw"
                 )
 
         readme_text = read_text_func(package_root / "README.md") or ""
@@ -273,29 +223,3 @@ def validate_mechanics_topology(
                 errors.append(
                     f"mechanics package {package} README.md must include `{heading}`"
                 )
-
-        if package in ARCHIVE_MECHANIC_PACKAGES:
-            required_files = (
-                *ARCHIVE_MECHANIC_REQUIRED_FILES,
-                *ARCHIVE_MECHANIC_EXTRA_REQUIRED_FILES.get(package, ()),
-            )
-            for required_file in required_files:
-                path = package_root / required_file
-                if not path.is_file():
-                    errors.append(f"mechanics archive package {package} is missing {required_file}")
-            for required_dir in ARCHIVE_MECHANIC_ARTIFACT_DIRS.get(package, ()):
-                path = package_root / required_dir
-                if not path.is_dir():
-                    errors.append(f"mechanics archive package {package} is missing {required_dir}")
-            if package in MARKER_ONLY_ARCHIVE_ARTIFACT_PACKAGES:
-                marker_root = package_root / "legacy" / "artifacts"
-                artifact_files = sorted(
-                    item.relative_to(package_root).as_posix()
-                    for item in marker_root.rglob("*")
-                    if item.is_file()
-                    and item.relative_to(marker_root).as_posix() != "README.md"
-                )
-                if artifact_files:
-                    errors.append(
-                        f"mechanics archive package {package} legacy/artifacts must stay marker-only, found {artifact_files}"
-                    )

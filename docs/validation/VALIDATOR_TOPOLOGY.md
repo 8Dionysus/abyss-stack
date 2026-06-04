@@ -35,7 +35,7 @@ parity posture.
 | Decision rationale | canonical decision IDs and generated decision indexes | `docs/decisions/` | source-fast, generated, release |
 | Generated diagnostics | diagnostic surface catalog and generated read model | `mechanics/diagnostic-spine/` | generated, release |
 | Script surface | root wrappers, part-local backends, MCP scripts, quest helpers, side effects | `docs/validation/script_inventory.json` | source-fast |
-| Test surface | root, mechanic part-local, MCP, and legacy provenance tests | `docs/testing/test_inventory.json` | tests, release |
+| Test surface | root, mechanic part-local, and MCP tests | `docs/testing/test_inventory.json` | tests, release |
 | MCP access plane | stack-owned MCP service validators and package tests | `mcp/services/*` | mcp-services, release |
 | Source/runtime parity | source checkout against deployed or synthetic `Configs` mirror | `scripts/release_check.py` and `scripts/validate_stack.py --parity-check` | release only |
 

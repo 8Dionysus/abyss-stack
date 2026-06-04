@@ -150,5 +150,5 @@
     }
   ],
   "runtime_posture": "local_dry_run_candidate_only",
-  "lineage_ref": "legacy/raw/AGON_WAVE13_RUNTIME_LANDING.md"
+  "lineage_ref": "PROVENANCE.md"
 }

@@ -131,21 +131,20 @@ def _validate_eval_upstream_compatibility(
         / "docs"
         / "UPSTREAM_COMPATIBILITY.md"
     ).read_text(encoding="utf-8")
-    compatibility_legacy_index = (
+    compatibility_detail = (
         root
         / "mechanics"
         / "federation-seams"
         / "parts"
         / "federation-checks"
-        / "legacy"
-        / "upstream-compatibility"
-        / "INDEX.md"
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY_DETAIL.md"
     ).read_text(encoding="utf-8")
     bridge_config = bridge_config_loader(errors)
     bridge_strings = bridge_string_iterator(bridge_config)
     for snippet in (
         "single active bridge",
-        "legacy/upstream-compatibility/INDEX.md",
+        "UPSTREAM_COMPATIBILITY_DETAIL.md",
         "upstream-compatibility-bridge.json",
         "Clean local route",
     ):
@@ -155,17 +154,17 @@ def _validate_eval_upstream_compatibility(
                 f"must keep the lightweight active bridge and mention {snippet}"
             )
     for bridge_value in bridge_strings:
-        is_legacy_value = any(
+        is_detail_value = any(
             marker in bridge_value for marker in ("phase-alpha", "a2a_wave", "playbook_automation_seeds", "seed_staging")
         )
-        if is_legacy_value and bridge_value in compatibility_doc:
+        if is_detail_value and bridge_value in compatibility_doc:
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-                f"must route detailed legacy value {bridge_value} through legacy/upstream-compatibility/INDEX.md"
+                f"must route detailed upstream value {bridge_value} through UPSTREAM_COMPATIBILITY_DETAIL.md"
             )
-        if is_legacy_value and bridge_value not in compatibility_legacy_index:
+        if is_detail_value and bridge_value not in compatibility_detail:
             errors.append(
-                "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md "
                 f"must mention {bridge_value}"
             )
 

@@ -63,12 +63,12 @@ def test_active_local_trials_backend_must_remain_compatibility_bridge(tmp_path: 
     bridge_path = tmp_path / inference_pilot_compatibility.LOCAL_TRIALS_BRIDGE_PATH
     write_text(
         bridge_path,
-        bridge_path.read_text(encoding="utf-8").replace("LEGACY_BACKEND", "ACTIVE_BACKEND"),
+        bridge_path.read_text(encoding="utf-8").replace("COMPATIBILITY_BACKEND", "ACTIVE_BACKEND"),
     )
 
     errors = run_inference_pilot_validator(tmp_path)
 
-    assert "local trials active backend must be a compatibility bridge to the legacy runner" in errors
+    assert "local trials active backend must be a compatibility bridge to the active compatibility runner" in errors
 
 
 def test_active_local_trials_bridge_must_not_reown_wave_metadata(tmp_path: Path) -> None:
@@ -79,7 +79,7 @@ def test_active_local_trials_bridge_must_not_reown_wave_metadata(tmp_path: Path)
     errors = run_inference_pilot_validator(tmp_path)
 
     assert (
-        "local trials wave metadata must stay in legacy/trials/artifacts/scripts, "
+        "local trials wave metadata must stay in compatibility-runners, "
         "not the active bridge"
     ) in errors
 
@@ -119,14 +119,14 @@ def test_langgraph_code_must_route_preserved_edit_gate(tmp_path: Path) -> None:
     ) in errors
 
 
-def test_llamacpp_doc_must_explain_legacy_gate_ids(tmp_path: Path) -> None:
+def test_llamacpp_doc_must_explain_preserved_gate_ids(tmp_path: Path) -> None:
     write_valid_surface(tmp_path)
     doc_path = tmp_path / inference_pilot_compatibility.LLAMACPP_DOC_PATH
     write_text(
         doc_path,
         doc_path.read_text(encoding="utf-8").replace(
-            "legacy trial runtime gate ID",
-            "legacy trial runtime identifier",
+            "preserved trial runtime gate ID",
+            "preserved trial runtime identifier",
         ),
     )
 
@@ -134,7 +134,7 @@ def test_llamacpp_doc_must_explain_legacy_gate_ids(tmp_path: Path) -> None:
 
     assert (
         "mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md "
-        "must explain `legacy trial runtime gate ID`"
+        "must explain `preserved trial runtime gate ID`"
     ) in errors
 
 

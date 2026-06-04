@@ -91,13 +91,14 @@
             "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
             "scripts/aoa-governed-run",
             "scripts/validate_stack.py",
-            "mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py",
+            "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_*.py",
+            "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
             ".github/workflows/validate-stack.yml"
           ],
           "acceptance_commands": [
             "python scripts/validate_stack.py",
             "python -m py_compile mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py scripts/aoa-governed-run scripts/validate_stack.py",
-            "python -m pytest mechanics/governed-execution/parts/governed-runner/tests/test_governed_execution.py"
+            "python -m pytest mechanics/governed-execution/parts/governed-runner/tests"
           ],
           "break_glass_allowed": true,
           "repair_allowed": true

@@ -197,21 +197,20 @@ def validate_federation_upstream_compatibility(
         / "README.md"
     )
     parts_path = root / "mechanics" / "federation-seams" / "PARTS.md"
-    legacy_index_path = (
+    detail_index_path = (
         root
         / "mechanics"
         / "federation-seams"
         / "parts"
         / "federation-checks"
-        / "legacy"
-        / "upstream-compatibility"
-        / "INDEX.md"
+        / "docs"
+        / "UPSTREAM_COMPATIBILITY_DETAIL.md"
     )
 
     verdict = read_text_func(verdict_path) or ""
     readme = read_text_func(readme_path) or ""
     parts = read_text_func(parts_path) or ""
-    legacy_index = read_text_func(legacy_index_path) or ""
+    detail_index = read_text_func(detail_index_path) or ""
     evals_config = read_text_func(root / "config-templates" / "Configs" / "federation" / "aoa-evals.yaml") or ""
     playbooks_config = (
         read_text_func(root / "config-templates" / "Configs" / "federation" / "aoa-playbooks.yaml") or ""
@@ -221,7 +220,7 @@ def validate_federation_upstream_compatibility(
 
     for required_snippet in (
         "single active bridge",
-        "legacy/upstream-compatibility/INDEX.md",
+        "UPSTREAM_COMPATIBILITY_DETAIL.md",
         "upstream-compatibility-bridge.json",
         "memo-recall-rerun",
         "automation-plans",
@@ -233,16 +232,16 @@ def validate_federation_upstream_compatibility(
             )
 
     for required_snippet in ("memo-recall-rerun", "memo-contradiction-gap", "memo-contradiction-rerun"):
-        if required_snippet not in legacy_index:
+        if required_snippet not in detail_index:
             errors.append(
-                "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md "
                 f"must classify `{required_snippet}`"
             )
     for bridge_value in bridge_strings:
         if any(marker in bridge_value for marker in ("phase-alpha", "a2a_wave", "playbook_automation_seeds", "seed_staging")):
-            if bridge_value not in legacy_index:
+            if bridge_value not in detail_index:
                 errors.append(
-                    "mechanics/federation-seams/parts/federation-checks/legacy/upstream-compatibility/INDEX.md "
+                    "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY_DETAIL.md "
                     f"must classify bridge value `{bridge_value}`"
                 )
         if bridge_value in verdict and any(
@@ -250,7 +249,7 @@ def validate_federation_upstream_compatibility(
         ):
             errors.append(
                 "mechanics/federation-seams/parts/federation-checks/docs/UPSTREAM_COMPATIBILITY.md "
-                f"must keep detailed legacy value `{bridge_value}` in legacy/upstream-compatibility/INDEX.md"
+                f"must keep detailed upstream value `{bridge_value}` in UPSTREAM_COMPATIBILITY_DETAIL.md"
             )
     for path, text in ((readme_path, readme), (parts_path, parts)):
         if "UPSTREAM_COMPATIBILITY.md" not in text:

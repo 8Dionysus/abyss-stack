@@ -66,26 +66,26 @@ def test_tracked_tests_are_inventory_covered() -> None:
     test_paths = {
         path
         for path in tracked_files()
-        if path.startswith("tests/test")
-        or ("/tests/test" in path and path.endswith(".py"))
+        if "/legacy/" not in path
+        and (
+            path.startswith("tests/test")
+            or ("/tests/test" in path and path.endswith(".py"))
+        )
     }
 
     assert test_paths <= inventory_paths()
 
 
-def test_legacy_tests_are_explicitly_labeled() -> None:
+def test_default_test_inventory_has_no_legacy_paths() -> None:
     inventory = load_inventory()
-    legacy_entries = [
-        entry
+    legacy_paths = [
+        path
         for entry in inventory["entries"]
-        if any("/legacy/" in path for path in entry["paths"])
+        for path in entry["paths"]
+        if "/legacy/" in path
     ]
 
-    assert legacy_entries
-    for entry in legacy_entries:
-        assert entry["disposition"] == "legacy-provenance-active"
-        assert "provenance" in entry["mode"]
-        assert "default pytest" in entry["protects"]
+    assert legacy_paths == []
 
 
 def test_test_inventory_does_not_store_shell_commands() -> None:

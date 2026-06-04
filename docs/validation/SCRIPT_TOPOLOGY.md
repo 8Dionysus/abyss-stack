@@ -16,7 +16,7 @@ stable entrypoint names and bridge contracts.
 | diagnostic generated helpers | `scripts/build_diagnostic_surface_catalog.py`, `scripts/validate_diagnostic_surface_catalog.py` | diagnostic spine | generated/read-model validation |
 | MCP service scripts | `mcp/services/*/scripts/*.py` | service-local route card | package-local access-plane validation/run |
 | quest helpers | `quests/scripts/*.py` | quest surface | source/generated quest support |
-| preserved legacy pilot scripts | `mechanics/inference-pilots/legacy/trials/artifacts/scripts/*` | inference-pilots provenance | legacy evidence, not a new hard gate |
+| inference pilot compatibility runners | `mechanics/inference-pilots/parts/local-trials/compatibility-runners/*`, `mechanics/inference-pilots/parts/quiet-bridge-commands/runners/*` | inference-pilots parts | active runner surface behind quiet bridge commands |
 
 ## Side-Effect Law
 
@@ -26,8 +26,8 @@ stable entrypoint names and bridge contracts.
   when run without `--check`.
 - MCP service scripts expose stdio access planes and package release checks;
   they must not promote sibling-owned truth.
-- Legacy artifact scripts remain provenance unless an owner decision promotes
-  them into an active package route.
+- Archived scripts remain provenance only; active command wrappers must execute
+  package-local runner surfaces.
 
 ## Inventory
 

@@ -9,21 +9,14 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-LEGACY_BACKEND = (
-    Path(__file__).resolve().parents[2]
-    / "legacy"
-    / "trials"
-    / "artifacts"
-    / "scripts"
-    / "aoa-local-ai-trials"
-)
+COMPATIBILITY_BACKEND = Path(__file__).resolve().parent / "compatibility-runners" / "aoa-local-ai-trials"
 
 
 def _load_backend() -> ModuleType:
-    loader = importlib.machinery.SourceFileLoader("_aoa_local_ai_trials_legacy", str(LEGACY_BACKEND))
-    spec = importlib.util.spec_from_loader("_aoa_local_ai_trials_legacy", loader)
+    loader = importlib.machinery.SourceFileLoader("_aoa_local_ai_trials_compatibility", str(COMPATIBILITY_BACKEND))
+    spec = importlib.util.spec_from_loader("_aoa_local_ai_trials_compatibility", loader)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"could not load legacy local AI trials backend: {LEGACY_BACKEND}")
+        raise RuntimeError(f"could not load local AI trials compatibility backend: {COMPATIBILITY_BACKEND}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -38,8 +31,8 @@ for _name in dir(_BACKEND):
 
 
 def main() -> None:
-    sys.argv[0] = str(LEGACY_BACKEND)
-    runpy.run_path(str(LEGACY_BACKEND), run_name="__main__")
+    sys.argv[0] = str(COMPATIBILITY_BACKEND)
+    runpy.run_path(str(COMPATIBILITY_BACKEND), run_name="__main__")
 
 
 if __name__ == "__main__":

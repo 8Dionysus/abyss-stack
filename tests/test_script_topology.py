@@ -21,7 +21,11 @@ def tracked_files() -> set[str]:
         capture_output=True,
         check=True,
     )
-    return set(result.stdout.splitlines())
+    return {
+        path
+        for path in result.stdout.splitlines()
+        if (REPO_ROOT / path).exists()
+    }
 
 
 def inventory_paths() -> set[str]:
@@ -47,6 +51,7 @@ def test_tracked_script_surfaces_are_inventory_covered() -> None:
         path
         for path in tracked_files()
         if (path.startswith("scripts/") or "/scripts/" in path)
+        and "/legacy/" not in path
         and "__pycache__" not in path
         and not path.endswith(".pyc")
     }
@@ -59,6 +64,7 @@ def test_no_tracked_python_cache_under_script_surfaces() -> None:
         path
         for path in tracked_files()
         if (path.startswith("scripts/") or "/scripts/" in path)
+        and "/legacy/" not in path
         and ("__pycache__" in path or path.endswith(".pyc"))
     ]
 
@@ -108,13 +114,14 @@ def test_focused_validator_modules_are_script_inventory_covered() -> None:
     assert "scripts/validators/sync_parity.py" in root_validation["paths"]
 
 
-def test_legacy_scripts_are_not_hidden_hard_gates() -> None:
+def test_inference_pilot_runners_are_active_package_local_bridges() -> None:
     inventory = load_inventory()
-    legacy = next(
+    runners = next(
         entry
         for entry in inventory["script_surfaces"]
-        if entry["family"] == "legacy-inference-pilot-artifact-scripts"
+        if entry["family"] == "inference-pilot-compatibility-runners"
     )
 
-    assert legacy["disposition"] == "legacy-provenance"
-    assert legacy["validation_lane"] == "advisory/provenance"
+    assert runners["disposition"] == "keep"
+    assert runners["validation_lane"] == "source-fast/release"
+    assert all("/legacy/" not in path for path in runners["paths"])

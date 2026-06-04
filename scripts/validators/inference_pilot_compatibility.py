@@ -20,13 +20,12 @@ LOCAL_TRIALS_ADAPTER_PATH = (
     / "local-trials"
     / "trial_compatibility_bridge.py"
 )
-LOCAL_TRIALS_LEGACY_PATH = (
+LOCAL_TRIALS_BACKEND_PATH = (
     Path("mechanics")
     / "inference-pilots"
-    / "legacy"
-    / "trials"
-    / "artifacts"
-    / "scripts"
+    / "parts"
+    / "local-trials"
+    / "compatibility-runners"
     / "aoa-local-ai-trials"
 )
 STALE_LOCAL_TRIALS_ADAPTER_PATH = (
@@ -84,7 +83,7 @@ AUTONOMY_STATUS_README_PATH = (
 INFERENCE_PILOT_COMPATIBILITY_FILES = (
     LOCAL_TRIALS_BRIDGE_PATH,
     LOCAL_TRIALS_ADAPTER_PATH,
-    LOCAL_TRIALS_LEGACY_PATH,
+    LOCAL_TRIALS_BACKEND_PATH,
     LANGGRAPH_CODE_PATH,
     LANGGRAPH_DOC_PATH,
     LLAMACPP_CODE_PATH,
@@ -107,13 +106,13 @@ def validate_local_trials_compatibility_bridge(
 ) -> None:
     bridge_path = root / LOCAL_TRIALS_BRIDGE_PATH
     adapter_path = root / LOCAL_TRIALS_ADAPTER_PATH
-    legacy_path = root / LOCAL_TRIALS_LEGACY_PATH
+    backend_path = root / LOCAL_TRIALS_BACKEND_PATH
     bridge_text = read_text_func(bridge_path) or ""
     adapter_text = read_text_func(adapter_path) or ""
-    legacy_text = read_text_func(legacy_path) or ""
+    backend_text = read_text_func(backend_path) or ""
 
-    if "LEGACY_BACKEND" not in bridge_text or "aoa-local-ai-trials" not in bridge_text:
-        errors.append("local trials active backend must be a compatibility bridge to the legacy runner")
+    if "COMPATIBILITY_BACKEND" not in bridge_text or "aoa-local-ai-trials" not in bridge_text:
+        errors.append("local trials active backend must be a compatibility bridge to the active compatibility runner")
     for required_snippet in (
         "CompatibilityGate",
         "RUNTIME_GATE",
@@ -137,11 +136,11 @@ def validate_local_trials_compatibility_bridge(
             "mechanics/inference-pilots/parts/langgraph-pilot/requirements.txt"
         )
     if "WAVE_METADATA =" in bridge_text:
-        errors.append("local trials wave metadata must stay in legacy/trials/artifacts/scripts, not the active bridge")
-    if "WAVE_METADATA =" not in legacy_text:
-        errors.append("legacy local AI trials runner must preserve the W0-W4 compatibility metadata")
-    if not is_executable_source_path_func(legacy_path):
-        errors.append("legacy local AI trials runner must stay executable")
+        errors.append("local trials wave metadata must stay in compatibility-runners, not the active bridge")
+    if "WAVE_METADATA =" not in backend_text:
+        errors.append("local AI trials compatibility runner must preserve the W0-W4 compatibility metadata")
+    if not is_executable_source_path_func(backend_path):
+        errors.append("local AI trials compatibility runner must stay executable")
 
 
 def validate_inference_pilot_compatibility_gate_language(
@@ -172,7 +171,7 @@ def validate_inference_pilot_compatibility_gate_language(
     for required_snippet in (
         "preserved local-trials bounded-edit",
         "bounded-edit compatibility gate",
-        "legacy/trials/",
+        "compatibility runner",
     ):
         if required_snippet not in langgraph_doc:
             errors.append(
@@ -198,8 +197,8 @@ def validate_inference_pilot_compatibility_gate_language(
     for required_snippet in (
         "runtime compatibility gate",
         "edit fixture compatibility gate",
-        "legacy trial runtime gate ID",
-        "legacy trial edit gate ID",
+        "preserved trial runtime gate ID",
+        "preserved trial edit gate ID",
     ):
         if required_snippet not in llamacpp_doc:
             errors.append(
@@ -218,9 +217,9 @@ def validate_inference_pilot_compatibility_gate_language(
                 "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py "
                 f"must route preserved pilot indexes through `{required_snippet}`"
             )
-    if "legacy trial compatibility route" not in autonomy_status_readme:
+    if "preserved trial compatibility route" not in autonomy_status_readme:
         errors.append(
-            "mechanics/governed-execution/parts/autonomy-status/README.md must explain the legacy trial compatibility route"
+            "mechanics/governed-execution/parts/autonomy-status/README.md must explain the preserved trial compatibility route"
         )
 
     active_texts = {

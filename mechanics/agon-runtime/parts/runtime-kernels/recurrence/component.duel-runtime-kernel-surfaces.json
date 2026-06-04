@@ -11,6 +11,6 @@
   "surface_refs": [
     "mechanics/agon-runtime/parts/runtime-kernels/generated/duel-runtime-kernel-registry.min.json",
     "mechanics/agon-runtime/parts/runtime-kernels/examples/mechanical-duel-event-log.example.json",
-    "mechanics/agon-runtime/legacy/raw/AGON_DUEL_RUNTIME_KERNEL.md"
+    "mechanics/agon-runtime/PROVENANCE.md"
   ]
 }
