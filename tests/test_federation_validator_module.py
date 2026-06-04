@@ -83,6 +83,60 @@ def test_federation_required_files_requires_runtime_template_fields(tmp_path: Pa
     )
 
 
+def test_federation_required_files_requires_playbook_automation_bridge_fields(tmp_path: Path) -> None:
+    bridge_path = tmp_path / "config-templates" / "Configs" / "federation" / "upstream-compatibility-bridge.json"
+    write_text(
+        bridge_path,
+        json.dumps(
+            {
+                "artifact_kind": "abyss-stack.upstream-compatibility-bridge",
+                "runtime_evidence_templates": {
+                    "memo-recall-rerun": {
+                        "canonical_selection_id": "memo-recall-rerun",
+                        "local_source_ref": "local",
+                        "upstream_source_ref": "upstream",
+                        "upstream_selection_id": "upstream-id",
+                    },
+                    "memo-contradiction-gap": {
+                        "canonical_selection_id": "memo-contradiction-gap",
+                        "local_source_ref": "local",
+                        "upstream_source_ref": "upstream",
+                        "upstream_selection_id": "upstream-id",
+                    },
+                    "memo-contradiction-rerun": {
+                        "canonical_selection_id": "memo-contradiction-rerun",
+                        "local_source_ref": "local",
+                        "upstream_source_ref": "upstream",
+                        "upstream_selection_id": "upstream-id",
+                    },
+                },
+                "playbook_automation_plans": {
+                    "owner_repo": "aoa-playbooks",
+                    "local_collection_route": "/playbooks/automation-plans",
+                    "local_item_route": "/playbooks/automation-plan",
+                    "upstream_rel_path": "generated/playbook_automation_seeds.json",
+                    "compatibility_collection_route": "/playbooks/automation-seeds",
+                    "compatibility_item_route": "/playbooks/automation-seed",
+                },
+            }
+        ),
+    )
+
+    errors: list[str] = []
+    federation_surface.validate_federation_required_files(
+        errors,
+        root=tmp_path,
+        required_runtime_inputs={},
+        bridge_path=bridge_path,
+        load_structured_object_func=lambda path: {},
+    )
+
+    assert (
+        "upstream compatibility bridge playbook automation plan bridge must include upstream_source_ref"
+        in errors
+    )
+
+
 def test_federation_upstream_compatibility_keeps_detailed_values_in_legacy_index(
     tmp_path: Path,
 ) -> None:
