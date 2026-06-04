@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import scripts.validate_stack as validate_stack
+from scripts.validators import questbook_surface
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+QUEST_SCRIPT_DIR = REPO_ROOT / "quests" / "scripts"
+if str(QUEST_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(QUEST_SCRIPT_DIR))
+
+import quest_surface  # noqa: E402
+
 RPG_RUNTIME_SURFACE_ROOT = Path("mechanics") / "federation-seams" / "parts" / "rpg-runtime"
 RPG_RUNTIME_SCHEMA_ROOT = RPG_RUNTIME_SURFACE_ROOT / "schemas"
 RPG_RUNTIME_EXAMPLE_ROOT = RPG_RUNTIME_SURFACE_ROOT / "examples"
@@ -21,7 +27,20 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-class ValidateStackQuestbookTestCase(unittest.TestCase):
+def load_structured_object(path: Path) -> dict[str, object]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        import yaml  # type: ignore
+
+        payload = yaml.safe_load(text)
+    except ImportError:
+        payload = json.loads(text)
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{path} must parse as an object")
+    return payload
+
+
+class QuestbookSurfaceContractsTestCase(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
             Path("QUESTBOOK.md"),
@@ -57,8 +76,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
                 (REPO_ROOT / relative_path).read_text(encoding="utf-8"),
             )
 
-        for quest_id in validate_stack.QUEST_IDS:
-            relative_path = validate_stack.quest_source_path(quest_id)
+        for quest_id in quest_surface.QUEST_IDS:
+            relative_path = quest_surface.quest_source_path(quest_id)
             write_text(
                 repo_root / relative_path,
                 (REPO_ROOT / relative_path).read_text(encoding="utf-8"),
@@ -66,8 +85,51 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
 
     def validate_surface(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
-        with patch.object(validate_stack, "ROOT", repo_root):
-            validate_stack.validate_questbook_surface(errors)
+        questbook_surface.validate_questbook_surface(
+            errors,
+            root=repo_root,
+            questbook_path=questbook_surface.QUESTBOOK_PATH,
+            questbook_integration_path=questbook_surface.QUESTBOOK_INTEGRATION_PATH,
+            rpg_runtime_frontend_posture_path=questbook_surface.RPG_RUNTIME_FRONTEND_POSTURE_PATH,
+            rpg_runtime_collections_path=questbook_surface.RPG_RUNTIME_COLLECTIONS_PATH,
+            rpg_runtime_builders_path=questbook_surface.RPG_RUNTIME_BUILDERS_PATH,
+            rpg_route_api_seam_path=questbook_surface.RPG_ROUTE_API_SEAM_PATH,
+            rpg_frontend_projection_seam_path=questbook_surface.RPG_FRONTEND_PROJECTION_SEAM_PATH,
+            quest_schema_path=questbook_surface.QUEST_SCHEMA_PATH,
+            quest_dispatch_schema_path=questbook_surface.QUEST_DISPATCH_SCHEMA_PATH,
+            agent_build_snapshot_schema_path=questbook_surface.AGENT_BUILD_SNAPSHOT_SCHEMA_PATH,
+            reputation_ledger_schema_path=questbook_surface.REPUTATION_LEDGER_SCHEMA_PATH,
+            quest_run_result_schema_path=questbook_surface.QUEST_RUN_RESULT_SCHEMA_PATH,
+            frontend_projection_bundle_schema_path=questbook_surface.FRONTEND_PROJECTION_BUNDLE_SCHEMA_PATH,
+            agent_build_snapshot_collection_schema_path=questbook_surface.AGENT_BUILD_SNAPSHOT_COLLECTION_SCHEMA_PATH,
+            reputation_ledger_collection_schema_path=questbook_surface.REPUTATION_LEDGER_COLLECTION_SCHEMA_PATH,
+            quest_run_result_collection_schema_path=questbook_surface.QUEST_RUN_RESULT_COLLECTION_SCHEMA_PATH,
+            frontend_projection_bundle_collection_schema_path=questbook_surface.FRONTEND_PROJECTION_BUNDLE_COLLECTION_SCHEMA_PATH,
+            quest_catalog_example_path=questbook_surface.QUEST_CATALOG_EXAMPLE_PATH,
+            quest_dispatch_example_path=questbook_surface.QUEST_DISPATCH_EXAMPLE_PATH,
+            agent_build_snapshot_example_path=questbook_surface.AGENT_BUILD_SNAPSHOT_EXAMPLE_PATH,
+            reputation_ledger_example_path=questbook_surface.REPUTATION_LEDGER_EXAMPLE_PATH,
+            quest_run_result_example_path=questbook_surface.QUEST_RUN_RESULT_EXAMPLE_PATH,
+            frontend_projection_bundle_example_path=questbook_surface.FRONTEND_PROJECTION_BUNDLE_EXAMPLE_PATH,
+            generated_agent_build_snapshots_path=questbook_surface.GENERATED_AGENT_BUILD_SNAPSHOTS_PATH,
+            generated_reputation_ledgers_path=questbook_surface.GENERATED_REPUTATION_LEDGERS_PATH,
+            generated_quest_run_results_path=questbook_surface.GENERATED_QUEST_RUN_RESULTS_PATH,
+            generated_frontend_projection_bundles_path=questbook_surface.GENERATED_FRONTEND_PROJECTION_BUNDLES_PATH,
+            quest_surface_root=questbook_surface.QUEST_SURFACE_ROOT,
+            quest_ids=quest_surface.QUEST_IDS,
+            quest_routes=quest_surface.QUEST_ROUTES,
+            questbook_required_tokens=questbook_surface.QUESTBOOK_REQUIRED_TOKENS,
+            questbook_forbidden_tokens=questbook_surface.QUESTBOOK_FORBIDDEN_TOKENS,
+            questbook_integration_required_tokens=questbook_surface.QUESTBOOK_INTEGRATION_REQUIRED_TOKENS,
+            questbook_integration_forbidden_tokens=questbook_surface.QUESTBOOK_INTEGRATION_FORBIDDEN_TOKENS,
+            quest_schema_required_fields=questbook_surface.QUEST_SCHEMA_REQUIRED_FIELDS,
+            quest_dispatch_required_fields=questbook_surface.QUEST_DISPATCH_REQUIRED_FIELDS,
+            closed_quest_states=questbook_surface.CLOSED_QUEST_STATES,
+            load_structured_object_func=load_structured_object,
+            quest_source_path_func=quest_surface.quest_source_path,
+            build_expected_quest_catalog_entry_func=quest_surface.build_expected_quest_catalog_entry,
+            build_expected_quest_dispatch_entry_func=quest_surface.build_expected_quest_dispatch_entry,
+        )
         return errors
 
     def test_valid_questbook_surface_passes(self) -> None:
@@ -91,7 +153,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
-            (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003")).unlink()
+            (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0003")).unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(any("ABYSS-STACK-Q-0003.yaml" in error for error in errors))
@@ -101,8 +163,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0002"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0002"))
                 .read_text(encoding="utf-8")
                 .replace("repo: abyss-stack", "repo: aoa-kag"),
             )
@@ -115,8 +177,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0002"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0002"))
                 .read_text(encoding="utf-8")
                 .replace("lane: profiles", "lane: stack"),
             )
@@ -130,7 +192,7 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             self.write_valid_surface(repo_root)
             write_text(
                 repo_root / "quests" / "ABYSS-STACK-Q-0002.yaml",
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0002")).read_text(
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0002")).read_text(
                     encoding="utf-8"
                 ),
             )
@@ -143,8 +205,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0004"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0004"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0004"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0004"))
                 .read_text(encoding="utf-8")
                 .replace("id: ABYSS-STACK-Q-0004", "id: ABYSS-STACK-Q-9999"),
             )
@@ -157,8 +219,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0001"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0001"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0001"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0001"))
                 .read_text(encoding="utf-8")
                 .replace("public_safe: true", "public_safe: false"),
             )
@@ -184,8 +246,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0003"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0003"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0003"))
                 .read_text(encoding="utf-8")
                 .replace("control_mode: human_gate", "control_mode: codex_supervised"),
             )
@@ -297,8 +359,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0006"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0006"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0006"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0006"))
                 .read_text(encoding="utf-8")
                 .replace("ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_ROUTE_API_SEAM.md"),
             )
@@ -313,8 +375,8 @@ class ValidateStackQuestbookTestCase(unittest.TestCase):
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
             write_text(
-                repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0007"),
-                (repo_root / validate_stack.quest_source_path("ABYSS-STACK-Q-0007"))
+                repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0007"),
+                (repo_root / quest_surface.quest_source_path("ABYSS-STACK-Q-0007"))
                 .read_text(encoding="utf-8")
                 .replace("ref: mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md", "ref: mechanics/federation-seams/parts/rpg-runtime/docs/RPG_RUNTIME_COLLECTIONS.md"),
             )

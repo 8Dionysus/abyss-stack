@@ -22,7 +22,7 @@ more specific `mechanics/<package>/parts/<part>/docs/` surface.
 - Keep `docs/README.md` as the short index for this directory.
 - Keep each immediate child district as a coherent owner lane:
   `routes/`, `runtime/`, `install/`, `operations/`, `profiles/`,
-  `governance/`, `decisions/`, and `legacy/`.
+  `governance/`, `validation/`, `testing/`, `decisions/`, and `legacy/`.
 - Keep `docs/routes/START_HERE_ROUTE_CONTRACT.md` as the route-mode contract
   for root entry surfaces.
 - Keep root docs as entrypoints for the whole repository, not as a flat
@@ -32,6 +32,11 @@ more specific `mechanics/<package>/parts/<part>/docs/` surface.
 - Keep decision records under `docs/decisions/`; follow
   `docs/decisions/AGENTS.md` and `docs/decisions/TEMPLATE.md` for durable
   decision rationale.
+- Keep validation command authority under `docs/validation/`; follow
+  `docs/validation/AGENTS.md` when changing validators, lane commands, script
+  topology, or validation inventories.
+- Keep test topology under `docs/testing/`; follow `docs/testing/AGENTS.md`
+  when adding root, mechanic, MCP, or legacy-provenance tests.
 - Keep old root guidance or old-stack migration material under `docs/legacy/`
   with an explicit active-route bridge.
 - If a root doc routes to package docs, link to the package-local source rather
@@ -44,7 +49,8 @@ Use the root validation path after documentation topology changes:
 ```bash
 python scripts/validate_decision_records.py
 python scripts/generate_decision_indexes.py --check
+python scripts/ci_gate.py --mode source-fast
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
-python -m pytest tests/test_roadmap_parity.py tests/test_decision_records.py tests/test_validate_stack_required_files.py
+python -m pytest tests/test_roadmap_parity.py tests/test_decision_records.py tests/test_source_topology_validator_modules.py tests/test_validation_topology.py tests/test_script_topology.py tests/test_test_topology.py
 ```

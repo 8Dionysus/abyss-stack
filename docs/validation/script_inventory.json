@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "owner": "docs/validation/SCRIPT_TOPOLOGY.md",
+  "command_authority": "docs/validation/validation_lanes.json",
+  "required_fields": [
+    "family",
+    "paths",
+    "organ_lane",
+    "owner_surface",
+    "source_truth",
+    "reads",
+    "writes",
+    "side_effects",
+    "validation_lane",
+    "ci_inclusion",
+    "test_target",
+    "disposition"
+  ],
+  "script_surfaces": [
+    {
+      "family": "script-route-docs",
+      "paths": [
+        "scripts/AGENTS.md",
+        "scripts/README.md"
+      ],
+      "organ_lane": "source route",
+      "owner_surface": "scripts/AGENTS.md",
+      "source_truth": [
+        "AGENTS.md",
+        "scripts/README.md"
+      ],
+      "reads": [
+        "repo route docs"
+      ],
+      "writes": [],
+      "side_effects": "documents command route; no execution",
+      "validation_lane": "source-fast",
+      "ci_inclusion": "covered by validate_stack and script topology tests",
+      "test_target": "tests/test_script_topology.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "root-operator-command-surface",
+      "paths": [
+        "scripts/aoa-a2a-return-closeout-dry-run",
+        "scripts/aoa-apply-resource-guards",
+        "scripts/aoa-bootstrap-configs",
+        "scripts/aoa-bootstrap-wsl.ps1",
+        "scripts/aoa-bounded-autonomy-pilot",
+        "scripts/aoa-check-layout",
+        "scripts/aoa-diagnose",
+        "scripts/aoa-doctor",
+        "scripts/aoa-doctor-win.ps1",
+        "scripts/aoa-down",
+        "scripts/aoa-export-artifact-hook-candidate",
+        "scripts/aoa-export-memo-candidate",
+        "scripts/aoa-export-runtime-evidence-selection",
+        "scripts/aoa-federated-check",
+        "scripts/aoa-first-run",
+        "scripts/aoa-governed-run",
+        "scripts/aoa-host-facts",
+        "scripts/aoa-install-layout",
+        "scripts/aoa-install-systemd",
+        "scripts/aoa-internal-probes",
+        "scripts/aoa-langgraph-pilot",
+        "scripts/aoa-lib.sh",
+        "scripts/aoa-llamacpp-pilot",
+        "scripts/aoa-local-ai-trials",
+        "scripts/aoa-logs",
+        "scripts/aoa-long-horizon-pilot",
+        "scripts/aoa-machine-bridge",
+        "scripts/aoa-machine-fit",
+        "scripts/aoa-platform-adaptation",
+        "scripts/aoa-preset-profiles",
+        "scripts/aoa-profile-endpoints",
+        "scripts/aoa-profile-modules",
+        "scripts/aoa-qwen-bench",
+        "scripts/aoa-qwen-check",
+        "scripts/aoa-qwen-run",
+        "scripts/aoa-render-config",
+        "scripts/aoa-render-services",
+        "scripts/aoa-rpg-runtime-projection",
+        "scripts/aoa-run-memo-contradiction-integrity",
+        "scripts/aoa-runtime-bench-index",
+        "scripts/aoa-smoke",
+        "scripts/aoa-status",
+        "scripts/aoa-sync-configs",
+        "scripts/aoa-sync-federation-surfaces",
+        "scripts/aoa-up",
+        "scripts/aoa-wait",
+        "scripts/aoa-warmup",
+        "scripts/aoa.ps1"
+      ],
+      "organ_lane": "runtime command surface",
+      "owner_surface": "scripts/README.md",
+      "source_truth": [
+        "mechanics/*/parts/*",
+        "scripts/AGENTS.md",
+        "scripts/README.md"
+      ],
+      "reads": [
+        "source checkout",
+        "operator environment",
+        "runtime Configs paths when invoked"
+      ],
+      "writes": [
+        "runtime paths only when command flags and backend docs allow it"
+      ],
+      "side_effects": "operator-facing wrappers; mutating commands require explicit flags or command-specific route docs",
+      "validation_lane": "source-fast/shellcheck/release",
+      "ci_inclusion": "validate_stack checks wrapper/backend routes; shellcheck lane covers shell wrappers when available",
+      "test_target": "tests/test_source_topology_validator_modules.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "root-validation-and-generated-entrypoints",
+      "paths": [
+        "scripts/build_diagnostic_surface_catalog.py",
+        "scripts/ci_gate.py",
+        "scripts/decision_indexes.py",
+        "scripts/generate_decision_indexes.py",
+        "scripts/release_check.py",
+        "scripts/validate_decision_records.py",
+        "scripts/validate_diagnostic_surface_catalog.py",
+        "scripts/validate_nested_agents.py",
+        "scripts/validate_stack.py",
+        "scripts/validation_lanes.py",
+        "scripts/validators/__init__.py",
+        "scripts/validators/active_topology_language.py",
+        "scripts/validators/agent_skill_projection.py",
+        "scripts/validators/branch_policy.py",
+        "scripts/validators/decision_surface.py",
+        "scripts/validators/diagnostic_spine.py",
+        "scripts/validators/federation_runtime_seams.py",
+        "scripts/validators/federation_surface.py",
+        "scripts/validators/inference_pilot_compatibility.py",
+        "scripts/validators/machine_fit.py",
+        "scripts/validators/mechanics_topology.py",
+        "scripts/validators/profile_topology.py",
+        "scripts/validators/questbook_surface.py",
+        "scripts/validators/return_policy.py",
+        "scripts/validators/root_routes.py",
+        "scripts/validators/runtime_route_contracts.py",
+        "scripts/validators/runtime_hygiene.py",
+        "scripts/validators/script_surface.py",
+        "scripts/validators/service_selection.py",
+        "scripts/validators/source_hygiene.py",
+        "scripts/validators/source_structure.py",
+        "scripts/validators/sync_parity.py"
+      ],
+      "organ_lane": "validation guard",
+      "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
+      "source_truth": [
+        "docs/validation/validation_lanes.json",
+        "docs/decisions/",
+        "mechanics/diagnostic-spine/"
+      ],
+      "reads": [
+        "source checkout",
+        "generated read models",
+        "git tracked file list where relevant"
+      ],
+      "writes": [
+        "generated indexes or diagnostic catalog only for builder commands run without --check"
+      ],
+      "side_effects": "validation output; release_check may prepare a temporary synthetic Configs mirror",
+      "validation_lane": "source-fast/generated/release",
+      "ci_inclusion": "called by ci_gate and release_check",
+      "test_target": "tests/test_validation_command_authority.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "mcp-service-scripts",
+      "paths": [
+        "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",
+        "mcp/services/abyss-machine-mcp/scripts/release_check.py",
+        "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
+        "mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py",
+        "mcp/services/aoa-evals-mcp/scripts/release_check.py",
+        "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+        "mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py",
+        "mcp/services/aoa-memo-mcp/scripts/release_check.py",
+        "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
+        "mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py",
+        "mcp/services/aoa-session-memory-mcp/scripts/release_check.py",
+        "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py"
+      ],
+      "organ_lane": "MCP access plane",
+      "owner_surface": "mcp/services/AGENTS.md",
+      "source_truth": [
+        "mcp/services/*/AGENTS.md",
+        "mcp/services/*/README.md",
+        "mcp/services/*/src"
+      ],
+      "reads": [
+        "service-local source",
+        "owner-layer read models through allowlisted routes"
+      ],
+      "writes": [],
+      "side_effects": "stdio server startup, validation, or service-local release smoke; no durable owner-truth promotion",
+      "validation_lane": "mcp-services/release",
+      "ci_inclusion": "mcp-services lane and default pytest collection",
+      "test_target": "mcp/services/*/tests",
+      "disposition": "keep"
+    },
+    {
+      "family": "quest-helper-scripts",
+      "paths": [
+        "quests/scripts/build_quest_examples.py",
+        "quests/scripts/quest_surface.py"
+      ],
+      "organ_lane": "questbook/generated read-model",
+      "owner_surface": "quests/AGENTS.md",
+      "source_truth": [
+        "quests/",
+        "docs/governance/QUESTBOOK_STACK_INTEGRATION.md"
+      ],
+      "reads": [
+        "quest source files"
+      ],
+      "writes": [
+        "quest examples when builder is run without --check"
+      ],
+      "side_effects": "quest example generation/checking only",
+      "validation_lane": "source-fast/release",
+      "ci_inclusion": "covered by validate_stack questbook checks and pytest",
+      "test_target": "tests/test_questbook_surface_contracts.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "legacy-inference-pilot-artifact-scripts",
+      "paths": [
+        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials",
+        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot",
+        "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot"
+      ],
+      "organ_lane": "legacy/provenance",
+      "owner_surface": "mechanics/inference-pilots/legacy/AGENTS.md",
+      "source_truth": [
+        "mechanics/inference-pilots/PROVENANCE.md",
+        "mechanics/inference-pilots/legacy/"
+      ],
+      "reads": [
+        "preserved legacy artifact context"
+      ],
+      "writes": [],
+      "side_effects": "preserved script evidence; not a promoted active command",
+      "validation_lane": "advisory/provenance",
+      "ci_inclusion": "covered by script topology as explicitly legacy, not by a hard command lane",
+      "test_target": "tests/test_script_topology.py",
+      "disposition": "legacy-provenance"
+    }
+  ]
+}

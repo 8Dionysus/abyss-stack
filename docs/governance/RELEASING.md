@@ -17,6 +17,8 @@ See also:
    needed.
 4. Run the repo-level verifier:
    - `python scripts/release_check.py`
+   - GitHub `Repo Validation` reaches the same release command sequence through
+     `python scripts/ci_gate.py --mode release`
    - this uses synthetic Configs parity by default; use
      `python scripts/release_check.py --parity-mode live` only after an
      intentional deployed mirror sync

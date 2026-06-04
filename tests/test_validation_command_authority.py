@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from scripts import ci_gate, release_check, validation_lanes
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MANIFEST_PATH = REPO_ROOT / "docs" / "validation" / "validation_lanes.json"
+
+
+def load_manifest() -> dict[str, object]:
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
+def test_manifest_loads_and_names_expected_lanes() -> None:
+    manifest = validation_lanes.load_manifest()
+
+    assert set(manifest["lanes"]) >= {
+        "source-fast",
+        "generated",
+        "tests",
+        "mechanics-part-local",
+        "mcp-services",
+        "shellcheck",
+        "release",
+    }
+    assert validation_lanes.lane_command_sequence("release")
+    assert validation_lanes.lane_command_sequence("source-fast")
+
+
+def test_release_check_reads_manifest_backed_release_lane(monkeypatch) -> None:
+    calls: list[tuple[str, tuple[str, ...]]] = []
+    steps = (
+        validation_lanes.CommandStep("first", ("python", "one.py")),
+        validation_lanes.CommandStep("second", ("python", "two.py")),
+    )
+
+    monkeypatch.setattr(release_check, "release_command_sequence", lambda: steps)
+    monkeypatch.setattr(
+        release_check,
+        "run_step",
+        lambda label, command: calls.append((label, command)) or 0,
+    )
+    monkeypatch.setattr(release_check, "run_parity_step", lambda parity_mode: 0)
+
+    assert release_check.main(["--parity-mode", "synthetic"]) == 0
+    assert calls == [("first", ("python", "one.py")), ("second", ("python", "two.py"))]
+
+
+def test_release_check_has_no_inline_command_authority() -> None:
+    text = (REPO_ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
+
+    assert "COMMANDS =" not in text
+    assert "command_sequence(\"release_check\")" in text
+
+
+def test_ci_gate_dispatches_manifest_lane(monkeypatch) -> None:
+    calls: list[tuple[str, tuple[str, ...]]] = []
+    steps = (validation_lanes.CommandStep("fake source check", ("python", "--version")),)
+
+    monkeypatch.setattr(ci_gate.validation_lanes, "lane_command_sequence", lambda mode: steps)
+    monkeypatch.setattr(
+        ci_gate,
+        "run_step",
+        lambda label, command: calls.append((label, command)) or 0,
+    )
+
+    assert ci_gate.run_lane("source-fast") == 0
+    assert calls == [("fake source check", ("python", "--version"))]
+
+
+def test_workflow_routes_reusable_commands_through_ci_gate() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "validate-stack.yml").read_text(
+        encoding="utf-8"
+    )
+    manifest = load_manifest()
+    shellcheck_commands = manifest["command_sequences"]["shellcheck"]
+
+    assert "python scripts/ci_gate.py --mode release" in workflow
+    assert "python scripts/ci_gate.py --mode shellcheck" in workflow
+    assert "run: python scripts/release_check.py" not in workflow
+    assert shellcheck_commands[0]["command"][0] == "shellcheck"
+
+
+def test_release_lane_runs_release_check_entrypoint_for_parity_stabilization() -> None:
+    steps = validation_lanes.lane_command_sequence("release")
+
+    assert len(steps) == 1
+    assert steps[0].command[-1] == "scripts/release_check.py"
+
+
+def test_manifest_is_stdlib_json_and_python_commands_normalize() -> None:
+    steps = validation_lanes.command_sequence("source_fast")
+
+    assert all(isinstance(step, validation_lanes.CommandStep) for step in steps)
+    assert steps[0].command[0] != "python"
+
+
+def test_no_validation_lane_commands_in_root_readme() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "python scripts/validate_stack.py" not in readme
+    assert "python scripts/release_check.py" not in readme

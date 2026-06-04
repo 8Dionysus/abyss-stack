@@ -3,9 +3,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import scripts.validate_stack as validate_stack
+from scripts.validators import runtime_hygiene
+from scripts.validators import source_hygiene
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -19,7 +19,7 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-class ValidateStackRuntimeHygieneTests(unittest.TestCase):
+class RuntimeHygieneContractTests(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
             Path("mechanics") / "runtime-lifecycle" / "parts" / "status-readouts" / "docs" / "GATEWAY_CACHE_POLICY.md",
@@ -40,9 +40,21 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
 
     def validate_surface(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
-        with patch.object(validate_stack, "ROOT", repo_root):
-            validate_stack.validate_runtime_hygiene_contracts(errors)
+        runtime_hygiene.validate_runtime_hygiene_contracts(errors, root=repo_root)
         return errors
+
+    def tracked_hygiene_issue(self, relative_path: str) -> str | None:
+        return source_hygiene.tracked_file_git_mirror_hygiene_issue(
+            relative_path,
+            runtime_top_level_dirs=source_hygiene.GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS,
+            cache_parts=source_hygiene.GIT_MIRROR_CACHE_PARTS,
+            live_env_names=source_hygiene.GIT_MIRROR_LIVE_ENV_NAMES,
+            private_suffixes=source_hygiene.GIT_MIRROR_PRIVATE_SUFFIXES,
+            rendered_suffixes=source_hygiene.GIT_MIRROR_RENDERED_SUFFIXES,
+            database_suffixes=source_hygiene.GIT_MIRROR_DATABASE_SUFFIXES,
+            heavy_suffixes=source_hygiene.GIT_MIRROR_HEAVY_SUFFIXES,
+            fixture_prefixes=source_hygiene.GIT_MIRROR_FIXTURE_PREFIXES,
+        )
 
     def test_git_mirror_hygiene_blocks_live_private_and_heavy_paths(self) -> None:
         blocked_paths = (
@@ -59,9 +71,7 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
         for relative_path in blocked_paths:
             with self.subTest(relative_path=relative_path):
                 self.assertIsNotNone(
-                    validate_stack.tracked_file_git_mirror_hygiene_issue(
-                        relative_path
-                    )
+                    self.tracked_hygiene_issue(relative_path)
                 )
 
     def test_git_mirror_hygiene_allows_public_docs_examples_and_fixtures(self) -> None:
@@ -79,14 +89,12 @@ class ValidateStackRuntimeHygieneTests(unittest.TestCase):
         for relative_path in allowed_paths:
             with self.subTest(relative_path=relative_path):
                 self.assertIsNone(
-                    validate_stack.tracked_file_git_mirror_hygiene_issue(
-                        relative_path
-                    )
+                    self.tracked_hygiene_issue(relative_path)
                 )
 
     def test_current_repo_runtime_hygiene_contracts_pass(self) -> None:
         errors: list[str] = []
-        validate_stack.validate_runtime_hygiene_contracts(errors)
+        runtime_hygiene.validate_runtime_hygiene_contracts(errors, root=REPO_ROOT)
         self.assertEqual(errors, [])
 
     def test_missing_gateway_policy_doc_fails(self) -> None:

@@ -38,7 +38,8 @@ This directory owns compose-time runtime shape: atomic modules, profile expansio
 - Do not put real secrets, tokens, or live values into compose files. Reference runtime files under `Configs/` and `Secrets/` instead.
 
 ## When changing modules
-- If a module structurally depends on another module, update `scripts/validate_stack.py` `MODULE_REQUIREMENTS`.
+- If a module structurally depends on another module, update
+  `scripts/validators/profile_topology.py` `MODULE_REQUIREMENTS`.
 - If a module adds or changes host-facing endpoints, update:
   - `scripts/aoa-profile-endpoints`
   - `scripts/aoa-smoke`

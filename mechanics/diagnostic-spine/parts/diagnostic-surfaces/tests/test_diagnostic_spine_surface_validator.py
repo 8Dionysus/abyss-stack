@@ -3,9 +3,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import scripts.validate_stack as validate_stack
+from scripts.validators import agent_skill_projection
+from scripts.validators import diagnostic_spine
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -16,7 +16,7 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-class ValidateStackDiagnosticSpineTests(unittest.TestCase):
+class DiagnosticSpineSurfaceValidatorTests(unittest.TestCase):
     def write_valid_surface(self, repo_root: Path) -> None:
         for relative_path in (
             Path("README.md"),
@@ -47,13 +47,28 @@ class ValidateStackDiagnosticSpineTests(unittest.TestCase):
 
     def validate_surface(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
-        with patch.object(validate_stack, "ROOT", repo_root):
-            validate_stack.validate_diagnostic_spine_contracts(errors)
+        diagnostic_spine.validate_diagnostic_spine_contracts(
+            errors,
+            root=repo_root,
+            overlay_skill_surfaces=agent_skill_projection.DIAGNOSTIC_OVERLAY_SKILL_SURFACES,
+            overlay_skill_validator=lambda **kwargs: agent_skill_projection.validate_overlay_skill_surface(
+                root=repo_root,
+                **kwargs,
+            ),
+        )
         return errors
 
     def test_current_repo_diagnostic_spine_contracts_pass(self) -> None:
         errors: list[str] = []
-        validate_stack.validate_diagnostic_spine_contracts(errors)
+        diagnostic_spine.validate_diagnostic_spine_contracts(
+            errors,
+            root=REPO_ROOT,
+            overlay_skill_surfaces=agent_skill_projection.DIAGNOSTIC_OVERLAY_SKILL_SURFACES,
+            overlay_skill_validator=lambda **kwargs: agent_skill_projection.validate_overlay_skill_surface(
+                root=REPO_ROOT,
+                **kwargs,
+            ),
+        )
         self.assertEqual(errors, [])
 
     def test_missing_diagnostic_doc_fails(self) -> None:

@@ -1,0 +1,31 @@
+# AGENTS.md
+
+Local guidance for `docs/testing/` in `abyss-stack`. Read root `AGENTS.md`,
+`docs/AGENTS.md`, and `tests/AGENTS.md` first.
+
+## Scope
+
+This district owns the human test topology and machine-readable test inventory
+for root tests, mechanic part-local tests, MCP service tests, and explicitly
+labeled legacy provenance tests.
+
+The machine inventory lives at `docs/testing/test_inventory.json`.
+
+It does not own executable command sequences. Those live in
+`docs/validation/validation_lanes.json` and local route cards.
+
+## Contract
+
+- Keep test inventory descriptive: family, paths, owner surface, lane, mode,
+  focused target, and failure route.
+- Keep legacy tests labeled if they remain in default pytest discovery.
+- Keep live-host, destructive, private, or model-download behavior out of the
+  default source-checkout test lane.
+- Add topology tests when a new test home, lane, or runner behavior appears.
+
+## Validate
+
+```bash
+python -m pytest -q tests/test_test_topology.py
+python scripts/ci_gate.py --mode tests
+```
