@@ -154,13 +154,34 @@ def validated_required_files(config: dict[str, Any], mirror_root: Path) -> list[
 
     normalized_required_files: list[str] = []
     for rel_path in required_files:
-        if not isinstance(rel_path, str) or not rel_path:
-            raise RuntimeError("required_files entries must be non-empty strings")
-        normalized_required_files.append(rel_path)
-        if not (mirror_root / rel_path).is_file():
-            raise RuntimeError(f"required mirrored file missing: {mirror_root / rel_path}")
+        append_validated_required_file(normalized_required_files, mirror_root, rel_path)
 
     return normalized_required_files
+
+
+def append_validated_required_file(required_files: list[str], mirror_root: Path, rel_path: Any) -> None:
+    if not isinstance(rel_path, str) or not rel_path:
+        raise RuntimeError("required_files entries must be non-empty strings")
+    if rel_path not in required_files:
+        required_files.append(rel_path)
+    if not (mirror_root / rel_path).is_file():
+        raise RuntimeError(f"required mirrored file missing: {mirror_root / rel_path}")
+
+
+def extend_required_files(
+    required_files: list[str],
+    mirror_root: Path,
+    rel_paths: list[str] | dict[str, str],
+) -> list[str]:
+    if isinstance(rel_paths, dict):
+        iterable = rel_paths.values()
+    else:
+        iterable = rel_paths
+    for rel_path in iterable:
+        if not isinstance(rel_path, str) or not rel_path:
+            raise RuntimeError("required_files entries must be non-empty strings")
+        append_validated_required_file(required_files, mirror_root, rel_path)
+    return required_files
 
 
 def load_agents_layer(config_path: Path, config: dict[str, Any], mirror_root: Path) -> LayerStore:
@@ -282,6 +303,7 @@ def load_evals_layer(
 ) -> LayerStore:
     required_files = validated_required_files(config, mirror_root)
     template_source_refs = runtime_evidence_template_source_refs(compatibility_bridge)
+    required_files = extend_required_files(required_files, mirror_root, template_source_refs)
     payloads = {
         "catalog": load_json(mirror_root / "generated/eval_catalog.min.json"),
         "capsules": load_json(mirror_root / "generated/eval_capsules.json"),
@@ -327,6 +349,7 @@ def load_playbooks_layer(
 ) -> LayerStore:
     required_files = validated_required_files(config, mirror_root)
     automation_bridge = playbook_automation_bridge(compatibility_bridge)
+    required_files = extend_required_files(required_files, mirror_root, [automation_bridge["upstream_rel_path"]])
     payloads = {
         "registry": load_json(mirror_root / "generated/playbook_registry.min.json"),
         "activation": load_json_value(mirror_root / "generated/playbook_activation_surfaces.min.json"),

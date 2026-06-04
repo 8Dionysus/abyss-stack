@@ -203,6 +203,10 @@
 
 - [ABYSS-STACK-D-0049 Federation Runtime Seams Validator Module](../ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md`)
 
+## federation surface
+
+- [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
+
 ## generated index handoff
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
@@ -283,6 +287,10 @@
 
 - [ABYSS-STACK-D-0048 Federation Landing Validator Split](../ABYSS-STACK-D-0048-federation-landing-validator-split.md) (`docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md`)
 
+## route-api closure status
+
+- [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
+
 ## route-api compatibility bridge
 
 - [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
@@ -328,6 +336,10 @@
 ## status readout
 
 - [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
+
+## sync parity
+
+- [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
 
 ## test topology
 

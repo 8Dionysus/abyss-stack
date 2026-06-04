@@ -99,6 +99,23 @@ class FederationRequiredFilesValidatorTests(unittest.TestCase):
 
         self.assertTrue(any("generated/playbook_registry.min.json" in error for error in errors))
 
+    def test_missing_kag_runtime_surface_contract_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            self.write_valid_surface(repo_root)
+            aoa_kag_path = (
+                repo_root / "config-templates" / "Configs" / "federation" / "aoa-kag.yaml"
+            )
+            write_text(
+                aoa_kag_path,
+                aoa_kag_path
+                .read_text(encoding="utf-8")
+                .replace("  - generated/reasoning_handoff_pack.min.json\n", ""),
+            )
+            errors = self.validate_surface(repo_root)
+
+        self.assertTrue(any("generated/reasoning_handoff_pack.min.json" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
