@@ -10,6 +10,9 @@ generated_indexes:
   - docs/decisions/indexes/by-stack-lane.md
   - docs/decisions/indexes/by-mechanic.md
   - docs/decisions/indexes/by-guard.md
+generated_graphs:
+  - docs/decisions/generated/README.md
+  - docs/decisions/generated/decision_graph.json
 required_metadata:
   - Original date
   - Surface classes

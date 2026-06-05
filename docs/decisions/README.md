@@ -40,6 +40,34 @@ Generated lookup indexes live under [`indexes/`](indexes/README.md):
 The indexes are generated read models from each record's `## Index Metadata`.
 They do not author meaning.
 
+Generated decision graph read models live under
+[`generated/`](generated/README.md):
+
+| Graph | Use |
+|---|---|
+| [Decision graph JSON](generated/decision_graph.json) | machine-readable decision nodes, facet nodes, and source-surface/guard/status edges |
+
+The graph is generated from decision metadata and source-surface lists. It does
+not replace the records and does not author runtime truth.
+
+For cross-repo agent navigation, refresh the ignored local workspace graph with:
+
+```bash
+python scripts/build_workspace_decision_graph.py --write
+```
+
+That command discovers source checkouts with `docs/decisions/` and writes
+`Logs/decision-graph/latest/{workspace_decision_graph.json,nodes.jsonl,edges.jsonl,summary.json}`.
+Those files are local read models for agents, not source-truth records.
+Use `python scripts/build_workspace_decision_graph.py --check` to verify the
+local graph is fresh after repository decision lanes move.
+
+The workspace graph has an explicit decision-surface registry. Every
+fingerprinted file under `docs/decisions/` must be modeled as a decision
+record, lane support doc, decision index, or reported as an issue. Add a
+registry entry before relying on a new durable entity type inside a decision
+lane.
+
 ## Record Shape
 
 New records must use [TEMPLATE.md](TEMPLATE.md). The standard shape is:
@@ -68,9 +96,9 @@ Do not use this district to absorb:
 - sibling-owner doctrine from AoA, ToS, skills, techniques, evals, memory,
   routing, KAG, playbooks, stats, agents, or machine repositories
 
-Do not treat a generated decision index as stronger than its source decision
-record, and do not treat a decision record as stronger than the current source
-surface it routes to.
+Do not treat a generated decision index or graph as stronger than its source
+decision record, and do not treat a decision record as stronger than the
+current source surface it routes to.
 
 ## Validation
 

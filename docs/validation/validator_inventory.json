@@ -445,19 +445,21 @@
       "paths": [
         "scripts/validate_decision_records.py",
         "scripts/generate_decision_indexes.py",
-        "scripts/decision_indexes.py"
+        "scripts/decision_indexes.py",
+        "scripts/validate_workspace_decision_graph.py"
       ],
-      "protects": "canonical decision IDs, decision metadata, and generated decision index freshness",
+      "protects": "canonical decision IDs, decision metadata, generated decision index freshness, and workspace decision graph schema/coverage",
       "owner_surface": "docs/decisions/",
       "layer": "decision/read-model",
-      "lane": "source-fast/generated/release",
+      "lane": "source-fast/generated/decision-graph/release",
       "mode": "blocking",
       "callers": [
         "scripts/ci_gate.py --mode source-fast",
         "scripts/ci_gate.py --mode generated",
+        "scripts/ci_gate.py --mode decision-graph",
         "scripts/release_check.py"
       ],
-      "failure_route": "Fix decision metadata or regenerate decision indexes.",
+      "failure_route": "Fix decision metadata, regenerate decision indexes, refresh the workspace graph, or repair the graph schema contract.",
       "status": "active"
     },
     {
@@ -499,10 +501,12 @@
       "family": "mcp-service-validators",
       "paths": [
         "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
+        "mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
         "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
         "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
         "mcp/services/aoa-memo-mcp/scripts/release_check.py",
+        "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
         "mcp/services/aoa-evals-mcp/scripts/release_check.py",
         "mcp/services/abyss-machine-mcp/scripts/release_check.py",
         "mcp/services/aoa-session-memory-mcp/scripts/release_check.py"

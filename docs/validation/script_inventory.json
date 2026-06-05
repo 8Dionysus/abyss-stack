@@ -116,11 +116,13 @@
       "family": "root-validation-and-generated-entrypoints",
       "paths": [
         "scripts/build_diagnostic_surface_catalog.py",
+        "scripts/build_workspace_decision_graph.py",
         "scripts/ci_gate.py",
         "scripts/decision_indexes.py",
         "scripts/generate_decision_indexes.py",
         "scripts/release_check.py",
         "scripts/validate_decision_records.py",
+        "scripts/validate_workspace_decision_graph.py",
         "scripts/validate_diagnostic_surface_catalog.py",
         "scripts/validate_nested_agents.py",
         "scripts/validate_stack.py",
@@ -153,6 +155,7 @@
       "source_truth": [
         "docs/validation/validation_lanes.json",
         "docs/decisions/",
+        "sibling docs/decisions/",
         "mechanics/diagnostic-spine/"
       ],
       "reads": [
@@ -161,11 +164,12 @@
         "git tracked file list where relevant"
       ],
       "writes": [
-        "generated indexes or diagnostic catalog only for builder commands run without --check"
+        "generated indexes or diagnostic catalog only for builder commands run without --check",
+        "ignored local workspace decision graph under Logs/ when build_workspace_decision_graph.py runs with --write"
       ],
       "side_effects": "validation output; release_check may prepare a temporary synthetic Configs mirror",
-      "validation_lane": "source-fast/generated/release",
-      "ci_inclusion": "called by ci_gate and release_check",
+      "validation_lane": "source-fast/generated/decision-graph/release",
+      "ci_inclusion": "portable repo validators are called by ci_gate and release_check; decision-graph lane checks local workspace graph freshness and schema",
       "test_target": "tests/test_validation_command_authority.py",
       "disposition": "keep"
     },
@@ -175,6 +179,9 @@
         "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",
         "mcp/services/abyss-machine-mcp/scripts/release_check.py",
         "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
+        "mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py",
+        "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
+        "mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py",
         "mcp/services/aoa-evals-mcp/scripts/release_check.py",
         "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",

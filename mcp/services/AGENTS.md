@@ -32,6 +32,13 @@ python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
 python -m pytest mcp/services/aoa-memo-mcp/tests -q
 ```
 
+For `aoa-decisions-mcp`, run:
+
+```bash
+python mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py
+python -m pytest mcp/services/aoa-decisions-mcp/tests -q
+```
+
 For `aoa-evals-mcp`, run:
 
 ```bash

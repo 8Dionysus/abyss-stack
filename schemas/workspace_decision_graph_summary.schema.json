@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/workspace_decision_graph_summary.schema.json",
+  "title": "AoA workspace decision graph summary",
+  "type": "object",
+  "required": [
+    "schema",
+    "input_fingerprint",
+    "repo_count",
+    "decision_count",
+    "decision_surface_count",
+    "node_count",
+    "edge_count",
+    "repo_decision_counts",
+    "node_type_counts",
+    "edge_type_counts",
+    "surface_kind_counts",
+    "issue_count",
+    "issues"
+  ],
+  "properties": {
+    "schema": {"const": "abyss_workspace_decision_graph_summary_v1"},
+    "input_fingerprint": {"type": ["string", "null"]},
+    "repo_count": {"type": "integer", "minimum": 0},
+    "decision_count": {"type": "integer", "minimum": 0},
+    "decision_surface_count": {"type": "integer", "minimum": 0},
+    "node_count": {"type": "integer", "minimum": 0},
+    "edge_count": {"type": "integer", "minimum": 0},
+    "repo_decision_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "node_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "edge_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "surface_kind_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "issue_count": {"type": "integer", "minimum": 0},
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repo", "path", "error"],
+        "properties": {
+          "repo": {"type": "string"},
+          "path": {"type": "string"},
+          "error": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

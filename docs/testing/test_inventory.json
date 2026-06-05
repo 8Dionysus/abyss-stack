@@ -27,6 +27,8 @@
         "tests/test_current_direction_routes.py",
         "tests/test_decision_records.py",
         "tests/test_decision_surface_validator_module.py",
+        "tests/test_workspace_decision_graph.py",
+        "tests/test_workspace_decision_graph_contract.py",
         "tests/test_diagnostic_spine_validator_module.py",
         "tests/test_federation_runtime_seams_validator_module.py",
         "tests/test_federation_validator_module.py",
@@ -133,6 +135,7 @@
       "family": "mcp-service-tests",
       "paths": [
         "mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
+        "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
         "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
         "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py"

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/workspace_decision_graph_node.schema.json",
+  "title": "AoA workspace decision graph node",
+  "type": "object",
+  "required": ["id", "type", "label"],
+  "properties": {
+    "id": {"type": "string"},
+    "type": {
+      "enum": [
+        "date",
+        "decision",
+        "decision_facet",
+        "decision_index",
+        "decision_lane",
+        "decision_lane_doc",
+        "owner_surface",
+        "repo",
+        "source_surface",
+        "status"
+      ]
+    },
+    "label": {"type": "string"}
+  },
+  "additionalProperties": true
+}

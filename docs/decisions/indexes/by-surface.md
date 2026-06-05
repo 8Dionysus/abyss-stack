@@ -90,6 +90,8 @@
 - [ABYSS-STACK-D-0035 AoA Evals MCP Access Plane](../ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0036 Abyss Machine MCP Access Plane](../ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0037 AoA Session Memory MCP Access Plane](../ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
 
 ## federation/read-model
 
@@ -158,6 +160,7 @@
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
 - [ABYSS-STACK-D-0061 Active Topology Language Validator Module](../ABYSS-STACK-D-0061-active-topology-language-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md`)
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
+- [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
 
 ## legacy/provenance
 
@@ -187,6 +190,12 @@
 
 - [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
 
+## decision graph
+
+- [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
+- [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
 ## decision route
 
 - [ABYSS-STACK-D-0056 Decision Surface Validator Module](../ABYSS-STACK-D-0056-decision-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md`)
@@ -206,6 +215,11 @@
 
 - [ABYSS-STACK-D-0045 Questbook Surface Validator Module](../ABYSS-STACK-D-0045-questbook-surface-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0045-questbook-surface-validator-module.md`)
 - [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
+
+## generated/read-model
+
+- [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 
 ## governance route
 
@@ -275,6 +289,10 @@
 
 - [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
 
+## schema/contract
+
+- [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
 ## service selection
 
 - [ABYSS-STACK-D-0043 Service Selection Validator Module](../ABYSS-STACK-D-0043-service-selection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0043-service-selection-validator-module.md`)
@@ -286,6 +304,10 @@
 ## status readout
 
 - [ABYSS-STACK-D-0051 Runtime Hygiene Validator Module](../ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md`)
+
+## validation
+
+- [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 
 ## validation topology
 
