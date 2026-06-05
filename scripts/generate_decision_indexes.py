@@ -39,7 +39,7 @@ def main() -> int:
             print(f"- {location}: {message}")
         return 1
 
-    for relative_path, expected_text in decision_indexes.render_index_files(records).items():
+    for relative_path, expected_text in decision_indexes.render_generated_files(records).items():
         path = repo_root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(expected_text, encoding="utf-8")

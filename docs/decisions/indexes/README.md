@@ -13,3 +13,5 @@ Decision notes own rationale; these indexes only make lookup cheaper for agents.
 - [By stack lane](by-stack-lane.md)
 - [By mechanic parent](by-mechanic.md)
 - [By validation or guard family](by-guard.md)
+
+Machine-readable decision graph read models live under [../generated/](../generated/README.md).

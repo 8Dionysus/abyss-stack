@@ -32,7 +32,7 @@ parity posture.
 | Root design and entry routes | root design cards, route contract exposure, front-door route modes, and command-authority handoff language | `scripts/validators/root_routes.py` | source-fast, release |
 | Agent route topology | nested `AGENTS.md` coverage and route snippets | `scripts/validate_nested_agents.py` | source-fast, release |
 | Decision surface routes | docs/decisions route cards, template requirements, validator/generator handoff, and test route exposure | `scripts/validators/decision_surface.py` | source-fast, release |
-| Decision rationale | canonical decision IDs and generated decision indexes | `docs/decisions/` | source-fast, generated, release |
+| Decision rationale | canonical decision IDs, generated repo graph, local workspace decision graph freshness, and graph schema/coverage contract | `docs/decisions/`, `scripts/build_workspace_decision_graph.py`, `scripts/validate_workspace_decision_graph.py` | source-fast, generated, decision-graph, release |
 | Generated diagnostics | diagnostic surface catalog and generated read model | `mechanics/diagnostic-spine/` | generated, release |
 | Script surface | root wrappers, part-local backends, MCP scripts, quest helpers, side effects | `docs/validation/script_inventory.json` | source-fast |
 | Test surface | root, mechanic part-local, and MCP tests | `docs/testing/test_inventory.json` | tests, release |
@@ -87,7 +87,9 @@ root-level wrapper APIs.
 | `scripts/validators/root_routes.py` | root design and entry route validator module | fix root design cards, start-here route exposure, route modes, command-authority handoff text, or focused root-route tests |
 | `scripts/validate_nested_agents.py` | AGENTS route topology | fix nearest `AGENTS.md` or required route doc |
 | `scripts/validators/decision_surface.py` | decision surface route validator module | fix decision route cards, template shape, validator/generator handoff text, or focused decision-surface tests |
-| `scripts/validate_decision_records.py` | decision record shape | fix decision metadata or generated indexes |
+| `scripts/validate_decision_records.py` | decision record shape | fix decision metadata or generated decision read models |
+| `scripts/build_workspace_decision_graph.py` | local workspace decision graph builder | refresh `Logs/decision-graph/latest/` with `--write` or verify it with `--check`; do not treat it as stronger than repo-local records |
+| `scripts/validate_workspace_decision_graph.py` | local workspace graph schema and coverage contract | refresh the graph cache, repair schema enums/counts, or model unknown decision-lane surfaces |
 | MCP service validators | service-local access-plane checks | fix the service package and owner-boundary docs |
 
 ## Must Not Claim

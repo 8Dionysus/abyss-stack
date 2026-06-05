@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import shutil
 import sys
 import tempfile
@@ -133,6 +134,51 @@ class DecisionRecordTests(unittest.TestCase):
             [path.as_posix() for path in decision_indexes.GENERATED_INDEX_PATHS],
             contract["generated_indexes"],
         )
+        self.assertEqual(
+            [path.as_posix() for path in decision_indexes.GENERATED_GRAPH_PATHS],
+            contract["generated_graphs"],
+        )
+
+    def test_generated_decision_graph_exposes_nodes_edges_and_supersession(self) -> None:
+        records, issues = decision_indexes.collect_decision_records(ROOT)
+        self.assertEqual([], issues)
+
+        graph = decision_indexes.build_decision_graph(records)
+
+        self.assertEqual("abyss_stack_decision_graph_v1", graph["schema"])
+        self.assertEqual(len(records), graph["decision_count"])
+        node_ids = {node["id"] for node in graph["nodes"]}
+        edge_keys = {(edge["source"], edge["target"], edge["type"]) for edge in graph["edges"]}
+        self.assertIn("decision:ABYSS-STACK-D-0031", node_ids)
+        self.assertIn("decision:ABYSS-STACK-D-0032", node_ids)
+        self.assertIn("status:superseded", node_ids)
+        self.assertIn("source_surface:mcp/AGENTS.md", node_ids)
+        self.assertIn(
+            (
+                "decision:ABYSS-STACK-D-0031",
+                "decision:ABYSS-STACK-D-0032",
+                "SUPERSEDED_BY",
+            ),
+            edge_keys,
+        )
+        self.assertIn(
+            (
+                "decision:ABYSS-STACK-D-0032",
+                "source_surface:mcp/AGENTS.md",
+                "CITES_SOURCE_SURFACE",
+            ),
+            edge_keys,
+        )
+
+    def test_generated_decision_graph_json_is_fresh(self) -> None:
+        records, issues = decision_indexes.collect_decision_records(ROOT)
+        self.assertEqual([], issues)
+        expected = json.loads(decision_indexes.render_decision_graph_json(records))
+        current = json.loads(
+            (ROOT / "docs" / "decisions" / "generated" / "decision_graph.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(expected, current)
 
     def test_generate_check_uses_full_contract_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -164,6 +210,24 @@ class DecisionRecordTests(unittest.TestCase):
         self.assertEqual(1, exit_code)
         self.assertIn("decision_id_prefix must be ABYSS-STACK-D", stdout.getvalue())
 
+    def test_generate_check_flags_unmodeled_decision_lane_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            shutil.copytree(ROOT / "docs" / "decisions", temp_root / "docs" / "decisions")
+            unknown = temp_root / "docs" / "decisions" / "entities" / "new-kind.yaml"
+            unknown.parent.mkdir(parents=True)
+            unknown.write_text("schema: future_decision_entity_v1\n", encoding="utf-8")
+
+            issues = decision_indexes.validate_decision_index_surfaces(temp_root)
+
+        self.assertIn(
+            (
+                "docs/decisions/entities/new-kind.yaml",
+                "unmodeled decision-lane surface; add it to the local decision surface contract or move it outside docs/decisions",
+            ),
+            issues,
+        )
+
     def test_index_contract_validation_covers_parser_contract_fields(self) -> None:
         contract, issues = decision_indexes.load_index_contract(ROOT)
         self.assertEqual([], issues)
@@ -172,6 +236,7 @@ class DecisionRecordTests(unittest.TestCase):
         drifted = dict(contract)
         drifted["path_policy"] = "date_prefixed_filename"
         drifted["source_glob"] = "docs/decisions/*.md"
+        drifted["generated_graphs"] = ["docs/decisions/generated/old.json"]
         drifted["required_metadata"] = ["Original date"]
 
         contract_issues = decision_indexes.validate_index_contract_payload(drifted)
@@ -187,6 +252,13 @@ class DecisionRecordTests(unittest.TestCase):
             (
                 "docs/decisions/indexes/index_contract.yaml",
                 "source_glob must be docs/decisions/ABYSS-STACK-D-*.md",
+            ),
+            contract_issues,
+        )
+        self.assertIn(
+            (
+                "docs/decisions/indexes/index_contract.yaml",
+                "generated_graphs must match the decision graph read-model set",
             ),
             contract_issues,
         )

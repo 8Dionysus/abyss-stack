@@ -14,3 +14,7 @@ read models into every prompt.
 
 MCP packages are access planes. Their outputs help agents move, but authority
 stays with the source owner named by the package.
+
+`aoa-decisions-mcp` is the access plane for the local workspace decision graph:
+it auto-refreshes the ignored graph cache before returning search results,
+repo slices, decision neighborhoods, or compact packets.

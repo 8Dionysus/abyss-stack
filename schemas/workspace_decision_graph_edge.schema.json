@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/workspace_decision_graph_edge.schema.json",
+  "title": "AoA workspace decision graph edge",
+  "type": "object",
+  "required": ["source", "target", "type"],
+  "properties": {
+    "source": {"type": "string"},
+    "target": {"type": "string"},
+    "type": {
+      "enum": [
+        "CITES_SOURCE_SURFACE",
+        "CONTAINS_DECISION",
+        "DATED",
+        "HAS_DECISION_FACET",
+        "HAS_DECISION_INDEX",
+        "HAS_DECISION_LANE",
+        "HAS_DECISION_LANE_DOC",
+        "HAS_STATUS",
+        "NEXT_DECISION_IN_REPO",
+        "OWNED_BY_SURFACE",
+        "SUPERSEDED_BY"
+      ]
+    }
+  },
+  "additionalProperties": true
+}
