@@ -634,6 +634,9 @@ def load_index_contract(repo_root: Path) -> tuple[dict[str, object] | None, list
         if line.startswith("  - ") and current_list_key is not None:
             value = line[4:].strip()
             existing = contract.setdefault(current_list_key, [])
+            if existing is None:
+                existing = []
+                contract[current_list_key] = existing
             if not isinstance(existing, list):
                 return None, [(INDEX_CONTRACT_PATH.as_posix(), f"{current_list_key} must be a list")]
             existing.append(value)
@@ -645,13 +648,49 @@ def load_index_contract(repo_root: Path) -> tuple[dict[str, object] | None, list
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
-        if value:
+        if value == "[]":
+            contract[key] = []
+            current_list_key = None
+        elif value:
             contract[key] = value
             current_list_key = None
         else:
-            contract[key] = []
+            contract[key] = None
             current_list_key = key
     return contract, []
+
+
+def modeled_decision_lane_surfaces(
+    repo_root: Path,
+    contract: dict[str, object],
+    issues: list[tuple[str, str]],
+) -> set[str]:
+    modeled = contract.get("modeled_surfaces")
+    if modeled is None:
+        issues.append((INDEX_CONTRACT_PATH.as_posix(), "modeled_surfaces must be a list of repo-relative docs/decisions paths"))
+        return set()
+    if not isinstance(modeled, list) or not all(isinstance(item, str) for item in modeled):
+        issues.append((INDEX_CONTRACT_PATH.as_posix(), "modeled_surfaces must be a list of repo-relative docs/decisions paths"))
+        return set()
+    allowed: set[str] = set()
+    for item in modeled:
+        relative = Path(item)
+        if relative.is_absolute() or ".." in relative.parts:
+            issues.append((INDEX_CONTRACT_PATH.as_posix(), f"modeled_surfaces entry must be a normalized repo-relative path under {DECISIONS_DIR.as_posix()}: {item}"))
+            continue
+        try:
+            relative.relative_to(DECISIONS_DIR)
+        except ValueError:
+            issues.append((INDEX_CONTRACT_PATH.as_posix(), f"modeled_surfaces entry must live under {DECISIONS_DIR.as_posix()}: {item}"))
+            continue
+        if relative.parent == DECISIONS_DIR and relative.suffix == ".md" and not FULL_ID_FILENAME_RE.match(relative.name):
+            issues.append((INDEX_CONTRACT_PATH.as_posix(), f"modeled_surfaces must not include root non-record Markdown: {item}"))
+            continue
+        if not (repo_root / relative).is_file():
+            issues.append((INDEX_CONTRACT_PATH.as_posix(), f"modeled_surfaces entry does not exist: {item}"))
+            continue
+        allowed.add(item)
+    return allowed
 
 
 def validate_index_contract_payload(contract: dict[str, object]) -> list[tuple[str, str]]:
@@ -700,6 +739,13 @@ def validate_index_contract_payload(contract: dict[str, object]) -> list[tuple[s
                 "generated_graphs must match the decision graph read-model set",
             )
         )
+    if not isinstance(contract.get("modeled_surfaces"), list):
+        issues.append(
+            (
+                INDEX_CONTRACT_PATH.as_posix(),
+                "modeled_surfaces must be a list of repo-relative docs/decisions paths",
+            )
+        )
     if contract.get("required_metadata") != list(REQUIRED_METADATA):
         issues.append(
             (
@@ -744,6 +790,10 @@ def validate_decision_lane_surfaces(repo_root: Path) -> list[tuple[str, str]]:
 
     allowed_paths = {path.as_posix() for path in LOCAL_DECISION_SURFACE_PATHS}
     issues: list[tuple[str, str]] = []
+    contract, contract_issues = load_index_contract(repo_root)
+    issues.extend(contract_issues)
+    if contract is not None:
+        allowed_paths.update(modeled_decision_lane_surfaces(repo_root, contract, issues))
     for path in sorted(decisions_root.rglob("*")):
         if not path.is_file():
             continue

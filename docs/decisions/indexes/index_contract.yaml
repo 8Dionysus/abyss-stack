@@ -13,6 +13,7 @@ generated_indexes:
 generated_graphs:
   - docs/decisions/generated/README.md
   - docs/decisions/generated/decision_graph.json
+modeled_surfaces: []
 required_metadata:
   - Original date
   - Surface classes

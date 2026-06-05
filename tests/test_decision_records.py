@@ -138,6 +138,7 @@ class DecisionRecordTests(unittest.TestCase):
             [path.as_posix() for path in decision_indexes.GENERATED_GRAPH_PATHS],
             contract["generated_graphs"],
         )
+        self.assertEqual([], contract["modeled_surfaces"])
 
     def test_generated_decision_graph_exposes_nodes_edges_and_supersession(self) -> None:
         records, issues = decision_indexes.collect_decision_records(ROOT)
@@ -228,6 +229,60 @@ class DecisionRecordTests(unittest.TestCase):
             issues,
         )
 
+    def test_modeled_surface_contract_allows_existing_nested_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            shutil.copytree(ROOT / "docs" / "decisions", temp_root / "docs" / "decisions")
+            modeled = temp_root / "docs" / "decisions" / "entities" / "new-kind.yaml"
+            modeled.parent.mkdir(parents=True)
+            modeled.write_text("schema: future_decision_entity_v1\n", encoding="utf-8")
+            contract_path = temp_root / "docs" / "decisions" / "indexes" / "index_contract.yaml"
+            contract_path.write_text(
+                contract_path.read_text(encoding="utf-8").replace(
+                    "modeled_surfaces: []",
+                    "modeled_surfaces:\n  - docs/decisions/entities/new-kind.yaml",
+                ),
+                encoding="utf-8",
+            )
+
+            issues = decision_indexes.validate_decision_index_surfaces(temp_root)
+
+        self.assertEqual([], issues)
+
+    def test_modeled_surface_contract_rejects_null_and_path_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            shutil.copytree(ROOT / "docs" / "decisions", temp_root / "docs" / "decisions")
+            contract_path = temp_root / "docs" / "decisions" / "indexes" / "index_contract.yaml"
+            contract_path.write_text(
+                contract_path.read_text(encoding="utf-8").replace("modeled_surfaces: []", "modeled_surfaces:"),
+                encoding="utf-8",
+            )
+            null_issues = decision_indexes.validate_decision_index_surfaces(temp_root)
+            contract_path.write_text(
+                contract_path.read_text(encoding="utf-8").replace(
+                    "modeled_surfaces:",
+                    "modeled_surfaces:\n  - docs/decisions/../../README.md",
+                ),
+                encoding="utf-8",
+            )
+            escape_issues = decision_indexes.validate_decision_index_surfaces(temp_root)
+
+        self.assertIn(
+            (
+                "docs/decisions/indexes/index_contract.yaml",
+                "modeled_surfaces must be a list of repo-relative docs/decisions paths",
+            ),
+            null_issues,
+        )
+        self.assertIn(
+            (
+                "docs/decisions/indexes/index_contract.yaml",
+                "modeled_surfaces entry must be a normalized repo-relative path under docs/decisions: docs/decisions/../../README.md",
+            ),
+            escape_issues,
+        )
+
     def test_index_contract_validation_covers_parser_contract_fields(self) -> None:
         contract, issues = decision_indexes.load_index_contract(ROOT)
         self.assertEqual([], issues)
@@ -237,6 +292,7 @@ class DecisionRecordTests(unittest.TestCase):
         drifted["path_policy"] = "date_prefixed_filename"
         drifted["source_glob"] = "docs/decisions/*.md"
         drifted["generated_graphs"] = ["docs/decisions/generated/old.json"]
+        drifted["modeled_surfaces"] = None
         drifted["required_metadata"] = ["Original date"]
 
         contract_issues = decision_indexes.validate_index_contract_payload(drifted)
@@ -259,6 +315,13 @@ class DecisionRecordTests(unittest.TestCase):
             (
                 "docs/decisions/indexes/index_contract.yaml",
                 "generated_graphs must match the decision graph read-model set",
+            ),
+            contract_issues,
+        )
+        self.assertIn(
+            (
+                "docs/decisions/indexes/index_contract.yaml",
+                "modeled_surfaces must be a list of repo-relative docs/decisions paths",
             ),
             contract_issues,
         )
