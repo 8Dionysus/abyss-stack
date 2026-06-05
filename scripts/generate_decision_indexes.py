@@ -33,7 +33,7 @@ def main() -> int:
     contract, contract_issues = decision_indexes.load_index_contract(repo_root)
     issues.extend(contract_issues)
     if contract is not None:
-        issues.extend(decision_indexes.validate_index_contract_payload(contract))
+        issues.extend(decision_indexes.validate_index_contract_payload(contract, repo_root=repo_root))
     if issues:
         for location, message in issues:
             print(f"- {location}: {message}")
