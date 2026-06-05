@@ -229,6 +229,40 @@ class DecisionRecordTests(unittest.TestCase):
             issues,
         )
 
+    def test_generate_write_rejects_invalid_modeled_surface_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            shutil.copytree(ROOT / "docs" / "decisions", temp_root / "docs" / "decisions")
+            contract_path = temp_root / "docs" / "decisions" / "indexes" / "index_contract.yaml"
+            contract_path.write_text(
+                contract_path.read_text(encoding="utf-8").replace(
+                    "modeled_surfaces: []",
+                    "modeled_surfaces:\n  - docs/decisions/../../README.md",
+                ),
+                encoding="utf-8",
+            )
+
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "generate_decision_indexes.py",
+                        "--repo-root",
+                        temp_root.as_posix(),
+                    ],
+                ),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = generate_decision_indexes.main()
+
+        self.assertEqual(1, exit_code)
+        self.assertIn(
+            "modeled_surfaces entry must be a normalized repo-relative path under docs/decisions",
+            stdout.getvalue(),
+        )
+
     def test_modeled_surface_contract_allows_existing_nested_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

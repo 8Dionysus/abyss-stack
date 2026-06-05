@@ -693,7 +693,10 @@ def modeled_decision_lane_surfaces(
     return allowed
 
 
-def validate_index_contract_payload(contract: dict[str, object]) -> list[tuple[str, str]]:
+def validate_index_contract_payload(
+    contract: dict[str, object],
+    repo_root: Path | None = None,
+) -> list[tuple[str, str]]:
     issues: list[tuple[str, str]] = []
     expected = [path.as_posix() for path in GENERATED_INDEX_PATHS]
     expected_graphs = [path.as_posix() for path in GENERATED_GRAPH_PATHS]
@@ -746,6 +749,8 @@ def validate_index_contract_payload(contract: dict[str, object]) -> list[tuple[s
                 "modeled_surfaces must be a list of repo-relative docs/decisions paths",
             )
         )
+    elif repo_root is not None:
+        modeled_decision_lane_surfaces(repo_root, contract, issues)
     if contract.get("required_metadata") != list(REQUIRED_METADATA):
         issues.append(
             (
