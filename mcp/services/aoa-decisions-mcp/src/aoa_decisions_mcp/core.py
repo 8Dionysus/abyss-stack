@@ -58,6 +58,10 @@ def _path_matches(surface: str, path: str) -> bool:
     )
 
 
+def _is_route_anchor_node(node: dict[str, Any]) -> bool:
+    return node.get("type") == "decision_facet" and node.get("facet_key") == "Route anchors"
+
+
 @dataclass(slots=True)
 class AoADecisionsMCPState:
     workspace_root: Path
@@ -319,7 +323,7 @@ class AoADecisionsMCPState:
         graph = self.graph()
         candidates: list[dict[str, Any]] = []
         query_text = query.lower().strip()
-        path_text = (path or "").lower().strip()
+        path_decision_ids, path_edges, _path_surfaces = self._path_impact(graph, path or "", repo=repo)
         for node in graph.get("nodes", []):
             if node.get("type") != "decision":
                 continue
@@ -327,7 +331,7 @@ class AoADecisionsMCPState:
                 continue
             if decision_id and str(node.get("label", "")).upper() != decision_id.upper():
                 continue
-            if path_text and path_text not in str(node.get("path", "")).lower():
+            if path and node.get("id") not in path_decision_ids and not _path_matches(str(node.get("path", "")), path):
                 continue
             if query_text and not _contains(node, query_text):
                 continue
@@ -340,6 +344,12 @@ class AoADecisionsMCPState:
             for edge in graph.get("edges", [])
             if edge.get("source") in decision_ids or edge.get("target") in decision_ids
         ]
+        if path:
+            related_edges.extend(
+                edge
+                for edge in path_edges
+                if edge.get("source") in decision_ids and edge not in related_edges
+            )
         related_node_ids = {
             endpoint
             for edge in related_edges
@@ -441,20 +451,7 @@ class AoADecisionsMCPState:
 
     def changed_path(self, path: str, repo: str | None = None, limit: int = 50) -> dict[str, Any]:
         graph = self.graph()
-        surface_nodes = [
-            node
-            for node in graph.get("nodes", [])
-            if node.get("type") in {"source_surface", "owner_surface"}
-            and (not repo or node.get("repo") == repo)
-            and _path_matches(str(node.get("label", "")), path)
-        ]
-        surface_ids = {node["id"] for node in surface_nodes}
-        matched_edges = [
-            edge
-            for edge in graph.get("edges", [])
-            if edge.get("target") in surface_ids and edge.get("type") in {"CITES_SOURCE_SURFACE", "OWNED_BY_SURFACE"}
-        ]
-        decision_ids = {edge["source"] for edge in matched_edges if isinstance(edge.get("source"), str)}
+        decision_ids, matched_edges, surface_nodes = self._path_impact(graph, path, repo=repo)
         decisions = [
             node
             for node in graph.get("nodes", [])
@@ -477,6 +474,47 @@ class AoADecisionsMCPState:
                 "MCP packet",
             ],
         }
+
+    def _path_impact(
+        self,
+        graph: dict[str, Any],
+        path: str,
+        *,
+        repo: str | None,
+    ) -> tuple[set[str], list[dict[str, Any]], list[dict[str, Any]]]:
+        surface_nodes = [
+            node
+            for node in graph.get("nodes", [])
+            if node.get("type") in {"source_surface", "owner_surface"}
+            and (not repo or node.get("repo") == repo)
+            and _path_matches(str(node.get("label", "")), path)
+        ]
+        route_anchor_nodes = [
+            node
+            for node in graph.get("nodes", [])
+            if _is_route_anchor_node(node)
+            and _path_matches(str(node.get("label", "")), path)
+        ]
+        surface_ids = {node["id"] for node in [*surface_nodes, *route_anchor_nodes]}
+        matched_edges = [
+            edge
+            for edge in graph.get("edges", [])
+            if edge.get("target") in surface_ids
+            and edge.get("type") in {"CITES_SOURCE_SURFACE", "OWNED_BY_SURFACE", "HAS_DECISION_FACET"}
+        ]
+        if repo:
+            repo_decision_ids = {
+                node["id"]
+                for node in graph.get("nodes", [])
+                if node.get("type") == "decision" and node.get("repo") == repo
+            }
+            matched_edges = [
+                edge
+                for edge in matched_edges
+                if edge.get("source") in repo_decision_ids
+            ]
+        decision_ids = {edge["source"] for edge in matched_edges if isinstance(edge.get("source"), str)}
+        return decision_ids, matched_edges, [*surface_nodes, *route_anchor_nodes]
 
     def repo_symmetry(self, repo: str | None = None) -> dict[str, Any]:
         graph = self.graph()
