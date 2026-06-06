@@ -10,7 +10,22 @@ from aoa_decisions_mcp.server import build_server
 STACK_ROOT = Path(__file__).resolve().parents[4]
 
 
-def write_decision(repo_root: Path, decision_id: str, title: str, source_surface: str) -> None:
+def write_decision(
+    repo_root: Path,
+    decision_id: str,
+    title: str,
+    source_surface: str,
+    route_anchor: str | None = None,
+) -> None:
+    metadata = [
+        f"- Decision ID: {decision_id}",
+        "- Original date: 2026-06-04",
+        "- Surface classes: docs route",
+        "- Guard families: decision graph",
+    ]
+    if route_anchor is not None:
+        metadata.append(f"- Route anchors: {route_anchor}")
+    metadata.append("- Posture: accepted")
     path = repo_root / "docs" / "decisions" / f"{decision_id}-test.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -20,11 +35,7 @@ def write_decision(repo_root: Path, decision_id: str, title: str, source_surface
                 "",
                 "## Index Metadata",
                 "",
-                f"- Decision ID: {decision_id}",
-                "- Original date: 2026-06-04",
-                "- Surface classes: docs route",
-                "- Guard families: decision graph",
-                "- Posture: accepted",
+                *metadata,
                 "",
                 "## Context",
                 "",
@@ -45,7 +56,7 @@ def seed_workspace(root: Path) -> None:
     (repo / ".git").mkdir(parents=True)
     (repo / "docs" / "decisions" / "indexes").mkdir(parents=True)
     (repo / "docs" / "decisions" / "indexes" / "README.md").write_text("# Index\n", encoding="utf-8")
-    write_decision(repo, "AAA-D-0001", "First Decision", "docs/source.md")
+    write_decision(repo, "AAA-D-0001", "First Decision", "docs/source.md", route_anchor="config/app.toml")
 
 
 def state_for(root: Path) -> AoADecisionsMCPState:
@@ -119,6 +130,22 @@ def test_impact_packets_return_surface_and_issue_context(tmp_path: Path) -> None
     assert symmetry_packet["repos"][0]["symmetry_note"] == "compare coverage posture; do not force identical repo structure"
     assert issues_packet["schema"] == "aoa_decisions_issues_packet_v1"
     assert issues_packet["issue_count"] == 0
+
+
+def test_path_packets_include_route_anchor_impacts(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    state = state_for(tmp_path)
+
+    changed_packet = state.changed_path("config/app.toml", repo="repo-a")
+    packet = state.packet(path="config/app.toml", repo="repo-a")
+
+    assert changed_packet["decision_count"] == 1
+    assert changed_packet["decisions"][0]["label"] == "AAA-D-0001"
+    assert any(surface.get("facet_key") == "Route anchors" for surface in changed_packet["surfaces"])
+    assert any(edge["type"] == "HAS_DECISION_FACET" for edge in changed_packet["edges"])
+    assert packet["decision_count"] == 1
+    assert packet["decisions"][0]["label"] == "AAA-D-0001"
+    assert any(edge["type"] == "HAS_DECISION_FACET" for edge in packet["edges"])
 
 
 def test_resources_and_server_build(tmp_path: Path) -> None:
