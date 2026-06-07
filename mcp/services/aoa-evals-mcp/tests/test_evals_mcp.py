@@ -515,6 +515,51 @@ def test_runtime_candidate_exports_are_read_only_validated_records(tmp_path: Pat
     assert payload_detail["candidate_payload"]["selection_id"] == "bounded-change-smoke"
 
 
+def test_runtime_candidate_exports_report_shape_invalid_private_candidates(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    stale_payload = {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": "old-shape-smoke",
+        "selected_evidence": [{"artifact_ref": "local:old-shape"}],
+        "review_required": True,
+    }
+    export = {
+        "artifact_kind": "aoa.runtime-eval-evidence-selection-candidate",
+        "schema_version": "1",
+        "capture_mode": "private",
+        "exported_at": "2026-05-25T00:03:00Z",
+        "exported_by": "scripts/aoa-export-runtime-evidence-selection",
+        "record_id": "2026-05-25T000300Z__runtime-evidence-selection__old-shape-smoke",
+        "title": "runtime evidence selection old-shape-smoke",
+        "summary": "Old-shape private candidate that must be reported, not accepted.",
+        "selection_id": "old-shape-smoke",
+        "source_input_ref": "local:/tmp/old-shape-smoke.json",
+        "source_input_sha256": "3" * 64,
+        "aoa_evals_contract_refs": ["local:/srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-evals/schemas/runtime-evidence-selection.schema.json"],
+        "candidate_payload": stale_payload,
+    }
+    write_json(
+        tmp_path / "abyss-stack/Logs/eval-exports/latest/runtime-evidence-selection/old-shape-smoke.private.json",
+        export,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    listing = state.runtime_candidate_exports()
+
+    assert listing["count"] == 1
+    assert listing["invalid_count"] == 0
+    assert listing["candidate_validation"]["invalid_shape_count"] == 1
+    assert listing["candidate_validation"]["latest_invalid_shape"][0]["record_id"] == export["record_id"]
+    candidate = listing["candidates"][0]
+    assert candidate["validation"]["valid"] is False
+    assert candidate["candidate_posture"] == "runtime_export_is_private_candidate_not_accepted_proof"
+
+    detail = state.read_runtime_candidate_export("old-shape-smoke")
+    assert detail["candidate_payload_included"] is False
+    assert detail["validation"]["valid"] is False
+    assert "candidate_payload" not in detail
+
+
 def test_server_builds(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     assert build_server(workspace_root=tmp_path) is not None

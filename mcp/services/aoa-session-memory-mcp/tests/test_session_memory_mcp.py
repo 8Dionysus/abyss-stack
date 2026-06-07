@@ -140,6 +140,18 @@ PROVIDER_STATUS = {
     "providers": {"portable_sqlite": {"ok": True, "status": "ready", "document_count": 10}},
 }
 
+ROUTE_READINESS_FAST_GATE = {
+    "schema_version": 1,
+    "artifact_type": "route_layer_readiness",
+    "ok": True,
+    "target": "all",
+    "limit": None,
+    "selected_count": 250,
+    "covered_requirement_count": 22,
+    "required_requirement_count": 22,
+    "remaining": [],
+}
+
 SEARCH_RESULTS = {
     "schema_version": 1,
     "artifact_type": "search_results",
@@ -329,6 +341,8 @@ class FakeRunner:
         self.calls.append((command, args))
         if command == "search-provider-status":
             payload = PROVIDER_STATUS
+        elif command == "route-readiness":
+            payload = ROUTE_READINESS_FAST_GATE
         elif command == "search":
             payload = SEARCH_RESULTS
         elif command == "trace-route":
@@ -377,7 +391,25 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["provider"]["ok"] is True
     assert status["atlas"]["entry_count"] == 1
     assert status["latest_route_readiness"]["reports"][0]["summary"]["ok"] is True
+    assert status["readiness_policy"]["cached_route_readiness"]["status_field"] == "latest_route_readiness"
     assert status["authority_boundary"]["mutation_posture"].startswith("no write")
+
+
+def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    status = state.session_memory_status(include_live=True)
+
+    route_calls = [call for call in runner.calls if call[0] == "route-readiness"]
+    assert len(route_calls) == 1
+    args = route_calls[0][1]
+    assert "--limit" not in args
+    assert args[args.index("--sample-limit") + 1] == "0"
+    assert status["live_route_readiness"]["ok"] is True
+    assert status["readiness_policy"]["live_route_readiness"]["limit"] is None
+    assert status["readiness_policy"]["live_route_readiness"]["sample_policy"] == "no evidence sample extraction in MCP status"
+    assert "--write-report" in status["readiness_policy"]["audit_route"]["command"]
 
 
 def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: Path) -> None:
