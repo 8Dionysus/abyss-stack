@@ -322,6 +322,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_memory_status",
                 "aoa_session_search",
                 "aoa_session_trace",
+                "aoa_session_entity_usage_audit",
                 "aoa_session_route",
                 "aoa_session_brief",
                 "aoa_session_retrieve",
@@ -491,6 +492,39 @@ class AoASessionMemoryMCPState:
         if explain:
             args.append("--explain")
         payload = self._archive_command("trace-route", args)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_entity_usage_audit(
+        self,
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 20,
+        per_route_limit: int = 20,
+        consequence_window: int = 8,
+        document_limit: int = 60,
+        session: str = "",
+    ) -> dict[str, Any]:
+        anchor_text = _ensure_short_text(anchor, "anchor")
+        if kind not in ALLOWED_TRACE_KINDS:
+            raise ValueError(f"unsupported trace kind: {kind}")
+        args = [
+            anchor_text,
+            "--kind",
+            kind,
+            "--limit",
+            str(_coerce_limit(limit, 20, 200)),
+            "--per-route-limit",
+            str(_coerce_limit(per_route_limit, 20, 100)),
+            "--consequence-window",
+            str(_coerce_limit(consequence_window, 8, 24)),
+            "--document-limit",
+            str(_coerce_limit(document_limit, 60, 200)),
+            "--full",
+        ]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        payload = self._archive_command("entity-usage-audit", args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 

@@ -50,6 +50,15 @@ def main() -> None:
     trace.add_argument("--session", default="")
     trace.add_argument("--doc-type", default="session")
 
+    usage = sub.add_parser("usage-audit")
+    usage.add_argument("anchor")
+    usage.add_argument("--kind", default="auto")
+    usage.add_argument("--limit", type=int, default=20)
+    usage.add_argument("--per-route-limit", type=int, default=20)
+    usage.add_argument("--consequence-window", type=int, default=8)
+    usage.add_argument("--document-limit", type=int, default=60)
+    usage.add_argument("--session", default="")
+
     route = sub.add_parser("route")
     route.add_argument("axis")
     route.add_argument("key", nargs="?", default="")
@@ -163,6 +172,18 @@ def main() -> None:
         )
     elif args.command == "route":
         _print(state.session_route(args.axis, args.key, limit=args.limit, include_entry_payloads=args.include_entry_payloads))
+    elif args.command == "usage-audit":
+        _print(
+            state.session_entity_usage_audit(
+                anchor=args.anchor,
+                kind=args.kind,
+                limit=args.limit,
+                per_route_limit=args.per_route_limit,
+                consequence_window=args.consequence_window,
+                document_limit=args.document_limit,
+                session=args.session,
+            )
+        )
     elif args.command == "brief":
         _print(state.session_brief(args.session, max_segments=args.max_segments))
     elif args.command == "retrieve":

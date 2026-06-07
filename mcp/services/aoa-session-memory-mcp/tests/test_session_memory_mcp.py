@@ -195,6 +195,31 @@ TRACE_RESULTS = {
     "results": SEARCH_RESULTS["results"],
 }
 
+ENTITY_USAGE_AUDIT = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_entity_usage_audit",
+    "ok": True,
+    "anchor": "aoa-session-memory-mcp",
+    "kind": "mcp",
+    "usage_event_count": 1,
+    "consequence_event_count": 1,
+    "document_refs": [{"kind": "mentioned_path", "value": "docs/decisions/README.md"}],
+    "usage_events": [
+        {
+            "event_type": "TOOL_CALL",
+            "title": "Tool call: aoa_session_memory_search",
+            "refs": {"raw": "raw:line:2", "segment": "000__initial-to-latest.md#event-000002"},
+        }
+    ],
+    "consequence_events": [
+        {
+            "event_type": "TOOL_OUTPUT",
+            "relation": "same_correlation_id",
+            "refs": {"raw": "raw:line:3", "segment": "000__initial-to-latest.md#event-000003"},
+        }
+    ],
+}
+
 RETRIEVAL_PACKET = {
     "schema_version": 1,
     "artifact_type": "retrieval_packet",
@@ -347,6 +372,8 @@ class FakeRunner:
             payload = SEARCH_RESULTS
         elif command == "trace-route":
             payload = TRACE_RESULTS
+        elif command == "entity-usage-audit":
+            payload = ENTITY_USAGE_AUDIT
         elif command == "retrieve":
             payload = RETRIEVAL_PACKET
         elif command == "rehydrate":
@@ -446,6 +473,32 @@ def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> No
     assert search["results"][0]["freshness"]["status"] == "fresh"
     assert any(call[0] == "trace-route" for call in runner.calls)
     assert any(call[0] == "search" and "--route-layer" in call[1] for call in runner.calls)
+
+
+def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    audit = state.session_entity_usage_audit(
+        "aoa-session-memory-mcp",
+        kind="mcp",
+        limit=5,
+        per_route_limit=4,
+        consequence_window=3,
+        document_limit=12,
+    )
+
+    assert audit["artifact_type"] == "session_memory_entity_usage_audit"
+    assert audit["usage_event_count"] == 1
+    assert audit["document_refs"][0]["kind"] == "mentioned_path"
+    usage_calls = [call for call in runner.calls if call[0] == "entity-usage-audit"]
+    assert len(usage_calls) == 1
+    args = usage_calls[0][1]
+    assert args[0] == "aoa-session-memory-mcp"
+    assert args[args.index("--kind") + 1] == "mcp"
+    assert args[args.index("--per-route-limit") + 1] == "4"
+    assert args[args.index("--consequence-window") + 1] == "3"
+    assert "--full" in args
 
 
 def test_route_reads_generated_axis_without_arbitrary_paths(tmp_path: Path) -> None:

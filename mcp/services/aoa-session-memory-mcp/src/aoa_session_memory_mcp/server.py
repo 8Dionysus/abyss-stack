@@ -60,6 +60,27 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_entity_usage_audit(
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 20,
+        per_route_limit: int = 20,
+        consequence_window: int = 8,
+        document_limit: int = 60,
+        session: str = "",
+    ) -> dict[str, Any]:
+        """Trace an entity to usage events, consequences, and document refs."""
+        return current_state().session_entity_usage_audit(
+            anchor=anchor,
+            kind=kind,
+            limit=limit,
+            per_route_limit=per_route_limit,
+            consequence_window=consequence_window,
+            document_limit=document_limit,
+            session=session,
+        )
+
+    @mcp.tool()
     def aoa_session_route(
         axis: str,
         key: str = "",
