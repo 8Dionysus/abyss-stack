@@ -59,6 +59,18 @@ def main() -> None:
     usage.add_argument("--document-limit", type=int, default=60)
     usage.add_argument("--session", default="")
 
+    usage_scenario = sub.add_parser("usage-scenario-audit")
+    usage_scenario.add_argument("--seed", default="entity-usage-scenario-audit")
+    usage_scenario.add_argument("--sample-size", type=int, default=8)
+    usage_scenario.add_argument("--layer", action="append")
+    usage_scenario.add_argument("--min-postings", type=int, default=1)
+    usage_scenario.add_argument("--limit", type=int, default=8)
+    usage_scenario.add_argument("--per-route-limit", type=int, default=8)
+    usage_scenario.add_argument("--consequence-window", type=int, default=4)
+    usage_scenario.add_argument("--document-limit", type=int, default=24)
+    usage_scenario.add_argument("--raw-preview-limit", type=int, default=3)
+    usage_scenario.add_argument("--full", action="store_true")
+
     route = sub.add_parser("route")
     route.add_argument("axis")
     route.add_argument("key", nargs="?", default="")
@@ -182,6 +194,21 @@ def main() -> None:
                 consequence_window=args.consequence_window,
                 document_limit=args.document_limit,
                 session=args.session,
+            )
+        )
+    elif args.command == "usage-scenario-audit":
+        _print(
+            state.session_entity_usage_scenario_audit(
+                sample_size=args.sample_size,
+                seed=args.seed,
+                layers=args.layer,
+                min_postings=args.min_postings,
+                limit=args.limit,
+                per_route_limit=args.per_route_limit,
+                consequence_window=args.consequence_window,
+                document_limit=args.document_limit,
+                raw_preview_limit=args.raw_preview_limit,
+                full=args.full,
             )
         )
     elif args.command == "brief":

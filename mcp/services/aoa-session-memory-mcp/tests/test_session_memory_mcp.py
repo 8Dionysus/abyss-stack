@@ -220,6 +220,24 @@ ENTITY_USAGE_AUDIT = {
     ],
 }
 
+ENTITY_USAGE_SCENARIO_AUDIT = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_entity_usage_scenario_audit",
+    "ok": True,
+    "seed": "fixture-random",
+    "quality": {
+        "sample_count": 2,
+        "passed_count": 1,
+        "warn_count": 1,
+        "failed_count": 0,
+        "raw_preview_counts": {"available": 3},
+    },
+    "samples": [
+        {"status": "passed", "candidate": {"kind": "tool", "anchor": "exec_command"}, "usage_event_count": 1},
+        {"status": "warn", "candidate": {"kind": "path", "anchor": "docs_decisions_readme_md"}, "usage_event_count": 0},
+    ],
+}
+
 RETRIEVAL_PACKET = {
     "schema_version": 1,
     "artifact_type": "retrieval_packet",
@@ -374,6 +392,8 @@ class FakeRunner:
             payload = TRACE_RESULTS
         elif command == "entity-usage-audit":
             payload = ENTITY_USAGE_AUDIT
+        elif command == "entity-usage-scenario-audit":
+            payload = ENTITY_USAGE_SCENARIO_AUDIT
         elif command == "retrieve":
             payload = RETRIEVAL_PACKET
         elif command == "rehydrate":
@@ -498,6 +518,36 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--kind") + 1] == "mcp"
     assert args[args.index("--per-route-limit") + 1] == "4"
     assert args[args.index("--consequence-window") + 1] == "3"
+    assert "--full" in args
+
+
+def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    audit = state.session_entity_usage_scenario_audit(
+        sample_size=2,
+        seed="fixture-random",
+        layers=["mcp", "tool"],
+        min_postings=2,
+        limit=3,
+        per_route_limit=4,
+        consequence_window=5,
+        document_limit=6,
+        raw_preview_limit=2,
+        full=True,
+    )
+
+    assert audit["artifact_type"] == "session_memory_entity_usage_scenario_audit"
+    assert audit["quality"]["failed_count"] == 0
+    usage_calls = [call for call in runner.calls if call[0] == "entity-usage-scenario-audit"]
+    assert len(usage_calls) == 1
+    args = usage_calls[0][1]
+    assert args[args.index("--seed") + 1] == "fixture-random"
+    assert args[args.index("--sample-size") + 1] == "2"
+    assert args.count("--layer") == 2
+    assert args[args.index("--per-route-limit") + 1] == "4"
+    assert args[args.index("--raw-preview-limit") + 1] == "2"
     assert "--full" in args
 
 

@@ -81,6 +81,33 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_entity_usage_scenario_audit(
+        sample_size: int = 8,
+        seed: str = "entity-usage-scenario-audit",
+        layers: list[str] | None = None,
+        min_postings: int = 1,
+        limit: int = 8,
+        per_route_limit: int = 8,
+        consequence_window: int = 4,
+        document_limit: int = 24,
+        raw_preview_limit: int = 3,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        """Run a seeded random live scenario over real route terms."""
+        return current_state().session_entity_usage_scenario_audit(
+            sample_size=sample_size,
+            seed=seed,
+            layers=layers,
+            min_postings=min_postings,
+            limit=limit,
+            per_route_limit=per_route_limit,
+            consequence_window=consequence_window,
+            document_limit=document_limit,
+            raw_preview_limit=raw_preview_limit,
+            full=full,
+        )
+
+    @mcp.tool()
     def aoa_session_route(
         axis: str,
         key: str = "",

@@ -323,6 +323,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_search",
                 "aoa_session_trace",
                 "aoa_session_entity_usage_audit",
+                "aoa_session_entity_usage_scenario_audit",
                 "aoa_session_route",
                 "aoa_session_brief",
                 "aoa_session_retrieve",
@@ -525,6 +526,46 @@ class AoASessionMemoryMCPState:
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         payload = self._archive_command("entity-usage-audit", args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_entity_usage_scenario_audit(
+        self,
+        sample_size: int = 8,
+        seed: str = "entity-usage-scenario-audit",
+        layers: list[str] | None = None,
+        min_postings: int = 1,
+        limit: int = 8,
+        per_route_limit: int = 8,
+        consequence_window: int = 4,
+        document_limit: int = 24,
+        raw_preview_limit: int = 3,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        seed_text = _ensure_short_text(seed, "seed", limit=120)
+        args = [
+            "--seed",
+            seed_text,
+            "--sample-size",
+            str(_coerce_limit(sample_size, 8, 50)),
+            "--min-postings",
+            str(_coerce_limit(min_postings, 1, 1000000)),
+            "--limit",
+            str(_coerce_limit(limit, 8, 50)),
+            "--per-route-limit",
+            str(_coerce_limit(per_route_limit, 8, 50)),
+            "--consequence-window",
+            str(_coerce_limit(consequence_window, 4, 24)),
+            "--document-limit",
+            str(_coerce_limit(document_limit, 24, 100)),
+            "--raw-preview-limit",
+            str(_coerce_limit(raw_preview_limit, 3, 20)),
+        ]
+        for layer in layers or []:
+            args.extend(["--layer", _safe_selector(str(layer), "layer", limit=80)])
+        if full:
+            args.append("--full")
+        payload = self._archive_command("entity-usage-scenario-audit", args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 

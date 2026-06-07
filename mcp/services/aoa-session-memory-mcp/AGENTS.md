@@ -82,6 +82,7 @@ aoa-session-memory-mcp-server
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli status
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli trace aoa-session-memory-mcp
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-audit aoa-session-memory-mcp --kind mcp
+PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli usage-scenario-audit --seed smoke --sample-size 4
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli search aoa-session-memory --limit 5
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli route by-mcp aoa-session-memory-mcp
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli brief latest
