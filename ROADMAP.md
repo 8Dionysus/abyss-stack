@@ -80,7 +80,7 @@ The current direction is:
   bounded consumption decisions
 - keep diagnostic spine and antifragility repair posture as evidence and packet
   routes before live mutation or authority promotion
-- keep release history in `CHANGELOG.md`; the current `v0.2.2` contour remains
+- keep release history in `CHANGELOG.md`; the current `v0.4.0` contour remains
   runtime-substrate hardening, not AoA/ToS meaning and not a claim of live
   service mutation
 - keep the current Intel inference route explicit: Gemma 4 E2B is a measured

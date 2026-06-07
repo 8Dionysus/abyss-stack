@@ -7,6 +7,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [0.4.0] - 2026-06-07
+
 ### Summary
 
 - root direction, release history, and decision rationale now follow an
@@ -417,17 +421,65 @@ Tracking starts with the community-docs baseline for this repository.
   receipts, and sibling memory-port references following the canonical service
   path
 
+### Included in this release
+
+Cross-check source: first-parent history and merged PRs from `v0.2.2` through
+PR #146, plus the repository diff against `v0.2.2`.
+
+- root and route surfaces: nested `AGENTS.md` guardrails, slim root `AGENTS`,
+  source-only mirror posture, GitHub surface separation, branch policy,
+  release/governance docs, route-mode README, design surfaces, roadmap routing,
+  docs district topology, and source/runtime path boundaries
+- mechanics topology: package-card spines, part-local operator backends,
+  package-local legacy containment, active-vs-archive language, quiet bridge
+  routes, and package docs for config projection, runtime lifecycle, machine
+  fit, inference pilots, federation seams, governed execution, diagnostic
+  spine, runtime repair, Agon runtime, and experience runtime
+- runtime profiles and services: `substrate`, `local-worker`, `intel-worker`,
+  `fallback-gateway`, `workflows`, `tools`, `reranking`, `rag`,
+  `speech-fast-experimental`, Gemma 4 E2B `llama.cpp` tuning, Qwen3 reranking,
+  RAG orchestration, BabelVox/OpenVINO TTS, resource-guard overlays, and
+  internal-only Loki/Alloy observability
+- systemd and host-operation surfaces: source-managed user and system unit
+  skeletons, service install routes, smoke/internal probes, warmup/status/log
+  wrappers, resource-guard application, host-facts, machine-fit, platform
+  adaptation, Windows/WSL bridge scripts, protected TTS warmth, and
+  `abyss-machine` read-only bridge integration
+- MCP access planes: `aoa-memo-mcp`, `aoa-evals-mcp`, `abyss-machine-mcp`,
+  `aoa-session-memory-mcp`, and `aoa-decisions-mcp`, including memo port
+  intake, corpus-backed memo search, memory writeback packet routing,
+  workspace-map port discovery, runtime export filtering, SQLite graph-store
+  sidecar posture, and read-only decision graph impact packets
+- decision and graph surfaces: canonical `ABYSS-STACK-D-####` records, generated
+  decision indexes, generated decision graph, workspace decision graph schemas,
+  graph builder/validator scripts, modeled decision-surface list contracts,
+  route-anchor impact packets, and decision-surface coverage guards
+- federation and runtime seams: effective runtime input alignment,
+  route-api/federation bridge compatibility IDs, eval/playbook/memo/KAG seam
+  contracts, synchronized bridge eval templates, sibling mirror topology for
+  aoa-agents, aoa-memo, and aoa-playbooks, and active legacy-archive
+  dependency removal
+- quests, memo, and recurrence read models: quest lane/state topology, quest
+  examples and schemas, memo intake/receipts/candidates, reviewed forwarding
+  receipts, recurrence manifests, diagnostic catalogs, degradation receipts,
+  repair-safe closeout, A2A return dry-run, and memo contradiction sidecar
+  validation
+- validation and CI: `ci_gate.py`, release-check synthetic Configs parity,
+  command-authority manifests, script/test/validator inventories, focused
+  validator modules, nested AGENTS validation, schema contracts, compose/RAG
+  contract tests, service-selection tests, decision-record tests, workspace
+  decision-graph tests, Windows host bridge CI, and GitHub Repo Validation
+
 ### Validation
 
-- `python scripts/validate_decision_records.py`
+- `python scripts/ci_gate.py --mode source-fast`
 - `python scripts/validate_stack.py`
 - `python scripts/validate_nested_agents.py`
-- `python -m pytest tests/test_decision_records.py tests/test_roadmap_parity.py`
+- `python scripts/generate_decision_indexes.py --check`
 - `python -m pytest -q`
 - `python scripts/release_check.py`
-- `systemd-analyze --user verify systemd/user/*.service systemd/user/*.timer systemd/user/*.path`
-- `systemd-analyze verify systemd/system/*.service systemd/system/*.timer`
-- `scripts/aoa-smoke --profile substrate --profile intel-worker --profile federation --profile reranking`
+- GitHub `Repo Validation` and `validate-windows-host-bridge` on the release
+  landing PRs
 
 ### Notes
 
