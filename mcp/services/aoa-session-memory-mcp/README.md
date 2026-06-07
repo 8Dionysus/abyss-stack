@@ -49,6 +49,7 @@ Tools:
 - `aoa_session_memory_status(include_live)`
 - `aoa_session_search(query, filters, limit)`
 - `aoa_session_trace(anchor, kind, limit, per_route_limit, session, doc_type)`; the default `doc_type` is `session` for bounded live archive probes, and callers can request `event` when exact event-level evidence is needed.
+- `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session)`
 - `aoa_session_route(axis, key, limit, include_entry_payloads)`
 - `aoa_session_brief(session, max_segments)`
 - `aoa_session_retrieve(recipe, query, session, limit, event_limit)`
