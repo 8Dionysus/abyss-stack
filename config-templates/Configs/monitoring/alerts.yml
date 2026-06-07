@@ -9,3 +9,19 @@ groups:
         annotations:
           summary: Prometheus target down
           description: Target {{ $labels.instance }} for job {{ $labels.job }} is down.
+      - alert: LokiUnavailable
+        expr: up{job="loki"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Loki target down
+          description: LogQL storage is unavailable through the Loki scrape target.
+      - alert: AlloyUnavailable
+        expr: up{job="alloy"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Alloy target down
+          description: Podman log ingestion into Loki is unavailable through the Alloy scrape target.

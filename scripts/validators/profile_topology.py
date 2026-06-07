@@ -216,6 +216,19 @@ def validate_profiles(errors: list[str], *, root: Path) -> None:
     if "n8n-task-runners" not in service_catalog_doc:
         errors.append("docs/runtime/SERVICE_CATALOG.md must mention n8n-task-runners")
 
+    monitoring_module = read_text(root, MODULE_DIR / "60-monitoring.yml")
+    if not re.search(r"docker\.io/grafana/loki:[^\s\"']+@sha256:[0-9a-f]{64}", monitoring_module):
+        errors.append(
+            "compose/modules/60-monitoring.yml must pin Loki as docker.io/grafana/loki:<version>@sha256:<digest>"
+        )
+    if not re.search(r"docker\.io/grafana/alloy:[^\s\"']+@sha256:[0-9a-f]{64}", monitoring_module):
+        errors.append(
+            "compose/modules/60-monitoring.yml must pin Alloy as docker.io/grafana/alloy:<version>@sha256:<digest>"
+        )
+    for required_text in ("loki", "alloy", "Loki", "Alloy"):
+        if required_text not in service_catalog_doc:
+            errors.append(f"docs/runtime/SERVICE_CATALOG.md must mention {required_text}")
+
     warmup_script = read_text(
         root,
         Path("mechanics") / "runtime-lifecycle" / "parts" / "start-stop" / "aoa_warmup.sh",

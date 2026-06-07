@@ -253,6 +253,8 @@ These should not expose host ports:
 - `docs-api`
 - `aoa-browser`
 - `cadvisor`
+- `loki`
+- `alloy`
 
 If they accidentally appear on host ports, treat that as drift.
 

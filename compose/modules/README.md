@@ -29,5 +29,5 @@ a service belongs to the default AbyssOS substrate.
 
 Do not add a module to `substrate` because it is useful. `substrate` is the
 storage base. Workflow automation, workers, fallback control paths, advisory
-seams, helpers, projections, and dashboards layer on top through explicit
+seams, helpers, projections, dashboards, and LogQL storage layer on top through explicit
 profiles or presets.

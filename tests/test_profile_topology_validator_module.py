@@ -91,6 +91,20 @@ def test_n8n_task_runner_image_must_stay_digest_pinned(tmp_path: Path) -> None:
     assert "compose/modules/20-orchestration.yml must pin n8n-task-runners as docker.io/n8nio/runners:<version>@sha256:<digest>" in errors
 
 
+def test_loki_and_alloy_images_must_stay_digest_pinned(tmp_path: Path) -> None:
+    copy_current_profile_surface(tmp_path)
+    module_path = tmp_path / profile_topology.MODULE_DIR / "60-monitoring.yml"
+    module_text = module_path.read_text(encoding="utf-8")
+    module_text = module_text.replace("docker.io/grafana/loki:3.7.0@sha256:", "docker.io/grafana/loki:3.7.0@sha257:", 1)
+    module_text = module_text.replace("docker.io/grafana/alloy:v1.16.1@sha256:", "docker.io/grafana/alloy:v1.16.1@sha257:", 1)
+    write_text(module_path, module_text)
+
+    errors = run_all_profile_validators(tmp_path)
+
+    assert "compose/modules/60-monitoring.yml must pin Loki as docker.io/grafana/loki:<version>@sha256:<digest>" in errors
+    assert "compose/modules/60-monitoring.yml must pin Alloy as docker.io/grafana/alloy:<version>@sha256:<digest>" in errors
+
+
 def test_active_route_docs_must_not_use_core_profile(tmp_path: Path) -> None:
     copy_current_profile_surface(tmp_path)
     doc_path = tmp_path / profile_topology.ACTIVE_ROUTE_PROFILE_DOCS[0]

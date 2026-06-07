@@ -144,7 +144,7 @@ needs bounded CPU, memory, retention, or sampling posture:
 | `compose/tuning/storage.intel-285h.resource-guard.yml` | `substrate` or presets containing it | caps Postgres, Redis, Qdrant, and Neo4j without changing the storage base |
 | `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | caps OVMS embeddings and `langchain-api` without changing the worker lane |
 | `compose/tuning/federation.thin-host.yml` | `federation` | caps advisory `route-api` without changing federation surfaces |
-| `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards available with shorter Prometheus retention and lower cAdvisor cadence |
+| `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards, PromQL, and LogQL available with shorter retention, lower cAdvisor cadence, and bounded Loki/Alloy resources |
 | `compose/tuning/tools.thin-host.yml` | `tools`, `agent-tools`, `intel-tools`, full presets | caps speech/browser helpers when selected |
 | `compose/tuning/workflows.thin-host.yml` | `workflows` | caps n8n and task runners while keeping workflows opt-in |
 | `compose/tuning/rag.thin-host.yml` | `rag` | caps `rag-api` and keeps RAG embedding batches conservative |

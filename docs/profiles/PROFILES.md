@@ -199,6 +199,10 @@ Optional helper surfaces:
 Optional monitoring stack:
 - `60-monitoring.yml`
 
+This profile carries Prometheus/PromQL, Grafana, Alertmanager, cAdvisor, Loki,
+and Alloy. Loki and Alloy stay internal-only; Grafana is the normal operator
+entry for LogQL.
+
 ## Design rule
 
 Profiles stay small and legible.

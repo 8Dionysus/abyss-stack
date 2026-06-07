@@ -93,6 +93,14 @@
     {
       "service": "rag-api",
       "reason": "added after the screenshot as the explicit RAG orchestration profile service"
+    },
+    {
+      "service": "loki",
+      "reason": "added after the screenshot as the internal LogQL store for the observability profile"
+    },
+    {
+      "service": "alloy",
+      "reason": "added after the screenshot as the internal log ingestion collector for the observability profile"
     }
   ],
   "known_policy_services_not_in_screenshot": [

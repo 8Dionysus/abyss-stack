@@ -168,6 +168,8 @@ This file maps the first migrated runtime modules to their intended services.
 - `grafana` — dashboards
 - `alertmanager` — alert routing
 - `cadvisor` — container metrics
+- `loki` — internal-only log storage and LogQL query surface
+- `alloy` — Grafana Alloy internal-only rootless Podman log ingestion into Loki, journald-first with a file-log fallback
 
 ## Exposure posture
 
@@ -193,6 +195,8 @@ Expected localhost-only services may include, depending on selected profiles:
 - prometheus
 - grafana
 - alertmanager
+- loki
+- alloy
 
 ### Internal-only
 
@@ -200,6 +204,8 @@ Expected internal-only services include:
 - docs-api
 - aoa-browser
 - cadvisor
+- loki
+- alloy
 
 ## User-unit orchestration
 

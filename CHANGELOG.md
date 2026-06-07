@@ -25,6 +25,10 @@ Tracking starts with the community-docs baseline for this repository.
   4 E2B `llama.cpp` Vulkan lane, an opt-in Qwen3 rerank API profile, thin-host
   guard overlays, a protected TTS keep-warm timer, and the first source-linked
   RAG orchestration profile
+- the observability route now adds internal-only Loki and Grafana Alloy so
+  PromQL, LogQL, dashboards, and alerting live in the same explicit profile
+- MCP access-plane and agent-skill projection surfaces now include the current
+  decision-lane and session-memory operator routes needed by this release line
 
 ### Added
 
@@ -76,6 +80,12 @@ Tracking starts with the community-docs baseline for this repository.
 - `docs/runtime/SERVICE_SELECTION.md` as the source-level service-selection
   guide for lean Intel, full Intel, optional workflows, tools, observability,
   reranking, and protected speech routes
+- `loki` and `alloy` in `compose/modules/60-monitoring.yml`, with public-safe
+  Loki, Alloy, Grafana datasource, Prometheus scrape, alert, layout, probe,
+  service-selection, and decision-record coverage for LogQL observability
+- `.agents/skills/aoa-decision*` and `.agents/skills/aoa-memo-writeback` as
+  repo-local projection routes into the sibling `aoa-skills` canon for
+  decision lookup, decision correction/creation, and memory writeback work
 - `compose/modules/45-rerank-api.yml`, `compose/profiles/reranking.txt`, and
   `config-templates/Services/rerank-api/` for the explicit localhost-only
   OpenVINO Qwen3 reranker wrapper
@@ -217,6 +227,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `release_check.py` now reads the release command sequence from
   `docs/validation/validation_lanes.json`, and GitHub `Repo Validation` routes
   reusable release and shellcheck commands through `scripts/ci_gate.py`
+- `aoa-session-memory-mcp` now reports a live SQLite graph store separately
+  from a missing exported sidecar, keeps bounded graph maintenance in the MCP
+  plan, and leaves full sidecar export under explicit offline operator commands
 - `validate_stack.py` now delegates script/operator-wrapper validation to the
   focused `scripts/validators/script_surface.py` module while keeping root API
   compatibility for existing tests and callers

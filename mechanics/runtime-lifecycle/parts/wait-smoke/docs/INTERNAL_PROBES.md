@@ -18,8 +18,12 @@ Both of these services already define healthchecks in the compose module, so the
 
 For the `observability` profile and any preset or profile-combination that includes `60-monitoring.yml`:
 - `cadvisor` via container running state
+- `loki` via container running state
+- `alloy` via container running state
 
-`cadvisor` is internal-only in the stack. The current probe checks that the container exists and is running. This is intentionally weaker than a dedicated HTTP health probe, but it is still useful and avoids widening host exposure.
+These services are internal-only in the stack. The current probe checks that the
+container exists and is running. This is intentionally weaker than a dedicated
+HTTP health probe, but it is still useful and avoids widening host exposure.
 
 ## Usage
 

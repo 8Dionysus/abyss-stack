@@ -21,7 +21,7 @@ without turning every module into the default AbyssOS substrate.
 | `speech-fast-experimental` | experimental speech | opt-in BabelVox/OpenVINO TTS lane |
 | `curation` | projection helper | ToS graph helper plus storage substrate |
 | `tools` | helper | speech and browser-like helper services |
-| `observability` | visibility | monitoring and dashboards |
+| `observability` | visibility | monitoring, dashboards, LogQL storage, and log ingestion |
 
 `44-llamacpp-agent-sidecar.yml` intentionally stays outside this directory's
 profiles. It is a pilot sidecar activated by the inference-pilot route or by an
@@ -48,3 +48,7 @@ does not make n8n, Dagster, or Temporal resident.
 `speech-fast-experimental` also stays opt-in: it exposes the BabelVox/OpenVINO
 TTS experiment as a bounded stack service without replacing the protected host
 warm TTS route or the normal `tools` speech module.
+`observability` includes metrics and logs together: Prometheus/PromQL,
+Alertmanager, Grafana, cAdvisor, Loki, and Alloy. Loki and Alloy stay
+internal-only and are reached through Grafana or internal probes, not host
+ports.

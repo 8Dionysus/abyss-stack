@@ -73,6 +73,7 @@
 
 - [ABYSS-STACK-D-0005 Operator Wrappers With Part-Local Backends](../ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md) (`docs/decisions/ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md`)
 - [ABYSS-STACK-D-0016 Live Runtime Cutover And Machine Parity](../ABYSS-STACK-D-0016-live-runtime-cutover-parity.md) (`docs/decisions/ABYSS-STACK-D-0016-live-runtime-cutover-parity.md`)
+- [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 
 ## runtime lifecycle
 
@@ -97,6 +98,7 @@
 - [ABYSS-STACK-D-0028 Intel Inference And Rerank Service Selection](../ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md) (`docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`)
 - [ABYSS-STACK-D-0029 BabelVox TTS Experimental Lane](../ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md) (`docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md`)
 - [ABYSS-STACK-D-0030 RAG Orchestration Profile](../ABYSS-STACK-D-0030-rag-orchestration-profile.md) (`docs/decisions/ABYSS-STACK-D-0030-rag-orchestration-profile.md`)
+- [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 
 ## profiles and presets
 
@@ -168,6 +170,10 @@
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
+## observability
+
+- [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 
 ## release/tooling
 

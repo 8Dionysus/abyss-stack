@@ -380,6 +380,29 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["authority_boundary"]["mutation_posture"].startswith("no write")
 
 
+def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    sqlite_path = aoa / "graph/graph.sqlite3"
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    sqlite_path.write_bytes(b"SQLite live store placeholder")
+
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+    status = state.session_memory_status()
+    plan = state.maintenance_plan()
+
+    assert status["graph"]["status"] == "sqlite_live_store_present"
+    assert status["graph"]["sidecar_status"] == "not_exported"
+    assert "graph_sidecar_not_exported" in status["graph"]["diagnostics"]
+    assert any("graph-maintenance all" in command for command in plan["allowed_operator_commands"])
+    assert any("force-large-export" in command for command in plan["offline_operator_commands"])
+
+
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)

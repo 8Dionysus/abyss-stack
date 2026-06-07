@@ -64,6 +64,9 @@ the retrieval brain.
 `speech-fast-experimental` is an explicit BabelVox/OpenVINO TTS lane for
 Intel speech experiments; keep it opt-in until latency and memory evidence
 justify promotion.
+`observability` includes both metrics and logs: Prometheus, Grafana,
+Alertmanager, cAdvisor, Loki, and Alloy. Loki and Alloy stay internal-only so
+LogQL arrives through Grafana rather than another host-facing port.
 
 ## Presets
 
