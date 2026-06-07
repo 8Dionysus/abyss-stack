@@ -99,6 +99,7 @@ REQUIRED_FILE_PATHS = tuple(
         "config-templates/Services/tos-graph/requirements.txt",
         "docs/AGENTS.md",
         "docs/README.md",
+        "docs/RELEASING.md",
         "docs/decisions/AGENTS.md",
         "docs/decisions/TEMPLATE.md",
         "docs/governance/BRANCH_POLICY.md",
@@ -423,7 +424,6 @@ def validate_root_residual_topology(
         root / "docs" / "PROFILE_RECIPES.md": "docs/profiles/PROFILE_RECIPES.md",
         root / "docs" / "BRANCH_POLICY.md": "docs/governance/BRANCH_POLICY.md",
         root / "docs" / "QUESTBOOK_STACK_INTEGRATION.md": "docs/governance/QUESTBOOK_STACK_INTEGRATION.md",
-        root / "docs" / "RELEASING.md": "docs/governance/RELEASING.md",
     }
     for path, target in forbidden_paths.items():
         if path.exists():

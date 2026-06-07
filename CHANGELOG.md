@@ -47,6 +47,8 @@ No unreleased changes yet.
   contract for root entry surfaces
 - `docs/{routes,runtime,install,operations,profiles,governance,legacy}/README.md`
   as short district maps for repo-wide documentation
+- `docs/RELEASING.md` as a compatibility route for release tooling and older
+  links, pointing to the authoritative `docs/governance/RELEASING.md` flow
 - `docs/decisions/ABYSS-STACK-D-0020-docs-district-topology.md` as the rationale for
   the docs district split
 - initial `mechanics/` topology with runtime lifecycle, config projection,
