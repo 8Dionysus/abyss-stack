@@ -32,7 +32,7 @@ def describe_neo4j_store(settings: TosGraphSettings) -> Neo4jStoreStatus:
             user=settings.neo4j_user,
             database=settings.neo4j_database,
             projection_mode=settings.projection_mode,
-            note="neo4j route sync is unavailable because TOS_GRAPH_NEO4J_URI is missing; sync requests fall back to preview counts",
+            note="neo4j corpus sync is unavailable because TOS_GRAPH_NEO4J_URI is missing; sync requests fall back to preview counts",
         )
 
     if settings.projection_mode == "preview_only":
@@ -54,7 +54,7 @@ def describe_neo4j_store(settings: TosGraphSettings) -> Neo4jStoreStatus:
             user=settings.neo4j_user,
             database=settings.neo4j_database,
             projection_mode=settings.projection_mode,
-            note="neo4j route sync is configured but credentials are incomplete; sync requests fall back to preview counts",
+            note="neo4j corpus sync is configured but credentials are incomplete; sync requests fall back to preview counts",
         )
 
     return Neo4jStoreStatus(
@@ -64,7 +64,7 @@ def describe_neo4j_store(settings: TosGraphSettings) -> Neo4jStoreStatus:
         user=settings.neo4j_user,
         database=settings.neo4j_database,
         projection_mode=settings.projection_mode,
-        note="neo4j route-scoped projection sync is ready; Tree of Sophia remains canonical and Neo4j remains projection-only",
+        note="neo4j corpus projection sync is ready; Tree of Sophia remains canonical and Neo4j remains projection-only",
     )
 
 
@@ -77,100 +77,47 @@ class Neo4jProjectionStore:
         self.settings = settings
         self.status = status
 
-    def _node_rows(self, graph: dict[str, Any]) -> list[dict[str, Any]]:
+    @staticmethod
+    def _corpus_rows(corpus: dict[str, Any], key: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
-        for node in graph.get("nodes", []):
-            rows.append(
-                {
-                    "node_id": node.get("node_id"),
-                    "props": {
-                        "route_path": graph["route"],
-                        "node_id": node.get("node_id"),
-                        "node_type": node.get("node_type") or "unknown",
-                        "canonical_label": node.get("canonical_label"),
-                        "source_anchor": node.get("source_anchor"),
-                        "distilled_thesis": node.get("distilled_thesis"),
-                        "source_file_path": node.get("source_file_path"),
-                        "source_file_sha256": node.get("source_file_sha256"),
-                        "key_terms_json": _json_dump(node.get("key_terms", [])),
-                        "interpretation_layers_json": _json_dump(node.get("interpretation_layers", [])),
-                        "relations_json": _json_dump(node.get("relations", [])),
-                        "language_witnesses_json": _json_dump(node.get("language_witnesses", [])),
-                        "translation_tensions_json": _json_dump(node.get("translation_tensions", [])),
-                        "raw_payload_json": _json_dump(node.get("raw_payload", {})),
-                    },
-                }
-            )
+        for item in corpus.get(key, []):
+            if isinstance(item, dict):
+                projection_id = (
+                    item.get("node_id")
+                    or item.get("path")
+                    or item.get("pack_id")
+                    or item.get("edge_id")
+                    or item.get("id")
+                    or item.get("view_id")
+                )
+                rows.append({"id": projection_id, "props": item})
         return rows
 
-    def _edge_rows(self, graph: dict[str, Any]) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for edge in graph.get("edges", []):
-            rows.append(
-                {
-                    "edge_id": edge.get("edge_id"),
-                    "from_id": edge.get("from_id"),
-                    "to_id": edge.get("to_id"),
-                    "props": {
-                        "route_path": graph["route"],
-                        "edge_id": edge.get("edge_id"),
-                        "edge_kind": edge.get("edge_kind"),
-                        "from_id": edge.get("from_id"),
-                        "predicate_id": edge.get("predicate_id"),
-                        "to_id": edge.get("to_id"),
-                        "layer": edge.get("layer"),
-                        "anchor_mode": edge.get("anchor_mode"),
-                        "anchor_start_secondary": edge.get("anchor_start_secondary"),
-                        "anchor_end_secondary": edge.get("anchor_end_secondary"),
-                        "anchor_segment_ids": edge.get("anchor_segment_ids"),
-                        "witness_scope": edge.get("witness_scope"),
-                        "connectivity_role": edge.get("connectivity_role"),
-                        "confidence": edge.get("confidence"),
-                        "note": edge.get("note"),
-                        "source_file_path": edge.get("source_file_path"),
-                        "source_file_sha256": edge.get("source_file_sha256"),
-                    },
-                    "rel_props": {
-                        "route_path": graph["route"],
-                        "edge_id": edge.get("edge_id"),
-                        "predicate_id": edge.get("predicate_id"),
-                        "edge_kind": edge.get("edge_kind"),
-                        "layer": edge.get("layer"),
-                        "anchor_mode": edge.get("anchor_mode"),
-                        "witness_scope": edge.get("witness_scope"),
-                        "connectivity_role": edge.get("connectivity_role"),
-                        "confidence": edge.get("confidence"),
-                        "note": edge.get("note"),
-                    },
-                }
-            )
-        return rows
-
-    def sync_route_projection(self, graph: dict[str, Any], route_label: str) -> dict[str, Any]:
+    def sync_corpus_projection(self, corpus: dict[str, Any]) -> dict[str, Any]:
         if not self.status.ready or not self.settings.neo4j_password:
             raise Neo4jStoreError(self.status.note)
 
         from neo4j import GraphDatabase
 
-        route = graph["route"]
-        source_node = graph.get("source_node") or {}
-        diagnostics = graph.get("diagnostics", {})
+        counts = corpus.get("counts", {})
         projected_at = datetime.now(UTC).isoformat()
-        route_props = {
-            "route": route,
-            "label": route_label,
-            "projection_mode": self.status.projection_mode,
-            "source_node_id": source_node.get("node_id"),
-            "source_canonical_label": source_node.get("canonical_label"),
-            "node_count": len(graph.get("nodes", [])),
-            "edge_count": len(graph.get("edges", [])),
-            "missing_nodes_json": _json_dump(diagnostics.get("missing_nodes", [])),
-            "edge_file": diagnostics.get("edge_file"),
-            "edge_file_sha256": diagnostics.get("edge_file_sha256"),
+        corpus_props = {
+            "owner_repo": corpus.get("owner_repo"),
+            "schema_version": corpus.get("schema_version"),
+            "surface_kind": corpus.get("surface_kind"),
+            "schema_ref": corpus.get("schema_ref"),
             "projected_at": projected_at,
+            "counts_json": _json_dump(counts),
+            "authority_order_json": _json_dump(corpus.get("authority_order", [])),
+            "runtime_projection_boundary_json": _json_dump(corpus.get("runtime_projection_boundary", {})),
         }
-        node_rows = self._node_rows(graph)
-        edge_rows = self._edge_rows(graph)
+        branch_rows = self._corpus_rows(corpus, "branches")
+        manifest_rows = self._corpus_rows(corpus, "manifests")
+        node_rows = self._corpus_rows(corpus, "nodes")
+        pack_rows = self._corpus_rows(corpus, "relation_packs")
+        edge_rows = self._corpus_rows(corpus, "relation_edges")
+        resource_rows = self._corpus_rows(corpus, "resources")
+        view_rows = self._corpus_rows(corpus, "graph_views")
 
         driver = GraphDatabase.driver(
             self.settings.neo4j_uri,
@@ -178,114 +125,118 @@ class Neo4jProjectionStore:
         )
         try:
             with driver.session(database=self.settings.neo4j_database) as session:
-                deleted_counts = session.execute_write(self._delete_route_projection, route)
-                session.execute_write(self._merge_route, route, route_props)
-                if node_rows:
-                    session.execute_write(self._merge_nodes, route, node_rows)
-                if edge_rows:
-                    session.execute_write(self._merge_edges, route, edge_rows)
+                deleted_counts = session.execute_write(self._delete_corpus_projection)
+                session.execute_write(self._merge_corpus_projection, corpus_props)
+                for label, rel_type, rows in (
+                    ("TosCorpusBranchProjection", "PROJECTS_BRANCH", branch_rows),
+                    ("TosCorpusManifestProjection", "PROJECTS_MANIFEST", manifest_rows),
+                    ("TosCorpusNodeProjection", "PROJECTS_NODE", node_rows),
+                    ("TosCorpusRelationPackProjection", "PROJECTS_RELATION_PACK", pack_rows),
+                    ("TosCorpusRelationEdgeProjection", "PROJECTS_RELATION_EDGE", edge_rows),
+                    ("TosCorpusResourceProjection", "PROJECTS_RESOURCE", resource_rows),
+                    ("TosCorpusGraphViewProjection", "PROJECTS_GRAPH_VIEW", view_rows),
+                ):
+                    if rows:
+                        session.execute_write(self._merge_corpus_rows, label, rel_type, rows)
+                if edge_rows and node_rows:
+                    session.execute_write(self._link_corpus_relation_edges, edge_rows)
         except Exception as exc:  # pragma: no cover - runtime integration path
-            raise Neo4jStoreError(f"neo4j route sync failed for {route}: {exc}") from exc
+            raise Neo4jStoreError(f"neo4j corpus sync failed: {exc}") from exc
         finally:
             driver.close()
 
         return {
-            "route": route,
-            "status": "route_synced",
-            "node_count": len(node_rows),
-            "edge_count": len(edge_rows),
-            "projection_target": "neo4j_route_projection",
-            "note": f"route-scoped projection synced into neo4j database '{self.settings.neo4j_database}' while ToS canon remained read-only",
+            "surface": "ToS/derived-exports/tos_corpus_index.min.json",
+            "status": "corpus_synced",
+            "node_count": int(counts.get("nodes") or len(node_rows)),
+            "edge_count": int(counts.get("relation_edges") or len(edge_rows)),
+            "resource_count": int(counts.get("resources") or len(resource_rows)),
+            "branch_count": int(counts.get("branches") or len(branch_rows)),
+            "projection_target": "neo4j_corpus_projection",
+            "note": f"whole-corpus projection synced into neo4j database '{self.settings.neo4j_database}' while Tree of Sophia remained canonical",
             "deleted_node_count": deleted_counts["deleted_node_count"],
             "deleted_edge_count": deleted_counts["deleted_edge_count"],
         }
 
     @staticmethod
-    def _delete_route_projection(tx: Any, route: str) -> dict[str, int]:
+    def _delete_corpus_projection(tx: Any) -> dict[str, int]:
         record = tx.run(
             """
-            MATCH (route:TosRouteProjection {route: $route})
-            OPTIONAL MATCH (route)-[:PROJECTS_NODE]->(node:TosNodeProjection)
-            WITH route, count(node) AS deleted_node_count
-            OPTIONAL MATCH (route)-[:PROJECTS_EDGE]->(edge:TosEdgeProjection)
-            RETURN deleted_node_count, count(edge) AS deleted_edge_count
-            """,
-            route=route,
+            MATCH (node)
+            WHERE node:TosCorpusBranchProjection
+               OR node:TosCorpusManifestProjection
+               OR node:TosCorpusNodeProjection
+               OR node:TosCorpusRelationPackProjection
+               OR node:TosCorpusRelationEdgeProjection
+               OR node:TosCorpusResourceProjection
+               OR node:TosCorpusGraphViewProjection
+               OR node:TosCorpusProjection
+            WITH collect(node) AS nodes
+            RETURN size(nodes) AS deleted_node_count
+            """
         ).single()
-
         tx.run(
             """
-            MATCH (route:TosRouteProjection {route: $route})
-            OPTIONAL MATCH (route)-[:PROJECTS_EDGE]->(edge:TosEdgeProjection)
-            DETACH DELETE edge
-            """,
-            route=route,
-        ).consume()
-        tx.run(
-            """
-            MATCH (route:TosRouteProjection {route: $route})
-            OPTIONAL MATCH (route)-[:PROJECTS_NODE]->(node:TosNodeProjection)
+            MATCH (node)
+            WHERE node:TosCorpusBranchProjection
+               OR node:TosCorpusManifestProjection
+               OR node:TosCorpusNodeProjection
+               OR node:TosCorpusRelationPackProjection
+               OR node:TosCorpusRelationEdgeProjection
+               OR node:TosCorpusResourceProjection
+               OR node:TosCorpusGraphViewProjection
+               OR node:TosCorpusProjection
             DETACH DELETE node
-            """,
-            route=route,
+            """
         ).consume()
-
         return {
             "deleted_node_count": int(record["deleted_node_count"]) if record else 0,
-            "deleted_edge_count": int(record["deleted_edge_count"]) if record else 0,
+            "deleted_edge_count": 0,
         }
 
     @staticmethod
-    def _merge_route(tx: Any, route: str, route_props: dict[str, Any]) -> None:
+    def _merge_corpus_projection(tx: Any, corpus_props: dict[str, Any]) -> None:
         tx.run(
             """
-            MERGE (route:TosRouteProjection {route: $route})
-            SET route += $route_props
+            MERGE (corpus:TosCorpusProjection {owner_repo: $owner_repo})
+            SET corpus += $props
             """,
-            route=route,
-            route_props=route_props,
+            owner_repo=corpus_props.get("owner_repo") or "Tree-of-Sophia",
+            props=corpus_props,
         ).consume()
 
     @staticmethod
-    def _merge_nodes(tx: Any, route: str, node_rows: list[dict[str, Any]]) -> None:
-        tx.run(
-            """
-            UNWIND $node_rows AS node
-            MATCH (route:TosRouteProjection {route: $route})
-            MERGE (projection:TosNodeProjection {route_path: $route, node_id: node.node_id})
-            SET projection += node.props
-            MERGE (route)-[:PROJECTS_NODE]->(projection)
-            FOREACH (_ IN CASE WHEN route.source_node_id = node.node_id THEN [1] ELSE [] END |
-              MERGE (route)-[:SOURCE_NODE]->(projection)
-            )
-            """,
-            route=route,
-            node_rows=node_rows,
-        ).consume()
+    def _merge_corpus_rows(tx: Any, label: str, rel_type: str, rows: list[dict[str, Any]]) -> None:
+        query = f"""
+        UNWIND $rows AS row
+        MATCH (corpus:TosCorpusProjection {{owner_repo: 'Tree-of-Sophia'}})
+        MERGE (projection:{label} {{projection_id: row.id}})
+        SET projection += row.props
+        MERGE (corpus)-[:{rel_type}]->(projection)
+        """
+        tx.run(query, rows=rows).consume()
 
     @staticmethod
-    def _merge_edges(tx: Any, route: str, edge_rows: list[dict[str, Any]]) -> None:
+    def _link_corpus_relation_edges(tx: Any, edge_rows: list[dict[str, Any]]) -> None:
         tx.run(
             """
             UNWIND $edge_rows AS edge
-            MATCH (route:TosRouteProjection {route: $route})
-            MERGE (projection:TosEdgeProjection {route_path: $route, edge_id: edge.edge_id})
-            SET projection += edge.props
-            MERGE (route)-[:PROJECTS_EDGE]->(projection)
-            WITH route, projection, edge
-            OPTIONAL MATCH (source:TosNodeProjection {route_path: $route, node_id: edge.from_id})
-            OPTIONAL MATCH (target:TosNodeProjection {route_path: $route, node_id: edge.to_id})
-            FOREACH (_ IN CASE WHEN source IS NULL OR target IS NULL THEN [] ELSE [1] END |
-              MERGE (source)-[rel:TOS_RELATION {route_path: $route, edge_id: edge.edge_id}]->(target)
-              SET rel += edge.rel_props
-            )
+            MATCH (projection:TosCorpusRelationEdgeProjection {projection_id: edge.id})
+            OPTIONAL MATCH (source:TosCorpusNodeProjection {node_id: edge.props.from_id})
+            OPTIONAL MATCH (target:TosCorpusNodeProjection {node_id: edge.props.to_id})
             FOREACH (_ IN CASE WHEN source IS NULL THEN [] ELSE [1] END |
               MERGE (projection)-[:FROM_NODE]->(source)
             )
             FOREACH (_ IN CASE WHEN target IS NULL THEN [] ELSE [1] END |
               MERGE (projection)-[:TO_NODE]->(target)
             )
+            FOREACH (_ IN CASE WHEN source IS NULL OR target IS NULL THEN [] ELSE [1] END |
+              MERGE (source)-[rel:TOS_CORPUS_RELATION {edge_id: edge.props.edge_id, pack_id: edge.props.pack_id}]->(target)
+              SET rel.predicate_id = edge.props.predicate_id,
+                  rel.authority_layer = edge.props.authority_layer,
+                  rel.owner_branch = edge.props.owner_branch,
+                  rel.status = edge.props.status
+            )
             """,
-            route=route,
             edge_rows=edge_rows,
         ).consume()

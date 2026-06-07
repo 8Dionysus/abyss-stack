@@ -295,7 +295,7 @@ scripts/aoa-smoke --profile federation
 
 ### What it is for
 
-A route-first helper for Tree of Sophia graph curation.
+A corpus-index helper for Tree of Sophia graph curation.
 This slice uses the storage substrate so `neo4j` is available, but it keeps the
 helper itself projection-only, read-first, and localhost-only.
 Machine-fit overlays that do not touch the selected services are skipped
@@ -320,7 +320,8 @@ scripts/aoa-smoke --profile curation
 ```
 
 Before launch, ensure `AOA_TOS_ROOT` points at the real `Tree-of-Sophia`
-checkout and `Secrets/Configs/tos-graph.env` exists in the deployed runtime.
+checkout with `ToS/derived-exports/tos_corpus_index.min.json` present, and
+`Secrets/Configs/tos-graph.env` exists in the deployed runtime.
 If `TOS_GRAPH_NEO4J_PASSWORD` is not set there, `tos-graph` falls back to the
 mounted `${AOA_STACK_ROOT}/Configs/stack.env` and derives the password from
 `NEO4J_AUTH`.
@@ -357,20 +358,23 @@ scripts/aoa-internal-probes --profile tools
 ### What it is for
 
 Optional visibility into the body rather than the body itself.
-It includes metrics, alert routing, dashboard exploration, and internal LogQL
-storage for runtime logs.
+It includes metrics, alert routing, dashboard exploration, internal LogQL
+storage for runtime logs, and a bounded OTLP-to-Tempo trace path for structural
+metric/log/span joins.
 
 ### Host-facing endpoints
 
 - `prometheus` -> `http://127.0.0.1:9090/-/ready`
 - `alertmanager` -> `http://127.0.0.1:9093/-/ready`
 - `grafana` -> `http://127.0.0.1:3000/api/health`
+- `tempo` -> `http://127.0.0.1:3200/ready`
+- `alloy-otlp-http` -> `http://127.0.0.1:4318/v1/traces`
 
 ### Internal-only notes
 
 - `cadvisor` is internal-only
 - `loki` is internal-only; query logs through Grafana's Loki datasource
-- `alloy` is internal-only; it ingests rootless Podman logs into Loki
+- `alloy` admin is internal-only; host-local OTLP ingest forwards traces to Tempo
 - set `AOA_PODMAN_CONTAINERS_ROOT` when rootless Podman storage is not under
   `/home/dionysus/.local/share/containers`
 

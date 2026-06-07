@@ -12,6 +12,7 @@ route card, and validation path.
 | [`aoa-evals-mcp`](aoa-evals-mcp/README.md) | bounded eval selection, bundle inspection, comparison readers, runtime evidence templates, candidate-only report skeletons |
 | [`abyss-machine-mcp`](abyss-machine-mcp/README.md) | compact owner-aware machine brief, host evidence map, resource/memory/typing/nervous read models, non-mutating route preflight |
 | [`aoa-session-memory-mcp`](aoa-session-memory-mcp/README.md) | `.aoa` session search, route traces, atlas map lookup, graph/GraphRAG evidence packets, quality samples, freshness checks, and diagnostics |
+| [`tos-corpus-mcp`](tos-corpus-mcp/README.md) | Tree of Sophia whole-corpus index status, graph-view packets, resource search, node lookup, and relation-pack access |
 
 For district law, read [AGENTS](AGENTS.md). For the parent access-plane route,
 read [mcp/AGENTS](../AGENTS.md).

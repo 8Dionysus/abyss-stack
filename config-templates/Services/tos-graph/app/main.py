@@ -6,29 +6,30 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
 from .config import load_settings
+from .corpus_reader import ToSCorpusReader, ToSCorpusReaderError
 from .models import (
+    CorpusGraphViewResponse,
+    CorpusSearchResponse,
+    CorpusStatusResponse,
+    CorpusSummaryResponse,
     HealthResponse,
     ProjectSyncResponse,
-    RouteGraphResponse,
-    RouteListResponse,
-    RouteTreeResponse,
 )
 from .neo4j_store import Neo4jProjectionStore, describe_neo4j_store
-from .projector import RouteProjector
-from .tos_reader import ToSReader, ToSReaderError
+from .projector import CorpusProjector
 from .ui import render_index
 
 
 settings = load_settings()
-reader = ToSReader(settings.tos_root, settings.route_default)
+reader = ToSCorpusReader(settings)
 neo4j_status = describe_neo4j_store(settings)
 neo4j_store = Neo4jProjectionStore(settings, neo4j_status)
-projector = RouteProjector(reader, neo4j_status, neo4j_store)
+projector = CorpusProjector(reader, neo4j_status, neo4j_store)
 
-app = FastAPI(title="tos-graph", version="0.1.0")
+app = FastAPI(title="tos-graph", version="0.2.0")
 
 
-def _handle_reader_error(exc: ToSReaderError) -> HTTPException:
+def _handle_reader_error(exc: ToSCorpusReaderError) -> HTTPException:
     return HTTPException(status_code=404, detail=str(exc))
 
 
@@ -42,7 +43,6 @@ def health() -> HealthResponse:
     return HealthResponse(
         service=settings.service_name,
         status="ok",
-        route_default=settings.route_default,
         write_enabled=settings.write_enabled,
         projection_mode=settings.projection_mode,
         neo4j_configured=neo4j_status.configured,
@@ -50,49 +50,60 @@ def health() -> HealthResponse:
         neo4j_note=neo4j_status.note,
         tos_root=settings.tos_root.as_posix(),
         tos_root_exists=settings.tos_root.exists(),
+        corpus_index_path=settings.corpus_index_path.as_posix(),
+        corpus_index_exists=settings.corpus_index_path.exists(),
+        default_view=settings.default_view,
     )
 
 
-@app.get("/api/routes", response_model=RouteListResponse)
-def list_routes() -> RouteListResponse:
-    return RouteListResponse(routes=reader.list_routes())
+@app.get("/api/corpus/status", response_model=CorpusStatusResponse)
+def corpus_status() -> CorpusStatusResponse:
+    return CorpusStatusResponse(**reader.status())
 
 
-@app.get("/api/tree", response_model=RouteTreeResponse)
-def route_tree(route: str | None = None) -> RouteTreeResponse:
+@app.get("/api/corpus/summary", response_model=CorpusSummaryResponse)
+def corpus_summary() -> CorpusSummaryResponse:
     try:
-        return RouteTreeResponse(**reader.get_route_tree(route))
-    except ToSReaderError as exc:
+        return CorpusSummaryResponse(**reader.summary())
+    except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc
 
 
-@app.get("/api/graph", response_model=RouteGraphResponse)
-def route_graph(route: str | None = None) -> RouteGraphResponse:
+@app.get("/api/corpus/search", response_model=CorpusSearchResponse)
+def corpus_search(query: str = "", limit: int = 20) -> CorpusSearchResponse:
     try:
-        return RouteGraphResponse(**reader.get_route_graph(route))
-    except ToSReaderError as exc:
+        return CorpusSearchResponse(**reader.search(query=query, limit=limit))
+    except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc
 
 
-@app.get("/api/nodes/{node_id:path}")
+@app.get("/api/corpus/graph-views/{view_id}", response_model=CorpusGraphViewResponse)
+def corpus_graph_view(view_id: str, limit: int = 100) -> CorpusGraphViewResponse:
+    try:
+        return CorpusGraphViewResponse(**reader.graph_view(view_id=view_id, limit=limit))
+    except ToSCorpusReaderError as exc:
+        raise _handle_reader_error(exc) from exc
+
+
+@app.get("/api/corpus/nodes/{node_id:path}")
 def node_detail(node_id: str) -> dict[str, Any]:
     try:
-        return reader.get_node(node_id)
-    except ToSReaderError as exc:
+        return reader.node(node_id)
+    except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc
 
 
-@app.get("/api/edges/{edge_id:path}")
-def edge_detail(edge_id: str) -> dict[str, Any]:
+@app.get("/api/corpus/relation-packs/{pack_id:path}")
+def relation_pack_detail(pack_id: str) -> dict[str, Any]:
     try:
-        return reader.get_edge(edge_id)
-    except ToSReaderError as exc:
+        return reader.relation_pack(pack_id)
+    except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc
 
 
 @app.post("/api/project/sync", response_model=ProjectSyncResponse)
-def project_sync(route: str | None = None) -> ProjectSyncResponse:
+def project_sync() -> ProjectSyncResponse:
     try:
-        return ProjectSyncResponse(**projector.sync_route(route))
-    except ToSReaderError as exc:
+        return ProjectSyncResponse(**projector.sync_corpus())
+    except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc

@@ -18,3 +18,7 @@ stays with the source owner named by the package.
 `aoa-decisions-mcp` is the access plane for the local workspace decision graph:
 it auto-refreshes the ignored graph cache before returning search results,
 repo slices, decision neighborhoods, or compact packets.
+
+`tos-corpus-mcp` is the access plane for the Tree of Sophia whole-corpus index:
+it reads the ToS-owned derived resource and returns graph-review packets without
+making `abyss-stack` the owner of ToS meaning.

@@ -178,6 +178,14 @@
       {
         "label": "test session memory mcp",
         "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-session-memory-mcp/tests"]
+      },
+      {
+        "label": "validate tos corpus mcp",
+        "command": ["python", "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"]
+      },
+      {
+        "label": "test tos corpus mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/tos-corpus-mcp/tests"]
       }
     ],
     "shellcheck": [
