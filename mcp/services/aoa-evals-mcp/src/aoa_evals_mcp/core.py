@@ -1135,6 +1135,11 @@ class AoAEvalsMCPState:
                 invalid_exports.append({"path": path.as_posix(), "error": str(exc)})
         entries = self._dedupe_candidate_exports(entries)
         entries.sort(key=lambda item: (str(item.get("exported_at") or ""), str(item.get("record_id") or "")), reverse=True)
+        invalid_shape_entries = [
+            entry
+            for entry in entries
+            if isinstance(entry.get("validation"), dict) and entry["validation"].get("valid") is not True
+        ]
         limit_value = max(0, min(int(limit if limit is not None else 20), 100))
         visible = entries[:limit_value] if limit_value else []
         return {
@@ -1144,6 +1149,21 @@ class AoAEvalsMCPState:
             "count": len(entries),
             "invalid_count": len(invalid_exports),
             "invalid_exports": invalid_exports,
+            "candidate_validation": {
+                "valid_shape_count": len(entries) - len(invalid_shape_entries),
+                "invalid_shape_count": len(invalid_shape_entries),
+                "latest_invalid_shape": [
+                    {
+                        "record_id": entry.get("record_id"),
+                        "candidate_id": entry.get("candidate_id"),
+                        "surface_type": entry.get("surface_type"),
+                        "path": entry.get("path"),
+                        "issues": (entry.get("validation") or {}).get("issues", [])[:8],
+                    }
+                    for entry in invalid_shape_entries[:10]
+                ],
+                "posture": "invalid_private_candidates_are_reported_for_review_not_accepted_as_proof",
+            },
             "limit": limit_value,
             "candidates": visible,
             "private_payloads_included": False,

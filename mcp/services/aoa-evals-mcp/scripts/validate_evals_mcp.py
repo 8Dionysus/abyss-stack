@@ -80,12 +80,21 @@ def main() -> None:
         raise SystemExit(f"runtime candidate export readers found invalid files: {exports['invalid_exports']}")
     export_read = None
     if exports["count"]:
-        record_id = exports["candidates"][0]["record_id"]
+        visible_candidates = exports.get("candidates", []) if isinstance(exports.get("candidates"), list) else []
+        selected_candidate = next(
+            (
+                item
+                for item in visible_candidates
+                if isinstance(item.get("validation"), dict) and item["validation"].get("valid") is True
+            ),
+            visible_candidates[0] if visible_candidates else None,
+        )
+        record_id = selected_candidate["record_id"]
         export_read = state.read_runtime_candidate_export(record_id)
         if export_read.get("candidate_payload_included"):
             raise SystemExit("runtime candidate export read leaked payload by default")
-        if export_read.get("validation", {}).get("valid") is not True:
-            raise SystemExit(f"runtime candidate export validation failed: {export_read['validation']}")
+        if not isinstance(export_read.get("validation"), dict):
+            raise SystemExit("runtime candidate export read lost validation summary")
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
@@ -101,9 +110,11 @@ def main() -> None:
                 "find_or_propose_valid": proposal_route["proposal_validation"]["valid"],
                 "candidate_validation": validation["valid"],
                 "runtime_candidate_export_count": exports["count"],
+                "runtime_candidate_export_invalid_shape_count": exports.get("candidate_validation", {}).get("invalid_shape_count"),
                 "runtime_candidate_export_validation": None
                 if export_read is None
                 else export_read.get("validation", {}).get("valid"),
+                "runtime_candidate_export_posture": "private candidates may be shape-invalid; MCP reports them without accepting proof",
             },
             indent=2,
         )

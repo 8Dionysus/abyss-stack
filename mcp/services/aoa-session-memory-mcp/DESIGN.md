@@ -77,6 +77,12 @@ aoa_session_maintenance_plan()
 The maintenance plan is read-only. It names the operator commands that would
 refresh `.aoa`, but the MCP does not run them.
 
+The status path is intentionally cheap. When `include_live=true`, MCP runs a
+full-archive readiness health gate without evidence sample extraction. The
+latest saved route-readiness diagnostic remains the cached audit summary, and
+sample-bearing readiness stays an explicit `.aoa` operator command rather than
+a frequent MCP health check.
+
 ## Source Discovery
 
 The service resolves the workspace root from `AOA_WORKSPACE_ROOT` or

@@ -78,6 +78,11 @@ Prompts:
 All tools are read-only. They do not reindex, repair, distill, relabel,
 export, promote, write memory, accept evidence, or mutate `.aoa`.
 
+`aoa_session_memory_status(include_live=true)` runs a fast full-archive
+readiness gate without extracting readiness evidence samples. Full
+sample-bearing `route-readiness --write-report` remains an explicit operator or
+audit route outside the MCP status path.
+
 When installed as a package, the direct server entry point is
 `aoa-session-memory-mcp-server`; `aoa-session-memory-mcp` remains the CLI entry
 point.

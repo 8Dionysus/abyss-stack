@@ -13,6 +13,8 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
+LIVE_READINESS_LIMIT: int | None = None
+LIVE_READINESS_SAMPLE_LIMIT = 0
 
 ALLOWED_TRACE_KINDS = {
     "auto",
@@ -376,15 +378,43 @@ class AoASessionMemoryMCPState:
         }
         return payload
 
+    def readiness_policy(self, include_live: bool = False) -> dict[str, Any]:
+        return {
+            "schema": "aoa_session_memory_readiness_policy_v1",
+            "cached_route_readiness": {
+                "source": "latest .aoa route-layer-readiness diagnostic",
+                "role": "cached audit summary with stronger evidence refs in .aoa diagnostics",
+                "status_field": "latest_route_readiness",
+            },
+            "live_route_readiness": {
+                "enabled": include_live,
+                "role": "fast full-archive health gate for frequent MCP status calls",
+                "command": "route-readiness",
+                "limit": LIVE_READINESS_LIMIT,
+                "sample_limit": LIVE_READINESS_SAMPLE_LIMIT,
+                "sample_policy": "no evidence sample extraction in MCP status",
+                "timeout_seconds": self.timeout_seconds,
+                "status_field": "live_route_readiness",
+            },
+            "audit_route": {
+                "role": "full evidence-bearing readiness remains an explicit operator/audit route outside status",
+                "command": "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py route-readiness all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
+            },
+            "authority_boundary": "MCP status is a read-only route companion; .aoa diagnostics and raw refs remain stronger evidence.",
+        }
+
     def session_memory_status(self, include_live: bool = False) -> dict[str, Any]:
         provider = self._archive_command("search-provider-status", ["--provider", "all"])
         atlas = self._atlas_summary()
         diagnostics = self.latest_diagnostics(kind="route-layer-readiness", limit=1)
         live_readiness = None
         if include_live:
+            live_args = ["all", "--sample-limit", str(LIVE_READINESS_SAMPLE_LIMIT)]
+            if LIVE_READINESS_LIMIT is not None:
+                live_args.extend(["--limit", str(LIVE_READINESS_LIMIT)])
             live_readiness = self._archive_command(
                 "route-readiness",
-                ["all", "--limit", "20", "--sample-limit", "1"],
+                live_args,
                 allow_nonzero_json=True,
             )
         return {
@@ -399,6 +429,7 @@ class AoASessionMemoryMCPState:
             "graph": self._graph_summary(),
             "latest_route_readiness": diagnostics,
             "live_route_readiness": live_readiness,
+            "readiness_policy": self.readiness_policy(include_live=include_live),
             "authority_boundary": self.authority_boundary(),
         }
 
