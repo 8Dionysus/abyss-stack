@@ -291,6 +291,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'python -m pytest',
     ),
 }
+LEGACY_ARCHIVE_AGENTS_DOCS: tuple[str, ...] = (
+    'mechanics/agon-runtime/legacy/AGENTS.md',
+    'mechanics/experience-runtime/legacy/AGENTS.md',
+    'mechanics/inference-pilots/legacy/AGENTS.md',
+    'mechanics/runtime-repair/legacy/AGENTS.md',
+)
 ADVISORY_AGENT_DIRS: tuple[str, ...] = ('config', 'manifests/recurrence')
 HEADING_PREFIXES = ("# AGENTS.md", "# AGENTS")
 IGNORED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
@@ -369,8 +375,9 @@ def validate(
                 issues.append(f"{rel_path}: missing required snippet {snippet!r}")
 
     required = set(REQUIRED_AGENTS_DOCS)
+    known_legacy_archive = set(LEGACY_ARCHIVE_AGENTS_DOCS)
     actual = discover_nested_agents(repo_root)
-    untracked = sorted(actual - required)
+    untracked = sorted(actual - required - known_legacy_archive)
     if untracked:
         message = "untracked nested AGENTS.md not yet in validator map: " + ", ".join(untracked)
         warnings.append(message)

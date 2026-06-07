@@ -70,3 +70,10 @@ roadmap checks.
   provenance tests.
 
 See [AGENTS.md](AGENTS.md) for editing rules.
+
+## Warning Filters
+
+`pytest.ini` suppresses the current external FastAPI/Starlette
+`fastapi.testclient` deprecation warning about `httpx2`. This keeps source
+validation output signal-only while dependency refresh remains a deliberate
+maintenance task rather than an implicit side effect of unrelated changes.

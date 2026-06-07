@@ -30,7 +30,7 @@ parity posture.
 | Return-policy runtime contracts | return-policy config routes, render-truth autonomy route, and runtime return policy/event schema identity | `scripts/validators/return_policy.py` | source-fast, release |
 | Branch governance | CONTRIBUTING branch route, canonical `main` posture, branch retirement rules, and source/runtime checkout distinction | `scripts/validators/branch_policy.py` | source-fast, release |
 | Root design and entry routes | root design cards, route contract exposure, front-door route modes, and command-authority handoff language | `scripts/validators/root_routes.py` | source-fast, release |
-| Agent route topology | nested `AGENTS.md` coverage and route snippets | `scripts/validate_nested_agents.py` | source-fast, release |
+| Agent route topology | nested `AGENTS.md` coverage, explicit legacy-archive card classification, and route snippets | `scripts/validate_nested_agents.py` | source-fast, release |
 | Decision surface routes | docs/decisions route cards, template requirements, validator/generator handoff, and test route exposure | `scripts/validators/decision_surface.py` | source-fast, release |
 | Decision rationale | canonical decision IDs, generated repo graph, local workspace decision graph freshness, and graph schema/coverage contract | `docs/decisions/`, `scripts/build_workspace_decision_graph.py`, `scripts/validate_workspace_decision_graph.py` | source-fast, generated, decision-graph, release |
 | Generated diagnostics | diagnostic surface catalog and generated read model | `mechanics/diagnostic-spine/` | generated, release |
@@ -85,7 +85,7 @@ root-level wrapper APIs.
 | `scripts/validators/return_policy.py` | return-policy runtime contract validator module | fix return-policy config routes, render-truth autonomy refs, runtime return schemas, or focused return-policy tests |
 | `scripts/validators/branch_policy.py` | branch governance validator module | fix CONTRIBUTING branch route, branch-policy main/retirement language, source/runtime checkout refs, or focused branch-policy tests |
 | `scripts/validators/root_routes.py` | root design and entry route validator module | fix root design cards, start-here route exposure, route modes, command-authority handoff text, or focused root-route tests |
-| `scripts/validate_nested_agents.py` | AGENTS route topology | fix nearest `AGENTS.md` or required route doc |
+| `scripts/validate_nested_agents.py` | AGENTS route topology | fix nearest active `AGENTS.md`, required route doc, or explicit legacy-archive classification |
 | `scripts/validators/decision_surface.py` | decision surface route validator module | fix decision route cards, template shape, validator/generator handoff text, or focused decision-surface tests |
 | `scripts/validate_decision_records.py` | decision record shape | fix decision metadata or generated decision read models |
 | `scripts/build_workspace_decision_graph.py` | local workspace decision graph builder | refresh `Logs/decision-graph/latest/` with `--write` or verify it with `--check`; do not treat it as stronger than repo-local records |
