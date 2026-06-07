@@ -21,9 +21,9 @@ def test_roadmap_names_current_runtime_posture_and_diagnostic_spine() -> None:
     changelog = read_text("CHANGELOG.md")
     payload = load_json("mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json")
 
-    assert "> Current release: `v0.2.2`" in readme
-    assert "## [0.2.2] - 2026-04-23" in changelog
-    assert "`v0.2.2`" in roadmap
+    assert "> Current release: `v0.4.0`" in readme
+    assert "## [0.4.0] - 2026-06-07" in changelog
+    assert "`v0.4.0`" in roadmap
     assert "## Authority" in roadmap
     assert "## Update Rule" in roadmap
     assert "## Current Released Contour" not in roadmap

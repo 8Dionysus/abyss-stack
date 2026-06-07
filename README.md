@@ -8,7 +8,7 @@ Use this README as the source checkout front door. It routes readers to the
 owner surface that can answer the question. It is not the roadmap, changelog,
 decision log, runtime receipt, or package-local inventory.
 
-> Current release: `v0.2.2`. See [CHANGELOG](CHANGELOG.md) for release notes.
+> Current release: `v0.4.0`. See [CHANGELOG](CHANGELOG.md) for release notes.
 
 ## What This Repository Does
 
@@ -102,7 +102,7 @@ surface that can answer it.
 
 ## Current Contour
 
-The current `v0.2.2` contour is runtime-substrate hardening, not AoA or ToS
+The current `v0.4.0` contour is runtime-substrate hardening, not AoA or ToS
 meaning and not a claim of live service mutation.
 
 The active source shape is:
