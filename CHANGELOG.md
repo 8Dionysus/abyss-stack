@@ -425,8 +425,8 @@ No unreleased changes yet.
 
 ### Included in this release
 
-Cross-check source: first-parent history and merged PRs from `v0.2.2` through
-PR #146, plus the repository diff against `v0.2.2`.
+Cross-check source: first-parent history, merged PRs, release-note follow-ups,
+and the repository diff from `v0.2.2` through the published `v0.4.0` tag.
 
 - root and route surfaces: nested `AGENTS.md` guardrails, slim root `AGENTS`,
   source-only mirror posture, GitHub surface separation, branch policy,
