@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note defines the initial owner-repo contract for a route-first ToS graph
+This note defines the owner-repo contract for a corpus-index ToS graph
 curation surface in `abyss-stack`.
 
 The surface belongs here only as runtime body, helper UI, compose/profile
@@ -12,9 +12,9 @@ It does not move ToS canonical meaning into `abyss-stack`.
 ## Source and authority split
 
 - `Tree-of-Sophia` remains the canonical source of truth for authored nodes,
-  relation packs, registries, and validator law
-- `abyss-stack` may project those surfaces into Neo4j and present them through
-  a localhost helper service
+  relation packs, registries, validator law, and the checked whole-corpus index
+- `abyss-stack` may project that corpus index into Neo4j and present it through
+  a localhost helper service and MCP access planes
 - Neo4j stays a projection and query surface only
 - mirrored `tos-source` federation surfaces stay advisory and must not be
   treated as canonical edit input
@@ -30,26 +30,26 @@ The first-class repo-local anchors for this slice are:
 - `config-templates/Configs/tos-graph/config.yaml`
 - `config-templates/Services/tos-graph/`
 
-The bounded first route is:
+The active runtime route is:
 
 - mount the real `Tree-of-Sophia` source checkout through `AOA_TOS_ROOT`
-- read canonical tree and relation-pack inputs
-- project a route-first slice into Neo4j
-- expose a localhost-only helper UI and API
-- keep write mode off by default
+- read `ToS/derived-exports/tos_corpus_index.min.json`
+- expose switchable corpus graph views through a localhost-only helper UI and API
+- project the whole corpus index into Neo4j when credentials are ready
+- keep write mode absent by default
 
 ## Dry-run-first landing order
 
 This owner-repo landing stays projection-first:
 
-1. define the contract and quest anchors
-2. land a read-only vertical slice
-3. verify route-first projection sync, inspector posture, and localhost bind
+1. define the corpus-index contract in Tree of Sophia
+2. expose the read-only corpus graph surface in `abyss-stack`
+3. verify corpus projection sync, graph-view posture, and localhost bind
 4. keep curation-profile launch narrow even when unrelated machine-fit overlays exist
-5. only then consider validator-gated patch preview and apply
+5. only then consider any validator-gated write route as a separate reviewed change
 
-The current landed slice has completed step `3` for route-scoped Neo4j sync.
-Writeback remains intentionally deferred.
+The current landed slice is corpus-index driven. Writeback remains intentionally
+absent.
 
 Do not jump straight to canonical writeback from a staging bundle.
 
@@ -71,6 +71,7 @@ Any later write path must keep these conditions explicit:
 - no autonomous write routes into ToS canon
 - no hidden git commits
 - no whole-corpus force-graph default
+- no fallback to the old root-level `tree/` route model
 
 ## Verification posture
 

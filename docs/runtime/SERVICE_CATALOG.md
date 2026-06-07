@@ -149,10 +149,10 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `52-tos-graph.yml`
 
-- `tos-graph` — route-first localhost helper for Tree of Sophia graph curation on `5410`
-- reads canonical ToS source files from the mounted `AOA_TOS_ROOT`
+- `tos-graph` — corpus-index localhost helper for Tree of Sophia graph curation on `5410`
+- reads the ToS-owned whole-corpus index from the mounted `AOA_TOS_ROOT`
 - keeps Neo4j in projection-only posture and does not treat mirrored `tos-source` advisory surfaces as canonical edit input
-- current first slice exposes a route-first localhost UI, health and route/tree/graph inspection APIs, and route-scoped Neo4j sync while writeback remains deferred
+- current slice exposes a corpus-first localhost UI, health and `/api/corpus/*` inspection APIs, and whole-corpus Neo4j projection sync while writeback remains absent
 
 ## `53-babelvox-tts.yml`
 

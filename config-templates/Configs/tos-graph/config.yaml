@@ -3,16 +3,14 @@ service:
   port: 5410
 
 source:
-  route_default: friedrich-nietzsche/thus-spoke-zarathustra/prologue-1
-  tree_root: tree
-  relation_root: tree/relations
-  registry_root: tree/registries
+  corpus_index: ToS/derived-exports/tos_corpus_index.min.json
 
 projection:
-  mode: route_sync
+  mode: corpus_sync
   database: neo4j
   neo4j_shadow: true
 
 ui:
   mode: api_plus_minimal_html
-  route_first: true
+  corpus_first: true
+  default_view: corpus-topology

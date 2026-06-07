@@ -60,6 +60,13 @@ python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.p
 python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
 ```
 
+For `tos-corpus-mcp`, run:
+
+```bash
+python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
+python -m pytest mcp/services/tos-corpus-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash

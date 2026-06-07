@@ -49,6 +49,7 @@
         "tests/test_service_app_guards.py",
         "tests/test_service_selection_validator_module.py",
         "tests/test_sync_parity_validator_module.py",
+        "tests/test_tos_graph_corpus_runtime.py",
         "tests/test_validate_nested_agents.py",
         "tests/test_federation_required_files_validator_module.py",
         "tests/test_sync_parity_entrypoint_contracts.py",
@@ -138,7 +139,8 @@
         "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
         "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
         "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
-        "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py"
+        "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
+        "mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py"
       ],
       "home_scope": "mcp-service",
       "protects": "MCP service-local access-plane boundaries, resources, tools, prompts, and owner-truth routing",

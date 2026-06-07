@@ -8,7 +8,6 @@ from pydantic import BaseModel
 class HealthResponse(BaseModel):
     service: str
     status: str
-    route_default: str
     write_enabled: bool
     projection_mode: str
     neo4j_configured: bool
@@ -16,41 +15,55 @@ class HealthResponse(BaseModel):
     neo4j_note: str
     tos_root: str
     tos_root_exists: bool
+    corpus_index_path: str
+    corpus_index_exists: bool
+    default_view: str
 
 
-class RouteEntry(BaseModel):
-    route: str
-    label: str
-    edge_count: int
-    has_source_node: bool
-    selected: bool
+class CorpusStatusResponse(BaseModel):
+    schema: str
+    index_exists: bool
+    index_path: str
+    counts: dict[str, int]
+    graph_views: list[str]
+    authority_order: list[dict[str, Any]]
+    runtime_projection_boundary: dict[str, Any]
 
 
-class RouteListResponse(BaseModel):
-    routes: list[RouteEntry]
+class CorpusSummaryResponse(BaseModel):
+    schema: str
+    status: dict[str, Any]
+    counts: dict[str, int]
+    branches: list[dict[str, Any]]
+    graph_views: list[dict[str, Any]]
+    authority_order: list[dict[str, Any]]
+    runtime_projection_boundary: dict[str, Any]
 
 
-class RouteTreeResponse(BaseModel):
-    route: str
-    source_node: dict[str, Any] | None
-    family_counts: dict[str, int]
-    edge_count: int
-    node_count: int
+class CorpusSearchResponse(BaseModel):
+    schema: str
+    query: str
+    result_count: int
+    results: list[dict[str, Any]]
+    authority_note: str
 
 
-class RouteGraphResponse(BaseModel):
-    route: str
-    source_node: dict[str, Any] | None
-    nodes: list[dict[str, Any]]
-    edges: list[dict[str, Any]]
-    diagnostics: dict[str, Any]
+class CorpusGraphViewResponse(BaseModel):
+    schema: str
+    view: dict[str, Any]
+    item_count: int
+    items: list[dict[str, Any]]
+    counts: dict[str, int]
+    runtime_projection_boundary: dict[str, Any]
 
 
 class ProjectSyncResponse(BaseModel):
-    route: str
+    surface: str
     status: str
     node_count: int
     edge_count: int
+    resource_count: int
+    branch_count: int
     projection_target: str
     note: str
     deleted_node_count: int | None = None

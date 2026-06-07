@@ -54,7 +54,8 @@ class TosGraphSettings:
     stack_env_path: Path
     tos_root: Path
     log_root: Path
-    route_default: str
+    corpus_index_path: Path
+    default_view: str
     write_enabled: bool
     neo4j_uri: str | None
     neo4j_user: str | None
@@ -71,23 +72,29 @@ def load_settings() -> TosGraphSettings:
     service_cfg = payload.get("service") if isinstance(payload.get("service"), dict) else {}
     source_cfg = payload.get("source") if isinstance(payload.get("source"), dict) else {}
     projection_cfg = payload.get("projection") if isinstance(payload.get("projection"), dict) else {}
+    ui_cfg = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
     fallback_user, fallback_password = _split_neo4j_auth(
         os.environ.get("NEO4J_AUTH") or runtime_env_payload.get("NEO4J_AUTH")
     )
+
+    tos_root = Path(os.environ.get("TOS_GRAPH_TOS_ROOT", "/workspace/Tree-of-Sophia"))
+    raw_corpus_index_path = Path(
+        os.environ.get(
+            "TOS_GRAPH_CORPUS_INDEX_PATH",
+            source_cfg.get("corpus_index", "ToS/derived-exports/tos_corpus_index.min.json"),
+        )
+    )
+    corpus_index_path = raw_corpus_index_path if raw_corpus_index_path.is_absolute() else tos_root / raw_corpus_index_path
 
     return TosGraphSettings(
         service_name=str(service_cfg.get("name", "tos-graph")),
         port=int(os.environ.get("TOS_GRAPH_PORT", service_cfg.get("port", 5410))),
         config_path=config_path,
         stack_env_path=stack_env_path,
-        tos_root=Path(os.environ.get("TOS_GRAPH_TOS_ROOT", "/workspace/Tree-of-Sophia")),
+        tos_root=tos_root,
         log_root=Path(os.environ.get("TOS_GRAPH_LOG_ROOT", "/app/logs")),
-        route_default=str(
-            os.environ.get(
-                "TOS_GRAPH_ROUTE_DEFAULT",
-                source_cfg.get("route_default", "friedrich-nietzsche/thus-spoke-zarathustra/prologue-1"),
-            )
-        ),
+        corpus_index_path=corpus_index_path,
+        default_view=str(os.environ.get("TOS_GRAPH_DEFAULT_VIEW", ui_cfg.get("default_view", "corpus-topology"))),
         write_enabled=_parse_bool(os.environ.get("TOS_GRAPH_WRITE_ENABLED"), False),
         neo4j_uri=os.environ.get("TOS_GRAPH_NEO4J_URI"),
         neo4j_user=os.environ.get("TOS_GRAPH_NEO4J_USER") or fallback_user,

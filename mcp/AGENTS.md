@@ -48,6 +48,11 @@ exposes `.aoa` search, route traces, atlas maps, session briefs, retrieval
 packets, freshness checks, and diagnostics while keeping raw/session authority
 in `.aoa`.
 
+For Tree of Sophia corpus graph context work,
+`mcp/services/tos-corpus-mcp/` exposes ToS corpus index status, graph-view
+packets, resources, nodes, and relation packs while keeping corpus authority in
+`Tree-of-Sophia`.
+
 ## Validation
 
 For `aoa-memo-mcp` changes, run:
@@ -82,7 +87,9 @@ For `aoa-session-memory-mcp` changes, run:
 
 ```bash
 python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
+python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
 python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
+python -m pytest mcp/services/tos-corpus-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:
