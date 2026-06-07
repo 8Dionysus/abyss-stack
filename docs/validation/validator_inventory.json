@@ -428,7 +428,7 @@
       "paths": [
         "scripts/validate_nested_agents.py"
       ],
-      "protects": "nested AGENTS route coverage and required route snippets",
+      "protects": "nested AGENTS route coverage, required route snippets, and explicit legacy-archive card classification",
       "owner_surface": "AGENTS.md",
       "layer": "agent-route/topology",
       "lane": "source-fast/release",
@@ -437,7 +437,7 @@
         "scripts/ci_gate.py --mode source-fast",
         "root AGENTS validation route"
       ],
-      "failure_route": "Fix the nearest AGENTS card or required owner route.",
+      "failure_route": "Fix the nearest active AGENTS card, required owner route, or explicit legacy-archive classification.",
       "status": "active"
     },
     {
