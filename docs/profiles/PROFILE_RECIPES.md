@@ -357,6 +357,8 @@ scripts/aoa-internal-probes --profile tools
 ### What it is for
 
 Optional visibility into the body rather than the body itself.
+It includes metrics, alert routing, dashboard exploration, and internal LogQL
+storage for runtime logs.
 
 ### Host-facing endpoints
 
@@ -367,6 +369,10 @@ Optional visibility into the body rather than the body itself.
 ### Internal-only notes
 
 - `cadvisor` is internal-only
+- `loki` is internal-only; query logs through Grafana's Loki datasource
+- `alloy` is internal-only; it ingests rootless Podman logs into Loki
+- set `AOA_PODMAN_CONTAINERS_ROOT` when rootless Podman storage is not under
+  `/home/dionysus/.local/share/containers`
 
 ### First checks
 
@@ -628,6 +634,7 @@ What it gives you:
 - Intel-aware agent runtime with OVMS
 - speech helpers
 - observability surfaces
+- internal-only `loki` and `alloy` for LogQL-backed runtime log inspection
 - all internal-only surfaces checked in one pass
 
 Try:

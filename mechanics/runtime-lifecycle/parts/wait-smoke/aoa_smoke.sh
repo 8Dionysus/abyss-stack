@@ -128,7 +128,7 @@ if has_module "60-monitoring.yml"; then
   if ((with_internal)); then
     aoa_note "monitoring internal probes requested"
   else
-    aoa_note "skip cadvisor host probe because it is internal-only"
+    aoa_note "skip cadvisor, loki, and alloy host probes because they are internal-only"
   fi
 fi
 

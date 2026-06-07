@@ -55,6 +55,13 @@ and DAG job manifests for the `rag-api` service. It describes where mounted
 runtime source mirrors live inside the container; it does not store embeddings,
 private captures, or generated Qdrant payloads in git.
 
+The `Configs/monitoring/` family carries Prometheus, Alertmanager, Grafana,
+Loki, and Alloy public-safe templates. Loki stores logs in a runtime volume;
+Alloy reads rootless Podman journald entries and keeps a file-log fallback for
+hosts that use a file log driver, forwarding both to Loki for LogQL through
+Grafana. When rootless Podman storage is relocated, render the monitoring
+profile with `AOA_PODMAN_CONTAINERS_ROOT` pointing at that containers root.
+
 `aoa-browser` is now source-managed here as a lightweight browser-helper build
 context. The Playwright browser payload under
 `/srv/AbyssOS/abyss-stack/Services/aoa-browser/ms-playwright/` remains runtime-only.

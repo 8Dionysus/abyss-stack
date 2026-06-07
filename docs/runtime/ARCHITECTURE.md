@@ -58,6 +58,8 @@ Optional observability:
 - Grafana
 - Alertmanager
 - cAdvisor
+- Loki
+- Alloy
 
 ## Module map
 

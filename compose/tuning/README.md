@@ -90,8 +90,8 @@ They are intentionally additive:
 - `federation.thin-host` caps the advisory `route-api` facade when the
   `federation` profile is selected
 - `observability.thin-host` shortens Prometheus retention, lowers cAdvisor
-  sampling/event retention, and caps dashboard services for explicit
-  observability runs
+  sampling/event retention, caps dashboard services, and bounds Loki plus Alloy
+  for explicit observability runs
 - `tools.thin-host` caps helper services when the `tools` layer is selected;
   it does not make speech/browser helpers resident
 - `workflows.thin-host` caps n8n and external task runners for explicit

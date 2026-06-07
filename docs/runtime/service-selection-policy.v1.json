@@ -190,6 +190,24 @@
       "decision": "keep bounded container metrics with lower sampling cadence"
     },
     {
+      "name": "loki",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep internal-only LogQL storage for runtime log diagnosis through Grafana"
+    },
+    {
+      "name": "alloy",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep internal-only rootless Podman log ingestion into Loki instead of adding Promtail"
+    },
+    {
       "name": "n8n",
       "module": "compose/modules/20-orchestration.yml",
       "owner_profile": "workflows",

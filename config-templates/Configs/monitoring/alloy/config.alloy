@@ -1,0 +1,124 @@
+logging {
+  level = "warn"
+}
+
+loki.relabel "podman_journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "syslog_identifier"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal__systemd_user_unit"]
+    target_label  = "user_unit"
+  }
+
+  rule {
+    source_labels = ["__journal_container_name"]
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__journal_podman_name"]
+    target_label  = "podman_name"
+  }
+
+  rule {
+    source_labels = ["__journal_podman_type"]
+    target_label  = "podman_type"
+  }
+
+  rule {
+    source_labels = ["__journal_podman_health_status"]
+    target_label  = "health_status"
+  }
+}
+
+loki.source.journal "container_stdout_persistent" {
+  forward_to     = [loki.write.local.receiver]
+  relabel_rules  = loki.relabel.podman_journal.rules
+  path           = "/var/log/journal"
+  matches        = "_COMM=conmon"
+  max_age        = "2h"
+  labels         = {source = "podman-journal-container", runtime = "rootless-podman"}
+  format_as_json = false
+}
+
+loki.source.journal "container_stdout_runtime" {
+  forward_to     = [loki.write.local.receiver]
+  relabel_rules  = loki.relabel.podman_journal.rules
+  path           = "/run/log/journal"
+  matches        = "_COMM=conmon"
+  max_age        = "2h"
+  labels         = {source = "podman-journal-container-runtime", runtime = "rootless-podman"}
+  format_as_json = false
+}
+
+loki.source.journal "podman_events_persistent" {
+  forward_to     = [loki.write.local.receiver]
+  relabel_rules  = loki.relabel.podman_journal.rules
+  path           = "/var/log/journal"
+  matches        = "SYSLOG_IDENTIFIER=podman PODMAN_TYPE=container"
+  max_age        = "2h"
+  labels         = {source = "podman-journal-event", runtime = "rootless-podman"}
+  format_as_json = false
+}
+
+loki.source.journal "podman_events_runtime" {
+  forward_to     = [loki.write.local.receiver]
+  relabel_rules  = loki.relabel.podman_journal.rules
+  path           = "/run/log/journal"
+  matches        = "SYSLOG_IDENTIFIER=podman PODMAN_TYPE=container"
+  max_age        = "2h"
+  labels         = {source = "podman-journal-event-runtime", runtime = "rootless-podman"}
+  format_as_json = false
+}
+
+loki.source.file "podman_containers" {
+  targets = [
+    {
+      __path__ = "/var/lib/containers/storage/overlay-containers/*/userdata/ctr.log",
+      source   = "podman-file",
+      runtime  = "rootless-podman",
+      host     = "abyss-local",
+    },
+  ]
+
+  forward_to = [loki.process.podman_containers.receiver]
+
+  file_match {
+    enabled           = true
+    sync_period       = "30s"
+    ignore_older_than = "24h"
+  }
+}
+
+loki.process "podman_containers" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.cri {}
+
+  stage.labels {
+    values = {
+      stream = "",
+    }
+  }
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

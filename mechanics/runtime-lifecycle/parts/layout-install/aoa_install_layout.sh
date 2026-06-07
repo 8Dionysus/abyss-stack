@@ -13,9 +13,11 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Configs" \
   "${AOA_STACK_ROOT}/Configs/agent-api" \
   "${AOA_STACK_ROOT}/Configs/federation" \
+  "${AOA_STACK_ROOT}/Configs/monitoring/alloy" \
   "${AOA_STACK_ROOT}/Configs/monitoring/alertmanager" \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources" \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/dashboards" \
+  "${AOA_STACK_ROOT}/Configs/monitoring/loki" \
   "${AOA_STACK_ROOT}/Configs/tts" \
   "${AOA_STACK_ROOT}/Configs/ollama" \
   "${AOA_STACK_ROOT}/Configs/tos-graph" \

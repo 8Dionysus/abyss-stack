@@ -742,8 +742,12 @@ class AoASessionMemoryMCPState:
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py index-maintenance --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py route-readiness all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py search-provider-status --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-build all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write --force-large-export",
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --batch-limit 3 --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-quality-audit --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
+            ],
+            "offline_operator_commands": [
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-build all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write --force-large-export",
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --export-sidecar --write-report",
             ],
             "mcp_stop_line": "This MCP reports the plan only; run maintenance outside MCP with explicit operator intent.",
             "authority_boundary": self.authority_boundary(),
@@ -938,8 +942,18 @@ class AoASessionMemoryMCPState:
 
     def _graph_summary(self) -> dict[str, Any]:
         index_path = self.aoa_root / "graph" / "index.json"
+        sqlite_path = self.aoa_root / "graph" / "graph.sqlite3"
         index = _read_json(index_path)
         if not isinstance(index, dict):
+            if sqlite_path.is_file():
+                return {
+                    "status": "sqlite_live_store_present",
+                    "db_path": sqlite_path.as_posix(),
+                    "db_mtime": sqlite_path.stat().st_mtime,
+                    "sidecar_status": "not_exported",
+                    "index_path": index_path.as_posix(),
+                    "diagnostics": ["graph_sidecar_not_exported"],
+                }
             return {"status": "missing", "index_path": index_path.as_posix()}
         return {
             "status": "present",

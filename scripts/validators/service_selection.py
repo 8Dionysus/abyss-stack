@@ -29,6 +29,8 @@ SERVICE_SELECTION_POLICY_REQUIRED_SERVICES = {
     "grafana",
     "alertmanager",
     "cadvisor",
+    "loki",
+    "alloy",
     "n8n",
     "n8n-task-runners",
     "ollama",

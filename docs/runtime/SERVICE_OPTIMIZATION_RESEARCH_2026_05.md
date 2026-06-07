@@ -58,14 +58,17 @@ cached or preloaded.
 
 ### Observability stays explicit and thin
 
-Prometheus, Grafana, Alertmanager, and cAdvisor are useful when diagnosing the
-machine, but they should not be unconstrained background noise. The
-`observability.thin-host` overlay keeps the services selected only when the
-profile includes observability, shortens Prometheus retention, sets retention
-size, caps dashboard memory, and lowers cAdvisor sampling cadence.
+Prometheus, Grafana, Alertmanager, cAdvisor, Loki, and Alloy are useful when
+diagnosing the machine, but they should not be unconstrained background noise.
+The `observability.thin-host` overlay keeps the services selected only when the
+profile includes observability, shortens Prometheus and Loki retention, sets
+retention size, caps dashboard memory, lowers cAdvisor sampling cadence, and
+keeps log ingestion internal-only.
 
-This aligns with Prometheus' storage retention flags, Prometheus' container-aware
-Go memory limit behavior, and cAdvisor's documented housekeeping intervals.
+This aligns with Prometheus' storage retention flags, Prometheus'
+container-aware Go memory limit behavior, cAdvisor's documented housekeeping
+intervals, Loki's current single-binary plus TSDB/filesystem guidance, and
+Grafana Alloy's journal-source and file-source ingestion paths.
 
 ### Workflows stay opt-in
 
@@ -125,6 +128,14 @@ PSI/zram evidence, and controlled restarts over killing services.
   https://prometheus.io/docs/prometheus/latest/storage/
 - Prometheus command-line flags:
   https://prometheus.io/docs/prometheus/latest/command-line/prometheus/
+- Loki Docker install:
+  https://grafana.com/docs/loki/latest/setup/install/docker/
+- Loki TSDB and filesystem storage:
+  https://grafana.com/docs/loki/latest/configure/storage/
+- Grafana Alloy Loki journal source:
+  https://grafana.com/docs/alloy/latest/reference/components/loki.source.journal/
+- Grafana Alloy Loki file source:
+  https://grafana.com/docs/alloy/latest/reference/components/loki.source.file/
 - cAdvisor runtime options:
   https://github.com/google/cadvisor/blob/master/docs/runtime_options.md
 - llama.cpp server options:

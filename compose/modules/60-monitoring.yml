@@ -13,6 +13,9 @@ services:
       - "prometheus_data:/prometheus:Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro,Z"
     restart: unless-stopped
+    depends_on:
+      - loki
+      - alloy
 
   cadvisor:
     container_name: cadvisor
@@ -27,7 +30,7 @@ services:
       - "/sys:/sys:ro"
       - "/dev/disk:/dev/disk:ro"
       - "/etc/machine-id:/etc/machine-id:ro"
-      - "/home/${AOA_RUNTIME_USER:-dionysus}/.local/share/containers:/var/lib/containers:ro"
+      - "${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}:/var/lib/containers:ro"
       - "/run/user/${AOA_RUNTIME_UID:-1000}/podman:/var/run/podman:ro"
     restart: unless-stopped
 
@@ -44,6 +47,45 @@ services:
       - "alertmanager_data:/alertmanager:Z"
     restart: unless-stopped
 
+  loki:
+    container_name: loki
+    image: docker.io/grafana/loki:3.7.0@sha256:c316b7c7589a5eeca843b6926c7446149d18300b79ac8538dc4ae063bc478da2
+    command:
+      - "-config.file=/etc/loki/loki.yml"
+      - "-config.expand-env=true"
+    expose:
+      - "3100"
+    environment:
+      AOA_LOKI_RETENTION_PERIOD: "${AOA_LOKI_RETENTION_PERIOD:-48h}"
+      AOA_LOKI_INGESTION_RATE_MB: "${AOA_LOKI_INGESTION_RATE_MB:-4}"
+      AOA_LOKI_INGESTION_BURST_SIZE_MB: "${AOA_LOKI_INGESTION_BURST_SIZE_MB:-8}"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/loki/loki.yml:/etc/loki/loki.yml:ro,Z"
+      - "loki_data:/loki:Z"
+    restart: unless-stopped
+
+  alloy:
+    container_name: alloy
+    image: docker.io/grafana/alloy:v1.16.1@sha256:51aeb9d829239345070619dad3edd6873186f913c84f45b365b74574fcb38ec0
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - "/etc/alloy/config.alloy"
+    expose:
+      - "12345"
+    security_opt:
+      - label=disable
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro,Z"
+      - "${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}:/var/lib/containers:ro"
+      - "/var/log/journal:/var/log/journal:ro"
+      - "/run/log/journal:/run/log/journal:ro"
+      - "alloy_data:/var/lib/alloy/data:Z"
+    restart: unless-stopped
+    depends_on:
+      - loki
+
   grafana:
     image: docker.io/grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
     ports:
@@ -52,14 +94,18 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: adminadmin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_METRICS_ENABLED: "true"
     volumes:
       - "grafana_data:/var/lib/grafana:Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro,Z"
     restart: unless-stopped
     depends_on:
       - prometheus
+      - loki
 
 volumes:
   prometheus_data: {}
   alertmanager_data: {}
+  loki_data: {}
+  alloy_data: {}
   grafana_data: {}

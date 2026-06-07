@@ -115,4 +115,6 @@ if has_module "60-monitoring.yml"; then
     internal_notes=1
   fi
   aoa_note "- cadvisor is internal-only"
+  aoa_note "- loki is internal-only; query it through Grafana's Loki datasource"
+  aoa_note "- alloy is internal-only; it ingests rootless Podman logs into Loki"
 fi

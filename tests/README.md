@@ -53,8 +53,10 @@ roadmap checks.
 - `test_decision_surface_validator_module.py`: focused decision-surface
   validator contracts for route cards, template shape, and validator handoffs.
 - `test_validate_nested_agents.py`: nested AGENTS coverage.
-- `test_decision_records.py`: canonical decision-record shape and generated
-  index validation.
+- `test_decision_records.py`: canonical decision-record shape plus generated
+  index and decision-graph validation.
+- `test_workspace_decision_graph.py`: local workspace decision graph builder for
+  cross-repo decision nodes and edges.
 - `test_roadmap_parity.py`: release-contour route parity.
 - `test_current_direction_routes.py`: root entrypoint direction.
 - `test_aoa_lib_env_compat.py`: shared shell env compatibility.
