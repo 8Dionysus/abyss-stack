@@ -767,6 +767,28 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     sqlite_path = aoa / "graph/graph.sqlite3"
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     sqlite_path.write_bytes(b"SQLite live store placeholder")
+    write_json(
+        aoa / "diagnostics/20260526T000001Z__graph-freshness-gates.json",
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_graph_freshness_gates",
+            "generated_at": "2026-05-26T00:00:01Z",
+            "ok": False,
+            "needs_index_maintenance": False,
+            "needs_graph_maintenance": True,
+            "search_index": {"status": "current"},
+            "atlas_index": {"status": "current"},
+            "graph_store": {
+                "status": "dirty",
+                "source_state": {
+                    "dirty_count": 7,
+                    "missing_count": 2,
+                    "blocked_count": 1,
+                },
+            },
+            "diagnostics": [],
+        },
+    )
 
     state = AoASessionMemoryMCPState.discover(
         workspace_root=tmp_path,
@@ -780,7 +802,14 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
 
     assert status["graph"]["status"] == "sqlite_live_store_present"
     assert status["graph"]["sidecar_status"] == "not_exported"
+    assert status["graph"]["needs_graph_maintenance"] is True
+    assert status["graph"]["freshness"]["graph_status"] == "dirty"
+    assert status["graph"]["freshness"]["dirty_count"] == 7
+    assert status["graph"]["freshness"]["missing_count"] == 2
     assert "graph_sidecar_not_exported" in status["graph"]["diagnostics"]
+    assert plan["current_status"]["needs_graph_maintenance"] is True
+    assert plan["current_status"]["graph_dirty_count"] == 7
+    assert plan["current_status"]["graph_missing_count"] == 2
     assert any("auto-maintenance hot" in command for command in plan["allowed_operator_commands"])
     assert any("auto-maintenance backlog" in command for command in plan["allowed_operator_commands"])
     assert any("graph-maintenance all" in command for command in plan["allowed_operator_commands"])
