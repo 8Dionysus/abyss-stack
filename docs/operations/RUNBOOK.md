@@ -166,6 +166,32 @@ Expect the normal answer plus a redacted `advisory_trace`; this path still does
 not promote `aoa-kag`, `aoa-memo`, `aoa-playbooks`, `aoa-routing`, or mirrored
 `tos-source` surfaces into runtime authority.
 
+Inspect the runtime trace inventory after any `langchain-api` run:
+
+```bash
+curl http://127.0.0.1:5403/langgraph/inventory
+curl http://127.0.0.1:5403/threads
+curl http://127.0.0.1:5403/traces
+```
+
+Use `POST /langgraph/smoke` for a no-LLM synthetic path that still creates a
+thread, checkpoint, trace record, stdout trace field, and best-effort OTLP span.
+The inventory stores hashes, lengths, IDs, and `traceparent`, not raw prompts or
+answers.
+
+Inspect stack-owned self-awareness read routes:
+
+```bash
+curl http://127.0.0.1:5402/observability/datasources
+curl http://127.0.0.1:5406/semantic-inventory
+```
+
+The datasource route is derived from Grafana provisioning files and omits secure
+JSON, passwords, tokens, and raw dashboard settings. The semantic inventory route
+summarizes Postgres schema/freshness, Neo4j labels/relationship types/freshness,
+RAG sources, and agentic graph shape without database rows, graph properties,
+source documents, or credentials.
+
 For a named opt-in startup bundle around this seam:
 
 ```bash

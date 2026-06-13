@@ -379,7 +379,7 @@ def _run_source_validators(errors: list[str]) -> None:
         inventory_path=service_selection.SERVICE_SCREENSHOT_INVENTORY_PATH,
         policy_path=service_selection.SERVICE_SELECTION_POLICY_PATH,
         required_screenshot_services=service_selection.SERVICE_SCREENSHOT_INVENTORY_REQUIRED_SERVICES,
-        expected_addon_services=("rerank-api", "rag-api", "loki", "alloy"),
+        expected_addon_services=("rerank-api", "rag-api", "loki", "tempo", "alloy"),
         selection_doc_paths=(
             Path("docs") / "runtime" / "SERVICE_SELECTION.md",
             Path("docs") / "runtime" / "README.md",

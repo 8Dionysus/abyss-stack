@@ -54,13 +54,26 @@ The `Configs/rag/` family carries public-safe RAG source registry, agentic graph
 and DAG job manifests for the `rag-api` service. It describes where mounted
 runtime source mirrors live inside the container; it does not store embeddings,
 private captures, or generated Qdrant payloads in git.
+`rag-api` also exposes a redacted `/semantic-inventory` read route for
+Postgres schema/freshness, Neo4j label/relationship/freshness, RAG source, and
+agentic graph shape. That route stores no database rows, graph properties,
+source documents, or credentials.
 
 The `Configs/monitoring/` family carries Prometheus, Alertmanager, Grafana,
 Loki, and Alloy public-safe templates. Loki stores logs in a runtime volume;
 Alloy reads rootless Podman journald entries and keeps a file-log fallback for
 hosts that use a file log driver, forwarding both to Loki for LogQL through
-Grafana. When rootless Podman storage is relocated, render the monitoring
-profile with `AOA_PODMAN_CONTAINERS_ROOT` pointing at that containers root.
+Grafana. Alloy also accepts OTLP traces for forwarding to Tempo. When rootless
+Podman storage is relocated, render the monitoring profile with
+`AOA_PODMAN_CONTAINERS_ROOT` pointing at that containers root.
+`route-api` reads Grafana datasource provisioning files as a bounded
+`/observability/datasources` inventory route; it exposes datasource identity,
+type, access, default status, and source file freshness without secure JSON,
+tokens, passwords, or raw dashboard settings.
+
+`Services/langchain-api/` writes redacted runtime thread, checkpoint, and trace
+inventory to `${AOA_STACK_ROOT}/Logs/langgraph-inventory` when bootstrapped and
+run through `41-agent-api.yml`; this is runtime evidence, not source truth.
 
 `aoa-browser` is now source-managed here as a lightweight browser-helper build
 context. The Playwright browser payload under

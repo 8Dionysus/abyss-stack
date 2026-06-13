@@ -15,7 +15,6 @@ if str(SRC) not in sys.path:
 from tos_corpus_mcp.core import ToSCorpusMCPState  # noqa: E402
 from tos_corpus_mcp.server import build_server  # noqa: E402
 
-
 def write_source_safe_fixture(root: Path) -> Path:
     index_path = root / "ToS" / "derived-exports" / "tos_corpus_index.min.json"
     index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,8 +127,6 @@ def discover_source_safe_state(fixture_root: Path) -> tuple[ToSCorpusMCPState, s
         return live_state, "live"
     write_source_safe_fixture(fixture_root)
     return ToSCorpusMCPState.discover(tos_root=fixture_root), "fixture"
-
-
 def main() -> None:
     required = [
         "AGENTS.md",

@@ -72,6 +72,8 @@ This file maps the first migrated runtime modules to their intended services.
 - may consume a public-safe return policy file and emit runtime return events
 - now also exposes opt-in `POST /run/federated` for live advisory consumption of `route-api` playbook and memo seams
 - returns the normal model answer plus a redacted `advisory_trace` when the federated path is enabled
+- emits a redacted runtime trace for `/run`, `/run/federated`, and `POST /langgraph/smoke`, storing thread/checkpoint/trace inventory under `${AOA_STACK_ROOT}/Logs/langgraph-inventory` and best-effort OTLP spans through Alloy/Tempo
+- exposes bounded read routes for that inventory at `/langgraph/inventory`, `/threads`, `/threads/{thread_id}/checkpoints`, `/traces`, and `/traces/{trace_id}` without storing raw prompt, answer, or advisory payload text
 - future gateway cache-lane status contract is documented in `mechanics/runtime-lifecycle/parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md`; it is a status-only runtime artifact and does not add new HTTP endpoints in this contract surface
 - future runtime usage and budget readout is documented in `mechanics/runtime-lifecycle/parts/status-readouts/docs/USAGE_BUDGET_POLICY.md`; it remains a bounded runtime artifact, not routing, billing, or quality authority
 
@@ -103,6 +105,9 @@ This file maps the first migrated runtime modules to their intended services.
 - `route-api` — localhost-only federation seam reader for mirrored `aoa-agents` contracts, `aoa-routing advisory routing surfaces`, `aoa-memo` recall surfaces, `aoa-evals` eval selection surfaces, `aoa-playbooks` activation/composition advisory surfaces, `aoa-kag` retrieval/regrounding surfaces, and the source-owned `tos-source` handoff companion
 - consumes only runtime-local public-safe mirror data
 - exposes thin routing metadata, structured advisory routing, bounded memo inspection, structured eval selection, playbook activation/composition inspection, `/kag/*` retrieval/regrounding inspection, and filesystem-first memo/eval export discovery
+- exposes `GET /observability/datasources` as a read-only Grafana datasource
+  inventory derived from provisioned datasource YAML, with secrets and
+  `secureJsonData` omitted
 - remains an advisory facade; it does not execute the route itself, while `langchain-api` is now the first live consumer of those mirrored seams
 
 ## `45-rerank-api.yml`
@@ -131,8 +136,12 @@ This file maps the first migrated runtime modules to their intended services.
   `langchain-api`, optional `rerank-api` scoring, `route-api` advisory surfaces,
   and `langchain-api` answer generation
 - exposes `GET /sources`, `GET /dag/jobs`, `GET /agentic-rag/graph`,
-  `POST /ingest/source`, `POST /retrieve`, `POST /answer`, and
-  `POST /agentic-rag/run`
+  `GET /semantic-inventory`, `POST /ingest/source`, `POST /retrieve`,
+  `POST /answer`, and `POST /agentic-rag/run`
+- `GET /semantic-inventory` is a bounded memory-space read route for Postgres
+  schema/freshness, Neo4j label/relationship/freshness, RAG sources, and
+  agentic graph shape; it does not return rows, graph properties, source
+  documents, or credentials
 - keeps n8n, Dagster, and Temporal out of the resident RAG path; those remain
   explicit DAG/integration lanes until a later promotion proves they should be
   always-on
@@ -169,7 +178,8 @@ This file maps the first migrated runtime modules to their intended services.
 - `alertmanager` — alert routing
 - `cadvisor` — container metrics
 - `loki` — internal-only log storage and LogQL query surface
-- `alloy` — Grafana Alloy internal-only rootless Podman log ingestion into Loki, journald-first with a file-log fallback
+- `tempo` — localhost-only Tempo trace backend on `3200` with internal OTLP ingest from Alloy
+- `alloy` — Grafana Alloy rootless Podman log ingestion into Loki, journald-first with a file-log fallback, plus localhost-only OTLP trace ingest on `4317`/`4318` forwarded to Tempo
 
 ## Exposure posture
 

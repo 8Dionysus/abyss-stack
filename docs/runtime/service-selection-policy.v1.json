@@ -199,6 +199,15 @@
       "decision": "keep internal-only LogQL storage for runtime log diagnosis through Grafana"
     },
     {
+      "name": "tempo",
+      "module": "compose/modules/60-monitoring.yml",
+      "owner_profile": "observability",
+      "posture": "selected_now",
+      "tier": "explicit_observability",
+      "resource_guard": "compose/tuning/observability.thin-host.yml",
+      "decision": "keep bounded trace backend for W3C trace-context, OTLP spans, and metric/log/span joins when observability is selected"
+    },
+    {
       "name": "alloy",
       "module": "compose/modules/60-monitoring.yml",
       "owner_profile": "observability",

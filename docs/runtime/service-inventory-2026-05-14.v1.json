@@ -1,6 +1,6 @@
 {
   "schema": "abyss_stack_runtime_service_inventory_v1",
-  "updated_at": "2026-05-16",
+  "updated_at": "2026-06-07",
   "inventory_id": "screenshot-2026-05-14-21-46-49",
   "source_screenshot": {
     "absolute_path": "/home/dionysus/\u0418\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u044f/\u0421\u043d\u0438\u043c\u043a\u0438 \u044d\u043a\u0440\u0430\u043d\u0430/\u0421\u043d\u0438\u043c\u043e\u043a \u044d\u043a\u0440\u0430\u043d\u0430 \u043e\u0442 2026-05-14 21-46-49.png",
@@ -99,8 +99,12 @@
       "reason": "added after the screenshot as the internal LogQL store for the observability profile"
     },
     {
+      "service": "tempo",
+      "reason": "added after the screenshot as the bounded trace backend for the observability profile"
+    },
+    {
       "service": "alloy",
-      "reason": "added after the screenshot as the internal log ingestion collector for the observability profile"
+      "reason": "added after the screenshot as the log and OTLP trace ingestion collector for the observability profile"
     }
   ],
   "known_policy_services_not_in_screenshot": [

@@ -4,9 +4,11 @@ services:
     container_name: route-api
     environment:
       ROUTE_API_CONFIG_DIR: /app/config
+      ROUTE_API_GRAFANA_DATASOURCE_DIR: /app/observability/grafana/datasources
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Knowledge/federation:/app/federation:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/federation:/app/config:ro,Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/grafana/provisioning/datasources:/app/observability/grafana/datasources:ro,Z"
     ports:
       - "127.0.0.1:5402:5402"
     healthcheck:

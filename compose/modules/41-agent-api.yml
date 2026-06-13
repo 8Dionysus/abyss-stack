@@ -19,6 +19,9 @@ services:
       AOA_RETURN_ENABLED: "${AOA_RETURN_ENABLED:-true}"
       AOA_RETURN_POLICY_PATH: "${AOA_RETURN_POLICY_PATH:-/app/config/return-policy.yaml}"
       AOA_RETURN_LOG_ROOT: "${AOA_RETURN_LOG_ROOT:-/app/logs/returns}"
+      AOA_LANGGRAPH_INVENTORY_ROOT: "${AOA_LANGGRAPH_INVENTORY_ROOT:-/app/logs/langgraph-inventory}"
+      AOA_LANGGRAPH_INVENTORY_OTLP_ENABLED: "${AOA_LANGGRAPH_INVENTORY_OTLP_ENABLED:-true}"
+      AOA_LANGGRAPH_INVENTORY_OTLP_URL: "${AOA_LANGGRAPH_INVENTORY_OTLP_URL:-http://alloy:4318/v1/traces}"
       AOA_ROUTE_API_BASE_URL: "${AOA_ROUTE_API_BASE_URL:-http://route-api:5402}"
       EMBEDDINGS_PROVIDER: "${AOA_EMBEDDINGS_PROVIDER:-disabled}"
       OVMS_EMBEDDINGS_URL: "${AOA_OVMS_EMBEDDINGS_URL:-http://ovms:8000/v3/embeddings}"
@@ -29,6 +32,7 @@ services:
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/agent-api/return-policy.yaml:/app/config/return-policy.yaml:ro,Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/returns:/app/logs/returns:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Logs/langgraph-inventory:/app/logs/langgraph-inventory:Z"
     depends_on:
       llama-cpp:
         condition: service_started

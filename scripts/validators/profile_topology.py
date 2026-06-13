@@ -225,7 +225,11 @@ def validate_profiles(errors: list[str], *, root: Path) -> None:
         errors.append(
             "compose/modules/60-monitoring.yml must pin Alloy as docker.io/grafana/alloy:<version>@sha256:<digest>"
         )
-    for required_text in ("loki", "alloy", "Loki", "Alloy"):
+    if not re.search(r"docker\.io/grafana/tempo:[^\s\"']+@sha256:[0-9a-f]{64}", monitoring_module):
+        errors.append(
+            "compose/modules/60-monitoring.yml must pin Tempo as docker.io/grafana/tempo:<version>@sha256:<digest>"
+        )
+    for required_text in ("loki", "alloy", "tempo", "Loki", "Alloy", "Tempo"):
         if required_text not in service_catalog_doc:
             errors.append(f"docs/runtime/SERVICE_CATALOG.md must mention {required_text}")
 

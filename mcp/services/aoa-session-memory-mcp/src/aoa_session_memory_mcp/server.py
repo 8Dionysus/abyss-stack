@@ -36,9 +36,103 @@ def build_server(
         return current_state().session_memory_status(include_live=include_live)
 
     @mcp.tool()
-    def aoa_session_search(query: str, filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
+    def aoa_session_search(query: str = "", filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
         """Search .aoa session evidence and return route refs plus freshness data."""
         return current_state().session_search(query=query, filters=filters, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_agent_responses(
+        query: str = "",
+        session: str = "",
+        agent_events: list[str] | None = None,
+        episode: str = "",
+        closeout_final: bool = False,
+        verification_state: str = "any",
+        failure_state: str = "any",
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Find assistant answer-like events by generated agent-event class with refs and freshness."""
+        return current_state().session_agent_responses(
+            query=query,
+            session=session,
+            agent_events=agent_events,
+            episode=episode,
+            closeout_final=closeout_final,
+            verification_state=verification_state,
+            failure_state=failure_state,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def aoa_session_agent_closeouts(query: str = "", session: str = "", episode: str = "", limit: int = 20) -> dict[str, Any]:
+        """Find assistant final closeout events separately from progress updates."""
+        return current_state().session_agent_closeouts(query=query, session=session, episode=episode, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_agent_progress_updates(query: str = "", session: str = "", episode: str = "", limit: int = 20) -> dict[str, Any]:
+        """Find assistant progress updates separately from final answers."""
+        return current_state().session_agent_progress_updates(query=query, session=session, episode=episode, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_agent_reasoning_windows(
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        limit: int = 10,
+        before: int = 3,
+        after: int = 6,
+    ) -> dict[str, Any]:
+        """Find reasoning boundary events and bounded neighboring events."""
+        return current_state().session_agent_reasoning_windows(
+            query=query,
+            session=session,
+            episode=episode,
+            limit=limit,
+            before=before,
+            after=after,
+        )
+
+    @mcp.tool()
+    def aoa_session_task_episodes(
+        target: str = "all",
+        session: str = "",
+        episode: str = "",
+        status: str = "",
+        verification_state: str = "",
+        failure_state: str = "",
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """List generated task episodes with start refs, event ranges, verification state, and failure state."""
+        return current_state().session_task_episodes(
+            target=target,
+            session=session,
+            episode=episode,
+            status=status,
+            verification_state=verification_state,
+            failure_state=failure_state,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def aoa_session_answer_neighborhood(
+        query: str = "",
+        session: str = "",
+        agent_events: list[str] | None = None,
+        episode: str = "",
+        limit: int = 10,
+        before: int = 3,
+        after: int = 6,
+    ) -> dict[str, Any]:
+        """Find assistant answer-like events and return bounded neighboring events."""
+        return current_state().session_answer_neighborhood(
+            query=query,
+            session=session,
+            agent_events=agent_events,
+            episode=episode,
+            limit=limit,
+            before=before,
+            after=after,
+        )
 
     @mcp.tool()
     def aoa_session_trace(
@@ -76,6 +170,31 @@ def build_server(
             limit=limit,
             per_route_limit=per_route_limit,
             consequence_window=consequence_window,
+            document_limit=document_limit,
+            session=session,
+        )
+
+    @mcp.tool()
+    def aoa_session_entity_usage_neighborhood(
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 6,
+        per_route_limit: int = 20,
+        before: int = 3,
+        after: int = 8,
+        raw_preview_chars: int = 600,
+        document_limit: int = 80,
+        session: str = "",
+    ) -> dict[str, Any]:
+        """Trace an entity to usage events and local before/after raw evidence windows."""
+        return current_state().session_entity_usage_neighborhood(
+            anchor=anchor,
+            kind=kind,
+            limit=limit,
+            per_route_limit=per_route_limit,
+            before=before,
+            after=after,
+            raw_preview_chars=raw_preview_chars,
             document_limit=document_limit,
             session=session,
         )
@@ -162,14 +281,48 @@ def build_server(
         )
 
     @mcp.tool()
-    def aoa_session_freshness_check(refs: list[str] | None = None) -> dict[str, Any]:
+    def aoa_session_freshness_check(refs: list[str] | None = None, session: str = "") -> dict[str, Any]:
         """Check whether evidence refs are present and whether the search provider is ready."""
-        return current_state().session_freshness_check(refs=refs)
+        return current_state().session_freshness_check(refs=refs, session=session)
 
     @mcp.tool()
     def aoa_session_pattern_scan(pattern: str, filters: dict[str, Any] | None = None, limit: int = 50) -> dict[str, Any]:
         """Aggregate recurring session-event patterns from .aoa search hits."""
         return current_state().session_pattern_scan(pattern=pattern, filters=filters, limit=limit)
+
+    @mcp.tool()
+    def aoa_session_entity_inventory(
+        layer: str = "skill",
+        query: str = "",
+        session: str = "",
+        limit: int = 50,
+        sample_limit: int = 2,
+    ) -> dict[str, Any]:
+        """Aggregate typed session entities such as skills, MCPs, hooks, tools, APIs, scripts, evals, Git, playbooks, techniques, mechanics, graphs, or memory surfaces."""
+        return current_state().session_entity_inventory(
+            layer=layer,
+            query=query,
+            session=session,
+            limit=limit,
+            sample_limit=sample_limit,
+        )
+
+    @mcp.tool()
+    def aoa_session_hook_receipts(
+        event_name: str = "UserPromptSubmit",
+        session: str = "",
+        date_from: str = "",
+        only_errors: bool = False,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read hook receipt evidence directly, without relying on search or graph noise."""
+        return current_state().session_hook_receipts(
+            event_name=event_name,
+            session=session,
+            date_from=date_from,
+            only_errors=only_errors,
+            limit=limit,
+        )
 
     @mcp.tool()
     def aoa_session_latest_diagnostics(
@@ -281,6 +434,10 @@ def build_server(
     @mcp.resource("aoa-session-memory://diagnostics/latest/{kind}")
     def diagnostics_resource(kind: str) -> str:
         return json.dumps(current_state().latest_diagnostics(kind=kind), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://entities/{layer}")
+    def entities_resource(layer: str) -> str:
+        return json.dumps(current_state().session_entity_inventory(layer=layer, limit=50, sample_limit=2), ensure_ascii=False, indent=2)
 
     @mcp.resource("aoa-session-memory://session/{session}/brief")
     def session_brief_resource(session: str) -> str:

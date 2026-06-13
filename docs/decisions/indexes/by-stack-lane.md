@@ -74,6 +74,7 @@
 - [ABYSS-STACK-D-0005 Operator Wrappers With Part-Local Backends](../ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md) (`docs/decisions/ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md`)
 - [ABYSS-STACK-D-0016 Live Runtime Cutover And Machine Parity](../ABYSS-STACK-D-0016-live-runtime-cutover-parity.md) (`docs/decisions/ABYSS-STACK-D-0016-live-runtime-cutover-parity.md`)
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## runtime lifecycle
 
@@ -99,6 +100,7 @@
 - [ABYSS-STACK-D-0029 BabelVox TTS Experimental Lane](../ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md) (`docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md`)
 - [ABYSS-STACK-D-0030 RAG Orchestration Profile](../ABYSS-STACK-D-0030-rag-orchestration-profile.md) (`docs/decisions/ABYSS-STACK-D-0030-rag-orchestration-profile.md`)
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## profiles and presets
 
@@ -143,6 +145,7 @@
 - [ABYSS-STACK-D-0037 AoA Session Memory MCP Access Plane](../ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+- [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 
 ## federation seams
 
@@ -164,6 +167,10 @@
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
 
+## Tree of Sophia access
+
+- [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
+
 ## agent surface
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
@@ -174,6 +181,7 @@
 ## observability
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## release/tooling
 

@@ -1,6 +1,9 @@
 import json
+import hashlib
 import os
 import re
+import secrets
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -75,6 +78,19 @@ FEDERATED_RUN_ENABLED = os.getenv("AOA_FEDERATED_RUN_ENABLED", "false").strip().
 }
 ROUTE_API_BASE_URL = os.getenv("AOA_ROUTE_API_BASE_URL", "http://route-api:5402").rstrip("/")
 RETURN_POLICY_PATH = Path(os.getenv("AOA_RETURN_POLICY_PATH", "/app/config/return-policy.yaml"))
+LANGGRAPH_INVENTORY_ROOT = Path(
+    os.getenv("AOA_LANGGRAPH_INVENTORY_ROOT", "/app/logs/langgraph-inventory")
+)
+LANGGRAPH_INVENTORY_LIMIT = max(1, int(os.getenv("AOA_LANGGRAPH_INVENTORY_LIMIT", "50")))
+LANGGRAPH_INVENTORY_OTLP_ENABLED = os.getenv(
+    "AOA_LANGGRAPH_INVENTORY_OTLP_ENABLED",
+    "true",
+).strip().lower() in {"1", "true", "yes", "on"}
+LANGGRAPH_INVENTORY_OTLP_URL = os.getenv(
+    "AOA_LANGGRAPH_INVENTORY_OTLP_URL",
+    os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://alloy:4318/v1/traces"),
+).strip()
+LANGGRAPH_INVENTORY_OTLP_TIMEOUT = float(os.getenv("AOA_LANGGRAPH_INVENTORY_OTLP_TIMEOUT_S", "1.5"))
 
 PROFILE_CLASS = Literal["spark", "workhorse", "deep", "archive"]
 MEMO_FAMILY = Literal["router", "object"]
@@ -160,6 +176,11 @@ class EmbeddingsReq(BaseModel):
     input: str | list[str]
     model: str | None = None
     encoding_format: str = "float"
+
+
+class LangGraphSmokeReq(BaseModel):
+    session_id: str | None = None
+    note: str = "synthetic langchain-api inventory smoke"
 
 
 class PlaybookSelectReq(BaseModel):
@@ -268,6 +289,355 @@ def _http_post_json(
     if not isinstance(parsed, dict):
         raise RuntimeError(f"unexpected_json_type from {url}: {type(parsed).__name__}")
     return parsed
+
+
+def _utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _bounded_string(value: Any, limit: int = 240) -> str:
+    text = str(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}..."
+
+
+def _safe_inventory_id(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._-")
+    return safe[:96] or secrets.token_hex(8)
+
+
+def _runtime_trace_context(req: RunReq | LangGraphSmokeReq, run_kind: str) -> dict[str, Any]:
+    trace_id = secrets.token_hex(16)
+    span_id = secrets.token_hex(8)
+    session_id = getattr(req, "session_id", None)
+    thread_seed = session_id or trace_id
+    thread_id = f"thread.{_sha256_text(thread_seed)[:16]}"
+    checkpoint_id = f"checkpoint.{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.{span_id}"
+    started_ns = time.time_ns()
+    return {
+        "run_kind": run_kind,
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "traceparent": f"00-{trace_id}-{span_id}-01",
+        "thread_id": _safe_inventory_id(thread_id),
+        "checkpoint_id": _safe_inventory_id(checkpoint_id),
+        "started_ns": started_ns,
+        "started_at": _utc_now(),
+        "session_present": session_id is not None,
+        "session_id_sha256": _sha256_text(session_id) if isinstance(session_id, str) else None,
+    }
+
+
+def _text_fingerprint(value: str | None) -> dict[str, Any]:
+    if value is None:
+        return {"present": False, "length": 0, "sha256": None}
+    return {
+        "present": True,
+        "length": len(value),
+        "sha256": _sha256_text(value),
+    }
+
+
+def _record_path(root: Path, *parts: str) -> Path:
+    path = root
+    for part in parts:
+        path /= _safe_inventory_id(part)
+    return path
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n")
+
+
+def _read_json_file(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines[-limit:]:
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _inventory_summary(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": record.get("schema"),
+        "created_at": record.get("created_at"),
+        "run_kind": record.get("run_kind"),
+        "status": record.get("status"),
+        "thread_id": record.get("thread_id"),
+        "checkpoint_id": record.get("checkpoint_id"),
+        "trace_id": record.get("trace_id"),
+        "span_id": record.get("span_id"),
+        "traceparent": record.get("traceparent"),
+        "backend": record.get("backend"),
+        "model": record.get("model"),
+        "input": record.get("input"),
+        "output": record.get("output"),
+        "error": record.get("error"),
+        "storage": record.get("storage"),
+        "observability": record.get("observability"),
+    }
+
+
+def _otlp_attributes(record: dict[str, Any]) -> list[dict[str, Any]]:
+    attrs: list[dict[str, Any]] = []
+
+    def add_string(key: str, value: Any) -> None:
+        if value is not None:
+            attrs.append({"key": key, "value": {"stringValue": str(value)}})
+
+    def add_bool(key: str, value: Any) -> None:
+        if value is not None:
+            attrs.append({"key": key, "value": {"boolValue": bool(value)}})
+
+    add_string("service.name", "abyss-stack.langchain-api")
+    add_string("abyss.run_kind", record.get("run_kind"))
+    add_string("abyss.thread_id", record.get("thread_id"))
+    add_string("abyss.checkpoint_id", record.get("checkpoint_id"))
+    add_string("abyss.status", record.get("status"))
+    add_string("abyss.backend", record.get("backend"))
+    add_string("abyss.model", record.get("model"))
+    add_bool("abyss.session_present", record.get("session_present"))
+    add_bool("abyss.raw_payload_stored", False)
+    return attrs
+
+
+def _send_otlp_trace(record: dict[str, Any]) -> dict[str, Any]:
+    if not LANGGRAPH_INVENTORY_OTLP_ENABLED:
+        return {"enabled": False, "ok": False, "reason": "disabled"}
+    if not LANGGRAPH_INVENTORY_OTLP_URL:
+        return {"enabled": True, "ok": False, "reason": "missing_endpoint"}
+
+    payload = {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "abyss-stack.langchain-api"}},
+                        {"key": "abyss.component", "value": {"stringValue": "langchain-runtime-inventory"}},
+                    ]
+                },
+                "scopeSpans": [
+                    {
+                        "scope": {"name": "abyss-stack.langchain-api.inventory"},
+                        "spans": [
+                            {
+                                "traceId": record["trace_id"],
+                                "spanId": record["span_id"],
+                                "name": f"langchain-api {record['run_kind']}",
+                                "kind": 2,
+                                "startTimeUnixNano": str(record["started_ns"]),
+                                "endTimeUnixNano": str(record["ended_ns"]),
+                                "attributes": _otlp_attributes(record),
+                                "status": {
+                                    "code": 1 if record.get("status") == "ok" else 2,
+                                    "message": _bounded_string(record.get("error", {}).get("detail", ""), 120)
+                                    if isinstance(record.get("error"), dict)
+                                    else "",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    try:
+        _http_post_json(LANGGRAPH_INVENTORY_OTLP_URL, payload, LANGGRAPH_INVENTORY_OTLP_TIMEOUT)
+    except Exception as exc:
+        return {
+            "enabled": True,
+            "ok": False,
+            "endpoint": LANGGRAPH_INVENTORY_OTLP_URL,
+            "error": f"{type(exc).__name__}: {_bounded_string(exc, 180)}",
+        }
+    return {"enabled": True, "ok": True, "endpoint": LANGGRAPH_INVENTORY_OTLP_URL}
+
+
+def _store_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
+    root = LANGGRAPH_INVENTORY_ROOT
+    date_id = time.strftime("%Y%m%d", time.gmtime())
+    paths = {
+        "latest": root / "latest.json",
+        "records": root / "records" / f"{date_id}.jsonl",
+        "thread": _record_path(root, "threads", f"{record['thread_id']}.jsonl"),
+        "checkpoint": _record_path(root, "checkpoints", f"{record['checkpoint_id']}.json"),
+        "trace": _record_path(root, "traces", f"{record['trace_id']}.json"),
+    }
+    try:
+        _append_jsonl(paths["records"], record)
+        _append_jsonl(paths["thread"], record)
+        _write_json_atomic(paths["checkpoint"], record)
+        _write_json_atomic(paths["trace"], record)
+        _write_json_atomic(paths["latest"], record)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "root": str(root),
+            "error": f"{type(exc).__name__}: {_bounded_string(exc, 180)}",
+        }
+    return {
+        "ok": True,
+        "root": str(root),
+        "paths": {key: str(value) for key, value in paths.items()},
+    }
+
+
+def _emit_inventory_log(record: dict[str, Any]) -> None:
+    event = {
+        "event": "langchain_runtime_trace",
+        "service": "langchain-api",
+        "created_at": record.get("created_at"),
+        "run_kind": record.get("run_kind"),
+        "status": record.get("status"),
+        "thread_id": record.get("thread_id"),
+        "checkpoint_id": record.get("checkpoint_id"),
+        "trace_id": record.get("trace_id"),
+        "span_id": record.get("span_id"),
+        "traceparent": record.get("traceparent"),
+        "raw_payload_stored": False,
+    }
+    print(json.dumps(event, ensure_ascii=True, sort_keys=True), flush=True)
+
+
+def _record_runtime_trace(
+    trace_context: dict[str, Any],
+    req: RunReq | FederatedRunReq | LangGraphSmokeReq,
+    *,
+    status: Literal["ok", "error"],
+    response: dict[str, Any] | None = None,
+    advisory_trace: dict[str, Any] | None = None,
+    error: Exception | HTTPException | None = None,
+) -> dict[str, Any]:
+    answer = response.get("answer") if isinstance(response, dict) and isinstance(response.get("answer"), str) else None
+    input_text = getattr(req, "user_text", None)
+    if input_text is None:
+        input_text = getattr(req, "note", None)
+    ended_ns = time.time_ns()
+    record: dict[str, Any] = {
+        "schema": "abyss_stack_langchain_runtime_trace_v1",
+        "service": "langchain-api",
+        "created_at": _utc_now(),
+        "started_at": trace_context["started_at"],
+        "run_kind": trace_context["run_kind"],
+        "status": status,
+        "thread_id": trace_context["thread_id"],
+        "checkpoint_id": trace_context["checkpoint_id"],
+        "trace_id": trace_context["trace_id"],
+        "span_id": trace_context["span_id"],
+        "traceparent": trace_context["traceparent"],
+        "started_ns": trace_context["started_ns"],
+        "ended_ns": ended_ns,
+        "duration_ms": round((ended_ns - int(trace_context["started_ns"])) / 1_000_000.0, 3),
+        "session_present": trace_context["session_present"],
+        "session_id_sha256": trace_context["session_id_sha256"],
+        "backend": response.get("backend") if isinstance(response, dict) else None,
+        "model": response.get("model") if isinstance(response, dict) else MODEL,
+        "input": _text_fingerprint(input_text if isinstance(input_text, str) else None),
+        "output": _text_fingerprint(answer),
+        "settings": {
+            "temperature": getattr(req, "temperature", None),
+            "max_tokens": getattr(req, "max_tokens", None),
+        },
+        "federated": {
+            "request": isinstance(req, FederatedRunReq),
+            "advisory_trace_keys": sorted(advisory_trace.keys()) if isinstance(advisory_trace, dict) else [],
+        },
+        "redaction": {
+            "raw_prompt_stored": False,
+            "raw_answer_stored": False,
+            "raw_advisory_payload_stored": False,
+            "stores_hashes_and_lengths": True,
+        },
+    }
+    if isinstance(req, FederatedRunReq):
+        record["federated"].update(
+            {
+                "profile_class": _effective_profile_class(req.profile_class),
+                "playbook_requested": req.playbook_id is not None or req.playbook_select is not None,
+                "memo_requested": req.memo is not None,
+                "kag_requested": req.kag is not None,
+            }
+        )
+    if error is not None:
+        status_code = getattr(error, "status_code", None)
+        detail = getattr(error, "detail", None)
+        record["error"] = {
+            "type": type(error).__name__,
+            "status_code": status_code,
+            "detail": _bounded_string(detail if detail is not None else error),
+        }
+
+    record["observability"] = {
+        "trace_backend": "tempo",
+        "otlp": _send_otlp_trace(record),
+        "loki_trace_correlation": "trace_id and traceparent are emitted as log fields, not high-cardinality labels",
+    }
+    record["storage"] = _store_inventory_record(record)
+    try:
+        _emit_inventory_log(record)
+    except Exception:
+        pass
+    return _inventory_summary(record)
+
+
+def _latest_thread_summaries(limit: int) -> list[dict[str, Any]]:
+    root = LANGGRAPH_INVENTORY_ROOT / "threads"
+    if not root.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for path in sorted(root.glob("thread.*.jsonl"), key=lambda item: item.stat().st_mtime, reverse=True):
+        tail = _read_jsonl_tail(path, 1)
+        if tail:
+            rows.append(_inventory_summary(tail[-1]))
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _latest_trace_summaries(limit: int) -> list[dict[str, Any]]:
+    root = LANGGRAPH_INVENTORY_ROOT / "traces"
+    if not root.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for path in sorted(root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        payload = _read_json_file(path)
+        if payload is not None:
+            rows.append(_inventory_summary(payload))
+        if len(rows) >= limit:
+            break
+    return rows
 
 
 def _http_auth_headers() -> dict[str, str] | None:
@@ -1251,14 +1621,21 @@ def health() -> dict[str, Any]:
         "embeddings_provider": EMBEDDINGS_PROVIDER,
         "ovms_auth_enabled": bool(OVMS_EMBEDDINGS_API_KEY),
         "federated_run_enabled": FEDERATED_RUN_ENABLED,
+        "langgraph_inventory_enabled": True,
+        "langgraph_inventory_root": str(LANGGRAPH_INVENTORY_ROOT),
+        "otlp_trace_export_enabled": LANGGRAPH_INVENTORY_OTLP_ENABLED,
     }
 
 
 @app.post("/run")
 def run(req: RunReq) -> dict[str, Any]:
+    trace_context = _runtime_trace_context(req, "run")
     try:
-        return _invoke_run_backend(req)
+        response = _invoke_run_backend(req)
+        response["runtime_trace"] = _record_runtime_trace(trace_context, req, status="ok", response=response)
+        return response
     except Exception as exc:
+        _record_runtime_trace(trace_context, req, status="error", error=exc)
         detail_key = "upstream_ollama_chat_error" if OLLAMA_NATIVE_CHAT and (
             "litellm" in BASE_URL or "ollama" in BASE_URL
         ) else "upstream_llm_error"
@@ -1270,9 +1647,9 @@ def run(req: RunReq) -> dict[str, Any]:
 
 @app.post("/run/federated")
 def run_federated(req: FederatedRunReq) -> dict[str, Any]:
-    _require_federated_enabled()
-
+    trace_context = _runtime_trace_context(req, "run_federated")
     try:
+        _require_federated_enabled()
         playbook_card = _resolve_playbook_card(req)
         memo_plan = _explicit_memo_plan(req.memo) if req.memo is not None else None
         if memo_plan is None and playbook_card is not None:
@@ -1304,18 +1681,122 @@ def run_federated(req: FederatedRunReq) -> dict[str, Any]:
             kag_context=kag_context,
             policy_snapshot=policy_snapshot,
         )
+        response["runtime_trace"] = _record_runtime_trace(
+            trace_context,
+            req,
+            status="ok",
+            response=response,
+            advisory_trace=response["advisory_trace"],
+        )
         return response
-    except HTTPException:
+    except HTTPException as exc:
+        _record_runtime_trace(trace_context, req, status="error", error=exc)
         raise
     except RouteAPIHTTPError as exc:
+        _record_runtime_trace(trace_context, req, status="error", error=exc)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except RouteAPIUnavailableError as exc:
+        _record_runtime_trace(trace_context, req, status="error", error=exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        _record_runtime_trace(trace_context, req, status="error", error=exc)
         raise HTTPException(
             status_code=502,
             detail=f"upstream_federated_run_error: {type(exc).__name__}: {exc}",
         ) from exc
+
+
+@app.get("/langgraph/inventory")
+def langgraph_inventory(limit: int = 20) -> dict[str, Any]:
+    safe_limit = max(1, min(limit, LANGGRAPH_INVENTORY_LIMIT))
+    latest = _read_json_file(LANGGRAPH_INVENTORY_ROOT / "latest.json")
+    return {
+        "ok": True,
+        "service": "langchain-api",
+        "schema": "abyss_stack_langchain_inventory_readout_v1",
+        "root": str(LANGGRAPH_INVENTORY_ROOT),
+        "thread_inventory_present": bool(_latest_thread_summaries(1)),
+        "checkpoint_inventory_present": (LANGGRAPH_INVENTORY_ROOT / "checkpoints").exists(),
+        "trace_inventory_present": bool(_latest_trace_summaries(1)),
+        "latest": _inventory_summary(latest) if isinstance(latest, dict) else None,
+        "threads": _latest_thread_summaries(safe_limit),
+        "traces": _latest_trace_summaries(safe_limit),
+        "redaction": {
+            "raw_prompt_stored": False,
+            "raw_answer_stored": False,
+            "raw_advisory_payload_stored": False,
+        },
+    }
+
+
+@app.get("/threads")
+def threads(limit: int = 20) -> dict[str, Any]:
+    safe_limit = max(1, min(limit, LANGGRAPH_INVENTORY_LIMIT))
+    rows = _latest_thread_summaries(safe_limit)
+    return {
+        "ok": True,
+        "schema": "abyss_stack_langchain_threads_v1",
+        "threads": rows,
+        "count": len(rows),
+    }
+
+
+@app.get("/threads/{thread_id}/checkpoints")
+def thread_checkpoints(thread_id: str, limit: int = 20) -> dict[str, Any]:
+    safe_limit = max(1, min(limit, LANGGRAPH_INVENTORY_LIMIT))
+    safe_thread_id = _safe_inventory_id(thread_id)
+    path = _record_path(LANGGRAPH_INVENTORY_ROOT, "threads", f"{safe_thread_id}.jsonl")
+    rows = [_inventory_summary(row) for row in _read_jsonl_tail(path, safe_limit)]
+    return {
+        "ok": True,
+        "schema": "abyss_stack_langchain_thread_checkpoints_v1",
+        "thread_id": safe_thread_id,
+        "checkpoints": rows,
+        "count": len(rows),
+    }
+
+
+@app.get("/traces")
+def traces(limit: int = 20) -> dict[str, Any]:
+    safe_limit = max(1, min(limit, LANGGRAPH_INVENTORY_LIMIT))
+    rows = _latest_trace_summaries(safe_limit)
+    return {
+        "ok": True,
+        "schema": "abyss_stack_langchain_traces_v1",
+        "traces": rows,
+        "count": len(rows),
+    }
+
+
+@app.get("/traces/{trace_id}")
+def trace_detail(trace_id: str) -> dict[str, Any]:
+    safe_trace_id = _safe_inventory_id(trace_id)
+    path = _record_path(LANGGRAPH_INVENTORY_ROOT, "traces", f"{safe_trace_id}.json")
+    record = _read_json_file(path)
+    if record is None:
+        raise HTTPException(status_code=404, detail="trace not found")
+    return {
+        "ok": True,
+        "schema": "abyss_stack_langchain_trace_detail_v1",
+        "trace": _inventory_summary(record),
+    }
+
+
+@app.post("/langgraph/smoke")
+def langgraph_smoke(req: LangGraphSmokeReq) -> dict[str, Any]:
+    trace_context = _runtime_trace_context(req, "synthetic_smoke")
+    response = {
+        "ok": True,
+        "backend": "synthetic",
+        "model": "none",
+        "answer": "langchain-api inventory smoke recorded",
+    }
+    runtime_trace = _record_runtime_trace(trace_context, req, status="ok", response=response)
+    return {
+        "ok": True,
+        "service": "langchain-api",
+        "runtime_trace": runtime_trace,
+    }
 
 
 @app.post("/embeddings")

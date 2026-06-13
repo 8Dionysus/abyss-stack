@@ -39,6 +39,7 @@
         "tests/test_profile_composition.py",
         "tests/test_questbook_validator_module.py",
         "tests/test_rag_bridge_contracts.py",
+        "tests/test_rag_api_semantic_inventory.py",
         "tests/test_return_policy_validator_module.py",
         "tests/test_roadmap_parity.py",
         "tests/test_root_routes_validator_module.py",

@@ -38,9 +38,57 @@ def main() -> None:
     status.add_argument("--include-live", action="store_true")
 
     search = sub.add_parser("search")
-    search.add_argument("query")
+    search.add_argument("query", nargs="?", default="")
     search.add_argument("--filter", action="append")
     search.add_argument("--limit", type=int, default=20)
+
+    agent_responses = sub.add_parser("agent-responses")
+    agent_responses.add_argument("query", nargs="?", default="")
+    agent_responses.add_argument("--session", default="")
+    agent_responses.add_argument("--agent-event", action="append")
+    agent_responses.add_argument("--episode", default="")
+    agent_responses.add_argument("--closeout-final", action="store_true")
+    agent_responses.add_argument("--verification-state", default="any")
+    agent_responses.add_argument("--failure-state", default="any")
+    agent_responses.add_argument("--limit", type=int, default=20)
+
+    agent_closeouts = sub.add_parser("agent-closeouts")
+    agent_closeouts.add_argument("query", nargs="?", default="")
+    agent_closeouts.add_argument("--session", default="")
+    agent_closeouts.add_argument("--episode", default="")
+    agent_closeouts.add_argument("--limit", type=int, default=20)
+
+    agent_progress = sub.add_parser("agent-progress-updates")
+    agent_progress.add_argument("query", nargs="?", default="")
+    agent_progress.add_argument("--session", default="")
+    agent_progress.add_argument("--episode", default="")
+    agent_progress.add_argument("--limit", type=int, default=20)
+
+    reasoning_windows = sub.add_parser("agent-reasoning-windows")
+    reasoning_windows.add_argument("query", nargs="?", default="")
+    reasoning_windows.add_argument("--session", default="")
+    reasoning_windows.add_argument("--episode", default="")
+    reasoning_windows.add_argument("--limit", type=int, default=10)
+    reasoning_windows.add_argument("--before", type=int, default=3)
+    reasoning_windows.add_argument("--after", type=int, default=6)
+
+    task_episodes = sub.add_parser("task-episodes")
+    task_episodes.add_argument("target", nargs="?", default="all")
+    task_episodes.add_argument("--session", default="")
+    task_episodes.add_argument("--episode", default="")
+    task_episodes.add_argument("--status", default="")
+    task_episodes.add_argument("--verification-state", default="")
+    task_episodes.add_argument("--failure-state", default="")
+    task_episodes.add_argument("--limit", type=int, default=20)
+
+    answer_neighborhood = sub.add_parser("answer-neighborhood")
+    answer_neighborhood.add_argument("query", nargs="?", default="")
+    answer_neighborhood.add_argument("--session", default="")
+    answer_neighborhood.add_argument("--agent-event", action="append")
+    answer_neighborhood.add_argument("--episode", default="")
+    answer_neighborhood.add_argument("--limit", type=int, default=10)
+    answer_neighborhood.add_argument("--before", type=int, default=3)
+    answer_neighborhood.add_argument("--after", type=int, default=6)
 
     trace = sub.add_parser("trace")
     trace.add_argument("anchor")
@@ -58,6 +106,17 @@ def main() -> None:
     usage.add_argument("--consequence-window", type=int, default=8)
     usage.add_argument("--document-limit", type=int, default=60)
     usage.add_argument("--session", default="")
+
+    usage_neighborhood = sub.add_parser("usage-neighborhood")
+    usage_neighborhood.add_argument("anchor")
+    usage_neighborhood.add_argument("--kind", default="auto")
+    usage_neighborhood.add_argument("--limit", type=int, default=6)
+    usage_neighborhood.add_argument("--per-route-limit", type=int, default=20)
+    usage_neighborhood.add_argument("--before", type=int, default=3)
+    usage_neighborhood.add_argument("--after", type=int, default=8)
+    usage_neighborhood.add_argument("--raw-preview-chars", type=int, default=600)
+    usage_neighborhood.add_argument("--document-limit", type=int, default=80)
+    usage_neighborhood.add_argument("--session", default="")
 
     usage_scenario = sub.add_parser("usage-scenario-audit")
     usage_scenario.add_argument("--seed", default="entity-usage-scenario-audit")
@@ -97,11 +156,26 @@ def main() -> None:
 
     freshness = sub.add_parser("freshness-check")
     freshness.add_argument("refs", nargs="*")
+    freshness.add_argument("--session", default="")
 
     pattern = sub.add_parser("pattern-scan")
     pattern.add_argument("pattern")
     pattern.add_argument("--filter", action="append")
     pattern.add_argument("--limit", type=int, default=50)
+
+    inventory = sub.add_parser("entity-inventory")
+    inventory.add_argument("--layer", default="skill")
+    inventory.add_argument("--query", default="")
+    inventory.add_argument("--session", default="")
+    inventory.add_argument("--limit", type=int, default=50)
+    inventory.add_argument("--sample-limit", type=int, default=2)
+
+    hook_receipts = sub.add_parser("hook-receipts")
+    hook_receipts.add_argument("--event-name", default="UserPromptSubmit")
+    hook_receipts.add_argument("--session", default="")
+    hook_receipts.add_argument("--date-from", default="")
+    hook_receipts.add_argument("--only-errors", action="store_true")
+    hook_receipts.add_argument("--limit", type=int, default=50)
 
     diagnostics = sub.add_parser("latest-diagnostics")
     diagnostics.add_argument("--kind", default="route-layer-readiness")
@@ -171,6 +245,58 @@ def main() -> None:
         _print(state.session_memory_status(include_live=args.include_live))
     elif args.command == "search":
         _print(state.session_search(args.query, filters=_parse_filter(args.filter), limit=args.limit))
+    elif args.command == "agent-responses":
+        _print(
+            state.session_agent_responses(
+                query=args.query,
+                session=args.session,
+                agent_events=args.agent_event,
+                episode=args.episode,
+                closeout_final=args.closeout_final,
+                verification_state=args.verification_state,
+                failure_state=args.failure_state,
+                limit=args.limit,
+            )
+        )
+    elif args.command == "agent-closeouts":
+        _print(state.session_agent_closeouts(query=args.query, session=args.session, episode=args.episode, limit=args.limit))
+    elif args.command == "agent-progress-updates":
+        _print(state.session_agent_progress_updates(query=args.query, session=args.session, episode=args.episode, limit=args.limit))
+    elif args.command == "agent-reasoning-windows":
+        _print(
+            state.session_agent_reasoning_windows(
+                query=args.query,
+                session=args.session,
+                episode=args.episode,
+                limit=args.limit,
+                before=args.before,
+                after=args.after,
+            )
+        )
+    elif args.command == "task-episodes":
+        _print(
+            state.session_task_episodes(
+                target=args.target,
+                session=args.session,
+                episode=args.episode,
+                status=args.status,
+                verification_state=args.verification_state,
+                failure_state=args.failure_state,
+                limit=args.limit,
+            )
+        )
+    elif args.command == "answer-neighborhood":
+        _print(
+            state.session_answer_neighborhood(
+                query=args.query,
+                session=args.session,
+                agent_events=args.agent_event,
+                episode=args.episode,
+                limit=args.limit,
+                before=args.before,
+                after=args.after,
+            )
+        )
     elif args.command == "trace":
         _print(
             state.session_trace(
@@ -192,6 +318,20 @@ def main() -> None:
                 limit=args.limit,
                 per_route_limit=args.per_route_limit,
                 consequence_window=args.consequence_window,
+                document_limit=args.document_limit,
+                session=args.session,
+            )
+        )
+    elif args.command == "usage-neighborhood":
+        _print(
+            state.session_entity_usage_neighborhood(
+                anchor=args.anchor,
+                kind=args.kind,
+                limit=args.limit,
+                per_route_limit=args.per_route_limit,
+                before=args.before,
+                after=args.after,
+                raw_preview_chars=args.raw_preview_chars,
                 document_limit=args.document_limit,
                 session=args.session,
             )
@@ -234,9 +374,29 @@ def main() -> None:
             )
         )
     elif args.command == "freshness-check":
-        _print(state.session_freshness_check(args.refs))
+        _print(state.session_freshness_check(args.refs, session=args.session))
     elif args.command == "pattern-scan":
         _print(state.session_pattern_scan(args.pattern, filters=_parse_filter(args.filter), limit=args.limit))
+    elif args.command == "entity-inventory":
+        _print(
+            state.session_entity_inventory(
+                layer=args.layer,
+                query=args.query,
+                session=args.session,
+                limit=args.limit,
+                sample_limit=args.sample_limit,
+            )
+        )
+    elif args.command == "hook-receipts":
+        _print(
+            state.session_hook_receipts(
+                event_name=args.event_name,
+                session=args.session,
+                date_from=args.date_from,
+                only_errors=args.only_errors,
+                limit=args.limit,
+            )
+        )
     elif args.command == "latest-diagnostics":
         _print(state.latest_diagnostics(kind=args.kind, limit=args.limit, include_payload=args.include_payload))
     elif args.command == "maintenance-plan":
