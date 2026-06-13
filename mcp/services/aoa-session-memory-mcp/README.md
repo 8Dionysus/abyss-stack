@@ -91,8 +91,14 @@ Prompts:
 All tools are read-only. They do not reindex, repair, distill, relabel,
 export, promote, write memory, accept evidence, or mutate `.aoa`.
 
-`aoa_session_memory_status(include_live=true)` runs a fast full-archive
-readiness gate without extracting readiness evidence samples. Full
+`aoa_session_memory_status()` uses a fast search read-model presence probe. It
+checks that the portable SQLite search surface, route index, atlas, and latest
+diagnostic pointers are available, but it does not run global search freshness.
+Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
+operator command when freshness itself is the question.
+
+`aoa_session_memory_status(include_live=true)` additionally runs a fast
+full-archive readiness gate without extracting readiness evidence samples. Full
 sample-bearing `route-readiness --write-report` remains an explicit operator or
 audit route outside the MCP status path.
 
