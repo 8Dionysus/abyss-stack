@@ -500,9 +500,125 @@ class AoASessionMemoryMCPState:
         }
         return payload
 
+    def _sqlite_table_exists(self, conn: sqlite3.Connection, name: str) -> bool:
+        row = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1", (name,)).fetchone()
+        return row is not None
+
+    def _search_provider_status_fast(self) -> dict[str, Any]:
+        db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
+        config = _read_json(self.aoa_root / "config" / "search-providers.json")
+        config = config if isinstance(config, dict) else {}
+        default_provider = str(config.get("default_provider") or "portable_sqlite")
+        authority_law = config.get("authority_law")
+        base: dict[str, Any] = {
+            "schema_version": 1,
+            "artifact_type": "search_provider_status",
+            "provider_schema_version": 1,
+            "generated_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            "aoa_root": self.aoa_root.as_posix(),
+            "config_path": (self.aoa_root / "config" / "search-providers.json").as_posix(),
+            "default_provider": default_provider,
+            "authority_law": authority_law,
+            "selected_provider": "portable_sqlite",
+            "status_mode": "fast_presence_probe",
+            "diagnostics": [],
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": db_path.as_posix(),
+                "authority_boundary": "MCP status reads fixed .aoa search read-model presence; full freshness stays in explicit diagnostics/freshness routes.",
+            },
+        }
+        if not db_path.is_file():
+            provider = {
+                "provider": "portable_sqlite",
+                "ok": False,
+                "status": "missing",
+                "db_path": db_path.as_posix(),
+                "count_mode": "not_counted_fast",
+                "freshness": {"status": "not_checked", "checked": False},
+                "diagnostics": ["search index missing; run search-index"],
+            }
+            base["ok"] = False
+            base["providers"] = {"portable_sqlite": provider}
+            base["diagnostics"] = ["portable_sqlite:missing"]
+            return base
+
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            meta = {
+                str(row["key"]): row["value"]
+                for row in conn.execute("SELECT key, value FROM meta").fetchall()
+            } if self._sqlite_table_exists(conn, "meta") else {}
+            has_documents = self._sqlite_table_exists(conn, "documents") and bool(
+                conn.execute("SELECT 1 FROM documents LIMIT 1").fetchone()
+            )
+            has_routes = self._sqlite_table_exists(conn, "document_routes") and bool(
+                conn.execute("SELECT 1 FROM document_routes LIMIT 1").fetchone()
+            )
+            has_route_terms = self._sqlite_table_exists(conn, "route_terms") and bool(
+                conn.execute("SELECT 1 FROM route_terms LIMIT 1").fetchone()
+            )
+        except sqlite3.Error as exc:
+            provider = {
+                "provider": "portable_sqlite",
+                "ok": False,
+                "status": "sqlite_error",
+                "db_path": db_path.as_posix(),
+                "count_mode": "not_counted_fast",
+                "freshness": {"status": "not_checked", "checked": False},
+                "diagnostics": [f"sqlite_error:{exc}"],
+            }
+            base["ok"] = False
+            base["providers"] = {"portable_sqlite": provider}
+            base["diagnostics"] = [f"portable_sqlite:{provider['status']}"]
+            return base
+        finally:
+            if conn is not None:
+                conn.close()
+
+        diagnostics: list[str] = []
+        if not has_documents:
+            diagnostics.append("search index has no documents")
+        if has_documents and not has_routes:
+            diagnostics.append("search_route_index_empty")
+        if has_routes and not has_route_terms:
+            diagnostics.append("search_route_terms_empty")
+        ok = bool(has_documents and not diagnostics)
+        provider = {
+            "provider": "portable_sqlite",
+            "ok": ok,
+            "status": "ready" if ok else ("empty" if not has_documents else "stale"),
+            "db_path": db_path.as_posix(),
+            "index_generated_at": meta.get("generated_at"),
+            "search_schema_version": meta.get("schema_version"),
+            "has_documents": has_documents,
+            "has_route_index": has_routes,
+            "has_route_terms": has_route_terms,
+            "count_mode": "not_counted_fast",
+            "freshness": {
+                "status": "not_checked",
+                "checked": False,
+                "reason": "MCP status uses fast presence probe; use aoa_session_freshness_check or search-provider-status for freshness.",
+            },
+            "diagnostics": diagnostics,
+        }
+        base["ok"] = ok
+        base["providers"] = {"portable_sqlite": provider}
+        base["diagnostics"] = [] if ok else [f"portable_sqlite:{provider['status']}"]
+        return base
+
     def readiness_policy(self, include_live: bool = False) -> dict[str, Any]:
         return {
             "schema": "aoa_session_memory_readiness_policy_v1",
+            "provider_status": {
+                "status_field": "provider",
+                "mode": "fast_presence_probe",
+                "freshness_checked": False,
+                "freshness_route": "aoa_session_freshness_check or explicit .aoa search-provider-status",
+            },
             "cached_route_readiness": {
                 "source": "latest .aoa route-layer-readiness diagnostic",
                 "role": "cached audit summary with stronger evidence refs in .aoa diagnostics",
@@ -527,7 +643,7 @@ class AoASessionMemoryMCPState:
 
     def session_memory_status(self, include_live: bool = False) -> dict[str, Any]:
         status_timeout = max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS)
-        provider = self._archive_command("search-provider-status", ["--provider", "all"], timeout_seconds=status_timeout)
+        provider = self._search_provider_status_fast()
         atlas = self._atlas_summary()
         diagnostics = self.latest_diagnostics(kind="route-layer-readiness", limit=1)
         live_readiness = None
@@ -1956,6 +2072,8 @@ class AoASessionMemoryMCPState:
     def maintenance_plan(self) -> dict[str, Any]:
         status = self.session_memory_status(include_live=False)
         provider = status.get("provider", {})
+        portable_provider = (provider.get("providers") or {}).get("portable_sqlite") or {}
+        provider_freshness = portable_provider.get("freshness") if isinstance(portable_provider, dict) else {}
         atlas = status.get("atlas", {})
         graph = status.get("graph", {})
         latest_readiness = status.get("latest_route_readiness", {})
@@ -1967,6 +2085,8 @@ class AoASessionMemoryMCPState:
             "current_status": {
                 "provider_ok": provider.get("ok"),
                 "default_provider": provider.get("default_provider"),
+                "provider_status_mode": provider.get("status_mode"),
+                "provider_freshness_checked": provider_freshness.get("checked") if isinstance(provider_freshness, dict) else None,
                 "atlas_entry_count": atlas.get("entry_count"),
                 "graph_node_count": graph.get("node_count"),
                 "graph_edge_count": graph.get("edge_count"),
@@ -2144,7 +2264,7 @@ class AoASessionMemoryMCPState:
         if netloc == "surfaces":
             return self.available_surfaces()
         if netloc == "provider" and parts == ["status"]:
-            return self._archive_command("search-provider-status", ["--provider", "all"])
+            return self._search_provider_status_fast()
         if netloc == "readiness" and parts == ["route-layer"]:
             return self.latest_diagnostics("route-layer-readiness", limit=1)
         if netloc == "diagnostics" and len(parts) >= 2 and parts[0] == "latest":

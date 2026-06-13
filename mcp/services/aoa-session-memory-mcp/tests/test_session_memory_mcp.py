@@ -734,15 +734,24 @@ def state_with_fixture(tmp_path: Path, runner: FakeRunner | None = None) -> AoAS
 
 
 def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> None:
-    state = state_with_fixture(tmp_path)
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
     status = state.session_memory_status()
 
     assert status["schema"] == "aoa_session_memory_status_v1"
     assert status["provider"]["ok"] is True
+    assert status["provider"]["status_mode"] == "fast_presence_probe"
+    assert status["provider"]["providers"]["portable_sqlite"]["freshness"]["checked"] is False
     assert status["atlas"]["entry_count"] == 2
     assert status["latest_route_readiness"]["reports"][0]["summary"]["ok"] is True
+    assert status["readiness_policy"]["provider_status"]["freshness_checked"] is False
     assert status["readiness_policy"]["cached_route_readiness"]["status_field"] == "latest_route_readiness"
     assert status["authority_boundary"]["mutation_posture"].startswith("no write")
+    assert not any(call[0] == "search-provider-status" for call in runner.calls)
+
+    provider_resource = state.read_resource("aoa-session-memory://provider/status")
+    assert provider_resource["status_mode"] == "fast_presence_probe"
+    assert not any(call[0] == "search-provider-status" for call in runner.calls)
 
 
 def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path: Path) -> None:
@@ -753,6 +762,7 @@ def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path:
 
     route_calls = [call for call in runner.calls if call[0] == "route-readiness"]
     assert len(route_calls) == 1
+    assert not any(call[0] == "search-provider-status" for call in runner.calls)
     args = route_calls[0][1]
     assert "--limit" not in args
     assert args[args.index("--sample-limit") + 1] == "0"
