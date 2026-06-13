@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
+STATUS_TIMEOUT_SECONDS = 60.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 
@@ -78,6 +79,13 @@ SEARCH_FILTER_FLAGS = {
     "freshness_status": "--freshness-status",
     "date_from": "--date-from",
     "date_to": "--date-to",
+}
+AGENT_ROUTE_SEARCH_FILTERS = {
+    "closeout_final",
+    "episode",
+    "failure_state",
+    "status",
+    "verification_state",
 }
 STOP_LINES = [
     "Do not replace raw transcript evidence with MCP summaries.",
@@ -265,6 +273,14 @@ def _split_pipe(value: Any) -> list[str]:
     return [part for part in value.strip("|").split("|") if part]
 
 
+def _split_filter_values(value: Any) -> list[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [part.strip() for part in str(value).split(",") if part.strip()]
+
+
 def _parse_iso_time(value: Any) -> dt.datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -439,7 +455,14 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
-    def _archive_command(self, command: str, args: list[str] | None = None, *, allow_nonzero_json: bool = False) -> dict[str, Any]:
+    def _archive_command(
+        self,
+        command: str,
+        args: list[str] | None = None,
+        *,
+        allow_nonzero_json: bool = False,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
         argv = [
             self.python_bin,
             self.script_path.as_posix(),
@@ -450,7 +473,8 @@ class AoASessionMemoryMCPState:
             "--aoa-root",
             self.aoa_root.as_posix(),
         ]
-        output = self.command_runner(argv, self.timeout_seconds)
+        effective_timeout = float(timeout_seconds if timeout_seconds is not None else self.timeout_seconds)
+        output = self.command_runner(argv, effective_timeout)
         try:
             payload: Any = json.loads(output.stdout)
         except json.JSONDecodeError:
@@ -469,6 +493,7 @@ class AoASessionMemoryMCPState:
             "archive_command": command,
             "returncode": output.returncode,
             "elapsed_ms": round(output.elapsed_ms, 2),
+            "timeout_seconds": effective_timeout,
             "stderr": output.stderr.strip()[:1000],
             "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
         }
@@ -500,7 +525,8 @@ class AoASessionMemoryMCPState:
         }
 
     def session_memory_status(self, include_live: bool = False) -> dict[str, Any]:
-        provider = self._archive_command("search-provider-status", ["--provider", "all"])
+        status_timeout = max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS)
+        provider = self._archive_command("search-provider-status", ["--provider", "all"], timeout_seconds=status_timeout)
         atlas = self._atlas_summary()
         diagnostics = self.latest_diagnostics(kind="route-layer-readiness", limit=1)
         live_readiness = None
@@ -512,6 +538,7 @@ class AoASessionMemoryMCPState:
                 "route-readiness",
                 live_args,
                 allow_nonzero_json=True,
+                timeout_seconds=status_timeout,
             )
         return {
             "schema": "aoa_session_memory_status_v1",
@@ -538,12 +565,22 @@ class AoASessionMemoryMCPState:
             if key in SEARCH_FILTER_FLAGS and value not in (None, "")
         }
         diagnostics: list[str] = []
-        for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - {"provider", "explain"}):
+        supported_extra = {"provider", "explain"} | AGENT_ROUTE_SEARCH_FILTERS
+        for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - supported_extra):
             diagnostics.append(f"ignored unsupported filter {key!r}")
         if text:
             text = _ensure_short_text(text, "query")
         elif not active_filters:
             raise ValueError("query or at least one search filter is required")
+        agent_route_payload = self._agent_route_filter_search(
+            query=text,
+            filters=filters,
+            active_filters=active_filters,
+            limit=limit,
+            diagnostics=diagnostics,
+        )
+        if agent_route_payload is not None:
+            return agent_route_payload
         elif self._can_use_local_session_filter_search(active_filters):
             return self._local_session_filter_search(filters=filters, limit=limit, diagnostics=diagnostics)
         args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
@@ -564,6 +601,56 @@ class AoASessionMemoryMCPState:
         if diagnostics:
             payload.setdefault("diagnostics", []).extend(diagnostics)
         payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def _agent_route_filter_search(
+        self,
+        *,
+        query: str,
+        filters: dict[str, Any],
+        active_filters: dict[str, Any],
+        limit: int,
+        diagnostics: list[str],
+    ) -> dict[str, Any] | None:
+        doc_type = str(active_filters.get("doc_type") or "")
+        session = str(active_filters.get("session") or "")
+        episode = str(active_filters.get("task_episode_id") or filters.get("episode") or "")
+
+        if doc_type == "task_episode" and not query and not active_filters.get("agent_event"):
+            payload = self.session_task_episodes(
+                target=session or "all",
+                session=session,
+                episode=episode,
+                status=str(filters.get("status") or ""),
+                verification_state=str(filters.get("verification_state") or ""),
+                failure_state=str(filters.get("failure_state") or ""),
+                limit=limit,
+            )
+            payload.setdefault("diagnostics", []).extend(
+                [*diagnostics, "served by MCP task-episode route fast path"]
+            )
+            return payload
+
+        if "agent_event" not in active_filters and "task_episode_id" not in active_filters:
+            return None
+        if doc_type not in ("", "all", "event"):
+            return None
+
+        payload = self.session_agent_responses(
+            query=query,
+            session=session,
+            agent_events=_split_filter_values(active_filters.get("agent_event")),
+            episode=episode,
+            closeout_final=_as_bool(filters.get("closeout_final"), default=False),
+            verification_state=str(filters.get("verification_state") or "any"),
+            failure_state=str(filters.get("failure_state") or "any"),
+            limit=limit,
+            provider=str(filters.get("provider") or "portable_sqlite"),
+            explain=_as_bool(filters.get("explain"), default=False),
+        )
+        payload.setdefault("diagnostics", []).extend(
+            [*diagnostics, "served by MCP agent-event route fast path"]
+        )
         return payload
 
     def session_agent_responses(
