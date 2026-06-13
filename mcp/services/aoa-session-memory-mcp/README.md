@@ -35,27 +35,39 @@ Resources:
 - `aoa-session-memory://provider/status`
 - `aoa-session-memory://readiness/route-layer`
 - `aoa-session-memory://diagnostics/latest/{kind}`
+- `aoa-session-memory://entities/{layer}`
 - `aoa-session-memory://session/{session}/brief`
 - `aoa-session-memory://session/{session}/manifest`
 - `aoa-session-memory://session/{session}/index`
 - `aoa-session-memory://session/{session}/rehydrate`
 - `aoa-session-memory://route/{axis}/{key}`
 - `aoa-session-memory://trace/{anchor}`
+- `aoa-session-memory://hooks/receipts/{event_name}`
 - `aoa-session-memory://graph/status`
 - `aoa-session-memory://graph/neighborhood/{anchor}`
 
 Tools:
 
 - `aoa_session_memory_status(include_live)`
-- `aoa_session_search(query, filters, limit)`
+- `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied.
+- `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
+- `aoa_session_agent_closeouts(query, session, episode, limit)`
+- `aoa_session_agent_progress_updates(query, session, episode, limit)`
+- `aoa_session_agent_reasoning_windows(query, session, episode, limit, before, after)`
+- `aoa_session_task_episodes(target, session, episode, status, verification_state, failure_state, limit)`
+- `aoa_session_answer_neighborhood(query, session, agent_events, episode, limit, before, after)`
 - `aoa_session_trace(anchor, kind, limit, per_route_limit, session, doc_type)`; the default `doc_type` is `session` for bounded live archive probes, and callers can request `event` when exact event-level evidence is needed.
 - `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session)`
+- `aoa_session_entity_usage_neighborhood(anchor, kind, limit, per_route_limit, before, after, raw_preview_chars, document_limit, session)`
+- `aoa_session_entity_usage_scenario_audit(sample_size, seed, layers, min_postings, limit, per_route_limit, consequence_window, document_limit, raw_preview_limit, full)`
 - `aoa_session_route(axis, key, limit, include_entry_payloads)`
 - `aoa_session_brief(session, max_segments)`
 - `aoa_session_retrieve(recipe, query, session, limit, event_limit)`
 - `aoa_session_evidence_packet(intent, query, anchors, refs, limit)`
-- `aoa_session_freshness_check(refs)`
+- `aoa_session_freshness_check(refs, session)`; pass `session` when checking session-relative refs such as `raw:line:412`.
 - `aoa_session_pattern_scan(pattern, filters, limit)`
+- `aoa_session_entity_inventory(layer, query, session, limit, sample_limit)`; aggregates typed session entities such as `skill`, `mcp`, `hook`, `tool`, `api`, `plugin`, `agent`, `script`, `validator`, `test`, `eval`, `git`, `playbook`, `technique`, `mechanic`, `graph`, and `memory` from route-signal indexes. This is session evidence inventory, not installed runtime inventory.
+- `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets.
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_plan()`
 - `aoa_session_graph_neighborhood(anchor, kind, depth, limit)`

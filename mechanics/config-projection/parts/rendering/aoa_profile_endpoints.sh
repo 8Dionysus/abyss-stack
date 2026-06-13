@@ -53,6 +53,7 @@ fi
 
 if has_module "41-agent-api.yml"; then
   aoa_note "- langchain-api    http://127.0.0.1:5403/health"
+  aoa_note "- langchain trace  http://127.0.0.1:5403/langgraph/inventory"
 fi
 
 if has_module "44-llamacpp-agent-sidecar.yml"; then
@@ -61,6 +62,7 @@ fi
 
 if has_module "43-federation-router.yml"; then
   aoa_note "- route-api        http://127.0.0.1:5402/health"
+  aoa_note "- route-api ds     http://127.0.0.1:5402/observability/datasources"
   aoa_note "- route-api memo   http://127.0.0.1:5402/memo/registry"
   aoa_note "- route-api evals  http://127.0.0.1:5402/evals/catalog"
   aoa_note "- route-api plays  http://127.0.0.1:5402/playbooks/activation"
@@ -74,6 +76,7 @@ fi
 
 if has_module "46-rag-api.yml"; then
   aoa_note "- rag-api          http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/health"
+  aoa_note "- rag-api semantic http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/semantic-inventory"
   aoa_note "- rag-api sources  http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/sources"
   aoa_note "- rag-api dag      http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/dag/jobs"
 fi
@@ -95,6 +98,8 @@ if has_module "60-monitoring.yml"; then
   aoa_note "- prometheus       http://127.0.0.1:9090/-/ready"
   aoa_note "- alertmanager     http://127.0.0.1:9093/-/ready"
   aoa_note "- grafana          http://127.0.0.1:3000/api/health"
+  aoa_note "- tempo            http://127.0.0.1:3200/ready"
+  aoa_note "- alloy-otlp-http  http://127.0.0.1:4318/v1/traces"
 fi
 
 internal_notes=0
@@ -116,5 +121,5 @@ if has_module "60-monitoring.yml"; then
   fi
   aoa_note "- cadvisor is internal-only"
   aoa_note "- loki is internal-only; query it through Grafana's Loki datasource"
-  aoa_note "- alloy is internal-only; it ingests rootless Podman logs into Loki"
+  aoa_note "- alloy admin is internal-only; host-local OTLP ingest forwards traces to Tempo"
 fi

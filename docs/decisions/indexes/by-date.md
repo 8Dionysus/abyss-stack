@@ -108,3 +108,8 @@
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
+## 2026-06-13
+
+- [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)

@@ -13,6 +13,12 @@ from pydantic import BaseModel, model_validator
 
 
 CONFIG_DIR = Path(os.environ.get("ROUTE_API_CONFIG_DIR", "/app/config"))
+GRAFANA_DATASOURCE_DIR = Path(
+    os.environ.get(
+        "ROUTE_API_GRAFANA_DATASOURCE_DIR",
+        "/app/observability/grafana/datasources",
+    )
+)
 COMPATIBILITY_BRIDGE_CONFIG = "upstream-compatibility-bridge.json"
 REQUIRED_CONFIGS = {
     "aoa-agents": "aoa-agents.yaml",
@@ -145,6 +151,133 @@ def iso_mtime(path: Path) -> str | None:
     if not path.exists():
         return None
     return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+
+
+def safe_url_without_userinfo(raw: Any) -> str | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    from urllib.parse import urlsplit, urlunsplit
+
+    try:
+        parsed = urlsplit(raw)
+    except ValueError:
+        return None
+    if not parsed.netloc:
+        return raw
+    host = parsed.hostname or ""
+    if parsed.port is not None:
+        host = f"{host}:{parsed.port}"
+    return urlunsplit((parsed.scheme, host, parsed.path, parsed.query, parsed.fragment))
+
+
+def datasource_identity(source_file: str, entry: dict[str, Any]) -> str:
+    uid = entry.get("uid")
+    if isinstance(uid, str) and uid:
+        return uid
+    name = entry.get("name")
+    datasource_type = entry.get("type")
+    if isinstance(name, str) and name and isinstance(datasource_type, str) and datasource_type:
+        return f"{datasource_type}:{name}"
+    return f"file:{source_file}"
+
+
+def safe_grafana_datasource_entry(source_file: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    json_data = entry.get("jsonData") if isinstance(entry.get("jsonData"), dict) else {}
+    secure_json_fields = entry.get("secureJsonFields") if isinstance(entry.get("secureJsonFields"), dict) else {}
+    source_name = source_file.name
+    return {
+        "datasource_uid_or_id": datasource_identity(source_name, entry),
+        "uid": entry.get("uid") if isinstance(entry.get("uid"), str) else None,
+        "name": entry.get("name") if isinstance(entry.get("name"), str) else None,
+        "type": entry.get("type") if isinstance(entry.get("type"), str) else None,
+        "access": entry.get("access") if isinstance(entry.get("access"), str) else None,
+        "url": safe_url_without_userinfo(entry.get("url")),
+        "is_default": bool(entry.get("isDefault")),
+        "editable": bool(entry.get("editable")),
+        "provisioned": True,
+        "source_file": source_name,
+        "source_mtime_utc": iso_mtime(source_file),
+        "json_data_keys": sorted(str(key) for key in json_data.keys())[:32],
+        "secure_json_field_keys": sorted(str(key) for key in secure_json_fields.keys())[:32],
+        "redaction": {
+            "secure_json_data_included": False,
+            "passwords_included": False,
+            "tokens_included": False,
+            "url_userinfo_redacted": True,
+            "json_data_values_included": False,
+        },
+    }
+
+
+def grafana_datasource_inventory(datasource_dir: Path = GRAFANA_DATASOURCE_DIR) -> dict[str, Any]:
+    generated_at = datetime.now(timezone.utc).isoformat()
+    files = sorted(
+        path for pattern in ("*.yml", "*.yaml") for path in datasource_dir.glob(pattern)
+        if path.is_file()
+    ) if datasource_dir.is_dir() else []
+    entries: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for path in files:
+        try:
+            payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:
+            errors.append({"file": path.name, "error": f"{type(exc).__name__}:{exc}"})
+            continue
+        datasources = payload.get("datasources") if isinstance(payload, dict) else None
+        if not isinstance(datasources, list):
+            errors.append({"file": path.name, "error": "datasources_not_list"})
+            continue
+        for item in datasources[:256]:
+            if isinstance(item, dict):
+                entries.append(safe_grafana_datasource_entry(path, item))
+    datasource_types = sorted({str(item.get("type")) for item in entries if item.get("type")})
+    default_datasources = [
+        str(item.get("datasource_uid_or_id"))
+        for item in entries
+        if item.get("is_default")
+    ]
+    return {
+        "ok": bool(entries) and not errors,
+        "schema": "abyss_stack_grafana_datasource_inventory_v1",
+        "generated_at": generated_at,
+        "source": {
+            "kind": "grafana_provisioning_datasources",
+            "path": datasource_dir.as_posix(),
+            "files": [path.name for path in files],
+            "file_count": len(files),
+        },
+        "datasource_inventory": {
+            "present": bool(entries),
+            "count": len(entries),
+            "types": datasource_types,
+            "default_datasource_ids": default_datasources,
+            "entries": entries,
+        },
+        "errors": errors,
+        "evidence_refs": [
+            {
+                "path": str(path),
+                "mtime_utc": iso_mtime(path),
+                "probe": "grafana_provisioning_datasource_file",
+            }
+            for path in files[:32]
+        ],
+        "redaction": {
+            "secure_json_data_included": False,
+            "passwords_included": False,
+            "tokens_included": False,
+            "raw_credentials_included": False,
+            "json_data_values_included": False,
+            "url_userinfo_redacted": True,
+        },
+        "policy": {
+            "read_only": True,
+            "stack_owned": True,
+            "host_layer_mutates_stack": False,
+            "stores_grafana_credentials": False,
+            "raw_secrets_included": False,
+        },
+    }
 
 
 def validated_required_files(config: dict[str, Any], mirror_root: Path) -> list[str]:
@@ -2036,6 +2169,11 @@ def surface_status() -> dict[str, Any]:
         "closure_summary": closure_summary(layers_status),
         "layers_status": layers_status,
     }
+
+
+@app.get("/observability/datasources")
+def observability_datasources() -> dict[str, Any]:
+    return grafana_datasource_inventory()
 
 
 @app.get("/agents")

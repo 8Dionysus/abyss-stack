@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import time
+import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -28,11 +30,24 @@ ALLOWED_TRACE_KINDS = {
     "hook",
     "mcp",
     "path",
+    "api",
+    "plugin",
+    "agent",
+    "script",
+    "validator",
+    "test",
+    "eval",
+    "git",
+    "playbook",
+    "technique",
+    "mechanic",
+    "graph",
+    "memory",
     "skill",
     "tool",
 }
 ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident"}
-ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident"}
+ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode"}
 DEFAULT_GRAPH_QUALITY_ANCHORS = [
     "mcp:aoa-session-memory-mcp",
     "skill:aoa-memo-writeback",
@@ -55,6 +70,8 @@ SEARCH_FILTER_FLAGS = {
     "outcome": "--outcome",
     "conversation_act": "--conversation-act",
     "session_act": "--session-act",
+    "agent_event": "--agent-event",
+    "task_episode_id": "--task-episode-id",
     "route_layer": "--route-layer",
     "route_signal": "--route-signal",
     "archive_status": "--archive-status",
@@ -74,8 +91,23 @@ ROUTE_LAYERS = [
     "authority_surface",
     "entity",
     "path",
+    "skill",
     "tool",
     "mcp",
+    "hook",
+    "api",
+    "plugin",
+    "agent",
+    "script",
+    "validator",
+    "test",
+    "eval",
+    "git",
+    "playbook",
+    "technique",
+    "mechanic",
+    "graph",
+    "memory",
     "hook_health",
     "goal",
     "verification_state",
@@ -91,7 +123,28 @@ ROUTE_LAYERS = [
     "access_boundary",
     "resource_profile",
     "operator_preference",
+    "agent_event",
 ]
+INVENTORY_LAYER_TO_AXIS = {
+    "skill": "by-skill",
+    "mcp": "by-mcp",
+    "hook": "by-hook",
+    "tool": "by-tool",
+    "api": "by-api",
+    "plugin": "by-plugin",
+    "agent": "by-agent",
+    "script": "by-script",
+    "validator": "by-validator",
+    "test": "by-test",
+    "eval": "by-eval",
+    "git": "by-git",
+    "playbook": "by-playbook",
+    "technique": "by-technique",
+    "mechanic": "by-mechanic",
+    "graph": "by-graph",
+    "memory": "by-memory-entity",
+    "agent_event": "by-agent-event",
+}
 
 
 @dataclass(slots=True)
@@ -150,6 +203,14 @@ def _coerce_limit(value: int | None, default: int, maximum: int) -> int:
     return max(1, min(parsed, maximum))
 
 
+def _coerce_bounded_int(value: int | None, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(parsed, maximum))
+
+
 def _as_bool(value: Any, default: bool = False) -> bool:
     if value is None:
         return default
@@ -180,6 +241,11 @@ def _route_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
 
 
+def _session_date_from_label(value: Any) -> str | None:
+    match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", str(value or ""))
+    return match.group(1) if match else None
+
+
 def _normalize_axis(axis: str) -> str:
     text = _ensure_short_text(axis, "axis", limit=80).casefold().replace("_", "-")
     return text if text.startswith("by-") else f"by-{text}"
@@ -199,6 +265,23 @@ def _split_pipe(value: Any) -> list[str]:
     return [part for part in value.strip("|").split("|") if part]
 
 
+def _parse_iso_time(value: Any) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        text = f"{text}T00:00:00+00:00"
+    elif text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.UTC)
+    return parsed.astimezone(dt.UTC)
+
+
 def _compact_hit(hit: dict[str, Any]) -> dict[str, Any]:
     return {
         "doc_id": hit.get("doc_id"),
@@ -210,6 +293,8 @@ def _compact_hit(hit: dict[str, Any]) -> dict[str, Any]:
         "family": hit.get("family"),
         "conversation_act": hit.get("conversation_act"),
         "session_act": hit.get("session_act"),
+        "agent_event": hit.get("agent_event"),
+        "task_episode_id": hit.get("task_episode_id"),
         "route_layers": hit.get("route_layers"),
         "route_signals": hit.get("route_signals"),
         "title": hit.get("title"),
@@ -321,14 +406,24 @@ class AoASessionMemoryMCPState:
             "tools": [
                 "aoa_session_memory_status",
                 "aoa_session_search",
+                "aoa_session_agent_responses",
+                "aoa_session_agent_closeouts",
+                "aoa_session_agent_progress_updates",
+                "aoa_session_agent_reasoning_windows",
+                "aoa_session_task_episodes",
+                "aoa_session_answer_neighborhood",
                 "aoa_session_trace",
                 "aoa_session_entity_usage_audit",
+                "aoa_session_entity_usage_neighborhood",
+                "aoa_session_entity_usage_scenario_audit",
                 "aoa_session_route",
                 "aoa_session_brief",
                 "aoa_session_retrieve",
                 "aoa_session_evidence_packet",
                 "aoa_session_freshness_check",
                 "aoa_session_pattern_scan",
+                "aoa_session_entity_inventory",
+                "aoa_session_hook_receipts",
                 "aoa_session_latest_diagnostics",
                 "aoa_session_maintenance_plan",
                 "aoa_session_graph_neighborhood",
@@ -435,10 +530,23 @@ class AoASessionMemoryMCPState:
         }
 
     def session_search(self, query: str, filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
-        text = _ensure_short_text(query, "query")
         filters = filters or {}
-        args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
+        text = str(query or "").strip()
+        active_filters = {
+            key: value
+            for key, value in filters.items()
+            if key in SEARCH_FILTER_FLAGS and value not in (None, "")
+        }
         diagnostics: list[str] = []
+        for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - {"provider", "explain"}):
+            diagnostics.append(f"ignored unsupported filter {key!r}")
+        if text:
+            text = _ensure_short_text(text, "query")
+        elif not active_filters:
+            raise ValueError("query or at least one search filter is required")
+        elif self._can_use_local_session_filter_search(active_filters):
+            return self._local_session_filter_search(filters=filters, limit=limit, diagnostics=diagnostics)
+        args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
         provider = filters.get("provider")
         if provider:
             args.extend(["--provider", _safe_selector(str(provider), "provider", limit=64)])
@@ -450,8 +558,6 @@ class AoASessionMemoryMCPState:
                 diagnostics.append(f"ignored unsupported doc_type={value!r}")
                 continue
             args.extend([flag, _safe_selector(str(value), key)])
-        for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - {"provider", "explain"}):
-            diagnostics.append(f"ignored unsupported filter {key!r}")
         if _as_bool(filters.get("explain"), default=True):
             args.append("--explain")
         payload = self._archive_command("search", args)
@@ -459,6 +565,338 @@ class AoASessionMemoryMCPState:
             payload.setdefault("diagnostics", []).extend(diagnostics)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
+
+    def session_agent_responses(
+        self,
+        query: str = "",
+        session: str = "",
+        agent_events: list[str] | None = None,
+        episode: str = "",
+        closeout_final: bool = False,
+        verification_state: str = "any",
+        failure_state: str = "any",
+        limit: int = 20,
+        provider: str = "portable_sqlite",
+        explain: bool = True,
+    ) -> dict[str, Any]:
+        text = str(query or "").strip()
+        if text:
+            text = _ensure_short_text(text, "query")
+        args = [
+            "--query",
+            text,
+            "--limit",
+            str(_coerce_limit(limit, 20, 100)),
+            "--provider",
+            _safe_selector(provider, "provider", limit=64),
+        ]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        if episode:
+            args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
+        for agent_event in agent_events or []:
+            args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
+        if closeout_final:
+            args.append("--closeout-final")
+        if verification_state != "any":
+            args.extend(["--verification-state", _safe_selector(verification_state, "verification_state", limit=32)])
+        if failure_state != "any":
+            args.extend(["--failure-state", _safe_selector(failure_state, "failure_state", limit=32)])
+        if explain:
+            args.append("--explain")
+        payload = self._archive_command("agent-responses", args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_agent_closeouts(
+        self,
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        limit: int = 20,
+        provider: str = "portable_sqlite",
+        explain: bool = True,
+    ) -> dict[str, Any]:
+        return self._simple_agent_event_route(
+            command="agent-closeouts",
+            query=query,
+            session=session,
+            episode=episode,
+            limit=limit,
+            provider=provider,
+            explain=explain,
+        )
+
+    def session_agent_progress_updates(
+        self,
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        limit: int = 20,
+        provider: str = "portable_sqlite",
+        explain: bool = True,
+    ) -> dict[str, Any]:
+        return self._simple_agent_event_route(
+            command="agent-progress-updates",
+            query=query,
+            session=session,
+            episode=episode,
+            limit=limit,
+            provider=provider,
+            explain=explain,
+        )
+
+    def _simple_agent_event_route(
+        self,
+        *,
+        command: str,
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        limit: int = 20,
+        provider: str = "portable_sqlite",
+        explain: bool = True,
+    ) -> dict[str, Any]:
+        text = str(query or "").strip()
+        if text:
+            text = _ensure_short_text(text, "query")
+        args = [
+            "--query",
+            text,
+            "--limit",
+            str(_coerce_limit(limit, 20, 100)),
+            "--provider",
+            _safe_selector(provider, "provider", limit=64),
+        ]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        if episode:
+            args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
+        if explain:
+            args.append("--explain")
+        payload = self._archive_command(command, args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_agent_reasoning_windows(
+        self,
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        limit: int = 10,
+        before: int = 3,
+        after: int = 6,
+        provider: str = "portable_sqlite",
+    ) -> dict[str, Any]:
+        return self._agent_event_window_route(
+            command="agent-reasoning-windows",
+            query=query,
+            session=session,
+            episode=episode,
+            limit=limit,
+            before=before,
+            after=after,
+            provider=provider,
+        )
+
+    def session_answer_neighborhood(
+        self,
+        query: str = "",
+        session: str = "",
+        agent_events: list[str] | None = None,
+        episode: str = "",
+        limit: int = 10,
+        before: int = 3,
+        after: int = 6,
+        provider: str = "portable_sqlite",
+    ) -> dict[str, Any]:
+        return self._agent_event_window_route(
+            command="answer-neighborhood",
+            query=query,
+            session=session,
+            episode=episode,
+            agent_events=agent_events,
+            limit=limit,
+            before=before,
+            after=after,
+            provider=provider,
+        )
+
+    def _agent_event_window_route(
+        self,
+        *,
+        command: str,
+        query: str = "",
+        session: str = "",
+        episode: str = "",
+        agent_events: list[str] | None = None,
+        limit: int = 10,
+        before: int = 3,
+        after: int = 6,
+        provider: str = "portable_sqlite",
+    ) -> dict[str, Any]:
+        text = str(query or "").strip()
+        if text:
+            text = _ensure_short_text(text, "query")
+        args = [
+            "--query",
+            text,
+            "--limit",
+            str(_coerce_limit(limit, 10, 50)),
+            "--before",
+            str(_coerce_bounded_int(before, 3, 0, 24)),
+            "--after",
+            str(_coerce_bounded_int(after, 6, 0, 48)),
+            "--provider",
+            _safe_selector(provider, "provider", limit=64),
+        ]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        if episode:
+            args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
+        for agent_event in agent_events or []:
+            args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
+        payload = self._archive_command(command, args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_task_episodes(
+        self,
+        target: str = "all",
+        session: str = "",
+        episode: str = "",
+        status: str = "",
+        verification_state: str = "",
+        failure_state: str = "",
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        args = [_safe_selector(target or "all", "target", limit=160), "--limit", str(_coerce_limit(limit, 20, 100))]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        if episode:
+            args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
+        if status:
+            args.extend(["--status", _safe_selector(status, "status", limit=32)])
+        if verification_state:
+            args.extend(["--verification-state", _safe_selector(verification_state, "verification_state", limit=32)])
+        if failure_state:
+            args.extend(["--failure-state", _safe_selector(failure_state, "failure_state", limit=32)])
+        payload = self._archive_command("task-episodes", args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def _can_use_local_session_filter_search(self, active_filters: dict[str, Any]) -> bool:
+        if "session" not in active_filters:
+            return False
+        allowed = {"session", "doc_type"}
+        if set(active_filters) - allowed:
+            return False
+        doc_type = active_filters.get("doc_type")
+        return doc_type in (None, "", "session")
+
+    def _local_session_filter_search(
+        self,
+        filters: dict[str, Any],
+        limit: int,
+        diagnostics: list[str] | None = None,
+    ) -> dict[str, Any]:
+        selector = _safe_selector(str(filters.get("session") or ""), "session")
+        include_explain = _as_bool(filters.get("explain"), default=True)
+        provider = str(filters.get("provider") or "portable_sqlite")
+        limit = _coerce_limit(limit, 20, 100)
+        session_dir = self._resolve_session_dir(selector)
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "search_results",
+            "search_schema_version": "mcp-local-session-filter",
+            "ok": True,
+            "query": "",
+            "normalized_query": "",
+            "result_count": 0,
+            "results": [],
+            "provider": {
+                "selected": provider,
+                "authoritative_result_provider": "mcp_local_session_filter",
+                "status": "local_session_filter_fast_path",
+                "authority_law": ".aoa refs remain authoritative; MCP local session filter only routes to existing session evidence.",
+            },
+            "diagnostics": list(diagnostics or []),
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "authority_boundary": "MCP local session filter routes to .aoa refs without invoking full archive search.",
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+        if session_dir is None:
+            payload["diagnostics"].append(f"session filter did not resolve: {selector}")
+            return payload
+        manifest_path = session_dir / "session.manifest.json"
+        index_path = session_dir / "session.index.json"
+        manifest = _read_json(manifest_path)
+        index = _read_json(index_path)
+        if not isinstance(manifest, dict):
+            payload["ok"] = False
+            payload["diagnostics"].append(f"session manifest missing or invalid: {manifest_path}")
+            return payload
+        if not isinstance(index, dict):
+            index = {}
+        display = manifest.get("display") if isinstance(manifest.get("display"), dict) else {}
+        source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
+        raw = manifest.get("raw") if isinstance(manifest.get("raw"), dict) else {}
+        session_id = str(manifest.get("session_id") or index.get("session_id") or "")
+        label = str(manifest.get("session_label") or display.get("label") or session_dir.name)
+        title = str(manifest.get("session_title") or display.get("title") or "")
+        session_date = str(display.get("date") or self._date_from_session_label(label) or "")
+        result = {
+            "rank": 0.0,
+            "doc_id": f"session:{session_id or label}",
+            "doc_type": "session",
+            "session_id": session_id,
+            "session_label": label,
+            "session_title": title,
+            "session_date": session_date,
+            "cwd": source.get("cwd") or manifest.get("cwd") or index.get("work_context"),
+            "archive_status": manifest.get("archive_status"),
+            "review_status": manifest.get("review_status"),
+            "distillation_status": manifest.get("distillation_status"),
+            "event_count": manifest.get("event_count") or index.get("event_count"),
+            "segment_count": manifest.get("segment_count") or index.get("segment_count"),
+            "title": title or label,
+            "snippet": " ".join(part for part in [label, title] if part)[:600],
+            "refs": {
+                "session": manifest_path.as_posix(),
+                "session_index": index_path.as_posix(),
+                "session_md": (session_dir / "SESSION.md").as_posix(),
+                "raw": raw.get("path"),
+                "raw_sha256": raw.get("sha256"),
+                "blocks_index": raw.get("blocks_index"),
+            },
+            "freshness": {
+                "status": "present",
+                "reasons": ["local_session_filter_fast_path"],
+            },
+        }
+        if include_explain:
+            result["explain"] = {
+                "query": "",
+                "matched_document_layer": "session",
+                "fast_path": "mcp_local_session_filter",
+                "session_selector": selector,
+                "routing_fields": {
+                    "session_id": session_id,
+                    "session_label": label,
+                    "session_title": title,
+                },
+            }
+        payload["result_count"] = 1 if limit >= 1 else 0
+        payload["results"] = [result] if limit >= 1 else []
+        payload["diagnostics"].append("served by MCP local session filter fast path")
+        return payload
+
+    def _date_from_session_label(self, label: str) -> str:
+        match = re.match(r"(\d{4}-\d{2}-\d{2})", label)
+        return match.group(1) if match else ""
 
     def session_trace(
         self,
@@ -525,6 +963,85 @@ class AoASessionMemoryMCPState:
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         payload = self._archive_command("entity-usage-audit", args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_entity_usage_neighborhood(
+        self,
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 6,
+        per_route_limit: int = 20,
+        before: int = 3,
+        after: int = 8,
+        raw_preview_chars: int = 600,
+        document_limit: int = 80,
+        session: str = "",
+    ) -> dict[str, Any]:
+        anchor_text = _ensure_short_text(anchor, "anchor")
+        if kind not in ALLOWED_TRACE_KINDS:
+            raise ValueError(f"unsupported trace kind: {kind}")
+        args = [
+            anchor_text,
+            "--kind",
+            kind,
+            "--limit",
+            str(_coerce_limit(limit, 6, 40)),
+            "--per-route-limit",
+            str(_coerce_limit(per_route_limit, 20, 100)),
+            "--before",
+            str(_coerce_bounded_int(before, 3, 0, 24)),
+            "--after",
+            str(_coerce_limit(after, 8, 48)),
+            "--raw-preview-chars",
+            str(_coerce_bounded_int(raw_preview_chars, 600, 0, 2000)),
+            "--document-limit",
+            str(_coerce_limit(document_limit, 80, 200)),
+            "--full",
+        ]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        payload = self._archive_command("entity-usage-neighborhood", args, allow_nonzero_json=True)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_entity_usage_scenario_audit(
+        self,
+        sample_size: int = 8,
+        seed: str = "entity-usage-scenario-audit",
+        layers: list[str] | None = None,
+        min_postings: int = 1,
+        limit: int = 8,
+        per_route_limit: int = 8,
+        consequence_window: int = 4,
+        document_limit: int = 24,
+        raw_preview_limit: int = 3,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        seed_text = _ensure_short_text(seed, "seed", limit=120)
+        args = [
+            "--seed",
+            seed_text,
+            "--sample-size",
+            str(_coerce_limit(sample_size, 8, 50)),
+            "--min-postings",
+            str(_coerce_limit(min_postings, 1, 1000000)),
+            "--limit",
+            str(_coerce_limit(limit, 8, 50)),
+            "--per-route-limit",
+            str(_coerce_limit(per_route_limit, 8, 50)),
+            "--consequence-window",
+            str(_coerce_limit(consequence_window, 4, 24)),
+            "--document-limit",
+            str(_coerce_limit(document_limit, 24, 100)),
+            "--raw-preview-limit",
+            str(_coerce_limit(raw_preview_limit, 3, 20)),
+        ]
+        for layer in layers or []:
+            args.extend(["--layer", _safe_selector(str(layer), "layer", limit=80)])
+        if full:
+            args.append("--full")
+        payload = self._archive_command("entity-usage-scenario-audit", args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -700,16 +1217,18 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
-    def session_freshness_check(self, refs: list[str] | None = None) -> dict[str, Any]:
+    def session_freshness_check(self, refs: list[str] | None = None, session: str = "") -> dict[str, Any]:
         refs = refs or []
         provider = self._archive_command("search-provider-status", ["--provider", "portable_sqlite"])
-        checks = [self._check_ref(ref) for ref in refs[:100]]
+        session_dir = self._resolve_session_dir(session) if session else None
+        checks = [self._check_ref(ref, session_dir=session_dir) for ref in refs[:100]]
         return {
             "schema": "aoa_session_memory_freshness_check_v1",
             "ok": bool(provider.get("ok")) and not any(check["status"] == "missing" for check in checks),
             "mutates": False,
             "provider": provider,
             "ref_count": len(refs),
+            "session": session or None,
             "checks": checks,
             "authority_boundary": self.authority_boundary(),
         }
@@ -745,6 +1264,469 @@ class AoASessionMemoryMCPState:
             "aggregates": {key: self._top_counts(value) for key, value in aggregates.items()},
             "sample_hits": [_compact_hit(hit) for hit in hits[:12]],
             "search": search,
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def session_entity_inventory(
+        self,
+        layer: str = "skill",
+        query: str = "",
+        session: str = "",
+        limit: int = 50,
+        sample_limit: int = 2,
+    ) -> dict[str, Any]:
+        layer_key = _safe_selector(str(layer or "skill"), "layer", limit=80)
+        if layer_key not in ROUTE_LAYERS:
+            raise ValueError(f"unsupported inventory layer: {layer_key}")
+        selected_limit = _coerce_limit(limit, 50, 200)
+        selected_sample_limit = _coerce_bounded_int(sample_limit, 2, 0, 5)
+        query_text = str(query or "").strip()
+        if query_text:
+            query_text = _ensure_short_text(query_text, "query", limit=120)
+        atlas_inventory = self._atlas_entity_inventory(
+            layer_key=layer_key,
+            query_text=query_text,
+            session=session,
+            limit=selected_limit,
+            sample_limit=selected_sample_limit,
+        )
+        if atlas_inventory is not None:
+            return atlas_inventory
+        db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
+        if not db_path.is_file():
+            return {
+                "schema": "aoa_session_memory_entity_inventory_v1",
+                "ok": False,
+                "mutates": False,
+                "layer": layer_key,
+                "source": "portable_sqlite",
+                "entity_count": 0,
+                "entities": [],
+                "diagnostics": [f"search db missing: {db_path}"],
+                "truth_status": "session route-signal inventory; not runtime installed inventory",
+                "authority_boundary": self.authority_boundary(),
+            }
+        filters = ["route_terms.layer = ?"]
+        params: list[Any] = [layer_key]
+        if query_text:
+            like = f"%{_route_key(query_text)}%"
+            filters.append("(route_terms.key LIKE ? OR route_terms.route_signal LIKE ?)")
+            params.extend([like, like])
+        if session:
+            selector = _safe_selector(session, "session", limit=180)
+            filters.append("(documents.session_id = ? OR documents.session_label LIKE ? OR documents.session_title LIKE ?)")
+            params.extend([selector, f"%{selector}%", f"%{selector}%"])
+        where = " AND ".join(filters)
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                f"""
+                SELECT
+                    route_terms.key AS entity_key,
+                    route_terms.route_signal AS route_signal,
+                    COUNT(*) AS signal_count,
+                    COUNT(DISTINCT documents.session_id) AS session_count,
+                    MAX(documents.session_date) AS latest_session_date
+                FROM route_terms
+                JOIN document_routes ON document_routes.route_id = route_terms.id
+                JOIN documents ON documents.rowid = document_routes.doc_rowid
+                WHERE {where}
+                GROUP BY route_terms.key, route_terms.route_signal
+                ORDER BY signal_count DESC, session_count DESC, entity_key ASC
+                LIMIT ?
+                """,
+                [*params, selected_limit],
+            ).fetchall()
+            entities: list[dict[str, Any]] = []
+            for row in rows:
+                samples = []
+                if selected_sample_limit:
+                    sample_rows = conn.execute(
+                        f"""
+                        SELECT
+                            documents.id,
+                            documents.doc_type,
+                            documents.session_id,
+                            documents.session_label,
+                            documents.session_title,
+                            documents.session_date,
+                            documents.event_type,
+                            documents.family,
+                            documents.title,
+                            documents.segment_ref,
+                            documents.segment_index_path,
+                            documents.raw_ref,
+                            documents.raw_block_ref,
+                            documents.manifest_path,
+                            documents.freshness_status,
+                            documents.stale_reason
+                        FROM route_terms
+                        JOIN document_routes ON document_routes.route_id = route_terms.id
+                        JOIN documents ON documents.rowid = document_routes.doc_rowid
+                        WHERE {where} AND route_terms.key = ?
+                        ORDER BY documents.session_date DESC, documents.rowid DESC
+                        LIMIT ?
+                        """,
+                        [*params, row["entity_key"], selected_sample_limit],
+                    ).fetchall()
+                    samples = [self._inventory_sample_from_row(sample) for sample in sample_rows]
+                entities.append(
+                    {
+                        "key": row["entity_key"],
+                        "route_signal": row["route_signal"],
+                        "signal_count": int(row["signal_count"] or 0),
+                        "session_count": int(row["session_count"] or 0),
+                        "latest_session_date": row["latest_session_date"],
+                        "samples": samples,
+                    }
+                )
+        except sqlite3.Error as exc:
+            return {
+                "schema": "aoa_session_memory_entity_inventory_v1",
+                "ok": False,
+                "mutates": False,
+                "layer": layer_key,
+                "source": "portable_sqlite",
+                "entity_count": 0,
+                "entities": [],
+                "diagnostics": [f"sqlite_error:{exc}"],
+                "truth_status": "session route-signal inventory; not runtime installed inventory",
+                "authority_boundary": self.authority_boundary(),
+            }
+        finally:
+            if conn is not None:
+                conn.close()
+        return {
+            "schema": "aoa_session_memory_entity_inventory_v1",
+            "ok": True,
+            "mutates": False,
+            "layer": layer_key,
+            "query": query_text,
+            "session": session or None,
+            "source": "portable_sqlite",
+            "entity_count": len(entities),
+            "entities": entities,
+            "diagnostics": [],
+            "truth_status": "session route-signal inventory; not runtime installed inventory",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _atlas_entity_inventory(
+        self,
+        *,
+        layer_key: str,
+        query_text: str,
+        session: str,
+        limit: int,
+        sample_limit: int,
+    ) -> dict[str, Any] | None:
+        axis = INVENTORY_LAYER_TO_AXIS.get(layer_key)
+        if not axis:
+            return None
+        index_path = self.aoa_root / "maps" / axis / "index.json"
+        if not index_path.is_file():
+            return None
+        payload = _read_json(index_path)
+        if not isinstance(payload, dict):
+            return {
+                "schema": "aoa_session_memory_entity_inventory_v1",
+                "ok": False,
+                "mutates": False,
+                "layer": layer_key,
+                "query": query_text,
+                "session": session or None,
+                "source": "atlas",
+                "atlas_index": index_path.as_posix(),
+                "entity_count": 0,
+                "entities": [],
+                "diagnostics": [f"atlas index unreadable: {index_path}"],
+                "truth_status": "session route-signal inventory; not runtime installed inventory",
+                "authority_boundary": self.authority_boundary(),
+            }
+        entries = payload.get("entries")
+        if not isinstance(entries, list):
+            entries = []
+        query_key = _route_key(query_text) if query_text else ""
+        session_selector = _safe_selector(session, "session", limit=180) if session else ""
+        aggregates: dict[str, dict[str, Any]] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            route_key = str(entry.get("route_key") or "").strip()
+            if not route_key:
+                continue
+            normalized_key = _route_key(route_key)
+            route_signal = f"{layer_key}:{normalized_key or route_key}"
+            if query_key and query_key not in normalized_key and query_key not in _route_key(route_signal):
+                continue
+            session_id = str(entry.get("session_id") or "").strip()
+            session_label = str(entry.get("session") or "").strip()
+            if session_selector:
+                comparable = " ".join([session_id, session_label]).casefold()
+                if session_selector.casefold() not in comparable:
+                    continue
+            bucket = aggregates.setdefault(
+                normalized_key or route_key,
+                {
+                    "key": normalized_key or route_key,
+                    "route_signal": route_signal,
+                    "signal_count": 0,
+                    "sessions": set(),
+                    "latest_session_date": None,
+                    "samples": [],
+                },
+            )
+            signal_count = int(entry.get("signal_count") or 1)
+            bucket["signal_count"] += max(signal_count, 1)
+            if session_id:
+                bucket["sessions"].add(session_id)
+            elif session_label:
+                bucket["sessions"].add(session_label)
+            session_date = _session_date_from_label(session_label)
+            if session_date and (bucket["latest_session_date"] is None or session_date > bucket["latest_session_date"]):
+                bucket["latest_session_date"] = session_date
+            if len(bucket["samples"]) < sample_limit:
+                bucket["samples"].append(self._inventory_sample_from_atlas_entry(entry))
+        entities = sorted(
+            aggregates.values(),
+            key=lambda item: (-int(item["signal_count"]), -len(item["sessions"]), str(item["key"])),
+        )[:limit]
+        cleaned_entities = [
+            {
+                "key": item["key"],
+                "route_signal": item["route_signal"],
+                "signal_count": int(item["signal_count"]),
+                "session_count": len(item["sessions"]),
+                "latest_session_date": item["latest_session_date"],
+                "samples": item["samples"],
+            }
+            for item in entities
+        ]
+        return {
+            "schema": "aoa_session_memory_entity_inventory_v1",
+            "ok": True,
+            "mutates": False,
+            "layer": layer_key,
+            "query": query_text,
+            "session": session or None,
+            "source": "atlas",
+            "atlas_axis": axis,
+            "atlas_index": index_path.as_posix(),
+            "atlas_generated_at": payload.get("generated_at"),
+            "entity_count": len(cleaned_entities),
+            "entities": cleaned_entities,
+            "diagnostics": [],
+            "truth_status": "session route-signal inventory; not runtime installed inventory",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _inventory_sample_from_atlas_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
+        evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
+        refs = {
+            "session": evidence.get("session_ref"),
+            "segment": evidence.get("segment_ref"),
+            "segment_index": evidence.get("generated_index_ref"),
+            "raw": evidence.get("raw_ref"),
+            "atlas_entry": entry.get("json"),
+            "atlas_markdown": entry.get("markdown"),
+        }
+        return {
+            "doc_id": entry.get("entry_id") or entry.get("json"),
+            "doc_type": "atlas_entry",
+            "session_id": entry.get("session_id"),
+            "session_label": entry.get("session"),
+            "session_title": entry.get("session_title"),
+            "session_date": _session_date_from_label(entry.get("session")),
+            "event_type": entry.get("event_type"),
+            "family": entry.get("family"),
+            "title": entry.get("title") or entry.get("summary"),
+            "confidence": entry.get("confidence"),
+            "refs": {key: value for key, value in refs.items() if value},
+            "freshness": {"status": "atlas_generated", "reasons": []},
+        }
+
+    def _inventory_sample_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        refs = {
+            "session": row["manifest_path"],
+            "segment": row["segment_ref"],
+            "segment_index": row["segment_index_path"],
+            "raw": row["raw_ref"],
+            "raw_block": row["raw_block_ref"],
+        }
+        return {
+            "doc_id": row["id"],
+            "doc_type": row["doc_type"],
+            "session_id": row["session_id"],
+            "session_label": row["session_label"],
+            "session_title": row["session_title"],
+            "session_date": row["session_date"],
+            "event_type": row["event_type"],
+            "family": row["family"],
+            "title": row["title"],
+            "refs": {key: value for key, value in refs.items() if value},
+            "freshness": {
+                "status": row["freshness_status"],
+                "reasons": [row["stale_reason"]] if row["stale_reason"] else [],
+            },
+        }
+
+    def session_hook_receipts(
+        self,
+        event_name: str = "UserPromptSubmit",
+        session: str = "",
+        date_from: str = "",
+        only_errors: bool = False,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        event_filter = str(event_name or "").strip()
+        if event_filter:
+            event_filter = _safe_selector(event_filter, "event_name", limit=80)
+        if session:
+            session = _safe_selector(session, "session", limit=180)
+        from_time = _parse_iso_time(date_from) if date_from else None
+        if date_from and from_time is None:
+            raise ValueError("date_from must be ISO-8601 date or timestamp")
+        selected_limit = _coerce_limit(limit, 50, 500)
+        session_dirs = self._receipt_session_dirs(session)
+        diagnostics: list[str] = []
+        if session and not session_dirs:
+            diagnostics.append("session not found")
+
+        matches: list[dict[str, Any]] = []
+        hook_counts: dict[str, int] = {}
+        action_counts: dict[str, int] = {}
+        session_counts: dict[str, int] = {}
+        durations: list[float] = []
+        parse_error_count = 0
+        scanned_line_count = 0
+        scanned_receipt_files = 0
+
+        for session_dir in session_dirs:
+            receipt_path = session_dir / "hooks" / "receipts.jsonl"
+            if not receipt_path.is_file():
+                continue
+            scanned_receipt_files += 1
+            manifest = _read_json(session_dir / "session.manifest.json")
+            if not isinstance(manifest, dict):
+                manifest = {}
+            display = manifest.get("display") if isinstance(manifest.get("display"), dict) else {}
+            session_id = str(manifest.get("session_id") or session_dir.name)
+            session_label = str(manifest.get("session_label") or display.get("label") or session_dir.name)
+            session_title = manifest.get("session_title") or display.get("title")
+            try:
+                handle = receipt_path.open("r", encoding="utf-8")
+            except OSError as exc:
+                diagnostics.append(f"could not read receipts for {session_label}: {exc}")
+                continue
+            with handle:
+                for line_number, line in enumerate(handle, start=1):
+                    scanned_line_count += 1
+                    try:
+                        receipt = json.loads(line)
+                    except json.JSONDecodeError:
+                        parse_error_count += 1
+                        continue
+                    if not isinstance(receipt, dict):
+                        parse_error_count += 1
+                        continue
+                    hook_event = str(
+                        receipt.get("hook_event_name")
+                        or receipt.get("event_name")
+                        or (receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}).get("hook_event_name")
+                        or ""
+                    )
+                    if event_filter and hook_event.casefold() != event_filter.casefold():
+                        continue
+                    timestamp = receipt.get("timestamp") or receipt.get("received_at") or receipt.get("generated_at")
+                    parsed_time = _parse_iso_time(timestamp)
+                    if from_time is not None and (parsed_time is None or parsed_time < from_time):
+                        continue
+                    errors = receipt.get("errors") if isinstance(receipt.get("errors"), list) else []
+                    actions = receipt.get("actions") if isinstance(receipt.get("actions"), list) else []
+                    typing_bridge = receipt.get("typing_bridge") if isinstance(receipt.get("typing_bridge"), dict) else {}
+                    hard_failed = receipt.get("ok") is False
+                    typing_bridge_failed = typing_bridge.get("ok") is False
+                    error_like = hard_failed or typing_bridge_failed or bool(errors)
+                    if only_errors and not error_like:
+                        continue
+
+                    duration = receipt.get("duration_ms") if isinstance(receipt.get("duration_ms"), (int, float)) else None
+                    if duration is not None:
+                        durations.append(float(duration))
+                    self._bump(hook_counts, hook_event or "unknown")
+                    self._bump(session_counts, session_label)
+                    for action in actions:
+                        self._bump(action_counts, action)
+                    matches.append(
+                        {
+                            "timestamp": timestamp,
+                            "_parsed_timestamp": parsed_time.isoformat() if parsed_time is not None else "",
+                            "hook_event_name": hook_event or None,
+                            "ok": receipt.get("ok"),
+                            "session_id": session_id,
+                            "session_label": session_label,
+                            "session_title": session_title,
+                            "actions": [str(action) for action in actions],
+                            "error_count": len(errors),
+                            "errors": [str(error)[:1000] for error in errors[:5]],
+                            "duration_ms": duration,
+                            "typing_bridge": {
+                                "ok": typing_bridge.get("ok"),
+                                "status": typing_bridge.get("status"),
+                                "adapter": typing_bridge.get("adapter"),
+                                "returncode": typing_bridge.get("returncode"),
+                                "typing_status": typing_bridge.get("typing_status"),
+                                "capture_gate_decision": typing_bridge.get("capture_gate_decision"),
+                                "stderr_head": str(typing_bridge.get("stderr_head") or "")[:1000] or None,
+                            }
+                            if typing_bridge
+                            else None,
+                            "refs": {
+                                "session": (session_dir / "session.manifest.json").as_posix(),
+                                "receipt": f"{receipt_path.as_posix()}#L{line_number}",
+                            },
+                        }
+                    )
+
+        matches.sort(key=lambda item: (str(item.get("_parsed_timestamp") or ""), str(item.get("session_label") or "")), reverse=True)
+        for item in matches:
+            item.pop("_parsed_timestamp", None)
+        error_receipt_count = sum(1 for item in matches if item.get("ok") is False or int(item.get("error_count") or 0) > 0 or (item.get("typing_bridge") or {}).get("ok") is False)
+        hard_failure_count = sum(1 for item in matches if item.get("ok") is False)
+        typing_bridge_failure_count = sum(1 for item in matches if (item.get("typing_bridge") or {}).get("ok") is False)
+        duration_summary = {
+            "count": len(durations),
+            "min_ms": round(min(durations), 2) if durations else None,
+            "avg_ms": round(sum(durations) / len(durations), 2) if durations else None,
+            "max_ms": round(max(durations), 2) if durations else None,
+        }
+        return {
+            "schema": "aoa_session_memory_hook_receipts_v1",
+            "ok": not bool(session and not session_dirs),
+            "mutates": False,
+            "event_name": event_filter or None,
+            "session": session or None,
+            "date_from": date_from or None,
+            "only_errors": only_errors,
+            "scanned_receipt_files": scanned_receipt_files,
+            "scanned_line_count": scanned_line_count,
+            "parse_error_count": parse_error_count,
+            "total_receipt_count": len(matches),
+            "returned_receipt_count": min(len(matches), selected_limit),
+            "summary": {
+                "error_receipt_count": error_receipt_count,
+                "hard_failure_count": hard_failure_count,
+                "typing_bridge_failure_count": typing_bridge_failure_count,
+                "hook_event_counts": self._top_counts(hook_counts),
+                "action_counts": self._top_counts(action_counts),
+                "session_counts": self._top_counts(session_counts),
+                "duration_ms": duration_summary,
+            },
+            "receipts": matches[:selected_limit],
+            "diagnostics": diagnostics,
+            "truth_status": "hook receipt evidence; not generated search or graph truth",
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -804,16 +1786,24 @@ class AoASessionMemoryMCPState:
                 else None,
             },
             "allowed_operator_commands": [
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py index-maintenance --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa",
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance hot --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance backlog --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py index-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --budget-seconds 120 --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py route-readiness all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py search-provider-status --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --batch-limit 3 --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-quality-audit --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
             ],
             "offline_operator_commands": [
+                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance deep --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-build all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write --force-large-export",
                 "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --export-sidecar --write-report",
             ],
+            "maintenance_lanes": {
+                "hot": "short budgeted pass for recent dirty graph/index posture; keeps MCP read-only and defers heavy repair when profile says so",
+                "backlog": "bounded repair lane for recent dirty route/search/atlas projections using per-session fingerprints",
+                "deep": "offline full-depth lane for whole archive repair, sample audits, and heavy graph/search work",
+            },
             "mcp_stop_line": "This MCP reports the plan only; run maintenance outside MCP with explicit operator intent.",
             "authority_boundary": self.authority_boundary(),
         }
@@ -965,6 +1955,11 @@ class AoASessionMemoryMCPState:
             return self.latest_diagnostics("route-layer-readiness", limit=1)
         if netloc == "diagnostics" and len(parts) >= 2 and parts[0] == "latest":
             return self.latest_diagnostics(parts[1], limit=5)
+        if netloc == "hooks" and parts and parts[0] == "receipts":
+            event_name = parts[1] if len(parts) > 1 else "UserPromptSubmit"
+            return self.session_hook_receipts(event_name=event_name, limit=50)
+        if netloc == "entities" and parts:
+            return self.session_entity_inventory(layer=parts[0], limit=50, sample_limit=2)
         if netloc == "session" and len(parts) >= 2:
             session = parts[0]
             if parts[1] == "brief":
@@ -1067,6 +2062,15 @@ class AoASessionMemoryMCPState:
         direct = self.aoa_root / "sessions" / selector
         return direct if direct.exists() else None
 
+    def _receipt_session_dirs(self, session: str = "") -> list[Path]:
+        if session:
+            session_dir = self._resolve_session_dir(session)
+            return [session_dir] if session_dir is not None and session_dir.exists() else []
+        sessions_root = self.aoa_root / "sessions"
+        if not sessions_root.exists():
+            return []
+        return sorted(path for path in sessions_root.iterdir() if path.is_dir())
+
     def _session_sort_key(self, item: dict[str, Any]) -> tuple[str, int, str]:
         display = item.get("display") if isinstance(item.get("display"), dict) else {}
         return (
@@ -1137,7 +2141,7 @@ class AoASessionMemoryMCPState:
                         refs.append(str(session[key]))
         return list(dict.fromkeys(refs))
 
-    def _check_ref(self, ref: str) -> dict[str, Any]:
+    def _check_ref(self, ref: str, *, session_dir: Path | None = None) -> dict[str, Any]:
         value = str(ref or "").strip()
         if not value:
             return {"ref": ref, "status": "invalid", "reason": "empty ref"}
@@ -1145,6 +2149,8 @@ class AoASessionMemoryMCPState:
             return {"ref": ref, "status": "invalid", "reason": "NUL byte"}
         path_part = value.split("#", 1)[0]
         if path_part.startswith("raw:line:"):
+            if session_dir is not None:
+                return self._check_raw_line_ref(value, session_dir=session_dir)
             return {"ref": value, "status": "needs_session_context", "reason": "raw line refs are session-relative"}
         if path_part.startswith("session:"):
             session_dir = self._resolve_session_dir(path_part.removeprefix("session:"))
@@ -1167,6 +2173,31 @@ class AoASessionMemoryMCPState:
             if candidate.exists():
                 return {"ref": value, "status": "present", "path": candidate.as_posix(), "inside_aoa_root": True}
         return {"ref": value, "status": "unknown", "reason": "relative or symbolic ref requires session context"}
+
+    def _check_raw_line_ref(self, ref: str, *, session_dir: Path) -> dict[str, Any]:
+        line_text = ref.split("#", 1)[0].removeprefix("raw:line:")
+        try:
+            line_number = int(line_text)
+        except ValueError:
+            return {"ref": ref, "status": "invalid", "reason": "raw line ref must end with an integer"}
+        raw_path = session_dir / "raw" / "session.raw.jsonl"
+        if not raw_path.exists():
+            return {"ref": ref, "status": "missing", "path": raw_path.as_posix(), "reason": "session raw file missing"}
+        if line_number < 1:
+            return {"ref": ref, "status": "invalid", "path": raw_path.as_posix(), "reason": "raw line must be positive"}
+        line_count = 0
+        with raw_path.open("r", encoding="utf-8") as handle:
+            for line_count, _line in enumerate(handle, start=1):
+                if line_count >= line_number:
+                    break
+        return {
+            "ref": ref,
+            "status": "present" if line_count >= line_number else "missing",
+            "path": raw_path.as_posix(),
+            "line": line_number,
+            "line_count": line_count,
+            "inside_aoa_root": _is_under(raw_path, self.aoa_root),
+        }
 
     def _bump(self, bucket: dict[str, int], value: Any) -> None:
         if value in (None, ""):

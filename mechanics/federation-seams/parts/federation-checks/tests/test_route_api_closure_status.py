@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import sys
 import tempfile
 import types
@@ -94,6 +95,41 @@ class RouteAPIClosureStatusTests(unittest.TestCase):
         path = root / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    def test_grafana_datasource_inventory_is_bounded_and_redacted(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(root, ignore_errors=True))
+        datasource_file = root / "prometheus.yml"
+        datasource_file.write_text(
+            """
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prom-main
+    type: prometheus
+    access: proxy
+    url: http://user:secret@prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+    secureJsonData:
+      basicAuthPassword: super-secret
+""",
+            encoding="utf-8",
+        )
+
+        inventory = self.module.grafana_datasource_inventory(root)
+        entry = inventory["datasource_inventory"]["entries"][0]
+
+        self.assertTrue(inventory["ok"])
+        self.assertEqual(entry["datasource_uid_or_id"], "prom-main")
+        self.assertEqual(entry["type"], "prometheus")
+        self.assertEqual(entry["url"], "http://prometheus:9090")
+        self.assertEqual(entry["json_data_keys"], ["httpMethod"])
+        self.assertFalse(entry["redaction"]["secure_json_data_included"])
+        self.assertFalse(entry["redaction"]["json_data_values_included"])
+        self.assertNotIn("super-secret", json.dumps(inventory))
 
     def make_store(self):
         temp_dir = tempfile.TemporaryDirectory()

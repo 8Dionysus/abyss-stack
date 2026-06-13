@@ -3,12 +3,17 @@ services:
     build: "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/rag-api"
     container_name: rag-api
     restart: unless-stopped
+    env_file:
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/stack.env"
     environment:
       AOA_RAG_CONFIG_ROOT: /app/config/rag
       AOA_RAG_QDRANT_URL: http://qdrant:6333
       AOA_RAG_LANGCHAIN_URL: http://langchain-api:5401
       AOA_RAG_ROUTE_API_URL: http://route-api:5402
       AOA_RAG_RERANK_URL: http://rerank-api:5405
+      AOA_RAG_POSTGRES_HOST: postgres
+      AOA_RAG_POSTGRES_PORT: "5432"
+      AOA_RAG_NEO4J_URI: bolt://neo4j:7687
       AOA_RAG_COLLECTION: "${AOA_RAG_COLLECTION:-abyss_stack_rag_chunks_v1}"
       AOA_RAG_VECTOR_SIZE: "${AOA_RAG_VECTOR_SIZE:-1024}"
       AOA_RAG_MAX_CHUNK_CHARS: "${AOA_RAG_MAX_CHUNK_CHARS:-1800}"

@@ -52,6 +52,14 @@ services:
       AOA_LOKI_INGESTION_RATE_MB: "${AOA_LOKI_INGESTION_RATE_MB:-4}"
       AOA_LOKI_INGESTION_BURST_SIZE_MB: "${AOA_LOKI_INGESTION_BURST_SIZE_MB:-8}"
 
+  tempo:
+    labels:
+      aoa.tuning.overlay: "observability.thin-host"
+      aoa.tuning.posture: "candidate"
+    cpus: "${AOA_TEMPO_CPUS:-0.5}"
+    mem_limit: "${AOA_TEMPO_MEM_LIMIT:-512m}"
+    mem_reservation: "${AOA_TEMPO_MEM_RESERVATION:-128m}"
+
   alloy:
     labels:
       aoa.tuning.overlay: "observability.thin-host"

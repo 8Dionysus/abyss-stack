@@ -18,6 +18,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/datasources" \
   "${AOA_STACK_ROOT}/Configs/monitoring/grafana/provisioning/dashboards" \
   "${AOA_STACK_ROOT}/Configs/monitoring/loki" \
+  "${AOA_STACK_ROOT}/Configs/monitoring/tempo" \
   "${AOA_STACK_ROOT}/Configs/tts" \
   "${AOA_STACK_ROOT}/Configs/ollama" \
   "${AOA_STACK_ROOT}/Configs/tos-graph" \
@@ -39,6 +40,7 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Logs/diagnostics/latest" \
   "${AOA_STACK_ROOT}/Logs/diagnostics/records" \
   "${AOA_STACK_ROOT}/Logs/governed-runs" \
+  "${AOA_STACK_ROOT}/Logs/langgraph-inventory" \
   "${AOA_STACK_ROOT}/Logs/memo-exports/latest" \
   "${AOA_STACK_ROOT}/Logs/memo-exports/records" \
   "${AOA_STACK_ROOT}/Logs/rpg/latest" \

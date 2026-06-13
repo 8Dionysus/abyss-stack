@@ -30,6 +30,7 @@ SERVICE_SELECTION_POLICY_REQUIRED_SERVICES = {
     "alertmanager",
     "cadvisor",
     "loki",
+    "tempo",
     "alloy",
     "n8n",
     "n8n-task-runners",

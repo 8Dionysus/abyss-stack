@@ -1,6 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -38,9 +39,13 @@ class LangchainFederatedRunTests(unittest.TestCase):
         cls.client = TestClient(cls.module.app)
 
     def setUp(self) -> None:
+        self.inventory_tmp = TemporaryDirectory()
+        self.addCleanup(self.inventory_tmp.cleanup)
         self.module.FEDERATED_RUN_ENABLED = True
+        self.module.LANGGRAPH_INVENTORY_ROOT = Path(self.inventory_tmp.name)
+        self.module.LANGGRAPH_INVENTORY_OTLP_ENABLED = False
 
-    def test_run_endpoint_stays_compatible(self) -> None:
+    def test_run_endpoint_stays_compatible_and_records_runtime_trace(self) -> None:
         with patch.object(
             self.module,
             "_invoke_run_backend",
@@ -49,11 +54,57 @@ class LangchainFederatedRunTests(unittest.TestCase):
             response = self.client.post("/run", json={"user_text": "hello"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {"ok": True, "backend": "stub", "model": "m", "answer": "plain"},
-        )
+        body = response.json()
+        self.assertEqual(body["ok"], True)
+        self.assertEqual(body["backend"], "stub")
+        self.assertEqual(body["model"], "m")
+        self.assertEqual(body["answer"], "plain")
+        self.assertEqual(body["runtime_trace"]["run_kind"], "run")
+        self.assertEqual(body["runtime_trace"]["status"], "ok")
+        self.assertTrue(body["runtime_trace"]["thread_id"].startswith("thread."))
+        self.assertTrue(body["runtime_trace"]["checkpoint_id"].startswith("checkpoint."))
+        self.assertEqual(len(body["runtime_trace"]["trace_id"]), 32)
+        self.assertEqual(len(body["runtime_trace"]["span_id"]), 16)
+        self.assertFalse(body["runtime_trace"]["input"]["sha256"] is None)
+        self.assertFalse(body["runtime_trace"]["output"]["sha256"] is None)
+        latest = self.module.LANGGRAPH_INVENTORY_ROOT / "latest.json"
+        self.assertTrue(latest.is_file())
+        self.assertNotIn("hello", latest.read_text(encoding="utf-8"))
+        self.assertNotIn("plain", latest.read_text(encoding="utf-8"))
         backend.assert_called_once()
+
+    def test_langgraph_smoke_creates_thread_checkpoint_and_trace_inventory(self) -> None:
+        response = self.client.post(
+            "/langgraph/smoke",
+            json={"session_id": "session-1", "note": "private smoke payload"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        trace = response.json()["runtime_trace"]
+        thread_id = trace["thread_id"]
+        trace_id = trace["trace_id"]
+
+        threads = self.client.get("/threads").json()
+        checkpoints = self.client.get(f"/threads/{thread_id}/checkpoints").json()
+        traces = self.client.get("/traces").json()
+        trace_detail = self.client.get(f"/traces/{trace_id}").json()
+        inventory = self.client.get("/langgraph/inventory").json()
+
+        self.assertEqual(threads["count"], 1)
+        self.assertEqual(checkpoints["count"], 1)
+        self.assertEqual(traces["count"], 1)
+        self.assertEqual(trace_detail["trace"]["trace_id"], trace_id)
+        self.assertTrue(inventory["thread_inventory_present"])
+        self.assertTrue(inventory["checkpoint_inventory_present"])
+        self.assertTrue(inventory["trace_inventory_present"])
+
+        stored_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in self.module.LANGGRAPH_INVENTORY_ROOT.rglob("*")
+            if path.is_file()
+        )
+        self.assertIn(trace["traceparent"], stored_text)
+        self.assertNotIn("private smoke payload", stored_text)
 
     def test_federated_run_returns_503_when_disabled(self) -> None:
         self.module.FEDERATED_RUN_ENABLED = False

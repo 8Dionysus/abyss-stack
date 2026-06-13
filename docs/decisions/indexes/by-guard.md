@@ -89,6 +89,7 @@
 - [ABYSS-STACK-D-0037 AoA Session Memory MCP Access Plane](../ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+- [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 
 ## service selection
 
@@ -279,6 +280,7 @@
 ## profile-topology
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## release governance
 
@@ -335,6 +337,7 @@
 ## service-selection
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## sibling canon target
 
@@ -361,6 +364,8 @@
 ## source-structure
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
+- [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
 ## stale path hygiene
 

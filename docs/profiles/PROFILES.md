@@ -200,8 +200,9 @@ Optional monitoring stack:
 - `60-monitoring.yml`
 
 This profile carries Prometheus/PromQL, Grafana, Alertmanager, cAdvisor, Loki,
-and Alloy. Loki and Alloy stay internal-only; Grafana is the normal operator
-entry for LogQL.
+Tempo, and Alloy. Loki stays internal-only; Grafana is the normal operator
+entry for LogQL. Alloy exposes localhost-only OTLP ingest on `4317`/`4318` and
+forwards traces to Tempo on the internal stack network.
 
 ## Design rule
 

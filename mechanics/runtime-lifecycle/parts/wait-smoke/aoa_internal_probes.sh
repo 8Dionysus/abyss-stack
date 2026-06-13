@@ -129,6 +129,7 @@ fi
 if has_module "60-monitoring.yml"; then
   probe_running_container "cadvisor" "cadvisor"
   probe_running_container "loki" "loki"
+  probe_running_container "tempo" "tempo"
   probe_running_container "alloy" "alloy"
 fi
 

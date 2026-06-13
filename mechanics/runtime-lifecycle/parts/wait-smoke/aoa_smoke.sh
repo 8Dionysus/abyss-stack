@@ -69,6 +69,7 @@ fi
 
 if has_module "41-agent-api.yml"; then
   aoa_probe_http "langchain-api" "http://127.0.0.1:5403/health" || failures=$((failures + 1))
+  aoa_probe_http "langchain inventory" "http://127.0.0.1:5403/langgraph/inventory" || failures=$((failures + 1))
   "${SCRIPTS_DIR}/aoa-qwen-check" --case exact-reply --url "http://127.0.0.1:5403/run" || failures=$((failures + 1))
 fi
 
@@ -79,6 +80,7 @@ fi
 
 if has_module "43-federation-router.yml"; then
   aoa_probe_http "route-api" "http://127.0.0.1:5402/health" || failures=$((failures + 1))
+  aoa_probe_http "route-api datasource inventory" "http://127.0.0.1:5402/observability/datasources" || failures=$((failures + 1))
   aoa_probe_http "route-api memo" "http://127.0.0.1:5402/memo/registry" || failures=$((failures + 1))
   aoa_probe_http "route-api evals" "http://127.0.0.1:5402/evals/catalog" || failures=$((failures + 1))
   aoa_probe_http "route-api playbooks" "http://127.0.0.1:5402/playbooks/activation" || failures=$((failures + 1))
@@ -96,6 +98,7 @@ fi
 
 if has_module "46-rag-api.yml"; then
   aoa_probe_http "rag-api" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/health" || failures=$((failures + 1))
+  aoa_probe_http "rag-api semantic inventory" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/semantic-inventory" || failures=$((failures + 1))
   aoa_probe_http "rag-api sources" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/sources" || failures=$((failures + 1))
   aoa_probe_http "rag-api dag" "http://127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}/dag/jobs" || failures=$((failures + 1))
 fi
@@ -125,10 +128,11 @@ if has_module "60-monitoring.yml"; then
   aoa_probe_http "prometheus" "http://127.0.0.1:9090/-/ready" || failures=$((failures + 1))
   aoa_probe_http "alertmanager" "http://127.0.0.1:9093/-/ready" || failures=$((failures + 1))
   aoa_probe_http "grafana" "http://127.0.0.1:3000/api/health" || failures=$((failures + 1))
+  aoa_probe_http "tempo" "http://127.0.0.1:3200/ready" || failures=$((failures + 1))
   if ((with_internal)); then
     aoa_note "monitoring internal probes requested"
   else
-    aoa_note "skip cadvisor, loki, and alloy host probes because they are internal-only"
+    aoa_note "skip cadvisor, loki, and alloy admin host probes because they are internal-only"
   fi
 fi
 
