@@ -16,6 +16,7 @@ from urllib.parse import unquote, urlparse
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
 STATUS_TIMEOUT_SECONDS = 60.0
+EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 
@@ -1049,7 +1050,12 @@ class AoASessionMemoryMCPState:
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
-        payload = self._archive_command("entity-usage-audit", args, allow_nonzero_json=True)
+        payload = self._archive_command(
+            "entity-usage-audit",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1088,7 +1094,12 @@ class AoASessionMemoryMCPState:
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
-        payload = self._archive_command("entity-usage-neighborhood", args, allow_nonzero_json=True)
+        payload = self._archive_command(
+            "entity-usage-neighborhood",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1304,19 +1315,111 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def _session_identity_values(self, session_dir: Path | None, session: str = "") -> set[str]:
+        values = {str(session).strip()} if str(session or "").strip() else set()
+        if session_dir is None:
+            return {value for value in values if value}
+        values.add(session_dir.name)
+        values.add(session_dir.as_posix())
+        manifest = _read_json(session_dir / "session.manifest.json")
+        if isinstance(manifest, dict):
+            for key in ("session_id", "session_label", "session_title"):
+                value = manifest.get(key)
+                if value:
+                    values.add(str(value))
+            display = manifest.get("display")
+            if isinstance(display, dict):
+                for key in ("label", "title", "path", "archive_path", "navigation_path"):
+                    value = display.get(key)
+                    if value:
+                        values.add(str(value))
+        return {value for value in values if value}
+
+    def _target_projection_freshness(
+        self,
+        provider: dict[str, Any],
+        *,
+        session_dir: Path | None,
+        session: str = "",
+    ) -> dict[str, Any]:
+        providers = provider.get("providers") if isinstance(provider.get("providers"), dict) else {}
+        portable = providers.get("portable_sqlite") if isinstance(providers.get("portable_sqlite"), dict) else {}
+        freshness = portable.get("freshness") if isinstance(portable.get("freshness"), dict) else {}
+        provider_status = str(portable.get("status") or "")
+
+        if session_dir is None:
+            return {
+                "status": "not_checked",
+                "target_dirty": None,
+                "provider_status": provider_status or None,
+                "reason": "session context not provided",
+            }
+        if not freshness:
+            status = "current" if bool(portable.get("ok")) and provider_status in ("", "ready") else "unknown"
+            return {
+                "status": status,
+                "target_dirty": False if status == "current" else None,
+                "provider_status": provider_status or None,
+                "reason": "provider did not return per-session freshness",
+            }
+
+        target_values = self._session_identity_values(session_dir, session)
+        dirty_values = {str(value) for value in freshness.get("dirty_session_ids", []) if value}
+        for item in freshness.get("dirty_sessions", []) if isinstance(freshness.get("dirty_sessions"), list) else []:
+            if not isinstance(item, dict):
+                continue
+            for key in ("session_id", "session_label", "session_dir"):
+                value = item.get(key)
+                if value:
+                    dirty_values.add(str(value))
+
+        target_dirty = bool(target_values & dirty_values)
+        if target_dirty:
+            status = "stale"
+        elif str(freshness.get("status") or "") == "stale":
+            status = "current_with_global_stale"
+        elif str(freshness.get("status") or "") == "current":
+            status = "current"
+        else:
+            status = "unknown"
+        return {
+            "status": status,
+            "target_dirty": target_dirty,
+            "provider_status": provider_status or None,
+            "global_status": freshness.get("status"),
+            "dirty_session_count": freshness.get("dirty_session_count"),
+            "target_values_checked": sorted(target_values)[:8],
+        }
+
     def session_freshness_check(self, refs: list[str] | None = None, session: str = "") -> dict[str, Any]:
         refs = refs or []
-        provider = self._archive_command("search-provider-status", ["--provider", "portable_sqlite"])
+        provider = self._archive_command(
+            "search-provider-status",
+            ["--provider", "portable_sqlite"],
+            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+        )
         session_dir = self._resolve_session_dir(session) if session else None
         checks = [self._check_ref(ref, session_dir=session_dir) for ref in refs[:100]]
+        projection_freshness = self._target_projection_freshness(
+            provider,
+            session_dir=session_dir,
+            session=session,
+        )
+        ref_missing = any(check["status"] == "missing" for check in checks)
+        provider_allows_ref_check = bool(provider.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
+        diagnostics = []
+        if projection_freshness.get("status") == "current_with_global_stale":
+            diagnostics.append("provider_global_stale_target_session_current")
         return {
             "schema": "aoa_session_memory_freshness_check_v1",
-            "ok": bool(provider.get("ok")) and not any(check["status"] == "missing" for check in checks),
+            "ok": provider_allows_ref_check and not ref_missing,
             "mutates": False,
             "provider": provider,
+            "projection_freshness": projection_freshness,
             "ref_count": len(refs),
             "session": session or None,
             "checks": checks,
+            "diagnostics": diagnostics,
             "authority_boundary": self.authority_boundary(),
         }
 

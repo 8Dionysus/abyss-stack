@@ -630,11 +630,13 @@ GRAPH_EXPLAIN = {
 class FakeRunner:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[str, ...]]] = []
+        self.timeouts: list[tuple[str, float]] = []
 
     def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
         command = argv[2]
         args = tuple(argv[3:])
         self.calls.append((command, args))
+        self.timeouts.append((command, timeout))
         if command == "search-provider-status":
             payload = PROVIDER_STATUS
         elif command == "route-readiness":
@@ -678,6 +680,46 @@ class FakeRunner:
         else:
             return CommandOutput(argv, 2, "{}", f"unexpected command {command}", 1.0)
         return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+
+class StaleProviderRunner(FakeRunner):
+    def __init__(self, *, dirty_session_id: str, dirty_session_label: str) -> None:
+        super().__init__()
+        self.dirty_session_id = dirty_session_id
+        self.dirty_session_label = dirty_session_label
+
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        command = argv[2]
+        args = tuple(argv[3:])
+        if command != "search-provider-status":
+            return super().__call__(argv, timeout)
+        self.calls.append((command, args))
+        self.timeouts.append((command, timeout))
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "search_provider_status",
+            "ok": False,
+            "providers": {
+                "portable_sqlite": {
+                    "ok": False,
+                    "status": "stale",
+                    "freshness": {
+                        "status": "stale",
+                        "dirty_session_count": 1,
+                        "dirty_session_ids": [self.dirty_session_id],
+                        "dirty_sessions": [
+                            {
+                                "session_id": self.dirty_session_id,
+                                "session_label": self.dirty_session_label,
+                                "session_dir": f"/tmp/.aoa/sessions/{self.dirty_session_label}",
+                            }
+                        ],
+                    },
+                }
+            },
+            "diagnostics": ["portable_sqlite:stale"],
+        }
+        return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
 
 
 def state_with_fixture(tmp_path: Path, runner: FakeRunner | None = None) -> AoASessionMemoryMCPState:
@@ -933,6 +975,33 @@ def test_freshness_check_resolves_raw_line_refs_with_session_context(tmp_path: P
     assert with_context["checks"][0]["line"] == 2
     assert with_context["checks"][1]["status"] == "missing"
     assert with_context["checks"][1]["line_count"] == 2
+    assert [timeout for command, timeout in runner.timeouts if command == "search-provider-status"] == [60.0, 60.0]
+
+
+def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tmp_path: Path) -> None:
+    runner = StaleProviderRunner(dirty_session_id="session-other", dirty_session_label="2026-05-26__002__other")
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="session-1")
+
+    assert freshness["ok"] is True
+    assert freshness["provider"]["ok"] is False
+    assert freshness["projection_freshness"]["status"] == "current_with_global_stale"
+    assert "provider_global_stale_target_session_current" in freshness["diagnostics"]
+
+
+def test_freshness_check_fails_when_target_session_projection_is_stale(tmp_path: Path) -> None:
+    runner = StaleProviderRunner(
+        dirty_session_id="session-1",
+        dirty_session_label="2026-05-26__001__session-memory-mcp",
+    )
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="session-1")
+
+    assert freshness["ok"] is False
+    assert freshness["projection_freshness"]["status"] == "stale"
+    assert freshness["projection_freshness"]["target_dirty"] is True
 
 
 def test_hook_receipts_are_first_class_session_evidence(tmp_path: Path) -> None:
@@ -981,6 +1050,7 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--per-route-limit") + 1] == "4"
     assert args[args.index("--consequence-window") + 1] == "3"
     assert "--full" in args
+    assert runner.timeouts[-1] == ("entity-usage-audit", 90.0)
 
 
 def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
@@ -1010,6 +1080,7 @@ def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_pat
     assert args[args.index("--after") + 1] == "5"
     assert args[args.index("--raw-preview-chars") + 1] == "320"
     assert "--full" in args
+    assert runner.timeouts[-1] == ("entity-usage-neighborhood", 90.0)
 
 
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
