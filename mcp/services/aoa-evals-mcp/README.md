@@ -15,6 +15,9 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 - whether source or approved mirror readers are fresh enough to use;
 - whether a candidate evidence packet is schema-shaped and review-routed;
 - which stack-owned private runtime candidate exports are waiting for review;
+- which sibling repositories expose repo-local `evals/` ports;
+- whether local eval pressure should stay local or route toward central
+  `aoa-evals`;
 - what report skeleton can be prepared without computing a verdict.
 
 ## Source Hierarchy
@@ -25,7 +28,8 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 | `aoa-evals/generated/` | catalog, capsule, section, comparison, and report read models |
 | `aoa-evals` runtime-candidate readers | candidate evidence and artifact hook templates |
 | `abyss-stack/Logs/eval-exports` | private runtime candidate exports produced by governed execution |
-| `aoa-evals-mcp` | live read-only MCP access plane over those surfaces |
+| sibling repo `evals/` ports | repo-local eval pressure, suite notes, report notes, and intake drafts |
+| `aoa-evals-mcp` | live MCP access plane over those surfaces, with narrow local-port write gates |
 
 ## MCP Surface
 
@@ -41,6 +45,11 @@ Resources:
 - `aoa-evals://runtime-candidate-exports`
 - `aoa-evals://runtime-candidate-export/{record_id}`
 - `aoa-evals://reports`
+- `aoa-evals://local-ports`
+- `aoa-evals://local-port/{repo}`
+- `aoa-evals://local-port/{repo}/intake`
+- `aoa-evals://local-port/{repo}/suites`
+- `aoa-evals://local-port/{repo}/reports`
 
 Tools:
 
@@ -55,6 +64,12 @@ Tools:
 - `aoa_evals_runtime_candidate_exports(limit)`
 - `aoa_evals_read_runtime_candidate_export(record_id, include_payload)`
 - `aoa_evals_report_skeleton(name, evidence_refs)`
+- `aoa_evals_local_ports(status, include_skeleton)`
+- `aoa_evals_local_port(repo)`
+- `aoa_evals_find_or_propose_local(repo, proof_question, proposal)`
+- `aoa_evals_write_local_intake(repo, packet, file_slug, apply, replace_existing)`
+- `aoa_evals_write_local_suite_note(repo, suite_slug, title, summary, body_markdown, refs, apply, replace_existing)`
+- `aoa_evals_write_local_report_note(repo, report_slug, title, summary, body_markdown, refs, apply, replace_existing)`
 
 Prompts:
 
@@ -62,12 +77,19 @@ Prompts:
 - `eval-find-or-propose`
 - `eval-review`
 - `evidence-packet`
+- `local-eval-port`
 - `report-skeleton`
 
 Selection, find-or-propose, inspection, expansion, comparison,
-evidence-template, runtime export, and skeleton tools are read-only. They do
-not run evals, compute verdicts, publish receipts, promote bundles, ingest or
-accept evidence, approve proposals, create bundles, or mutate `aoa-evals`.
+evidence-template, runtime export, local-port inspection, and skeleton tools are
+read-only. Local write tools are gated by `apply=false` by default and may only
+write repo-local `evals/intake/*.eval_need.json`,
+`evals/suites/*.suite.md`, `evals/reports/*.report.md`, and the matching
+`PORT.yaml` activation from `skeleton` to `active`.
+
+The service does not run evals, compute verdicts, publish receipts, promote
+bundles, ingest or accept evidence, approve proposals, create central bundles,
+or mutate `aoa-evals`.
 
 In the shared AoA Codex plane this service is registered as `aoa_evals` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher

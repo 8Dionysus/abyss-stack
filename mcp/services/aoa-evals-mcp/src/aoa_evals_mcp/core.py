@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+import yaml
 from jsonschema import Draft202012Validator
 
 
@@ -49,6 +50,38 @@ RUNTIME_CANDIDATE_LATEST_DIRS = (
     "runtime-evidence-selection",
     "artifact-hook",
 )
+LOCAL_PORT_REQUIRED_FILES = (
+    "AGENTS.md",
+    "README.md",
+    "PORT.yaml",
+    "intake/README.md",
+    "suites/README.md",
+    "reports/README.md",
+)
+LOCAL_PORT_REQUIRED_FIELDS = (
+    "schema_version",
+    "owner_repo",
+    "status",
+    "proof_owner_repo",
+    "default_intake_schema",
+    "local_role",
+    "central_boundary",
+)
+LOCAL_PORT_BOUNDARY_TOKENS = ("verdict", "scoring", "regression", "proof doctrine")
+LOCAL_WRITE_AUTHORITY_BOUNDARY = "no verdict, scoring, regression, or proof doctrine authority"
+SAFE_FILE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,120}$")
+LOCAL_NOTE_CONFIG = {
+    "suites": {
+        "glob_suffix": ".suite.md",
+        "schema_version": "local_eval_suite_note_v1",
+        "resource_key": "suites",
+    },
+    "reports": {
+        "glob_suffix": ".report.md",
+        "schema_version": "local_eval_report_note_v1",
+        "resource_key": "reports",
+    },
+}
 
 READER_GROUPS: dict[str, tuple[Path, ...]] = {
     "catalog": (CATALOG_MIN, CATALOG_FULL),
@@ -105,6 +138,15 @@ def _read_json(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid JSON reader: {path}") from exc
+
+
+def _read_yaml(path: Path) -> Any:
+    if not path.exists():
+        return None
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML reader: {path}") from exc
 
 
 def _read_json_first(root: Path, rels: tuple[Path, ...]) -> tuple[Any, Path | None]:
@@ -255,6 +297,72 @@ def _eval_need_name(proof_question: str, proposal: dict[str, Any], matches: list
     return f"aoa-{slug or 'eval-need'}"
 
 
+def _safe_file_slug(value: str, fallback: str = "local-eval-pressure") -> str:
+    slug = _slug(value) or fallback
+    slug = slug[:120].strip("-") or fallback
+    if not SAFE_FILE_SLUG.fullmatch(slug):
+        raise ValueError(f"unsafe local eval file slug: {value!r}")
+    return slug
+
+
+def _safe_repo_name(value: str) -> str:
+    repo = str(value or "").strip()
+    if not repo or repo in {".", ".."} or "/" in repo or "\\" in repo or "\x00" in repo:
+        raise ValueError(f"unsafe repo name: {value!r}")
+    return repo
+
+
+def _relative_repo_path(path: Path, repo_root: Path) -> str:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _within(root: Path, path: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_public_refs(refs: list[str]) -> list[str]:
+    issues: list[str] = []
+    for ref in refs:
+        text = str(ref or "").strip()
+        if not text:
+            issues.append("refs must not contain empty values")
+        if text.startswith("/") or "\\" in text or "\x00" in text:
+            issues.append(f"ref is not repo-local/public-safe: {text!r}")
+        parts = Path(text).parts
+        if ".." in parts:
+            issues.append(f"ref must not traverse upward: {text!r}")
+        if text.casefold().startswith(("private:", "secret:", "credential:")):
+            issues.append(f"ref must not point at private material: {text!r}")
+    return issues
+
+
+def _markdown_frontmatter(path: Path) -> tuple[dict[str, Any] | None, str]:
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return None, text
+    try:
+        _, frontmatter, body = text.split("---\n", 2)
+    except ValueError:
+        return None, text
+    payload = yaml.safe_load(frontmatter)
+    return (payload if isinstance(payload, dict) else None), body.lstrip()
+
+
+def _note_markdown(frontmatter: dict[str, Any], title: str, body_markdown: str) -> str:
+    frontmatter_text = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=False).strip()
+    body = str(body_markdown or "").strip()
+    if not body:
+        body = f"# {title}\n\nLocal eval-port note."
+    return f"---\n{frontmatter_text}\n---\n\n{body}\n"
+
+
 @dataclass(slots=True)
 class AoAEvalsMCPState:
     workspace_root: Path
@@ -393,9 +501,10 @@ class AoAEvalsMCPState:
 
     def authority_boundary(self) -> dict[str, Any]:
         return {
-            "mcp_role": "read-only access plane over bounded proof surfaces",
+            "mcp_role": "access plane over bounded proof surfaces plus gated repo-local eval-port writes",
             "stronger_owner": "bundle-local EVAL.md and eval.yaml",
             "service_owner": "abyss-stack owns the runnable MCP package only",
+            "local_write_scope": "sibling repo evals/intake, evals/suites, evals/reports, and PORT.yaml activation only",
             "root_kind": self.root_kind,
             "stop_lines": STOP_LINES,
         }
@@ -432,6 +541,413 @@ class AoAEvalsMCPState:
     def runtime_intake_templates(self) -> list[dict[str, Any]]:
         payload, _ = self._payload_first(RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR)
         return _list_from(payload, "templates")
+
+    def _local_port_roots(self) -> list[Path]:
+        if not self.workspace_root.exists():
+            return []
+        roots: list[Path] = []
+        try:
+            children = sorted(path for path in self.workspace_root.iterdir() if path.is_dir())
+        except OSError:
+            return []
+        for child in children:
+            if child.name == "aoa-evals":
+                continue
+            if (child / "evals" / "PORT.yaml").is_file():
+                roots.append(child)
+        return roots
+
+    def _local_repo_root(self, repo: str) -> Path:
+        repo_name = _safe_repo_name(repo)
+        root = (self.workspace_root / repo_name).resolve()
+        if not _within(self.workspace_root, root):
+            raise ValueError(f"repo escapes workspace root: {repo}")
+        if not (root / "evals" / "PORT.yaml").is_file():
+            raise ValueError(f"repo does not expose a local eval port: {repo}")
+        return root
+
+    def _local_port_payload(self, repo_root: Path) -> dict[str, Any]:
+        payload = _read_yaml(repo_root / "evals" / "PORT.yaml")
+        return payload if isinstance(payload, dict) else {}
+
+    def _local_port_issues(self, repo_root: Path, port: dict[str, Any]) -> list[str]:
+        evals_dir = repo_root / "evals"
+        issues: list[str] = []
+        for rel in LOCAL_PORT_REQUIRED_FILES:
+            if not (evals_dir / rel).is_file():
+                issues.append(f"missing {rel}")
+        for field in LOCAL_PORT_REQUIRED_FIELDS:
+            if field not in port:
+                issues.append(f"PORT.yaml missing {field}")
+        if port.get("schema_version") != "local_eval_port_v1":
+            issues.append("PORT.yaml schema_version must be local_eval_port_v1")
+        if port.get("owner_repo") != repo_root.name:
+            issues.append(f"PORT.yaml owner_repo must be {repo_root.name}")
+        if port.get("status") not in {"skeleton", "active"}:
+            issues.append("PORT.yaml status must be skeleton or active")
+        if port.get("proof_owner_repo") != "aoa-evals":
+            issues.append("PORT.yaml proof_owner_repo must be aoa-evals")
+        if port.get("default_intake_schema") != "eval_need_v1":
+            issues.append("PORT.yaml default_intake_schema must be eval_need_v1")
+        boundary = str(port.get("central_boundary") or "").casefold()
+        if not boundary:
+            issues.append("PORT.yaml central_boundary is required")
+        else:
+            missing = [token for token in LOCAL_PORT_BOUNDARY_TOKENS if token not in boundary]
+            if missing:
+                issues.append("PORT.yaml central_boundary must name no verdict, scoring, regression, or proof doctrine authority")
+        return issues
+
+    def _local_intake_records(self, repo_root: Path) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        intake_dir = repo_root / "evals" / "intake"
+        if not intake_dir.is_dir():
+            return records
+        for path in sorted(intake_dir.glob("*.eval_need.json")):
+            try:
+                payload = _read_json(path)
+            except ValueError as exc:
+                records.append(
+                    {
+                        "path": _relative_repo_path(path, repo_root),
+                        "valid": False,
+                        "issues": [str(exc)],
+                    }
+                )
+                continue
+            validation = self._validate_eval_need(payload if isinstance(payload, dict) else {})
+            records.append(
+                {
+                    "path": _relative_repo_path(path, repo_root),
+                    "name": payload.get("name") if isinstance(payload, dict) else None,
+                    "authoring_route": payload.get("authoring_route") if isinstance(payload, dict) else None,
+                    "proof_question": payload.get("proof_question") if isinstance(payload, dict) else None,
+                    "valid": validation["valid"],
+                    "issues": validation["issues"],
+                    "packet": payload if isinstance(payload, dict) else None,
+                }
+            )
+        return records
+
+    def _local_note_records(self, repo_root: Path, directory_name: str) -> list[dict[str, Any]]:
+        config = LOCAL_NOTE_CONFIG[directory_name]
+        records: list[dict[str, Any]] = []
+        directory = repo_root / "evals" / directory_name
+        if not directory.is_dir():
+            return records
+        for path in sorted(directory.glob(f"*{config['glob_suffix']}")):
+            try:
+                frontmatter, body = _markdown_frontmatter(path)
+            except (OSError, yaml.YAMLError) as exc:
+                records.append(
+                    {
+                        "path": _relative_repo_path(path, repo_root),
+                        "valid": False,
+                        "issues": [str(exc)],
+                    }
+                )
+                continue
+            issues: list[str] = []
+            if frontmatter is None:
+                issues.append("missing YAML frontmatter")
+                frontmatter = {}
+            if frontmatter.get("schema_version") != config["schema_version"]:
+                issues.append(f"schema_version must be {config['schema_version']}")
+            if frontmatter.get("owner_repo") != repo_root.name:
+                issues.append(f"owner_repo must be {repo_root.name}")
+            if frontmatter.get("status") not in {"draft", "reviewed"}:
+                issues.append("status must be draft or reviewed")
+            boundary = str(frontmatter.get("authority_boundary") or "").casefold()
+            if not boundary:
+                issues.append("authority_boundary is required")
+            else:
+                missing = [token for token in LOCAL_PORT_BOUNDARY_TOKENS if token not in boundary]
+                if missing:
+                    issues.append("authority_boundary must name no verdict, scoring, regression, or proof doctrine authority")
+            records.append(
+                {
+                    "path": _relative_repo_path(path, repo_root),
+                    "slug": path.name[: -len(config["glob_suffix"])],
+                    "title": frontmatter.get("title"),
+                    "summary": frontmatter.get("summary"),
+                    "status": frontmatter.get("status"),
+                    "refs": frontmatter.get("refs", []),
+                    "valid": not issues,
+                    "issues": issues,
+                    "frontmatter": frontmatter,
+                    "content_markdown": body,
+                }
+            )
+        return records
+
+    def _local_bundle_count(self, repo_root: Path) -> int:
+        evals_dir = repo_root / "evals"
+        return sum(1 for _ in evals_dir.glob("**/eval.yaml")) if evals_dir.is_dir() else 0
+
+    def _local_port_summary(self, repo_root: Path, *, include_files: bool = False) -> dict[str, Any]:
+        port = self._local_port_payload(repo_root)
+        intake = self._local_intake_records(repo_root)
+        suites = self._local_note_records(repo_root, "suites")
+        reports = self._local_note_records(repo_root, "reports")
+        bundle_count = self._local_bundle_count(repo_root)
+        active_count = len(intake) + len(suites) + len(reports) + bundle_count
+        issues = self._local_port_issues(repo_root, port)
+        if port.get("status") == "active" and active_count == 0:
+            issues.append("active local eval port must contain local pressure files")
+        if port.get("status") == "skeleton" and active_count > 0:
+            issues.append("skeleton local eval port must not contain local pressure files")
+        issues.extend(
+            f"{record['path']}: " + "; ".join(record.get("issues", []))
+            for record in [*intake, *suites, *reports]
+            if record.get("valid") is False
+        )
+        result: dict[str, Any] = {
+            "repo": repo_root.name,
+            "repo_root": repo_root.as_posix(),
+            "evals_root": (repo_root / "evals").as_posix(),
+            "port": port,
+            "status": port.get("status"),
+            "counts": {
+                "intake": len(intake),
+                "suites": len(suites),
+                "reports": len(reports),
+                "local_bundles": bundle_count,
+                "active_pressure": active_count,
+            },
+            "validation": {
+                "valid": not issues,
+                "issues": issues,
+            },
+            "authority_boundary": {
+                "local_role": "repo-local eval pressure only",
+                "stronger_owner": "aoa-evals central proof doctrine, verdict, scoring, and regression",
+                "mcp_write_scope": "local eval-port files only",
+            },
+        }
+        if include_files:
+            result.update({"intake": intake, "suites": suites, "reports": reports})
+        return result
+
+    def local_ports(self, status: str | None = None, include_skeleton: bool = True) -> dict[str, Any]:
+        ports = [self._local_port_summary(root) for root in self._local_port_roots()]
+        if status:
+            ports = [port for port in ports if str(port.get("status") or "") == status]
+        if not include_skeleton:
+            ports = [port for port in ports if port.get("status") != "skeleton"]
+        return {
+            "schema": "aoa_evals_local_ports_v1",
+            "workspace_root": self.workspace_root.as_posix(),
+            "count": len(ports),
+            "ports": ports,
+            "read_only": True,
+            "write_scope": "use gated write tools for local port files only",
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def local_port(self, repo: str) -> dict[str, Any]:
+        repo_root = self._local_repo_root(repo)
+        result = self._local_port_summary(repo_root, include_files=True)
+        result["schema"] = "aoa_evals_local_port_v1"
+        result["read_only"] = True
+        result["write_scope"] = "local intake, suite notes, and report notes only"
+        result["authority_boundary"] = self.authority_boundary()
+        return result
+
+    def _local_write_target(self, repo_root: Path, directory_name: str, slug: str, suffix: str) -> Path:
+        safe_slug = _safe_file_slug(slug)
+        target = repo_root / "evals" / directory_name / f"{safe_slug}{suffix}"
+        if not _within(repo_root / "evals", target):
+            raise ValueError("local eval write target escapes evals port")
+        return target
+
+    def _maybe_activate_port(self, repo_root: Path, *, apply: bool) -> bool:
+        port_path = repo_root / "evals" / "PORT.yaml"
+        port = self._local_port_payload(repo_root)
+        if port.get("status") != "skeleton":
+            return False
+        if not apply:
+            return True
+        text = port_path.read_text(encoding="utf-8")
+        updated = re.sub(r"(?m)^status:\s*skeleton\s*$", "status: active", text, count=1)
+        if updated == text:
+            raise ValueError("PORT.yaml status line could not be activated safely")
+        port_path.write_text(updated, encoding="utf-8")
+        return True
+
+    def find_or_propose_local(
+        self,
+        repo: str,
+        proof_question: str = "",
+        proposal: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        repo_root = self._local_repo_root(repo)
+        base = self.find_or_propose(proof_question=proof_question, proposal=proposal)
+        packet = base["proposal_context"]["packet"]
+        slug = _safe_file_slug(str(packet.get("name") or proof_question or repo_root.name))
+        target = self._local_write_target(repo_root, "intake", slug, ".eval_need.json")
+        return {
+            "schema": "aoa_evals_local_find_or_propose_v1",
+            "repo": repo_root.name,
+            "local_port": self._local_port_summary(repo_root),
+            "central_route": base,
+            "local_write_plan": {
+                "target_path": target.as_posix(),
+                "relative_path": _relative_repo_path(target, repo_root),
+                "apply_default": False,
+                "tool": "aoa_evals_write_local_intake",
+                "port_activation_needed": self._local_port_payload(repo_root).get("status") == "skeleton",
+            },
+            "candidate_only": True,
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def write_local_intake(
+        self,
+        repo: str,
+        packet: dict[str, Any],
+        file_slug: str | None = None,
+        *,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        repo_root = self._local_repo_root(repo)
+        packet = packet if isinstance(packet, dict) else {}
+        validation = self._validate_eval_need(packet)
+        slug = _safe_file_slug(str(file_slug or packet.get("name") or "local-eval-pressure"))
+        target = self._local_write_target(repo_root, "intake", slug, ".eval_need.json")
+        issues = list(validation.get("issues", []))
+        if target.exists() and not replace_existing:
+            issues.append("target file already exists; set replace_existing=True to overwrite")
+        activated = self._maybe_activate_port(repo_root, apply=False)
+        write_allowed = validation["valid"] and not issues
+        if apply and write_allowed:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            activated = self._maybe_activate_port(repo_root, apply=True)
+        return {
+            "schema": "aoa_evals_local_intake_write_v1",
+            "repo": repo_root.name,
+            "target_path": target.as_posix(),
+            "relative_path": _relative_repo_path(target, repo_root),
+            "apply": apply,
+            "applied": bool(apply and write_allowed),
+            "write_allowed": write_allowed,
+            "replace_existing": replace_existing,
+            "port_activation_needed": activated,
+            "validation": {
+                **validation,
+                "valid": write_allowed,
+                "issues": issues,
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _write_local_note(
+        self,
+        *,
+        repo: str,
+        directory_name: str,
+        note_slug: str,
+        title: str,
+        summary: str,
+        body_markdown: str,
+        refs: list[str] | None = None,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        repo_root = self._local_repo_root(repo)
+        config = LOCAL_NOTE_CONFIG[directory_name]
+        safe_slug = _safe_file_slug(note_slug)
+        target = self._local_write_target(repo_root, directory_name, safe_slug, str(config["glob_suffix"]))
+        refs = [str(ref) for ref in (refs or [])]
+        issues = _validate_public_refs(refs)
+        if len(str(title or "").strip()) < 3:
+            issues.append("title must be at least 3 characters")
+        if len(str(summary or "").strip()) < 12:
+            issues.append("summary must be at least 12 characters")
+        if target.exists() and not replace_existing:
+            issues.append("target file already exists; set replace_existing=True to overwrite")
+        activated = self._maybe_activate_port(repo_root, apply=False)
+        write_allowed = not issues
+        frontmatter = {
+            "schema_version": config["schema_version"],
+            "owner_repo": repo_root.name,
+            "status": "draft",
+            "title": str(title).strip(),
+            "summary": str(summary).strip(),
+            "refs": refs,
+            "authority_boundary": LOCAL_WRITE_AUTHORITY_BOUNDARY,
+        }
+        if apply and write_allowed:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(_note_markdown(frontmatter, str(title).strip(), body_markdown), encoding="utf-8")
+            activated = self._maybe_activate_port(repo_root, apply=True)
+        return {
+            "schema": f"aoa_evals_local_{directory_name[:-1]}_write_v1",
+            "repo": repo_root.name,
+            "target_path": target.as_posix(),
+            "relative_path": _relative_repo_path(target, repo_root),
+            "apply": apply,
+            "applied": bool(apply and write_allowed),
+            "write_allowed": write_allowed,
+            "replace_existing": replace_existing,
+            "port_activation_needed": activated,
+            "frontmatter": frontmatter,
+            "validation": {
+                "valid": write_allowed,
+                "issues": issues,
+                "warnings": [],
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def write_local_suite_note(
+        self,
+        repo: str,
+        suite_slug: str,
+        title: str,
+        summary: str,
+        body_markdown: str,
+        refs: list[str] | None = None,
+        *,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        return self._write_local_note(
+            repo=repo,
+            directory_name="suites",
+            note_slug=suite_slug,
+            title=title,
+            summary=summary,
+            body_markdown=body_markdown,
+            refs=refs,
+            apply=apply,
+            replace_existing=replace_existing,
+        )
+
+    def write_local_report_note(
+        self,
+        repo: str,
+        report_slug: str,
+        title: str,
+        summary: str,
+        body_markdown: str,
+        refs: list[str] | None = None,
+        *,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        return self._write_local_note(
+            repo=repo,
+            directory_name="reports",
+            note_slug=report_slug,
+            title=title,
+            summary=summary,
+            body_markdown=body_markdown,
+            refs=refs,
+            apply=apply,
+            replace_existing=replace_existing,
+        )
 
     def build_catalog(self) -> dict[str, Any]:
         catalog = self.catalog_payload()
@@ -1337,6 +1853,24 @@ class AoAEvalsMCPState:
             return self.read_runtime_candidate_export(parts[1])
         if parts == ["reports"]:
             return self.reports()
+        if parts == ["local-ports"]:
+            return self.local_ports()
+        if len(parts) == 2 and parts[0] == "local-port":
+            return self.local_port(parts[1])
+        if len(parts) == 3 and parts[0] == "local-port" and parts[2] == "intake":
+            return {
+                "schema": "aoa_evals_local_port_intake_v1",
+                "repo": parts[1],
+                "intake": self._local_intake_records(self._local_repo_root(parts[1])),
+                "authority_boundary": self.authority_boundary(),
+            }
+        if len(parts) == 3 and parts[0] == "local-port" and parts[2] in {"suites", "reports"}:
+            return {
+                "schema": f"aoa_evals_local_port_{parts[2]}_v1",
+                "repo": parts[1],
+                parts[2]: self._local_note_records(self._local_repo_root(parts[1]), parts[2]),
+                "authority_boundary": self.authority_boundary(),
+            }
         if len(parts) == 2 and parts[0] == "bundle":
             return self.inspect_bundle(parts[1])
         if len(parts) == 3 and parts[0] == "bundle" and parts[2] == "sections":

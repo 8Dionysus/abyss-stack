@@ -73,6 +73,45 @@ def main() -> None:
     skeleton.add_argument("name")
     skeleton.add_argument("--evidence-ref", action="append")
 
+    local_ports = sub.add_parser("local-ports")
+    local_ports.add_argument("--status")
+    local_ports.add_argument("--active-only", action="store_true")
+
+    local_port = sub.add_parser("local-port")
+    local_port.add_argument("repo")
+
+    local_find = sub.add_parser("find-or-propose-local")
+    local_find.add_argument("repo")
+    local_find.add_argument("--proof-question", default="")
+    local_find.add_argument("--proposal-file")
+
+    write_intake = sub.add_parser("write-local-intake")
+    write_intake.add_argument("repo")
+    write_intake.add_argument("--packet-file", required=True)
+    write_intake.add_argument("--file-slug")
+    write_intake.add_argument("--apply", action="store_true")
+    write_intake.add_argument("--replace-existing", action="store_true")
+
+    write_suite = sub.add_parser("write-local-suite-note")
+    write_suite.add_argument("repo")
+    write_suite.add_argument("suite_slug")
+    write_suite.add_argument("--title", required=True)
+    write_suite.add_argument("--summary", required=True)
+    write_suite.add_argument("--body-file", required=True)
+    write_suite.add_argument("--ref", action="append")
+    write_suite.add_argument("--apply", action="store_true")
+    write_suite.add_argument("--replace-existing", action="store_true")
+
+    write_report = sub.add_parser("write-local-report-note")
+    write_report.add_argument("repo")
+    write_report.add_argument("report_slug")
+    write_report.add_argument("--title", required=True)
+    write_report.add_argument("--summary", required=True)
+    write_report.add_argument("--body-file", required=True)
+    write_report.add_argument("--ref", action="append")
+    write_report.add_argument("--apply", action="store_true")
+    write_report.add_argument("--replace-existing", action="store_true")
+
     resource = sub.add_parser("read-resource")
     resource.add_argument("uri")
 
@@ -107,6 +146,52 @@ def main() -> None:
         _print(state.read_runtime_candidate_export(args.record_id, include_payload=args.include_payload))
     elif args.command == "report-skeleton":
         _print(state.report_skeleton(args.name, args.evidence_ref))
+    elif args.command == "local-ports":
+        _print(state.local_ports(status=args.status, include_skeleton=not args.active_only))
+    elif args.command == "local-port":
+        _print(state.local_port(args.repo))
+    elif args.command == "find-or-propose-local":
+        proposal = None
+        if args.proposal_file:
+            proposal = json.loads(Path(args.proposal_file).read_text(encoding="utf-8"))
+        _print(state.find_or_propose_local(args.repo, args.proof_question, proposal))
+    elif args.command == "write-local-intake":
+        packet = json.loads(Path(args.packet_file).read_text(encoding="utf-8"))
+        _print(
+            state.write_local_intake(
+                args.repo,
+                packet,
+                file_slug=args.file_slug,
+                apply=args.apply,
+                replace_existing=args.replace_existing,
+            )
+        )
+    elif args.command == "write-local-suite-note":
+        _print(
+            state.write_local_suite_note(
+                args.repo,
+                args.suite_slug,
+                args.title,
+                args.summary,
+                Path(args.body_file).read_text(encoding="utf-8"),
+                refs=args.ref,
+                apply=args.apply,
+                replace_existing=args.replace_existing,
+            )
+        )
+    elif args.command == "write-local-report-note":
+        _print(
+            state.write_local_report_note(
+                args.repo,
+                args.report_slug,
+                args.title,
+                args.summary,
+                Path(args.body_file).read_text(encoding="utf-8"),
+                refs=args.ref,
+                apply=args.apply,
+                replace_existing=args.replace_existing,
+            )
+        )
     elif args.command == "read-resource":
         _print(state.read_resource(args.uri))
 

@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 70,
-  "edge_count": 1468,
+  "decision_count": 71,
+  "edge_count": 1492,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 567,
-    "DATED": 70,
-    "GUARDED_BY": 175,
-    "HAS_STATUS": 70,
-    "HAS_SURFACE_CLASS": 168,
-    "IN_STACK_LANE": 135,
-    "NEXT_DECISION": 69,
-    "OWNED_BY_SURFACE": 73,
-    "OWNS_DECISION": 70,
+    "CITES_SOURCE_SURFACE": 575,
+    "DATED": 71,
+    "GUARDED_BY": 178,
+    "HAS_STATUS": 71,
+    "HAS_SURFACE_CLASS": 171,
+    "IN_STACK_LANE": 138,
+    "NEXT_DECISION": 70,
+    "OWNED_BY_SURFACE": 74,
+    "OWNS_DECISION": 71,
     "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 70
+    "UNDER_MECHANIC_PARENT": 72
   },
   "edges": [
     {
@@ -6993,6 +6993,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0070",
+      "target": "decision:ABYSS-STACK-D-0071",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0070",
       "target": "owner_surface:compose/modules/60-monitoring.yml",
       "type": "OWNED_BY_SURFACE"
     },
@@ -7004,6 +7009,116 @@
     {
       "source": "decision:ABYSS-STACK-D-0070",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/pyproject.toml",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/cli.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/server.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "source_surface:mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "date:2026-06-13",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "guard_family:MCP%20port%20confinement",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "guard_family:read-only%20access%20plane",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "guard_family:source/runtime%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "surface_class:federation/read-model",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "stack_lane:federation%20seams",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "stack_lane:governed%20execution",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "owner_surface:mcp/services/aoa-evals-mcp/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -7355,18 +7470,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0070",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0071",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 608,
+  "node_count": 614,
   "node_type_counts": {
     "date": 14,
-    "decision": 70,
+    "decision": 71,
     "guard_family": 70,
     "mechanic_parent": 10,
-    "owner_surface": 32,
+    "owner_surface": 33,
     "repo": 1,
-    "source_surface": 335,
+    "source_surface": 339,
     "stack_lane": 22,
     "status": 2,
     "surface_class": 52
@@ -8143,6 +8263,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-06-13",
+      "id": "decision:ABYSS-STACK-D-0071",
+      "label": "ABYSS-STACK-D-0071",
+      "path": "docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md",
+      "posture": "accepted local-eval-port write-gate rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -8565,6 +8695,11 @@
     {
       "id": "owner_surface:mcp/services/aoa-decisions-mcp/",
       "label": "mcp/services/aoa-decisions-mcp/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mcp/services/aoa-evals-mcp/",
+      "label": "mcp/services/aoa-evals-mcp/",
       "type": "owner_surface"
     },
     {
@@ -9419,6 +9554,21 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mcp/services/aoa-evals-mcp/pyproject.toml",
+      "label": "mcp/services/aoa-evals-mcp/pyproject.toml",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+      "label": "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/cli.py",
+      "label": "mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/cli.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
       "label": "mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/core.py",
       "type": "source_surface"
@@ -9426,6 +9576,11 @@
     {
       "id": "source_surface:mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/server.py",
       "label": "mcp/services/aoa-evals-mcp/src/aoa_evals_mcp/server.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
+      "label": "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
       "type": "source_surface"
     },
     {
