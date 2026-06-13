@@ -86,6 +86,88 @@ def build_server(
         """Prepare a candidate-only report skeleton without computing a verdict."""
         return current_state().report_skeleton(name=name, evidence_refs=evidence_refs)
 
+    @mcp.tool()
+    def aoa_evals_local_ports(status: str | None = None, include_skeleton: bool = True) -> dict[str, Any]:
+        """List workspace repo-local eval ports and validation summaries."""
+        return current_state().local_ports(status=status, include_skeleton=include_skeleton)
+
+    @mcp.tool()
+    def aoa_evals_local_port(repo: str) -> dict[str, Any]:
+        """Inspect one repo-local eval port."""
+        return current_state().local_port(repo=repo)
+
+    @mcp.tool()
+    def aoa_evals_find_or_propose_local(
+        repo: str,
+        proof_question: str = "",
+        proposal: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Find central routes and prepare a local eval_need write plan."""
+        return current_state().find_or_propose_local(repo=repo, proof_question=proof_question, proposal=proposal)
+
+    @mcp.tool()
+    def aoa_evals_write_local_intake(
+        repo: str,
+        packet: dict[str, Any],
+        file_slug: str | None = None,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        """Dry-run or write one repo-local eval_need_v1 intake packet."""
+        return current_state().write_local_intake(
+            repo=repo,
+            packet=packet,
+            file_slug=file_slug,
+            apply=apply,
+            replace_existing=replace_existing,
+        )
+
+    @mcp.tool()
+    def aoa_evals_write_local_suite_note(
+        repo: str,
+        suite_slug: str,
+        title: str,
+        summary: str,
+        body_markdown: str,
+        refs: list[str] | None = None,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        """Dry-run or write one repo-local suite note."""
+        return current_state().write_local_suite_note(
+            repo=repo,
+            suite_slug=suite_slug,
+            title=title,
+            summary=summary,
+            body_markdown=body_markdown,
+            refs=refs,
+            apply=apply,
+            replace_existing=replace_existing,
+        )
+
+    @mcp.tool()
+    def aoa_evals_write_local_report_note(
+        repo: str,
+        report_slug: str,
+        title: str,
+        summary: str,
+        body_markdown: str,
+        refs: list[str] | None = None,
+        apply: bool = False,
+        replace_existing: bool = False,
+    ) -> dict[str, Any]:
+        """Dry-run or write one repo-local report note."""
+        return current_state().write_local_report_note(
+            repo=repo,
+            report_slug=report_slug,
+            title=title,
+            summary=summary,
+            body_markdown=body_markdown,
+            refs=refs,
+            apply=apply,
+            replace_existing=replace_existing,
+        )
+
     @mcp.resource("aoa-evals://catalog")
     def catalog_resource() -> str:
         return json.dumps(current_state().build_catalog(), ensure_ascii=False, indent=2)
@@ -125,6 +207,26 @@ def build_server(
     @mcp.resource("aoa-evals://reports")
     def reports_resource() -> str:
         return json.dumps(current_state().reports(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://local-ports")
+    def local_ports_resource() -> str:
+        return json.dumps(current_state().local_ports(), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://local-port/{repo}")
+    def local_port_resource(repo: str) -> str:
+        return json.dumps(current_state().local_port(repo), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://local-port/{repo}/intake")
+    def local_port_intake_resource(repo: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-evals://local-port/{repo}/intake"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://local-port/{repo}/suites")
+    def local_port_suites_resource(repo: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-evals://local-port/{repo}/suites"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-evals://local-port/{repo}/reports")
+    def local_port_reports_resource(repo: str) -> str:
+        return json.dumps(current_state().read_resource(f"aoa-evals://local-port/{repo}/reports"), ensure_ascii=False, indent=2)
 
     @mcp.prompt(name="eval-select")
     def eval_select(proof_question: str) -> str:
@@ -167,6 +269,15 @@ def build_server(
         return (
             f"Use aoa_evals_report_skeleton(name={name!r}, evidence_refs=[]). "
             "Leave verdict unset; MCP must not publish receipts or compute the result."
+        )
+
+    @mcp.prompt(name="local-eval-port")
+    def local_eval_port(repo: str, proof_question: str) -> str:
+        """Prompt route for local eval-port discovery and gated authoring."""
+        return (
+            f"Use aoa_evals_local_port(repo={repo!r}) and "
+            f"aoa_evals_find_or_propose_local(repo={repo!r}, proof_question={proof_question!r}, proposal={{}}). "
+            "Use write tools with apply=false first. Local writes stay below central proof authority."
         )
 
     LOGGER.info("AoA evals MCP server ready")

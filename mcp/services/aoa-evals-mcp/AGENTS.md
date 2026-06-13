@@ -8,7 +8,9 @@ Local route card for `mcp/services/aoa-evals-mcp/`.
 surfaces. It lets agents select, inspect, expand, compare, check runtime
 freshness, find-or-propose eval-need routes, validate candidate evidence packet
 shape, read stack-owned runtime candidate exports, and prepare candidate
-evidence/report skeletons without turning MCP into proof authority.
+evidence/report skeletons without turning MCP into proof authority. It also
+federates sibling repository `evals/` ports and can perform explicitly gated
+repo-local port writes.
 
 ## Owner Lane
 
@@ -24,6 +26,11 @@ This stack-owned MCP surface owns:
 - Read-only runtime status and schema-backed candidate packet validation.
 - Read-only metadata/detail access for private stack-owned runtime candidate
   exports under `Logs/eval-exports/`.
+- Listing, inspection, dry-run planning, and gated local writes for sibling
+  repo `evals/` ports.
+- Local-port writes limited to `evals/intake/*.eval_need.json`,
+  `evals/suites/*.suite.md`, `evals/reports/*.report.md`, and `PORT.yaml`
+  `skeleton` to `active` activation when the same write adds first pressure.
 
 It does not own:
 
@@ -31,6 +38,8 @@ It does not own:
 - generated reader source truth;
 - runtime evidence acceptance;
 - receipt publication or bundle promotion.
+- central `aoa-evals` bundle creation from MCP;
+- sibling repo proof doctrine, verdict logic, scoring, or regression gates.
 
 ## Start Here
 
@@ -54,6 +63,7 @@ It does not own:
 | stack runtime candidate exports | `abyss-stack:mechanics/governed-execution/parts/candidate-exports/` and `Logs/eval-exports/` |
 | source/mirror freshness | `src/aoa_evals_mcp/core.py` and `mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh` |
 | report skeleton behavior | `src/aoa_evals_mcp/core.py` and source bundle report contract |
+| repo-local eval ports | `src/aoa_evals_mcp/core.py` and `aoa-evals:docs/guides/LOCAL_EVAL_PORT_STANDARD.md` |
 | Codex-plane registration | `8Dionysus:config/codex_plane/runtime_manifest.v1.json` |
 
 ## AGENTS Stack Law
@@ -62,6 +72,8 @@ It does not own:
 - Generated readers and MCP responses stay weaker than bundle-local `EVAL.md`
   and `eval.yaml`.
 - Runtime evidence templates stay candidate-only until bundle-local review.
+- Local eval-port writes stay below central `aoa-evals` proof authority and
+  must dry-run before `apply=true`.
 - Keep the server stdio-only unless a later decision widens exposure.
 
 ## Run
@@ -98,6 +110,9 @@ PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-ev
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-status
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli validate-evidence-candidate --candidate-file /tmp/runtime-evidence-selection.json
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-candidate-exports --limit 5
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli local-ports
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli local-port aoa-memo
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli find-or-propose-local aoa-memo --proof-question "repo-local eval pressure"
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli report-skeleton aoa-bounded-change-quality --evidence-ref artifact:example
 ```
 

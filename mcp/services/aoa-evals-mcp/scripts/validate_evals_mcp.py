@@ -42,6 +42,52 @@ def main() -> None:
         raise SystemExit("find-or-propose must stay read-only and source-nonmutating")
     if not proposal_route["proposal_validation"]["valid"]:
         raise SystemExit(f"find-or-propose produced invalid eval_need_v1: {proposal_route['proposal_validation']}")
+    local_ports = state.read_resource("aoa-evals://local-ports")
+    if local_ports["schema"] != "aoa_evals_local_ports_v1":
+        raise SystemExit("local eval-port resource schema drifted")
+    local_port_repo = None
+    local_port_valid = None
+    local_find_valid = None
+    local_dry_write_allowed = None
+    valid_local_ports = [
+        port
+        for port in local_ports.get("ports", [])
+        if isinstance(port.get("validation"), dict) and port["validation"].get("valid") is True
+    ]
+    if valid_local_ports:
+        local_port_repo = valid_local_ports[0]["repo"]
+        local_detail = state.read_resource(f"aoa-evals://local-port/{local_port_repo}")
+        if local_detail["schema"] != "aoa_evals_local_port_v1":
+            raise SystemExit("local eval-port detail resource schema drifted")
+        if local_detail["repo"] != local_port_repo or not local_detail["validation"]["valid"]:
+            raise SystemExit(f"local eval-port detail invalid: {local_detail.get('validation')}")
+        local_port_valid = True
+        local_find = state.find_or_propose_local(
+            local_port_repo,
+            f"bounded proof route for {first_name}",
+        )
+        if local_find["schema"] != "aoa_evals_local_find_or_propose_v1":
+            raise SystemExit("local find-or-propose schema drifted")
+        local_find_valid = bool(local_find["central_route"]["proposal_validation"]["valid"])
+        if not local_find_valid:
+            raise SystemExit(
+                "local find-or-propose produced invalid eval_need_v1: "
+                f"{local_find['central_route']['proposal_validation']}"
+            )
+        dry_write = state.write_local_intake(
+            local_port_repo,
+            local_find["central_route"]["proposal_context"]["packet"],
+            file_slug="aoa-evals-mcp-validator-smoke",
+            apply=False,
+            replace_existing=True,
+        )
+        if dry_write["applied"]:
+            raise SystemExit("local intake smoke mutated files during dry-run")
+        local_dry_write_allowed = bool(dry_write["write_allowed"])
+        if not local_dry_write_allowed:
+            raise SystemExit(f"local intake dry-run rejected a valid packet: {dry_write['validation']}")
+    elif local_ports.get("count", 0):
+        raise SystemExit("local eval-port listing found only invalid ports")
     if state.report_skeleton(first_name, [])["sections"]["verdict"] != "UNSET: MCP must not compute verdicts":
         raise SystemExit("report skeleton must leave verdict unset")
     status = state.runtime_status()
@@ -108,6 +154,11 @@ def main() -> None:
                 "catalog_count": catalog["count"],
                 "freshness_status": status["freshness"]["status"],
                 "find_or_propose_valid": proposal_route["proposal_validation"]["valid"],
+                "local_eval_port_count": local_ports["count"],
+                "local_eval_port_smoke_repo": local_port_repo,
+                "local_eval_port_detail_valid": local_port_valid,
+                "local_find_or_propose_valid": local_find_valid,
+                "local_intake_dry_write_allowed": local_dry_write_allowed,
                 "candidate_validation": validation["valid"],
                 "runtime_candidate_export_count": exports["count"],
                 "runtime_candidate_export_invalid_shape_count": exports.get("candidate_validation", {}).get("invalid_shape_count"),

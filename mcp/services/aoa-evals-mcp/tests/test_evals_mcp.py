@@ -12,6 +12,51 @@ def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def valid_eval_need_packet(name: str = "aoa-memory-guardrail-pressure") -> dict[str, object]:
+    return {
+        "schema_version": "eval_need_v1",
+        "name": name,
+        "proof_question": "Does memory guardrail pressure route to bounded proof review?",
+        "origin_need": "A local memory handoff needs a route before central proof adoption.",
+        "summary": "Checks whether memory guardrail pressure stays below proof authority.",
+        "object_under_evaluation": "memory guardrail handoff",
+        "category": "boundary",
+        "claim_type": "bounded",
+        "baseline_mode": "none",
+        "report_format": "summary-with-breakdown",
+        "authoring_route": "candidate_evidence_packet",
+        "expected_use_when": ["memory guardrail pressure appears locally"],
+        "blind_spot_notes": ["does not accept a central proof verdict"],
+        "candidate_evidence_refs": ["mechanics/consumer-handoff/parts/eval-guardrail-handoff/"],
+    }
+
+
+def seed_local_eval_port(root: Path, repo: str = "aoa-memo", *, status: str = "skeleton") -> Path:
+    repo_root = root / repo
+    write_text(
+        repo_root / "evals/PORT.yaml",
+        f"""schema_version: local_eval_port_v1
+owner_repo: {repo}
+status: {status}
+proof_owner_repo: aoa-evals
+default_intake_schema: eval_need_v1
+local_role: repo-local eval pressure, fixtures, suites, and reports
+central_boundary: no verdict, scoring, regression, or proof doctrine authority
+""",
+    )
+    write_text(repo_root / "evals/AGENTS.md", "Route verdict, scoring, regression, and proof doctrine to aoa-evals.\n")
+    write_text(repo_root / "evals/README.md", "Local port; aoa-evals owns verdict, scoring, regression, and proof doctrine.\n")
+    write_text(repo_root / "evals/intake/README.md", "# Intake\n")
+    write_text(repo_root / "evals/suites/README.md", "# Suites\n")
+    write_text(repo_root / "evals/reports/README.md", "# Reports\n")
+    return repo_root
+
+
 def seed_evals(root: Path) -> None:
     evals = root / "aoa-evals"
     record = {
@@ -558,6 +603,130 @@ def test_runtime_candidate_exports_report_shape_invalid_private_candidates(tmp_p
     assert detail["candidate_payload_included"] is False
     assert detail["validation"]["valid"] is False
     assert "candidate_payload" not in detail
+
+
+def test_local_ports_are_first_class_resources(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="active")
+    write_json(
+        tmp_path / "aoa-memo/evals/intake/memory-guardrail.eval_need.json",
+        valid_eval_need_packet(),
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    listing = state.local_ports()
+    assert listing["schema"] == "aoa_evals_local_ports_v1"
+    assert listing["count"] == 1
+    assert listing["ports"][0]["repo"] == "aoa-memo"
+    assert listing["ports"][0]["counts"]["intake"] == 1
+    assert listing["ports"][0]["validation"]["valid"] is True
+
+    detail = state.read_resource("aoa-evals://local-port/aoa-memo")
+    assert detail["schema"] == "aoa_evals_local_port_v1"
+    assert detail["intake"][0]["valid"] is True
+    assert detail["read_only"] is True
+
+    intake = state.read_resource("aoa-evals://local-port/aoa-memo/intake")
+    assert intake["intake"][0]["name"] == "aoa-memory-guardrail-pressure"
+
+
+def test_find_or_propose_local_returns_write_plan(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="skeleton")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.find_or_propose_local("aoa-memo", "memory guardrail pressure before proof adoption")
+
+    assert result["schema"] == "aoa_evals_local_find_or_propose_v1"
+    assert result["repo"] == "aoa-memo"
+    assert result["local_write_plan"]["relative_path"].startswith("evals/intake/")
+    assert result["local_write_plan"]["apply_default"] is False
+    assert result["local_write_plan"]["port_activation_needed"] is True
+    assert not list((tmp_path / "aoa-memo/evals/intake").glob("*.eval_need.json"))
+
+
+def test_write_local_intake_dry_run_does_not_mutate(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=False)
+
+    assert result["write_allowed"] is True
+    assert result["applied"] is False
+    assert result["port_activation_needed"] is True
+    assert not Path(result["target_path"]).exists()
+    assert "status: skeleton" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
+
+
+def test_write_local_intake_apply_writes_and_activates_port(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=True)
+
+    assert result["applied"] is True
+    assert Path(result["target_path"]).is_file()
+    assert "status: active" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
+    detail = state.local_port("aoa-memo")
+    assert detail["counts"]["intake"] == 1
+    assert detail["validation"]["valid"] is True
+
+
+def test_write_local_suite_and_report_notes_are_local_only(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    suite = state.write_local_suite_note(
+        "aoa-memo",
+        "memory-guardrail",
+        "Memory guardrail suite",
+        "Local suite note for memory guardrail pressure.",
+        "# Memory guardrail suite\n\nLocal deterministic case list.",
+        refs=["mechanics/consumer-handoff/parts/eval-guardrail-handoff/"],
+        apply=True,
+    )
+    report = state.write_local_report_note(
+        "aoa-memo",
+        "memory-guardrail",
+        "Memory guardrail report",
+        "Local report note for memory guardrail pressure.",
+        "# Memory guardrail report\n\nNo verdict computed.",
+        refs=["evals/suites/memory-guardrail.suite.md"],
+        apply=True,
+    )
+
+    assert suite["applied"] is True
+    assert report["applied"] is True
+    assert (repo_root / "evals/suites/memory-guardrail.suite.md").is_file()
+    assert (repo_root / "evals/reports/memory-guardrail.report.md").is_file()
+    detail = state.local_port("aoa-memo")
+    assert detail["counts"]["suites"] == 1
+    assert detail["counts"]["reports"] == 1
+    assert detail["validation"]["valid"] is True
+
+
+def test_write_local_note_rejects_private_or_traversing_refs(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="active")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_report_note(
+        "aoa-memo",
+        "bad-ref",
+        "Bad ref report",
+        "Local report note with unsafe reference.",
+        "# Bad ref report\n",
+        refs=["../secret/private.json", "private:/tmp/secret.json"],
+        apply=True,
+    )
+
+    assert result["write_allowed"] is False
+    assert result["applied"] is False
+    assert not Path(result["target_path"]).exists()
+    assert any("ref" in issue for issue in result["validation"]["issues"])
 
 
 def test_server_builds(tmp_path: Path) -> None:
