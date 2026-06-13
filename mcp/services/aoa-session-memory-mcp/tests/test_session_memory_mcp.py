@@ -774,6 +774,59 @@ def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> No
     assert args[args.index("--doc-type") + 1] == "event"
 
 
+def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "event",
+            "agent_event": "assistant_final_closeout",
+            "task_episode_id": "task-0001",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "agent_event_route_results"
+    assert search["results"][0]["agent_event"] == "assistant_answer"
+    assert "served by MCP agent-event route fast path" in search["diagnostics"]
+    assert not any(call[0] == "search" for call in runner.calls)
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["agent-responses"]
+    assert args[args.index("--session") + 1] == "session-1"
+    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+    assert "--explain" not in args
+
+
+def test_generic_search_routes_task_episode_filters_to_fast_episode_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "task_episode",
+            "status": "closed",
+            "verification_state": "verified",
+        },
+        limit=4,
+    )
+
+    assert search["artifact_type"] == "task_episode_route_results"
+    assert search["results"][0]["episode_id"] == "task-0001"
+    assert "served by MCP task-episode route fast path" in search["diagnostics"]
+    assert not any(call[0] == "search" for call in runner.calls)
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["task-episodes"]
+    assert args[args.index("--session") + 1] == "session-1"
+    assert args[args.index("--status") + 1] == "closed"
+    assert args[args.index("--verification-state") + 1] == "verified"
+
+
 def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
