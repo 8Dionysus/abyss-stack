@@ -1971,6 +1971,10 @@ class AoASessionMemoryMCPState:
                 "graph_node_count": graph.get("node_count"),
                 "graph_edge_count": graph.get("edge_count"),
                 "graph_status": graph.get("status"),
+                "graph_freshness_status": (graph.get("freshness") or {}).get("graph_status") if isinstance(graph.get("freshness"), dict) else None,
+                "needs_graph_maintenance": graph.get("needs_graph_maintenance"),
+                "graph_dirty_count": (graph.get("freshness") or {}).get("dirty_count") if isinstance(graph.get("freshness"), dict) else None,
+                "graph_missing_count": (graph.get("freshness") or {}).get("missing_count") if isinstance(graph.get("freshness"), dict) else None,
                 "latest_route_readiness_ok": (latest_readiness.get("reports") or [{}])[0].get("summary", {}).get("ok")
                 if latest_readiness.get("reports")
                 else None,
@@ -2193,6 +2197,7 @@ class AoASessionMemoryMCPState:
     def _graph_summary(self) -> dict[str, Any]:
         index_path = self.aoa_root / "graph" / "index.json"
         sqlite_path = self.aoa_root / "graph" / "graph.sqlite3"
+        freshness = self._latest_graph_freshness_summary()
         index = _read_json(index_path)
         if not isinstance(index, dict):
             if sqlite_path.is_file():
@@ -2203,8 +2208,17 @@ class AoASessionMemoryMCPState:
                     "sidecar_status": "not_exported",
                     "index_path": index_path.as_posix(),
                     "diagnostics": ["graph_sidecar_not_exported"],
+                    "freshness": freshness,
+                    "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
+                    "needs_index_maintenance": freshness.get("needs_index_maintenance"),
                 }
-            return {"status": "missing", "index_path": index_path.as_posix()}
+            return {
+                "status": "missing",
+                "index_path": index_path.as_posix(),
+                "freshness": freshness,
+                "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
+                "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+            }
         return {
             "status": "present",
             "index_path": index_path.as_posix(),
@@ -2214,6 +2228,33 @@ class AoASessionMemoryMCPState:
             "edge_count": index.get("edge_count"),
             "node_type_counts": index.get("node_type_counts", {}),
             "edge_type_counts": index.get("edge_type_counts", {}),
+            "freshness": freshness,
+            "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
+            "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+        }
+
+    def _latest_graph_freshness_summary(self) -> dict[str, Any]:
+        latest = self.latest_diagnostics("graph-freshness-gates", limit=1, include_payload=True)
+        reports = latest.get("reports") if isinstance(latest.get("reports"), list) else []
+        report = reports[0] if reports and isinstance(reports[0], dict) else {}
+        payload = report.get("payload") if isinstance(report.get("payload"), dict) else {}
+        graph_store = payload.get("graph_store") if isinstance(payload.get("graph_store"), dict) else {}
+        source_state = graph_store.get("source_state") if isinstance(graph_store.get("source_state"), dict) else {}
+        return {
+            "checked": bool(payload),
+            "report": report.get("path"),
+            "generated_at": payload.get("generated_at"),
+            "ok": payload.get("ok"),
+            "search_status": (payload.get("search_index") or {}).get("status") if isinstance(payload.get("search_index"), dict) else None,
+            "atlas_status": (payload.get("atlas_index") or {}).get("status") if isinstance(payload.get("atlas_index"), dict) else None,
+            "graph_status": graph_store.get("status"),
+            "needs_index_maintenance": payload.get("needs_index_maintenance"),
+            "needs_graph_maintenance": payload.get("needs_graph_maintenance"),
+            "dirty_count": source_state.get("dirty_count"),
+            "missing_count": source_state.get("missing_count"),
+            "blocked_count": source_state.get("blocked_count"),
+            "diagnostics": payload.get("diagnostics", []) if isinstance(payload.get("diagnostics"), list) else [],
+            "authority": "latest diagnostic summary; run graph-freshness-check outside MCP for live truth",
         }
 
     def _read_map_entry_payload(self, axis_name: str, json_path: Any) -> Any:
