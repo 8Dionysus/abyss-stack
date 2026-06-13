@@ -76,6 +76,12 @@ If the package is installed, the server entry point is:
 aoa-session-memory-mcp-server
 ```
 
+Codex starts MCP servers once per Codex process. After changing this package's
+tool surface or Python import path, restart the Codex session or MCP process
+before treating `tool_search` / `mcp__aoa_session_memory.*` output as current.
+Killing the running stdio server inside an already-open Codex session closes
+the transport; it does not prove hot reload.
+
 ## Smoke
 
 ```bash
