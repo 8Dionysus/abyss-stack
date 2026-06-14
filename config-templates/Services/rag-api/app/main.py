@@ -69,6 +69,17 @@ def safe_url_without_userinfo(raw: Any) -> str | None:
     return urlunsplit((parsed.scheme, host, parsed.path, parsed.query, parsed.fragment))
 
 
+def safe_inventory_url_ref(raw: Any) -> str | None:
+    redacted = safe_url_without_userinfo(raw)
+    if redacted is None:
+        return None
+    try:
+        parsed = urlsplit(redacted)
+    except ValueError:
+        return None
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+
+
 _NEO4J_AUTH_USER, _NEO4J_AUTH_PASSWORD = split_neo4j_auth(os.getenv("NEO4J_AUTH"))
 NEO4J_USER = os.getenv("AOA_RAG_NEO4J_USER") or _NEO4J_AUTH_USER
 NEO4J_PASSWORD = os.getenv("AOA_RAG_NEO4J_PASSWORD") or _NEO4J_AUTH_PASSWORD
@@ -276,7 +287,7 @@ def neo4j_semantic_inventory() -> dict[str, Any]:
     result: dict[str, Any] = {
         "ok": False,
         "generated_at": generated_at,
-        "uri": safe_url_without_userinfo(NEO4J_URI),
+        "uri": safe_inventory_url_ref(NEO4J_URI),
         "database": NEO4J_DATABASE,
         "graph_inventory_present": False,
         "labels": [],
@@ -385,12 +396,24 @@ def semantic_inventory_payload() -> dict[str, Any]:
             "inventory_complete": inventory_complete,
         },
         "evidence_refs": [
-            {"url": qdrant_collections.get("url"), "ok": qdrant_collections.get("ok"), "probe": "qdrant_collections"},
-            {"url": route_health.get("url"), "ok": route_health.get("ok"), "probe": "route_api_health"},
-            {"url": route_openapi.get("url"), "ok": route_openapi.get("ok"), "probe": "route_api_openapi"},
+            {
+                "url": safe_inventory_url_ref(qdrant_collections.get("url")),
+                "ok": qdrant_collections.get("ok"),
+                "probe": "qdrant_collections",
+            },
+            {
+                "url": safe_inventory_url_ref(route_health.get("url")),
+                "ok": route_health.get("ok"),
+                "probe": "route_api_health",
+            },
+            {
+                "url": safe_inventory_url_ref(route_openapi.get("url")),
+                "ok": route_openapi.get("ok"),
+                "probe": "route_api_openapi",
+            },
             {"url": f"tcp://{POSTGRES_HOST}:{POSTGRES_PORT}", "ok": postgres.get("tcp_ready"), "probe": "postgres_tcp_ready"},
             {
-                "url": safe_url_without_userinfo(NEO4J_URI),
+                "url": safe_inventory_url_ref(NEO4J_URI),
                 "ok": neo4j.get("graph_inventory_present"),
                 "probe": "neo4j_bolt_inventory",
             },

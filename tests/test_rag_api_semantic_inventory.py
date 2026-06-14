@@ -38,9 +38,15 @@ def test_semantic_inventory_payload_is_bounded_and_redacted(tmp_path: Path) -> N
     )
     module.SOURCES_PATH = sources_path
     module.AGENTIC_GRAPH_PATH = graph_path
-    module.NEO4J_URI = "bolt://neo4j_user:secret_password@neo4j.example:7687"
+    module.QDRANT_URL = "https://qdrant_user:qdrant_secret@qdrant.example:6443/vector"
+    module.ROUTE_API_URL = "https://route_user:route_secret@route.example:9443/api"
+    module.NEO4J_URI = "bolt://neo4j_user:secret_password@neo4j.example:7687?auth=neo4j_query_secret"
 
-    module.safe_http_json = lambda method, url, payload=None, timeout=45: {"ok": True, "url": url, "data": {}}
+    def fake_safe_http_json(method, url, payload=None, timeout=45):
+        token = "qdrant_query_secret" if "qdrant" in url else "route_query_secret"
+        return {"ok": True, "url": f"{url}?token={token}", "data": {}}
+
+    module.safe_http_json = fake_safe_http_json
     module.postgres_semantic_inventory = lambda: {
         "ok": True,
         "tcp_ready": True,
@@ -51,7 +57,7 @@ def test_semantic_inventory_payload_is_bounded_and_redacted(tmp_path: Path) -> N
     }
     module.neo4j_semantic_inventory = lambda: {
         "ok": True,
-        "uri": module.safe_url_without_userinfo(module.NEO4J_URI),
+        "uri": module.safe_inventory_url_ref(module.NEO4J_URI),
         "graph_inventory_present": True,
         "labels": ["TosCorpusProjection"],
         "relationship_types": ["PROJECTS_NODE"],
@@ -69,8 +75,24 @@ def test_semantic_inventory_payload_is_bounded_and_redacted(tmp_path: Path) -> N
     assert payload["redaction"]["raw_graph_properties_stored"] is False
     assert payload["redaction"]["raw_source_documents_stored"] is False
     assert payload["neo4j"]["uri"] == "bolt://neo4j.example:7687"
+    qdrant_refs = [ref for ref in payload["evidence_refs"] if ref.get("probe") == "qdrant_collections"]
+    assert qdrant_refs == [
+        {"url": "https://qdrant.example:6443/vector/collections", "ok": True, "probe": "qdrant_collections"}
+    ]
+    route_refs = [ref for ref in payload["evidence_refs"] if str(ref.get("probe", "")).startswith("route_api_")]
+    assert route_refs == [
+        {"url": "https://route.example:9443/api/health", "ok": True, "probe": "route_api_health"},
+        {"url": "https://route.example:9443/api/openapi.json", "ok": True, "probe": "route_api_openapi"},
+    ]
     neo4j_refs = [ref for ref in payload["evidence_refs"] if ref.get("probe") == "neo4j_bolt_inventory"]
     assert neo4j_refs == [{"url": "bolt://neo4j.example:7687", "ok": True, "probe": "neo4j_bolt_inventory"}]
     payload_json = json.dumps(payload).lower()
     assert "secret_password" not in payload_json
     assert "neo4j_user" not in payload_json
+    assert "qdrant_secret" not in payload_json
+    assert "qdrant_user" not in payload_json
+    assert "route_secret" not in payload_json
+    assert "route_user" not in payload_json
+    assert "qdrant_query_secret" not in payload_json
+    assert "route_query_secret" not in payload_json
+    assert "neo4j_query_secret" not in payload_json
