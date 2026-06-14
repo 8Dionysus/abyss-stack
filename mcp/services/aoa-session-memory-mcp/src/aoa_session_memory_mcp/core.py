@@ -1619,9 +1619,12 @@ class AoASessionMemoryMCPState:
             filters.append("(route_terms.key LIKE ? OR route_terms.route_signal LIKE ?)")
             params.extend([like, like])
         if session:
-            selector = _safe_selector(session, "session", limit=180)
-            filters.append("(documents.session_id = ? OR documents.session_label LIKE ? OR documents.session_title LIKE ?)")
-            params.extend([selector, f"%{selector}%", f"%{selector}%"])
+            selectors = self._session_selector_terms(session)
+            session_filters = []
+            for selector in selectors:
+                session_filters.append("(documents.session_id = ? OR documents.session_label LIKE ? OR documents.session_title LIKE ?)")
+                params.extend([selector, f"%{selector}%", f"%{selector}%"])
+            filters.append("(" + " OR ".join(session_filters) + ")")
         where = " AND ".join(filters)
         conn: sqlite3.Connection | None = None
         try:
@@ -1755,7 +1758,7 @@ class AoASessionMemoryMCPState:
         if not isinstance(entries, list):
             entries = []
         query_key = _route_key(query_text) if query_text else ""
-        session_selector = _safe_selector(session, "session", limit=180) if session else ""
+        session_selectors = self._session_selector_terms(session) if session else []
         aggregates: dict[str, dict[str, Any]] = {}
         for entry in entries:
             if not isinstance(entry, dict):
@@ -1769,10 +1772,17 @@ class AoASessionMemoryMCPState:
                 continue
             session_id = str(entry.get("session_id") or "").strip()
             session_label = str(entry.get("session") or "").strip()
-            if session_selector:
+            if session_selectors:
                 comparable = " ".join([session_id, session_label]).casefold()
-                if session_selector.casefold() not in comparable:
+                if not any(selector.casefold() in comparable for selector in session_selectors):
                     continue
+            detail_entry: dict[str, Any] | None = None
+            signal_count = int(entry.get("signal_count") or 0)
+            if signal_count <= 0 and entry.get("json"):
+                detail = _read_json(Path(str(entry.get("json"))))
+                if isinstance(detail, dict):
+                    detail_entry = {**entry, **detail}
+                    signal_count = int(detail.get("signal_count") or 0)
             bucket = aggregates.setdefault(
                 normalized_key or route_key,
                 {
@@ -1784,7 +1794,6 @@ class AoASessionMemoryMCPState:
                     "samples": [],
                 },
             )
-            signal_count = int(entry.get("signal_count") or 1)
             bucket["signal_count"] += max(signal_count, 1)
             if session_id:
                 bucket["sessions"].add(session_id)
@@ -1794,7 +1803,7 @@ class AoASessionMemoryMCPState:
             if session_date and (bucket["latest_session_date"] is None or session_date > bucket["latest_session_date"]):
                 bucket["latest_session_date"] = session_date
             if len(bucket["samples"]) < sample_limit:
-                bucket["samples"].append(self._inventory_sample_from_atlas_entry(entry))
+                bucket["samples"].append(self._inventory_sample_from_atlas_entry(detail_entry or entry))
         entities = sorted(
             aggregates.values(),
             key=lambda item: (-int(item["signal_count"]), -len(item["sessions"]), str(item["key"])),
@@ -2392,12 +2401,33 @@ class AoASessionMemoryMCPState:
         sessions = payload.get("sessions") if isinstance(payload, dict) else None
         return [item for item in sessions if isinstance(item, dict)] if isinstance(sessions, list) else []
 
+    def _session_selector_terms(self, session: str) -> list[str]:
+        selector = _safe_selector(session, "session", limit=180)
+        terms = [selector] if selector else []
+        session_dir = self._resolve_session_dir(selector) if selector else None
+        if session_dir is not None:
+            manifest = _read_json(session_dir / "session.manifest.json")
+            display = manifest.get("display") if isinstance(manifest.get("display"), dict) else {}
+            for value in (
+                manifest.get("session_id"),
+                manifest.get("session_label"),
+                manifest.get("session_title"),
+                display.get("label"),
+                display.get("title"),
+                session_dir.name,
+                session_dir.as_posix(),
+            ):
+                text = str(value or "").strip()
+                if text and text not in terms:
+                    terms.append(text)
+        return terms
+
     def _resolve_session_dir(self, session: str) -> Path | None:
         selector = (session or "latest").strip()
         sessions = self._registry_sessions()
         if selector == "latest":
             if sessions:
-                latest = sorted(sessions, key=self._session_sort_key)[-1]
+                latest = sorted(sessions, key=lambda item: str(item.get("updated_at", "")), reverse=True)[0]
                 return self._session_path_from_registry(latest)
             dirs = sorted((self.aoa_root / "sessions").glob("*"))
             return dirs[-1] if dirs else None

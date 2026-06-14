@@ -190,7 +190,6 @@ def seed_archive(root: Path) -> Path:
                     "session": session_dir.name,
                     "session_id": "session-1",
                     "confidence": "high",
-                    "signal_count": 4,
                     "json": skill_entry_path.as_posix(),
                     "markdown": (aoa / "maps/by-skill/entries/aoa_decision__session.md").as_posix(),
                     "evidence": {
@@ -203,7 +202,7 @@ def seed_archive(root: Path) -> Path:
             ],
         },
     )
-    write_json(skill_entry_path, {"route_key": "aoa_decision", "summary": "test skill entry"})
+    write_json(skill_entry_path, {"route_key": "aoa_decision", "summary": "test skill entry", "signal_count": 4})
     search_db = aoa / "search/aoa-search.sqlite3"
     search_db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(search_db))
@@ -733,6 +732,50 @@ def state_with_fixture(tmp_path: Path, runner: FakeRunner | None = None) -> AoAS
     )
 
 
+def test_latest_session_resolution_uses_registry_updated_at(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    registry_path = aoa / "session-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["sessions"][0]["updated_at"] = "2026-06-14T00:00:00Z"
+    calendar_newer = aoa / "sessions/2026-06-13__005__calendar-newer-but-stale"
+    calendar_newer.mkdir(parents=True)
+    write_json(
+        calendar_newer / "session.manifest.json",
+        {
+            "session_id": "session-stale",
+            "session_label": calendar_newer.name,
+            "session_title": "Calendar newer but stale",
+            "archive_status": "indexed",
+        },
+    )
+    registry["sessions"].append(
+        {
+            "session_id": "session-stale",
+            "updated_at": "2026-06-13T00:00:00Z",
+            "display": {
+                "date": "2026-06-13",
+                "sequence": 5,
+                "label": calendar_newer.name,
+                "title": "Calendar newer but stale",
+                "path": calendar_newer.as_posix(),
+            },
+        }
+    )
+    write_json(registry_path, registry)
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+
+    brief = state.session_brief("latest", max_segments=1)
+
+    assert brief["ok"] is True
+    assert brief["session"]["session_id"] == "session-1"
+
+
 def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -982,6 +1025,8 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     state = state_with_fixture(tmp_path)
 
     skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
+    latest_skill_inventory = state.session_entity_inventory(layer="skill", session="latest", limit=5)
+    explicit_skill_inventory = state.session_entity_inventory(layer="skill", session="session-1", limit=5)
     eval_inventory = state.session_entity_inventory(layer="eval", limit=5)
     git_inventory = state.session_entity_inventory(layer="git", limit=5)
     playbook_inventory = state.session_entity_inventory(layer="playbook", limit=5)
@@ -994,6 +1039,8 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert skill_inventory["entities"][0]["signal_count"] == 4
     assert skill_inventory["entities"][0]["samples"][0]["doc_type"] == "atlas_entry"
     assert skill_inventory["entities"][0]["samples"][0]["refs"]["raw"] == "raw:line:2"
+    assert latest_skill_inventory["entities"][0]["key"] == "aoa_decision"
+    assert explicit_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert eval_inventory["source"] == "portable_sqlite"
     assert eval_inventory["entities"][0]["key"] == "inspect_ai"
     assert git_inventory["entities"][0]["key"] == "git"
