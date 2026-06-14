@@ -89,6 +89,18 @@ AGENT_ROUTE_SEARCH_FILTERS = {
     "status",
     "verification_state",
 }
+AGENT_ROUTE_ONLY_SEARCH_FILTERS = {
+    "closeout_final",
+    "failure_state",
+    "status",
+    "verification_state",
+}
+AGENT_ROUTE_FAST_PATH_FILTERS = {
+    "agent_event",
+    "doc_type",
+    "session",
+    "task_episode_id",
+}
 STOP_LINES = [
     "Do not replace raw transcript evidence with MCP summaries.",
     "Do not write, repair, reindex, relabel, export, distill, or promote session memory from this MCP.",
@@ -227,6 +239,10 @@ def _as_bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).casefold() in {"1", "true", "yes", "on"}
+
+
+def _filter_is_active(value: Any) -> bool:
+    return value not in (None, "", "any", False)
 
 
 def _ensure_short_text(value: str, field: str, limit: int = 600) -> str:
@@ -848,6 +864,9 @@ class AoASessionMemoryMCPState:
                 diagnostics.append(f"ignored unsupported doc_type={value!r}")
                 continue
             args.extend([flag, _safe_selector(str(value), key)])
+        episode = filters.get("episode")
+        if episode not in (None, "") and filters.get("task_episode_id") in (None, ""):
+            args.extend(["--task-episode-id", _safe_selector(str(episode), "episode")])
         if _as_bool(filters.get("explain"), default=True):
             args.append("--explain")
         payload = self._archive_command("search", args)
@@ -868,6 +887,35 @@ class AoASessionMemoryMCPState:
         doc_type = str(active_filters.get("doc_type") or "")
         session = str(active_filters.get("session") or "")
         episode = str(active_filters.get("task_episode_id") or filters.get("episode") or "")
+        unsupported_fast_filters = set(active_filters) - AGENT_ROUTE_FAST_PATH_FILTERS
+        if unsupported_fast_filters:
+            route_only_filters = sorted(
+                key
+                for key in AGENT_ROUTE_ONLY_SEARCH_FILTERS
+                if _filter_is_active(filters.get(key))
+            )
+            if route_only_filters:
+                return {
+                    "ok": False,
+                    "artifact_type": "session_search_filter_error",
+                    "diagnostics": [
+                        *diagnostics,
+                        "agent-event/task-episode fast path cannot preserve ordinary search filters "
+                        "while also applying route-specific filters; narrow the request or use the "
+                        "dedicated route tool",
+                    ],
+                    "unsupported_filter_mix": {
+                        "ordinary_search_filters": sorted(unsupported_fast_filters),
+                        "route_specific_filters": route_only_filters,
+                    },
+                    "mcp_access": {
+                        "mutates": False,
+                        "archive_command": None,
+                        "authority_boundary": "MCP rejected a mixed filter request rather than silently broadening search.",
+                    },
+                    "authority_boundary": self.authority_boundary(),
+                }
+            return None
 
         if doc_type == "task_episode" and not query and not active_filters.get("agent_event"):
             payload = self.session_task_episodes(

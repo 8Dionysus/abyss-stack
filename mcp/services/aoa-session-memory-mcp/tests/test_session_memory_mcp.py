@@ -931,6 +931,82 @@ def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path:
     assert "--explain" not in args
 
 
+def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "event",
+            "agent_event": "assistant_final_closeout",
+            "task_episode_id": "task-0001",
+            "route_signal": "mcp:aoa_session_memory_mcp",
+            "event_type": "TOOL_CALL",
+            "date_from": "2026-06-01",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "search_results"
+    assert not any(call[0] == "agent-responses" for call in runner.calls)
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+    assert args[args.index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
+    assert args[args.index("--event-type") + 1] == "TOOL_CALL"
+    assert args[args.index("--date-from") + 1] == "2026-06-01"
+
+
+def test_task_episode_route_only_filters_with_ordinary_filters_are_rejected(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "doc_type": "task_episode",
+            "status": "closed",
+            "date_from": "2026-06-01",
+        },
+        limit=3,
+    )
+
+    assert search["ok"] is False
+    assert search["artifact_type"] == "session_search_filter_error"
+    assert search["unsupported_filter_mix"]["ordinary_search_filters"] == ["date_from"]
+    assert search["unsupported_filter_mix"]["route_specific_filters"] == ["status"]
+    assert not runner.calls
+
+
+def test_episode_alias_is_preserved_when_agent_route_falls_back_to_search(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "doc_type": "event",
+            "agent_event": "assistant_final_closeout",
+            "episode": "task-0001",
+            "event_type": "TOOL_CALL",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "search_results"
+    assert not any(call[0] == "agent-responses" for call in runner.calls)
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+    assert args[args.index("--event-type") + 1] == "TOOL_CALL"
+
+
 def test_generic_search_routes_task_episode_filters_to_fast_episode_route(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
