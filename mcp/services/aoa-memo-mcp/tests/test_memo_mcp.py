@@ -625,6 +625,22 @@ def test_workspace_map_full_ports_are_known_for_candidate_validation(tmp_path: P
     assert any("aoa-agents" in hit["path"] for hit in ports_search["hits"])
 
 
+def test_unregistered_memo_port_rejects_candidate_writes_before_file(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    source_ref = "docs/UNLISTED_MEMORY_POSTURE.md"
+    port = seed_local_memo_port(tmp_path, "unlisted-repo", source_ref)
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    with pytest.raises(ValueError, match="not registered as a known local memo port"):
+        state.create_candidate(
+            "unlisted-repo",
+            [source_ref],
+            "unregistered memo ports must not accept local candidates",
+        )
+
+    assert list((port / "candidates").glob("*.candidate.json")) == []
+
+
 def test_route_only_workspace_surface_rejects_candidate_writes(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     source_ref = "docs/TREE_MEMORY_POSTURE.md"
