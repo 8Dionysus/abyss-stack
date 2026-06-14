@@ -1039,6 +1039,38 @@ class AoASessionMemoryMCPState:
         text = str(query or "").strip()
         if text:
             text = _ensure_short_text(text, "query")
+        scoped = bool(
+            text
+            or session
+            or episode
+            or closeout_final
+            or (agent_events or [])
+            or verification_state != "any"
+            or failure_state != "any"
+        )
+        if not scoped:
+            return {
+                "schema_version": 1,
+                "artifact_type": "agent_event_route_guidance",
+                "ok": False,
+                "mutates": False,
+                "diagnostics": [
+                    "unscoped_agent_response_route_requires_query_session_episode_or_event_filter"
+                ],
+                "next_route": (
+                    "Provide a session, query, episode, or agent_event filter before using "
+                    "agent-responses over the full archive. Use aoa_session_search or "
+                    "aoa_session_task_episodes to narrow the evidence route first."
+                ),
+                "mcp_access": {
+                    "mutates": False,
+                    "archive_command": None,
+                    "authority_boundary": (
+                        "MCP returns route guidance only; no archive scan was started."
+                    ),
+                },
+                "authority_boundary": self.authority_boundary(),
+            }
         args = [
             "--query",
             text,
