@@ -473,6 +473,25 @@ def test_brief_returns_reviewed_memory_for_repo(tmp_path: Path, monkeypatch) -> 
     assert brief["reviewed_memory"][0]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
 
 
+def test_abyss_stack_route_fails_closed_when_source_checkout_is_missing(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    runtime_port = seed_local_memo_port(tmp_path, "abyss-stack", "DESIGN.md")
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "missing-stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    route = state.repo_route("abyss-stack")
+
+    assert route.source_root is None
+    assert route.memo_port is None
+    with pytest.raises(ValueError, match="unknown repo or missing source root: abyss-stack"):
+        state.create_candidate(
+            "abyss-stack",
+            ["DESIGN.md"],
+            "Missing source checkout should not fall back to the runtime mirror",
+        )
+    assert not list((runtime_port / "candidates").glob("*.json"))
+
+
 def test_brief_uses_workspace_memory_map_for_route_only_and_authority(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = AoAMemoMCPState.discover(tmp_path)
@@ -731,6 +750,25 @@ def test_session_rehydrate_missing_archive_path_is_not_found(tmp_path: Path) -> 
     result = state.build_session_rehydrate("session-without-path")
     assert result["found"] is False
     assert result["reason"] == "session archive path is missing"
+    assert "agents" not in result
+
+
+def test_session_rehydrate_missing_archive_target_is_not_found(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    registry = tmp_path / ".aoa/session-registry.json"
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    data["sessions"].append(
+        {
+            "session_id": "session-with-stale-path",
+            "display": {"label": "stale-path", "path": "sessions/missing"},
+        }
+    )
+    registry.write_text(json.dumps(data), encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    result = state.build_session_rehydrate("session-with-stale-path")
+    assert result["found"] is False
+    assert result["reason"] == "session archive path does not exist"
     assert "agents" not in result
 
 
