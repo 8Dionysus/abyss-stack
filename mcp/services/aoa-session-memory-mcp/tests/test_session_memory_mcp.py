@@ -1211,6 +1211,28 @@ def test_freshness_check_resolves_latest_before_provider_scope(tmp_path: Path) -
     assert "latest" not in freshness_calls[0]
 
 
+def test_freshness_check_rejects_relative_refs_that_escape_aoa_root(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    outside_ref = tmp_path / "outside-evidence.json"
+    outside_ref.write_text("{}", encoding="utf-8")
+
+    freshness = state.session_freshness_check(["../outside-evidence.json"])
+    check = freshness["checks"][0]
+
+    assert freshness["ok"] is False
+    assert check["status"] == "invalid"
+    assert check["inside_aoa_root"] is False
+    assert check["path"] == outside_ref.resolve().as_posix()
+
+    absolute_freshness = state.session_freshness_check([outside_ref.as_posix()])
+    absolute_check = absolute_freshness["checks"][0]
+
+    assert absolute_freshness["ok"] is False
+    assert absolute_check["status"] == "present"
+    assert absolute_check["inside_aoa_root"] is False
+
+
 def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tmp_path: Path) -> None:
     runner = StaleProviderRunner(dirty_session_id="session-other", dirty_session_label="2026-05-26__002__other")
     state = state_with_fixture(tmp_path, runner)
