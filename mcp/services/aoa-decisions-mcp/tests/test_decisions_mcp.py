@@ -148,6 +148,26 @@ def test_path_packets_include_route_anchor_impacts(tmp_path: Path) -> None:
     assert any(edge["type"] == "HAS_DECISION_FACET" for edge in packet["edges"])
 
 
+def test_route_anchor_path_packets_respect_repo_scope(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    repo_b = tmp_path / "repo-b"
+    (repo_b / ".git").mkdir(parents=True)
+    (repo_b / "docs" / "decisions" / "indexes").mkdir(parents=True)
+    (repo_b / "docs" / "decisions" / "indexes" / "README.md").write_text("# Index\n", encoding="utf-8")
+    write_decision(repo_b, "BBB-D-0001", "Foreign Decision", "docs/foreign.md", route_anchor="config/foreign.toml")
+    state = state_for(tmp_path)
+
+    changed_packet = state.changed_path("config/foreign.toml", repo="repo-a")
+    packet = state.packet(path="config/foreign.toml", repo="repo-a")
+
+    assert changed_packet["decision_count"] == 0
+    assert changed_packet["surfaces"] == []
+    assert changed_packet["edges"] == []
+    assert packet["decision_count"] == 0
+    assert packet["nodes"] == []
+    assert packet["edges"] == []
+
+
 def test_resources_and_server_build(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     state = state_for(tmp_path)
