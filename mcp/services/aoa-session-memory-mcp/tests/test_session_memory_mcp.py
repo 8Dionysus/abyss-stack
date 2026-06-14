@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sqlite3
+import sys
+from datetime import timedelta
 from pathlib import Path
+
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from aoa_session_memory_mcp.core import AoASessionMemoryMCPState, CommandOutput
 from aoa_session_memory_mcp.server import build_server
@@ -1019,6 +1025,44 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_inventory" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
+
+
+def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    server_script = Path(__file__).resolve().parents[1] / "scripts" / "aoa_session_memory_mcp_server.py"
+
+    async def run_smoke() -> dict[str, object]:
+        env = {
+            **os.environ,
+            "AOA_WORKSPACE_ROOT": tmp_path.as_posix(),
+            "AOA_SESSION_MEMORY_ROOT": aoa.as_posix(),
+            "AOA_SESSION_MEMORY_SCRIPT": (aoa / "scripts" / "aoa_session_memory.py").as_posix(),
+            "AOA_SESSION_MEMORY_MCP_TIMEOUT": "2",
+        }
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=[server_script.as_posix()],
+            cwd=Path(__file__).resolve().parents[4].as_posix(),
+            env=env,
+        )
+        async with stdio_client(params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                tools = {tool.name for tool in (await session.list_tools()).tools}
+                result = await session.call_tool(
+                    "aoa_session_entity_inventory",
+                    {"layer": "skill", "session": "latest", "limit": 3, "sample_limit": 0},
+                    read_timeout_seconds=timedelta(seconds=5),
+                )
+        assert not result.isError
+        payload = json.loads(result.content[0].text)
+        return {"tools": tools, "payload": payload}
+
+    smoke = asyncio.run(run_smoke())
+
+    assert "aoa_session_entity_inventory" in smoke["tools"]
+    assert smoke["payload"]["ok"] is True
+    assert smoke["payload"]["entities"][0]["key"] == "aoa_decision"
 
 
 def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: Path) -> None:
