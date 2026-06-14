@@ -186,12 +186,25 @@ def _runtime_export_match_tokens(text: str) -> set[str]:
     return tokens
 
 
+RUNTIME_EXPORT_REF_PREFIX = "runtime-candidate-export:"
+
+
 def _runtime_export_ref_id(value: str) -> str:
     text = value.casefold().strip()
-    prefix = "runtime-candidate-export:"
-    if text.startswith(prefix):
-        text = text[len(prefix) :]
+    if text.startswith(RUNTIME_EXPORT_REF_PREFIX):
+        text = text[len(RUNTIME_EXPORT_REF_PREFIX) :]
     return text
+
+
+def _explicit_runtime_export_ref_ids(values: list[str]) -> set[str]:
+    ids: set[str] = set()
+    for value in values:
+        if not value.casefold().strip().startswith(RUNTIME_EXPORT_REF_PREFIX):
+            continue
+        record_id = _runtime_export_ref_id(value)
+        if record_id:
+            ids.add(record_id)
+    return ids
 
 
 def _text_blob(record: dict[str, Any]) -> str:
@@ -1131,7 +1144,7 @@ class AoAEvalsMCPState:
         explicit_refs: list[str],
     ) -> list[dict[str, Any]]:
         tokens = _runtime_export_match_tokens(proof_question)
-        explicit_ref_set = {_runtime_export_ref_id(ref) for ref in explicit_refs}
+        explicit_ref_set = _explicit_runtime_export_ref_ids(explicit_refs)
         refs: list[dict[str, Any]] = []
         for entry in self.runtime_candidate_exports(limit=25).get("candidates", []):
             validation = entry.get("validation") if isinstance(entry.get("validation"), dict) else {}
