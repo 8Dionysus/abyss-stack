@@ -28,6 +28,9 @@ That separation is what allows `abyss-stack` to be Fedora-first while still usab
 - `AOA_TOS_ROOT` — optional source root used to mirror the source-owned `Tree-of-Sophia` handoff companion surfaces into the runtime tree
 - `AOA_RUNTIME_USER` — runtime username for a few host-specific mounts
 - `AOA_RUNTIME_UID` — runtime UID for a few host-specific mounts
+- `AOA_PODMAN_CONTAINERS_ROOT` — rootless Podman containers storage root for
+  observability mounts; the `aoa-*` shell route defaults it to
+  `/home/${AOA_RUNTIME_USER}/.local/share/containers`
 
 ## Fedora-first default paths
 

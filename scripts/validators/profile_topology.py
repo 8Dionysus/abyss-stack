@@ -217,6 +217,7 @@ def validate_profiles(errors: list[str], *, root: Path) -> None:
         errors.append("docs/runtime/SERVICE_CATALOG.md must mention n8n-task-runners")
 
     monitoring_module = read_text(root, MODULE_DIR / "60-monitoring.yml")
+    aoa_lib = read_text(root, Path("scripts") / "aoa-lib.sh")
     if not re.search(r"docker\.io/grafana/loki:[^\s\"']+@sha256:[0-9a-f]{64}", monitoring_module):
         errors.append(
             "compose/modules/60-monitoring.yml must pin Loki as docker.io/grafana/loki:<version>@sha256:<digest>"
@@ -228,6 +229,14 @@ def validate_profiles(errors: list[str], *, root: Path) -> None:
     if not re.search(r"docker\.io/grafana/tempo:[^\s\"']+@sha256:[0-9a-f]{64}", monitoring_module):
         errors.append(
             "compose/modules/60-monitoring.yml must pin Tempo as docker.io/grafana/tempo:<version>@sha256:<digest>"
+        )
+    if monitoring_module.count("${AOA_PODMAN_CONTAINERS_ROOT}:/var/lib/containers:ro") != 2:
+        errors.append(
+            "compose/modules/60-monitoring.yml must mount Podman containers through computed AOA_PODMAN_CONTAINERS_ROOT for both cAdvisor and Alloy"
+        )
+    if 'AOA_PODMAN_CONTAINERS_ROOT="${AOA_PODMAN_CONTAINERS_ROOT:-/home/${AOA_RUNTIME_USER}/.local/share/containers}"' not in aoa_lib:
+        errors.append(
+            "scripts/aoa-lib.sh must default AOA_PODMAN_CONTAINERS_ROOT from AOA_RUNTIME_USER"
         )
     for required_text in ("loki", "alloy", "tempo", "Loki", "Alloy", "Tempo"):
         if required_text not in service_catalog_doc:

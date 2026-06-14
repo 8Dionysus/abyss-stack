@@ -30,7 +30,7 @@ services:
       - "/sys:/sys:ro"
       - "/dev/disk:/dev/disk:ro"
       - "/etc/machine-id:/etc/machine-id:ro"
-      - "${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}:/var/lib/containers:ro"
+      - "${AOA_PODMAN_CONTAINERS_ROOT}:/var/lib/containers:ro"
       - "/run/user/${AOA_RUNTIME_UID:-1000}/podman:/var/run/podman:ro"
     restart: unless-stopped
 
@@ -96,7 +96,7 @@ services:
       - label=disable
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro,Z"
-      - "${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}:/var/lib/containers:ro"
+      - "${AOA_PODMAN_CONTAINERS_ROOT}:/var/lib/containers:ro"
       - "/var/log/journal:/var/log/journal:ro"
       - "/run/log/journal:/run/log/journal:ro"
       - "alloy_data:/var/lib/alloy/data:Z"

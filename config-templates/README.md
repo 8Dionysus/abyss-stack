@@ -65,7 +65,8 @@ Alloy reads rootless Podman journald entries and keeps a file-log fallback for
 hosts that use a file log driver, forwarding both to Loki for LogQL through
 Grafana. Alloy also accepts OTLP traces for forwarding to Tempo. When rootless
 Podman storage is relocated, render the monitoring profile with
-`AOA_PODMAN_CONTAINERS_ROOT` pointing at that containers root.
+`AOA_PODMAN_CONTAINERS_ROOT` pointing at that containers root; otherwise the
+`aoa-*` shell route derives it from `AOA_RUNTIME_USER`.
 `route-api` reads Grafana datasource provisioning files as a bounded
 `/observability/datasources` inventory route; it exposes datasource identity,
 type, access, default status, and source file freshness without secure JSON,
