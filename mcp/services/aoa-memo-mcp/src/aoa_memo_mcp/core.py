@@ -298,6 +298,10 @@ class AoAMemoMCPState:
         source_refs: list[str] | None = None,
     ) -> dict[str, Any]:
         route = self.repo_route(repo)
+        if route.default_mode == "read_only":
+            raise ValueError(
+                f"repo route is read_only; candidate writes are disabled for: {route.name}"
+            )
         if route.memo_port is None:
             raise ValueError(f"unknown repo or missing source root: {repo}")
         candidates_dir = route.memo_port / "candidates"
