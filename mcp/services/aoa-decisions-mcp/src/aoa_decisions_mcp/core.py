@@ -514,7 +514,13 @@ class AoADecisionsMCPState:
                 if edge.get("source") in repo_decision_ids
             ]
         decision_ids = {edge["source"] for edge in matched_edges if isinstance(edge.get("source"), str)}
-        return decision_ids, matched_edges, [*surface_nodes, *route_anchor_nodes]
+        matched_surface_ids = {edge["target"] for edge in matched_edges if isinstance(edge.get("target"), str)}
+        matched_surface_nodes = [
+            node
+            for node in [*surface_nodes, *route_anchor_nodes]
+            if node.get("id") in matched_surface_ids
+        ]
+        return decision_ids, matched_edges, matched_surface_nodes
 
     def repo_symmetry(self, repo: str | None = None) -> dict[str, Any]:
         graph = self.graph()
