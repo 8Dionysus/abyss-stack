@@ -19,6 +19,7 @@ STATUS_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
+PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
 
 ALLOWED_TRACE_KINDS = {
     "auto",
@@ -346,6 +347,141 @@ def _compact_diagnostic(payload: Any) -> dict[str, Any]:
         "diagnostics": payload.get("diagnostics", []),
         "remaining": remaining_summary,
     }
+
+
+def _compact_dirty_session_sample(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {"session_id": str(item)}
+    keys = (
+        "session_id",
+        "session_label",
+        "session_dir",
+        "status",
+        "reason",
+        "reasons",
+        "dirty_reasons",
+        "stale_reasons",
+        "source_fingerprint_changed",
+        "route_signal_classifier_version_changed",
+        "updated_at",
+        "index_generated_at",
+    )
+    return {key: item.get(key) for key in keys if key in item}
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _compact_provider_freshness_for_mcp(freshness: dict[str, Any], *, sample_limit: int) -> dict[str, Any]:
+    keys = (
+        "status",
+        "checked",
+        "scope",
+        "selected_session_state_count",
+        "indexed_session_state_count",
+        "dirty_session_count",
+        "current_session_count",
+        "indexed_session_count",
+        "missing_session_count",
+        "stale_session_count",
+        "latest_source_mtime",
+        "db_mtime",
+        "reason",
+        "reasons",
+        "diagnostics",
+    )
+    compact = {key: freshness.get(key) for key in keys if key in freshness}
+    dirty_sessions = freshness.get("dirty_sessions")
+    dirty_ids = freshness.get("dirty_session_ids")
+    samples: list[dict[str, Any]] = []
+    if isinstance(dirty_sessions, list):
+        samples.extend(_compact_dirty_session_sample(item) for item in dirty_sessions[:sample_limit])
+    elif isinstance(dirty_ids, list):
+        samples.extend({"session_id": str(item)} for item in dirty_ids[:sample_limit])
+
+    if samples:
+        dirty_count = _safe_int(freshness.get("dirty_session_count"))
+        if dirty_count is None:
+            dirty_count = len(dirty_sessions) if isinstance(dirty_sessions, list) else len(samples)
+        compact["dirty_session_samples"] = samples
+        compact["dirty_session_sample_count"] = len(samples)
+        compact["omitted_dirty_session_count"] = max(0, dirty_count - len(samples))
+    if "dirty_session_ids" in freshness or "dirty_sessions" in freshness:
+        compact["omitted_fields"] = ["dirty_session_ids", "dirty_sessions"]
+    return compact
+
+
+def _compact_provider_status_for_mcp(provider: dict[str, Any]) -> dict[str, Any]:
+    top_keys = (
+        "schema_version",
+        "artifact_type",
+        "provider_schema_version",
+        "generated_at",
+        "ok",
+        "aoa_root",
+        "config_path",
+        "default_provider",
+        "authority_law",
+        "selected_provider",
+        "status_mode",
+        "diagnostics",
+    )
+    provider_keys = (
+        "provider",
+        "ok",
+        "status",
+        "db_path",
+        "index_generated_at",
+        "search_schema_version",
+        "expected_search_schema_version",
+        "document_count",
+        "route_index_count",
+        "has_documents",
+        "has_route_index",
+        "has_route_terms",
+        "count_mode",
+        "diagnostics",
+    )
+    compact = {key: provider.get(key) for key in top_keys if key in provider}
+    providers = provider.get("providers")
+    if isinstance(providers, dict):
+        compact_providers: dict[str, Any] = {}
+        for name, value in providers.items():
+            if not isinstance(value, dict):
+                compact_providers[str(name)] = value
+                continue
+            compact_provider = {key: value.get(key) for key in provider_keys if key in value}
+            freshness = value.get("freshness")
+            if isinstance(freshness, dict):
+                compact_provider["freshness"] = _compact_provider_freshness_for_mcp(
+                    freshness,
+                    sample_limit=PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT,
+                )
+            compact_providers[str(name)] = compact_provider
+        compact["providers"] = compact_providers
+
+    mcp_access = provider.get("mcp_access")
+    if isinstance(mcp_access, dict):
+        compact["mcp_access"] = dict(mcp_access)
+    else:
+        compact["mcp_access"] = {
+            "mutates": False,
+            "archive_command": "search-provider-status",
+            "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
+        }
+    compact["mcp_access"]["response_compacted"] = True
+    compact["mcp_access"]["omitted_fields"] = [
+        "providers.*.freshness.dirty_session_ids",
+        "providers.*.freshness.dirty_sessions",
+    ]
+    compact["mcp_access"]["full_freshness_route"] = (
+        "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py search-provider-status --provider portable_sqlite"
+    )
+    return compact
 
 
 @dataclass(slots=True)
@@ -1509,20 +1645,24 @@ class AoASessionMemoryMCPState:
 
     def session_freshness_check(self, refs: list[str] | None = None, session: str = "") -> dict[str, Any]:
         refs = refs or []
-        provider = self._archive_command(
+        session_dir = self._resolve_session_dir(session) if session else None
+        provider_session = session_dir.name if session_dir is not None else session
+        provider_args = ["--provider", "portable_sqlite"]
+        if provider_session:
+            provider_args.extend(["--session", _safe_selector(provider_session, "session")])
+        provider_full = self._archive_command(
             "search-provider-status",
-            ["--provider", "portable_sqlite"],
+            provider_args,
             timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
         )
-        session_dir = self._resolve_session_dir(session) if session else None
         checks = [self._check_ref(ref, session_dir=session_dir) for ref in refs[:100]]
         projection_freshness = self._target_projection_freshness(
-            provider,
+            provider_full,
             session_dir=session_dir,
             session=session,
         )
         ref_missing = any(check["status"] == "missing" for check in checks)
-        provider_allows_ref_check = bool(provider.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
+        provider_allows_ref_check = bool(provider_full.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
         diagnostics = []
         if projection_freshness.get("status") == "current_with_global_stale":
             diagnostics.append("provider_global_stale_target_session_current")
@@ -1530,7 +1670,7 @@ class AoASessionMemoryMCPState:
             "schema": "aoa_session_memory_freshness_check_v1",
             "ok": provider_allows_ref_check and not ref_missing,
             "mutates": False,
-            "provider": provider,
+            "provider": _compact_provider_status_for_mcp(provider_full),
             "projection_freshness": projection_freshness,
             "ref_count": len(refs),
             "session": session or None,
