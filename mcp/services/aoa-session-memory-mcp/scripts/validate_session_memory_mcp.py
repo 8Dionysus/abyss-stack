@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 
@@ -13,6 +16,8 @@ if str(SRC) not in sys.path:
 
 from aoa_session_memory_mcp.core import AoASessionMemoryMCPState  # noqa: E402
 from aoa_session_memory_mcp.server import build_server  # noqa: E402
+from mcp import ClientSession  # noqa: E402
+from mcp.client.stdio import StdioServerParameters, stdio_client  # noqa: E402
 
 
 def _select_freshness_smoke_brief(state: AoASessionMemoryMCPState, latest_brief: dict) -> dict:
@@ -51,6 +56,45 @@ def _provider_usable_for_smoke(status: dict) -> bool:
     if provider.get("ok"):
         return True
     return portable.get("status") == "stale" and bool(portable.get("db_path"))
+
+
+async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> dict:
+    env = {
+        **os.environ,
+        "AOA_WORKSPACE_ROOT": state.workspace_root.as_posix(),
+        "AOA_SESSION_MEMORY_ROOT": state.aoa_root.as_posix(),
+        "AOA_SESSION_MEMORY_SCRIPT": state.script_path.as_posix(),
+        "AOA_SESSION_MEMORY_MCP_TIMEOUT": "20",
+    }
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[(REPO_ROOT / "scripts" / "aoa_session_memory_mcp_server.py").as_posix()],
+        cwd=REPO_ROOT.as_posix(),
+        env=env,
+    )
+    async with stdio_client(params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as mcp_session:
+            await mcp_session.initialize()
+            tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
+            if "aoa_session_entity_inventory" not in tools:
+                raise SystemExit("stdio MCP tool list does not include aoa_session_entity_inventory")
+            result = await mcp_session.call_tool(
+                "aoa_session_entity_inventory",
+                {"layer": "skill", "session": session, "limit": 5, "sample_limit": 0},
+                read_timeout_seconds=timedelta(seconds=40),
+            )
+    if result.isError:
+        raise SystemExit(f"stdio MCP entity inventory call failed: {result.content}")
+    if not result.content:
+        raise SystemExit("stdio MCP entity inventory returned no content")
+    payload = json.loads(result.content[0].text)
+    if not payload.get("ok") or payload.get("entity_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP entity inventory returned no entities: {payload.get('diagnostics')}")
+    return {
+        "tool_count": len(tools),
+        "inventory_entity_count": payload.get("entity_count"),
+        "inventory_source": payload.get("source"),
+    }
 
 
 def main() -> None:
@@ -119,11 +163,17 @@ def main() -> None:
     if raw_checked:
         freshness_refs.append("raw:line:1")
     freshness = state.session_freshness_check(freshness_refs, session=latest_session)
-    if not freshness.get("ok"):
-        raise SystemExit(f"freshness check failed: {freshness.get('checks')}")
+    failed_ref_checks = [
+        check
+        for check in freshness.get("checks", [])
+        if check.get("status") not in {"present", "needs_session_context"}
+    ]
+    if failed_ref_checks:
+        raise SystemExit(f"freshness ref resolution failed: {failed_ref_checks}")
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
+    stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
 
     print(
         json.dumps(
@@ -144,7 +194,12 @@ def main() -> None:
                 "usage_neighborhood_count": neighborhood.get("quality", {}).get("neighborhood_count"),
                 "latest_session": latest_brief.get("session", {}).get("label") or "latest",
                 "freshness_smoke_session": latest_session,
+                "freshness_ok": freshness.get("ok"),
+                "freshness_projection": freshness.get("projection_freshness", {}).get("status"),
                 "raw_line_freshness_checked": raw_checked,
+                "stdio_tool_count": stdio_smoke["tool_count"],
+                "stdio_inventory_entity_count": stdio_smoke["inventory_entity_count"],
+                "stdio_inventory_source": stdio_smoke["inventory_source"],
             },
             indent=2,
         )
