@@ -470,6 +470,34 @@ def test_find_or_propose_uses_significant_runtime_export_tokens(tmp_path: Path) 
     ]
 
 
+def test_find_or_propose_does_not_treat_non_runtime_refs_as_export_selectors(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    latency_export = seed_named_runtime_candidate_export(
+        tmp_path,
+        record_id="2026-05-25T000100Z__runtime-evidence-selection__workhorse-q4-vs-q6-latency-tradeoff",
+        candidate_id="workhorse-q4-vs-q6-latency-tradeoff",
+        title="runtime evidence selection workhorse q4 vs q6 latency tradeoff",
+        summary="Bounded runtime evidence selection candidate for a Workhorse latency and VRAM tradeoff.",
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.find_or_propose(
+        "Compare Workhorse q4 and q6 runtime variants to determine the bounded latency versus VRAM tradeoff.",
+        {
+            "name": "aoa-runtime-latency-tradeoff",
+            "authoring_route": "new_draft_bundle",
+            "candidate_evidence_refs": ["artifact:review-note"],
+        },
+    )
+
+    record_ids = [ref["record_id"] for ref in result["runtime_candidate_export_refs"]]
+    assert record_ids == [latency_export["record_id"]]
+    assert result["proposal_context"]["packet"]["candidate_evidence_refs"] == [
+        "artifact:review-note",
+        f"runtime-candidate-export:{latency_export['record_id']}",
+    ]
+
+
 def test_resources_and_runtime_templates(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
