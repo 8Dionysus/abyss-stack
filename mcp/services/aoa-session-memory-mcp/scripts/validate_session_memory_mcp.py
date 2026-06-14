@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+import tomllib
 from datetime import timedelta
 from pathlib import Path
 
@@ -58,19 +59,70 @@ def _provider_usable_for_smoke(status: dict) -> bool:
     return portable.get("status") == "stale" and bool(portable.get("db_path"))
 
 
-async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> dict:
-    env = {
+def _stdio_env(state: AoASessionMemoryMCPState) -> dict[str, str]:
+    return {
         **os.environ,
         "AOA_WORKSPACE_ROOT": state.workspace_root.as_posix(),
         "AOA_SESSION_MEMORY_ROOT": state.aoa_root.as_posix(),
         "AOA_SESSION_MEMORY_SCRIPT": state.script_path.as_posix(),
         "AOA_SESSION_MEMORY_MCP_TIMEOUT": "20",
     }
+
+
+def _codex_config_path() -> Path:
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        return Path(codex_home).expanduser() / "config.toml"
+    return Path.home() / ".codex" / "config.toml"
+
+
+def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServerParameters | None, dict]:
+    config_path = _codex_config_path()
+    if not config_path.exists():
+        return None, {"available": False, "reason": "codex_config_missing", "config_path": config_path.as_posix()}
+
+    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    servers = data.get("mcp_servers") if isinstance(data.get("mcp_servers"), dict) else {}
+    entry = servers.get("aoa_session_memory") if isinstance(servers.get("aoa_session_memory"), dict) else None
+    if not entry:
+        return None, {"available": False, "reason": "aoa_session_memory_config_missing", "config_path": config_path.as_posix()}
+
+    command = entry.get("command")
+    args = entry.get("args")
+    if not isinstance(command, str) or not command:
+        raise SystemExit("configured Codex MCP aoa_session_memory command is missing")
+    if args is None:
+        args = []
+    if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
+        raise SystemExit("configured Codex MCP aoa_session_memory args must be a list of strings")
+
+    cwd_value = entry.get("cwd") or state.workspace_root.as_posix()
+    if not isinstance(cwd_value, str):
+        raise SystemExit("configured Codex MCP aoa_session_memory cwd must be a string")
+    cwd = Path(os.path.expandvars(cwd_value)).expanduser()
+
+    env = _stdio_env(state)
+    configured_env = entry.get("env")
+    if isinstance(configured_env, dict):
+        env.update({str(key): str(value) for key, value in configured_env.items()})
+
+    params = StdioServerParameters(command=command, args=args, cwd=cwd.as_posix(), env=env)
+    meta = {
+        "available": True,
+        "config_path": config_path.as_posix(),
+        "command": command,
+        "args": args,
+        "cwd": cwd.as_posix(),
+    }
+    return params, meta
+
+
+async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> dict:
     params = StdioServerParameters(
         command=sys.executable,
         args=[(REPO_ROOT / "scripts" / "aoa_session_memory_mcp_server.py").as_posix()],
         cwd=REPO_ROOT.as_posix(),
-        env=env,
+        env=_stdio_env(state),
     )
     async with stdio_client(params) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as mcp_session:
@@ -150,6 +202,44 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     }
 
 
+async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
+    params, meta = _configured_stdio_params(state)
+    if params is None:
+        return {**meta, "ok": True, "skipped": True}
+
+    async with stdio_client(params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as mcp_session:
+            await mcp_session.initialize()
+            tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
+            required_tools = {
+                "aoa_session_memory_status",
+                "aoa_session_agent_responses",
+                "aoa_session_agent_closeouts",
+                "aoa_session_agent_progress_updates",
+                "aoa_session_agent_reasoning_windows",
+                "aoa_session_task_episodes",
+                "aoa_session_answer_neighborhood",
+            }
+            missing_tools = sorted(required_tools - tools)
+            if missing_tools:
+                raise SystemExit(f"configured Codex MCP tool list is missing required tools: {missing_tools}")
+
+            result = await mcp_session.call_tool(
+                "aoa_session_memory_status",
+                {"include_live": False},
+                read_timeout_seconds=timedelta(seconds=20),
+            )
+            if result.isError:
+                raise SystemExit(f"configured Codex MCP status call failed: {result.content}")
+            if not result.content:
+                raise SystemExit("configured Codex MCP status call returned no content")
+            payload = json.loads(result.content[0].text)
+            if not isinstance(payload, dict) or not payload.get("ok"):
+                raise SystemExit(f"configured Codex MCP status returned not-ok payload: {payload}")
+
+    return {**meta, "ok": True, "skipped": False, "tool_count": len(tools), "status_ok": payload.get("ok")}
+
+
 def main() -> None:
     required = [
         "AGENTS.md",
@@ -223,10 +313,14 @@ def main() -> None:
     ]
     if failed_ref_checks:
         raise SystemExit(f"freshness ref resolution failed: {failed_ref_checks}")
+    freshness_status = freshness.get("projection_freshness", {}).get("status")
+    if not freshness.get("ok") or freshness_status != "current":
+        raise SystemExit(f"freshness smoke is not current: {freshness_status}")
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
     stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
+    configured_stdio_smoke = asyncio.run(_configured_stdio_smoke(state))
 
     print(
         json.dumps(
@@ -259,6 +353,7 @@ def main() -> None:
                 "stdio_agent_reasoning_window_count": stdio_smoke["agent_reasoning_window_count"],
                 "stdio_task_episode_count": stdio_smoke["task_episode_count"],
                 "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
+                "configured_stdio": configured_stdio_smoke,
             },
             indent=2,
         )
