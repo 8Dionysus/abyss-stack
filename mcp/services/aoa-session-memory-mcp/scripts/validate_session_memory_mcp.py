@@ -76,24 +76,77 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
             tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
-            if "aoa_session_entity_inventory" not in tools:
-                raise SystemExit("stdio MCP tool list does not include aoa_session_entity_inventory")
-            result = await mcp_session.call_tool(
+            required_tools = {
                 "aoa_session_entity_inventory",
-                {"layer": "skill", "session": session, "limit": 5, "sample_limit": 0},
-                read_timeout_seconds=timedelta(seconds=40),
+                "aoa_session_agent_responses",
+                "aoa_session_agent_closeouts",
+                "aoa_session_agent_progress_updates",
+                "aoa_session_agent_reasoning_windows",
+                "aoa_session_task_episodes",
+                "aoa_session_answer_neighborhood",
+            }
+            missing_tools = sorted(required_tools - tools)
+            if missing_tools:
+                raise SystemExit(f"stdio MCP tool list is missing required tools: {missing_tools}")
+
+            async def call_json(name: str, arguments: dict, timeout_seconds: int = 50) -> dict:
+                result = await mcp_session.call_tool(
+                    name,
+                    arguments,
+                    read_timeout_seconds=timedelta(seconds=timeout_seconds),
+                )
+                if result.isError:
+                    raise SystemExit(f"stdio MCP {name} call failed: {result.content}")
+                if not result.content:
+                    raise SystemExit(f"stdio MCP {name} returned no content")
+                payload = json.loads(result.content[0].text)
+                if not isinstance(payload, dict):
+                    raise SystemExit(f"stdio MCP {name} returned non-object JSON")
+                if not payload.get("ok"):
+                    raise SystemExit(f"stdio MCP {name} returned not-ok payload: {payload.get('diagnostics')}")
+                return payload
+
+            inventory = await call_json(
+                "aoa_session_entity_inventory",
+                {"layer": "skill", "limit": 5, "sample_limit": 0},
             )
-    if result.isError:
-        raise SystemExit(f"stdio MCP entity inventory call failed: {result.content}")
-    if not result.content:
-        raise SystemExit("stdio MCP entity inventory returned no content")
-    payload = json.loads(result.content[0].text)
-    if not payload.get("ok") or payload.get("entity_count", 0) <= 0:
-        raise SystemExit(f"stdio MCP entity inventory returned no entities: {payload.get('diagnostics')}")
+            responses = await call_json("aoa_session_agent_responses", {"session": session, "limit": 2})
+            closeouts = await call_json("aoa_session_agent_closeouts", {"session": session, "limit": 2})
+            progress = await call_json("aoa_session_agent_progress_updates", {"session": session, "limit": 2})
+            reasoning = await call_json(
+                "aoa_session_agent_reasoning_windows",
+                {"session": session, "limit": 1, "before": 1, "after": 2},
+            )
+            episodes = await call_json("aoa_session_task_episodes", {"session": session, "limit": 2})
+            neighborhood = await call_json(
+                "aoa_session_answer_neighborhood",
+                {"session": session, "limit": 1, "before": 1, "after": 2},
+            )
+
+    if inventory.get("entity_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    if responses.get("result_count", 0) <= 0:
+        raise SystemExit("stdio MCP agent responses route returned no results")
+    if closeouts.get("result_count", 0) <= 0:
+        raise SystemExit("stdio MCP agent closeouts route returned no results")
+    if progress.get("result_count", 0) <= 0:
+        raise SystemExit("stdio MCP agent progress route returned no results")
+    if reasoning.get("window_count", 0) <= 0:
+        raise SystemExit("stdio MCP agent reasoning windows route returned no windows")
+    if episodes.get("result_count", 0) <= 0:
+        raise SystemExit("stdio MCP task episodes route returned no results")
+    if neighborhood.get("window_count", 0) <= 0:
+        raise SystemExit("stdio MCP answer neighborhood route returned no windows")
     return {
         "tool_count": len(tools),
-        "inventory_entity_count": payload.get("entity_count"),
-        "inventory_source": payload.get("source"),
+        "inventory_entity_count": inventory.get("entity_count"),
+        "inventory_source": inventory.get("source"),
+        "agent_response_count": responses.get("result_count"),
+        "agent_closeout_count": closeouts.get("result_count"),
+        "agent_progress_count": progress.get("result_count"),
+        "agent_reasoning_window_count": reasoning.get("window_count"),
+        "task_episode_count": episodes.get("result_count"),
+        "answer_neighborhood_count": neighborhood.get("window_count"),
     }
 
 
@@ -200,6 +253,12 @@ def main() -> None:
                 "stdio_tool_count": stdio_smoke["tool_count"],
                 "stdio_inventory_entity_count": stdio_smoke["inventory_entity_count"],
                 "stdio_inventory_source": stdio_smoke["inventory_source"],
+                "stdio_agent_response_count": stdio_smoke["agent_response_count"],
+                "stdio_agent_closeout_count": stdio_smoke["agent_closeout_count"],
+                "stdio_agent_progress_count": stdio_smoke["agent_progress_count"],
+                "stdio_agent_reasoning_window_count": stdio_smoke["agent_reasoning_window_count"],
+                "stdio_task_episode_count": stdio_smoke["task_episode_count"],
+                "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
             },
             indent=2,
         )

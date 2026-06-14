@@ -1105,7 +1105,22 @@ def test_freshness_check_resolves_raw_line_refs_with_session_context(tmp_path: P
     assert with_context["checks"][0]["line"] == 2
     assert with_context["checks"][1]["status"] == "missing"
     assert with_context["checks"][1]["line_count"] == 2
+    freshness_calls = [args for command, args in runner.calls if command == "search-provider-status"]
+    assert "--session" not in freshness_calls[0]
+    assert freshness_calls[1][freshness_calls[1].index("--session") + 1] == "2026-05-26__001__session-memory-mcp"
     assert [timeout for command, timeout in runner.timeouts if command == "search-provider-status"] == [60.0, 60.0]
+
+
+def test_freshness_check_resolves_latest_before_provider_scope(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="latest")
+
+    freshness_calls = [args for command, args in runner.calls if command == "search-provider-status"]
+    assert freshness["checks"][0]["status"] == "present"
+    assert freshness_calls[0][freshness_calls[0].index("--session") + 1] == "2026-05-26__001__session-memory-mcp"
+    assert "latest" not in freshness_calls[0]
 
 
 def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tmp_path: Path) -> None:
@@ -1113,9 +1128,16 @@ def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tm
     state = state_with_fixture(tmp_path, runner)
 
     freshness = state.session_freshness_check(["raw:line:1"], session="session-1")
+    provider_freshness = freshness["provider"]["providers"]["portable_sqlite"]["freshness"]
 
     assert freshness["ok"] is True
     assert freshness["provider"]["ok"] is False
+    assert "dirty_session_ids" not in provider_freshness
+    assert "dirty_sessions" not in provider_freshness
+    assert provider_freshness["dirty_session_count"] == 1
+    assert provider_freshness["dirty_session_samples"][0]["session_id"] == "session-other"
+    assert provider_freshness["omitted_fields"] == ["dirty_session_ids", "dirty_sessions"]
+    assert freshness["provider"]["mcp_access"]["response_compacted"] is True
     assert freshness["projection_freshness"]["status"] == "current_with_global_stale"
     assert "provider_global_stale_target_session_current" in freshness["diagnostics"]
 

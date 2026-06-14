@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -521,10 +522,12 @@ def build_server(
             "Promotion still requires reviewed distillation or owner-repo change outside MCP."
         )
 
-    LOGGER.info("AoA session-memory MCP server ready")
+    LOGGER.debug("AoA session-memory MCP server ready")
     return mcp
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    level_name = os.environ.get("AOA_SESSION_MEMORY_MCP_LOG_LEVEL", "WARNING").upper()
+    level = getattr(logging, level_name, logging.WARNING)
+    logging.basicConfig(level=level)
     build_server().run(transport="stdio")
