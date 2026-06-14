@@ -822,7 +822,7 @@ class AoAMemoMCPState:
         needle = " ".join(terms).lower().strip()
         roots = self._search_roots(scope)
         hits = self._search_memory_objects(terms, filters, scope, limit)
-        if not needle and not filters:
+        if not needle:
             return self._search_result(query, scope, mode, hits)
         if len(hits) >= limit:
             return self._search_result(query, scope, mode, hits[:limit])

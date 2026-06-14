@@ -652,6 +652,13 @@ def test_resources_and_search(tmp_path: Path) -> None:
     assert corpus_search["hits"][0]["type"] == "memory_object"
     assert corpus_search["hits"][0]["source_kind"] == "reviewed_corpus"
     assert corpus_search["hits"][0]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
+    filter_only_search = state.search("repo:abyss-stack", scope="all", limit=5)
+    assert filter_only_search["hits"]
+    assert all(hit["type"] == "memory_object" for hit in filter_only_search["hits"])
+    assert filter_only_search["hits"][0]["id"] == "memo.decision.2026-05-22.abyss-stack-aoa-memo-mcp-access-plane"
+    filter_only_mismatch = state.search("repo:missing-repo", scope="all")
+    assert filter_only_mismatch["hits"] == []
+    assert filter_only_mismatch["low_confidence"] is True
     mismatch = state.search("access repo:abyss-stack kind:pattern", scope="corpus")
     assert mismatch["hits"] == []
     assert mismatch["low_confidence"] is True
