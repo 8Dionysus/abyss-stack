@@ -818,7 +818,12 @@ def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path:
     assert status["live_route_readiness"]["ok"] is True
     assert status["readiness_policy"]["live_route_readiness"]["limit"] is None
     assert status["readiness_policy"]["live_route_readiness"]["sample_policy"] == "no evidence sample extraction in MCP status"
-    assert "--write-report" in status["readiness_policy"]["audit_route"]["command"]
+    audit_command = status["readiness_policy"]["audit_route"]["command"]
+    assert "--write-report" in audit_command
+    assert tmp_path.as_posix() in audit_command
+    assert (tmp_path / ".aoa").as_posix() in audit_command
+    assert (tmp_path / ".aoa/scripts/aoa_session_memory.py").as_posix() in audit_command
+    assert "/srv/AbyssOS/.aoa" not in audit_command
 
 
 def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: Path) -> None:
@@ -874,6 +879,13 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert any("graph-maintenance all" in command for command in plan["allowed_operator_commands"])
     assert plan["maintenance_lanes"]["deep"].startswith("offline full-depth")
     assert any("force-large-export" in command for command in plan["offline_operator_commands"])
+    operator_commands = plan["allowed_operator_commands"] + plan["offline_operator_commands"]
+    assert operator_commands
+    for command in operator_commands:
+        assert tmp_path.as_posix() in command
+        assert aoa.as_posix() in command
+        assert (aoa / "scripts/aoa_session_memory.py").as_posix() in command
+        assert "/srv/AbyssOS/.aoa" not in command
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -1214,6 +1226,11 @@ def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tm
     assert provider_freshness["dirty_session_samples"][0]["session_id"] == "session-other"
     assert provider_freshness["omitted_fields"] == ["dirty_session_ids", "dirty_sessions"]
     assert freshness["provider"]["mcp_access"]["response_compacted"] is True
+    full_freshness_route = freshness["provider"]["mcp_access"]["full_freshness_route"]
+    assert tmp_path.as_posix() in full_freshness_route
+    assert (tmp_path / ".aoa").as_posix() in full_freshness_route
+    assert (tmp_path / ".aoa/scripts/aoa_session_memory.py").as_posix() in full_freshness_route
+    assert "/srv/AbyssOS/.aoa" not in full_freshness_route
     assert freshness["projection_freshness"]["status"] == "current_with_global_stale"
     assert "provider_global_stale_target_session_current" in freshness["diagnostics"]
 

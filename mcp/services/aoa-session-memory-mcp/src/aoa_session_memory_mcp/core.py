@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import sqlite3
 import subprocess
 import time
@@ -431,7 +432,11 @@ def _compact_provider_freshness_for_mcp(freshness: dict[str, Any], *, sample_lim
     return compact
 
 
-def _compact_provider_status_for_mcp(provider: dict[str, Any]) -> dict[str, Any]:
+def _compact_provider_status_for_mcp(
+    provider: dict[str, Any],
+    *,
+    full_freshness_route: str | None = None,
+) -> dict[str, Any]:
     top_keys = (
         "schema_version",
         "artifact_type",
@@ -494,9 +499,8 @@ def _compact_provider_status_for_mcp(provider: dict[str, Any]) -> dict[str, Any]
         "providers.*.freshness.dirty_session_ids",
         "providers.*.freshness.dirty_sessions",
     ]
-    compact["mcp_access"]["full_freshness_route"] = (
-        "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py search-provider-status --provider portable_sqlite"
-    )
+    if full_freshness_route is not None:
+        compact["mcp_access"]["full_freshness_route"] = full_freshness_route
     return compact
 
 
@@ -616,16 +620,7 @@ class AoASessionMemoryMCPState:
         allow_nonzero_json: bool = False,
         timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
-        argv = [
-            self.python_bin,
-            self.script_path.as_posix(),
-            command,
-            *(args or []),
-            "--workspace-root",
-            self.workspace_root.as_posix(),
-            "--aoa-root",
-            self.aoa_root.as_posix(),
-        ]
+        argv = self._archive_argv(command, args)
         effective_timeout = float(timeout_seconds if timeout_seconds is not None else self.timeout_seconds)
         output = self.command_runner(argv, effective_timeout)
         try:
@@ -651,6 +646,21 @@ class AoASessionMemoryMCPState:
             "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
         }
         return payload
+
+    def _archive_argv(self, command: str, args: list[str] | None = None) -> list[str]:
+        return [
+            self.python_bin,
+            self.script_path.as_posix(),
+            command,
+            *(args or []),
+            "--workspace-root",
+            self.workspace_root.as_posix(),
+            "--aoa-root",
+            self.aoa_root.as_posix(),
+        ]
+
+    def _archive_command_line(self, command: str, args: list[str] | None = None) -> str:
+        return shlex.join(self._archive_argv(command, args))
 
     def _sqlite_table_exists(self, conn: sqlite3.Connection, name: str) -> bool:
         row = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1", (name,)).fetchone()
@@ -788,7 +798,7 @@ class AoASessionMemoryMCPState:
             },
             "audit_route": {
                 "role": "full evidence-bearing readiness remains an explicit operator/audit route outside status",
-                "command": "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py route-readiness all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
+                "command": self._archive_command_line("route-readiness", ["all", "--write-report"]),
             },
             "authority_boundary": "MCP status is a read-only route companion; .aoa diagnostics and raw refs remain stronger evidence.",
         }
@@ -1718,7 +1728,10 @@ class AoASessionMemoryMCPState:
             "schema": "aoa_session_memory_freshness_check_v1",
             "ok": provider_allows_ref_check and not ref_missing,
             "mutates": False,
-            "provider": _compact_provider_status_for_mcp(provider_full),
+            "provider": _compact_provider_status_for_mcp(
+                provider_full,
+                full_freshness_route=self._archive_command_line("search-provider-status", provider_args),
+            ),
             "projection_freshness": projection_freshness,
             "ref_count": len(refs),
             "session": session or None,
@@ -2297,18 +2310,18 @@ class AoASessionMemoryMCPState:
                 else None,
             },
             "allowed_operator_commands": [
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance hot --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance backlog --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py index-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --budget-seconds 120 --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py route-readiness all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py search-provider-status --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --batch-limit 3 --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-quality-audit --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write-report",
+                self._archive_command_line("auto-maintenance", ["hot", "--apply", "--write-report"]),
+                self._archive_command_line("auto-maintenance", ["backlog", "--apply", "--write-report"]),
+                self._archive_command_line("index-maintenance", ["all", "--apply", "--budget-seconds", "120", "--write-report"]),
+                self._archive_command_line("route-readiness", ["all", "--write-report"]),
+                self._archive_command_line("search-provider-status", ["--write-report"]),
+                self._archive_command_line("graph-maintenance", ["all", "--apply", "--batch-limit", "3", "--write-report"]),
+                self._archive_command_line("graph-quality-audit", ["--write-report"]),
             ],
             "offline_operator_commands": [
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py auto-maintenance deep --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --write-report",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-build all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --write --force-large-export",
-                "python3 /srv/AbyssOS/.aoa/scripts/aoa_session_memory.py graph-maintenance all --workspace-root /srv/AbyssOS --aoa-root /srv/AbyssOS/.aoa --apply --export-sidecar --write-report",
+                self._archive_command_line("auto-maintenance", ["deep", "--apply", "--write-report"]),
+                self._archive_command_line("graph-build", ["all", "--write", "--force-large-export"]),
+                self._archive_command_line("graph-maintenance", ["all", "--apply", "--export-sidecar", "--write-report"]),
             ],
             "maintenance_lanes": {
                 "hot": "short budgeted pass for recent dirty graph/index posture; keeps MCP read-only and defers heavy repair when profile says so",
