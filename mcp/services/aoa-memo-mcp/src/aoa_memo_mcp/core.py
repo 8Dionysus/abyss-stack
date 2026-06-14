@@ -165,12 +165,11 @@ class AoAMemoMCPState:
             )
         if normalized == "abyss-stack":
             source = Path(os.environ.get("AOA_ABYSS_STACK_ROOT", DEFAULT_ABYSS_STACK_SOURCE)).expanduser()
-            if not source.exists():
-                source = self.workspace_root / "abyss-stack"
+            source = source if source.exists() else None
             return RepoRoute(
                 name="abyss-stack",
-                source_root=source.resolve() if source.exists() else None,
-                memo_port=(source / "memo").resolve() if source.exists() else None,
+                source_root=source.resolve() if source else None,
+                memo_port=(source / "memo").resolve() if source else None,
                 default_mode="write_candidate_only",
                 owner_note="runtime substrate source checkout; runtime mirror is not the source repo",
             )
@@ -1131,6 +1130,16 @@ class AoAMemoMCPState:
             path = (self.aoa_archive_root / path).resolve()
         else:
             path = path.resolve()
+        if not path.is_dir():
+            return {
+                "schema": "aoa_session_rehydrate_pointer_v1",
+                "session_id": session.get("session_id"),
+                "label": display.get("label"),
+                "found": False,
+                "registry": str(registry_path),
+                "session_path": str(path),
+                "reason": "session archive path does not exist",
+            }
         return {
             "schema": "aoa_session_rehydrate_pointer_v1",
             "session_id": session.get("session_id"),
