@@ -760,18 +760,38 @@ class AoAEvalsMCPState:
             raise ValueError("local eval write target escapes evals port")
         return target
 
-    def _maybe_activate_port(self, repo_root: Path, *, apply: bool) -> bool:
+    def _port_activation_update(self, repo_root: Path) -> tuple[bool, str | None, list[str]]:
         port_path = repo_root / "evals" / "PORT.yaml"
         port = self._local_port_payload(repo_root)
         if port.get("status") != "skeleton":
+            return False, None, []
+        text = port_path.read_text(encoding="utf-8")
+        status_pattern = re.compile(
+            r"(?m)^(?P<prefix>\s*status\s*:\s*)(?P<quote>['\"]?)skeleton(?P=quote)(?P<suffix>\s*(?:#.*)?)$"
+        )
+        updated, count = status_pattern.subn(r"\g<prefix>active\g<suffix>", text, count=1)
+        if count != 1:
+            return True, None, ["PORT.yaml status line could not be activated safely"]
+        return True, updated, []
+
+    def _local_write_gate(self, repo_root: Path) -> tuple[bool, list[str]]:
+        port_summary = self._local_port_summary(repo_root)
+        issues = list(port_summary.get("validation", {}).get("issues", []))
+        activation_needed, _, activation_issues = self._port_activation_update(repo_root)
+        issues.extend(activation_issues)
+        return activation_needed, issues
+
+    def _maybe_activate_port(self, repo_root: Path, *, apply: bool) -> bool:
+        activation_needed, updated, issues = self._port_activation_update(repo_root)
+        if not activation_needed:
             return False
+        if issues:
+            raise ValueError(issues[0])
         if not apply:
             return True
-        text = port_path.read_text(encoding="utf-8")
-        updated = re.sub(r"(?m)^status:\s*skeleton\s*$", "status: active", text, count=1)
-        if updated == text:
+        if updated is None:
             raise ValueError("PORT.yaml status line could not be activated safely")
-        port_path.write_text(updated, encoding="utf-8")
+        (repo_root / "evals" / "PORT.yaml").write_text(updated, encoding="utf-8")
         return True
 
     def find_or_propose_local(
@@ -815,10 +835,10 @@ class AoAEvalsMCPState:
         validation = self._validate_eval_need(packet)
         slug = _safe_file_slug(str(file_slug or packet.get("name") or "local-eval-pressure"))
         target = self._local_write_target(repo_root, "intake", slug, ".eval_need.json")
-        issues = list(validation.get("issues", []))
+        activated, issues = self._local_write_gate(repo_root)
+        issues = [*issues, *validation.get("issues", [])]
         if target.exists() and not replace_existing:
             issues.append("target file already exists; set replace_existing=True to overwrite")
-        activated = self._maybe_activate_port(repo_root, apply=False)
         write_allowed = validation["valid"] and not issues
         if apply and write_allowed:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -860,14 +880,14 @@ class AoAEvalsMCPState:
         safe_slug = _safe_file_slug(note_slug)
         target = self._local_write_target(repo_root, directory_name, safe_slug, str(config["glob_suffix"]))
         refs = [str(ref) for ref in (refs or [])]
-        issues = _validate_public_refs(refs)
+        activated, issues = self._local_write_gate(repo_root)
+        issues = [*issues, *_validate_public_refs(refs)]
         if len(str(title or "").strip()) < 3:
             issues.append("title must be at least 3 characters")
         if len(str(summary or "").strip()) < 12:
             issues.append("summary must be at least 12 characters")
         if target.exists() and not replace_existing:
             issues.append("target file already exists; set replace_existing=True to overwrite")
-        activated = self._maybe_activate_port(repo_root, apply=False)
         write_allowed = not issues
         frontmatter = {
             "schema_version": config["schema_version"],

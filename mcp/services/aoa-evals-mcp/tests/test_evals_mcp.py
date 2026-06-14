@@ -674,6 +674,58 @@ def test_write_local_intake_apply_writes_and_activates_port(tmp_path: Path) -> N
     assert detail["validation"]["valid"] is True
 
 
+def test_write_local_intake_rejects_invalid_port_before_apply(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="skeleton")
+    port_path = tmp_path / "aoa-memo/evals/PORT.yaml"
+    port_path.write_text(
+        port_path.read_text(encoding="utf-8").replace("owner_repo: aoa-memo", "owner_repo: wrong-repo"),
+        encoding="utf-8",
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=True)
+
+    assert result["write_allowed"] is False
+    assert result["applied"] is False
+    assert not Path(result["target_path"]).exists()
+    assert any("owner_repo" in issue for issue in result["validation"]["issues"])
+
+
+def test_write_local_intake_rejects_skeleton_port_with_existing_pressure(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    write_json(repo_root / "evals/intake/existing.eval_need.json", valid_eval_need_packet("existing-pressure"))
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=True)
+
+    assert result["write_allowed"] is False
+    assert result["applied"] is False
+    assert not Path(result["target_path"]).exists()
+    assert "skeleton local eval port must not contain local pressure files" in result["validation"]["issues"]
+    assert "status: skeleton" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
+
+
+def test_write_local_intake_activates_quoted_or_commented_skeleton_status(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    scenarios = {
+        "quoted": '"skeleton"',
+        "commented": "skeleton # first local pressure activates the port",
+    }
+
+    for repo_suffix, status in scenarios.items():
+        repo = f"aoa-memo-{repo_suffix}"
+        repo_root = seed_local_eval_port(tmp_path, repo=repo, status=status)
+        state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+        result = state.write_local_intake(repo, valid_eval_need_packet(f"{repo}-pressure"), apply=True)
+
+        assert result["applied"] is True
+        assert Path(result["target_path"]).is_file()
+        assert "status: active" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
+
+
 def test_write_local_suite_and_report_notes_are_local_only(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     repo_root = seed_local_eval_port(tmp_path, status="skeleton")
