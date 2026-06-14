@@ -209,6 +209,40 @@ class AoALocalAiTrialsTests(unittest.TestCase):
         self.assertEqual([True, True], submit_flags)
         self.assertEqual(["fail", "pass"], submitted_gate_results)
 
+    def test_w4_repo_scope_uses_documented_sibling_root(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_root = Path(tmpdir) / "AbyssOS"
+            repo_root = workspace_root / "aoa-skills"
+            repo_root.mkdir(parents=True)
+
+            with patch.object(module._BACKEND, "SIBLING_REPO_ROOT", workspace_root):
+                case = {"case_id": "w4-demo", "repo_scope": ["aoa-skills"]}
+
+                self.assertEqual(repo_root, module.repo_root_for_w4_case(case))
+                self.assertEqual(
+                    str((repo_root / "scripts" / "validate_skills.py").resolve()),
+                    module.repo_path("aoa-skills", "scripts/validate_skills.py"),
+                )
+
+    def test_w4_worktree_neighbor_links_use_documented_sibling_root(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_root = Path(tmpdir) / "AbyssOS"
+            repo_root = workspace_root / "aoa-skills"
+            repo_root.mkdir(parents=True)
+            worktree_path = Path(tmpdir) / "worktrees" / "case-worktree"
+            worktree_path.mkdir(parents=True)
+
+            with patch.object(module._BACKEND, "SIBLING_REPO_ROOT", workspace_root):
+                with patch.object(module._BACKEND, "W4_WORKTREE_NEIGHBOR_REPOS", ["aoa-skills"]):
+                    created = module.ensure_w4_worktree_neighbor_links(worktree_path)
+
+            link_path = worktree_path.parent / "aoa-skills"
+            self.assertEqual([str(link_path)], created)
+            self.assertTrue(link_path.is_symlink())
+            self.assertEqual(repo_root, link_path.resolve())
+
 
 if __name__ == "__main__":
     unittest.main()
