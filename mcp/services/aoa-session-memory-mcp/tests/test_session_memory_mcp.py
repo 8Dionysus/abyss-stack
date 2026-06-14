@@ -986,6 +986,19 @@ def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path:
     assert "--explain" not in args
 
 
+def test_unscoped_agent_responses_returns_route_guidance_without_archive_scan(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_agent_responses(limit=8)
+
+    assert payload["ok"] is False
+    assert payload["artifact_type"] == "agent_event_route_guidance"
+    assert "unscoped_agent_response_route_requires_query_session_episode_or_event_filter" in payload["diagnostics"]
+    assert payload["mcp_access"]["archive_command"] is None
+    assert runner.calls == []
+
+
 def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
