@@ -378,7 +378,7 @@ def seed_memory_port_schemas(memo: Path) -> None:
             "additionalProperties": False,
             "required": ["schema", "id", "repo", "candidate_ref", "result", "route", "checks", "errors", "created_at"],
             "properties": {
-                "schema": {"const": "aoa_local_memo_receipt_v1"},
+                "schema": {"const": "aoa_local_memo_receipt_v2"},
                 "id": common_string,
                 "repo": common_string,
                 "candidate_ref": common_string,
@@ -780,6 +780,7 @@ def test_port_index_validation_and_intake_review(tmp_path: Path, monkeypatch) ->
     reviewed = state.review_intake(export["path"])
     assert reviewed["ok"] is True
     assert Path(reviewed["receipt_path"]).exists()
+    assert reviewed["receipt"]["schema"] == "aoa_local_memo_receipt_v2"
     assert reviewed["receipt"]["result"] == "forwarded"
     assert reviewed["receipt"]["checked_by"] == "aoa-memo-mcp"
     assert "reviewed_by" not in reviewed["receipt"]

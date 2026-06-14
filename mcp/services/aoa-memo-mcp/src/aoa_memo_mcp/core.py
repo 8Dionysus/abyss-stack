@@ -650,7 +650,7 @@ class AoAMemoMCPState:
         slug = _id_slug(str(payload.get("id") or "intake-review"), 48)
         receipt_path = port / "receipts" / f"{stamp}.{slug}.forwarding-receipt.json"
         receipt = {
-            "schema": "aoa_local_memo_receipt_v1",
+            "schema": "aoa_local_memo_receipt_v2",
             "id": f"receipt:{repo}:{stamp}:{slug}",
             "repo": repo,
             "candidate_ref": str((payload.get("candidate_refs") or [""])[0]),

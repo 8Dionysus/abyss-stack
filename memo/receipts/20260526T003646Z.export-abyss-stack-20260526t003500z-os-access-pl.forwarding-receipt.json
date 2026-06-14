@@ -1,5 +1,5 @@
 {
-  "schema": "aoa_local_memo_receipt_v1",
+  "schema": "aoa_local_memo_receipt_v2",
   "id": "receipt:abyss-stack:20260526T003646Z:export-abyss-stack-20260526t003500z-os-access-pl",
   "repo": "abyss-stack",
   "candidate_ref": "candidates/20260526T003500Z.os-access-plane-mcp-services-owner-split.candidate.json",
