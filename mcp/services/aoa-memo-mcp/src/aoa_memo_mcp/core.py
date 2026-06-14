@@ -756,11 +756,21 @@ class AoAMemoMCPState:
                 "schema": "aoa_memo_landing_plan_v1",
                 "repo": route.name,
                 "ok": False,
+                "export_ref": export_ref,
                 "errors": [str(exc)],
+            }
+        if export_path is None:
+            return {
+                "schema": "aoa_memo_landing_plan_v1",
+                "repo": route.name,
+                "ok": False,
+                "export_ref": export_ref,
+                "errors": [f"export ref not found: {export_ref}"],
             }
         payload = _read_json(export_path) if export_path else None
         readiness = self._export_landing_readiness(port, export_path, payload)
-        export_slug = _id_slug(str((payload or {}).get("id") or export_path.stem), 64).replace("export-", "")
+        payload_id = payload.get("id") if isinstance(payload, dict) else None
+        export_slug = _id_slug(str(payload_id or export_path.stem), 64).replace("export-", "")
         slug = slug or export_slug
         reviewed_at = reviewed_at or _now()
         title_args = ["--title", title] if title else []
@@ -1381,7 +1391,9 @@ class AoAMemoMCPState:
             return {
                 "schema": "aoa_memo_export_landing_readiness_v1",
                 "ok": False,
+                "ready_for_landing": False,
                 "landing_state": "invalid",
+                "copied_intake": None,
                 "errors": ["export packet is not a JSON object"],
             }
         errors.extend(self._schema_errors(LOCAL_MEMO_EXPORT_SCHEMA, payload, "export"))
