@@ -29,7 +29,8 @@ def find_repo_root(start: Path) -> Path:
 
 
 SOURCE_ROOT = find_repo_root(Path(__file__).resolve().parent)
-STACK_ROOT = Path("/srv/AbyssOS/abyss-stack")
+SIBLING_REPO_ROOT = Path("/srv/AbyssOS")
+STACK_ROOT = SIBLING_REPO_ROOT / "abyss-stack"
 CONFIGS_ROOT = STACK_ROOT / "Configs"
 SCRIPTS_ROOT = CONFIGS_ROOT / "scripts"
 DEFAULT_LANGCHAIN_RUN_URL = "http://127.0.0.1:5403/run"
@@ -37,7 +38,7 @@ LANGCHAIN_RUN_URL = DEFAULT_LANGCHAIN_RUN_URL
 LANGCHAIN_BASE_URL = DEFAULT_LANGCHAIN_RUN_URL.rsplit("/", 1)[0]
 LOG_ROOT_DEFAULT = STACK_ROOT / "Logs" / "local-ai-trials" / PROGRAM_ID
 MIRROR_ROOT_DEFAULT = Path("/srv/Dionysus/reports/local-ai-trials") / PROGRAM_ID
-AOA_SDK_ROOT = Path("/srv/AbyssOS/aoa-sdk")
+AOA_SDK_ROOT = SIBLING_REPO_ROOT / "aoa-sdk"
 AOA_CLOSEOUT_TRIGGER = "runtime-trial-closeout"
 AOA_SKILL_DISPATCH_TIMEOUT_S = 90
 TERMINAL_WAVE_GATE_RESULTS = {"pass", "fail"}
@@ -497,7 +498,7 @@ def absolute(path: str | Path) -> str:
 
 
 def repo_path(repo: str, relative: str) -> str:
-    return absolute(Path("/srv") / repo / relative)
+    return absolute(SIBLING_REPO_ROOT / repo / relative)
 
 
 def stack_path(relative: str) -> str:
@@ -5348,7 +5349,7 @@ def repo_root_for_w4_case(case: dict[str, Any]) -> Path:
     repo_scope = case.get("repo_scope") or []
     if len(repo_scope) != 1:
         raise RuntimeError(f"W4 case `{case['case_id']}` must target exactly one repo")
-    repo_root = Path("/srv") / repo_scope[0]
+    repo_root = SIBLING_REPO_ROOT / repo_scope[0]
     if not repo_root.exists():
         raise RuntimeError(f"missing W4 repo root: {repo_root}")
     return repo_root
@@ -7393,7 +7394,7 @@ def ensure_w4_worktree_neighbor_links(worktree_path: Path) -> list[str]:
     parent = worktree_path.parent
     created: list[str] = []
     for name in W4_WORKTREE_NEIGHBOR_REPOS:
-        target = Path("/srv") / name
+        target = SIBLING_REPO_ROOT / name
         link_path = parent / name
         if not target.exists() or link_path.exists():
             continue
