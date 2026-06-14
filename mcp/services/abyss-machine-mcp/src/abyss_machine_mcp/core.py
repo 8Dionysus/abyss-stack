@@ -390,6 +390,8 @@ def _summary(payload: Any) -> Any:
 def _payload_ok(payload: Any, returncode: int) -> bool:
     if returncode != 0:
         return False
+    if payload is None:
+        return False
     if isinstance(payload, dict) and payload.get("ok") is False:
         return False
     return True
