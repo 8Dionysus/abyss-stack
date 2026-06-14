@@ -304,6 +304,7 @@ class AoAMemoMCPState:
             )
         if route.memo_port is None:
             raise ValueError(f"unknown repo or missing source root: {repo}")
+        self._require_known_memo_port_route(route, "candidate writes")
         candidates_dir = route.memo_port / "candidates"
         candidates_dir.mkdir(parents=True, exist_ok=True)
         stamp = _utc_stamp()
@@ -1367,6 +1368,18 @@ class AoAMemoMCPState:
             if repo not in names:
                 names.append(repo)
         return names
+
+    def _require_known_memo_port_route(self, route: RepoRoute, action: str) -> None:
+        assert route.memo_port is not None
+        memo_port = route.memo_port.resolve()
+        known_ports = self._known_memo_ports()
+        if memo_port in set(known_ports.values()):
+            return
+        known = ", ".join(str(port) for port in known_ports.values()) or "none"
+        raise ValueError(
+            f"memo port is not registered as a known local memo port for {action}: "
+            f"{route.name} ({memo_port}); known ports: {known}"
+        )
 
     def _assert_under_port(self, port: Path, path: Path, required_dir: str | None = None) -> Path:
         resolved_port = port.expanduser().resolve()
