@@ -340,6 +340,65 @@ def _compact_hit(hit: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_episode_ref(ref: Any) -> dict[str, Any]:
+    if not isinstance(ref, dict):
+        return {"ref": str(ref)}
+    keys = (
+        "event_id",
+        "line",
+        "raw_ref",
+        "segment_id",
+        "segment_ref",
+        "event_type",
+        "source_type",
+        "conversation_act",
+        "session_act",
+        "agent_event",
+    )
+    return {key: ref.get(key) for key in keys if ref.get(key) not in (None, "", [])}
+
+
+def _compact_episode_sample_refs(sample_refs: Any, *, per_bucket_limit: int = 1) -> dict[str, Any]:
+    if not isinstance(sample_refs, dict):
+        return {}
+    compact: dict[str, Any] = {}
+    for bucket, refs in sample_refs.items():
+        if not isinstance(refs, list):
+            continue
+        selected = [_compact_episode_ref(ref) for ref in refs[:per_bucket_limit]]
+        compact[str(bucket)] = {
+            "refs": selected,
+            "ref_count": len(refs),
+            "omitted_ref_count": max(0, len(refs) - len(selected)),
+        }
+    return compact
+
+
+def _compact_task_episode(episode: dict[str, Any]) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    for key in (
+        "session_id",
+        "session_label",
+        "episode_id",
+        "status",
+        "confidence",
+        "verification_state",
+        "failure_state",
+        "ambiguity_flags",
+        "transition",
+        "event_range",
+        "counts",
+        "truth_level",
+    ):
+        if key in episode:
+            compact[key] = episode.get(key)
+    if isinstance(episode.get("start_user_ref"), dict):
+        compact["start_user_ref"] = _compact_episode_ref(episode["start_user_ref"])
+    if isinstance(episode.get("sample_refs"), dict):
+        compact["sample_refs"] = _compact_episode_sample_refs(episode["sample_refs"], per_bucket_limit=1)
+    return compact
+
+
 def _compact_diagnostic(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"ok": False, "diagnostic": "unreadable"}
@@ -1180,6 +1239,18 @@ class AoASessionMemoryMCPState:
         if failure_state:
             args.extend(["--failure-state", _safe_selector(failure_state, "failure_state", limit=32)])
         payload = self._archive_command("task-episodes", args, allow_nonzero_json=True)
+        results = payload.get("results")
+        if isinstance(results, list):
+            payload["results"] = [_compact_task_episode(item) for item in results if isinstance(item, dict)]
+            payload["mcp_payload_policy"] = {
+                "response_compacted": True,
+                "sample_refs_per_bucket": 1,
+                "full_refs_route": "Use .aoa task-episodes CLI or session.index.json for full generated episode refs.",
+            }
+            mcp_access = payload.get("mcp_access")
+            if isinstance(mcp_access, dict):
+                mcp_access["response_compacted"] = True
+                mcp_access["full_refs_route"] = payload["mcp_payload_policy"]["full_refs_route"]
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1461,14 +1532,15 @@ class AoASessionMemoryMCPState:
         limit: int = 8,
         event_limit: int = 12,
     ) -> dict[str, Any]:
-        if recipe not in ALLOWED_RETRIEVAL_RECIPES:
-            raise ValueError(f"unsupported retrieval recipe: {recipe}")
-        args = [recipe, "--limit", str(_coerce_limit(limit, 8, 50)), "--event-limit", str(_coerce_limit(event_limit, 12, 60))]
+        recipe_text = _safe_selector(recipe, "recipe", limit=120)
+        args = [recipe_text, "--limit", str(_coerce_limit(limit, 8, 50)), "--event-limit", str(_coerce_limit(event_limit, 12, 60))]
         if query:
             args.extend(["--query", _ensure_short_text(query, "query")])
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
-        payload = self._archive_command("retrieve", args)
+        payload = self._archive_command("retrieve", args, allow_nonzero_json=True)
+        if recipe_text not in ALLOWED_RETRIEVAL_RECIPES and payload.get("ok") is False:
+            payload.setdefault("mcp_known_recipes", sorted(ALLOWED_RETRIEVAL_RECIPES))
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
