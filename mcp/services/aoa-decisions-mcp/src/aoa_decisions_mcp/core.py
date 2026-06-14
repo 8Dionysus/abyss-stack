@@ -12,7 +12,7 @@ from types import ModuleType
 from typing import Any, Iterator
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
-DEFAULT_STACK_ROOT = Path("/home/dionysus/src/abyss-stack")
+DEFAULT_STACK_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_OUTPUT_DIR = Path("Logs/decision-graph/latest")
 GRAPH_FILE = "workspace_decision_graph.json"
 SUMMARY_FILE = "summary.json"

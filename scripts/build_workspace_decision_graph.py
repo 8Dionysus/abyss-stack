@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
-DEFAULT_LOCAL_STACK_ROOT = Path("/home/dionysus/src/abyss-stack")
+DEFAULT_LOCAL_STACK_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("Logs/decision-graph/latest")
 GRAPH_SCHEMA = "abyss_workspace_decision_graph_v1"
 GRAPH_SUMMARY_SCHEMA = "abyss_workspace_decision_graph_summary_v1"

@@ -13,6 +13,13 @@ if str(SCRIPTS_DIR) not in sys.path:
 import build_workspace_decision_graph as workspace_graph  # noqa: E402
 
 
+def test_default_local_stack_root_is_current_checkout() -> None:
+    source = (SCRIPTS_DIR / "build_workspace_decision_graph.py").read_text(encoding="utf-8")
+
+    assert workspace_graph.DEFAULT_LOCAL_STACK_ROOT == ROOT
+    assert 'Path("/home/dionysus/src/abyss-stack")' not in source
+
+
 def write_decision(
     repo_root: Path,
     *,
