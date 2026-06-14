@@ -975,6 +975,29 @@ def test_review_intake_rejects_export_path_outside_known_port(tmp_path: Path) ->
     assert any("known local memo port" in error for error in result["errors"])
 
 
+def test_review_intake_returns_rejection_for_unknown_export_repo(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "Unknown export repos should reject without crashing",
+    )
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
+    export_path = Path(export["path"])
+    payload = json.loads(export_path.read_text(encoding="utf-8"))
+    payload["repo"] = "unknown-repo"
+    export_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = state.review_intake(export_path)
+
+    assert result["ok"] is False
+    assert result["receipt"]["result"] == "rejected"
+    assert Path(result["receipt_path"]).exists()
+    assert any("export repo does not resolve to a known memo port" in error for error in result["errors"])
+
+
 def test_mcp_surface_contracts(tmp_path: Path) -> None:
     seed_workspace(tmp_path)
     server = build_server(tmp_path)

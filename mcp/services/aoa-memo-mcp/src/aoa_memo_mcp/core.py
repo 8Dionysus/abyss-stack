@@ -621,8 +621,12 @@ class AoAMemoMCPState:
             errors.append(str(exc))
         if route is None or route.memo_port is None:
             errors.append("export repo does not resolve to a known memo port")
+            route_matches_port = False
         elif route.memo_port.resolve() != port.resolve():
             errors.append(f"export repo must match containing memo port: {repo_from_path}")
+            route_matches_port = False
+        else:
+            route_matches_port = True
         if payload.get("schema") != "aoa_local_memo_export_v1":
             errors.append("export schema must be aoa_local_memo_export_v1")
         if payload.get("target_owner") != "aoa-memo" or payload.get("target_route") != "reviewed_intake":
@@ -677,7 +681,7 @@ class AoAMemoMCPState:
                 "errors": errors,
             }
         receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        if repo:
+        if route_matches_port:
             self.build_port_index(repo, write=True)
         return {
             "schema": "aoa_local_memo_intake_review_v1",
