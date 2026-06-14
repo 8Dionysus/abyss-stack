@@ -375,8 +375,9 @@ metric/log/span joins.
 - `cadvisor` is internal-only
 - `loki` is internal-only; query logs through Grafana's Loki datasource
 - `alloy` admin is internal-only; host-local OTLP ingest forwards traces to Tempo
-- set `AOA_PODMAN_CONTAINERS_ROOT` when rootless Podman storage is not under
-  `/home/dionysus/.local/share/containers`
+- `AOA_PODMAN_CONTAINERS_ROOT` defaults through the `aoa-*` shell route to
+  `/home/${AOA_RUNTIME_USER}/.local/share/containers`; set it explicitly when
+  rootless Podman storage is elsewhere
 
 ### First checks
 

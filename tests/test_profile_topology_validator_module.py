@@ -105,6 +105,43 @@ def test_loki_and_alloy_images_must_stay_digest_pinned(tmp_path: Path) -> None:
     assert "compose/modules/60-monitoring.yml must pin Alloy as docker.io/grafana/alloy:<version>@sha256:<digest>" in errors
 
 
+def test_podman_container_mount_default_tracks_runtime_user(tmp_path: Path) -> None:
+    copy_current_profile_surface(tmp_path)
+    module_path = tmp_path / profile_topology.MODULE_DIR / "60-monitoring.yml"
+    module_text = module_path.read_text(encoding="utf-8")
+    write_text(
+        module_path,
+        module_text.replace(
+            "${AOA_PODMAN_CONTAINERS_ROOT}:/var/lib/containers:ro",
+            "${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}:/var/lib/containers:ro",
+        ),
+    )
+
+    errors = run_all_profile_validators(tmp_path)
+
+    assert (
+        "compose/modules/60-monitoring.yml must mount Podman containers through computed AOA_PODMAN_CONTAINERS_ROOT for both cAdvisor and Alloy"
+        in errors
+    )
+
+
+def test_podman_container_root_default_must_be_computed_in_aoa_lib(tmp_path: Path) -> None:
+    copy_current_profile_surface(tmp_path)
+    lib_path = tmp_path / "scripts" / "aoa-lib.sh"
+    lib_text = lib_path.read_text(encoding="utf-8")
+    write_text(
+        lib_path,
+        lib_text.replace(
+            'AOA_PODMAN_CONTAINERS_ROOT="${AOA_PODMAN_CONTAINERS_ROOT:-/home/${AOA_RUNTIME_USER}/.local/share/containers}"',
+            'AOA_PODMAN_CONTAINERS_ROOT="${AOA_PODMAN_CONTAINERS_ROOT:-/home/dionysus/.local/share/containers}"',
+        ),
+    )
+
+    errors = run_all_profile_validators(tmp_path)
+
+    assert "scripts/aoa-lib.sh must default AOA_PODMAN_CONTAINERS_ROOT from AOA_RUNTIME_USER" in errors
+
+
 def test_active_route_docs_must_not_use_core_profile(tmp_path: Path) -> None:
     copy_current_profile_surface(tmp_path)
     doc_path = tmp_path / profile_topology.ACTIVE_ROUTE_PROFILE_DOCS[0]
