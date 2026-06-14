@@ -824,6 +824,44 @@ def test_landing_plan_blocks_missing_candidate_source_ref(tmp_path: Path, monkey
     assert any("source_refs[0] points to missing ref" in error for error in export["errors"])
 
 
+def test_uri_scheme_payload_refs_are_symbolic_for_intake_and_landing_plan(
+    tmp_path: Path, monkeypatch
+) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+    created = state.create_candidate(
+        "abyss-stack",
+        ["mcp/services/aoa-memo-mcp/DESIGN.md"],
+        "MCP should preserve non-local URI refs as symbolic handles",
+    )
+    candidate_path = Path(created["path"])
+    candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+    candidate["source_refs"] = ["urn:aoa:memo:source"]
+    candidate["evidence_refs"] = ["git+ssh://github.com/8Dionysus/aoa-memo.git#main"]
+    candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+    validation = state.validate_candidate(candidate_path)
+    export = state.prepare_intake_packet("abyss-stack", [created["local_ref"]])
+    reviewed = state.review_intake(export["path"])
+    export_path = Path(export["path"])
+    payload = json.loads(export_path.read_text(encoding="utf-8"))
+    payload["allowed_result"] = "reviewed_write"
+    payload["receipt_refs"] = [
+        Path(reviewed["receipt_path"]).relative_to(tmp_path / "stack-source/memo").as_posix()
+    ]
+    export_path.write_text(json.dumps(payload), encoding="utf-8")
+    plan = state.build_landing_plan(
+        "abyss-stack",
+        export_path.relative_to(tmp_path / "stack-source/memo").as_posix(),
+    )
+
+    assert validation["ok"] is True
+    assert export["ok"] is True
+    assert reviewed["ok"] is True
+    assert plan["ok"] is True
+
+
 def test_absolute_candidate_refs_are_rejected_for_intake(tmp_path: Path, monkeypatch) -> None:
     seed_workspace(tmp_path)
     monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))

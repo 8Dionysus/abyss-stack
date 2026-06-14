@@ -1449,11 +1449,14 @@ class AoAMemoMCPState:
         return port.parent if port.name == "memo" else port
 
     def _resolve_payload_ref(self, port: Path, ref: str) -> Path | None:
+        ref = ref.strip()
+        if not ref:
+            return None
         if ref.startswith(SYMBOLIC_REF_PREFIXES):
             return None
-        text = ref.split("#", 1)[0].strip()
-        if not text:
+        if urlparse(ref).scheme:
             return None
+        text = ref.split("#", 1)[0].strip()
         path = Path(text)
         if path.is_absolute():
             raise ValueError("local refs must be relative or symbolic")
