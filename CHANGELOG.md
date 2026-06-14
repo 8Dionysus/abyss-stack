@@ -7,7 +7,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Fixed
+
+- Decision graph builder and `aoa-decisions-mcp` now derive the default
+  `abyss-stack` checkout from the running source tree instead of a private
+  `/home/dionysus/src/abyss-stack` path.
 
 ## [0.4.0] - 2026-06-07
 

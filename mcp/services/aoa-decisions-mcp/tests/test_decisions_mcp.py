@@ -3,11 +3,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import aoa_decisions_mcp.core as core
 from aoa_decisions_mcp.core import AoADecisionsMCPState
 from aoa_decisions_mcp.server import build_server
 
 
 STACK_ROOT = Path(__file__).resolve().parents[4]
+
+
+def test_default_stack_root_is_current_checkout() -> None:
+    source = Path(core.__file__).read_text(encoding="utf-8")
+
+    assert core.DEFAULT_STACK_ROOT == STACK_ROOT
+    assert 'Path("/home/dionysus/src/abyss-stack")' not in source
 
 
 def write_decision(
