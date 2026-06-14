@@ -1719,14 +1719,17 @@ class AoASessionMemoryMCPState:
             session_dir=session_dir,
             session=session,
         )
-        ref_missing = any(check["status"] == "missing" for check in checks)
+        ref_failed = any(
+            check["status"] != "present" or check.get("inside_aoa_root") is False
+            for check in checks
+        )
         provider_allows_ref_check = bool(provider_full.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
         diagnostics = []
         if projection_freshness.get("status") == "current_with_global_stale":
             diagnostics.append("provider_global_stale_target_session_current")
         return {
             "schema": "aoa_session_memory_freshness_check_v1",
-            "ok": provider_allows_ref_check and not ref_missing,
+            "ok": provider_allows_ref_check and not ref_failed,
             "mutates": False,
             "provider": _compact_provider_status_for_mcp(
                 provider_full,
@@ -2752,8 +2755,17 @@ class AoASessionMemoryMCPState:
             }
         relative_candidates = [self.aoa_root / path_part, self.aoa_root / "sessions" / path_part]
         for candidate in relative_candidates:
+            resolved = candidate.resolve()
+            if candidate.exists() and not _is_under(resolved, self.aoa_root):
+                return {
+                    "ref": value,
+                    "status": "invalid",
+                    "path": resolved.as_posix(),
+                    "inside_aoa_root": False,
+                    "reason": "relative ref escapes aoa root",
+                }
             if candidate.exists():
-                return {"ref": value, "status": "present", "path": candidate.as_posix(), "inside_aoa_root": True}
+                return {"ref": value, "status": "present", "path": resolved.as_posix(), "inside_aoa_root": True}
         return {"ref": value, "status": "unknown", "reason": "relative or symbolic ref requires session context"}
 
     def _check_raw_line_ref(self, ref: str, *, session_dir: Path) -> dict[str, Any]:
