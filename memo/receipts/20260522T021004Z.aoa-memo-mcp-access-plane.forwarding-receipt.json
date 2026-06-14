@@ -1,5 +1,5 @@
 {
-  "schema": "aoa_local_memo_receipt_v1",
+  "schema": "aoa_local_memo_receipt_v2",
   "id": "receipt:abyss-stack:20260522T021004Z:aoa-memo-mcp-access-plane-forwarding",
   "repo": "abyss-stack",
   "candidate_ref": "candidates/20260522T021004Z.aoa-memo-mcp-access-plane-reviewed-route.candidate.json",

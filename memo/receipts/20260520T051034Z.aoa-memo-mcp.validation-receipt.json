@@ -1,5 +1,5 @@
 {
-  "schema": "aoa_local_memo_receipt_v1",
+  "schema": "aoa_local_memo_receipt_v2",
   "id": "receipt:abyss-stack:20260520T051034Z:aoa-memo-mcp-validation",
   "repo": "abyss-stack",
   "candidate_ref": "candidates/20260520T051034Z.aoa-memo-mcp-provides-the-first-stack-owned-mcp.candidate.json",

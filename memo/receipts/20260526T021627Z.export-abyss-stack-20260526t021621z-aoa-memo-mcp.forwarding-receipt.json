@@ -1,5 +1,5 @@
 {
-  "schema": "aoa_local_memo_receipt_v1",
+  "schema": "aoa_local_memo_receipt_v2",
   "id": "receipt:abyss-stack:20260526T021627Z:export-abyss-stack-20260526t021621z-aoa-memo-mcp",
   "repo": "abyss-stack",
   "candidate_ref": "candidates/20260526T021616Z.b4df4c0f.aoa-memo-mcp-derives-known-local-memo-ports-from.candidate.json",
