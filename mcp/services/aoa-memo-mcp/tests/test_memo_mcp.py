@@ -805,6 +805,40 @@ def test_landing_plan_blocks_missing_export_evidence_ref(tmp_path: Path, monkeyp
     assert any("evidence_refs[0] points to missing ref" in error for error in plan["errors"])
 
 
+def test_landing_plan_reports_missing_export_id(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    plan = state.build_landing_plan("abyss-stack", "export:abyss-stack:missing")
+
+    assert plan["schema"] == "aoa_memo_landing_plan_v1"
+    assert plan["ok"] is False
+    assert plan["export_ref"] == "export:abyss-stack:missing"
+    assert any("export ref not found" in error for error in plan["errors"])
+
+
+def test_invalid_export_packet_keeps_pending_and_brief_shapes(tmp_path: Path, monkeypatch) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    export_path = tmp_path / "stack-source/memo/exports/broken.json"
+    export_path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    pending = state.list_pending_exports("abyss-stack")
+    status = state.build_local_port_status("abyss-stack")
+    brief = state.build_brief("abyss-stack", "landing readiness")
+
+    assert pending["ok"] is True
+    assert pending["counts"] == {"total": 1, "pending": 1, "ready": 0, "landed": 0}
+    assert pending["exports"][0]["landing_state"] == "invalid"
+    assert pending["exports"][0]["ready_for_landing"] is False
+    assert any("not a JSON object" in error for error in pending["exports"][0]["errors"])
+    assert status["pending_exports"] == pending["counts"]
+    assert brief["local_intake"]["pending_exports"] == 1
+    assert brief["local_intake"]["ready_exports"] == 0
+
+
 def test_landing_plan_blocks_missing_candidate_source_ref(tmp_path: Path, monkeypatch) -> None:
     seed_workspace(tmp_path)
     monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
