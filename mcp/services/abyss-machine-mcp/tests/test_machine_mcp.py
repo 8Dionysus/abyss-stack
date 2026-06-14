@@ -263,6 +263,21 @@ class FakeRunner:
         return CommandOutput(argv=argv, returncode=0, stdout=json.dumps(payload), stderr="", elapsed_ms=1.0)
 
 
+class NonJsonRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        self.calls.append(key)
+        if key == ("memory", "pressure", "--json"):
+            return CommandOutput(
+                argv=argv,
+                returncode=0,
+                stdout="warning: changed output shape\nnot-json",
+                stderr="",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
 def state_with_fake(runner: FakeRunner | None = None) -> AbyssMachineMCPState:
     return AbyssMachineMCPState.discover(
         workspace_root="/tmp/abyss",
@@ -315,6 +330,17 @@ def test_read_resource_and_recall() -> None:
     recall = state.recall("swap pressure")
     assert recall["surface"] == "nervous-recall"
     assert recall["payload_schema"] == "abyss_machine_nervous_retrieval_pack_v1"
+
+
+def test_surface_fails_closed_when_json_payload_is_unparsable() -> None:
+    state = state_with_fake(NonJsonRunner())
+
+    result = state.surface("memory-pressure")
+
+    assert result["returncode"] == 0
+    assert result["payload_parse_ok"] is False
+    assert result["ok"] is False
+    assert result["payload_summary"] is None
 
 
 def test_maps_tool_queries_axis_as_route_signals() -> None:
