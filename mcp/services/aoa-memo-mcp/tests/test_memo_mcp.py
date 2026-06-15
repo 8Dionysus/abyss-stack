@@ -1034,6 +1034,11 @@ def test_review_intake_returns_rejection_for_unknown_export_repo(tmp_path: Path,
     assert result["receipt"]["result"] == "rejected"
     assert Path(result["receipt_path"]).exists()
     assert any("export repo does not resolve to a known memo port" in error for error in result["errors"])
+    assert state.build_port_index("abyss-stack", check=True)["ok"] is True
+    index = json.loads((tmp_path / "stack-source/memo/index.min.json").read_text(encoding="utf-8"))
+    receipt_ref = Path(result["receipt_path"]).relative_to(tmp_path / "stack-source/memo").as_posix()
+    assert index["counts"]["receipts"] == 1
+    assert receipt_ref in index["source_refs"]
 
 
 def test_mcp_surface_contracts(tmp_path: Path) -> None:
