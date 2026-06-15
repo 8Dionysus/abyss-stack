@@ -736,6 +736,59 @@ class StaleProviderRunner(FakeRunner):
         return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
 
 
+class LiveDeferredProviderRunner(FakeRunner):
+    def __init__(self, *, dirty_session_id: str, dirty_session_label: str) -> None:
+        super().__init__()
+        self.dirty_session_id = dirty_session_id
+        self.dirty_session_label = dirty_session_label
+
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        command = argv[2]
+        args = tuple(argv[3:])
+        if command != "search-provider-status":
+            return super().__call__(argv, timeout)
+        self.calls.append((command, args))
+        self.timeouts.append((command, timeout))
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "search_provider_status",
+            "ok": True,
+            "providers": {
+                "portable_sqlite": {
+                    "ok": True,
+                    "status": "ready_with_deferred_live_updates",
+                    "freshness": {
+                        "status": "current_with_deferred_live_updates",
+                        "dirty_session_count": 1,
+                        "actionable_dirty_session_count": 0,
+                        "deferred_live_session_count": 1,
+                        "dirty_session_ids": [self.dirty_session_id],
+                        "actionable_dirty_session_ids": [],
+                        "dirty_sessions": [
+                            {
+                                "session_id": self.dirty_session_id,
+                                "session_label": self.dirty_session_label,
+                                "session_dir": f"/tmp/.aoa/sessions/{self.dirty_session_label}",
+                            }
+                        ],
+                        "actionable_dirty_sessions": [],
+                        "deferred_live_sessions": [
+                            {
+                                "session_id": self.dirty_session_id,
+                                "session_label": self.dirty_session_label,
+                                "session_dir": f"/tmp/.aoa/sessions/{self.dirty_session_label}",
+                                "live_transcript_path": "/tmp/.codex/sessions/2026/06/15/rollout-live.jsonl",
+                            }
+                        ],
+                        "reasons": ["recent_live_projection_updates_deferred"],
+                    },
+                }
+            },
+            "diagnostics": [],
+        }
+        return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+
 class UnsupportedRetrieveRunner(FakeRunner):
     def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
         command = argv[2]
@@ -1317,6 +1370,31 @@ def test_freshness_check_keeps_target_refs_ok_when_unrelated_session_is_stale(tm
     assert "provider_global_stale_target_session_current" in freshness["diagnostics"]
 
 
+def test_freshness_check_marks_target_live_deferred_without_failing(tmp_path: Path) -> None:
+    runner = LiveDeferredProviderRunner(
+        dirty_session_id="session-1",
+        dirty_session_label="2026-05-26__001__session-memory-mcp",
+    )
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="session-1")
+    provider_freshness = freshness["provider"]["providers"]["portable_sqlite"]["freshness"]
+
+    assert freshness["ok"] is True
+    assert freshness["provider"]["ok"] is True
+    assert freshness["provider"]["providers"]["portable_sqlite"]["status"] == "ready_with_deferred_live_updates"
+    assert provider_freshness["status"] == "current_with_deferred_live_updates"
+    assert provider_freshness["dirty_session_count"] == 1
+    assert provider_freshness["actionable_dirty_session_count"] == 0
+    assert provider_freshness["deferred_live_session_count"] == 1
+    assert provider_freshness["deferred_live_session_samples"][0]["session_id"] == "session-1"
+    assert "deferred_live_sessions" in provider_freshness["omitted_fields"]
+    assert freshness["projection_freshness"]["status"] == "current_with_deferred_live_updates"
+    assert freshness["projection_freshness"]["target_dirty"] is False
+    assert freshness["projection_freshness"]["target_deferred_live"] is True
+    assert "provider_target_session_deferred_live_update" in freshness["diagnostics"]
+
+
 def test_freshness_check_fails_when_target_session_projection_is_stale(tmp_path: Path) -> None:
     runner = StaleProviderRunner(
         dirty_session_id="session-1",
@@ -1438,6 +1516,7 @@ def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_p
     assert args[args.index("--per-route-limit") + 1] == "4"
     assert args[args.index("--raw-preview-limit") + 1] == "2"
     assert "--full" in args
+    assert runner.timeouts[-1] == ("entity-usage-scenario-audit", 90.0)
 
 
 def test_route_reads_generated_axis_without_arbitrary_paths(tmp_path: Path) -> None:

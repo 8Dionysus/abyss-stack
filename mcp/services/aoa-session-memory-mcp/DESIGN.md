@@ -83,6 +83,15 @@ freshness. That makes status suitable as the first agent health/orientation
 call. Freshness remains explicit through `aoa_session_freshness_check(...)` or
 the `.aoa search-provider-status` operator route.
 
+Freshness distinguishes stable stale work from live transcript catch-up. If an
+open or recently written Codex transcript under `.codex/sessions` has not yet
+been fully archived into search/atlas/graph projections, MCP reports
+`current_with_deferred_live_updates` / `ready_with_deferred_live_updates`
+instead of hiding the dirty sessions or failing the whole route. Agents may use
+the last committed snapshot for navigation, but must treat deferred live
+sessions as not fully checked and go to raw refs or operator maintenance when
+the newest transcript lines matter.
+
 When `include_live=true`, MCP runs a full-archive readiness health gate without
 evidence sample extraction. The latest saved route-readiness diagnostic remains
 the cached audit summary, and sample-bearing readiness stays an explicit `.aoa`

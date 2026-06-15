@@ -97,6 +97,15 @@ diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
 
+When `.aoa` is actively catching up to open Codex transcripts,
+`aoa_session_freshness_check(...)` may report
+`current_with_deferred_live_updates` and the provider may report
+`ready_with_deferred_live_updates`. That means the last committed search/graph
+snapshot is usable for routing, while the named live sessions are visible but
+not asserted as fully indexed. If exact newest transcript evidence matters,
+open the returned raw/session refs or run the explicit maintenance/audit route
+outside MCP.
+
 `aoa_session_memory_status(include_live=true)` additionally runs a fast
 full-archive readiness gate without extracting readiness evidence samples. Full
 sample-bearing `route-readiness --write-report` remains an explicit operator or
