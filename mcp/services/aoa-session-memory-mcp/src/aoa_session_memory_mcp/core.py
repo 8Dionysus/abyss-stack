@@ -17,6 +17,7 @@ from urllib.parse import unquote, urlparse
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
 STATUS_TIMEOUT_SECONDS = 60.0
+SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
@@ -460,10 +461,13 @@ def _compact_provider_freshness_for_mcp(freshness: dict[str, Any], *, sample_lim
         "selected_session_state_count",
         "indexed_session_state_count",
         "dirty_session_count",
+        "actionable_dirty_session_count",
+        "deferred_live_session_count",
         "current_session_count",
         "indexed_session_count",
         "missing_session_count",
         "stale_session_count",
+        "live_defer_quiet_seconds",
         "latest_source_mtime",
         "db_mtime",
         "reason",
@@ -486,8 +490,25 @@ def _compact_provider_freshness_for_mcp(freshness: dict[str, Any], *, sample_lim
         compact["dirty_session_samples"] = samples
         compact["dirty_session_sample_count"] = len(samples)
         compact["omitted_dirty_session_count"] = max(0, dirty_count - len(samples))
+    deferred_live_sessions = freshness.get("deferred_live_sessions")
+    if isinstance(deferred_live_sessions, list):
+        deferred_samples = [_compact_dirty_session_sample(item) for item in deferred_live_sessions[:sample_limit]]
+        if deferred_samples:
+            deferred_count = _safe_int(freshness.get("deferred_live_session_count"))
+            if deferred_count is None:
+                deferred_count = len(deferred_live_sessions)
+            compact["deferred_live_session_samples"] = deferred_samples
+            compact["deferred_live_session_sample_count"] = len(deferred_samples)
+            compact["omitted_deferred_live_session_count"] = max(0, deferred_count - len(deferred_samples))
     if "dirty_session_ids" in freshness or "dirty_sessions" in freshness:
-        compact["omitted_fields"] = ["dirty_session_ids", "dirty_sessions"]
+        omitted = ["dirty_session_ids", "dirty_sessions"]
+        if "actionable_dirty_session_ids" in freshness:
+            omitted.append("actionable_dirty_session_ids")
+        if "actionable_dirty_sessions" in freshness:
+            omitted.append("actionable_dirty_sessions")
+        if "deferred_live_sessions" in freshness:
+            omitted.append("deferred_live_sessions")
+        compact["omitted_fields"] = omitted
     return compact
 
 
@@ -557,6 +578,9 @@ def _compact_provider_status_for_mcp(
     compact["mcp_access"]["omitted_fields"] = [
         "providers.*.freshness.dirty_session_ids",
         "providers.*.freshness.dirty_sessions",
+        "providers.*.freshness.actionable_dirty_session_ids",
+        "providers.*.freshness.actionable_dirty_sessions",
+        "providers.*.freshness.deferred_live_sessions",
     ]
     if full_freshness_route is not None:
         compact["mcp_access"]["full_freshness_route"] = full_freshness_route
@@ -938,7 +962,11 @@ class AoASessionMemoryMCPState:
             args.extend(["--task-episode-id", _safe_selector(str(episode), "episode")])
         if _as_bool(filters.get("explain"), default=True):
             args.append("--explain")
-        payload = self._archive_command("search", args)
+        payload = self._archive_command(
+            "search",
+            args,
+            timeout_seconds=max(self.timeout_seconds, SEARCH_TIMEOUT_SECONDS),
+        )
         if diagnostics:
             payload.setdefault("diagnostics", []).extend(diagnostics)
         payload.setdefault("authority_boundary", self.authority_boundary())
@@ -1552,7 +1580,12 @@ class AoASessionMemoryMCPState:
             args.extend(["--layer", _safe_selector(str(layer), "layer", limit=80)])
         if full:
             args.append("--full")
-        payload = self._archive_command("entity-usage-scenario-audit", args, allow_nonzero_json=True)
+        payload = self._archive_command(
+            "entity-usage-scenario-audit",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1777,21 +1810,44 @@ class AoASessionMemoryMCPState:
                 "reason": "provider did not return per-session freshness",
             }
 
+        def session_values_from(*, ids_key: str, sessions_key: str) -> set[str]:
+            values = {str(value) for value in freshness.get(ids_key, []) if value}
+            for item in freshness.get(sessions_key, []) if isinstance(freshness.get(sessions_key), list) else []:
+                if not isinstance(item, dict):
+                    continue
+                for key in ("session_id", "session_label", "session_dir"):
+                    value = item.get(key)
+                    if value:
+                        values.add(str(value))
+            return values
+
         target_values = self._session_identity_values(session_dir, session)
-        dirty_values = {str(value) for value in freshness.get("dirty_session_ids", []) if value}
+        has_actionable_fields = "actionable_dirty_session_ids" in freshness or "actionable_dirty_sessions" in freshness
+        dirty_values = (
+            session_values_from(ids_key="actionable_dirty_session_ids", sessions_key="actionable_dirty_sessions")
+            if has_actionable_fields
+            else session_values_from(ids_key="dirty_session_ids", sessions_key="dirty_sessions")
+        )
+        deferred_values = session_values_from(ids_key="", sessions_key="deferred_live_sessions")
         for item in freshness.get("dirty_sessions", []) if isinstance(freshness.get("dirty_sessions"), list) else []:
             if not isinstance(item, dict):
                 continue
             for key in ("session_id", "session_label", "session_dir"):
                 value = item.get(key)
                 if value:
-                    dirty_values.add(str(value))
+                    if not has_actionable_fields:
+                        dirty_values.add(str(value))
 
         target_dirty = bool(target_values & dirty_values)
+        target_deferred_live = bool(target_values & deferred_values)
         if target_dirty:
             status = "stale"
+        elif target_deferred_live:
+            status = "current_with_deferred_live_updates"
         elif str(freshness.get("status") or "") == "stale":
             status = "current_with_global_stale"
+        elif str(freshness.get("status") or "") == "current_with_deferred_live_updates":
+            status = "current_with_global_deferred_live_updates"
         elif str(freshness.get("status") or "") == "current":
             status = "current"
         else:
@@ -1799,9 +1855,12 @@ class AoASessionMemoryMCPState:
         return {
             "status": status,
             "target_dirty": target_dirty,
+            "target_deferred_live": target_deferred_live,
             "provider_status": provider_status or None,
             "global_status": freshness.get("status"),
             "dirty_session_count": freshness.get("dirty_session_count"),
+            "actionable_dirty_session_count": freshness.get("actionable_dirty_session_count"),
+            "deferred_live_session_count": freshness.get("deferred_live_session_count"),
             "target_values_checked": sorted(target_values)[:8],
         }
 
@@ -1831,6 +1890,10 @@ class AoASessionMemoryMCPState:
         diagnostics = []
         if projection_freshness.get("status") == "current_with_global_stale":
             diagnostics.append("provider_global_stale_target_session_current")
+        elif projection_freshness.get("status") == "current_with_global_deferred_live_updates":
+            diagnostics.append("provider_global_deferred_live_updates_target_session_current")
+        elif projection_freshness.get("status") == "current_with_deferred_live_updates":
+            diagnostics.append("provider_target_session_deferred_live_update")
         return {
             "schema": "aoa_session_memory_freshness_check_v1",
             "ok": provider_allows_ref_check and not ref_failed,

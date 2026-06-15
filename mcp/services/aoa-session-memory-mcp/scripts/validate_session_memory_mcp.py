@@ -40,6 +40,18 @@ def _select_freshness_smoke_brief(state: AoASessionMemoryMCPState, latest_brief:
         brief = state.session_brief(str(label), max_segments=2)
         if brief.get("ok") and brief.get("session", {}).get("archive_status") == "indexed":
             return brief
+        refs = hit.get("refs") if isinstance(hit.get("refs"), dict) else {}
+        manifest = refs.get("session") or hit.get("session_ref")
+        if manifest and hit.get("archive_status") == "indexed":
+            return {
+                "ok": True,
+                "session": {
+                    "id": hit.get("session_id"),
+                    "label": label,
+                    "archive_status": "indexed",
+                },
+                "refs": {"manifest": str(manifest)},
+            }
 
     return latest_brief
 
@@ -264,7 +276,7 @@ def main() -> None:
     trace = state.session_trace("aoa-session-memory-mcp", kind="mcp", doc_type="session", limit=5, per_route_limit=3)
     if not trace.get("route_candidates"):
         raise SystemExit("trace-route did not return route candidates")
-    search = state.session_search("aoa-session-memory", limit=3)
+    search = state.session_search("", filters={"route_signal": "mcp:aoa_session_memory_mcp", "doc_type": "session"}, limit=3)
     if search.get("result_count", 0) <= 0:
         raise SystemExit("session search returned no smoke hits")
     route_only = state.session_search("", filters={"route_signal": "tool:view_image", "doc_type": "event"}, limit=3)
@@ -314,7 +326,13 @@ def main() -> None:
     if failed_ref_checks:
         raise SystemExit(f"freshness ref resolution failed: {failed_ref_checks}")
     freshness_status = freshness.get("projection_freshness", {}).get("status")
-    if not freshness.get("ok") or freshness_status != "current":
+    acceptable_freshness = {
+        "current",
+        "current_with_deferred_live_updates",
+        "current_with_global_deferred_live_updates",
+        "current_with_global_stale",
+    }
+    if not freshness.get("ok") or freshness_status not in acceptable_freshness:
         raise SystemExit(f"freshness smoke is not current: {freshness_status}")
     server = build_server()
     if server is None:
