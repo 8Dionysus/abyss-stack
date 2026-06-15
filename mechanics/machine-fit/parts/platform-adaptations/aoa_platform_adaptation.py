@@ -63,8 +63,9 @@ def default_host_facts_ref(mode: str) -> str | None:
         SCRIPT_ROOT
         / "mechanics"
         / "machine-fit"
-        / "docs"
+        / "parts"
         / "host-facts"
+        / "examples"
         / "reference-host.public.json"
     )
     if mode == "private" and private_ref.exists():
