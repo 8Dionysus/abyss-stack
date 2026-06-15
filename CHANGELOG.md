@@ -12,6 +12,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Decision graph builder and `aoa-decisions-mcp` now derive the default
   `abyss-stack` checkout from the running source tree instead of a private
   `/home/dionysus/src/abyss-stack` path.
+- `aoa-memo-mcp` now rebuilds the containing local memo port index after
+  rejected reviewed-intake receipts, keeping receipt indexes fresh for invalid
+  or mismatched export repos.
 
 ## [0.4.0] - 2026-06-07
 
