@@ -35,6 +35,7 @@
         "tests/test_inference_pilot_compatibility_validator_module.py",
         "tests/test_machine_fit_validator_module.py",
         "tests/test_mechanics_topology_validator_module.py",
+        "tests/test_platform_adaptation_backend.py",
         "tests/test_profile_topology_validator_module.py",
         "tests/test_profile_composition.py",
         "tests/test_questbook_validator_module.py",
