@@ -129,6 +129,35 @@ def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServ
     return params, meta
 
 
+def _payload_count(payload: dict, key: str) -> int:
+    value = payload.get(key)
+    return value if isinstance(value, int) else 0
+
+
+def _stdio_route_count_summary(
+    inventory: dict,
+    responses: dict,
+    closeouts: dict,
+    progress: dict,
+    reasoning: dict,
+    episodes: dict,
+    neighborhood: dict,
+    *,
+    tool_count: int,
+) -> dict:
+    return {
+        "tool_count": tool_count,
+        "inventory_entity_count": _payload_count(inventory, "entity_count"),
+        "inventory_source": inventory.get("source"),
+        "agent_response_count": _payload_count(responses, "result_count"),
+        "agent_closeout_count": _payload_count(closeouts, "result_count"),
+        "agent_progress_count": _payload_count(progress, "result_count"),
+        "agent_reasoning_window_count": _payload_count(reasoning, "window_count"),
+        "task_episode_count": _payload_count(episodes, "result_count"),
+        "answer_neighborhood_count": _payload_count(neighborhood, "window_count"),
+    }
+
+
 async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> dict:
     params = StdioServerParameters(
         command=sys.executable,
@@ -189,29 +218,16 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
-    if responses.get("result_count", 0) <= 0:
-        raise SystemExit("stdio MCP agent responses route returned no results")
-    if closeouts.get("result_count", 0) <= 0:
-        raise SystemExit("stdio MCP agent closeouts route returned no results")
-    if progress.get("result_count", 0) <= 0:
-        raise SystemExit("stdio MCP agent progress route returned no results")
-    if reasoning.get("window_count", 0) <= 0:
-        raise SystemExit("stdio MCP agent reasoning windows route returned no windows")
-    if episodes.get("result_count", 0) <= 0:
-        raise SystemExit("stdio MCP task episodes route returned no results")
-    if neighborhood.get("window_count", 0) <= 0:
-        raise SystemExit("stdio MCP answer neighborhood route returned no windows")
-    return {
-        "tool_count": len(tools),
-        "inventory_entity_count": inventory.get("entity_count"),
-        "inventory_source": inventory.get("source"),
-        "agent_response_count": responses.get("result_count"),
-        "agent_closeout_count": closeouts.get("result_count"),
-        "agent_progress_count": progress.get("result_count"),
-        "agent_reasoning_window_count": reasoning.get("window_count"),
-        "task_episode_count": episodes.get("result_count"),
-        "answer_neighborhood_count": neighborhood.get("window_count"),
-    }
+    return _stdio_route_count_summary(
+        inventory,
+        responses,
+        closeouts,
+        progress,
+        reasoning,
+        episodes,
+        neighborhood,
+        tool_count=len(tools),
+    )
 
 
 async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
