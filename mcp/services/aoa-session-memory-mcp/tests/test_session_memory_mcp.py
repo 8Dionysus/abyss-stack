@@ -789,24 +789,6 @@ class LiveDeferredProviderRunner(FakeRunner):
         return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
 
 
-class UnsupportedRetrieveRunner(FakeRunner):
-    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
-        command = argv[2]
-        args = tuple(argv[3:])
-        if command != "retrieve":
-            return super().__call__(argv, timeout)
-        self.calls.append((command, args))
-        self.timeouts.append((command, timeout))
-        payload = {
-            "schema_version": 1,
-            "artifact_type": "retrieval_packet",
-            "ok": False,
-            "recipe": args[0],
-            "diagnostics": [f"unknown recipe: {args[0]}"],
-        }
-        return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
-
-
 def state_with_fixture(tmp_path: Path, runner: FakeRunner | None = None) -> AoASessionMemoryMCPState:
     aoa = seed_archive(tmp_path)
     return AoASessionMemoryMCPState.discover(
@@ -997,7 +979,7 @@ def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> No
 
 
 def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Path) -> None:
-    runner = UnsupportedRetrieveRunner()
+    runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
     payload = state.session_retrieve(recipe="review", query="audit decision skill", limit=5, event_limit=8)
@@ -1006,10 +988,11 @@ def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Pat
     assert payload["artifact_type"] == "retrieval_packet"
     assert payload["recipe"] == "review"
     assert payload["mcp_access"]["archive_command"] == "retrieve"
-    assert payload["mcp_access"]["returncode"] == 1
+    assert payload["mcp_access"]["archive_dispatched"] is False
+    assert payload["mcp_access"]["returncode"] is None
     assert payload["authority_boundary"]["mutation_posture"].startswith("no write")
     assert "continue-session" in payload["mcp_known_recipes"]
-    assert any(call[0] == "retrieve" for call in runner.calls)
+    assert not any(call[0] == "retrieve" for call in runner.calls)
 
 
 def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path: Path) -> None:
