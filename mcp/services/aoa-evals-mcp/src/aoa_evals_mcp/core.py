@@ -780,7 +780,7 @@ class AoAEvalsMCPState:
             return False, None, []
         text = port_path.read_text(encoding="utf-8")
         status_pattern = re.compile(
-            r"(?m)^(?P<prefix>\s*status\s*:\s*)(?P<quote>['\"]?)skeleton(?P=quote)(?P<suffix>\s*(?:#.*)?)$"
+            r"(?m)^(?P<prefix>status\s*:\s*)(?P<quote>['\"]?)skeleton(?P=quote)(?P<suffix>\s*(?:#.*)?)$"
         )
         updated, count = status_pattern.subn(r"\g<prefix>active\g<suffix>", text, count=1)
         if count != 1:
