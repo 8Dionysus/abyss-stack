@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,7 +13,49 @@ from types import ModuleType
 from typing import Any, Iterator
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
-DEFAULT_STACK_ROOT = Path(__file__).resolve().parents[5]
+BUILDER_RELATIVE_PATH = Path("scripts") / "build_workspace_decision_graph.py"
+
+
+def _has_decision_graph_builder(root: Path) -> bool:
+    return (root / BUILDER_RELATIVE_PATH).is_file()
+
+
+def _root_from_path_with_builder(path: Path) -> Path | None:
+    current = path.expanduser().resolve()
+    if current.is_file():
+        current = current.parent
+    for candidate in (current, *current.parents):
+        if _has_decision_graph_builder(candidate):
+            return candidate
+    return None
+
+
+def discover_stack_root(
+    *,
+    package_file: str | Path | None = None,
+    cwd: str | Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    env = environ if environ is not None else os.environ
+    candidates = [
+        package_file or __file__,
+        env.get("AOA_SOURCE_ROOT"),
+        cwd or Path.cwd(),
+    ]
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        root = _root_from_path_with_builder(Path(candidate))
+        if root is not None:
+            return root
+    raise FileNotFoundError(
+        "missing abyss-stack source checkout containing "
+        f"{BUILDER_RELATIVE_PATH.as_posix()}; set AOA_ABYSS_STACK_ROOT "
+        "or launch from the checkout"
+    )
+
+
+DEFAULT_STACK_ROOT = _root_from_path_with_builder(Path(__file__)) or Path.cwd().resolve()
 DEFAULT_OUTPUT_DIR = Path("Logs/decision-graph/latest")
 GRAPH_FILE = "workspace_decision_graph.json"
 SUMMARY_FILE = "summary.json"
@@ -80,7 +123,7 @@ class AoADecisionsMCPState:
         stack = Path(
             stack_root
             or os.environ.get("AOA_ABYSS_STACK_ROOT")
-            or DEFAULT_STACK_ROOT
+            or discover_stack_root()
         ).expanduser().resolve()
         output = Path(
             output_dir

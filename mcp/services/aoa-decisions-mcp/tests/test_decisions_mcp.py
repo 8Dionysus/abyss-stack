@@ -18,6 +18,20 @@ def test_default_stack_root_is_current_checkout() -> None:
     assert 'Path("/home/dionysus/src/abyss-stack")' not in source
 
 
+def test_installed_entrypoint_discovers_checkout_from_cwd(tmp_path: Path) -> None:
+    installed_core = tmp_path / "venv" / "lib" / "python3.12" / "site-packages" / "aoa_decisions_mcp" / "core.py"
+    installed_core.parent.mkdir(parents=True)
+    installed_core.write_text("# installed package file\n", encoding="utf-8")
+    checkout = tmp_path / "checkout" / "abyss-stack"
+    builder = checkout / "scripts" / "build_workspace_decision_graph.py"
+    builder.parent.mkdir(parents=True)
+    builder.write_text("# builder\n", encoding="utf-8")
+    cwd = checkout / "mcp" / "services"
+    cwd.mkdir(parents=True)
+
+    assert core.discover_stack_root(package_file=installed_core, cwd=cwd) == checkout.resolve()
+
+
 def write_decision(
     repo_root: Path,
     decision_id: str,
