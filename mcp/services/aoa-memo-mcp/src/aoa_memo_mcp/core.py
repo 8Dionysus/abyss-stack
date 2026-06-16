@@ -1667,6 +1667,8 @@ class AoAMemoMCPState:
             return "aoa-memo source patch/review path; no repo-local candidate shortcut"
         if route_status == "session_evidence_route":
             return ".aoa carries session evidence; candidate creation routes through a repo memo port or aoa-memo intake"
+        if route.default_mode == "read_only" and port["ready"]:
+            return "read-only memory route; no local candidate writes from this MCP route"
         if port["ready"]:
             return "repo memo/candidates"
         return "no local candidate route until this place has a memo port"
@@ -1688,6 +1690,13 @@ class AoAMemoMCPState:
                 "read .aoa owner guidance for session evidence",
                 "use session rehydrate or retrieve routes for raw grounding",
                 "send reviewed memory candidates through a repo memo port or aoa-memo intake route",
+            ]
+        if route.default_mode == "read_only" and port["ready"]:
+            return [
+                "read the workspace memory map for current read-only status",
+                "use aoa_memo for reviewed recall and owner evidence routes for grounding",
+                "do not create local candidates from this MCP route",
+                "land durable memory through aoa-memo reviewed intake only from a writable owner route",
             ]
         if not port["ready"]:
             if recommended_level == "full_port" and current_level == "route_only":
