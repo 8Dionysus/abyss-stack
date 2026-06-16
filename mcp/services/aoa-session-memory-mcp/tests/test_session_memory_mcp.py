@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import os
 import sqlite3
@@ -13,6 +14,17 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from aoa_session_memory_mcp.core import AoASessionMemoryMCPState, CommandOutput
 from aoa_session_memory_mcp.server import build_server
+
+
+VALIDATOR_PATH = Path(__file__).resolve().parents[1] / "scripts" / "validate_session_memory_mcp.py"
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("validate_session_memory_mcp_under_test", VALIDATOR_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -1172,6 +1184,30 @@ def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) ->
     episode_args = calls["task-episodes"]
     assert episode_args[episode_args.index("--status") + 1] == "closed"
     assert episode_args[episode_args.index("--verification-state") + 1] == "verified"
+
+
+def test_stdio_route_count_summary_allows_empty_route_results() -> None:
+    validator = load_validator_module()
+
+    summary = validator._stdio_route_count_summary(
+        {"entity_count": 1, "source": "atlas"},
+        {"ok": True, "result_count": 0},
+        {"ok": True, "result_count": 0},
+        {"ok": True, "result_count": 0},
+        {"ok": True, "window_count": 0},
+        {"ok": True, "result_count": 0},
+        {"ok": True, "window_count": 0},
+        tool_count=30,
+    )
+
+    assert summary["tool_count"] == 30
+    assert summary["inventory_entity_count"] == 1
+    assert summary["agent_response_count"] == 0
+    assert summary["agent_closeout_count"] == 0
+    assert summary["agent_progress_count"] == 0
+    assert summary["agent_reasoning_window_count"] == 0
+    assert summary["task_episode_count"] == 0
+    assert summary["answer_neighborhood_count"] == 0
 
 
 def test_session_only_search_uses_local_fast_path_without_archive_search(tmp_path: Path) -> None:
