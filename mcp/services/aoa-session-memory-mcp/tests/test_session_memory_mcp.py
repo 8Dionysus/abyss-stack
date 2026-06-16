@@ -1538,6 +1538,23 @@ def test_evidence_packet_combines_trace_search_retrieve_and_freshness(tmp_path: 
     assert packet["candidate_posture"].startswith("candidate evidence")
 
 
+def test_evidence_packet_does_not_fail_session_relative_raw_refs_without_session(
+    tmp_path: Path,
+) -> None:
+    state = state_with_fixture(tmp_path)
+    packet = state.session_evidence_packet(
+        intent="debug aoa-session-memory-mcp",
+        refs=["raw:line:1"],
+        limit=4,
+    )
+
+    assert packet["freshness"]["ok"] is True
+    assert packet["freshness"]["checks"][0]["status"] == "needs_session_context"
+    assert packet["freshness"]["checks"][0]["reason"] == (
+        "raw line refs are session-relative"
+    )
+
+
 def test_pattern_scan_aggregates_route_signals(tmp_path: Path) -> None:
     state = state_with_fixture(tmp_path)
     scan = state.session_pattern_scan("aoa-session-memory", limit=10)
