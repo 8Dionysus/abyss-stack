@@ -754,6 +754,31 @@ def test_write_local_intake_activates_quoted_or_commented_skeleton_status(tmp_pa
         assert "status: active" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
 
 
+def test_write_local_intake_activates_only_top_level_port_status(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="skeleton")
+    port_path = repo_root / "evals/PORT.yaml"
+    port_path.write_text(
+        port_path.read_text(encoding="utf-8").replace(
+            "status: skeleton\n",
+            "metadata:\n  status: skeleton\nstatus: skeleton\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=True)
+
+    assert result["applied"] is True
+    updated = port_path.read_text(encoding="utf-8")
+    assert "metadata:\n  status: skeleton\n" in updated
+    assert "\nstatus: active\n" in f"\n{updated}"
+    detail = state.local_port("aoa-memo")
+    assert detail["status"] == "active"
+    assert detail["validation"]["valid"] is True
+
+
 def test_write_local_suite_and_report_notes_are_local_only(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     repo_root = seed_local_eval_port(tmp_path, status="skeleton")
