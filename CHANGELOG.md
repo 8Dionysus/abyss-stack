@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-memo-mcp` now checks colon-suffixed local payload refs like
+  `README.md:12` as local paths instead of letting `urlparse` classify them as
+  symbolic URI schemes.
 - Decision graph builder and `aoa-decisions-mcp` now derive the default
   `abyss-stack` checkout from the running source tree instead of a private
   `/home/dionysus/src/abyss-stack` path.
