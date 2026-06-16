@@ -856,6 +856,48 @@ def test_latest_session_resolution_uses_registry_updated_at(tmp_path: Path) -> N
     assert brief["session"]["session_id"] == "session-1"
 
 
+def test_latest_session_resolution_falls_back_to_registry_date_sequence(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    registry_path = aoa / "session-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    fallback_latest = aoa / "sessions/2026-06-13__005__fallback-latest"
+    fallback_latest.mkdir(parents=True)
+    write_json(
+        fallback_latest / "session.manifest.json",
+        {
+            "session_id": "session-fallback-latest",
+            "session_label": fallback_latest.name,
+            "session_title": "Fallback latest",
+            "archive_status": "indexed",
+        },
+    )
+    registry["sessions"].append(
+        {
+            "session_id": "session-fallback-latest",
+            "display": {
+                "date": "2026-06-13",
+                "sequence": 5,
+                "label": fallback_latest.name,
+                "title": "Fallback latest",
+                "path": fallback_latest.as_posix(),
+            },
+        }
+    )
+    write_json(registry_path, registry)
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+
+    brief = state.session_brief("latest", max_segments=1)
+
+    assert brief["ok"] is True
+    assert brief["session"]["session_id"] == "session-fallback-latest"
+
+
 def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -1311,6 +1353,27 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert playbook_inventory["entities"][0]["key"] == "session_audit"
     assert technique_inventory["entities"][0]["key"] == "entity_routing"
     assert mechanic_inventory["entities"][0]["key"] == "route_maintenance"
+
+
+def test_entity_inventory_resolves_relative_atlas_detail_json(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    index_path = aoa / "maps/by-skill/index.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    index["entries"][0]["json"] = "aoa_decision__session.json"
+    write_json(index_path, index)
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+
+    skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
+
+    assert skill_inventory["source"] == "atlas"
+    assert skill_inventory["entities"][0]["key"] == "aoa_decision"
+    assert skill_inventory["entities"][0]["signal_count"] == 4
 
 
 def test_freshness_check_resolves_raw_line_refs_with_session_context(tmp_path: Path) -> None:

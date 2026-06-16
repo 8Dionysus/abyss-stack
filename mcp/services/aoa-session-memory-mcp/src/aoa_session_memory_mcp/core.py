@@ -2171,7 +2171,7 @@ class AoASessionMemoryMCPState:
             detail_entry: dict[str, Any] | None = None
             signal_count = int(entry.get("signal_count") or 0)
             if signal_count <= 0 and entry.get("json"):
-                detail = _read_json(Path(str(entry.get("json"))))
+                detail = self._read_map_entry_payload(axis, entry.get("json"))
                 if isinstance(detail, dict):
                     detail_entry = {**entry, **detail}
                     signal_count = int(detail.get("signal_count") or 0)
@@ -2819,7 +2819,7 @@ class AoASessionMemoryMCPState:
         sessions = self._registry_sessions()
         if selector == "latest":
             if sessions:
-                latest = sorted(sessions, key=lambda item: str(item.get("updated_at", "")), reverse=True)[0]
+                latest = sorted(sessions, key=self._session_recency_key, reverse=True)[0]
                 return self._session_path_from_registry(latest)
             dirs = sorted((self.aoa_root / "sessions").glob("*"))
             return dirs[-1] if dirs else None
@@ -2851,6 +2851,10 @@ class AoASessionMemoryMCPState:
             int(display.get("sequence") or item.get("sequence") or 0),
             str(display.get("label") or item.get("session_id") or ""),
         )
+
+    def _session_recency_key(self, item: dict[str, Any]) -> tuple[str, int, str]:
+        date, sequence, label = self._session_sort_key(item)
+        return (str(item.get("updated_at") or date), sequence, label)
 
     def _session_path_from_registry(self, item: dict[str, Any]) -> Path | None:
         display = item.get("display") if isinstance(item.get("display"), dict) else {}
