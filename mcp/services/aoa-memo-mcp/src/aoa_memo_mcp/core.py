@@ -61,6 +61,7 @@ SYMBOLIC_REF_PREFIXES = (
     "export:",
     "landing-receipt:",
 )
+LOCAL_LINE_REF_RE = re.compile(r"^(?P<path>.+):(?P<line>[0-9]+)$")
 OPEN_REVIEW_STATES = {"candidate", "validated", "forwarded", "reviewed"}
 TERMINAL_REVIEW_STATES = {"rejected", "landed", "superseded", "archived"}
 FALLBACK_VOCABULARY_TERMS = {
@@ -1491,9 +1492,13 @@ class AoAMemoMCPState:
             return None
         if ref.startswith(SYMBOLIC_REF_PREFIXES):
             return None
-        if urlparse(ref).scheme:
-            return None
         text = ref.split("#", 1)[0].strip()
+        parsed = urlparse(text)
+        line_ref = LOCAL_LINE_REF_RE.fullmatch(text)
+        if line_ref and "://" not in text and not urlparse(line_ref.group("path")).scheme:
+            text = line_ref.group("path").strip()
+        elif parsed.scheme:
+            return None
         path = Path(text)
         if path.is_absolute():
             raise ValueError("local refs must be relative or symbolic")

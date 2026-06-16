@@ -951,7 +951,7 @@ def test_uri_scheme_payload_refs_are_symbolic_for_intake_and_landing_plan(
     )
     candidate_path = Path(created["path"])
     candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
-    candidate["source_refs"] = ["urn:aoa:memo:source"]
+    candidate["source_refs"] = ["urn:aoa:memo:3"]
     candidate["evidence_refs"] = ["git+ssh://github.com/8Dionysus/aoa-memo.git#main"]
     candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
 
@@ -974,6 +974,34 @@ def test_uri_scheme_payload_refs_are_symbolic_for_intake_and_landing_plan(
     assert export["ok"] is True
     assert reviewed["ok"] is True
     assert plan["ok"] is True
+
+
+def test_colon_suffixed_local_payload_refs_are_checked(
+    tmp_path: Path, monkeypatch
+) -> None:
+    seed_workspace(tmp_path)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(tmp_path / "stack-source"))
+    readme = tmp_path / "stack-source/README.md"
+    readme.write_text("# Stack source\n", encoding="utf-8")
+    state = AoAMemoMCPState.discover(tmp_path)
+
+    valid = state.create_candidate(
+        "abyss-stack",
+        ["README.md:12"],
+        "MCP should treat line-suffixed local refs as checked local paths",
+    )
+    missing = state.create_candidate(
+        "abyss-stack",
+        ["MISSING.md:12"],
+        "MCP should reject missing line-suffixed local refs",
+    )
+
+    assert valid["validation"]["ok"] is True
+    assert missing["validation"]["ok"] is False
+    assert any(
+        "evidence_refs[0] points to missing ref MISSING.md:12" in error
+        for error in missing["validation"]["errors"]
+    )
 
 
 def test_absolute_candidate_refs_are_rejected_for_intake(tmp_path: Path, monkeypatch) -> None:
