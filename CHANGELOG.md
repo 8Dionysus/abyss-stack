@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now rejects unsupported retrieval recipes before
+  dispatching to the archive, keeping the MCP retrieval allowlist as the local
+  gate instead of relying on downstream archive errors.
 - `aoa-memo-mcp` now checks colon-suffixed local payload refs like
   `README.md:12` as local paths instead of letting `urlparse` classify them as
   symbolic URI schemes.

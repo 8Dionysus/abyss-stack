@@ -1598,14 +1598,34 @@ class AoASessionMemoryMCPState:
         event_limit: int = 12,
     ) -> dict[str, Any]:
         recipe_text = _safe_selector(recipe, "recipe", limit=120)
+        if recipe_text not in ALLOWED_RETRIEVAL_RECIPES:
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "retrieval_packet",
+                "ok": False,
+                "recipe": recipe_text,
+                "diagnostics": [f"unsupported retrieval recipe for MCP access: {recipe_text}"],
+                "mcp_known_recipes": sorted(ALLOWED_RETRIEVAL_RECIPES),
+                "mcp_access": {
+                    "mutates": False,
+                    "archive_command": "retrieve",
+                    "archive_dispatched": False,
+                    "returncode": None,
+                    "elapsed_ms": 0,
+                    "timeout_seconds": self.timeout_seconds,
+                    "stderr": "",
+                    "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
+                    "reason": "recipe is not in the MCP retrieval allowlist",
+                },
+            }
+            payload.setdefault("authority_boundary", self.authority_boundary())
+            return payload
         args = [recipe_text, "--limit", str(_coerce_limit(limit, 8, 50)), "--event-limit", str(_coerce_limit(event_limit, 12, 60))]
         if query:
             args.extend(["--query", _ensure_short_text(query, "query")])
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         payload = self._archive_command("retrieve", args, allow_nonzero_json=True)
-        if recipe_text not in ALLOWED_RETRIEVAL_RECIPES and payload.get("ok") is False:
-            payload.setdefault("mcp_known_recipes", sorted(ALLOWED_RETRIEVAL_RECIPES))
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
