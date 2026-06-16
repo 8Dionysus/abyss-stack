@@ -15,6 +15,9 @@ Tracking starts with the community-docs baseline for this repository.
 - `aoa-memo-mcp` now rebuilds the containing local memo port index after
   rejected reviewed-intake receipts, keeping receipt indexes fresh for invalid
   or mismatched export repos.
+- `aoa-memo-mcp` briefs now honor read-only workspace memory routes even when a
+  physical memo port exists, avoiding candidate-write guidance that the tool
+  will reject.
 
 ## [0.4.0] - 2026-06-07
 

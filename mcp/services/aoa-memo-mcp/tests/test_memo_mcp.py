@@ -504,7 +504,7 @@ def test_brief_uses_workspace_memory_map_for_route_only_and_authority(tmp_path: 
     assert route_only["workspace_memory_map"]["recommended_port_level"] == "full_port"
     assert route_only["memory_route"]["candidate"] == "no local candidate route until this place has a memo port"
     assert any("repo-local topology pass" in item for item in route_only["recommended_route"])
-    assert "create or repair local memo port" not in route_only["recommended_route"]
+    assert "create local candidate under memo/candidates" not in route_only["recommended_route"]
     assert authority["operation_mode"] == "read_write_under_review"
     assert authority["owner_note"].startswith("reviewed memory authority")
     assert authority["memory_route"]["candidate"] == "aoa-memo source patch/review path; no repo-local candidate shortcut"
@@ -665,6 +665,15 @@ def test_route_only_workspace_surface_rejects_candidate_writes(tmp_path: Path) -
     source_ref = "docs/TREE_MEMORY_POSTURE.md"
     port = seed_local_memo_port(tmp_path, "Tree-of-Sophia", source_ref)
     state = AoAMemoMCPState.discover(tmp_path)
+    brief = state.build_brief("Tree-of-Sophia", "route-only physical port")
+
+    assert brief["local_port"]["ready"] is True
+    assert brief["operation_mode"] == "read_only"
+    assert brief["memory_route"]["candidate"] == (
+        "read-only memory route; no local candidate writes from this MCP route"
+    )
+    assert "create local candidate under memo/candidates" not in brief["recommended_route"]
+    assert any("do not create local candidates" in item for item in brief["recommended_route"])
 
     with pytest.raises(ValueError, match="read_only"):
         state.create_candidate(
