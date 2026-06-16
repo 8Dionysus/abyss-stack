@@ -75,6 +75,68 @@ class AoaLibEnvCompatTests(unittest.TestCase):
 
         self.assertEqual(output, "|compose/tuning/missing.yml")
 
+    def test_machine_fit_podman_root_overrides_computed_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            machine_fit = root / "Logs" / "machine-fit" / "latest" / "latest.private.json"
+            machine_fit.parent.mkdir(parents=True)
+            machine_fit.write_text(
+                json.dumps(
+                    {
+                        "runtime_recommendation": {
+                            "validated_settings": {
+                                "AOA_PODMAN_CONTAINERS_ROOT": "/srv/podman-rootless/containers",
+                            },
+                        }
+                    },
+                    ensure_ascii=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            output = run_aoa_lib(
+                "unset AOA_PODMAN_CONTAINERS_ROOT; "
+                "export AOA_MACHINE_FIT_AUTO_APPLY=true; "
+                f"export AOA_MACHINE_FIT_PATH={shlex.quote(str(machine_fit))}; "
+                "source scripts/aoa-lib.sh; "
+                "aoa_apply_machine_fit_runtime_posture; "
+                'printf "%s" "$AOA_PODMAN_CONTAINERS_ROOT"'
+            )
+
+        self.assertEqual(output, "/srv/podman-rootless/containers")
+
+    def test_explicit_podman_root_wins_over_machine_fit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            machine_fit = root / "Logs" / "machine-fit" / "latest" / "latest.private.json"
+            machine_fit.parent.mkdir(parents=True)
+            machine_fit.write_text(
+                json.dumps(
+                    {
+                        "runtime_recommendation": {
+                            "validated_settings": {
+                                "AOA_PODMAN_CONTAINERS_ROOT": "/srv/podman-rootless/containers",
+                            },
+                        }
+                    },
+                    ensure_ascii=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            output = run_aoa_lib(
+                "export AOA_PODMAN_CONTAINERS_ROOT=/operator/podman; "
+                "export AOA_MACHINE_FIT_AUTO_APPLY=true; "
+                f"export AOA_MACHINE_FIT_PATH={shlex.quote(str(machine_fit))}; "
+                "source scripts/aoa-lib.sh; "
+                "aoa_apply_machine_fit_runtime_posture; "
+                'printf "%s" "$AOA_PODMAN_CONTAINERS_ROOT"'
+            )
+
+        self.assertEqual(output, "/operator/podman")
+
 
 if __name__ == "__main__":
     unittest.main()

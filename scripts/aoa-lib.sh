@@ -7,6 +7,10 @@ AOA_VAULT_ROOT="${AOA_VAULT_ROOT:-/abyss}"
 AOA_WORKSPACE_ROOT="${AOA_WORKSPACE_ROOT:-/srv/AbyssOS}"
 AOA_RUNTIME_USER="${AOA_RUNTIME_USER:-dionysus}"
 AOA_RUNTIME_UID="${AOA_RUNTIME_UID:-1000}"
+AOA_PODMAN_CONTAINERS_ROOT_OPERATOR_SET=0
+if [[ -n "${AOA_PODMAN_CONTAINERS_ROOT+x}" ]]; then
+  AOA_PODMAN_CONTAINERS_ROOT_OPERATOR_SET=1
+fi
 AOA_PODMAN_CONTAINERS_ROOT="${AOA_PODMAN_CONTAINERS_ROOT:-/home/${AOA_RUNTIME_USER}/.local/share/containers}"
 AOA_AGENTS_ROOT="${AOA_AGENTS_ROOT:-${AOA_WORKSPACE_ROOT}/aoa-agents}"
 AOA_ROUTING_ROOT="${AOA_ROUTING_ROOT:-${AOA_WORKSPACE_ROOT}/aoa-routing}"
@@ -193,7 +197,7 @@ aoa_apply_machine_fit_runtime_posture() {
     case "$record_type" in
       SETTING)
         [[ "$key" =~ ^AOA_[A-Z0-9_]+$ ]] || continue
-        if [[ -z "${!key+x}" ]]; then
+        if [[ -z "${!key+x}" ]] || [[ "$key" == "AOA_PODMAN_CONTAINERS_ROOT" && "${AOA_PODMAN_CONTAINERS_ROOT_OPERATOR_SET}" != "1" ]]; then
           export "${key}=${value}"
         fi
         ;;
