@@ -1903,7 +1903,8 @@ class AoASessionMemoryMCPState:
             session=session,
         )
         ref_failed = any(
-            check["status"] != "present" or check.get("inside_aoa_root") is False
+            check["status"] not in {"present", "needs_session_context"}
+            or check.get("inside_aoa_root") is False
             for check in checks
         )
         provider_allows_ref_check = bool(provider_full.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
