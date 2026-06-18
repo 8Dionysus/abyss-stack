@@ -341,6 +341,51 @@ ROUTE_READINESS_FAST_GATE = {
     "remaining": [],
 }
 
+MAINTENANCE_STATUS = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_maintenance_status",
+    "ok": True,
+    "mutates": False,
+    "mode": "hot",
+    "recommendation": "wait_live_catchup",
+    "agent_route": {
+        "action": "use_graph_search_for_stable_archive_wait_for_recent_live",
+        "can_use_graph_search": True,
+        "maintenance_required": False,
+        "live_catchup_pending": True,
+        "actionable_search_session_count": 0,
+        "actionable_graph_source_count": 0,
+        "deferred_live_count": 1,
+        "raw_or_deep_route": "For claims about very recent live transcripts, wait for catch-up or run a deep check.",
+    },
+    "search": {
+        "status": "current_with_deferred_live_updates",
+        "actionable_dirty_session_count": 0,
+        "deferred_live_session_count": 1,
+    },
+    "graph": {
+        "status": "current",
+        "actionable_count": 0,
+        "dirty_count": 0,
+        "missing_count": 0,
+        "blocked_count": 0,
+    },
+    "route": {
+        "status": "current",
+        "needs_index_maintenance": False,
+        "needs_graph_maintenance": False,
+    },
+    "next_actions": [
+        {
+            "id": "wait_live_catchup",
+            "reason": "recent_live_sources_deferred_until_quiet_window",
+            "command": ["python3", "scripts/aoa_session_memory.py", "auto-maintenance", "hot", "all", "--apply", "--write-report"],
+        }
+    ],
+    "exact_next_command": "python3 scripts/aoa_session_memory.py auto-maintenance hot all --apply --write-report",
+    "mcp_boundary": "MCP may expose this packet read-only; repair/reindex/maintenance commands stay outside MCP.",
+}
+
 SEARCH_RESULTS = {
     "schema_version": 1,
     "artifact_type": "search_results",
@@ -667,6 +712,8 @@ class FakeRunner:
             payload = PROVIDER_STATUS
         elif command == "route-readiness":
             payload = ROUTE_READINESS_FAST_GATE
+        elif command == "maintenance-status":
+            payload = MAINTENANCE_STATUS
         elif command == "search":
             payload = SEARCH_RESULTS
         elif command in {"agent-responses", "agent-closeouts", "agent-progress-updates"}:
@@ -987,21 +1034,33 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert status["graph"]["freshness"]["dirty_count"] == 7
     assert status["graph"]["freshness"]["missing_count"] == 2
     assert "graph_sidecar_not_exported" in status["graph"]["diagnostics"]
-    assert plan["current_status"]["needs_graph_maintenance"] is True
-    assert plan["current_status"]["graph_dirty_count"] == 7
-    assert plan["current_status"]["graph_missing_count"] == 2
-    assert any("auto-maintenance hot" in command for command in plan["allowed_operator_commands"])
-    assert any("auto-maintenance backlog" in command for command in plan["allowed_operator_commands"])
-    assert any("graph-maintenance all" in command for command in plan["allowed_operator_commands"])
-    assert plan["maintenance_lanes"]["deep"].startswith("offline full-depth")
-    assert any("force-large-export" in command for command in plan["offline_operator_commands"])
-    operator_commands = plan["allowed_operator_commands"] + plan["offline_operator_commands"]
-    assert operator_commands
-    for command in operator_commands:
-        assert tmp_path.as_posix() in command
-        assert aoa.as_posix() in command
-        assert (aoa / "scripts/aoa_session_memory.py").as_posix() in command
-        assert "/srv/AbyssOS/.aoa" not in command
+    assert plan["artifact_type"] == "session_memory_maintenance_status"
+    assert plan["compatibility_tool"] == "aoa_session_maintenance_plan"
+    assert plan["preferred_tool"] == "aoa_session_maintenance_status"
+    assert plan["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
+    assert plan["mcp_access"]["archive_command"] == "maintenance-status"
+    assert "--no-timers" in [arg for command, args in state.command_runner.calls if command == "maintenance-status" for arg in args]
+
+
+def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_maintenance_status(deep=True, include_timers=False, full=True)
+
+    maintenance_calls = [args for command, args in runner.calls if command == "maintenance-status"]
+    assert len(maintenance_calls) == 1
+    args = maintenance_calls[0]
+    assert args[:3] == ("--deep", "--no-timers", "--full")
+    assert args[args.index("--workspace-root") + 1] == tmp_path.as_posix()
+    assert args[args.index("--aoa-root") + 1] == (tmp_path / ".aoa").as_posix()
+    assert [timeout for command, timeout in runner.timeouts if command == "maintenance-status"] == [60.0]
+    assert payload["artifact_type"] == "session_memory_maintenance_status"
+    assert payload["mutates"] is False
+    assert payload["mcp_access"]["mutates"] is False
+    assert payload["mcp_access"]["response_compacted"] is False
+    assert "maintenance-status --deep --no-timers --full" in payload["mcp_access"]["full_status_route"]
+    assert tmp_path.as_posix() in payload["mcp_access"]["full_status_route"]
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -1239,6 +1298,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "window_count": 0},
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
+        {"recommendation": "use_graph_search"},
         tool_count=30,
     )
 
@@ -1250,6 +1310,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["agent_reasoning_window_count"] == 0
     assert summary["task_episode_count"] == 0
     assert summary["answer_neighborhood_count"] == 0
+    assert summary["maintenance_recommendation"] == "use_graph_search"
 
 
 def test_session_only_search_uses_local_fast_path_without_archive_search(tmp_path: Path) -> None:

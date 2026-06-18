@@ -335,8 +335,17 @@ def build_server(
         return current_state().latest_diagnostics(kind=kind, limit=limit, include_payload=include_payload)
 
     @mcp.tool()
+    def aoa_session_maintenance_status(
+        deep: bool = False,
+        include_timers: bool = True,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        """Return the canonical read-only .aoa maintenance status packet."""
+        return current_state().session_maintenance_status(deep=deep, include_timers=include_timers, full=full)
+
+    @mcp.tool()
     def aoa_session_maintenance_plan() -> dict[str, Any]:
-        """Return a non-mutating maintenance plan for stale search/atlas/readiness surfaces."""
+        """Return the non-mutating maintenance status through the older plan name."""
         return current_state().maintenance_plan()
 
     @mcp.tool()
@@ -510,7 +519,7 @@ def build_server(
     def stale_ref_repair_plan(ref: str) -> str:
         """Prompt route for handling stale evidence refs."""
         return (
-            f"Use aoa_session_freshness_check(refs=[{ref!r}]) and aoa_session_maintenance_plan(). "
+            f"Use aoa_session_freshness_check(refs=[{ref!r}]) and aoa_session_maintenance_status(include_timers=False). "
             "If repair is needed, run .aoa maintenance outside MCP with explicit operator intent."
         )
 

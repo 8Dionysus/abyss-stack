@@ -182,7 +182,15 @@ def main() -> None:
     diagnostics.add_argument("--limit", type=int, default=5)
     diagnostics.add_argument("--include-payload", action="store_true")
 
-    sub.add_parser("maintenance-plan")
+    maintenance_status = sub.add_parser("maintenance-status")
+    maintenance_status.add_argument("--deep", action="store_true")
+    maintenance_status.add_argument("--no-timers", action="store_true")
+    maintenance_status.add_argument("--full", action="store_true")
+
+    maintenance_plan = sub.add_parser("maintenance-plan")
+    maintenance_plan.add_argument("--deep", action="store_true")
+    maintenance_plan.add_argument("--no-timers", action="store_true")
+    maintenance_plan.add_argument("--full", action="store_true")
 
     graph_neighborhood = sub.add_parser("graph-neighborhood")
     graph_neighborhood.add_argument("anchor")
@@ -399,8 +407,13 @@ def main() -> None:
         )
     elif args.command == "latest-diagnostics":
         _print(state.latest_diagnostics(kind=args.kind, limit=args.limit, include_payload=args.include_payload))
+    elif args.command == "maintenance-status":
+        _print(state.session_maintenance_status(deep=args.deep, include_timers=not args.no_timers, full=args.full))
     elif args.command == "maintenance-plan":
-        _print(state.maintenance_plan())
+        if args.deep or args.no_timers or args.full:
+            _print(state.session_maintenance_status(deep=args.deep, include_timers=not args.no_timers, full=args.full))
+        else:
+            _print(state.maintenance_plan())
     elif args.command == "graph-neighborhood":
         _print(state.graph_neighborhood(anchor=args.anchor, kind=args.kind, depth=args.depth, limit=args.limit))
     elif args.command == "graph-timeline":

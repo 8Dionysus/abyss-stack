@@ -71,11 +71,15 @@ Freshness and readiness stay explicit:
 aoa_session_memory_status(include_live=false)
 aoa_session_freshness_check(refs)
 aoa_session_latest_diagnostics(kind)
+aoa_session_maintenance_status(deep=false, include_timers=true, full=false)
 aoa_session_maintenance_plan()
 ```
 
-The maintenance plan is read-only. It names the operator commands that would
-refresh `.aoa`, but the MCP does not run them.
+The maintenance status is read-only. It is the canonical `.aoa
+maintenance-status` packet with an `agent_route`, exact next operator command,
+and search/graph/timer posture. It can name operator commands that would
+refresh `.aoa`, but the MCP does not run them. `aoa_session_maintenance_plan`
+is retained as a compatibility entry to the same status route.
 
 The status path is intentionally cheap. By default it uses a fast presence probe
 over the fixed portable SQLite search read model and does not run global
