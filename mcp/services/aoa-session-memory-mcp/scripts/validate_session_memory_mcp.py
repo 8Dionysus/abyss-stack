@@ -142,6 +142,7 @@ def _stdio_route_count_summary(
     reasoning: dict,
     episodes: dict,
     neighborhood: dict,
+    maintenance_status: dict,
     *,
     tool_count: int,
 ) -> dict:
@@ -155,6 +156,7 @@ def _stdio_route_count_summary(
         "agent_reasoning_window_count": _payload_count(reasoning, "window_count"),
         "task_episode_count": _payload_count(episodes, "result_count"),
         "answer_neighborhood_count": _payload_count(neighborhood, "window_count"),
+        "maintenance_recommendation": maintenance_status.get("recommendation"),
     }
 
 
@@ -177,12 +179,13 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_agent_reasoning_windows",
                 "aoa_session_task_episodes",
                 "aoa_session_answer_neighborhood",
+                "aoa_session_maintenance_status",
             }
             missing_tools = sorted(required_tools - tools)
             if missing_tools:
                 raise SystemExit(f"stdio MCP tool list is missing required tools: {missing_tools}")
 
-            async def call_json(name: str, arguments: dict, timeout_seconds: int = 50) -> dict:
+            async def call_json(name: str, arguments: dict, timeout_seconds: int = 50, require_ok: bool = True) -> dict:
                 result = await mcp_session.call_tool(
                     name,
                     arguments,
@@ -195,7 +198,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 payload = json.loads(result.content[0].text)
                 if not isinstance(payload, dict):
                     raise SystemExit(f"stdio MCP {name} returned non-object JSON")
-                if not payload.get("ok"):
+                if require_ok and not payload.get("ok"):
                     raise SystemExit(f"stdio MCP {name} returned not-ok payload: {payload.get('diagnostics')}")
                 return payload
 
@@ -215,9 +218,16 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_answer_neighborhood",
                 {"session": session, "limit": 1, "before": 1, "after": 2},
             )
+            maintenance_status = await call_json(
+                "aoa_session_maintenance_status",
+                {"include_timers": False},
+                require_ok=False,
+            )
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
+        raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     return _stdio_route_count_summary(
         inventory,
         responses,
@@ -226,6 +236,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         reasoning,
         episodes,
         neighborhood,
+        maintenance_status,
         tool_count=len(tools),
     )
 
@@ -247,6 +258,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 "aoa_session_agent_reasoning_windows",
                 "aoa_session_task_episodes",
                 "aoa_session_answer_neighborhood",
+                "aoa_session_maintenance_status",
             }
             missing_tools = sorted(required_tools - tools)
             if missing_tools:
@@ -307,6 +319,13 @@ def main() -> None:
     hook_receipts = state.session_hook_receipts(event_name="UserPromptSubmit", limit=5)
     if not hook_receipts.get("ok"):
         raise SystemExit(f"hook receipts surface failed: {hook_receipts.get('diagnostics')}")
+    maintenance_status = state.session_maintenance_status(include_timers=False)
+    if (
+        maintenance_status.get("artifact_type") != "session_memory_maintenance_status"
+        or maintenance_status.get("mutates") is not False
+        or not isinstance(maintenance_status.get("agent_route"), dict)
+    ):
+        raise SystemExit(f"maintenance status surface failed: {maintenance_status.get('diagnostics')}")
     neighborhood = state.session_entity_usage_neighborhood(
         "view_image",
         kind="tool",
@@ -372,6 +391,8 @@ def main() -> None:
                 "session_only_result_count": session_only.get("result_count"),
                 "hook_receipt_count": hook_receipts.get("total_receipt_count"),
                 "hook_receipt_error_count": hook_receipts.get("summary", {}).get("error_receipt_count"),
+                "maintenance_recommendation": maintenance_status.get("recommendation"),
+                "maintenance_agent_action": maintenance_status.get("agent_route", {}).get("action"),
                 "usage_neighborhood_count": neighborhood.get("quality", {}).get("neighborhood_count"),
                 "latest_session": latest_brief.get("session", {}).get("label") or "latest",
                 "freshness_smoke_session": latest_session,

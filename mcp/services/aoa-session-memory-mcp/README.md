@@ -69,7 +69,8 @@ Tools:
 - `aoa_session_entity_inventory(layer, query, session, limit, sample_limit)`; aggregates typed session entities such as `skill`, `mcp`, `hook`, `tool`, `api`, `plugin`, `agent`, `script`, `validator`, `test`, `eval`, `git`, `playbook`, `technique`, `mechanic`, `graph`, and `memory` from route-signal indexes. This is session evidence inventory, not installed runtime inventory.
 - `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets.
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
-- `aoa_session_maintenance_plan()`
+- `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.
+- `aoa_session_maintenance_plan()`; compatibility entry that returns the same maintenance-status route without timers.
 - `aoa_session_graph_neighborhood(anchor, kind, depth, limit)`
 - `aoa_session_graph_timeline(anchor, kind, limit)`
 - `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
@@ -96,6 +97,11 @@ checks that the portable SQLite search surface, route index, atlas, and latest
 diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
+
+`aoa_session_maintenance_status()` is the agent decision packet for freshness
+and maintenance posture. It delegates to `.aoa maintenance-status`, remains
+read-only, and tells the caller whether to use graph/search, wait for live
+catch-up, run operator maintenance outside MCP, or escalate to raw/deep checks.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

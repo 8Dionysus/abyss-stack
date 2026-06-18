@@ -681,6 +681,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_entity_inventory",
                 "aoa_session_hook_receipts",
                 "aoa_session_latest_diagnostics",
+                "aoa_session_maintenance_status",
                 "aoa_session_maintenance_plan",
                 "aoa_session_graph_neighborhood",
                 "aoa_session_graph_timeline",
@@ -2470,58 +2471,39 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def session_maintenance_status(
+        self,
+        *,
+        deep: bool = False,
+        include_timers: bool = True,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        args: list[str] = []
+        if deep:
+            args.append("--deep")
+        if not include_timers:
+            args.append("--no-timers")
+        if full:
+            args.append("--full")
+        payload = self._archive_command(
+            "maintenance-status",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+        )
+        payload.setdefault("mutates", False)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["response_compacted"] = not full
+            mcp_access["full_status_route"] = self._archive_command_line("maintenance-status", [*args, "--full"] if not full else args)
+        return payload
+
     def maintenance_plan(self) -> dict[str, Any]:
-        status = self.session_memory_status(include_live=False)
-        provider = status.get("provider", {})
-        portable_provider = (provider.get("providers") or {}).get("portable_sqlite") or {}
-        provider_freshness = portable_provider.get("freshness") if isinstance(portable_provider, dict) else {}
-        atlas = status.get("atlas", {})
-        graph = status.get("graph", {})
-        latest_readiness = status.get("latest_route_readiness", {})
-        return {
-            "schema": "aoa_session_memory_maintenance_plan_v1",
-            "ok": True,
-            "mutates": False,
-            "posture": "plan_only",
-            "current_status": {
-                "provider_ok": provider.get("ok"),
-                "default_provider": provider.get("default_provider"),
-                "provider_status_mode": provider.get("status_mode"),
-                "provider_freshness_checked": provider_freshness.get("checked") if isinstance(provider_freshness, dict) else None,
-                "atlas_entry_count": atlas.get("entry_count"),
-                "graph_node_count": graph.get("node_count"),
-                "graph_edge_count": graph.get("edge_count"),
-                "graph_status": graph.get("status"),
-                "graph_freshness_status": (graph.get("freshness") or {}).get("graph_status") if isinstance(graph.get("freshness"), dict) else None,
-                "needs_graph_maintenance": graph.get("needs_graph_maintenance"),
-                "graph_dirty_count": (graph.get("freshness") or {}).get("dirty_count") if isinstance(graph.get("freshness"), dict) else None,
-                "graph_missing_count": (graph.get("freshness") or {}).get("missing_count") if isinstance(graph.get("freshness"), dict) else None,
-                "latest_route_readiness_ok": (latest_readiness.get("reports") or [{}])[0].get("summary", {}).get("ok")
-                if latest_readiness.get("reports")
-                else None,
-            },
-            "allowed_operator_commands": [
-                self._archive_command_line("auto-maintenance", ["hot", "--apply", "--write-report"]),
-                self._archive_command_line("auto-maintenance", ["backlog", "--apply", "--write-report"]),
-                self._archive_command_line("index-maintenance", ["all", "--apply", "--budget-seconds", "120", "--write-report"]),
-                self._archive_command_line("route-readiness", ["all", "--write-report"]),
-                self._archive_command_line("search-provider-status", ["--write-report"]),
-                self._archive_command_line("graph-maintenance", ["all", "--apply", "--batch-limit", "3", "--write-report"]),
-                self._archive_command_line("graph-quality-audit", ["--write-report"]),
-            ],
-            "offline_operator_commands": [
-                self._archive_command_line("auto-maintenance", ["deep", "--apply", "--write-report"]),
-                self._archive_command_line("graph-build", ["all", "--write", "--force-large-export"]),
-                self._archive_command_line("graph-maintenance", ["all", "--apply", "--export-sidecar", "--write-report"]),
-            ],
-            "maintenance_lanes": {
-                "hot": "short budgeted pass for recent dirty graph/index posture; keeps MCP read-only and defers heavy repair when profile says so",
-                "backlog": "bounded repair lane for recent dirty route/search/atlas projections using per-session fingerprints",
-                "deep": "offline full-depth lane for whole archive repair, sample audits, and heavy graph/search work",
-            },
-            "mcp_stop_line": "This MCP reports the plan only; run maintenance outside MCP with explicit operator intent.",
-            "authority_boundary": self.authority_boundary(),
-        }
+        payload = self.session_maintenance_status(include_timers=False)
+        payload["compatibility_tool"] = "aoa_session_maintenance_plan"
+        payload["preferred_tool"] = "aoa_session_maintenance_status"
+        return payload
 
     def graph_neighborhood(self, anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
