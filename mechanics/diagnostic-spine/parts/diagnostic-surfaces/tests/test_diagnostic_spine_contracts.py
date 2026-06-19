@@ -118,6 +118,15 @@ class DiagnosticSpineContractTests(unittest.TestCase):
         self.assertEqual(payload["owner_repo"], "abyss-stack")
         self.assertEqual(payload["surface_kind"], "runtime_surface")
         self.assertEqual(payload["authority_ref"], "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md")
+        identity = payload["artifact_identity"]
+        self.assertEqual(identity["artifact_class"], "runtime_diagnostic_readmodel_catalog")
+        self.assertEqual(identity["owner_repo"], "abyss-stack")
+        self.assertEqual(
+            identity["trust_layer"],
+            ["abi_contract_signature", "w3c_prov_lineage"],
+        )
+        self.assertIn("machine-local state", identity["privacy_boundary"])
+        self.assertIn("diagnostic_surface_catalog.min.json", identity["content_identity"])
         self.assertEqual(
             [entry["name"] for entry in payload["surfaces"]],
             [

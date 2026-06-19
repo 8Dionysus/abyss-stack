@@ -71,6 +71,17 @@ DIAGNOSTIC_CATALOG_REF = (
 DIAGNOSTIC_AUTHORITY_REF = (
     "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"
 )
+DIAGNOSTIC_SURFACE_ARTIFACT_IDENTITY = {
+    "artifact_class": "runtime_diagnostic_readmodel_catalog",
+    "surface_state": "public_source_generated_runtime_diagnostic_catalog",
+    "owner_repo": "abyss-stack",
+    "authority_ref": DIAGNOSTIC_AUTHORITY_REF,
+    "trust_layer": [
+        "abi_contract_signature",
+        "w3c_prov_lineage",
+    ],
+    "action": "ADD_CONSUMER_EXPECTATION",
+}
 
 
 def read_required_text(errors: list[str], *, root: Path, relative_path: Path) -> str:
@@ -522,6 +533,26 @@ def validate_diagnostic_surface_catalog(errors: list[str], *, root: Path) -> Non
         errors.append(
             f"{DIAGNOSTIC_CATALOG_REF} must point authority_ref to {DIAGNOSTIC_AUTHORITY_REF}"
         )
+    artifact_identity = catalog.get("artifact_identity")
+    if not isinstance(artifact_identity, dict):
+        errors.append(f"{DIAGNOSTIC_CATALOG_REF} must include artifact_identity")
+    else:
+        for key, expected in DIAGNOSTIC_SURFACE_ARTIFACT_IDENTITY.items():
+            if artifact_identity.get(key) != expected:
+                errors.append(
+                    f"{DIAGNOSTIC_CATALOG_REF} artifact_identity.{key} must equal {expected!r}"
+                )
+        for key in (
+            "producer",
+            "consumer_expectation",
+            "privacy_boundary",
+            "content_identity",
+            "abi_epoch",
+            "contract_version",
+            "verification",
+        ):
+            if key not in artifact_identity:
+                errors.append(f"{DIAGNOSTIC_CATALOG_REF} artifact_identity must include {key}")
 
     surfaces = catalog.get("surfaces")
     if not isinstance(surfaces, list) or len(surfaces) != len(DIAGNOSTIC_SURFACE_CATALOG_EXPECTED_NAMES):
