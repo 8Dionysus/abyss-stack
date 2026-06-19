@@ -43,6 +43,8 @@ Resources:
 - `aoa-session-memory://route/{axis}/{key}`
 - `aoa-session-memory://trace/{anchor}`
 - `aoa-session-memory://hooks/receipts/{event_name}`
+- `aoa-session-memory://entity-registry/{kind}`
+- `aoa-session-memory://entity-lookup/{kind}/{anchor}`
 - `aoa-session-memory://graph/status`
 - `aoa-session-memory://graph/neighborhood/{anchor}`
 
@@ -68,6 +70,7 @@ Tools:
 - `aoa_session_freshness_check(refs, session)`; pass `session` when checking session-relative refs such as `raw:line:412`.
 - `aoa_session_pattern_scan(pattern, filters, limit)`
 - `aoa_session_entity_inventory(layer, query, session, limit, sample_limit)`; aggregates typed session entities such as `skill`, `mcp`, `hook`, `tool`, `api`, `plugin`, `agent`, `script`, `validator`, `test`, `eval`, `git`, `playbook`, `technique`, `mechanic`, `graph`, and `memory` from route-signal indexes. This is session evidence inventory, not installed runtime inventory.
+- `aoa_session_entity_registry(kind, query, lookup, limit)`; reads the generated entity registry snapshot for known skills, MCP services/tools, tools, APIs, hooks, scripts, validators, tests, evals, graph, and memory entities. This is a read-only navigation registry; `--write` refresh stays outside MCP.
 - `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets.
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.

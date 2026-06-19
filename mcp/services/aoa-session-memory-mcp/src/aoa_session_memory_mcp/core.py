@@ -51,8 +51,8 @@ ALLOWED_TRACE_KINDS = {
     "skill",
     "tool",
 }
-ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident", "task_episode", "goal_lifecycle"}
-ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode", "goal_lifecycle"}
+ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
+ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
 DEFAULT_GRAPH_QUALITY_ANCHORS = [
     "mcp:aoa-session-memory-mcp",
     "skill:aoa-memo-writeback",
@@ -697,6 +697,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_freshness_check",
                 "aoa_session_pattern_scan",
                 "aoa_session_entity_inventory",
+                "aoa_session_entity_registry",
                 "aoa_session_hook_receipts",
                 "aoa_session_latest_diagnostics",
                 "aoa_session_maintenance_status",
@@ -2189,6 +2190,36 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def session_entity_registry(
+        self,
+        kind: str = "all",
+        query: str = "",
+        lookup: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        kind_key = _safe_selector(str(kind or "all"), "kind", limit=80)
+        query_text = str(query or "").strip()
+        lookup_text = str(lookup or "").strip()
+        args = ["--kind", kind_key, "--limit", str(_coerce_limit(limit, 50, 500))]
+        if query_text:
+            args.extend(["--query", _ensure_short_text(query_text, "query", limit=160)])
+        if lookup_text:
+            args.extend(["--lookup", _ensure_short_text(lookup_text, "lookup", limit=160)])
+        payload = self._archive_command(
+            "entity-registry",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+        )
+        payload.setdefault("mutates", False)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["read_only_registry_route"] = True
+            mcp_access["write_route"] = self._archive_command_line("entity-registry", ["--kind", kind_key, "--write"])
+            mcp_access["write_requires_operator_outside_mcp"] = True
+        return payload
+
     def _atlas_entity_inventory(
         self,
         *,
@@ -2731,6 +2762,12 @@ class AoASessionMemoryMCPState:
             return self.session_hook_receipts(event_name=event_name, limit=50)
         if netloc == "entities" and parts:
             return self.session_entity_inventory(layer=parts[0], limit=50, sample_limit=2)
+        if netloc == "entity-registry":
+            kind = parts[0] if parts else "all"
+            query = "/".join(parts[1:]) if len(parts) > 1 else ""
+            return self.session_entity_registry(kind=kind, query=query, limit=50)
+        if netloc == "entity-lookup" and len(parts) >= 2:
+            return self.session_entity_registry(kind=parts[0], lookup="/".join(parts[1:]), limit=10)
         if netloc == "session" and len(parts) >= 2:
             session = parts[0]
             if parts[1] == "brief":

@@ -179,6 +179,12 @@ def main() -> None:
     inventory.add_argument("--limit", type=int, default=50)
     inventory.add_argument("--sample-limit", type=int, default=2)
 
+    registry = sub.add_parser("entity-registry")
+    registry.add_argument("--kind", default="all")
+    registry.add_argument("--query", default="")
+    registry.add_argument("--lookup", default="")
+    registry.add_argument("--limit", type=int, default=50)
+
     hook_receipts = sub.add_parser("hook-receipts")
     hook_receipts.add_argument("--event-name", default="UserPromptSubmit")
     hook_receipts.add_argument("--session", default="")
@@ -416,6 +422,8 @@ def main() -> None:
                 sample_limit=args.sample_limit,
             )
         )
+    elif args.command == "entity-registry":
+        _print(state.session_entity_registry(kind=args.kind, query=args.query, lookup=args.lookup, limit=args.limit))
     elif args.command == "hook-receipts":
         _print(
             state.session_hook_receipts(

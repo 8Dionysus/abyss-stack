@@ -197,6 +197,11 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_entity_registry(kind: str = "all", query: str = "", lookup: str = "", limit: int = 50) -> dict[str, Any]:
+        """Read generated entity registry or lookup one skill/MCP/tool/hook/API/etc anchor."""
+        return current_state().session_entity_registry(kind=kind, query=query, lookup=lookup, limit=limit)
+
+    @mcp.tool()
     def aoa_session_entity_usage_neighborhood(
         anchor: str,
         kind: str = "auto",
@@ -469,6 +474,14 @@ def build_server(
     @mcp.resource("aoa-session-memory://entities/{layer}")
     def entities_resource(layer: str) -> str:
         return json.dumps(current_state().session_entity_inventory(layer=layer, limit=50, sample_limit=2), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://entity-registry/{kind}")
+    def entity_registry_resource(kind: str) -> str:
+        return json.dumps(current_state().session_entity_registry(kind=kind, limit=50), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://entity-lookup/{kind}/{anchor}")
+    def entity_lookup_resource(kind: str, anchor: str) -> str:
+        return json.dumps(current_state().session_entity_registry(kind=kind, lookup=anchor, limit=10), ensure_ascii=False, indent=2)
 
     @mcp.resource("aoa-session-memory://session/{session}/brief")
     def session_brief_resource(session: str) -> str:

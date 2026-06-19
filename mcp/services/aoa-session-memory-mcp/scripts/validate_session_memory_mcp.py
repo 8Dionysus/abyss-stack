@@ -188,6 +188,7 @@ def _stdio_route_count_summary(
     episodes: dict,
     goal_lifecycles: dict,
     neighborhood: dict,
+    registry: dict,
     maintenance_status: dict,
     *,
     tool_count: int,
@@ -203,6 +204,7 @@ def _stdio_route_count_summary(
         "task_episode_count": _payload_count(episodes, "result_count"),
         "goal_lifecycle_count": _payload_count(goal_lifecycles, "result_count"),
         "answer_neighborhood_count": _payload_count(neighborhood, "window_count"),
+        "registry_entity_count": _payload_count(registry, "entity_count"),
         "maintenance_recommendation": maintenance_status.get("recommendation"),
     }
 
@@ -220,6 +222,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
             tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
             required_tools = {
                 "aoa_session_entity_inventory",
+                "aoa_session_entity_registry",
                 "aoa_session_agent_responses",
                 "aoa_session_agent_closeouts",
                 "aoa_session_agent_progress_updates",
@@ -254,6 +257,10 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_entity_inventory",
                 {"layer": "skill", "limit": 5, "sample_limit": 0},
             )
+            registry = await call_json(
+                "aoa_session_entity_registry",
+                {"kind": "skill", "limit": 5},
+            )
             responses = await call_json("aoa_session_agent_responses", {"session": session, "limit": 2})
             closeouts = await call_json("aoa_session_agent_closeouts", {"session": session, "limit": 2})
             progress = await call_json("aoa_session_agent_progress_updates", {"session": session, "limit": 2})
@@ -275,6 +282,8 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    if registry.get("entity_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP entity registry returned no entities: {registry.get('diagnostics')}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     return _stdio_route_count_summary(
@@ -286,6 +295,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         episodes,
         goal_lifecycles,
         neighborhood,
+        registry,
         maintenance_status,
         tool_count=len(tools),
     )
@@ -302,6 +312,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
             required_tools = {
                 "aoa_session_memory_status",
+                "aoa_session_entity_registry",
                 "aoa_session_agent_responses",
                 "aoa_session_agent_closeouts",
                 "aoa_session_agent_progress_updates",
@@ -364,6 +375,9 @@ def main() -> None:
     skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
     if not skill_inventory.get("ok") or skill_inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"skill entity inventory failed: {skill_inventory.get('diagnostics')}")
+    skill_registry = state.session_entity_registry(kind="skill", limit=5)
+    if not skill_registry.get("ok") or skill_registry.get("entity_count", 0) <= 0:
+        raise SystemExit(f"skill entity registry failed: {skill_registry.get('diagnostics')}")
     git_inventory = state.session_entity_inventory(layer="git", limit=5)
     if not git_inventory.get("ok") or git_inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"git entity inventory failed: {git_inventory.get('diagnostics')}")
