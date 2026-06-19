@@ -51,8 +51,8 @@ ALLOWED_TRACE_KINDS = {
     "skill",
     "tool",
 }
-ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident"}
-ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode"}
+ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident", "task_episode", "goal_lifecycle"}
+ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode", "goal_lifecycle"}
 DEFAULT_GRAPH_QUALITY_ANCHORS = [
     "mcp:aoa-session-memory-mcp",
     "skill:aoa-memo-writeback",
@@ -86,14 +86,18 @@ SEARCH_FILTER_FLAGS = {
 }
 AGENT_ROUTE_SEARCH_FILTERS = {
     "closeout_final",
+    "event_kind",
     "episode",
     "failure_state",
+    "goal_id",
     "status",
     "verification_state",
 }
 AGENT_ROUTE_ONLY_SEARCH_FILTERS = {
     "closeout_final",
+    "event_kind",
     "failure_state",
+    "goal_id",
     "status",
     "verification_state",
 }
@@ -400,6 +404,19 @@ def _compact_task_episode(episode: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(lifecycle)
+    sample_events = compact.get("sample_events")
+    if isinstance(sample_events, list):
+        compact["sample_events"] = [
+            event
+            for event in sample_events[:4]
+            if isinstance(event, dict)
+        ]
+        compact["omitted_sample_event_count"] = max(0, len(sample_events) - 4)
+    return compact
+
+
 def _compact_diagnostic(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"ok": False, "diagnostic": "unreadable"}
@@ -667,6 +684,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_agent_progress_updates",
                 "aoa_session_agent_reasoning_windows",
                 "aoa_session_task_episodes",
+                "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_trace",
                 "aoa_session_entity_usage_audit",
@@ -998,7 +1016,7 @@ class AoASessionMemoryMCPState:
                     "artifact_type": "session_search_filter_error",
                     "diagnostics": [
                         *diagnostics,
-                        "agent-event/task-episode fast path cannot preserve ordinary search filters "
+                        "agent-route fast path cannot preserve ordinary search filters "
                         "while also applying route-specific filters; narrow the request or use the "
                         "dedicated route tool",
                     ],
@@ -1027,6 +1045,20 @@ class AoASessionMemoryMCPState:
             )
             payload.setdefault("diagnostics", []).extend(
                 [*diagnostics, "served by MCP task-episode route fast path"]
+            )
+            return payload
+
+        if doc_type == "goal_lifecycle" and not query:
+            payload = self.session_goal_lifecycles(
+                target=session or "all",
+                session=session,
+                goal_id=str(filters.get("goal_id") or ""),
+                status=str(filters.get("status") or ""),
+                event_kind=str(filters.get("event_kind") or ""),
+                limit=limit,
+            )
+            payload.setdefault("diagnostics", []).extend(
+                [*diagnostics, "served by MCP goal-lifecycle route fast path"]
             )
             return payload
 
@@ -1307,6 +1339,43 @@ class AoASessionMemoryMCPState:
                 "response_compacted": True,
                 "sample_refs_per_bucket": 1,
                 "full_refs_route": "Use .aoa task-episodes CLI or session.index.json for full generated episode refs.",
+            }
+            mcp_access = payload.get("mcp_access")
+            if isinstance(mcp_access, dict):
+                mcp_access["response_compacted"] = True
+                mcp_access["full_refs_route"] = payload["mcp_payload_policy"]["full_refs_route"]
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return payload
+
+    def session_goal_lifecycles(
+        self,
+        target: str = "all",
+        session: str = "",
+        goal_id: str = "",
+        status: str = "",
+        event_kind: str = "",
+        limit: int = 20,
+        order: str = "recent",
+    ) -> dict[str, Any]:
+        args = [_safe_selector(target or "all", "target", limit=160), "--limit", str(_coerce_limit(limit, 20, 100))]
+        if session:
+            args.extend(["--session", _safe_selector(session, "session")])
+        if goal_id:
+            args.extend(["--goal-id", _safe_selector(goal_id, "goal_id", limit=80)])
+        if status:
+            args.extend(["--status", _safe_selector(status, "status", limit=32)])
+        if event_kind:
+            args.extend(["--event-kind", _safe_selector(event_kind, "event_kind", limit=80)])
+        if order:
+            args.extend(["--order", _safe_selector(order, "order", limit=32)])
+        payload = self._archive_command("goal-lifecycles", args, allow_nonzero_json=True)
+        results = payload.get("results")
+        if isinstance(results, list):
+            payload["results"] = [_compact_goal_lifecycle(item) for item in results if isinstance(item, dict)]
+            payload["mcp_payload_policy"] = {
+                "response_compacted": True,
+                "sample_events_per_lifecycle": 4,
+                "full_refs_route": "Use .aoa goal-lifecycles CLI or session.index.json for full generated lifecycle refs.",
             }
             mcp_access = payload.get("mcp_access")
             if isinstance(mcp_access, dict):
