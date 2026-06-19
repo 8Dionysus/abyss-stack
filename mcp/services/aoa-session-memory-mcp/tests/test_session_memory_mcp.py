@@ -1326,6 +1326,31 @@ def test_generic_search_routes_goal_lifecycle_filters_to_fast_goal_route(tmp_pat
     assert args[args.index("--event-kind") + 1] == "goal_completed"
 
 
+def test_goal_lifecycle_search_with_agent_filters_uses_full_search(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "goal_lifecycle",
+            "agent_event": "assistant_final_closeout",
+            "task_episode_id": "task-0001",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "search_results"
+    assert not any(call[0] == "goal-lifecycles" for call in runner.calls)
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--doc-type") + 1] == "goal_lifecycle"
+    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+
+
 def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)

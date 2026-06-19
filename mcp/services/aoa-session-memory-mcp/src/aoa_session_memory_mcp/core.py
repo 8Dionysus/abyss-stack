@@ -1048,7 +1048,12 @@ class AoASessionMemoryMCPState:
             )
             return payload
 
-        if doc_type == "goal_lifecycle" and not query:
+        if (
+            doc_type == "goal_lifecycle"
+            and not query
+            and "agent_event" not in active_filters
+            and "task_episode_id" not in active_filters
+        ):
             payload = self.session_goal_lifecycles(
                 target=session or "all",
                 session=session,
