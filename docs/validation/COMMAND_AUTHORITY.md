@@ -33,6 +33,8 @@ stabilizer, but it reads the release command sequence from the lane manifest.
   rehearsal, live service checks, or release-only stabilization.
 - Keep `.github` platform rehearsal public-safe and source-checkout-only.
 - Keep live parity opt-in through `scripts/release_check.py --parity-mode live`.
+- Keep OS Abyss artifact bundle checks in the release lane when they validate
+  generated deployable outputs rather than source topology alone.
 
 ## Active Lanes
 

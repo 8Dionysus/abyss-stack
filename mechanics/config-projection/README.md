@@ -53,6 +53,6 @@ and [federation-seams](../federation-seams/README.md) for owner-surface mirrors.
 
 ## Active route
 
-Current source surfaces stay in `config-templates/`, `env/`, `scripts/`, and
-`mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`.
-
+Current source surfaces stay in `config-templates/`, `env/`, `scripts/`,
+`mechanics/config-projection/parts/bootstrap/docs/SECRETS_BOOTSTRAP.md`, and
+the rendering part's OS Abyss artifact bundle manifest/validator.

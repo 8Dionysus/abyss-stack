@@ -30,6 +30,7 @@ htmlcov/
 *.sqlite3
 
 # Heavy model/build/archive artifacts
+/dist/
 *.gguf
 *.safetensors
 *.pt

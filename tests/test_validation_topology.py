@@ -75,6 +75,27 @@ def test_validation_like_entrypoints_are_in_inventory() -> None:
     assert validation_like <= covered
 
 
+def test_runtime_config_bundle_hashes_rendered_subject() -> None:
+    manifest_path = (
+        REPO_ROOT
+        / "mechanics"
+        / "config-projection"
+        / "parts"
+        / "rendering"
+        / "manifests"
+        / "runtime_config.bundle.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest["abi_subject"]["path"] == "dist/abyss-stack-runtime-config/substrate.rendered.yml"
+    assert manifest["artifact_subjects"] == [
+        {
+            "path": "dist/abyss-stack-runtime-config/substrate.rendered.yml",
+            "role": "rendered_runtime_config",
+        }
+    ]
+
+
 def test_root_validator_is_marked_as_orchestrator() -> None:
     inventory = load_inventory()
     entries = [entry for entry in inventory["entries"] if "scripts/validate_stack.py" in entry["paths"]]

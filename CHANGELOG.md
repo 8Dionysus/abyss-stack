@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Release validation now renders the public-safe `substrate` config as an OS
+  Abyss artifact bundle and verifies ABI, SBOM, SLSA/in-toto, and
+  signature-decision sidecars through `abyss-machine`.
 - `aoa-session-memory-mcp` now rejects unsupported retrieval recipes before
   dispatching to the archive, keeping the MCP retrieval allowlist as the local
   gate instead of relying on downstream archive errors.
