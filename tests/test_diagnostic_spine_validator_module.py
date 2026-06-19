@@ -103,6 +103,27 @@ def test_catalog_surface_order_drift_fails(tmp_path: Path) -> None:
     ) in errors
 
 
+def test_catalog_artifact_identity_trust_layer_drift_fails(tmp_path: Path) -> None:
+    write_valid_surface(tmp_path)
+    catalog_path = (
+        tmp_path
+        / DIAGNOSTIC_SURFACE_ROOT
+        / "generated"
+        / "diagnostic_surface_catalog.min.json"
+    )
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    catalog["artifact_identity"]["trust_layer"] = ["cosign"]
+    write_json(catalog_path, catalog)
+
+    errors = run_validator(tmp_path)
+
+    assert (
+        "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json "
+        "artifact_identity.trust_layer must equal "
+        "['abi_contract_signature', 'w3c_prov_lineage']"
+    ) in errors
+
+
 def test_repair_handoff_readiness_drift_fails(tmp_path: Path) -> None:
     write_valid_surface(tmp_path)
     handoff_path = (

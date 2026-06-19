@@ -467,6 +467,52 @@ TASK_EPISODES = {
     ],
 }
 
+GOAL_LIFECYCLES = {
+    "schema_version": 1,
+    "artifact_type": "goal_lifecycle_route_results",
+    "goal_lifecycle_schema_version": 1,
+    "ok": True,
+    "target": "all",
+    "session": "session-1",
+    "goal_id": "goal-0001",
+    "status": "complete",
+    "event_kind": "goal_completed",
+    "selected_goal_lifecycle_count": 1,
+    "result_count": 1,
+    "results": [
+        {
+            "schema_version": 1,
+            "session_label": "2026-05-26__001__session-memory-mcp",
+            "session_id": "session-1",
+            "goal_id": "goal-0001",
+            "goal_instance_id": "session-1:goal-0001",
+            "status": "complete",
+            "objective": "Close goal lifecycle routing",
+            "event_count": 5,
+            "event_kinds": ["goal_created", "goal_updated", "goal_completed"],
+            "event_ids": ["000002", "000003", "000004", "000005", "000006"],
+            "task_episode_ids": ["task-0001"],
+            "ambiguity_flags": [],
+            "usage": {"tokens_used": 1234, "time_used_seconds": 56},
+            "refs": {
+                "created": {"raw_ref": "raw:line:2", "segment_ref": "000__initial-to-latest.md#event-000002"},
+                "completed": {"raw_ref": "raw:line:6", "segment_ref": "000__initial-to-latest.md#event-000006"},
+            },
+            "graph_refs": ["graph:node:goal_lifecycle:session-1:goal-0001"],
+            "raw_refs": ["raw:line:2", "raw:line:6"],
+            "segment_refs": ["000__initial-to-latest.md#event-000002", "000__initial-to-latest.md#event-000006"],
+            "sample_events": [
+                {"event_kind": "goal_created", "event_id": "000002", "raw_ref": "raw:line:2"},
+                {"event_kind": "goal_updated", "event_id": "000003", "raw_ref": "raw:line:3"},
+                {"event_kind": "goal_updated", "event_id": "000004", "raw_ref": "raw:line:4"},
+                {"event_kind": "goal_updated", "event_id": "000005", "raw_ref": "raw:line:5"},
+                {"event_kind": "goal_completed", "event_id": "000006", "raw_ref": "raw:line:6"},
+            ],
+            "truth_level": "generated_goal_lifecycle_navigation_not_reviewed_truth",
+        }
+    ],
+}
+
 TRACE_RESULTS = {
     "schema_version": 1,
     "artifact_type": "route_trace",
@@ -722,6 +768,8 @@ class FakeRunner:
             payload = AGENT_WINDOWS
         elif command == "task-episodes":
             payload = TASK_EPISODES
+        elif command == "goal-lifecycles":
+            payload = GOAL_LIFECYCLES
         elif command == "trace-route":
             payload = TRACE_RESULTS
         elif command == "entity-usage-audit":
@@ -1250,6 +1298,59 @@ def test_generic_search_routes_task_episode_filters_to_fast_episode_route(tmp_pa
     assert args[args.index("--verification-state") + 1] == "verified"
 
 
+def test_generic_search_routes_goal_lifecycle_filters_to_fast_goal_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "goal_lifecycle",
+            "goal_id": "goal-0001",
+            "status": "complete",
+            "event_kind": "goal_completed",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "goal_lifecycle_route_results"
+    assert search["results"][0]["goal_id"] == "goal-0001"
+    assert "served by MCP goal-lifecycle route fast path" in search["diagnostics"]
+    assert not any(call[0] == "search" for call in runner.calls)
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["goal-lifecycles"]
+    assert args[args.index("--session") + 1] == "session-1"
+    assert args[args.index("--goal-id") + 1] == "goal-0001"
+    assert args[args.index("--status") + 1] == "complete"
+    assert args[args.index("--event-kind") + 1] == "goal_completed"
+
+
+def test_goal_lifecycle_search_with_agent_filters_uses_full_search(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "goal_lifecycle",
+            "agent_event": "assistant_final_closeout",
+            "task_episode_id": "task-0001",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "search_results"
+    assert not any(call[0] == "goal-lifecycles" for call in runner.calls)
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--doc-type") + 1] == "goal_lifecycle"
+    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+
+
 def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -1287,6 +1388,36 @@ def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) ->
     assert episode_args[episode_args.index("--verification-state") + 1] == "verified"
 
 
+def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    lifecycles = state.session_goal_lifecycles(
+        session="session-1",
+        goal_id="goal-0001",
+        status="complete",
+        event_kind="goal_completed",
+        limit=4,
+        order="chronological",
+    )
+
+    assert lifecycles["artifact_type"] == "goal_lifecycle_route_results"
+    assert lifecycles["results"][0]["goal_id"] == "goal-0001"
+    assert lifecycles["results"][0]["status"] == "complete"
+    assert lifecycles["results"][0]["task_episode_ids"] == ["task-0001"]
+    assert lifecycles["results"][0]["refs"]["completed"]["raw_ref"] == "raw:line:6"
+    assert len(lifecycles["results"][0]["sample_events"]) == 4
+    assert lifecycles["results"][0]["omitted_sample_event_count"] == 1
+    assert lifecycles["mcp_payload_policy"]["response_compacted"] is True
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["goal-lifecycles"]
+    assert args[args.index("--session") + 1] == "session-1"
+    assert args[args.index("--goal-id") + 1] == "goal-0001"
+    assert args[args.index("--status") + 1] == "complete"
+    assert args[args.index("--event-kind") + 1] == "goal_completed"
+    assert args[args.index("--order") + 1] == "chronological"
+
+
 def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     validator = load_validator_module()
 
@@ -1296,6 +1427,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
+        {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
         {"recommendation": "use_graph_search"},
@@ -1309,8 +1441,37 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["agent_progress_count"] == 0
     assert summary["agent_reasoning_window_count"] == 0
     assert summary["task_episode_count"] == 0
+    assert summary["goal_lifecycle_count"] == 0
     assert summary["answer_neighborhood_count"] == 0
     assert summary["maintenance_recommendation"] == "use_graph_search"
+
+
+def test_usage_neighborhood_probe_uses_indexed_candidate_session() -> None:
+    validator = load_validator_module()
+
+    class ProbeState:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def session_entity_usage_neighborhood(self, anchor: str, **kwargs: object) -> dict:
+            session = str(kwargs.get("session") or "")
+            self.calls.append((anchor, session))
+            if anchor == "view_image" and session == "route-session":
+                return {"ok": True, "neighborhoods": [{"id": "window-1"}], "quality": {"neighborhood_count": 1}}
+            return {"ok": True, "neighborhoods": [], "quality": {"neighborhood_count": 0}}
+
+    state = ProbeState()
+
+    anchor, session, neighborhood = validator._select_usage_neighborhood_probe(
+        state,
+        {"results": [{"session_label": "route-session"}]},
+        {"results": [{"session_label": "goal-session"}]},
+    )
+
+    assert anchor == "view_image"
+    assert session == "route-session"
+    assert neighborhood["quality"]["neighborhood_count"] == 1
+    assert state.calls == [("view_image", "route-session")]
 
 
 def test_session_only_search_uses_local_fast_path_without_archive_search(tmp_path: Path) -> None:
@@ -1342,12 +1503,15 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_agent_progress_updates" in tools
     assert "aoa_session_agent_reasoning_windows" in tools
     assert "aoa_session_task_episodes" in tools
+    assert "aoa_session_goal_lifecycles" in tools
     assert "aoa_session_answer_neighborhood" in tools
     assert "aoa_session_entity_usage_neighborhood" in tools
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
+    assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
+    assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]["default"] == "recent"
 
 
 def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Path) -> None:

@@ -55,6 +55,7 @@ Tools:
 - `aoa_session_agent_progress_updates(query, session, episode, limit)`
 - `aoa_session_agent_reasoning_windows(query, session, episode, limit, before, after)`
 - `aoa_session_task_episodes(target, session, episode, status, verification_state, failure_state, limit)`
+- `aoa_session_goal_lifecycles(target, session, goal_id, status, event_kind, limit, order)`
 - `aoa_session_answer_neighborhood(query, session, agent_events, episode, limit, before, after)`
 - `aoa_session_trace(anchor, kind, limit, per_route_limit, session, doc_type)`; the default `doc_type` is `session` for bounded live archive probes, and callers can request `event` when exact event-level evidence is needed.
 - `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session)`

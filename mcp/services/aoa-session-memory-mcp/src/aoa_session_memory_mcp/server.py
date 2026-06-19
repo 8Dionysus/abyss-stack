@@ -115,6 +115,27 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_goal_lifecycles(
+        target: str = "all",
+        session: str = "",
+        goal_id: str = "",
+        status: str = "",
+        event_kind: str = "",
+        limit: int = 20,
+        order: str = "recent",
+    ) -> dict[str, Any]:
+        """List generated Codex goal lifecycles with refs, task episodes, graph refs, and ambiguity flags."""
+        return current_state().session_goal_lifecycles(
+            target=target,
+            session=session,
+            goal_id=goal_id,
+            status=status,
+            event_kind=event_kind,
+            limit=limit,
+            order=order,
+        )
+
+    @mcp.tool()
     def aoa_session_answer_neighborhood(
         query: str = "",
         session: str = "",

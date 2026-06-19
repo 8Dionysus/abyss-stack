@@ -134,6 +134,51 @@ def _payload_count(payload: dict, key: str) -> int:
     return value if isinstance(value, int) else 0
 
 
+def _candidate_sessions(*payloads: dict) -> list[str]:
+    sessions: list[str] = []
+    for payload in payloads:
+        results = payload.get("results")
+        if not isinstance(results, list):
+            continue
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            for key in ("session_label", "session_id", "session"):
+                value = item.get(key)
+                if isinstance(value, str) and value and value not in sessions:
+                    sessions.append(value)
+    return sessions
+
+
+def _select_usage_neighborhood_probe(
+    state: AoASessionMemoryMCPState,
+    route_only: dict,
+    goal_usage_probe: dict,
+) -> tuple[str, str, dict]:
+    anchors = ("view_image", "update_goal", "get_goal", "apply_patch", "exec_command")
+    sessions = _candidate_sessions(route_only, goal_usage_probe)
+    attempts: list[str] = []
+
+    for session in sessions:
+        for anchor in anchors:
+            attempts.append(f"{anchor}@{session}")
+            neighborhood = state.session_entity_usage_neighborhood(
+                anchor,
+                kind="tool",
+                limit=1,
+                per_route_limit=1,
+                before=1,
+                after=2,
+                raw_preview_chars=0,
+                document_limit=3,
+                session=session,
+            )
+            if neighborhood.get("ok") and neighborhood.get("neighborhoods"):
+                return anchor, session, neighborhood
+
+    raise SystemExit(f"usage neighborhood returned no evidence windows for indexed smoke candidates: {attempts}")
+
+
 def _stdio_route_count_summary(
     inventory: dict,
     responses: dict,
@@ -141,6 +186,7 @@ def _stdio_route_count_summary(
     progress: dict,
     reasoning: dict,
     episodes: dict,
+    goal_lifecycles: dict,
     neighborhood: dict,
     maintenance_status: dict,
     *,
@@ -155,6 +201,7 @@ def _stdio_route_count_summary(
         "agent_progress_count": _payload_count(progress, "result_count"),
         "agent_reasoning_window_count": _payload_count(reasoning, "window_count"),
         "task_episode_count": _payload_count(episodes, "result_count"),
+        "goal_lifecycle_count": _payload_count(goal_lifecycles, "result_count"),
         "answer_neighborhood_count": _payload_count(neighborhood, "window_count"),
         "maintenance_recommendation": maintenance_status.get("recommendation"),
     }
@@ -178,6 +225,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_agent_progress_updates",
                 "aoa_session_agent_reasoning_windows",
                 "aoa_session_task_episodes",
+                "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_maintenance_status",
             }
@@ -214,6 +262,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"session": session, "limit": 1, "before": 1, "after": 2},
             )
             episodes = await call_json("aoa_session_task_episodes", {"session": session, "limit": 2})
+            goal_lifecycles = await call_json("aoa_session_goal_lifecycles", {"session": session, "limit": 2})
             neighborhood = await call_json(
                 "aoa_session_answer_neighborhood",
                 {"session": session, "limit": 1, "before": 1, "after": 2},
@@ -235,6 +284,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         progress,
         reasoning,
         episodes,
+        goal_lifecycles,
         neighborhood,
         maintenance_status,
         tool_count=len(tools),
@@ -257,6 +307,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 "aoa_session_agent_progress_updates",
                 "aoa_session_agent_reasoning_windows",
                 "aoa_session_task_episodes",
+                "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_maintenance_status",
             }
@@ -326,17 +377,10 @@ def main() -> None:
         or not isinstance(maintenance_status.get("agent_route"), dict)
     ):
         raise SystemExit(f"maintenance status surface failed: {maintenance_status.get('diagnostics')}")
-    neighborhood = state.session_entity_usage_neighborhood(
-        "view_image",
-        kind="tool",
-        limit=1,
-        per_route_limit=3,
-        before=1,
-        after=3,
-        raw_preview_chars=240,
-    )
-    if not neighborhood.get("ok") or not neighborhood.get("neighborhoods"):
-        raise SystemExit(f"usage neighborhood returned no evidence windows: {neighborhood.get('diagnostics')}")
+    goal_usage_probe = state.session_goal_lifecycles(event_kind="goal_completed", limit=1)
+    if not goal_usage_probe.get("ok") or goal_usage_probe.get("result_count", 0) <= 0:
+        raise SystemExit(f"goal usage probe returned no completed goal lifecycle: {goal_usage_probe.get('diagnostics')}")
+    usage_anchor, usage_session, neighborhood = _select_usage_neighborhood_probe(state, route_only, goal_usage_probe)
     latest_brief = state.session_brief("latest", max_segments=2)
     if not latest_brief.get("ok") or not latest_brief.get("refs", {}).get("manifest"):
         raise SystemExit("latest session brief is not readable")
@@ -347,6 +391,9 @@ def main() -> None:
     session_only = state.session_search("", filters={"session": latest_session}, limit=1)
     if session_only.get("result_count", 0) <= 0 or session_only.get("provider", {}).get("status") != "local_session_filter_fast_path":
         raise SystemExit(f"session-only search fast path failed: {session_only.get('diagnostics')}")
+    goal_lifecycles = state.session_goal_lifecycles(session=latest_session, limit=3)
+    if not goal_lifecycles.get("ok") or goal_lifecycles.get("artifact_type") != "goal_lifecycle_route_results":
+        raise SystemExit(f"goal lifecycle surface failed: {goal_lifecycles.get('diagnostics')}")
     freshness_refs = [brief["refs"]["manifest"]]
     raw_path = Path(brief["refs"]["manifest"]).parent / "raw" / "session.raw.jsonl"
     raw_checked = raw_path.exists()
@@ -389,10 +436,14 @@ def main() -> None:
                 "skill_inventory_count": skill_inventory.get("entity_count"),
                 "git_inventory_count": git_inventory.get("entity_count"),
                 "session_only_result_count": session_only.get("result_count"),
+                "goal_lifecycle_result_count": goal_lifecycles.get("result_count"),
                 "hook_receipt_count": hook_receipts.get("total_receipt_count"),
                 "hook_receipt_error_count": hook_receipts.get("summary", {}).get("error_receipt_count"),
                 "maintenance_recommendation": maintenance_status.get("recommendation"),
                 "maintenance_agent_action": maintenance_status.get("agent_route", {}).get("action"),
+                "goal_usage_probe_count": goal_usage_probe.get("result_count"),
+                "usage_neighborhood_anchor": usage_anchor,
+                "usage_neighborhood_session": usage_session,
                 "usage_neighborhood_count": neighborhood.get("quality", {}).get("neighborhood_count"),
                 "latest_session": latest_brief.get("session", {}).get("label") or "latest",
                 "freshness_smoke_session": latest_session,
@@ -407,6 +458,7 @@ def main() -> None:
                 "stdio_agent_progress_count": stdio_smoke["agent_progress_count"],
                 "stdio_agent_reasoning_window_count": stdio_smoke["agent_reasoning_window_count"],
                 "stdio_task_episode_count": stdio_smoke["task_episode_count"],
+                "stdio_goal_lifecycle_count": stdio_smoke["goal_lifecycle_count"],
                 "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
                 "configured_stdio": configured_stdio_smoke,
             },

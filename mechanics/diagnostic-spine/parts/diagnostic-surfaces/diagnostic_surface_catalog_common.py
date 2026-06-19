@@ -34,6 +34,46 @@ SURFACE_PAYLOAD = {
     "owner_repo": "abyss-stack",
     "surface_kind": "runtime_surface",
     "authority_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
+    "artifact_identity": {
+        "artifact_class": "runtime_diagnostic_readmodel_catalog",
+        "surface_state": "public_source_generated_runtime_diagnostic_catalog",
+        "owner_repo": "abyss-stack",
+        "authority_ref": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
+        "producer": (
+            "scripts/build_diagnostic_surface_catalog.py from diagnostic_surface_catalog_common.py "
+            "and diagnostic surface docs, schemas, and examples"
+        ),
+        "consumer_expectation": (
+            "Verify owner_repo, surface_kind, authority_ref, surfaces, validation_refs, "
+            "artifact_identity, catalog rebuild parity, and diagnostic validators before "
+            "using this as runtime diagnostic navigation or repair-handoff orientation."
+        ),
+        "privacy_boundary": (
+            "Public-safe source refs and examples only; no live Logs/diagnostics payloads, "
+            "private host facts, secrets, rendered configs, models, or machine-local state."
+        ),
+        "content_identity": (
+            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/"
+            "diagnostic_surface_catalog.min.json rendered from build_payload() and compared "
+            "by build_diagnostic_surface_catalog --check plus validator."
+        ),
+        "abi_epoch": "abyss_stack_diagnostic_surface_catalog_v1",
+        "contract_version": (
+            "mechanics/diagnostic-spine/parts/diagnostic-surfaces/"
+            "diagnostic_surface_catalog_common.py@"
+            "abyss_stack_diagnostic_surface_catalog_v1#artifact_identity"
+        ),
+        "trust_layer": [
+            "abi_contract_signature",
+            "w3c_prov_lineage",
+        ],
+        "verification": [
+            "python scripts/build_diagnostic_surface_catalog.py --check",
+            "python scripts/validate_diagnostic_surface_catalog.py",
+            "python scripts/validate_stack.py",
+        ],
+        "action": "ADD_CONSUMER_EXPECTATION",
+    },
 }
 
 SURFACE_SPECS = (

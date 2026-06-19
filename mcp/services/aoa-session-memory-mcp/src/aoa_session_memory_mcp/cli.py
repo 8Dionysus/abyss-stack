@@ -81,6 +81,15 @@ def main() -> None:
     task_episodes.add_argument("--failure-state", default="")
     task_episodes.add_argument("--limit", type=int, default=20)
 
+    goal_lifecycles = sub.add_parser("goal-lifecycles")
+    goal_lifecycles.add_argument("target", nargs="?", default="all")
+    goal_lifecycles.add_argument("--session", default="")
+    goal_lifecycles.add_argument("--goal-id", default="")
+    goal_lifecycles.add_argument("--status", default="")
+    goal_lifecycles.add_argument("--event-kind", default="")
+    goal_lifecycles.add_argument("--limit", type=int, default=20)
+    goal_lifecycles.add_argument("--order", default="recent")
+
     answer_neighborhood = sub.add_parser("answer-neighborhood")
     answer_neighborhood.add_argument("query", nargs="?", default="")
     answer_neighborhood.add_argument("--session", default="")
@@ -291,6 +300,18 @@ def main() -> None:
                 verification_state=args.verification_state,
                 failure_state=args.failure_state,
                 limit=args.limit,
+            )
+        )
+    elif args.command == "goal-lifecycles":
+        _print(
+            state.session_goal_lifecycles(
+                target=args.target,
+                session=args.session,
+                goal_id=args.goal_id,
+                status=args.status,
+                event_kind=args.event_kind,
+                limit=args.limit,
+                order=args.order,
             )
         )
     elif args.command == "answer-neighborhood":
