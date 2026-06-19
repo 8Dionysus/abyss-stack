@@ -529,6 +529,26 @@ TRACE_RESULTS = {
     "results": SEARCH_RESULTS["results"],
 }
 
+ENTITY_REGISTRY = {
+    "schema_version": 1,
+    "artifact_type": "entity_registry_snapshot",
+    "ok": True,
+    "mutates": False,
+    "entity_count": 1,
+    "entries": [
+        {
+            "entity_id": "skill:aoa_decision",
+            "kind": "skill",
+            "canonical_key": "aoa_decision",
+            "status": "active",
+            "route_layer": "skill",
+            "route_signal": "skill:aoa_decision",
+            "source_refs": [{"source_type": "codex_user_skills", "path": "/tmp/.codex/skills/aoa-decision/SKILL.md"}],
+        }
+    ],
+    "truth_status": "generated_entity_registry_navigation_not_source_truth",
+}
+
 ENTITY_USAGE_AUDIT = {
     "schema_version": 1,
     "artifact_type": "session_memory_entity_usage_audit",
@@ -772,6 +792,8 @@ class FakeRunner:
             payload = GOAL_LIFECYCLES
         elif command == "trace-route":
             payload = TRACE_RESULTS
+        elif command == "entity-registry":
+            payload = ENTITY_REGISTRY
         elif command == "entity-usage-audit":
             payload = ENTITY_USAGE_AUDIT
         elif command == "entity-usage-neighborhood":
@@ -1430,6 +1452,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
+        {"ok": True, "entity_count": 1},
         {"recommendation": "use_graph_search"},
         tool_count=30,
     )
@@ -1508,8 +1531,10 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_usage_neighborhood" in tools
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
+    assert "aoa_session_entity_registry" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
+    assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]["default"] == "recent"
 
@@ -1578,6 +1603,23 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert playbook_inventory["entities"][0]["key"] == "session_audit"
     assert technique_inventory["entities"][0]["key"] == "entity_routing"
     assert mechanic_inventory["entities"][0]["key"] == "route_maintenance"
+
+
+def test_entity_registry_routes_to_read_only_archive_command(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    registry = state.session_entity_registry(kind="skill", lookup="aoa-decision", limit=5)
+    resource = state.read_resource("aoa-session-memory://entity-lookup/skill/aoa-decision")
+
+    assert registry["artifact_type"] == "entity_registry_snapshot"
+    assert registry["entries"][0]["canonical_key"] == "aoa_decision"
+    assert registry["mcp_access"]["read_only_registry_route"] is True
+    registry_calls = [args for command, args in runner.calls if command == "entity-registry"]
+    assert registry_calls
+    assert "--lookup" in registry_calls[0]
+    assert "--write" not in registry_calls[0]
+    assert resource["entries"][0]["kind"] == "skill"
 
 
 def test_entity_inventory_resolves_relative_atlas_detail_json(tmp_path: Path) -> None:
