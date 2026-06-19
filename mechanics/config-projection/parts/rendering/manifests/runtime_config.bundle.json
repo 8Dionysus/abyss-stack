@@ -1,0 +1,29 @@
+{
+  "schema": "abyss_machine_artifact_bundle_manifest_v1",
+  "id": "abyss-stack-runtime-config-bundle",
+  "artifact_class": "abyss_stack_runtime_config_bundle",
+  "owner_repo": "abyss-stack",
+  "policy_ref": "manifests/artifact_signature_policy.manifest.json",
+  "mode": "github_release",
+  "subject_repo_root": "../../../../..",
+  "build_type": "https://abyssos.local/buildtypes/runtime-config-bundle/v1",
+  "artifact_identity": {
+    "artifact_class": "abyss_stack_runtime_config_bundle",
+    "abi_epoch": "abyss_stack_runtime_config_bundle_v1"
+  },
+  "abi_subject": {
+    "path": "dist/abyss-stack-runtime-config/substrate.rendered.yml"
+  },
+  "artifact_subjects": [
+    {
+      "path": "dist/abyss-stack-runtime-config/substrate.rendered.yml",
+      "role": "rendered_runtime_config"
+    }
+  ],
+  "package": {
+    "ecosystem": "compose",
+    "name": "abyss-stack-runtime-config",
+    "purl": "pkg:generic/abyss-stack-runtime-config@0"
+  },
+  "consumer_command": "python mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"
+}

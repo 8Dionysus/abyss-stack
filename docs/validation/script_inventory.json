@@ -174,6 +174,33 @@
       "disposition": "keep"
     },
     {
+      "family": "config-projection-rendering-artifact-validator",
+      "paths": [
+        "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"
+      ],
+      "organ_lane": "mechanic/package-local release artifact validation",
+      "owner_surface": "mechanics/config-projection/parts/rendering/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/rendering/manifests/runtime_config.bundle.json",
+        "docs/validation/validation_lanes.json",
+        "abyss-machine artifact bundle policy"
+      ],
+      "reads": [
+        "source checkout",
+        "rendering manifest",
+        "abyss-machine verifier repository through ABYSS_MACHINE_REPO_ROOT when set"
+      ],
+      "writes": [
+        "temporary synthetic Configs mirror",
+        "ignored dist/abyss-stack-runtime-config and dist/abyss-artifact-bundle outputs"
+      ],
+      "side_effects": "renders public-safe runtime config and verifies OS Abyss artifact bundle sidecars only under ignored dist paths",
+      "validation_lane": "release",
+      "ci_inclusion": "release_check calls it through validation_lanes.json",
+      "test_target": "tests/test_validation_topology.py",
+      "disposition": "keep"
+    },
+    {
       "family": "mcp-service-scripts",
       "paths": [
         "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",

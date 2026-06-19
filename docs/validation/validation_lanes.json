@@ -273,6 +273,10 @@
       {
         "label": "run tests",
         "command": ["python", "-m", "pytest", "-q"]
+      },
+      {
+        "label": "validate OS Abyss runtime config artifact bundle",
+        "command": ["python", "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"]
       }
     ]
   }

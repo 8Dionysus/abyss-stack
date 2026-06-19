@@ -13,6 +13,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      - name: Clone abyss-machine verifier
+        run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -27,6 +30,8 @@ jobs:
           sudo apt-get install -y shellcheck rsync podman podman-compose
 
       - name: Run release audit
+        env:
+          ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
         run: python scripts/ci_gate.py --mode release
 
       - name: Shellcheck scripts

@@ -481,6 +481,24 @@
       "status": "active"
     },
     {
+      "family": "config-projection-rendering-artifact-validator",
+      "paths": [
+        "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py"
+      ],
+      "protects": "public-safe rendered runtime config artifact bundles, ABI identity, SBOM, SLSA/in-toto provenance, signature policy decisions, and abyss-machine verifier consumption",
+      "owner_surface": "mechanics/config-projection/parts/rendering/README.md",
+      "layer": "mechanic part-local release artifact",
+      "lane": "release",
+      "mode": "blocking-part-local",
+      "callers": [
+        "docs/validation/validation_lanes.json",
+        "scripts/release_check.py",
+        ".github/workflows/validate-stack.yml"
+      ],
+      "failure_route": "Fix the rendering manifest, generated public-safe config output, abyss-machine artifact policy, or verifier import route before changing root validation.",
+      "status": "active"
+    },
+    {
       "family": "mechanic-part-validators",
       "paths": [
         "mechanics/agon-runtime/parts/runtime-kernels/validate_duel_runtime_kernels.py",
