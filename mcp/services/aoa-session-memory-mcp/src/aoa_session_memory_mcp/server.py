@@ -463,6 +463,10 @@ def build_server(
     def provider_status_resource() -> str:
         return json.dumps(current_state().read_resource("aoa-session-memory://provider/status"), ensure_ascii=False, indent=2)
 
+    @mcp.resource("aoa-session-memory://maintenance/status")
+    def maintenance_status_resource() -> str:
+        return json.dumps(current_state().read_resource("aoa-session-memory://maintenance/status"), ensure_ascii=False, indent=2)
+
     @mcp.resource("aoa-session-memory://readiness/route-layer")
     def readiness_resource() -> str:
         return json.dumps(current_state().read_resource("aoa-session-memory://readiness/route-layer"), ensure_ascii=False, indent=2)

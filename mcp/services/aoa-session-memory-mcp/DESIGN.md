@@ -47,9 +47,23 @@ failure mode, decision thread, writeback concern, goal, or recurring pattern.
 The service treats all of these as route coordinates, not as privileged object
 types.
 
+The generated entity registry is a hot navigation read model. MCP reads
+`maps/entity-registry.json` directly for skill/MCP/hook/tool/API/etc lookup and
+inventory. Refreshing or rebuilding that registry remains an explicit `.aoa`
+operator route outside MCP, because source-surface scans can be materially
+slower than an agent health probe.
+
 Session-level tracing is the default live probe because `.aoa` archives can be
 large. Event-level tracing remains available through an explicit
 `doc_type="event"` request when exact event evidence is needed.
+
+Agent-event and lightweight usage-neighborhood routes have MCP-local fast
+paths over the portable SQLite projection. They are deliberately bounded:
+session-scoped answer/closeout/progress/reasoning packets can return zero
+classified events without failing, and lightweight entity-neighborhood probes
+can return route-signal refs without raw previews. The packet names the deeper
+`.aoa` command for raw windows or consequence expansion, but the MCP does not
+run that expansion if it would turn an agent health probe into a bulk scan.
 
 Session review and continuation use compact packets:
 
@@ -72,14 +86,18 @@ aoa_session_memory_status(include_live=false)
 aoa_session_freshness_check(refs)
 aoa_session_latest_diagnostics(kind)
 aoa_session_maintenance_status(deep=false, include_timers=true, full=false)
+aoa-session-memory://maintenance/status
 aoa_session_maintenance_plan()
 ```
 
 The maintenance status is read-only. It is the canonical `.aoa
 maintenance-status` packet with an `agent_route`, exact next operator command,
-and search/graph/timer posture. It can name operator commands that would
-refresh `.aoa`, but the MCP does not run them. `aoa_session_maintenance_plan`
-is retained as a compatibility entry to the same status route.
+search/graph/timer posture, and any `.aoa` operations summary such as
+warnings, latest search-index timings, recent problem jobs, last successful
+auto-maintenance profiles, and `why_maintenance_long`. It can name operator
+commands that would refresh `.aoa`, but the MCP does not run them.
+`aoa_session_maintenance_plan` is retained as a compatibility entry to the same
+status route.
 
 The status path is intentionally cheap. By default it uses a fast presence probe
 over the fixed portable SQLite search read model and does not run global
