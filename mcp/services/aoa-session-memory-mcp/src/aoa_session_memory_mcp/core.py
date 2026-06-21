@@ -20,6 +20,7 @@ DEFAULT_TIMEOUT_SECONDS = 20.0
 STATUS_TIMEOUT_SECONDS = 60.0
 SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
+DEFAULT_SEARCH_MAX_SHARDS = 24
 USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
@@ -1022,6 +1023,7 @@ class AoASessionMemoryMCPState:
         elif self._can_use_local_session_filter_search(active_filters):
             return self._local_session_filter_search(filters=filters, limit=limit, diagnostics=diagnostics)
         args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
+        args.extend(["--use-shards", "--max-shards", str(DEFAULT_SEARCH_MAX_SHARDS)])
         provider = filters.get("provider")
         if provider:
             args.extend(["--provider", _safe_selector(str(provider), "provider", limit=64)])
@@ -1201,6 +1203,9 @@ class AoASessionMemoryMCPState:
             str(_coerce_limit(limit, 20, 100)),
             "--provider",
             _safe_selector(provider, "provider", limit=64),
+            "--use-shards",
+            "--max-shards",
+            str(DEFAULT_SEARCH_MAX_SHARDS),
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
@@ -1291,6 +1296,9 @@ class AoASessionMemoryMCPState:
             str(_coerce_limit(limit, 20, 100)),
             "--provider",
             _safe_selector(provider, "provider", limit=64),
+            "--use-shards",
+            "--max-shards",
+            str(DEFAULT_SEARCH_MAX_SHARDS),
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
@@ -1326,6 +1334,8 @@ class AoASessionMemoryMCPState:
     ) -> dict[str, Any] | None:
         explicit_agent_events = [str(item) for item in agent_events if str(item or "").strip()]
         if not (session or episode or query or explicit_agent_events):
+            return None
+        if query:
             return None
         db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
         if not db_path.is_file():
@@ -1433,6 +1443,20 @@ class AoASessionMemoryMCPState:
             "agent_events": explicit_agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []),
             "result_count": len(results),
             "results": results,
+            "search_projection": {
+                "mode": "mcp_sqlite_agent_event_fast_path",
+                "read_model": db_path.as_posix(),
+                "fallback_route": "archive_cli_shard_fanout",
+                "next_expansion_command": self._archive_command_line(command, archive_args),
+            },
+            "cost_profile": {
+                "lightweight_route": True,
+                "structured_route_filter": True,
+                "uses_fts": False,
+                "hydrates_body": False,
+                "semantic_preview": False,
+                "uses_shards": False,
+            },
             "provider": {
                 "selected": "portable_sqlite",
                 "status": "mcp_sqlite_agent_event_fast_path",
@@ -1551,6 +1575,9 @@ class AoASessionMemoryMCPState:
             str(_coerce_bounded_int(after, 6, 0, 48)),
             "--provider",
             _safe_selector(provider, "provider", limit=64),
+            "--use-shards",
+            "--max-shards",
+            str(DEFAULT_SEARCH_MAX_SHARDS),
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])

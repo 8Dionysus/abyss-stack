@@ -107,11 +107,13 @@ Scoped agent-event routes such as `aoa_session_agent_responses`,
 `aoa_session_agent_closeouts`, `aoa_session_agent_progress_updates`,
 `aoa_session_agent_reasoning_windows`, and
 `aoa_session_answer_neighborhood` use the portable SQLite projection as a fast
-MCP read path when the live schema supports it. These packets are bounded,
+MCP read path when the live schema supports it. These packets expose
+`cost_profile`, `search_projection`, and evidence refs, remain bounded and
 read-only, and may return zero results for a session without classified agent
-events instead of starting a slow archive scan. Each fast packet carries a
-`next_expansion_command` for the deeper `.aoa` route when raw before/after
-windows or richer consequence analysis are needed.
+events instead of starting a slow archive scan. Text-query fallbacks and
+`next_expansion_command` use the `.aoa` shard-aware archive route
+(`--use-shards --max-shards 24`) when raw before/after windows or richer
+consequence analysis are needed.
 
 `aoa_session_entity_usage_neighborhood` has the same shape for lightweight
 probes: when `raw_preview_chars=0` with small limits, or when the deep archive
