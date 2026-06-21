@@ -35,6 +35,13 @@ records under `Logs/eval-exports/`, omits private payloads by default, and
 validates nested candidate packet shape for routing only. A readable export is
 not accepted proof.
 
+Local-port inventory is below repo mutation and below central proof adoption.
+It may classify workspace Git roots and recommend repair, selection, apply, or
+stop routes, but it does not decide that a local eval should exist, promote a
+local bundle, or replace direct inspection of the target repo before a write.
+Its machine-readable status and route vocabulary is consumed from
+`aoa-evals`, not authored by `abyss-stack`.
+
 ## Stop Lines
 
 - No general eval runner.

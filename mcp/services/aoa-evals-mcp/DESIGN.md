@@ -96,6 +96,28 @@ When the stack federation sync wrapper refreshes the mirror, it writes
 required files, and compact counts. MCP treats the manifest as freshness
 evidence, not proof authority.
 
+## Local Port Inventory
+
+Repo-local `evals/` ports are exposed as a read-only workspace inventory before
+any write route. The inventory scans Git roots below the OS Abyss workspace,
+ignores worktrees and runtime-heavy stack paths, excludes `aoa-evals` as the
+central proof owner, and classifies each repo as `missing`, `stale_candidate`,
+`invalid`, `skeleton`, or `active`.
+
+Each entry carries pressure counts, validator issues, central-name overlaps,
+and a route recommendation such as `valid_skeleton_keep_dormant`,
+`active_intake_select_then_apply_or_design`, or `invalid_active_repair`.
+The recommendation is a routing hint only. It must not promote local pressure,
+accept evidence, compute a verdict, or create central bundles.
+
+The producer/consumer lock for this read-model is
+`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v1.json`.
+`aoa-evals` owns the status vocabulary, summary keys, route keys, discovery
+ignore policy, and authority boundary. The MCP implementation loads that
+contract from the selected source or mirror root, reports the loaded contract
+metadata, and uses fallback constants only when older mirrors have not yet
+carried the contract.
+
 ## Readiness
 
 The first layer is ready when:
@@ -108,6 +130,10 @@ The first layer is ready when:
 - candidate validation keeps `human_review_required`/`review_required` true;
 - runtime candidate export listing does not include private payloads by default;
 - runtime status exposes missing or unmanifested mirrors;
+- local-port inventory covers top-level and nested Git roots without scanning
+  runtime-heavy stack state;
+- local-port inventory route keys and summary keys match the central
+  `aoa-evals` inventory contract;
 - the Codex plane can resolve `aoa_evals`;
 - validation proves the service did not become a runner, publisher, promoter,
   or source writer.

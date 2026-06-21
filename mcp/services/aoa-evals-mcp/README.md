@@ -16,6 +16,8 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 - whether a candidate evidence packet is schema-shaped and review-routed;
 - which stack-owned private runtime candidate exports are waiting for review;
 - which sibling repositories expose repo-local `evals/` ports;
+- which OS Abyss Git roots are missing, skeleton, active, invalid, or stale
+  local-port candidates;
 - whether local eval pressure should stay local or route toward central
   `aoa-evals`;
 - what report skeleton can be prepared without computing a verdict.
@@ -90,6 +92,18 @@ write repo-local `evals/intake/*.eval_need.json`,
 The service does not run evals, compute verdicts, publish receipts, promote
 bundles, ingest or accept evidence, approve proposals, create central bundles,
 or mutate `aoa-evals`.
+
+`aoa_evals_local_ports` is an OS Abyss-wide routing inventory, not just a list
+of present `PORT.yaml` files. It scans Git roots below the workspace, skips
+runtime-heavy and worktree paths, excludes `aoa-evals` as the central proof
+owner, and returns `inventory_status`, `pressure_counts`,
+`validation_issues`, `central_eval_name_matches`, and `route_recommendation`.
+Those recommendations are advisory routing evidence; direct repo inspection and
+central `aoa-evals` review still own any mutation or proof adoption.
+The inventory shape is locked to
+`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v1.json`;
+MCP reports the loaded contract metadata and treats missing contract data as a
+degraded fallback, not as a new source of truth.
 
 In the shared AoA Codex plane this service is registered as `aoa_evals` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher

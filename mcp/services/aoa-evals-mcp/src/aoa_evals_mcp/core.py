@@ -15,6 +15,9 @@ from jsonschema import Draft202012Validator
 
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
+LOCAL_PORT_INVENTORY_CONTRACT = Path("docs/architecture/local_eval_port_inventory.contract.v1.json")
+LOCAL_PORT_INVENTORY_SCHEMA = "os_abyss_local_eval_port_inventory_v1"
+LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH = 4
 
 CATALOG_MIN = Path("generated/eval_catalog.min.json")
 CATALOG_FULL = Path("generated/eval_catalog.json")
@@ -69,6 +72,118 @@ LOCAL_PORT_REQUIRED_FIELDS = (
 )
 LOCAL_PORT_BOUNDARY_TOKENS = ("verdict", "scoring", "regression", "proof doctrine")
 LOCAL_WRITE_AUTHORITY_BOUNDARY = "no verdict, scoring, regression, or proof doctrine authority"
+LOCAL_PORT_AUTHORITY_BOUNDARY = (
+    "Repo-local eval ports carry intake, suites, reports, and pressure evidence only. "
+    "Central verdict, scoring, regression, proof doctrine, and central bundle adoption "
+    "remain in aoa-evals."
+)
+LOCAL_PORT_SOURCE_OF_TRUTH = {
+    "local_port_standard": "aoa-evals:docs/guides/LOCAL_EVAL_PORT_STANDARD.md",
+    "local_port_validator": "aoa-evals:scripts/validate_local_eval_port.py",
+    "central_eval_catalog": "aoa-evals:generated/eval_catalog.min.json",
+    "mcp_contract": "aoa-evals:docs/architecture/AOA_EVALS_MCP_CONTRACT.md",
+    "inventory_contract": f"aoa-evals:{LOCAL_PORT_INVENTORY_CONTRACT.as_posix()}",
+}
+LOCAL_PORT_IGNORED_DIR_NAMES = {
+    ".git",
+    ".hg",
+    ".svn",
+    ".aoa",
+    ".codex",
+    ".worktrees",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+}
+LOCAL_PORT_IGNORED_RELATIVE_PREFIXES = (
+    ".worktrees",
+    ".codex",
+    "abyss-stack/Logs",
+    "abyss-stack/Models",
+    "abyss-stack/Services",
+    "bundles",
+)
+LOCAL_PORT_PROOF_BOUNDARY = "central proof adoption, verdicts, scoring, regression, and proof doctrine stay in aoa-evals"
+LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS: dict[str, dict[str, str]] = {
+    "missing_no_pressure": {
+        "route_key": "missing_no_pressure",
+        "route": "stop",
+        "subskill": "none",
+        "action": "Do not create a local eval port unless current repo work produces real eval pressure.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "stale_local_eval_surface_review": {
+        "route_key": "stale_local_eval_surface_review",
+        "route": "aoa-eval-select",
+        "subskill": "aoa-eval-select",
+        "action": "Inspect the existing eval-like surface before mutation; add a valid port only if current pressure warrants it.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "invalid_port_repair": {
+        "route_key": "invalid_port_repair",
+        "route": "repair-local-port",
+        "subskill": "aoa-eval-select",
+        "action": "Repair the local eval-port shape and rerun the validator before applying or designing evals.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "invalid_active_repair": {
+        "route_key": "invalid_active_repair",
+        "route": "repair-local-port",
+        "subskill": "aoa-eval-select",
+        "action": "Repair the local eval-port shape and rerun the validator before applying or designing evals.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "central_overlap_apply_existing_first": {
+        "route_key": "central_overlap_apply_existing_first",
+        "route": "aoa-eval-select",
+        "subskill": "aoa-eval-select",
+        "action": "Local pressure overlaps central eval names; inspect and apply the existing central route before designing a new local suite.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "valid_skeleton_keep_dormant": {
+        "route_key": "valid_skeleton_keep_dormant",
+        "route": "stop",
+        "subskill": "none",
+        "action": "Keep the valid skeleton dormant until a current task creates local eval pressure.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "local_bundle_central_review_candidate": {
+        "route_key": "local_bundle_central_review_candidate",
+        "route": "central-adoption-review",
+        "subskill": "aoa-eval-select",
+        "action": "Review the local draft bundle against central aoa-evals routes before any adoption or normalization.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "active_suite_apply_or_regression_check": {
+        "route_key": "active_suite_apply_or_regression_check",
+        "route": "aoa-eval-apply",
+        "subskill": "aoa-eval-apply",
+        "action": "Use the local suite as a candidate deterministic check or regression surface; keep scoring and verdict authority central.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "active_intake_select_then_apply_or_design": {
+        "route_key": "active_intake_select_then_apply_or_design",
+        "route": "aoa-eval-select",
+        "subskill": "aoa-eval-select",
+        "action": "Select existing local and central eval routes first, then apply or design only after duplicate-fit review.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "active_reports_only_suite_extraction_or_review": {
+        "route_key": "active_reports_only_suite_extraction_or_review",
+        "route": "aoa-eval-design",
+        "subskill": "aoa-eval-design",
+        "action": "Treat reports-only pressure as a candidate for suite extraction or central review, not proof acceptance.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+    "active_without_detected_pressure": {
+        "route_key": "active_without_detected_pressure",
+        "route": "repair-local-port",
+        "subskill": "aoa-eval-select",
+        "action": "Declared active state has no detected pressure files; repair status or add the missing reviewed pressure surface.",
+        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+    },
+}
 SAFE_FILE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,120}$")
 LOCAL_NOTE_CONFIG = {
     "suites": {
@@ -318,11 +433,16 @@ def _safe_file_slug(value: str, fallback: str = "local-eval-pressure") -> str:
     return slug
 
 
-def _safe_repo_name(value: str) -> str:
-    repo = str(value or "").strip()
-    if not repo or repo in {".", ".."} or "/" in repo or "\\" in repo or "\x00" in repo:
-        raise ValueError(f"unsafe repo name: {value!r}")
-    return repo
+def _safe_repo_id(value: str) -> str:
+    repo_id = unquote(str(value or "")).strip().strip("/")
+    if not repo_id or "\\" in repo_id or "\x00" in repo_id:
+        raise ValueError(f"unsafe repo id: {value!r}")
+    path = Path(repo_id)
+    if path.is_absolute():
+        raise ValueError(f"unsafe repo id: {value!r}")
+    if any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError(f"unsafe repo id: {value!r}")
+    return path.as_posix()
 
 
 def _relative_repo_path(path: Path, repo_root: Path) -> str:
@@ -338,6 +458,33 @@ def _within(root: Path, path: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _workspace_relative(path: Path, workspace_root: Path) -> str:
+    try:
+        relative = path.relative_to(workspace_root)
+    except ValueError:
+        return path.as_posix()
+    return "." if str(relative) == "." else relative.as_posix()
+
+
+def _local_repo_id(path: Path, workspace_root: Path) -> str:
+    relative = _workspace_relative(path, workspace_root)
+    return path.name if relative == "." else relative
+
+
+def _local_port_relative_depth(path: Path, workspace_root: Path) -> int:
+    relative = _workspace_relative(path, workspace_root)
+    if relative == ".":
+        return 0
+    return len(Path(relative).parts)
+
+
+def _local_port_path_is_ignored(path: Path, workspace_root: Path) -> bool:
+    relative = _workspace_relative(path, workspace_root)
+    if relative == ".":
+        return False
+    return any(relative == prefix or relative.startswith(f"{prefix}/") for prefix in LOCAL_PORT_IGNORED_RELATIVE_PREFIXES)
 
 
 def _validate_public_refs(refs: list[str]) -> list[str]:
@@ -555,29 +702,133 @@ class AoAEvalsMCPState:
         payload, _ = self._payload_first(RUNTIME_INTAKE, RUNTIME_INTAKE_MIRROR)
         return _list_from(payload, "templates")
 
-    def _local_port_roots(self) -> list[Path]:
-        if not self.workspace_root.exists():
+    def _local_port_inventory_contract(self) -> tuple[dict[str, Any], Path | None, str]:
+        candidates = [self.source_root, self.evals_root, self.mirror_root]
+        seen: set[Path] = set()
+        for root in candidates:
+            if root is None:
+                continue
+            resolved = root.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            path = resolved / LOCAL_PORT_INVENTORY_CONTRACT
+            payload = _read_json(path)
+            if isinstance(payload, dict):
+                return payload, path, "aoa-evals"
+        return {}, None, "fallback"
+
+    def _local_port_inventory_contract_summary(self) -> dict[str, Any]:
+        contract, path, source = self._local_port_inventory_contract()
+        route_keys = [
+            str(route.get("route_key"))
+            for route in contract.get("route_recommendations", [])
+            if isinstance(route, dict) and route.get("route_key")
+        ]
+        return {
+            "schema_version": contract.get("schema_version"),
+            "inventory_schema_version": contract.get("inventory_schema_version", LOCAL_PORT_INVENTORY_SCHEMA),
+            "contract_ref": path.as_posix() if path else None,
+            "contract_source": source,
+            "route_keys": route_keys or sorted(LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS),
+            "status_vocabulary": contract.get(
+                "inventory_statuses",
+                ["missing", "stale_candidate", "invalid", "skeleton", "active"],
+            ),
+            "summary_keys": contract.get(
+                "summary_keys",
+                [
+                    "repos",
+                    "validator_ok",
+                    "validator_failed",
+                    "with_local_port",
+                    "with_detected_pressure",
+                    "excluded_repos",
+                    "missing",
+                    "stale_candidate",
+                    "invalid",
+                    "skeleton",
+                    "active",
+                ],
+            ),
+        }
+
+    def _local_port_contract_route_recommendation(self, route_key: str) -> dict[str, str]:
+        contract, _path, _source = self._local_port_inventory_contract()
+        routes = contract.get("route_recommendations")
+        if isinstance(routes, list):
+            for route in routes:
+                if isinstance(route, dict) and route.get("route_key") == route_key:
+                    return {str(key): str(value) for key, value in route.items()}
+        fallback = LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS.get(route_key)
+        if fallback is None:
+            raise ValueError(f"unknown local eval-port route key: {route_key}")
+        return dict(fallback)
+
+    def _local_port_discovery_max_depth(self) -> int:
+        contract, _path, _source = self._local_port_inventory_contract()
+        discovery = contract.get("discovery") if isinstance(contract.get("discovery"), dict) else {}
+        if isinstance(discovery.get("default_max_depth"), int):
+            return int(discovery["default_max_depth"])
+        try:
+            return int(os.environ.get("AOA_EVALS_LOCAL_PORT_MAX_DEPTH") or LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH)
+        except ValueError:
+            return LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH
+
+    def _discover_local_repo_roots(self) -> list[Path]:
+        workspace_root = self.workspace_root.resolve()
+        if not workspace_root.exists():
             return []
         roots: list[Path] = []
+        max_depth = self._local_port_discovery_max_depth()
         try:
-            children = sorted(path for path in self.workspace_root.iterdir() if path.is_dir())
+            walker = os.walk(workspace_root)
+            for current, dirnames, _filenames in walker:
+                current_path = Path(current)
+                if _local_port_path_is_ignored(current_path, workspace_root):
+                    dirnames[:] = []
+                    continue
+                if _local_port_relative_depth(current_path, workspace_root) > max_depth:
+                    dirnames[:] = []
+                    continue
+
+                dirnames[:] = sorted(
+                    name
+                    for name in dirnames
+                    if name not in LOCAL_PORT_IGNORED_DIR_NAMES
+                    and not name.startswith(".")
+                    and not _local_port_path_is_ignored(current_path / name, workspace_root)
+                )
+
+                if (current_path / ".git").exists():
+                    roots.append(current_path.resolve())
         except OSError:
             return []
-        for child in children:
-            if child.name == "aoa-evals":
-                continue
-            if (child / "evals" / "PORT.yaml").is_file():
-                roots.append(child)
-        return roots
+        return sorted(set(roots), key=lambda path: _workspace_relative(path, workspace_root))
+
+    def _resolve_local_repo_root(self, repo: str, *, require_port: bool = True) -> Path:
+        repo_id = _safe_repo_id(repo)
+        workspace_root = self.workspace_root.resolve()
+        roots = [root for root in self._discover_local_repo_roots() if root.name != "aoa-evals"]
+        exact = [root for root in roots if _local_repo_id(root, workspace_root) == repo_id]
+        matches = exact or [root for root in roots if root.name == repo_id]
+        if len(matches) > 1:
+            repo_ids = ", ".join(_local_repo_id(root, workspace_root) for root in matches)
+            raise ValueError(f"ambiguous repo id {repo!r}; use one of: {repo_ids}")
+        if matches:
+            root = matches[0]
+        else:
+            root = (workspace_root / repo_id).resolve()
+        if not _within(workspace_root, root):
+            raise ValueError(f"repo escapes workspace root: {repo}")
+        if require_port and not (root / "evals" / "PORT.yaml").is_file():
+            raise ValueError(f"repo does not expose a local eval port: {repo}")
+        if not root.exists():
+            raise ValueError(f"repo does not exist under workspace root: {repo}")
+        return root
 
     def _local_repo_root(self, repo: str) -> Path:
-        repo_name = _safe_repo_name(repo)
-        root = (self.workspace_root / repo_name).resolve()
-        if not _within(self.workspace_root, root):
-            raise ValueError(f"repo escapes workspace root: {repo}")
-        if not (root / "evals" / "PORT.yaml").is_file():
-            raise ValueError(f"repo does not expose a local eval port: {repo}")
-        return root
+        return self._resolve_local_repo_root(repo, require_port=True)
 
     def _local_port_payload(self, repo_root: Path) -> dict[str, Any]:
         payload = _read_yaml(repo_root / "evals" / "PORT.yaml")
@@ -697,6 +948,146 @@ class AoAEvalsMCPState:
         evals_dir = repo_root / "evals"
         return sum(1 for _ in evals_dir.glob("**/eval.yaml")) if evals_dir.is_dir() else 0
 
+    def _local_eval_names(self, repo_root: Path, intake: list[dict[str, Any]] | None = None) -> set[str]:
+        evals_dir = repo_root / "evals"
+        names: set[str] = set()
+        if not evals_dir.is_dir():
+            return names
+        for manifest_path in sorted(evals_dir.glob("**/eval.yaml")):
+            try:
+                payload = _read_yaml(manifest_path)
+            except ValueError:
+                continue
+            if isinstance(payload, dict) and isinstance(payload.get("name"), str):
+                names.add(str(payload["name"]))
+        for record in intake if intake is not None else self._local_intake_records(repo_root):
+            name = record.get("name")
+            if isinstance(name, str) and name:
+                names.add(name)
+        return names
+
+    def _local_port_issue_records(
+        self,
+        repo_root: Path,
+        port: dict[str, Any],
+        intake: list[dict[str, Any]],
+        suites: list[dict[str, Any]],
+        reports: list[dict[str, Any]],
+        active_count: int,
+    ) -> list[dict[str, str]]:
+        evals_dir = repo_root / "evals"
+        issues: list[dict[str, str]] = []
+        if evals_dir.exists() or (evals_dir / "PORT.yaml").exists():
+            for issue in self._local_port_issues(repo_root, port):
+                location = "evals/PORT.yaml"
+                if issue.startswith("missing "):
+                    location = f"evals/{issue.removeprefix('missing ')}"
+                issues.append({"location": location, "message": issue})
+        if port.get("status") == "active" and active_count == 0:
+            issues.append(
+                {
+                    "location": "evals/PORT.yaml",
+                    "message": "active local eval port must contain local pressure files",
+                }
+            )
+        if port.get("status") == "skeleton" and active_count > 0:
+            issues.append(
+                {
+                    "location": "evals/PORT.yaml",
+                    "message": "skeleton local eval port must not contain local pressure files",
+                }
+            )
+        for record in [*intake, *suites, *reports]:
+            if record.get("valid") is not False:
+                continue
+            for issue in record.get("issues", []):
+                issues.append({"location": str(record.get("path") or "evals"), "message": str(issue)})
+        return issues
+
+    def _local_port_inventory_status(
+        self,
+        *,
+        repo_root: Path,
+        issue_records: list[dict[str, str]],
+        declared_status: str | None,
+    ) -> str:
+        evals_dir = repo_root / "evals"
+        port_path = evals_dir / "PORT.yaml"
+        if not port_path.is_file():
+            if evals_dir.exists():
+                return "stale_candidate"
+            return "missing"
+        if issue_records:
+            return "invalid"
+        if declared_status in {"skeleton", "active"}:
+            return declared_status
+        return "invalid"
+
+    def _local_port_central_boundary_ok(
+        self,
+        port: dict[str, Any],
+        issue_records: list[dict[str, str]],
+    ) -> bool:
+        if port.get("proof_owner_repo") != "aoa-evals":
+            return False
+        for issue in issue_records:
+            if issue.get("location") != "evals/PORT.yaml":
+                continue
+            message = str(issue.get("message") or "")
+            if "proof_owner_repo" in message or "central_boundary" in message:
+                return False
+        return True
+
+    def _local_port_route_recommendation(
+        self,
+        *,
+        status: str,
+        declared_status: str | None,
+        counts: dict[str, int],
+        central_matches: list[str],
+    ) -> dict[str, str]:
+        if status == "missing":
+            return self._local_port_contract_route_recommendation("missing_no_pressure")
+        if status == "stale_candidate":
+            return self._local_port_contract_route_recommendation("stale_local_eval_surface_review")
+        if status == "invalid":
+            return self._local_port_contract_route_recommendation(
+                "invalid_active_repair" if declared_status == "active" else "invalid_port_repair"
+            )
+        if central_matches:
+            return self._local_port_contract_route_recommendation("central_overlap_apply_existing_first")
+        if status == "skeleton":
+            return self._local_port_contract_route_recommendation("valid_skeleton_keep_dormant")
+        if counts["local_bundles"]:
+            return self._local_port_contract_route_recommendation("local_bundle_central_review_candidate")
+        if counts["suite_notes"]:
+            return self._local_port_contract_route_recommendation("active_suite_apply_or_regression_check")
+        if counts["intake_packets"]:
+            return self._local_port_contract_route_recommendation("active_intake_select_then_apply_or_design")
+        if counts["report_notes"]:
+            return self._local_port_contract_route_recommendation("active_reports_only_suite_extraction_or_review")
+        return self._local_port_contract_route_recommendation("active_without_detected_pressure")
+
+    def _local_port_source_of_truth(self) -> dict[str, str]:
+        contract, _path, _source = self._local_port_inventory_contract()
+        source_of_truth = contract.get("source_of_truth")
+        if isinstance(source_of_truth, dict):
+            return {str(key): str(value) for key, value in source_of_truth.items()}
+        return dict(LOCAL_PORT_SOURCE_OF_TRUTH)
+
+    def _local_port_authority_boundary(self) -> str:
+        contract, _path, _source = self._local_port_inventory_contract()
+        boundary = contract.get("authority_boundary")
+        return str(boundary) if boundary else LOCAL_PORT_AUTHORITY_BOUNDARY
+
+    def _local_port_summary_keys(self) -> list[str]:
+        contract_summary = self._local_port_inventory_contract_summary()
+        return [str(key) for key in contract_summary["summary_keys"]]
+
+    def _local_port_status_vocabulary(self) -> list[str]:
+        contract_summary = self._local_port_inventory_contract_summary()
+        return [str(status) for status in contract_summary["status_vocabulary"]]
+
     def _local_port_summary(self, repo_root: Path, *, include_files: bool = False) -> dict[str, Any]:
         port = self._local_port_payload(repo_root)
         intake = self._local_intake_records(repo_root)
@@ -704,22 +1095,37 @@ class AoAEvalsMCPState:
         reports = self._local_note_records(repo_root, "reports")
         bundle_count = self._local_bundle_count(repo_root)
         active_count = len(intake) + len(suites) + len(reports) + bundle_count
-        issues = self._local_port_issues(repo_root, port)
-        if port.get("status") == "active" and active_count == 0:
-            issues.append("active local eval port must contain local pressure files")
-        if port.get("status") == "skeleton" and active_count > 0:
-            issues.append("skeleton local eval port must not contain local pressure files")
-        issues.extend(
-            f"{record['path']}: " + "; ".join(record.get("issues", []))
-            for record in [*intake, *suites, *reports]
-            if record.get("valid") is False
+        issue_records = self._local_port_issue_records(repo_root, port, intake, suites, reports, active_count)
+        declared_status = port.get("status") if isinstance(port.get("status"), str) else None
+        inventory_status = self._local_port_inventory_status(
+            repo_root=repo_root,
+            issue_records=issue_records,
+            declared_status=declared_status,
         )
+        validator_ok = not issue_records and inventory_status not in {"missing", "stale_candidate"}
+        counts = {
+            "intake_packets": len(intake),
+            "suite_notes": len(suites),
+            "report_notes": len(reports),
+            "local_bundles": bundle_count,
+            "active_total": active_count,
+        }
+        central_eval_names = {_name(record) for record in self.catalog_records() if _name(record)}
+        central_matches = sorted(self._local_eval_names(repo_root, intake) & central_eval_names)
+        repo_id = _local_repo_id(repo_root, self.workspace_root.resolve())
         result: dict[str, Any] = {
             "repo": repo_root.name,
+            "repo_path": _workspace_relative(repo_root, self.workspace_root.resolve()),
+            "repo_id": repo_id,
             "repo_root": repo_root.as_posix(),
+            "root": repo_root.as_posix(),
             "evals_root": (repo_root / "evals").as_posix(),
+            "port_path": "evals/PORT.yaml",
+            "inventory_status": inventory_status,
+            "validator_ok": validator_ok,
+            "declared_status": declared_status,
             "port": port,
-            "status": port.get("status"),
+            "status": declared_status,
             "counts": {
                 "intake": len(intake),
                 "suites": len(suites),
@@ -727,9 +1133,30 @@ class AoAEvalsMCPState:
                 "local_bundles": bundle_count,
                 "active_pressure": active_count,
             },
+            "pressure_counts": counts,
+            "owner_boundary": {
+                "schema_version": port.get("schema_version"),
+                "owner_repo": port.get("owner_repo"),
+                "proof_owner_repo": port.get("proof_owner_repo"),
+                "default_intake_schema": port.get("default_intake_schema"),
+                "local_role": port.get("local_role"),
+                "central_boundary": port.get("central_boundary"),
+                "central_proof_boundary_ok": self._local_port_central_boundary_ok(port, issue_records),
+            },
+            "central_eval_name_matches": central_matches,
+            "validation_issues": issue_records,
+            "route_recommendation": self._local_port_route_recommendation(
+                status=inventory_status,
+                declared_status=declared_status,
+                counts=counts,
+                central_matches=central_matches,
+            ),
             "validation": {
-                "valid": not issues,
-                "issues": issues,
+                "valid": validator_ok,
+                "issues": [
+                    f"{issue['location']}: {issue['message']}"
+                    for issue in issue_records
+                ],
             },
             "authority_boundary": {
                 "local_role": "repo-local eval pressure only",
@@ -742,27 +1169,62 @@ class AoAEvalsMCPState:
         return result
 
     def local_ports(self, status: str | None = None, include_skeleton: bool = True) -> dict[str, Any]:
-        ports = [self._local_port_summary(root) for root in self._local_port_roots()]
+        workspace_root = self.workspace_root.resolve()
+        inventory_contract = self._local_port_inventory_contract_summary()
+        status_vocabulary = self._local_port_status_vocabulary()
+        roots = self._discover_local_repo_roots()
+        excluded_repos = [
+            {
+                "repo": root.name,
+                "repo_path": _workspace_relative(root, workspace_root),
+                "repo_id": _local_repo_id(root, workspace_root),
+                "reason": "central_proof_owner_not_repo_local_port",
+            }
+            for root in roots
+            if root.name == "aoa-evals"
+        ]
+        ports = [self._local_port_summary(root) for root in roots if root.name != "aoa-evals"]
         if status:
-            ports = [port for port in ports if str(port.get("status") or "") == status]
+            ports = [port for port in ports if str(port.get("inventory_status") or "") == status]
         if not include_skeleton:
-            ports = [port for port in ports if port.get("status") != "skeleton"]
+            ports = [port for port in ports if port.get("inventory_status") != "skeleton"]
+        summary: dict[str, int] = {
+            "repos": len(ports),
+            "validator_ok": sum(1 for port in ports if port["validator_ok"]),
+            "validator_failed": sum(1 for port in ports if port["validation_issues"]),
+            "with_local_port": sum(
+                1 for port in ports if port["inventory_status"] not in {"missing", "stale_candidate"}
+            ),
+            "with_detected_pressure": sum(1 for port in ports if port["pressure_counts"]["active_total"] > 0),
+            "excluded_repos": len(excluded_repos),
+        }
+        for inventory_status in status_vocabulary:
+            summary[inventory_status] = sum(1 for port in ports if port["inventory_status"] == inventory_status)
         return {
             "schema": "aoa_evals_local_ports_v1",
+            "inventory_schema_version": inventory_contract["inventory_schema_version"],
+            "layer": "aoa-evals-local-port-inventory",
             "workspace_root": self.workspace_root.as_posix(),
+            "proof_owner_repo": "aoa-evals",
+            "inventory_contract": inventory_contract,
+            "summary": summary,
+            "excluded_repos": sorted(excluded_repos, key=lambda entry: str(entry["repo_id"])),
             "count": len(ports),
             "ports": ports,
             "read_only": True,
             "write_scope": "use gated write tools for local port files only",
+            "source_of_truth": self._local_port_source_of_truth(),
+            "inventory_authority_boundary": self._local_port_authority_boundary(),
             "authority_boundary": self.authority_boundary(),
         }
 
     def local_port(self, repo: str) -> dict[str, Any]:
-        repo_root = self._local_repo_root(repo)
+        repo_root = self._resolve_local_repo_root(repo, require_port=False)
         result = self._local_port_summary(repo_root, include_files=True)
         result["schema"] = "aoa_evals_local_port_v1"
         result["read_only"] = True
         result["write_scope"] = "local intake, suite notes, and report notes only"
+        result["inventory_contract"] = self._local_port_inventory_contract_summary()
         result["authority_boundary"] = self.authority_boundary()
         return result
 
@@ -789,7 +1251,15 @@ class AoAEvalsMCPState:
 
     def _local_write_gate(self, repo_root: Path) -> tuple[bool, list[str]]:
         port_summary = self._local_port_summary(repo_root)
-        issues = list(port_summary.get("validation", {}).get("issues", []))
+        issue_records = port_summary.get("validation_issues")
+        if isinstance(issue_records, list):
+            issues = [
+                str(issue.get("message") or "")
+                for issue in issue_records
+                if isinstance(issue, dict) and str(issue.get("message") or "")
+            ]
+        else:
+            issues = list(port_summary.get("validation", {}).get("issues", []))
         activation_needed, _, activation_issues = self._port_activation_update(repo_root)
         issues.extend(activation_issues)
         return activation_needed, issues
@@ -1888,20 +2358,31 @@ class AoAEvalsMCPState:
             return self.reports()
         if parts == ["local-ports"]:
             return self.local_ports()
-        if len(parts) == 2 and parts[0] == "local-port":
-            return self.local_port(parts[1])
-        if len(parts) == 3 and parts[0] == "local-port" and parts[2] == "intake":
+        if len(parts) >= 2 and parts[0] == "local-port":
+            if parts[-1] in {"intake", "suites", "reports"}:
+                repo_id = "/".join(parts[1:-1])
+                resource_key = parts[-1]
+            else:
+                repo_id = "/".join(parts[1:])
+                resource_key = None
+            if not repo_id:
+                raise ValueError(f"local-port resource requires a repo id: {uri}")
+            if resource_key is None:
+                return self.local_port(repo_id)
+            repo_root = self._resolve_local_repo_root(repo_id, require_port=False)
+            if resource_key == "intake":
+                return {
+                    "schema": "aoa_evals_local_port_intake_v1",
+                    "repo": repo_root.name,
+                    "repo_id": _local_repo_id(repo_root, self.workspace_root.resolve()),
+                    "intake": self._local_intake_records(repo_root),
+                    "authority_boundary": self.authority_boundary(),
+                }
             return {
-                "schema": "aoa_evals_local_port_intake_v1",
-                "repo": parts[1],
-                "intake": self._local_intake_records(self._local_repo_root(parts[1])),
-                "authority_boundary": self.authority_boundary(),
-            }
-        if len(parts) == 3 and parts[0] == "local-port" and parts[2] in {"suites", "reports"}:
-            return {
-                "schema": f"aoa_evals_local_port_{parts[2]}_v1",
-                "repo": parts[1],
-                parts[2]: self._local_note_records(self._local_repo_root(parts[1]), parts[2]),
+                "schema": f"aoa_evals_local_port_{resource_key}_v1",
+                "repo": repo_root.name,
+                "repo_id": _local_repo_id(repo_root, self.workspace_root.resolve()),
+                resource_key: self._local_note_records(repo_root, resource_key),
                 "authority_boundary": self.authority_boundary(),
             }
         if len(parts) == 2 and parts[0] == "bundle":
