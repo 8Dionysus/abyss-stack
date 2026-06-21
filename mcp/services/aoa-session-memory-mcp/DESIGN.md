@@ -62,8 +62,11 @@ paths over the portable SQLite projection. They are deliberately bounded:
 session-scoped answer/closeout/progress/reasoning packets can return zero
 classified events without failing, and lightweight entity-neighborhood probes
 can return route-signal refs without raw previews. The packet names the deeper
-`.aoa` command for raw windows or consequence expansion, but the MCP does not
-run that expansion if it would turn an agent health probe into a bulk scan.
+`.aoa` command for raw windows or consequence expansion. Agent-event text
+queries and expansion commands use shard-aware archive routes when available,
+while queryless scoped packets may stay on the MCP-local SQLite shortcut and
+report their cost/profile explicitly. The MCP does not run expansion if it
+would turn an agent health probe into a bulk scan.
 
 Session review and continuation use compact packets:
 

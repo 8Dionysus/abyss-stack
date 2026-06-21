@@ -1269,6 +1269,8 @@ def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path:
     assert not any(call[0] == "search" for call in runner.calls)
     calls = {call[0]: call[1] for call in runner.calls}
     args = calls["agent-responses"]
+    assert "--use-shards" in args
+    assert args[args.index("--max-shards") + 1] == "24"
     assert args[args.index("--session") + 1] == "session-1"
     assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
     assert args[args.index("--task-episode-id") + 1] == "task-0001"
@@ -1311,6 +1313,8 @@ def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Pat
     search_calls = [call for call in runner.calls if call[0] == "search"]
     assert len(search_calls) == 1
     args = search_calls[0][1]
+    assert "--use-shards" in args
+    assert args[args.index("--max-shards") + 1] == "24"
     assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
     assert args[args.index("--task-episode-id") + 1] == "task-0001"
     assert args[args.index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
@@ -1470,6 +1474,8 @@ def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) ->
     assert neighborhood["artifact_type"] == "agent_event_windows"
     calls = {call[0]: call[1] for call in runner.calls}
     response_args = calls["agent-responses"]
+    assert "--use-shards" in response_args
+    assert response_args[response_args.index("--max-shards") + 1] == "24"
     assert response_args[response_args.index("--agent-event") + 1] == "assistant_final_closeout"
     assert response_args[response_args.index("--task-episode-id") + 1] == "task-0001"
     assert "agent-progress-updates" in calls
@@ -1526,12 +1532,57 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     assert responses["source"] == "portable_sqlite_agent_event_fast_path"
     assert responses["result_count"] == 1
     assert responses["results"][0]["agent_event"] == "assistant_answer"
+    assert responses["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
+    assert responses["search_projection"]["fallback_route"] == "archive_cli_shard_fanout"
+    assert responses["cost_profile"]["lightweight_route"] is True
+    assert responses["cost_profile"]["uses_fts"] is False
     assert responses["mcp_access"]["archive_command"] is None
     assert search["source"] == "portable_sqlite_agent_event_fast_path"
     assert "served by MCP agent-event route fast path" in search["diagnostics"]
     assert neighborhood["source"] == "portable_sqlite_agent_event_window_fast_path"
     assert neighborhood["window_count"] == 1
     assert not any(call[0] in {"agent-responses", "answer-neighborhood"} for call in runner.calls)
+
+
+def test_text_agent_event_route_uses_archive_shard_path_even_when_sqlite_fast_schema_exists(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    conn = sqlite3.connect(state.aoa_root / "search/aoa-search.sqlite3")
+    try:
+        conn.executescript(
+            """
+            ALTER TABLE documents ADD COLUMN conversation_act TEXT;
+            ALTER TABLE documents ADD COLUMN session_act TEXT;
+            ALTER TABLE documents ADD COLUMN agent_event TEXT;
+            ALTER TABLE documents ADD COLUMN task_episode_id TEXT;
+            ALTER TABLE documents ADD COLUMN route_layers TEXT;
+            ALTER TABLE documents ADD COLUMN route_signals TEXT;
+            ALTER TABLE documents ADD COLUMN body TEXT;
+            CREATE INDEX idx_documents_session_agent_event ON documents(session_label, agent_event);
+            CREATE INDEX idx_documents_agent_event ON documents(agent_event);
+            """
+        )
+        conn.execute(
+            """
+            UPDATE documents
+            SET agent_event = 'assistant_answer',
+                body = 'answer body'
+            WHERE id = 'event:session-1:000:000001'
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    responses = state.session_agent_responses(query="answer", session="session-1", limit=3)
+
+    assert responses["artifact_type"] == "agent_event_route_results"
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["agent-responses"]
+    assert "--use-shards" in args
+    assert args[args.index("--max-shards") + 1] == "24"
+    assert args[args.index("--query") + 1] == "answer"
+    assert args[args.index("--session") + 1] == "session-1"
 
 
 def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: Path) -> None:
