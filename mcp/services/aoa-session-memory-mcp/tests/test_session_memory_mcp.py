@@ -1707,6 +1707,8 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
     latest_skill_inventory = state.session_entity_inventory(layer="skill", session="latest", limit=5)
     explicit_skill_inventory = state.session_entity_inventory(layer="skill", session="session-1", limit=5)
+    mcp_inventory = state.session_entity_inventory(layer="mcp", limit=5)
+    mcp_service_inventory = state.session_entity_inventory(layer="mcp_service", limit=5)
     eval_inventory = state.session_entity_inventory(layer="eval", limit=5)
     git_inventory = state.session_entity_inventory(layer="git", limit=5)
     playbook_inventory = state.session_entity_inventory(layer="playbook", limit=5)
@@ -1721,6 +1723,11 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert skill_inventory["entities"][0]["samples"][0]["refs"]["raw"] == "raw:line:2"
     assert latest_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert explicit_skill_inventory["entities"][0]["key"] == "aoa_decision"
+    assert mcp_inventory["source"] == "atlas"
+    assert mcp_inventory["entities"][0]["key"] == "aoa_session_memory_mcp"
+    assert mcp_service_inventory["layer"] == "mcp"
+    assert mcp_service_inventory["source"] == "atlas"
+    assert mcp_service_inventory["entities"] == mcp_inventory["entities"]
     assert eval_inventory["source"] == "portable_sqlite"
     assert eval_inventory["entities"][0]["key"] == "inspect_ai"
     assert git_inventory["entities"][0]["key"] == "git"
