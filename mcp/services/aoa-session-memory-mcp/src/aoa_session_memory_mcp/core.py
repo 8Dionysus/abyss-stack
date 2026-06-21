@@ -175,6 +175,28 @@ INVENTORY_LAYER_TO_AXIS = {
     "memory": "by-memory-entity",
     "agent_event": "by-agent-event",
 }
+INVENTORY_INPUT_LAYER_TO_ROUTE_LAYER = {
+    "skills": "skill",
+    "mcp_service": "mcp",
+    "mcp_services": "mcp",
+    "mcps": "mcp",
+    "hooks": "hook",
+    "tools": "tool",
+    "apis": "api",
+    "plugins": "plugin",
+    "agents": "agent",
+    "scripts": "script",
+    "validators": "validator",
+    "tests": "test",
+    "evals": "eval",
+    "git_tools": "git",
+    "playbooks": "playbook",
+    "techniques": "technique",
+    "mechanics": "mechanic",
+    "graphs": "graph",
+    "memories": "memory",
+    "goals": "goal",
+}
 AGENT_EVENT_DEFAULTS_BY_ROUTE = {
     "agent-closeouts": ["assistant_closeout", "assistant_verification_report"],
     "agent-progress-updates": ["assistant_progress_update"],
@@ -2546,7 +2568,8 @@ class AoASessionMemoryMCPState:
         limit: int = 50,
         sample_limit: int = 2,
     ) -> dict[str, Any]:
-        layer_key = _safe_selector(str(layer or "skill"), "layer", limit=80)
+        input_layer_key = _safe_selector(str(layer or "skill"), "layer", limit=80)
+        layer_key = INVENTORY_INPUT_LAYER_TO_ROUTE_LAYER.get(input_layer_key, input_layer_key)
         if layer_key not in ROUTE_LAYERS:
             raise ValueError(f"unsupported inventory layer: {layer_key}")
         selected_limit = _coerce_limit(limit, 50, 200)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
@@ -23,6 +24,24 @@ def tracked_files() -> set[str]:
         check=True,
     )
     return set(result.stdout.splitlines())
+
+
+def load_runtime_config_bundle_validator():
+    script = (
+        REPO_ROOT
+        / "mechanics"
+        / "config-projection"
+        / "parts"
+        / "rendering"
+        / "scripts"
+        / "validate_abyss_machine_runtime_config_bundle.py"
+    )
+    spec = importlib.util.spec_from_file_location("abyss_stack_runtime_config_bundle_validator", script)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def covered_paths(inventory: dict[str, object]) -> set[str]:
@@ -94,6 +113,45 @@ def test_runtime_config_bundle_hashes_rendered_subject() -> None:
             "role": "rendered_runtime_config",
         }
     ]
+    assert manifest["lifecycle"]["latest_eligible_states"] == [
+        "manually-verified",
+        "release-ready",
+        "published",
+    ]
+    assert manifest["consumer_contract"]["registry_required"] is True
+
+
+def test_runtime_config_bundle_validator_reports_external_paths(tmp_path: Path) -> None:
+    validator = load_runtime_config_bundle_validator()
+
+    assert validator._path_ref(REPO_ROOT / "dist" / "bundle") == "dist/bundle"
+    assert validator._path_ref(tmp_path / "bundle") == str((tmp_path / "bundle").resolve())
+
+
+def test_runtime_config_bundle_validator_sanitizes_public_verify_sidecar(tmp_path: Path) -> None:
+    validator = load_runtime_config_bundle_validator()
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    sidecar = bundle_dir / "artifact.verify.json"
+    sidecar.write_text(
+        json.dumps(
+            {
+                "artifact_subject_resolution": [
+                    {
+                        "path": "dist/abyss-stack-runtime-config/substrate.rendered.yml",
+                        "resolved_path": str(REPO_ROOT / "dist" / "abyss-stack-runtime-config" / "substrate.rendered.yml"),
+                        "ok": True,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    validator._sanitize_public_verify_sidecar(bundle_dir)
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+
+    assert payload["artifact_subject_resolution"][0]["resolved_path"] == "dist/abyss-stack-runtime-config/substrate.rendered.yml"
 
 
 def test_root_validator_is_marked_as_orchestrator() -> None:
