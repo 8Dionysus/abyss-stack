@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import time
 import datetime as dt
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -19,6 +20,7 @@ DEFAULT_TIMEOUT_SECONDS = 20.0
 STATUS_TIMEOUT_SECONDS = 60.0
 SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
+USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
@@ -172,6 +174,12 @@ INVENTORY_LAYER_TO_AXIS = {
     "graph": "by-graph",
     "memory": "by-memory-entity",
     "agent_event": "by-agent-event",
+}
+AGENT_EVENT_DEFAULTS_BY_ROUTE = {
+    "agent-closeouts": ["assistant_closeout", "assistant_verification_report"],
+    "agent-progress-updates": ["assistant_progress_update"],
+    "agent-reasoning-windows": ["assistant_reasoning_boundary", "assistant_reasoning"],
+    "answer-neighborhood": ["assistant_answer", "assistant_closeout", "assistant_verification_report"],
 }
 
 
@@ -711,6 +719,26 @@ class AoASessionMemoryMCPState:
                 "aoa_session_graph_eval",
                 "aoa_session_graph_quality_audit",
             ],
+            "resources": [
+                "aoa-session-memory://status",
+                "aoa-session-memory://surfaces",
+                "aoa-session-memory://provider/status",
+                "aoa-session-memory://maintenance/status",
+                "aoa-session-memory://readiness/route-layer",
+                "aoa-session-memory://diagnostics/latest/{kind}",
+                "aoa-session-memory://entities/{layer}",
+                "aoa-session-memory://entity-registry/{kind}",
+                "aoa-session-memory://entity-lookup/{kind}/{anchor}",
+                "aoa-session-memory://session/{session}/brief",
+                "aoa-session-memory://session/{session}/manifest",
+                "aoa-session-memory://session/{session}/index",
+                "aoa-session-memory://session/{session}/rehydrate",
+                "aoa-session-memory://route/{axis}/{key}",
+                "aoa-session-memory://trace/{anchor}",
+                "aoa-session-memory://hooks/receipts/{event_name}",
+                "aoa-session-memory://graph/status",
+                "aoa-session-memory://graph/neighborhood/{anchor}",
+            ],
             "route_layers": ROUTE_LAYERS,
             "authority_boundary": self.authority_boundary(),
         }
@@ -768,6 +796,12 @@ class AoASessionMemoryMCPState:
     def _sqlite_table_exists(self, conn: sqlite3.Connection, name: str) -> bool:
         row = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1", (name,)).fetchone()
         return row is not None
+
+    def _sqlite_table_columns(self, conn: sqlite3.Connection, name: str) -> set[str]:
+        try:
+            return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({name})").fetchall()}
+        except sqlite3.Error:
+            return set()
 
     def _search_provider_status_fast(self) -> dict[str, Any]:
         db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
@@ -1160,6 +1194,18 @@ class AoASessionMemoryMCPState:
             args.extend(["--failure-state", _safe_selector(failure_state, "failure_state", limit=32)])
         if explain:
             args.append("--explain")
+        if not closeout_final and verification_state == "any" and failure_state == "any":
+            fast_payload = self._agent_event_sqlite_fast_path(
+                command="agent-responses",
+                query=text,
+                session=session,
+                episode=episode,
+                agent_events=agent_events or [],
+                limit=_coerce_limit(limit, 20, 100),
+                archive_args=args,
+            )
+            if fast_payload is not None:
+                return fast_payload
         payload = self._archive_command("agent-responses", args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
@@ -1230,9 +1276,187 @@ class AoASessionMemoryMCPState:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
         if explain:
             args.append("--explain")
+        fast_payload = self._agent_event_sqlite_fast_path(
+            command=command,
+            query=text,
+            session=session,
+            episode=episode,
+            agent_events=AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []),
+            limit=_coerce_limit(limit, 20, 100),
+            archive_args=args,
+        )
+        if fast_payload is not None:
+            return fast_payload
         payload = self._archive_command(command, args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
+
+    def _agent_event_sqlite_fast_path(
+        self,
+        *,
+        command: str,
+        query: str,
+        session: str,
+        episode: str,
+        agent_events: list[str],
+        limit: int,
+        archive_args: list[str],
+    ) -> dict[str, Any] | None:
+        explicit_agent_events = [str(item) for item in agent_events if str(item or "").strip()]
+        if not (session or episode or query or explicit_agent_events):
+            return None
+        db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
+        if not db_path.is_file():
+            return None
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            if not self._sqlite_table_exists(conn, "documents"):
+                return None
+            columns = self._sqlite_table_columns(conn, "documents")
+            if "agent_event" not in columns:
+                return None
+            filters = ["doc_type = 'event'"]
+            params: list[Any] = []
+            table_expr = "documents"
+            session_dir = self._resolve_session_dir(session) if session else None
+            if session:
+                if "session_label" not in columns:
+                    return None
+                table_expr = "documents INDEXED BY idx_documents_session_agent_event"
+                filters.append("session_label = ?")
+                params.append(session_dir.name if session_dir is not None else session)
+            elif explicit_agent_events and "agent_event" in columns:
+                table_expr = "documents INDEXED BY idx_documents_agent_event"
+            if episode and "task_episode_id" in columns:
+                filters.append("task_episode_id = ?")
+                params.append(episode)
+            elif episode:
+                return None
+            if explicit_agent_events:
+                placeholders = ", ".join("?" for _ in explicit_agent_events)
+                filters.append(f"agent_event IN ({placeholders})")
+                params.extend(explicit_agent_events)
+            elif command in AGENT_EVENT_DEFAULTS_BY_ROUTE:
+                defaults = AGENT_EVENT_DEFAULTS_BY_ROUTE[command]
+                placeholders = ", ".join("?" for _ in defaults)
+                filters.append(f"agent_event IN ({placeholders})")
+                params.extend(defaults)
+            else:
+                filters.append("agent_event IS NOT NULL AND agent_event != ''")
+            if query:
+                searchable_columns = [name for name in ("title", "body") if name in columns]
+                if not searchable_columns:
+                    return None
+                filters.append(
+                    "("
+                    + " OR ".join(f"LOWER(COALESCE({name}, '')) LIKE ?" for name in searchable_columns)
+                    + ")"
+                )
+                params.extend([f"%{query.casefold()}%" for _ in searchable_columns])
+
+            def select_expr(name: str) -> str:
+                return f"{name} AS {name}" if name in columns else f"NULL AS {name}"
+
+            rows = conn.execute(
+                f"""
+                SELECT
+                    rowid AS rowid,
+                    id AS id,
+                    doc_type AS doc_type,
+                    {select_expr("session_id")},
+                    {select_expr("session_label")},
+                    {select_expr("session_title")},
+                    {select_expr("session_date")},
+                    {select_expr("event_type")},
+                    {select_expr("family")},
+                    {select_expr("conversation_act")},
+                    {select_expr("session_act")},
+                    {select_expr("agent_event")},
+                    {select_expr("task_episode_id")},
+                    {select_expr("route_layers")},
+                    {select_expr("route_signals")},
+                    {select_expr("title")},
+                    {select_expr("segment_ref")},
+                    {select_expr("segment_index_path")},
+                    {select_expr("raw_ref")},
+                    {select_expr("raw_block_ref")},
+                    {select_expr("manifest_path")},
+                    {select_expr("freshness_status")},
+                    {select_expr("stale_reason")}
+                FROM {table_expr}
+                WHERE {" AND ".join(filters)}
+                ORDER BY rowid DESC
+                LIMIT ?
+                """,
+                [*params, limit],
+            ).fetchall()
+        except sqlite3.Error:
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+        results = [self._agent_event_hit_from_sqlite_row(row) for row in rows]
+        return {
+            "schema_version": 1,
+            "artifact_type": "agent_event_route_results",
+            "ok": True,
+            "mutates": False,
+            "source": "portable_sqlite_agent_event_fast_path",
+            "command": command,
+            "query": query,
+            "session": session or None,
+            "episode": episode or None,
+            "agent_events": explicit_agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []),
+            "result_count": len(results),
+            "results": results,
+            "provider": {
+                "selected": "portable_sqlite",
+                "status": "mcp_sqlite_agent_event_fast_path",
+                "db_path": db_path.as_posix(),
+            },
+            "diagnostics": ["served by MCP SQLite agent-event fast path"],
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": db_path.as_posix(),
+                "next_expansion_command": self._archive_command_line(command, archive_args),
+                "authority_boundary": "MCP fast path reads generated search projection; raw transcript refs remain authoritative.",
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _agent_event_hit_from_sqlite_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        refs = {
+            "session": row["manifest_path"],
+            "segment": row["segment_ref"],
+            "segment_index": row["segment_index_path"],
+            "raw": row["raw_ref"],
+            "raw_block": row["raw_block_ref"],
+        }
+        return {
+            "doc_id": row["id"],
+            "doc_type": row["doc_type"],
+            "session_id": row["session_id"],
+            "session_label": row["session_label"],
+            "session_title": row["session_title"],
+            "session_date": row["session_date"],
+            "event_type": row["event_type"],
+            "family": row["family"],
+            "conversation_act": row["conversation_act"],
+            "session_act": row["session_act"],
+            "agent_event": row["agent_event"],
+            "task_episode_id": row["task_episode_id"],
+            "route_layers": row["route_layers"],
+            "route_signals": row["route_signals"],
+            "title": row["title"],
+            "refs": {key: value for key, value in refs.items() if value},
+            "freshness": {
+                "status": row["freshness_status"],
+                "reasons": [row["stale_reason"]] if row["stale_reason"] else [],
+            },
+        }
 
     def session_agent_reasoning_windows(
         self,
@@ -1312,9 +1536,66 @@ class AoASessionMemoryMCPState:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
         for agent_event in agent_events or []:
             args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
+        fast_events = list(agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
+        fast_payload = self._agent_event_sqlite_fast_path(
+            command=command,
+            query=text,
+            session=session,
+            episode=episode,
+            agent_events=fast_events,
+            limit=_coerce_limit(limit, 10, 50),
+            archive_args=args,
+        )
+        if fast_payload is not None:
+            return self._agent_event_window_fast_path_payload(
+                command=command,
+                source_payload=fast_payload,
+                before=_coerce_bounded_int(before, 3, 0, 24),
+                after=_coerce_bounded_int(after, 6, 0, 48),
+            )
         payload = self._archive_command(command, args, allow_nonzero_json=True)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
+
+    def _agent_event_window_fast_path_payload(
+        self,
+        *,
+        command: str,
+        source_payload: dict[str, Any],
+        before: int,
+        after: int,
+    ) -> dict[str, Any]:
+        results = source_payload.get("results") if isinstance(source_payload.get("results"), list) else []
+        windows = [
+            {
+                "ok": True,
+                "source": "portable_sqlite_agent_event_window_fast_path",
+                "center_event": result,
+                "events": [result],
+                "refs": result.get("refs") if isinstance(result, dict) else {},
+                "freshness": result.get("freshness") if isinstance(result, dict) else None,
+            }
+            for result in results
+            if isinstance(result, dict)
+        ]
+        return {
+            "schema_version": 1,
+            "artifact_type": "agent_event_windows",
+            "ok": True,
+            "mutates": False,
+            "source": "portable_sqlite_agent_event_window_fast_path",
+            "command": command,
+            "window_count": len(windows),
+            "windows": windows,
+            "parameters": {"before": before, "after": after},
+            "provider": source_payload.get("provider"),
+            "diagnostics": [
+                "served by MCP SQLite agent-event window fast path",
+                "fast path returns center refs only; use next_expansion_command for raw before/after windows",
+            ],
+            "mcp_access": source_payload.get("mcp_access", {}),
+            "authority_boundary": self.authority_boundary(),
+        }
 
     def session_task_episodes(
         self,
@@ -1591,34 +1872,250 @@ class AoASessionMemoryMCPState:
         anchor_text = _ensure_short_text(anchor, "anchor")
         if kind not in ALLOWED_TRACE_KINDS:
             raise ValueError(f"unsupported trace kind: {kind}")
+        selected_limit = _coerce_limit(limit, 6, 40)
+        selected_per_route_limit = _coerce_limit(per_route_limit, 20, 100)
+        selected_before = _coerce_bounded_int(before, 3, 0, 24)
+        selected_after = _coerce_limit(after, 8, 48)
+        selected_raw_preview_chars = _coerce_bounded_int(raw_preview_chars, 600, 0, 2000)
+        selected_document_limit = _coerce_limit(document_limit, 80, 200)
         args = [
             anchor_text,
             "--kind",
             kind,
             "--limit",
-            str(_coerce_limit(limit, 6, 40)),
+            str(selected_limit),
             "--per-route-limit",
-            str(_coerce_limit(per_route_limit, 20, 100)),
+            str(selected_per_route_limit),
             "--before",
-            str(_coerce_bounded_int(before, 3, 0, 24)),
+            str(selected_before),
             "--after",
-            str(_coerce_limit(after, 8, 48)),
+            str(selected_after),
             "--raw-preview-chars",
-            str(_coerce_bounded_int(raw_preview_chars, 600, 0, 2000)),
+            str(selected_raw_preview_chars),
             "--document-limit",
-            str(_coerce_limit(document_limit, 80, 200)),
+            str(selected_document_limit),
             "--full",
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
+        if (
+            selected_raw_preview_chars == 0
+            and selected_limit <= 3
+            and selected_per_route_limit <= 3
+            and selected_document_limit <= 10
+        ):
+            return self._usage_neighborhood_search_fast_path(
+                anchor=anchor_text,
+                kind=kind,
+                limit=selected_limit,
+                per_route_limit=selected_per_route_limit,
+                before=selected_before,
+                after=selected_after,
+                raw_preview_chars=selected_raw_preview_chars,
+                document_limit=selected_document_limit,
+                session=session,
+                deep_args=args,
+                reason="lightweight_mcp_probe",
+            )
         payload = self._archive_command(
             "entity-usage-neighborhood",
             args,
             allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+            timeout_seconds=min(max(self.timeout_seconds, 10.0), USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS),
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
+        if not payload.get("ok") or not payload.get("neighborhoods"):
+            return self._usage_neighborhood_search_fast_path(
+                anchor=anchor_text,
+                kind=kind,
+                limit=selected_limit,
+                per_route_limit=selected_per_route_limit,
+                before=selected_before,
+                after=selected_after,
+                raw_preview_chars=selected_raw_preview_chars,
+                document_limit=selected_document_limit,
+                session=session,
+                deep_args=args,
+                reason="archive_route_unavailable",
+                archive_payload=payload,
+            )
         return payload
+
+    def _usage_neighborhood_search_fast_path(
+        self,
+        *,
+        anchor: str,
+        kind: str,
+        limit: int,
+        per_route_limit: int,
+        before: int,
+        after: int,
+        raw_preview_chars: int,
+        document_limit: int,
+        session: str,
+        deep_args: list[str],
+        reason: str,
+        archive_payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        route_attempts: list[dict[str, Any]] = []
+        selected_hits: list[dict[str, Any]] = []
+        selected_signal = None
+        provider: dict[str, Any] | None = None
+        search_limit = max(1, min(limit * max(1, per_route_limit), 20))
+        for signal in self._usage_route_signal_candidates(kind=kind, anchor=anchor):
+            filters = {"route_signal": signal, "doc_type": "event"}
+            if session:
+                filters["session"] = session
+            search = self.session_search("", filters=filters, limit=search_limit)
+            route_attempts.append(
+                {
+                    "route_signal": signal,
+                    "ok": search.get("ok"),
+                    "result_count": search.get("result_count", 0),
+                    "provider_status": search.get("provider", {}).get("status")
+                    if isinstance(search.get("provider"), dict)
+                    else None,
+                    "diagnostics": search.get("diagnostics", [])[:3]
+                    if isinstance(search.get("diagnostics"), list)
+                    else [],
+                }
+            )
+            results = search.get("results") if isinstance(search.get("results"), list) else []
+            selected_hits = [hit for hit in results if isinstance(hit, dict)]
+            if search.get("ok") and selected_hits:
+                selected_signal = signal
+                provider = search.get("provider") if isinstance(search.get("provider"), dict) else None
+                break
+
+        neighborhoods = []
+        for hit in selected_hits[:limit]:
+            compact = _compact_hit(hit)
+            source_event = {
+                key: compact.get(key)
+                for key in (
+                    "doc_id",
+                    "doc_type",
+                    "session_id",
+                    "session_label",
+                    "session_title",
+                    "event_type",
+                    "conversation_act",
+                    "session_act",
+                    "agent_event",
+                    "task_episode_id",
+                    "title",
+                    "refs",
+                    "freshness",
+                    "route_signals",
+                    "matched_routes",
+                )
+                if compact.get(key) not in (None, "", [], {})
+            }
+            source_event["raw_preview"] = {
+                "status": "not_loaded",
+                "reason": "mcp_search_fast_path",
+            }
+            neighborhoods.append(
+                {
+                    "ok": True,
+                    "source": "mcp_search_route_signal_fast_path",
+                    "source_usage_event": source_event,
+                    "local_events": [],
+                    "consequence_events": [],
+                    "refs": compact.get("refs") or {},
+                    "freshness": compact.get("freshness"),
+                }
+            )
+
+        diagnostics = [f"served by MCP search-backed usage neighborhood fast path: {reason}"]
+        if not neighborhoods:
+            diagnostics.append("usage neighborhood fast path found no route-signal hits")
+        if archive_payload is not None:
+            diagnostics.extend(
+                str(item)
+                for item in archive_payload.get("diagnostics", [])
+                if item
+            )
+        mcp_access = {
+            "mutates": False,
+            "archive_command": None,
+            "fast_path": True,
+            "fallback_reason": reason,
+            "selected_route_signal": selected_signal,
+            "next_expansion_command": self._archive_command_line("entity-usage-neighborhood", deep_args),
+            "authority_boundary": "MCP fast path returns generated search refs; raw evidence remains authoritative.",
+        }
+        if archive_payload is not None:
+            mcp_access["fallback_from"] = archive_payload.get("mcp_access", {})
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_neighborhood",
+            "ok": bool(neighborhoods),
+            "mutates": False,
+            "anchor": anchor,
+            "kind": kind,
+            "session": session or None,
+            "window_count": len(neighborhoods),
+            "neighborhoods": neighborhoods,
+            "quality": {
+                "usage_neighborhood_present": bool(neighborhoods),
+                "consequence_present": False,
+                "raw_preview_available": False,
+                "neighborhood_count": len(neighborhoods),
+                "consequence_event_count": 0,
+                "fast_path": True,
+            },
+            "route_attempts": route_attempts,
+            "provider": provider,
+            "parameters": {
+                "limit": limit,
+                "per_route_limit": per_route_limit,
+                "before": before,
+                "after": after,
+                "raw_preview_chars": raw_preview_chars,
+                "document_limit": document_limit,
+            },
+            "diagnostics": diagnostics,
+            "mcp_access": mcp_access,
+            "authority_boundary": self.authority_boundary(),
+        }
+
+    def _usage_route_signal_candidates(self, *, kind: str, anchor: str) -> list[str]:
+        anchor_text = str(anchor or "").strip()
+        normalized_anchor = _route_key(anchor_text)
+        normalized_kind = _route_key(kind or "auto")
+        candidates: list[str] = []
+        if ":" in anchor_text:
+            candidates.append(anchor_text)
+            prefix, _, value = anchor_text.partition(":")
+            normalized_value = _route_key(value)
+            if prefix and normalized_value:
+                candidates.append(f"{_route_key(prefix)}:{normalized_value}")
+        if normalized_kind and normalized_kind != "auto" and normalized_anchor:
+            candidates.append(f"{normalized_kind}:{normalized_anchor}")
+            candidates.append(f"{normalized_kind}:{anchor_text}")
+        elif normalized_anchor:
+            for layer in (
+                "tool",
+                "mcp",
+                "skill",
+                "hook",
+                "api",
+                "plugin",
+                "script",
+                "validator",
+                "test",
+                "eval",
+                "git",
+                "playbook",
+                "technique",
+                "mechanic",
+                "graph",
+                "memory",
+                "agent",
+            ):
+                candidates.append(f"{layer}:{normalized_anchor}")
+        return list(dict.fromkeys(candidate for candidate in candidates if candidate and not candidate.endswith(":")))
 
     def session_entity_usage_scenario_audit(
         self,
@@ -2200,25 +2697,114 @@ class AoASessionMemoryMCPState:
         kind_key = _safe_selector(str(kind or "all"), "kind", limit=80)
         query_text = str(query or "").strip()
         lookup_text = str(lookup or "").strip()
-        args = ["--kind", kind_key, "--limit", str(_coerce_limit(limit, 50, 500))]
-        if query_text:
-            args.extend(["--query", _ensure_short_text(query_text, "query", limit=160)])
-        if lookup_text:
-            args.extend(["--lookup", _ensure_short_text(lookup_text, "lookup", limit=160)])
-        payload = self._archive_command(
-            "entity-registry",
-            args,
-            allow_nonzero_json=True,
-            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
-        )
-        payload.setdefault("mutates", False)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        mcp_access = payload.get("mcp_access")
-        if isinstance(mcp_access, dict):
-            mcp_access["read_only_registry_route"] = True
-            mcp_access["write_route"] = self._archive_command_line("entity-registry", ["--kind", kind_key, "--write"])
-            mcp_access["write_requires_operator_outside_mcp"] = True
+        selected_limit = _coerce_limit(limit, 50, 500)
+        payload = self._entity_registry_snapshot(kind_key=kind_key, query_text=query_text, lookup_text=lookup_text, limit=selected_limit)
+        payload["authority_boundary"] = self.authority_boundary()
+        payload["mcp_access"] = {
+            "mutates": False,
+            "archive_command": None,
+            "read_model": (self.aoa_root / "maps" / "entity-registry.json").as_posix(),
+            "read_only_registry_route": True,
+            "write_route": self._archive_command_line("entity-registry", ["--kind", kind_key, "--write"]),
+            "write_requires_operator_outside_mcp": True,
+            "timeout_risk_avoided": "MCP reads the generated registry snapshot directly; refresh/write stays outside MCP.",
+        }
         return payload
+
+    def _entity_registry_snapshot(self, *, kind_key: str, query_text: str, lookup_text: str, limit: int) -> dict[str, Any]:
+        path = self.aoa_root / "maps" / "entity-registry.json"
+        snapshot = _read_json(path)
+        if not isinstance(snapshot, dict):
+            return {
+                "schema_version": 1,
+                "artifact_type": "entity_registry_snapshot",
+                "ok": False,
+                "mutates": False,
+                "registry_path": path.as_posix(),
+                "kind": kind_key,
+                "query": query_text,
+                "lookup": lookup_text,
+                "total_entity_count": 0,
+                "entity_count": 0,
+                "entries": [],
+                "diagnostics": ["entity_registry_snapshot_missing"],
+                "truth_status": "generated_entity_registry_navigation_not_source_truth",
+            }
+        entries = snapshot.get("entries") if isinstance(snapshot.get("entries"), list) else []
+        selected: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if not self._entity_registry_kind_matches(str(entry.get("kind") or ""), kind_key):
+                continue
+            if query_text and not self._entity_registry_query_matches(entry, query_text):
+                continue
+            if lookup_text and not self._entity_registry_lookup_matches(entry, lookup_text):
+                continue
+            selected.append(entry)
+            if len(selected) >= limit:
+                break
+        kind_counts = Counter(str(item.get("kind") or "unknown") for item in selected if isinstance(item, dict))
+        status_counts = Counter(str(item.get("status") or "unknown") for item in selected if isinstance(item, dict))
+        return {
+            "schema_version": snapshot.get("schema_version", 1),
+            "artifact_type": "entity_registry_snapshot",
+            "generated_at": snapshot.get("generated_at"),
+            "generated_at_epoch": snapshot.get("generated_at_epoch"),
+            "ok": True,
+            "mutates": False,
+            "aoa_root": self.aoa_root.as_posix(),
+            "registry_path": path.as_posix(),
+            "source": "generated_entity_registry_snapshot",
+            "source_surfaces": snapshot.get("source_surfaces", []),
+            "source_truth_surfaces": snapshot.get("source_truth_surfaces", []),
+            "total_entity_count": snapshot.get("entity_count", len(entries)),
+            "entity_count": len(selected),
+            "counts_by_kind": dict(sorted(kind_counts.items())),
+            "counts_by_status": dict(sorted(status_counts.items())),
+            "snapshot_counts_by_kind": snapshot.get("counts_by_kind", {}),
+            "snapshot_counts_by_status": snapshot.get("counts_by_status", {}),
+            "query": query_text,
+            "lookup": lookup_text,
+            "kind": kind_key,
+            "entries": selected,
+            "diagnostics": snapshot.get("diagnostics", []) if isinstance(snapshot.get("diagnostics"), list) else [],
+            "next_route": snapshot.get("next_route") or "Use trace-route/search/graph/entity-usage-audit for observed use; open source_refs for source truth.",
+            "truth_status": snapshot.get("truth_status") or "generated_entity_registry_navigation_not_source_truth",
+        }
+
+    def _entity_registry_kind_matches(self, entry_kind: str, kind_key: str) -> bool:
+        normalized_kind = _route_key(kind_key)
+        normalized_entry = _route_key(entry_kind)
+        if normalized_kind in {"all", "any", "entity", "entities"}:
+            return True
+        if normalized_kind == "mcp":
+            return normalized_entry.startswith("mcp")
+        return normalized_entry == normalized_kind
+
+    def _entity_registry_query_matches(self, entry: dict[str, Any], query_text: str) -> bool:
+        needle = query_text.casefold()
+        haystacks = [
+            entry.get("entity_id"),
+            entry.get("canonical_key"),
+            entry.get("route_signal"),
+            entry.get("owner"),
+            entry.get("source_surface"),
+            *(entry.get("aliases") if isinstance(entry.get("aliases"), list) else []),
+        ]
+        return any(needle in str(value or "").casefold() for value in haystacks)
+
+    def _entity_registry_lookup_matches(self, entry: dict[str, Any], lookup_text: str) -> bool:
+        needle = lookup_text.casefold()
+        normalized = _route_key(lookup_text)
+        aliases = entry.get("aliases") if isinstance(entry.get("aliases"), list) else []
+        candidates = [
+            entry.get("entity_id"),
+            entry.get("canonical_key"),
+            entry.get("route_signal"),
+            *aliases,
+        ]
+        return any(needle == str(value or "").casefold() or normalized == _route_key(str(value or "")) for value in candidates)
 
     def _atlas_entity_inventory(
         self,
@@ -2753,6 +3339,8 @@ class AoASessionMemoryMCPState:
             return self.available_surfaces()
         if netloc == "provider" and parts == ["status"]:
             return self._search_provider_status_fast()
+        if netloc == "maintenance" and parts == ["status"]:
+            return self.session_maintenance_status(include_timers=False)
         if netloc == "readiness" and parts == ["route-layer"]:
             return self.latest_diagnostics("route-layer-readiness", limit=1)
         if netloc == "diagnostics" and len(parts) >= 2 and parts[0] == "latest":

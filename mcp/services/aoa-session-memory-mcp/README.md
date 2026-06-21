@@ -33,6 +33,7 @@ Resources:
 - `aoa-session-memory://status`
 - `aoa-session-memory://surfaces`
 - `aoa-session-memory://provider/status`
+- `aoa-session-memory://maintenance/status`
 - `aoa-session-memory://readiness/route-layer`
 - `aoa-session-memory://diagnostics/latest/{kind}`
 - `aoa-session-memory://entities/{layer}`
@@ -70,7 +71,7 @@ Tools:
 - `aoa_session_freshness_check(refs, session)`; pass `session` when checking session-relative refs such as `raw:line:412`.
 - `aoa_session_pattern_scan(pattern, filters, limit)`
 - `aoa_session_entity_inventory(layer, query, session, limit, sample_limit)`; aggregates typed session entities such as `skill`, `mcp`, `hook`, `tool`, `api`, `plugin`, `agent`, `script`, `validator`, `test`, `eval`, `git`, `playbook`, `technique`, `mechanic`, `graph`, and `memory` from route-signal indexes. This is session evidence inventory, not installed runtime inventory.
-- `aoa_session_entity_registry(kind, query, lookup, limit)`; reads the generated entity registry snapshot for known skills, MCP services/tools, tools, APIs, hooks, scripts, validators, tests, evals, graph, and memory entities. This is a read-only navigation registry; `--write` refresh stays outside MCP.
+- `aoa_session_entity_registry(kind, query, lookup, limit)`; reads the generated entity registry snapshot directly for known skills, MCP services/tools, tools, APIs, hooks, scripts, validators, tests, evals, graph, and memory entities. This is a fast read-only navigation registry; `--write` refresh stays outside MCP.
 - `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets.
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.
@@ -102,10 +103,30 @@ diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
 
-`aoa_session_maintenance_status()` is the agent decision packet for freshness
-and maintenance posture. It delegates to `.aoa maintenance-status`, remains
-read-only, and tells the caller whether to use graph/search, wait for live
-catch-up, run operator maintenance outside MCP, or escalate to raw/deep checks.
+Scoped agent-event routes such as `aoa_session_agent_responses`,
+`aoa_session_agent_closeouts`, `aoa_session_agent_progress_updates`,
+`aoa_session_agent_reasoning_windows`, and
+`aoa_session_answer_neighborhood` use the portable SQLite projection as a fast
+MCP read path when the live schema supports it. These packets are bounded,
+read-only, and may return zero results for a session without classified agent
+events instead of starting a slow archive scan. Each fast packet carries a
+`next_expansion_command` for the deeper `.aoa` route when raw before/after
+windows or richer consequence analysis are needed.
+
+`aoa_session_entity_usage_neighborhood` has the same shape for lightweight
+probes: when `raw_preview_chars=0` with small limits, or when the deep archive
+route times out, MCP returns a search-backed route-signal packet with refs and
+a `next_expansion_command`. That keeps live agent audits bounded while leaving
+raw transcript evidence authoritative.
+
+`aoa_session_maintenance_status()` and
+`aoa-session-memory://maintenance/status` are the agent decision packet for
+freshness and maintenance posture. They delegate to `.aoa maintenance-status`,
+remain read-only, and tell the caller whether to use graph/search, wait for
+live catch-up, run operator maintenance outside MCP, or escalate to raw/deep
+checks. When `.aoa` provides an `operations` summary, MCP preserves warnings,
+latest search-index timings, recent problem jobs, last successful
+auto-maintenance profiles, and `why_maintenance_long` evidence.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

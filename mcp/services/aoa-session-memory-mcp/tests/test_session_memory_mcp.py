@@ -221,6 +221,32 @@ def seed_archive(root: Path) -> Path:
         },
     )
     write_json(skill_entry_path, {"route_key": "aoa_decision", "summary": "test skill entry", "signal_count": 4})
+    write_json(
+        aoa / "maps/entity-registry.json",
+        {
+            "schema_version": 1,
+            "artifact_type": "entity_registry_snapshot",
+            "generated_at": "2026-05-26T00:00:00Z",
+            "ok": True,
+            "mutates": False,
+            "entity_count": 1,
+            "counts_by_kind": {"skill": 1},
+            "counts_by_status": {"active": 1},
+            "entries": [
+                {
+                    "entity_id": "skill:aoa_decision",
+                    "kind": "skill",
+                    "canonical_key": "aoa_decision",
+                    "aliases": ["aoa-decision", "skill:aoa_decision"],
+                    "status": "active",
+                    "route_layer": "skill",
+                    "route_signal": "skill:aoa_decision",
+                    "source_refs": [{"source_type": "codex_user_skills", "path": "/tmp/.codex/skills/aoa-decision/SKILL.md"}],
+                }
+            ],
+            "truth_status": "generated_entity_registry_navigation_not_source_truth",
+        },
+    )
     search_db = aoa / "search/aoa-search.sqlite3"
     search_db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(search_db))
@@ -383,6 +409,36 @@ MAINTENANCE_STATUS = {
         }
     ],
     "exact_next_command": "python3 scripts/aoa_session_memory.py auto-maintenance hot all --apply --write-report",
+    "operations": {
+        "schema_version": 1,
+        "artifact_type": "session_memory_operations_summary",
+        "mutates": False,
+        "warning_count": 2,
+        "warnings": [
+            {"code": "search_db_large", "severity": "warning", "label": "search_db", "size_human": "13.3 GiB"},
+            {"code": "graph_db_large", "severity": "warning", "label": "graph_db", "size_human": "57.2 GiB"},
+        ],
+        "latest_search_index": {
+            "exists": True,
+            "ok": True,
+            "target": "all",
+            "processed_count": 281,
+            "document_count": 1630447,
+            "elapsed_ms": 3042335,
+            "documents_per_second": 535.92,
+            "budget_exhausted": False,
+        },
+        "last_successful_auto_maintenance": {
+            "hot": {"status": "wait_live_catchup", "elapsed_ms": 2387},
+            "catchup": {"status": "nothing_to_do", "elapsed_ms": 3136},
+        },
+        "recent_problem_job_count": 0,
+        "why_maintenance_long": [
+            {"reason": "search_index_phase", "phase": "session_bulk_index", "elapsed_ms": 2081000},
+            {"reason": "sqlite_index_build", "index": "idx_document_routes_route", "elapsed_ms": 96131},
+        ],
+        "truth_status": "diagnostic_projection_for_operator_routing_not_archive_truth",
+    },
     "mcp_boundary": "MCP may expose this packet read-only; repair/reindex/maintenance commands stay outside MCP.",
 }
 
@@ -1109,6 +1165,9 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert plan["preferred_tool"] == "aoa_session_maintenance_status"
     assert plan["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
     assert plan["mcp_access"]["archive_command"] == "maintenance-status"
+    assert plan["operations"]["warning_count"] == 2
+    assert plan["operations"]["latest_search_index"]["document_count"] == 1630447
+    assert plan["operations"]["why_maintenance_long"][0]["phase"] == "session_bulk_index"
     assert "--no-timers" in [arg for command, args in state.command_runner.calls if command == "maintenance-status" for arg in args]
 
 
@@ -1129,8 +1188,19 @@ def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) ->
     assert payload["mutates"] is False
     assert payload["mcp_access"]["mutates"] is False
     assert payload["mcp_access"]["response_compacted"] is False
+    assert payload["operations"]["mutates"] is False
+    assert payload["operations"]["warnings"][0]["code"] == "search_db_large"
+    assert payload["operations"]["latest_search_index"]["elapsed_ms"] == 3042335
     assert "maintenance-status --deep --no-timers --full" in payload["mcp_access"]["full_status_route"]
     assert tmp_path.as_posix() in payload["mcp_access"]["full_status_route"]
+
+    resource = state.read_resource("aoa-session-memory://maintenance/status")
+    assert resource["artifact_type"] == "session_memory_maintenance_status"
+    assert resource["operations"]["recent_problem_job_count"] == 0
+    assert any(item["reason"] == "sqlite_index_build" for item in resource["operations"]["why_maintenance_long"])
+
+    surfaces = state.available_surfaces()
+    assert "aoa-session-memory://maintenance/status" in surfaces["resources"]
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -1410,6 +1480,60 @@ def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) ->
     assert episode_args[episode_args.index("--verification-state") + 1] == "verified"
 
 
+def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    conn = sqlite3.connect(state.aoa_root / "search/aoa-search.sqlite3")
+    try:
+        conn.executescript(
+            """
+            ALTER TABLE documents ADD COLUMN conversation_act TEXT;
+            ALTER TABLE documents ADD COLUMN session_act TEXT;
+            ALTER TABLE documents ADD COLUMN agent_event TEXT;
+            ALTER TABLE documents ADD COLUMN task_episode_id TEXT;
+            ALTER TABLE documents ADD COLUMN route_layers TEXT;
+            ALTER TABLE documents ADD COLUMN route_signals TEXT;
+            ALTER TABLE documents ADD COLUMN body TEXT;
+            CREATE INDEX idx_documents_session_agent_event ON documents(session_label, agent_event);
+            CREATE INDEX idx_documents_agent_event ON documents(agent_event);
+            """
+        )
+        conn.execute(
+            """
+            UPDATE documents
+            SET conversation_act = 'assistant_response',
+                session_act = 'answer',
+                agent_event = 'assistant_answer',
+                task_episode_id = 'task-0001',
+                route_layers = '|agent_event|',
+                route_signals = '|agent_event:assistant_answer|',
+                body = 'answer body'
+            WHERE id = 'event:session-1:000:000001'
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    responses = state.session_agent_responses(session="session-1", limit=3)
+    search = state.session_search(
+        "",
+        filters={"session": "session-1", "doc_type": "event", "agent_event": "assistant_answer"},
+        limit=3,
+    )
+    neighborhood = state.session_answer_neighborhood(session="session-1", limit=1)
+
+    assert responses["source"] == "portable_sqlite_agent_event_fast_path"
+    assert responses["result_count"] == 1
+    assert responses["results"][0]["agent_event"] == "assistant_answer"
+    assert responses["mcp_access"]["archive_command"] is None
+    assert search["source"] == "portable_sqlite_agent_event_fast_path"
+    assert "served by MCP agent-event route fast path" in search["diagnostics"]
+    assert neighborhood["source"] == "portable_sqlite_agent_event_window_fast_path"
+    assert neighborhood["window_count"] == 1
+    assert not any(call[0] in {"agent-responses", "answer-neighborhood"} for call in runner.calls)
+
+
 def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -1605,7 +1729,7 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert mechanic_inventory["entities"][0]["key"] == "route_maintenance"
 
 
-def test_entity_registry_routes_to_read_only_archive_command(tmp_path: Path) -> None:
+def test_entity_registry_reads_generated_snapshot_without_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
@@ -1614,11 +1738,12 @@ def test_entity_registry_routes_to_read_only_archive_command(tmp_path: Path) -> 
 
     assert registry["artifact_type"] == "entity_registry_snapshot"
     assert registry["entries"][0]["canonical_key"] == "aoa_decision"
+    assert registry["source"] == "generated_entity_registry_snapshot"
     assert registry["mcp_access"]["read_only_registry_route"] is True
+    assert registry["mcp_access"]["archive_command"] is None
+    assert registry["mcp_access"]["write_requires_operator_outside_mcp"] is True
     registry_calls = [args for command, args in runner.calls if command == "entity-registry"]
-    assert registry_calls
-    assert "--lookup" in registry_calls[0]
-    assert "--write" not in registry_calls[0]
+    assert registry_calls == []
     assert resource["entries"][0]["kind"] == "skill"
 
 
@@ -1834,7 +1959,61 @@ def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_pat
     assert args[args.index("--after") + 1] == "5"
     assert args[args.index("--raw-preview-chars") + 1] == "320"
     assert "--full" in args
-    assert runner.timeouts[-1] == ("entity-usage-neighborhood", 90.0)
+    assert runner.timeouts[-1] == ("entity-usage-neighborhood", 10.0)
+
+
+def test_entity_usage_neighborhood_light_probe_uses_search_fast_path(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    neighborhood = state.session_entity_usage_neighborhood(
+        "aoa-session-memory-mcp",
+        kind="mcp",
+        limit=1,
+        per_route_limit=1,
+        raw_preview_chars=0,
+        document_limit=3,
+    )
+
+    assert neighborhood["ok"] is True
+    assert neighborhood["quality"]["fast_path"] is True
+    assert neighborhood["neighborhoods"][0]["source"] == "mcp_search_route_signal_fast_path"
+    assert neighborhood["mcp_access"]["archive_command"] is None
+    assert neighborhood["mcp_access"]["selected_route_signal"] == "mcp:aoa_session_memory_mcp"
+    assert not [call for call in runner.calls if call[0] == "entity-usage-neighborhood"]
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert search_calls
+    assert search_calls[0][1][search_calls[0][1].index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
+
+
+def test_entity_usage_neighborhood_falls_back_to_search_when_archive_route_times_out(tmp_path: Path) -> None:
+    class TimeoutUsageRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command == "entity-usage-neighborhood":
+                self.calls.append((command, tuple(argv[3:])))
+                self.timeouts.append((command, timeout))
+                return CommandOutput(argv, 124, "", "command timed out", timeout * 1000)
+            return super().__call__(argv, timeout)
+
+    runner = TimeoutUsageRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    neighborhood = state.session_entity_usage_neighborhood(
+        "aoa-session-memory-mcp",
+        kind="mcp",
+        limit=3,
+        per_route_limit=4,
+        raw_preview_chars=320,
+        document_limit=12,
+    )
+
+    assert neighborhood["ok"] is True
+    assert neighborhood["quality"]["fast_path"] is True
+    assert neighborhood["mcp_access"]["fallback_reason"] == "archive_route_unavailable"
+    assert neighborhood["mcp_access"]["fallback_from"]["returncode"] == 124
+    assert neighborhood["mcp_access"]["selected_route_signal"] == "mcp:aoa_session_memory_mcp"
+    assert runner.timeouts[0] == ("entity-usage-neighborhood", 10.0)
 
 
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
