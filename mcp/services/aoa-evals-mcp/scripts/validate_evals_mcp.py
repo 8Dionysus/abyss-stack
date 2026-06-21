@@ -45,6 +45,25 @@ def main() -> None:
     local_ports = state.read_resource("aoa-evals://local-ports")
     if local_ports["schema"] != "aoa_evals_local_ports_v1":
         raise SystemExit("local eval-port resource schema drifted")
+    contract = local_ports.get("inventory_contract")
+    if not isinstance(contract, dict) or contract.get("schema_version") != "aoa_local_eval_port_inventory_contract_v1":
+        raise SystemExit("local eval-port inventory contract is unavailable or wrong schema")
+    if contract.get("contract_source") != "aoa-evals":
+        raise SystemExit(f"local eval-port inventory contract source drifted: {contract.get('contract_source')}")
+    contract_summary_keys = set(contract.get("summary_keys", []))
+    if set(local_ports.get("summary", {})) != contract_summary_keys:
+        raise SystemExit("local eval-port summary keys drifted from inventory contract")
+    contract_route_keys = set(contract.get("route_keys", []))
+    unknown_route_keys = sorted(
+        {
+            port.get("route_recommendation", {}).get("route_key")
+            for port in local_ports.get("ports", [])
+            if isinstance(port, dict)
+        }
+        - contract_route_keys
+    )
+    if unknown_route_keys:
+        raise SystemExit(f"local eval-port route keys drifted from inventory contract: {unknown_route_keys}")
     local_port_repo = None
     local_port_valid = None
     local_find_valid = None

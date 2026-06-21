@@ -9,6 +9,7 @@ required_files:
   - docs/RUNTIME_BENCH_PROMOTION_GUIDE.md
   - docs/SELF_AGENT_CHECKPOINT_EVAL_POSTURE.md
   - docs/RECURRENCE_PROOF_PROGRAM.md
+  - docs/architecture/local_eval_port_inventory.contract.v1.json
   - generated/eval_catalog.min.json
   - generated/eval_capsules.json
   - generated/eval_sections.full.json

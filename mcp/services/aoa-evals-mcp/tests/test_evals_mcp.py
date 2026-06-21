@@ -36,8 +36,122 @@ def valid_eval_need_packet(name: str = "aoa-memory-guardrail-pressure") -> dict[
     }
 
 
+def local_port_inventory_contract() -> dict[str, object]:
+    proof_boundary = "central proof adoption, verdicts, scoring, regression, and proof doctrine stay in aoa-evals"
+
+    def route(route_key: str, route_name: str, subskill: str, action: str) -> dict[str, str]:
+        return {
+            "route_key": route_key,
+            "route": route_name,
+            "subskill": subskill,
+            "action": action,
+            "proof_boundary": proof_boundary,
+        }
+
+    return {
+        "schema_version": "aoa_local_eval_port_inventory_contract_v1",
+        "inventory_schema_version": "os_abyss_local_eval_port_inventory_v1",
+        "layer": "aoa-evals-local-port-inventory",
+        "proof_owner_repo": "aoa-evals",
+        "authority_boundary": (
+            "Repo-local eval ports carry intake, suites, reports, and pressure evidence only. "
+            "Central verdict, scoring, regression, proof doctrine, and central bundle adoption remain in aoa-evals."
+        ),
+        "source_of_truth": {
+            "local_port_standard": "docs/guides/LOCAL_EVAL_PORT_STANDARD.md",
+            "local_port_validator": "scripts/validate_local_eval_port.py",
+            "central_eval_catalog": "generated/eval_catalog.min.json",
+            "mcp_contract": "docs/architecture/AOA_EVALS_MCP_CONTRACT.md",
+            "inventory_contract": "docs/architecture/local_eval_port_inventory.contract.v1.json",
+        },
+        "inventory_statuses": ["missing", "stale_candidate", "invalid", "skeleton", "active"],
+        "summary_keys": [
+            "repos",
+            "validator_ok",
+            "validator_failed",
+            "with_local_port",
+            "with_detected_pressure",
+            "excluded_repos",
+            "missing",
+            "stale_candidate",
+            "invalid",
+            "skeleton",
+            "active",
+        ],
+        "route_recommendations": [
+            route(
+                "missing_no_pressure",
+                "stop",
+                "none",
+                "Do not create a local eval port unless current repo work produces real eval pressure.",
+            ),
+            route(
+                "stale_local_eval_surface_review",
+                "aoa-eval-select",
+                "aoa-eval-select",
+                "Inspect the existing eval-like surface before mutation; add a valid port only if current pressure warrants it.",
+            ),
+            route(
+                "invalid_port_repair",
+                "repair-local-port",
+                "aoa-eval-select",
+                "Repair the local eval-port shape and rerun the validator before applying or designing evals.",
+            ),
+            route(
+                "invalid_active_repair",
+                "repair-local-port",
+                "aoa-eval-select",
+                "Repair the local eval-port shape and rerun the validator before applying or designing evals.",
+            ),
+            route(
+                "central_overlap_apply_existing_first",
+                "aoa-eval-select",
+                "aoa-eval-select",
+                "Local pressure overlaps central eval names; inspect and apply the existing central route before designing a new local suite.",
+            ),
+            route(
+                "valid_skeleton_keep_dormant",
+                "stop",
+                "none",
+                "Keep the valid skeleton dormant until a current task creates local eval pressure.",
+            ),
+            route(
+                "local_bundle_central_review_candidate",
+                "central-adoption-review",
+                "aoa-eval-select",
+                "Review the local draft bundle against central aoa-evals routes before any adoption or normalization.",
+            ),
+            route(
+                "active_suite_apply_or_regression_check",
+                "aoa-eval-apply",
+                "aoa-eval-apply",
+                "Use the local suite as a candidate deterministic check or regression surface; keep scoring and verdict authority central.",
+            ),
+            route(
+                "active_intake_select_then_apply_or_design",
+                "aoa-eval-select",
+                "aoa-eval-select",
+                "Select existing local and central eval routes first, then apply or design only after duplicate-fit review.",
+            ),
+            route(
+                "active_reports_only_suite_extraction_or_review",
+                "aoa-eval-design",
+                "aoa-eval-design",
+                "Treat reports-only pressure as a candidate for suite extraction or central review, not proof acceptance.",
+            ),
+            route(
+                "active_without_detected_pressure",
+                "repair-local-port",
+                "aoa-eval-select",
+                "Declared active state has no detected pressure files; repair status or add the missing reviewed pressure surface.",
+            ),
+        ],
+    }
+
+
 def seed_local_eval_port(root: Path, repo: str = "aoa-memo", *, status: str = "skeleton") -> Path:
     repo_root = root / repo
+    (repo_root / ".git").mkdir(parents=True, exist_ok=True)
     write_text(
         repo_root / "evals/PORT.yaml",
         f"""schema_version: local_eval_port_v1
@@ -59,6 +173,10 @@ central_boundary: no verdict, scoring, regression, or proof doctrine authority
 
 def seed_evals(root: Path) -> None:
     evals = root / "aoa-evals"
+    write_json(
+        evals / "docs/architecture/local_eval_port_inventory.contract.v1.json",
+        local_port_inventory_contract(),
+    )
     record = {
         "name": "aoa-bounded-change-quality",
         "category": "workflow",
@@ -644,6 +762,11 @@ def test_local_ports_are_first_class_resources(tmp_path: Path) -> None:
 
     listing = state.local_ports()
     assert listing["schema"] == "aoa_evals_local_ports_v1"
+    assert listing["inventory_contract"]["schema_version"] == "aoa_local_eval_port_inventory_contract_v1"
+    assert listing["inventory_contract"]["contract_source"] == "aoa-evals"
+    assert listing["inventory_contract"]["contract_ref"].endswith(
+        "aoa-evals/docs/architecture/local_eval_port_inventory.contract.v1.json"
+    )
     assert listing["count"] == 1
     assert listing["ports"][0]["repo"] == "aoa-memo"
     assert listing["ports"][0]["counts"]["intake"] == 1
@@ -656,6 +779,92 @@ def test_local_ports_are_first_class_resources(tmp_path: Path) -> None:
 
     intake = state.read_resource("aoa-evals://local-port/aoa-memo/intake")
     assert intake["intake"][0]["name"] == "aoa-memory-guardrail-pressure"
+
+
+def test_local_ports_inventory_covers_workspace_git_roots_and_nested_repos(tmp_path: Path) -> None:
+    workspace = tmp_path / "AbyssOS"
+    (workspace / ".git").mkdir(parents=True)
+    seed_evals(workspace)
+    (workspace / "aoa-evals/.git").mkdir(parents=True)
+
+    seed_local_eval_port(workspace, repo="aoa-routing", status="skeleton")
+    seed_local_eval_port(workspace, repo="aoa-memo", status="active")
+    write_json(
+        workspace / "aoa-memo/evals/intake/memory-guardrail.eval_need.json",
+        valid_eval_need_packet(),
+    )
+    seed_local_eval_port(workspace, repo="connectors/aoa-4pda-connector", status="active")
+    stale = workspace / "legacy-evals"
+    (stale / ".git").mkdir(parents=True)
+    write_text(stale / "evals/README.md", "# Old local eval notes\n")
+    state = AoAEvalsMCPState.discover(workspace_root=workspace)
+
+    listing = state.local_ports()
+    entries = {entry["repo_id"]: entry for entry in listing["ports"]}
+    contract_route_keys = set(listing["inventory_contract"]["route_keys"])
+
+    assert "aoa-evals" not in entries
+    assert set(listing["summary"]) == set(listing["inventory_contract"]["summary_keys"])
+    assert listing["excluded_repos"] == [
+        {
+            "repo": "aoa-evals",
+            "repo_path": "aoa-evals",
+            "repo_id": "aoa-evals",
+            "reason": "central_proof_owner_not_repo_local_port",
+        }
+    ]
+    assert entries["AbyssOS"]["inventory_status"] == "missing"
+    assert entries["AbyssOS"]["route_recommendation"]["route_key"] == "missing_no_pressure"
+    assert entries["aoa-routing"]["inventory_status"] == "skeleton"
+    assert entries["aoa-routing"]["validator_ok"] is True
+    assert entries["aoa-routing"]["route_recommendation"]["route_key"] == "valid_skeleton_keep_dormant"
+    assert entries["aoa-memo"]["inventory_status"] == "active"
+    assert entries["aoa-memo"]["pressure_counts"]["intake_packets"] == 1
+    assert entries["aoa-memo"]["route_recommendation"]["route_key"] == "active_intake_select_then_apply_or_design"
+    assert entries["connectors/aoa-4pda-connector"]["repo"] == "aoa-4pda-connector"
+    assert entries["connectors/aoa-4pda-connector"]["inventory_status"] == "invalid"
+    assert entries["connectors/aoa-4pda-connector"]["route_recommendation"]["route_key"] == "invalid_active_repair"
+    assert entries["legacy-evals"]["inventory_status"] == "stale_candidate"
+    assert entries["legacy-evals"]["route_recommendation"]["route_key"] == "stale_local_eval_surface_review"
+    assert {
+        entry["route_recommendation"]["route_key"]
+        for entry in entries.values()
+    }.issubset(contract_route_keys)
+    assert listing["summary"]["repos"] == 5
+    assert listing["summary"]["active"] == 1
+    assert listing["summary"]["skeleton"] == 1
+    assert listing["summary"]["invalid"] == 1
+    assert listing["summary"]["missing"] == 1
+    assert listing["summary"]["stale_candidate"] == 1
+    assert listing["summary"]["excluded_repos"] == 1
+
+    invalid_detail = state.local_port("connectors/aoa-4pda-connector")
+    assert invalid_detail["schema"] == "aoa_evals_local_port_v1"
+    assert invalid_detail["inventory_contract"]["schema_version"] == "aoa_local_eval_port_inventory_contract_v1"
+    assert invalid_detail["repo_id"] == "connectors/aoa-4pda-connector"
+    assert invalid_detail["validation"]["valid"] is False
+
+    encoded = state.read_resource("aoa-evals://local-port/connectors%2Faoa-4pda-connector")
+    unencoded = state.read_resource("aoa-evals://local-port/connectors/aoa-4pda-connector")
+    assert encoded["repo_id"] == "connectors/aoa-4pda-connector"
+    assert unencoded["repo_id"] == "connectors/aoa-4pda-connector"
+
+
+def test_local_ports_status_filter_uses_inventory_status(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, repo="aoa-routing", status="skeleton")
+    seed_local_eval_port(tmp_path, repo="aoa-memo", status="active")
+    write_json(
+        tmp_path / "aoa-memo/evals/intake/memory-guardrail.eval_need.json",
+        valid_eval_need_packet(),
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    active = state.local_ports(status="active")
+    non_skeleton = state.local_ports(include_skeleton=False)
+
+    assert [entry["repo_id"] for entry in active["ports"]] == ["aoa-memo"]
+    assert [entry["repo_id"] for entry in non_skeleton["ports"]] == ["aoa-memo"]
 
 
 def test_find_or_propose_local_returns_write_plan(tmp_path: Path) -> None:

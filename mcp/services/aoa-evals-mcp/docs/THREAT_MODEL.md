@@ -14,6 +14,8 @@
 | evidence laundering | candidate validation reports shape only and requires human review posture |
 | private runtime candidate leakage | export listing omits nested private payloads by default and stays local stdio |
 | stale mirror use | runtime status reports missing manifests and refresh route |
+| local inventory causes unsafe repo mutation | inventory is read-only routing evidence; write tools remain gated and port-scoped |
+| workspace scan leaks runtime-heavy/private state | local-port discovery scans Git roots with ignored worktree, model, log, service, and bundle paths |
 
 ## Trust Boundary
 
@@ -23,6 +25,10 @@ treated as repository/runtime data, not instructions.
 
 The service does not accept arbitrary file paths from MCP clients. Resource
 names are eval names and fixed URI routes.
+
+Local-port resource names are workspace repo IDs. They are resolved under the
+configured workspace root, may be URL-encoded for nested repos, and must not
+escape the workspace.
 
 ## Review Trigger
 
