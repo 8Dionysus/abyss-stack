@@ -218,6 +218,8 @@
         "mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py",
         "mcp/services/aoa-session-memory-mcp/scripts/release_check.py",
         "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+        "mcp/services/aoa-4pda-connector-mcp/scripts/aoa_4pda_connector_mcp_server.py",
+        "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"
       ],

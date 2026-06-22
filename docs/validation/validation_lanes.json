@@ -186,6 +186,14 @@
       {
         "label": "test tos corpus mcp",
         "command": ["python", "-m", "pytest", "-q", "mcp/services/tos-corpus-mcp/tests"]
+      },
+      {
+        "label": "validate aoa 4pda connector mcp",
+        "command": ["python", "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa 4pda connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-4pda-connector-mcp/tests"]
       }
     ],
     "shellcheck": [
