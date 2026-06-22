@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from aoa_evals_mcp.core import AoAEvalsMCPState
 from aoa_evals_mcp.server import build_server
 
@@ -896,6 +898,62 @@ def test_write_local_intake_dry_run_does_not_mutate(tmp_path: Path) -> None:
     assert "status: skeleton" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
 
 
+def test_write_local_intake_rejects_unknown_escape_and_central_repos(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="active")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    with pytest.raises(ValueError, match="unsafe repo id"):
+        state.write_local_intake("../aoa-memo", valid_eval_need_packet(), apply=True)
+
+    with pytest.raises(ValueError, match="unsafe repo id"):
+        state.write_local_intake("/srv/AbyssOS/aoa-memo", valid_eval_need_packet(), apply=True)
+
+    with pytest.raises(ValueError, match="local eval port"):
+        state.write_local_intake("aoa-evals", valid_eval_need_packet(), apply=True)
+
+    assert not (tmp_path / "aoa-evals/evals/intake").exists()
+    assert not list((tmp_path / "aoa-memo/evals/intake").glob("*.eval_need.json"))
+
+
+def test_write_local_explicit_slugs_reject_path_segments_without_mutation(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="active")
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    with pytest.raises(ValueError, match="unsafe local eval file slug"):
+        state.write_local_intake(
+            "aoa-memo",
+            valid_eval_need_packet(),
+            file_slug="../memory-guardrail",
+            apply=True,
+        )
+
+    with pytest.raises(ValueError, match="unsafe local eval file slug"):
+        state.write_local_suite_note(
+            "aoa-memo",
+            "nested/memory-guardrail",
+            "Memory guardrail suite",
+            "Local suite note for memory guardrail pressure.",
+            "# Memory guardrail suite\n",
+            apply=True,
+        )
+
+    with pytest.raises(ValueError, match="unsafe local eval file slug"):
+        state.write_local_report_note(
+            "aoa-memo",
+            r"nested\memory-guardrail",
+            "Memory guardrail report",
+            "Local report note for memory guardrail pressure.",
+            "# Memory guardrail report\n",
+            apply=True,
+        )
+
+    assert not list((repo_root / "evals/intake").glob("*.eval_need.json"))
+    assert not list((repo_root / "evals/suites").glob("*.suite.md"))
+    assert not list((repo_root / "evals/reports").glob("*.report.md"))
+
+
 def test_write_local_intake_apply_writes_and_activates_port(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     repo_root = seed_local_eval_port(tmp_path, status="skeleton")
@@ -909,6 +967,24 @@ def test_write_local_intake_apply_writes_and_activates_port(tmp_path: Path) -> N
     detail = state.local_port("aoa-memo")
     assert detail["counts"]["intake"] == 1
     assert detail["validation"]["valid"] is True
+    assert not (tmp_path / "aoa-evals/evals/intake").exists()
+
+
+def test_write_local_intake_refuses_overwrite_without_replace_flag(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, status="active")
+    target = repo_root / "evals/intake/aoa-memory-guardrail-pressure.eval_need.json"
+    write_json(target, valid_eval_need_packet())
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    packet = valid_eval_need_packet()
+    packet["summary"] = "Changed packet that should not overwrite without explicit replace."
+    result = state.write_local_intake("aoa-memo", packet, apply=True)
+
+    assert result["write_allowed"] is False
+    assert result["applied"] is False
+    assert "target file already exists; set replace_existing=True to overwrite" in result["validation"]["issues"]
+    assert json.loads(target.read_text(encoding="utf-8"))["summary"] != packet["summary"]
 
 
 def test_write_local_intake_rejects_invalid_port_before_apply(tmp_path: Path) -> None:
