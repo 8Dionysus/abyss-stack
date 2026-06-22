@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 71,
-  "edge_count": 1492,
+  "decision_count": 72,
+  "edge_count": 1521,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 575,
-    "DATED": 71,
-    "GUARDED_BY": 178,
-    "HAS_STATUS": 71,
-    "HAS_SURFACE_CLASS": 171,
-    "IN_STACK_LANE": 138,
-    "NEXT_DECISION": 70,
-    "OWNED_BY_SURFACE": 74,
-    "OWNS_DECISION": 71,
+    "CITES_SOURCE_SURFACE": 589,
+    "DATED": 72,
+    "GUARDED_BY": 182,
+    "HAS_STATUS": 72,
+    "HAS_SURFACE_CLASS": 174,
+    "IN_STACK_LANE": 140,
+    "NEXT_DECISION": 71,
+    "OWNED_BY_SURFACE": 75,
+    "OWNS_DECISION": 72,
     "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 72
+    "UNDER_MECHANIC_PARENT": 73
   },
   "edges": [
     {
@@ -7108,6 +7108,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0071",
+      "target": "decision:ABYSS-STACK-D-0072",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0071",
       "target": "owner_surface:mcp/services/aoa-evals-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -7119,6 +7124,141 @@
     {
       "source": "decision:ABYSS-STACK-D-0071",
       "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:aoa-4pda-connector%3Adocs/MCP_ROLLOUT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:aoa-4pda-connector%3Adocs/RUNTIME_CONTRACT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/DESIGN.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/docs/BOUNDARIES.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/docs/THREAT_MODEL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/core.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/server.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "source_surface:mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "date:2026-06-21",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "guard_family:MCP%20port%20confinement",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "guard_family:read-only%20access%20plane",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "guard_family:source-structure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "guard_family:source/runtime%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "surface_class:federation/read-model",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "stack_lane:federation%20seams",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "owner_surface:mcp/services/aoa-4pda-connector-mcp/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0072",
+      "target": "mechanic_parent:federation-seams",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -7475,18 +7615,23 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0071",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0072",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 614,
+  "node_count": 628,
   "node_type_counts": {
-    "date": 14,
-    "decision": 71,
+    "date": 15,
+    "decision": 72,
     "guard_family": 70,
     "mechanic_parent": 10,
-    "owner_surface": 33,
+    "owner_surface": 34,
     "repo": 1,
-    "source_surface": 339,
+    "source_surface": 350,
     "stack_lane": 22,
     "status": 2,
     "surface_class": 52
@@ -7560,6 +7705,11 @@
     {
       "id": "date:2026-06-13",
       "label": "2026-06-13",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-06-21",
+      "label": "2026-06-21",
       "type": "date"
     },
     {
@@ -8273,6 +8423,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-06-21",
+      "id": "decision:ABYSS-STACK-D-0072",
+      "label": "ABYSS-STACK-D-0072",
+      "path": "docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md",
+      "posture": "accepted 4PDA connector MCP access-plane rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -8693,6 +8853,11 @@
       "type": "owner_surface"
     },
     {
+      "id": "owner_surface:mcp/services/aoa-4pda-connector-mcp/",
+      "label": "mcp/services/aoa-4pda-connector-mcp/",
+      "type": "owner_surface"
+    },
+    {
       "id": "owner_surface:mcp/services/aoa-decisions-mcp/",
       "label": "mcp/services/aoa-decisions-mcp/",
       "type": "owner_surface"
@@ -8986,6 +9151,16 @@
     {
       "id": "source_surface:ROADMAP.md",
       "label": "ROADMAP.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-4pda-connector%3Adocs/MCP_ROLLOUT.md",
+      "label": "aoa-4pda-connector:docs/MCP_ROLLOUT.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-4pda-connector%3Adocs/RUNTIME_CONTRACT.md",
+      "label": "aoa-4pda-connector:docs/RUNTIME_CONTRACT.md",
       "type": "source_surface"
     },
     {
@@ -9501,6 +9676,51 @@
     {
       "id": "source_surface:mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/core.py",
       "label": "mcp/services/abyss-machine-mcp/src/abyss_machine_mcp/core.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/AGENTS.md",
+      "label": "mcp/services/aoa-4pda-connector-mcp/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/DESIGN.md",
+      "label": "mcp/services/aoa-4pda-connector-mcp/DESIGN.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/README.md",
+      "label": "mcp/services/aoa-4pda-connector-mcp/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/docs/BOUNDARIES.md",
+      "label": "mcp/services/aoa-4pda-connector-mcp/docs/BOUNDARIES.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/docs/THREAT_MODEL.md",
+      "label": "mcp/services/aoa-4pda-connector-mcp/docs/THREAT_MODEL.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
+      "label": "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/core.py",
+      "label": "mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/core.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/server.py",
+      "label": "mcp/services/aoa-4pda-connector-mcp/src/aoa_4pda_connector_mcp/server.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py",
+      "label": "mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py",
       "type": "source_surface"
     },
     {

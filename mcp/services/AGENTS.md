@@ -67,6 +67,13 @@ python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
 python -m pytest mcp/services/tos-corpus-mcp/tests -q
 ```
 
+For `aoa-4pda-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
+python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash

@@ -523,6 +523,7 @@
         "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
         "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
         "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+        "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py",
         "mcp/services/aoa-memo-mcp/scripts/release_check.py",
         "mcp/services/aoa-decisions-mcp/scripts/release_check.py",

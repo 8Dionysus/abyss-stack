@@ -53,6 +53,11 @@ For Tree of Sophia corpus graph context work,
 packets, resources, nodes, and relation packs while keeping corpus authority in
 `Tree-of-Sophia`.
 
+For 4PDA connector evidence work,
+`mcp/services/aoa-4pda-connector-mcp/` exposes local connector status,
+source-route, graph/hybrid query, and answer packets while keeping source
+policy, packet truth, and generated storage in `aoa-4pda-connector`.
+
 ## Validation
 
 For `aoa-memo-mcp` changes, run:
@@ -90,6 +95,13 @@ python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.p
 python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
 python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
 python -m pytest mcp/services/tos-corpus-mcp/tests -q
+```
+
+For `aoa-4pda-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
+python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:
