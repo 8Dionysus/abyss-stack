@@ -425,7 +425,19 @@ def _eval_need_name(proof_question: str, proposal: dict[str, Any], matches: list
     return f"aoa-{slug or 'eval-need'}"
 
 
-def _safe_file_slug(value: str, fallback: str = "local-eval-pressure") -> str:
+def _safe_file_slug(value: str, fallback: str = "local-eval-pressure", *, explicit: bool = False) -> str:
+    raw = str(value or "").strip()
+    if explicit:
+        raw_path = Path(raw)
+        if (
+            not raw
+            or raw_path.is_absolute()
+            or "/" in raw
+            or "\\" in raw
+            or "\x00" in raw
+            or any(part in {"", ".", ".."} for part in raw_path.parts)
+        ):
+            raise ValueError(f"unsafe local eval file slug: {value!r}")
     slug = _slug(value) or fallback
     slug = slug[:120].strip("-") or fallback
     if not SAFE_FILE_SLUG.fullmatch(slug):
@@ -434,15 +446,15 @@ def _safe_file_slug(value: str, fallback: str = "local-eval-pressure") -> str:
 
 
 def _safe_repo_id(value: str) -> str:
-    repo_id = unquote(str(value or "")).strip().strip("/")
-    if not repo_id or "\\" in repo_id or "\x00" in repo_id:
+    raw = unquote(str(value or "")).strip()
+    if not raw or "\\" in raw or "\x00" in raw:
         raise ValueError(f"unsafe repo id: {value!r}")
-    path = Path(repo_id)
+    path = Path(raw)
     if path.is_absolute():
         raise ValueError(f"unsafe repo id: {value!r}")
     if any(part in {"", ".", ".."} for part in path.parts):
         raise ValueError(f"unsafe repo id: {value!r}")
-    return path.as_posix()
+    return path.as_posix().strip("/")
 
 
 def _relative_repo_path(path: Path, repo_root: Path) -> str:
@@ -1316,7 +1328,10 @@ class AoAEvalsMCPState:
         repo_root = self._local_repo_root(repo)
         packet = packet if isinstance(packet, dict) else {}
         validation = self._validate_eval_need(packet)
-        slug = _safe_file_slug(str(file_slug or packet.get("name") or "local-eval-pressure"))
+        slug = _safe_file_slug(
+            str(file_slug or packet.get("name") or "local-eval-pressure"),
+            explicit=file_slug is not None,
+        )
         target = self._local_write_target(repo_root, "intake", slug, ".eval_need.json")
         activated, issues = self._local_write_gate(repo_root)
         issues = [*issues, *validation.get("issues", [])]
@@ -1360,7 +1375,7 @@ class AoAEvalsMCPState:
     ) -> dict[str, Any]:
         repo_root = self._local_repo_root(repo)
         config = LOCAL_NOTE_CONFIG[directory_name]
-        safe_slug = _safe_file_slug(note_slug)
+        safe_slug = _safe_file_slug(note_slug, explicit=True)
         target = self._local_write_target(repo_root, directory_name, safe_slug, str(config["glob_suffix"]))
         refs = [str(ref) for ref in (refs or [])]
         activated, issues = self._local_write_gate(repo_root)

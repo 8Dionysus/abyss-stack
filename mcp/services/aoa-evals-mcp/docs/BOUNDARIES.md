@@ -7,7 +7,7 @@
 | `aoa-evals` | bounded proof bundles, verdict logic, generated reader contracts, runtime-candidate posture | runtime service execution |
 | generated readers | deterministic catalog, capsule, section, comparison, and report read models | proof interpretation stronger than source bundles |
 | runtime-candidate readers | candidate evidence and artifact hook templates | accepted proof or verdicts |
-| `aoa-evals-mcp` | read-only access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, candidate packet validation, runtime candidate export read-model, report skeletons | eval running, verdict computation, receipt publication, bundle promotion, source mutation, proposal approval, evidence acceptance |
+| `aoa-evals-mcp` | read access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, candidate packet validation, runtime candidate export read-model, report skeletons, and gated sibling repo-local eval-port writes | eval running, verdict computation, receipt publication, bundle promotion, central `aoa-evals` source mutation, proposal approval, evidence acceptance, arbitrary sibling path mutation |
 | `abyss-stack` | runnable MCP package and stdio service topology | proof meaning |
 
 ## Interface
@@ -42,6 +42,13 @@ local bundle, or replace direct inspection of the target repo before a write.
 Its machine-readable status and route vocabulary is consumed from
 `aoa-evals`, not authored by `abyss-stack`.
 
+Local-port write tools are below local repo review and below central proof
+adoption. They may prepare or apply only `evals/intake/*.eval_need.json`,
+`evals/suites/*.suite.md`, `evals/reports/*.report.md`, and first-pressure
+`PORT.yaml` activation from `skeleton` to `active`. They default to dry-run,
+reject workspace escape and path-like explicit slugs, and require explicit
+overwrite permission.
+
 ## Stop Lines
 
 - No general eval runner.
@@ -50,5 +57,6 @@ Its machine-readable status and route vocabulary is consumed from
 - No bundle promotion.
 - No `aoa-evals` source mutation.
 - No proposal approval or source bundle creation.
+- No arbitrary sibling path writes outside repo-local `evals/` ports.
 - No treating MCP/generated/runtime output as stronger than source bundles.
 - No moving proof authority into `abyss-stack`.
