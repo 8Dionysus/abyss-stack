@@ -40,6 +40,8 @@ PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
 GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS = 320
 GOAL_LIFECYCLE_SAMPLE_OBJECTIVE_PREVIEW_CHARS = 220
 GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT = 2
+INVENTORY_SAMPLE_LABEL_CHARS = 64
+INVENTORY_TOTAL_SAMPLE_LIMIT = 12
 
 ALLOWED_TRACE_KINDS = {
     "auto",
@@ -360,6 +362,15 @@ def _ensure_short_text(value: str, field: str, limit: int = 600) -> str:
     if "\x00" in text:
         raise ValueError(f"{field} contains an invalid NUL byte")
     return text
+
+
+def _bounded_string(value: Any, limit: int) -> str | None:
+    if value in (None, ""):
+        return None
+    text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."
 
 
 def _safe_selector(value: str, field: str, limit: int = 160) -> str:
@@ -3005,6 +3016,7 @@ class AoASessionMemoryMCPState:
                         "samples": samples,
                     }
                 )
+            omitted_samples = self._bound_inventory_entity_samples(entities)
         except sqlite3.Error as exc:
             payload = {
                 "schema": "aoa_session_memory_entity_inventory_v1",
@@ -3038,6 +3050,7 @@ class AoASessionMemoryMCPState:
             "source": "portable_sqlite",
             "entity_count": len(entities),
             "entities": entities,
+            "sample_omitted_count": omitted_samples,
             "diagnostics": [],
             "truth_status": "session route-signal inventory; not runtime installed inventory",
             "authority_boundary": self.authority_boundary(),
@@ -3063,6 +3076,7 @@ class AoASessionMemoryMCPState:
         payload["normalized_layer"] = normalized_layer
         payload["runtime"] = self.runtime_identity()
         payload["provider"] = provider
+        self._annotate_inventory_route_packet(payload, normalized_layer=normalized_layer)
         payload["mcp_access"] = {
             "mutates": False,
             "archive_command": None,
@@ -3073,6 +3087,108 @@ class AoASessionMemoryMCPState:
             "authority_boundary": "MCP inventory reads generated atlas/search route indexes; raw transcript refs remain authoritative.",
             "runtime_reload_required": payload["runtime"].get("reload_required"),
         }
+        if payload.get("next_expansion"):
+            payload["mcp_access"]["next_expansion"] = payload["next_expansion"]
+
+    def _annotate_inventory_route_packet(self, payload: dict[str, Any], *, normalized_layer: str) -> None:
+        entities = payload.get("entities") if isinstance(payload.get("entities"), list) else []
+        axis = INVENTORY_LAYER_TO_AXIS.get(normalized_layer)
+        top_key = ""
+        if entities and isinstance(entities[0], dict):
+            top_key = str(entities[0].get("key") or "").strip()
+        query_key = _route_key(str(payload.get("query") or ""))
+        expansion_key = query_key or top_key
+        sample_ref_packets: list[dict[str, Any]] = []
+        sample_count = 0
+        signal_count = 0
+        session_count = 0
+        latest_session_date: str | None = None
+        for entity in entities:
+            if not isinstance(entity, dict):
+                continue
+            try:
+                signal_count += int(entity.get("signal_count") or 0)
+            except (TypeError, ValueError):
+                pass
+            try:
+                session_count += int(entity.get("session_count") or 0)
+            except (TypeError, ValueError):
+                pass
+            entity_date = entity.get("latest_session_date")
+            if entity_date and (latest_session_date is None or str(entity_date) > latest_session_date):
+                latest_session_date = str(entity_date)
+            samples = entity.get("samples") if isinstance(entity.get("samples"), list) else []
+            sample_count += len(samples)
+            for sample in samples[:1]:
+                if not isinstance(sample, dict):
+                    continue
+                refs = sample.get("refs") if isinstance(sample.get("refs"), dict) else {}
+                packet = {
+                    "entity": entity.get("key"),
+                    "session_id": sample.get("session_id"),
+                    "session_label": _bounded_string(sample.get("session_label"), INVENTORY_SAMPLE_LABEL_CHARS),
+                    "session_date": sample.get("session_date"),
+                    "raw": refs.get("raw"),
+                    "segment": refs.get("segment"),
+                }
+                sample_ref_packets.append({key: value for key, value in packet.items() if value not in (None, "", [], {})})
+                if len(sample_ref_packets) >= 12:
+                    break
+            if len(sample_ref_packets) >= 12:
+                break
+        next_expansion: dict[str, Any]
+        if axis:
+            route_args = {
+                "axis": axis,
+                "key": expansion_key,
+                "limit": max(20, min(100, len(entities) or 20)),
+                "include_entry_payloads": True,
+            }
+            next_expansion = {
+                "mcp_tool": "aoa_session_route",
+                "arguments": route_args,
+                "command": (
+                    "aoa_session_route("
+                    f"axis={axis!r}, key={expansion_key!r}, "
+                    f"limit={route_args['limit']!r}, include_entry_payloads=True)"
+                ),
+            }
+        else:
+            route_signal = f"{normalized_layer}:{expansion_key}" if expansion_key else ""
+            filters = {"route_layer": normalized_layer}
+            if route_signal:
+                filters["route_signal"] = route_signal
+            next_expansion = {
+                "mcp_tool": "aoa_session_search",
+                "arguments": {"query": "", "filters": filters, "limit": 20},
+                "command": f"aoa_session_search(query='', filters={filters!r}, limit=20)",
+            }
+        payload["route_packet"] = {
+            "bounded": True,
+            "source": payload.get("source"),
+            "layer": normalized_layer,
+            "axis": axis,
+            "query": payload.get("query") or "",
+            "session": payload.get("session"),
+            "returned_entity_count": len(entities),
+            "sample_ref_count": len(sample_ref_packets),
+            "aggregate_signal_count": signal_count,
+            "aggregate_session_count": session_count,
+            "latest_session_date": latest_session_date,
+            "sample_refs": sample_ref_packets,
+        }
+        payload["response_profile"] = {
+            "bounded_mcp_packet": True,
+            "sample_shape": "compact_refs_only",
+            "raw_text_loaded": False,
+            "entry_payloads_loaded": False,
+            "sample_count": sample_count,
+            "sample_omitted_count": int(payload.get("sample_omitted_count") or 0),
+            "sample_budget": INVENTORY_TOTAL_SAMPLE_LIMIT,
+            "next_expansion_required_for_entry_payloads": True,
+        }
+        payload["next_expansion"] = next_expansion
+        payload["next_expansion_command"] = next_expansion.get("command")
 
     def session_entity_registry(
         self,
@@ -3290,6 +3406,7 @@ class AoASessionMemoryMCPState:
             }
             for item in entities
         ]
+        omitted_samples = self._bound_inventory_entity_samples(cleaned_entities)
         return {
             "schema": "aoa_session_memory_entity_inventory_v1",
             "ok": True,
@@ -3303,60 +3420,80 @@ class AoASessionMemoryMCPState:
             "atlas_generated_at": payload.get("generated_at"),
             "entity_count": len(cleaned_entities),
             "entities": cleaned_entities,
+            "sample_omitted_count": omitted_samples,
             "diagnostics": [],
             "truth_status": "session route-signal inventory; not runtime installed inventory",
             "authority_boundary": self.authority_boundary(),
         }
 
+    def _bound_inventory_entity_samples(self, entities: list[dict[str, Any]]) -> int:
+        sample_lists = [entity.get("samples") if isinstance(entity.get("samples"), list) else [] for entity in entities]
+        total = sum(len(samples) for samples in sample_lists)
+        if total <= INVENTORY_TOTAL_SAMPLE_LIMIT:
+            return 0
+        keep_counts = [0 for _ in sample_lists]
+        remaining = INVENTORY_TOTAL_SAMPLE_LIMIT
+        for idx, samples in enumerate(sample_lists):
+            if remaining <= 0:
+                break
+            if samples:
+                keep_counts[idx] = 1
+                remaining -= 1
+        while remaining > 0:
+            progressed = False
+            for idx, samples in enumerate(sample_lists):
+                if remaining <= 0:
+                    break
+                if len(samples) > keep_counts[idx]:
+                    keep_counts[idx] += 1
+                    remaining -= 1
+                    progressed = True
+            if not progressed:
+                break
+        for entity, keep_count in zip(entities, keep_counts):
+            samples = entity.get("samples") if isinstance(entity.get("samples"), list) else []
+            entity["samples"] = samples[:keep_count]
+        return max(0, total - sum(keep_counts))
+
     def _inventory_sample_from_atlas_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
         evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
         refs = {
-            "session": evidence.get("session_ref"),
             "segment": evidence.get("segment_ref"),
-            "segment_index": evidence.get("generated_index_ref"),
             "raw": evidence.get("raw_ref"),
-            "atlas_entry": entry.get("json"),
-            "atlas_markdown": entry.get("markdown"),
         }
-        return {
-            "doc_id": entry.get("entry_id") or entry.get("json"),
+        sample = {
             "doc_type": "atlas_entry",
             "session_id": entry.get("session_id"),
-            "session_label": entry.get("session"),
-            "session_title": entry.get("session_title"),
+            "session_label": _bounded_string(entry.get("session"), INVENTORY_SAMPLE_LABEL_CHARS),
             "session_date": _session_date_from_entry(entry),
             "event_type": entry.get("event_type"),
             "family": entry.get("family"),
-            "title": entry.get("title") or entry.get("summary"),
             "confidence": entry.get("confidence"),
             "refs": {key: value for key, value in refs.items() if value},
             "freshness": {"status": "atlas_generated", "reasons": []},
         }
+        return {key: value for key, value in sample.items() if value not in (None, "", [], {})}
 
     def _inventory_sample_from_row(self, row: sqlite3.Row) -> dict[str, Any]:
         refs = {
-            "session": row["manifest_path"],
             "segment": row["segment_ref"],
-            "segment_index": row["segment_index_path"],
             "raw": row["raw_ref"],
             "raw_block": row["raw_block_ref"],
         }
-        return {
-            "doc_id": row["id"],
+        sample = {
             "doc_type": row["doc_type"],
             "session_id": row["session_id"],
-            "session_label": row["session_label"],
-            "session_title": row["session_title"],
+            "session_label": _bounded_string(row["session_label"], INVENTORY_SAMPLE_LABEL_CHARS),
             "session_date": row["session_date"],
             "event_type": row["event_type"],
             "family": row["family"],
-            "title": row["title"],
             "refs": {key: value for key, value in refs.items() if value},
             "freshness": {
                 "status": row["freshness_status"],
                 "reasons": [row["stale_reason"]] if row["stale_reason"] else [],
             },
         }
+        return {key: value for key, value in sample.items() if value not in (None, "", [], {})}
 
     def session_hook_receipts(
         self,
