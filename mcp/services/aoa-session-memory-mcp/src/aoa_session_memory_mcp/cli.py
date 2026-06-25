@@ -208,6 +208,9 @@ def main() -> None:
     maintenance_plan.add_argument("--no-timers", action="store_true")
     maintenance_plan.add_argument("--full", action="store_true")
 
+    projection_status = sub.add_parser("projection-status")
+    projection_status.add_argument("--include-payload", action="store_true")
+
     graph_neighborhood = sub.add_parser("graph-neighborhood")
     graph_neighborhood.add_argument("anchor")
     graph_neighborhood.add_argument("--kind", default="auto")
@@ -445,6 +448,8 @@ def main() -> None:
             _print(state.session_maintenance_status(deep=args.deep, include_timers=not args.no_timers, full=args.full))
         else:
             _print(state.maintenance_plan())
+    elif args.command == "projection-status":
+        _print(state.session_projection_status(include_payload=args.include_payload))
     elif args.command == "graph-neighborhood":
         _print(state.graph_neighborhood(anchor=args.anchor, kind=args.kind, depth=args.depth, limit=args.limit))
     elif args.command == "graph-timeline":

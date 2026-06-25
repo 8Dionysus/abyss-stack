@@ -918,6 +918,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_latest_diagnostics",
                 "aoa_session_maintenance_status",
                 "aoa_session_maintenance_plan",
+                "aoa_session_projection_status",
                 "aoa_session_graph_neighborhood",
                 "aoa_session_graph_timeline",
                 "aoa_session_graph_shortest_path",
@@ -932,6 +933,7 @@ class AoASessionMemoryMCPState:
                 "aoa-session-memory://surfaces",
                 "aoa-session-memory://provider/status",
                 "aoa-session-memory://maintenance/status",
+                "aoa-session-memory://projection/status",
                 "aoa-session-memory://readiness/route-layer",
                 "aoa-session-memory://diagnostics/latest/{kind}",
                 "aoa-session-memory://entities/{layer}",
@@ -3881,6 +3883,58 @@ class AoASessionMemoryMCPState:
         payload["preferred_tool"] = "aoa_session_maintenance_status"
         return payload
 
+    def session_projection_status(self, include_payload: bool = False) -> dict[str, Any]:
+        diagnostics = self.latest_diagnostics(kind="projection-catchup", limit=1, include_payload=True)
+        reports = diagnostics.get("reports") if isinstance(diagnostics.get("reports"), list) else []
+        latest = reports[0] if reports and isinstance(reports[0], dict) else {}
+        latest_payload = latest.get("payload") if isinstance(latest.get("payload"), dict) else {}
+        completeness = latest_payload.get("projection_completeness")
+        if not isinstance(completeness, dict):
+            completeness = latest_payload.get("completeness_check") if isinstance(latest_payload.get("completeness_check"), dict) else {}
+        completeness_current = (
+            isinstance(completeness, dict)
+            and completeness.get("artifact_type") == "session_memory_projection_completeness"
+            and isinstance(completeness.get("surfaces"), dict)
+        )
+        next_route = latest_payload.get("next_route") if isinstance(latest_payload.get("next_route"), dict) else {}
+        maintenance = self._maintenance_summary_for_status()
+        refresh_route = {
+            "id": "run_projection_catchup_outside_mcp",
+            "status": "needed",
+            "reason": "projection_completeness_missing_or_legacy",
+            "command": self._archive_argv("projection-catchup", ["all", "--write-report"]),
+        }
+        payload = {
+            "schema": "aoa_session_memory_projection_status_v1",
+            "ok": completeness_current,
+            "mutates": False,
+            "source": (
+                "latest_projection_catchup_diagnostic"
+                if completeness_current
+                else ("legacy_projection_catchup_diagnostic" if completeness else "missing_projection_catchup_diagnostic")
+            ),
+            "projection_completeness": completeness,
+            "latest_projection_catchup": {
+                "path": latest.get("path"),
+                "mtime": latest.get("mtime"),
+                "summary": latest.get("summary"),
+                "payload": latest_payload if include_payload else None,
+            },
+            "current_maintenance": maintenance,
+            "next_operator_route": next_route if completeness_current and next_route else refresh_route,
+            "diagnostics": [] if completeness_current else ["projection_completeness_missing_or_legacy"],
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_only": True,
+                "does_not_run_projection_catchup": True,
+                "writer_route_stays_outside_mcp": True,
+                "elapsed_ms": (maintenance.get("mcp_access") or {}).get("elapsed_ms") if isinstance(maintenance.get("mcp_access"), dict) else None,
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+        return payload
+
     def graph_neighborhood(self, anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
@@ -4024,6 +4078,8 @@ class AoASessionMemoryMCPState:
             return self._search_provider_status_fast()
         if netloc == "maintenance" and parts == ["status"]:
             return self.session_maintenance_status(include_timers=False)
+        if netloc == "projection" and parts == ["status"]:
+            return self.session_projection_status()
         if netloc == "readiness" and parts == ["route-layer"]:
             return self.latest_diagnostics("route-layer-readiness", limit=1)
         if netloc == "diagnostics" and len(parts) >= 2 and parts[0] == "latest":

@@ -246,6 +246,7 @@ def _stdio_route_count_summary(
     agent_event_usage: dict,
     retrieve_usage: dict,
     maintenance_status: dict,
+    projection_status: dict,
     *,
     tool_count: int,
 ) -> dict:
@@ -292,6 +293,10 @@ def _stdio_route_count_summary(
         if isinstance(retrieve_usage.get("retrieval_redirect"), dict)
         else None,
         "maintenance_recommendation": maintenance_status.get("recommendation"),
+        "projection_status_ok": projection_status.get("ok"),
+        "projection_completeness_status": projection_status.get("projection_completeness", {}).get("status")
+        if isinstance(projection_status.get("projection_completeness"), dict)
+        else None,
     }
 
 
@@ -317,6 +322,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_maintenance_status",
+                "aoa_session_projection_status",
             }
             missing_tools = sorted(required_tools - tools)
             if missing_tools:
@@ -404,6 +410,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"include_timers": False},
                 require_ok=False,
             )
+            projection_status = await call_json(
+                "aoa_session_projection_status",
+                {},
+                require_ok=False,
+            )
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
@@ -448,6 +459,10 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
+    if projection_status.get("schema") != "aoa_session_memory_projection_status_v1" or projection_status.get("mutates") is not False:
+        raise SystemExit(f"stdio MCP projection status returned invalid payload: {projection_status.get('diagnostics')}")
+    if projection_status.get("mcp_access", {}).get("does_not_run_projection_catchup") is not True:
+        raise SystemExit(f"stdio MCP projection status violated read-only catchup boundary: {projection_status.get('mcp_access')}")
     return _stdio_route_count_summary(
         inventory,
         mcp_service_inventory,
@@ -468,6 +483,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         agent_event_usage,
         retrieve_usage,
         maintenance_status,
+        projection_status,
         tool_count=len(tools),
     )
 
@@ -496,6 +512,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_maintenance_status",
+                "aoa_session_projection_status",
             }
             missing_tools = sorted(required_tools - tools)
             if missing_tools:
@@ -596,6 +613,21 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             ):
                 raise SystemExit(f"configured Codex MCP retrieve entity_usage redirect failed: {retrieve_payload}")
 
+            projection_result = await mcp_session.call_tool(
+                "aoa_session_projection_status",
+                {},
+                read_timeout_seconds=timedelta(seconds=20),
+            )
+            if projection_result.isError or not projection_result.content:
+                raise SystemExit(f"configured Codex MCP projection status call failed: {projection_result.content}")
+            projection_payload = json.loads(projection_result.content[0].text)
+            if (
+                not isinstance(projection_payload, dict)
+                or projection_payload.get("schema") != "aoa_session_memory_projection_status_v1"
+                or projection_payload.get("mcp_access", {}).get("does_not_run_projection_catchup") is not True
+            ):
+                raise SystemExit(f"configured Codex MCP projection status contract failed: {projection_payload}")
+
     return {
         **meta,
         "ok": True,
@@ -616,6 +648,10 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         "agent_event_usage_outcome_count": agent_event_usage_payload.get("outcome_event_count") if isinstance(agent_event_usage_payload, dict) else None,
         "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_payload, dict) and isinstance(retrieve_payload.get("retrieval_redirect"), dict)
+        else None,
+        "projection_status_ok": projection_payload.get("ok") if isinstance(projection_payload, dict) else None,
+        "projection_completeness_status": projection_payload.get("projection_completeness", {}).get("status")
+        if isinstance(projection_payload, dict) and isinstance(projection_payload.get("projection_completeness"), dict)
         else None,
     }
 
@@ -669,6 +705,13 @@ def main() -> None:
         or not isinstance(maintenance_status.get("agent_route"), dict)
     ):
         raise SystemExit(f"maintenance status surface failed: {maintenance_status.get('diagnostics')}")
+    projection_status = state.session_projection_status()
+    if (
+        projection_status.get("schema") != "aoa_session_memory_projection_status_v1"
+        or projection_status.get("mutates") is not False
+        or projection_status.get("mcp_access", {}).get("does_not_run_projection_catchup") is not True
+    ):
+        raise SystemExit(f"projection status surface failed: {projection_status.get('diagnostics')}")
     goal_usage_probe = state.session_goal_lifecycles(event_kind="goal_completed", limit=1)
     if not goal_usage_probe.get("ok") or goal_usage_probe.get("result_count", 0) <= 0:
         raise SystemExit(f"goal usage probe returned no completed goal lifecycle: {goal_usage_probe.get('diagnostics')}")
@@ -733,6 +776,10 @@ def main() -> None:
                 "hook_receipt_error_count": hook_receipts.get("summary", {}).get("error_receipt_count"),
                 "maintenance_recommendation": maintenance_status.get("recommendation"),
                 "maintenance_agent_action": maintenance_status.get("agent_route", {}).get("action"),
+                "projection_status_ok": projection_status.get("ok"),
+                "projection_completeness_status": projection_status.get("projection_completeness", {}).get("status")
+                if isinstance(projection_status.get("projection_completeness"), dict)
+                else None,
                 "goal_usage_probe_count": goal_usage_probe.get("result_count"),
                 "usage_neighborhood_anchor": usage_anchor,
                 "usage_neighborhood_session": usage_session,
@@ -776,6 +823,8 @@ def main() -> None:
                 "stdio_agent_event_usage_kind": stdio_smoke["agent_event_usage_kind"],
                 "stdio_agent_event_usage_outcome_count": stdio_smoke["agent_event_usage_outcome_count"],
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
+                "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
+                "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],
                 "configured_stdio": configured_stdio_smoke,
             },
             indent=2,

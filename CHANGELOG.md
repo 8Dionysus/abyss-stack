@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now exposes a read-only projection-status route over
+  the latest `.aoa projection-catchup` completeness diagnostic, so agents can
+  see post-classifier/schema projection coverage without running maintenance
+  through MCP.
 - `aoa-session-memory-mcp` compact status now preserves the latest
   search-shard materialization timings and bounded slow-session samples, so
   agents can see which real session made maintenance slow without opening the
