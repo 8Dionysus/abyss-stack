@@ -229,6 +229,10 @@ def _select_usage_neighborhood_probe(
 def _stdio_route_count_summary(
     inventory: dict,
     mcp_service_inventory: dict,
+    hook_inventory: dict,
+    tool_inventory: dict,
+    api_inventory: dict,
+    open_threads: dict,
     search_alias: dict,
     responses: dict,
     closeouts: dict,
@@ -263,6 +267,10 @@ def _stdio_route_count_summary(
         "mcp_service_inventory_sample_count": mcp_service_inventory.get("response_profile", {}).get("sample_count")
         if isinstance(mcp_service_inventory.get("response_profile"), dict)
         else None,
+        "hook_inventory_entity_count": _payload_count(hook_inventory, "entity_count"),
+        "tool_inventory_entity_count": _payload_count(tool_inventory, "entity_count"),
+        "api_inventory_entity_count": _payload_count(api_inventory, "entity_count"),
+        "open_thread_result_count": _payload_count(open_threads, "result_count"),
         "search_alias_result_count": _payload_count(search_alias, "result_count"),
         "search_alias_projection_mode": search_alias.get("search_projection", {}).get("mode")
         if isinstance(search_alias.get("search_projection"), dict)
@@ -336,6 +344,22 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_entity_inventory",
                 {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 5, "sample_limit": 3},
             )
+            hook_inventory = await call_json(
+                "aoa_session_entity_inventory",
+                {"layer": "hook", "limit": 5, "sample_limit": 2},
+            )
+            tool_inventory = await call_json(
+                "aoa_session_entity_inventory",
+                {"layer": "tool", "limit": 5, "sample_limit": 2},
+            )
+            api_inventory = await call_json(
+                "aoa_session_entity_inventory",
+                {"layer": "api", "limit": 5, "sample_limit": 2},
+            )
+            open_threads = await call_json(
+                "aoa_session_search",
+                {"query": "", "filters": {"route_signal": "agent_event:assistant_open_thread", "doc_type": "event"}, "limit": 3},
+            )
             search_alias = await call_json(
                 "aoa_session_search",
                 {"query": "aoa-session-memory-mcp", "filters": {"layer": "mcp", "use_shards": True}, "limit": 3},
@@ -384,6 +408,16 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     if mcp_service_inventory.get("requested_layer") != "mcp_service" or mcp_service_inventory.get("normalized_layer") != "mcp":
         raise SystemExit(f"stdio MCP mcp_service inventory alias contract failed: {mcp_service_inventory}")
     _assert_bounded_inventory_packet(mcp_service_inventory, "stdio MCP mcp_service")
+    for layer_name, layer_inventory in (
+        ("hook", hook_inventory),
+        ("tool", tool_inventory),
+        ("api", api_inventory),
+    ):
+        if layer_inventory.get("entity_count", 0) <= 0:
+            raise SystemExit(f"stdio MCP {layer_name} inventory returned no entities: {layer_inventory.get('diagnostics')}")
+        _assert_bounded_inventory_packet(layer_inventory, f"stdio MCP {layer_name}")
+    if open_threads.get("result_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP open-thread search returned no results: {open_threads.get('diagnostics')}")
     first_mcp_inventory_entity = _first_entity(mcp_service_inventory)
     if not first_mcp_inventory_entity.get("latest_session_date"):
         raise SystemExit(f"stdio MCP mcp_service inventory did not report latest_session_date: {mcp_service_inventory}")
@@ -407,6 +441,10 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     return _stdio_route_count_summary(
         inventory,
         mcp_service_inventory,
+        hook_inventory,
+        tool_inventory,
+        api_inventory,
+        open_threads,
         search_alias,
         responses,
         closeouts,
@@ -692,6 +730,10 @@ def main() -> None:
                     "mcp_service_inventory_runtime_reload_required"
                 ],
                 "stdio_mcp_service_inventory_sample_count": stdio_smoke["mcp_service_inventory_sample_count"],
+                "stdio_hook_inventory_entity_count": stdio_smoke["hook_inventory_entity_count"],
+                "stdio_tool_inventory_entity_count": stdio_smoke["tool_inventory_entity_count"],
+                "stdio_api_inventory_entity_count": stdio_smoke["api_inventory_entity_count"],
+                "stdio_open_thread_result_count": stdio_smoke["open_thread_result_count"],
                 "stdio_search_alias_result_count": stdio_smoke["search_alias_result_count"],
                 "stdio_search_alias_projection_mode": stdio_smoke["search_alias_projection_mode"],
                 "stdio_agent_response_count": stdio_smoke["agent_response_count"],
