@@ -184,6 +184,7 @@ def build_server(
         consequence_window: int = 8,
         document_limit: int = 60,
         session: str = "",
+        full: bool = False,
     ) -> dict[str, Any]:
         """Trace an entity to usage events, consequences, and document refs."""
         return current_state().session_entity_usage_audit(
@@ -194,6 +195,7 @@ def build_server(
             consequence_window=consequence_window,
             document_limit=document_limit,
             session=session,
+            full=full,
         )
 
     @mcp.tool()
@@ -212,6 +214,7 @@ def build_server(
         raw_preview_chars: int = 600,
         document_limit: int = 80,
         session: str = "",
+        full: bool = False,
     ) -> dict[str, Any]:
         """Trace an entity to usage events and local before/after raw evidence windows."""
         return current_state().session_entity_usage_neighborhood(
@@ -224,6 +227,7 @@ def build_server(
             raw_preview_chars=raw_preview_chars,
             document_limit=document_limit,
             session=session,
+            full=full,
         )
 
     @mcp.tool()

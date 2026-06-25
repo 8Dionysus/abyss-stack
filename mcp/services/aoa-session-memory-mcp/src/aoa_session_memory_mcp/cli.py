@@ -116,6 +116,7 @@ def main() -> None:
     usage.add_argument("--consequence-window", type=int, default=8)
     usage.add_argument("--document-limit", type=int, default=60)
     usage.add_argument("--session", default="")
+    usage.add_argument("--full", action="store_true")
 
     usage_neighborhood = sub.add_parser("usage-neighborhood")
     usage_neighborhood.add_argument("anchor")
@@ -127,6 +128,7 @@ def main() -> None:
     usage_neighborhood.add_argument("--raw-preview-chars", type=int, default=600)
     usage_neighborhood.add_argument("--document-limit", type=int, default=80)
     usage_neighborhood.add_argument("--session", default="")
+    usage_neighborhood.add_argument("--full", action="store_true")
 
     usage_scenario = sub.add_parser("usage-scenario-audit")
     usage_scenario.add_argument("--seed", default="entity-usage-scenario-audit")
@@ -360,6 +362,7 @@ def main() -> None:
                 consequence_window=args.consequence_window,
                 document_limit=args.document_limit,
                 session=args.session,
+                full=args.full,
             )
         )
     elif args.command == "usage-neighborhood":
@@ -374,6 +377,7 @@ def main() -> None:
                 raw_preview_chars=args.raw_preview_chars,
                 document_limit=args.document_limit,
                 session=args.session,
+                full=args.full,
             )
         )
     elif args.command == "usage-scenario-audit":
