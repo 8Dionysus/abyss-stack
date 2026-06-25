@@ -243,6 +243,7 @@ def _stdio_route_count_summary(
     neighborhood: dict,
     registry: dict,
     usage_alias: dict,
+    agent_event_usage: dict,
     retrieve_usage: dict,
     maintenance_status: dict,
     *,
@@ -285,6 +286,8 @@ def _stdio_route_count_summary(
         "registry_entity_count": _payload_count(registry, "entity_count"),
         "usage_alias_kind": usage_alias.get("kind"),
         "usage_alias_requested_kind": usage_alias.get("requested_kind"),
+        "agent_event_usage_kind": agent_event_usage.get("kind"),
+        "agent_event_usage_outcome_count": _payload_count(agent_event_usage, "outcome_event_count"),
         "retrieve_usage_served_by": retrieve_usage.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_usage.get("retrieval_redirect"), dict)
         else None,
@@ -386,6 +389,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
                 timeout_seconds=90,
             )
+            agent_event_usage = await call_json(
+                "aoa_session_entity_usage_audit",
+                {"anchor": "assistant_answer", "kind": "agent_event", "limit": 3, "per_route_limit": 5},
+                timeout_seconds=90,
+            )
             retrieve_usage = await call_json(
                 "aoa_session_retrieve",
                 {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
@@ -434,6 +442,8 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP entity registry returned no entities: {registry.get('diagnostics')}")
     if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
+    if agent_event_usage.get("kind") != "agent_event" or agent_event_usage.get("outcome_event_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP agent_event usage route failed: {agent_event_usage.get('diagnostics')}")
     if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_audit":
         raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
@@ -455,6 +465,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         neighborhood,
         registry,
         usage_alias,
+        agent_event_usage,
         retrieve_usage,
         maintenance_status,
         tool_count=len(tools),
@@ -556,6 +567,21 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             ):
                 raise SystemExit(f"configured Codex MCP usage kind alias contract failed: {usage_payload}")
 
+            agent_event_usage_result = await mcp_session.call_tool(
+                "aoa_session_entity_usage_audit",
+                {"anchor": "assistant_answer", "kind": "agent_event", "limit": 3, "per_route_limit": 5},
+                read_timeout_seconds=timedelta(seconds=90),
+            )
+            if agent_event_usage_result.isError or not agent_event_usage_result.content:
+                raise SystemExit(f"configured Codex MCP agent_event usage call failed: {agent_event_usage_result.content}")
+            agent_event_usage_payload = json.loads(agent_event_usage_result.content[0].text)
+            if (
+                not isinstance(agent_event_usage_payload, dict)
+                or agent_event_usage_payload.get("kind") != "agent_event"
+                or agent_event_usage_payload.get("outcome_event_count", 0) <= 0
+            ):
+                raise SystemExit(f"configured Codex MCP agent_event usage contract failed: {agent_event_usage_payload}")
+
             retrieve_result = await mcp_session.call_tool(
                 "aoa_session_retrieve",
                 {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
@@ -586,6 +612,8 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         if isinstance(inventory_payload.get("response_profile"), dict)
         else None,
         "usage_alias_kind": usage_payload.get("kind") if isinstance(usage_payload, dict) else None,
+        "agent_event_usage_kind": agent_event_usage_payload.get("kind") if isinstance(agent_event_usage_payload, dict) else None,
+        "agent_event_usage_outcome_count": agent_event_usage_payload.get("outcome_event_count") if isinstance(agent_event_usage_payload, dict) else None,
         "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_payload, dict) and isinstance(retrieve_payload.get("retrieval_redirect"), dict)
         else None,
@@ -745,6 +773,8 @@ def main() -> None:
                 "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
                 "stdio_usage_alias_kind": stdio_smoke["usage_alias_kind"],
                 "stdio_usage_alias_requested_kind": stdio_smoke["usage_alias_requested_kind"],
+                "stdio_agent_event_usage_kind": stdio_smoke["agent_event_usage_kind"],
+                "stdio_agent_event_usage_outcome_count": stdio_smoke["agent_event_usage_outcome_count"],
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "configured_stdio": configured_stdio_smoke,
             },

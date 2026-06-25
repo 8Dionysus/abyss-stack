@@ -125,14 +125,41 @@ def test_runtime_config_bundle_hashes_rendered_subject() -> None:
     assert "durable evidence promotion" in manifest["consumer_contract"]["consumer_expectation"]
     assert "materialized subject-store verification" in manifest["consumer_contract"]["consumer_expectation"]
     assert "source/trust-root matching" in manifest["consumer_contract"]["consumer_expectation"]
+    assert "agent rehearsal" in manifest["consumer_contract"]["consumer_expectation"]
+    assert "manual_review_required until a release trust root is present" in manifest["consumer_contract"]["consumer_expectation"]
     command_text = "\n".join(manifest["consumer_command"])
+    materialize_command = next(item for item in manifest["consumer_command"] if "materialize-subjects" in item)
+    trust_gate_command = next(item for item in manifest["consumer_command"] if " artifacts trust-gate " in item)
     assert "abyss-machine artifacts evidence-promote" in command_text
     assert "abyss-machine artifacts materialize-subjects" in command_text
     assert "abyss-machine artifacts trust-gate" in command_text
     assert "abyss-machine artifacts registry-latest" in command_text
     assert "--store-root SUBJECT_STORE_ROOT" in command_text
-    assert "--consumer-intent runtime" in command_text
+    assert "--consumer-intent agent" in materialize_command
+    assert "--consumer-intent runtime" in trust_gate_command
     assert "--trust-root-mode host_managed" in command_text
+
+
+def test_runtime_config_bundle_validator_accepts_expected_runtime_manual_review() -> None:
+    validator = load_runtime_config_bundle_validator()
+    state = validator._runtime_trust_gate_manual_review_state(
+        {
+            "verdict": "manual_review_required",
+            "decision": {"allow": False},
+            "blockers": [],
+            "manual_review": ["production_consumer_requires_release_trust_root"],
+            "inspected_claims": {
+                "registry_latest": {"selected_record_is_latest": True},
+                "controls": {"required_controls_missing": []},
+                "source": {"source_repo_matched": True},
+                "trust_root": {"trust_root_mode_matched": True},
+                "artifact_subject_store": {"ok": True},
+            },
+        }
+    )
+
+    assert state["ok"] is True
+    assert state["mode"] == "expected_manual_review_until_release_trust_root"
 
 
 def test_runtime_config_bundle_validator_reports_external_paths(tmp_path: Path) -> None:

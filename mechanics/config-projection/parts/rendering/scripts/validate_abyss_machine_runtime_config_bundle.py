@@ -30,10 +30,13 @@ DEFAULT_SUBJECT_STORE_ROOT = REPO_ROOT / "dist" / "abyss-artifact-subjects" / "a
 PUBLIC_RUNTIME_ROOT = "/srv/AbyssOS/abyss-stack"
 ARTIFACT_CLASS = "abyss_stack_runtime_config_bundle"
 CONSUMER_INTENT = "runtime"
+MATERIALIZATION_REHEARSAL_CONSUMER_INTENT = "agent"
 CONSUMER_REF = "abyss-stack:config-projection-rendering"
 SOURCE_REPO = "abyss-stack"
 TRUST_ROOT_MODE = "host_managed"
 PRODUCER = "abyss-stack config rendering scripts from tracked compose modules and public-safe runtime route inputs"
+REQUIRED_SUBJECT_STORE_BLOCKER = "required_artifact_subject_store_not_verified"
+PRODUCTION_RELEASE_TRUST_ROOT_REVIEW = "production_consumer_requires_release_trust_root"
 
 
 def _candidate_abyss_machine_roots() -> list[Path]:
@@ -294,8 +297,13 @@ def _verify_missing_sbom(artifact_bundles: Any, abyss_repo_root: Path, bundle_di
         if path.exists():
             path.unlink()
     verification = artifact_bundles.verify_bundle(candidate, repo_root=abyss_repo_root)
+    errors = [str(item) for item in verification.get("errors", [])]
     return {
-        "ok": verification.get("ok") is False and bool(verification.get("missing")),
+        "ok": verification.get("ok") is False
+        and (
+            bool(verification.get("missing"))
+            or any("SBOM sidecars do not cover artifact subject digests" in item for item in errors)
+        ),
         "verification": verification,
     }
 
@@ -448,17 +456,57 @@ def _trust_gate_pre_materialization_state(
         if isinstance(inspected_claims, dict) and isinstance(inspected_claims.get("artifact_subject_store"), dict)
         else {}
     )
-    tolerated_pre_materialization_reasons = {"required_artifact_subject_store_not_verified"}
+    manual_review = set(trust_gate.get("manual_review") or [])
+    tolerated_pre_materialization_blockers = {REQUIRED_SUBJECT_STORE_BLOCKER}
+    tolerated_manual_review = {PRODUCTION_RELEASE_TRUST_ROOT_REVIEW}
     gate_failures = blockers | reasons
     missing_subject_store = (
-        gate_failures == tolerated_pre_materialization_reasons
+        REQUIRED_SUBJECT_STORE_BLOCKER in gate_failures
         and subject_store.get("ok") is False
     )
+    expected_runtime_manual_review = bool(
+        manual_review == tolerated_manual_review
+        and blockers <= tolerated_pre_materialization_blockers
+    )
     return {
-        "ok": bool(gate_check.get("ok") or missing_subject_store),
-        "mode": "allow_existing_subject_store" if gate_check.get("ok") else "deny_until_subject_store_materialized",
+        "ok": bool(gate_check.get("ok") or missing_subject_store or expected_runtime_manual_review),
+        "mode": (
+            "allow_existing_subject_store"
+            if gate_check.get("ok")
+            else "deny_until_subject_store_materialized"
+            if missing_subject_store
+            else "manual_review_until_release_trust_root"
+        ),
         "expected_pre_materialization_deny": bool(missing_subject_store),
+        "expected_runtime_manual_review": bool(expected_runtime_manual_review),
         "trust_gate": trust_gate,
+    }
+
+
+def _runtime_trust_gate_manual_review_state(gate: dict[str, Any]) -> dict[str, Any]:
+    inspected_claims = gate.get("inspected_claims") if isinstance(gate, dict) else {}
+    inspected_claims = inspected_claims if isinstance(inspected_claims, dict) else {}
+    artifact_subject_store = inspected_claims.get("artifact_subject_store")
+    artifact_subject_store = artifact_subject_store if isinstance(artifact_subject_store, dict) else {}
+    blockers = set(gate.get("blockers") or []) if isinstance(gate, dict) else set()
+    manual_review = set(gate.get("manual_review") or []) if isinstance(gate, dict) else set()
+    expected_manual_review = {PRODUCTION_RELEASE_TRUST_ROOT_REVIEW}
+    ok = bool(
+        gate.get("verdict") == "manual_review_required"
+        and gate.get("decision", {}).get("allow") is False
+        and not blockers
+        and manual_review == expected_manual_review
+        and inspected_claims.get("registry_latest", {}).get("selected_record_is_latest") is True
+        and inspected_claims.get("controls", {}).get("required_controls_missing") == []
+        and inspected_claims.get("source", {}).get("source_repo_matched") is True
+        and inspected_claims.get("trust_root", {}).get("trust_root_mode_matched") is True
+        and artifact_subject_store.get("ok") is True
+    )
+    return {
+        "ok": ok,
+        "mode": "expected_manual_review_until_release_trust_root",
+        "expected_manual_review": sorted(expected_manual_review),
+        "trust_gate": gate,
     }
 
 
@@ -525,7 +573,7 @@ def _verify_materialized_subject_store(
         store_root=store_root,
         registry_dir=registry_dir,
         manifest_ref=manifest,
-        consumer_intent=CONSUMER_INTENT,
+        consumer_intent=MATERIALIZATION_REHEARSAL_CONSUMER_INTENT,
         expected_source_repo=SOURCE_REPO,
         expected_trust_root_mode=TRUST_ROOT_MODE,
     )
@@ -548,6 +596,7 @@ def _verify_materialized_subject_store(
         expected_source_repo=SOURCE_REPO,
         expected_trust_root_mode=TRUST_ROOT_MODE,
     )
+    runtime_gate = _runtime_trust_gate_manual_review_state(gate)
     return _sanitize_public_payload({
         "ok": bool(
             pre_registry.get("ok")
@@ -555,14 +604,12 @@ def _verify_materialized_subject_store(
             and refreshed_registry.get("ok")
             and isinstance(store_status, dict)
             and store_status.get("ok") is True
-            and gate.get("verdict") in {"allow", "warn"}
-            and gate.get("decision", {}).get("allow") is True
-            and gate.get("inspected_claims", {}).get("artifact_subject_store", {}).get("ok") is True
+            and runtime_gate.get("ok")
         ),
         "pre_registry": pre_registry,
         "materialized": materialized,
         "refreshed_registry": refreshed_registry,
-        "trust_gate": gate,
+        "runtime_trust_gate": runtime_gate,
     })
 
 
@@ -643,7 +690,7 @@ def validate_bundle(
         store_root=subject_store_root,
         registry_dir=registry_dir,
         manifest_ref=manifest,
-        consumer_intent=CONSUMER_INTENT,
+        consumer_intent=MATERIALIZATION_REHEARSAL_CONSUMER_INTENT,
         expected_source_repo=SOURCE_REPO,
         expected_trust_root_mode=TRUST_ROOT_MODE,
     )
@@ -655,7 +702,6 @@ def validate_bundle(
         lifecycle_state="release-ready",
         evidence_ref="materialized-subject-store",
     )
-    trust_gate = _trust_gate_allow_latest(artifact_bundles, registry_dir, registry_with_subject_store)
     subject_store_gate = artifact_bundles.trust_gate(
         registry_dir,
         artifact_class=ARTIFACT_CLASS,
@@ -664,6 +710,7 @@ def validate_bundle(
         expected_source_repo=SOURCE_REPO,
         expected_trust_root_mode=TRUST_ROOT_MODE,
     )
+    runtime_trust_gate = _runtime_trust_gate_manual_review_state(subject_store_gate)
     adversarial = _run_adversarial_checks(
         artifact_bundles,
         abyss_repo_root,
@@ -688,13 +735,9 @@ def validate_bundle(
             and release_check.get("ok")
             and registry.get("ok")
             and pre_materialization_gate.get("ok")
-            and trust_gate.get("ok")
             and materialized.get("ok")
             and registry_with_subject_store.get("ok")
-            and subject_store_gate.get("ok")
-            and subject_store_gate.get("verdict") in {"allow", "warn"}
-            and subject_store_gate.get("decision", {}).get("allow") is True
-            and subject_store_gate.get("inspected_claims", {}).get("artifact_subject_store", {}).get("ok") is True
+            and runtime_trust_gate.get("ok")
             and adversarial.get("ok")
         ),
         "schema": "abyss_stack_runtime_config_artifact_bundle_validation_v1",
@@ -713,7 +756,7 @@ def validate_bundle(
         },
         "registry": registry,
         "pre_materialization_gate": pre_materialization_gate,
-        "trust_gate": trust_gate,
+        "runtime_trust_gate": runtime_trust_gate,
         "materialized_subject_store": materialized,
         "registry_with_subject_store": registry_with_subject_store,
         "subject_store_gate": subject_store_gate,
