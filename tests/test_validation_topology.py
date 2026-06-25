@@ -119,11 +119,18 @@ def test_runtime_config_bundle_hashes_rendered_subject() -> None:
         "published",
     ]
     assert manifest["consumer_contract"]["registry_required"] is True
+    assert manifest["consumer_contract"]["subject_store_required"] is True
+    assert manifest["consumer_contract"]["admission_gate"] == "fail_closed_consumer_admission"
+    assert manifest["consumer_contract"]["consumer_verdict"] == "allow_or_deny_required_before_use"
+    assert "durable evidence promotion" in manifest["consumer_contract"]["consumer_expectation"]
+    assert "materialized subject-store verification" in manifest["consumer_contract"]["consumer_expectation"]
+    assert "source/trust-root matching" in manifest["consumer_contract"]["consumer_expectation"]
     command_text = "\n".join(manifest["consumer_command"])
     assert "abyss-machine artifacts evidence-promote" in command_text
     assert "abyss-machine artifacts materialize-subjects" in command_text
     assert "abyss-machine artifacts trust-gate" in command_text
     assert "abyss-machine artifacts registry-latest" in command_text
+    assert "--store-root SUBJECT_STORE_ROOT" in command_text
     assert "--consumer-intent runtime" in command_text
     assert "--trust-root-mode host_managed" in command_text
 
@@ -159,6 +166,23 @@ def test_runtime_config_bundle_validator_sanitizes_public_verify_sidecar(tmp_pat
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
 
     assert payload["artifact_subject_resolution"][0]["resolved_path"] == "dist/abyss-stack-runtime-config/substrate.rendered.yml"
+
+
+def test_runtime_config_bundle_validator_sanitizes_host_paths() -> None:
+    validator = load_runtime_config_bundle_validator()
+    sanitized = validator._sanitize_public_payload(
+        {
+            "repo": str(REPO_ROOT),
+            "tmp": "/srv/abyss-machine/tmp/runtime-config-negative/example.json",
+            "home": str(Path.home() / "src" / "abyss-machine"),
+        }
+    )
+
+    assert sanitized == {
+        "repo": ".",
+        "tmp": "host-tmp:abyss-machine/runtime-config-negative/example.json",
+        "home": "host-home-redacted",
+    }
 
 
 def test_root_validator_is_marked_as_orchestrator() -> None:
