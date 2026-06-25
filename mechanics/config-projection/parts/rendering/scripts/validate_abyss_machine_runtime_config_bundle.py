@@ -448,8 +448,10 @@ def _trust_gate_pre_materialization_state(
         if isinstance(inspected_claims, dict) and isinstance(inspected_claims.get("artifact_subject_store"), dict)
         else {}
     )
+    tolerated_pre_materialization_reasons = {"required_artifact_subject_store_not_verified"}
+    gate_failures = blockers | reasons
     missing_subject_store = (
-        "required_artifact_subject_store_not_verified" in blockers | reasons
+        gate_failures == tolerated_pre_materialization_reasons
         and subject_store.get("ok") is False
     )
     return {
