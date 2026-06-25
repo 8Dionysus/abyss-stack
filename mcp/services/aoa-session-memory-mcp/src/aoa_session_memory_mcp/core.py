@@ -1106,6 +1106,7 @@ class AoASessionMemoryMCPState:
         provider = self._search_provider_status_fast()
         atlas = self._atlas_summary()
         diagnostics = self.latest_diagnostics(kind="route-layer-readiness", limit=1)
+        maintenance = self._maintenance_summary_for_status()
         live_readiness = None
         if include_live:
             live_args = ["all", "--sample-limit", str(LIVE_READINESS_SAMPLE_LIMIT)]
@@ -1126,7 +1127,8 @@ class AoASessionMemoryMCPState:
             "script_path": self.script_path.as_posix(),
             "provider": provider,
             "atlas": atlas,
-            "graph": self._graph_summary(),
+            "graph": self._graph_summary(maintenance),
+            "maintenance_status": maintenance,
             "latest_route_readiness": diagnostics,
             "live_route_readiness": live_readiness,
             "readiness_policy": self.readiness_policy(include_live=include_live),
@@ -3407,6 +3409,68 @@ class AoASessionMemoryMCPState:
             mcp_access["full_status_route"] = self._archive_command_line("maintenance-status", [*args, "--full"] if not full else args)
         return payload
 
+    def _maintenance_summary_for_status(self) -> dict[str, Any]:
+        payload = self.session_maintenance_status(include_timers=False, full=False)
+        mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
+        if payload.get("artifact_type") != "session_memory_maintenance_status":
+            return {
+                "ok": False,
+                "source": "maintenance-status",
+                "diagnostics": payload.get("diagnostics", ["maintenance-status returned unexpected payload"]),
+                "mcp_access": {
+                    "elapsed_ms": mcp_access.get("elapsed_ms"),
+                    "returncode": mcp_access.get("returncode"),
+                },
+            }
+        agent_route = payload.get("agent_route") if isinstance(payload.get("agent_route"), dict) else {}
+        search = payload.get("search") if isinstance(payload.get("search"), dict) else {}
+        graph = payload.get("graph") if isinstance(payload.get("graph"), dict) else {}
+        route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
+        entity_registry = payload.get("entity_registry") if isinstance(payload.get("entity_registry"), dict) else {}
+        return {
+            "ok": bool(payload.get("ok")),
+            "source": "maintenance-status",
+            "generated_at": payload.get("generated_at"),
+            "recommendation": payload.get("recommendation"),
+            "agent_route": {
+                "action": agent_route.get("action"),
+                "can_use_graph_search": agent_route.get("can_use_graph_search"),
+                "maintenance_required": agent_route.get("maintenance_required"),
+                "live_catchup_pending": agent_route.get("live_catchup_pending"),
+                "deferred_live_count": agent_route.get("deferred_live_count"),
+                "raw_or_deep_route": agent_route.get("raw_or_deep_route"),
+            },
+            "search": {
+                "status": search.get("status"),
+                "actionable_dirty_session_count": search.get("actionable_dirty_session_count"),
+                "deferred_live_session_count": search.get("deferred_live_session_count"),
+            },
+            "graph": {
+                "status": graph.get("status"),
+                "needs_maintenance": graph.get("needs_maintenance"),
+                "dirty_count": graph.get("dirty_count"),
+                "missing_count": graph.get("missing_count"),
+                "blocked_count": graph.get("blocked_count"),
+                "actionable_count": graph.get("actionable_count"),
+            },
+            "route": {
+                "status": route.get("status"),
+                "needs_index_maintenance": route.get("needs_index_maintenance"),
+                "needs_graph_maintenance": route.get("needs_graph_maintenance"),
+            },
+            "entity_registry": {
+                "status": entity_registry.get("status"),
+                "entity_count": entity_registry.get("entity_count"),
+            },
+            "next_actions": payload.get("next_actions", [])[:3] if isinstance(payload.get("next_actions"), list) else [],
+            "exact_next_command": payload.get("exact_next_command"),
+            "mcp_access": {
+                "elapsed_ms": mcp_access.get("elapsed_ms"),
+                "returncode": mcp_access.get("returncode"),
+            },
+            "truth_status": "canonical_hot_maintenance_summary_for_agent_routing",
+        }
+
     def maintenance_plan(self) -> dict[str, Any]:
         payload = self.session_maintenance_status(include_timers=False)
         payload["compatibility_tool"] = "aoa_session_maintenance_plan"
@@ -3611,10 +3675,32 @@ class AoASessionMemoryMCPState:
             "axes": axes[:60],
         }
 
-    def _graph_summary(self) -> dict[str, Any]:
+    def _graph_summary(self, maintenance: dict[str, Any] | None = None) -> dict[str, Any]:
         index_path = self.aoa_root / "graph" / "index.json"
         sqlite_path = self.aoa_root / "graph" / "graph.sqlite3"
         freshness = self._latest_graph_freshness_summary()
+        maintenance = maintenance if isinstance(maintenance, dict) else {}
+        maintenance_graph = maintenance.get("graph") if isinstance(maintenance.get("graph"), dict) else {}
+        maintenance_route = maintenance.get("route") if isinstance(maintenance.get("route"), dict) else {}
+        has_maintenance_verdict = bool(maintenance.get("ok")) and bool(maintenance_graph or maintenance_route)
+        decision_source = "maintenance_status" if has_maintenance_verdict else "cached_graph_freshness_diagnostic"
+        needs_graph_maintenance = (
+            maintenance_route.get("needs_graph_maintenance")
+            if has_maintenance_verdict and maintenance_route.get("needs_graph_maintenance") is not None
+            else freshness.get("needs_graph_maintenance")
+        )
+        needs_index_maintenance = (
+            maintenance_route.get("needs_index_maintenance")
+            if has_maintenance_verdict and maintenance_route.get("needs_index_maintenance") is not None
+            else freshness.get("needs_index_maintenance")
+        )
+        maintenance_status = maintenance_graph.get("status") if has_maintenance_verdict else None
+        diagnostic_conflict = (
+            has_maintenance_verdict
+            and freshness.get("checked")
+            and freshness.get("needs_graph_maintenance") is True
+            and needs_graph_maintenance is False
+        )
         index = _read_json(index_path)
         if not isinstance(index, dict):
             if sqlite_path.is_file():
@@ -3626,15 +3712,23 @@ class AoASessionMemoryMCPState:
                     "index_path": index_path.as_posix(),
                     "diagnostics": ["graph_sidecar_not_exported"],
                     "freshness": freshness,
-                    "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
-                    "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+                    "freshness_source": "cached_graph_freshness_diagnostic",
+                    "decision_source": decision_source,
+                    "maintenance_status": maintenance_status,
+                    "cached_freshness_conflicts_with_maintenance": diagnostic_conflict,
+                    "needs_graph_maintenance": needs_graph_maintenance,
+                    "needs_index_maintenance": needs_index_maintenance,
                 }
             return {
                 "status": "missing",
                 "index_path": index_path.as_posix(),
                 "freshness": freshness,
-                "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
-                "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+                "freshness_source": "cached_graph_freshness_diagnostic",
+                "decision_source": decision_source,
+                "maintenance_status": maintenance_status,
+                "cached_freshness_conflicts_with_maintenance": diagnostic_conflict,
+                "needs_graph_maintenance": needs_graph_maintenance,
+                "needs_index_maintenance": needs_index_maintenance,
             }
         return {
             "status": "present",
@@ -3646,8 +3740,12 @@ class AoASessionMemoryMCPState:
             "node_type_counts": index.get("node_type_counts", {}),
             "edge_type_counts": index.get("edge_type_counts", {}),
             "freshness": freshness,
-            "needs_graph_maintenance": freshness.get("needs_graph_maintenance"),
-            "needs_index_maintenance": freshness.get("needs_index_maintenance"),
+            "freshness_source": "cached_graph_freshness_diagnostic",
+            "decision_source": decision_source,
+            "maintenance_status": maintenance_status,
+            "cached_freshness_conflicts_with_maintenance": diagnostic_conflict,
+            "needs_graph_maintenance": needs_graph_maintenance,
+            "needs_index_maintenance": needs_index_maintenance,
         }
 
     def _latest_graph_freshness_summary(self) -> dict[str, Any]:
