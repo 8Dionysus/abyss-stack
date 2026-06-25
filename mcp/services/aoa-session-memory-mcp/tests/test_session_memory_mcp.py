@@ -451,6 +451,51 @@ MAINTENANCE_STATUS = {
             "documents_per_second": 535.92,
             "budget_exhausted": False,
         },
+        "search_shards": {
+            "status": "current",
+            "shard_count": 3,
+            "materialized_shard_count": 3,
+            "raw_text_query_route": "structured shards use monolith fallback for raw-text queries unless materialized with --full-text",
+            "fast_path_defaults": {
+                "agent_event_routes": {
+                    "default_use_shards": True,
+                    "default_projection": "materialized_shard_fanout",
+                    "raw_text_query_projection": "monolith_fallback",
+                    "raw_text_fallback_dependency_status": "monolith_required_for_raw_text_query",
+                    "raw_text_fallback_dependency_next_route": "use the scoped full-text command for repeated literal raw-text queries in the affected shard",
+                }
+            },
+            "raw_text_fallback_dependency": {
+                "status": "monolith_required_for_raw_text_query",
+                "raw_text_query_support": "monolith_fallback_required",
+                "monolith_fallback_db_path": "/srv/AbyssOS/.aoa/search/aoa-search.sqlite3",
+                "full_text_shard_count": 0,
+                "structured_only_shard_count": 3,
+                "unsupported_shard_count": 3,
+                "nonmaterialized_shard_count": 0,
+                "route_blocked_shard_count": 3,
+                "route_blocked_shards": ["month/2026-04", "month/2026-05", "month/2026-06"],
+                "scoped_full_text_next_commands": [
+                    {
+                        "shard": "month/2026-04",
+                        "command": "python3 scripts/aoa_session_memory.py search-shards all --aoa-root /srv/AbyssOS/.aoa --shard month/2026-04 --full-text --write-report",
+                    },
+                    {
+                        "shard": "month/2026-05",
+                        "command": "python3 scripts/aoa_session_memory.py search-shards all --aoa-root /srv/AbyssOS/.aoa --shard month/2026-05 --full-text --write-report",
+                    },
+                    {
+                        "shard": "month/2026-06",
+                        "command": "python3 scripts/aoa_session_memory.py search-shards all --aoa-root /srv/AbyssOS/.aoa --shard month/2026-06 --full-text --write-report",
+                    },
+                ],
+                "global_full_text_next_command": "python3 scripts/aoa_session_memory.py search-shards all --aoa-root /srv/AbyssOS/.aoa --full-text --write-report",
+                "quality_tradeoff": "raw-text recall is preserved by monolith fallback until a scoped full-text shard is explicitly materialized.",
+                "weight_tradeoff": "structured shards stay slim; full-text shards add FTS and compressed-body weight, so use scoped full-text shards for repeated literal raw-text work.",
+                "authority_boundary": "monolith and shards are generated search projections; raw transcript and session indexes remain the evidence authority.",
+                "next_route": "use the scoped full-text command for repeated literal raw-text queries in the affected shard",
+            },
+        },
         "last_successful_auto_maintenance": {
             "hot": {"status": "wait_live_catchup", "elapsed_ms": 2387},
             "catchup": {"status": "nothing_to_do", "elapsed_ms": 3136},
@@ -1199,6 +1244,19 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["runtime"]["reload_required"] is False
     assert status["maintenance_status"]["source"] == "maintenance-status"
     assert status["maintenance_status"]["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
+    assert status["maintenance_status"]["search_shards"]["status"] == "current"
+    assert (
+        status["maintenance_status"]["search_shards"]["fast_path_defaults"]["agent_event_routes"][
+            "raw_text_fallback_dependency_status"
+        ]
+        == "monolith_required_for_raw_text_query"
+    )
+    raw_text_dependency = status["maintenance_status"]["search_shards"]["raw_text_fallback_dependency"]
+    assert raw_text_dependency["status"] == "monolith_required_for_raw_text_query"
+    assert raw_text_dependency["route_blocked_shards"] == ["month/2026-04", "month/2026-05", "month/2026-06"]
+    assert raw_text_dependency["scoped_full_text_next_commands"][0]["shard"] == "month/2026-04"
+    assert "--full-text" in raw_text_dependency["scoped_full_text_next_commands"][0]["command"]
+    assert raw_text_dependency["authority_boundary"].startswith("monolith and shards are generated search projections")
     assert status["latest_route_readiness"]["reports"][0]["summary"]["ok"] is True
     assert status["readiness_policy"]["provider_status"]["freshness_checked"] is False
     assert status["readiness_policy"]["cached_route_readiness"]["status_field"] == "latest_route_readiness"
@@ -1307,6 +1365,7 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert plan["mcp_access"]["archive_command"] == "maintenance-status"
     assert plan["operations"]["warning_count"] == 2
     assert plan["operations"]["latest_search_index"]["document_count"] == 1630447
+    assert plan["operations"]["search_shards"]["raw_text_fallback_dependency"]["route_blocked_shard_count"] == 3
     assert plan["operations"]["why_maintenance_long"][0]["phase"] == "session_bulk_index"
     assert "--no-timers" in [arg for command, args in state.command_runner.calls if command == "maintenance-status" for arg in args]
 
