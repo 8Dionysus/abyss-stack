@@ -1440,6 +1440,8 @@ class AoASessionMemoryMCPState:
                     str(_coerce_bounded_int(max_shards, DEFAULT_SEARCH_MAX_SHARDS, 1, DEFAULT_SEARCH_MAX_SHARDS)),
                 ]
             )
+        else:
+            args.append("--no-shards")
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         if episode:
