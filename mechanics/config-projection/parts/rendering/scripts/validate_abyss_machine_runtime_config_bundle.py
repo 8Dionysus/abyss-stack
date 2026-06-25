@@ -428,6 +428,38 @@ def _trust_gate_allow_latest(
     }
 
 
+def _trust_gate_pre_materialization_state(
+    artifact_bundles: Any,
+    registry_dir: Path,
+    registry_roundtrip: dict[str, Any],
+) -> dict[str, Any]:
+    gate_check = _trust_gate_allow_latest(
+        artifact_bundles,
+        registry_dir,
+        registry_roundtrip,
+        require_subject_store=False,
+    )
+    trust_gate = gate_check.get("trust_gate", {})
+    blockers = set(trust_gate.get("blockers") or [])
+    reasons = set(trust_gate.get("reasons") or [])
+    inspected_claims = trust_gate.get("inspected_claims") if isinstance(trust_gate, dict) else {}
+    subject_store = (
+        inspected_claims.get("artifact_subject_store")
+        if isinstance(inspected_claims, dict) and isinstance(inspected_claims.get("artifact_subject_store"), dict)
+        else {}
+    )
+    missing_subject_store = (
+        "required_artifact_subject_store_not_verified" in blockers | reasons
+        and subject_store.get("ok") is False
+    )
+    return {
+        "ok": bool(gate_check.get("ok") or missing_subject_store),
+        "mode": "allow_existing_subject_store" if gate_check.get("ok") else "deny_until_subject_store_materialized",
+        "expected_pre_materialization_deny": bool(missing_subject_store),
+        "trust_gate": trust_gate,
+    }
+
+
 def _verify_terminal_registry_state(artifact_bundles: Any, bundle_dir: Path, tmp_root: Path) -> dict[str, Any]:
     registry_dir = tmp_root / "terminal-registry"
     release_ready = _registry_roundtrip(
@@ -599,11 +631,10 @@ def validate_bundle(
         lifecycle_state="release-ready",
         evidence_ref=f"{_path_ref(bundle_dir)}/artifact.verify.json",
     )
-    pre_materialization_gate = _trust_gate_allow_latest(
+    pre_materialization_gate = _trust_gate_pre_materialization_state(
         artifact_bundles,
         registry_dir,
         registry,
-        require_subject_store=False,
     )
     materialized = artifact_bundles.materialize_artifact_subjects(
         bundle_dir,
