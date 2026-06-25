@@ -40,6 +40,12 @@ PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
 GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS = 320
 GOAL_LIFECYCLE_SAMPLE_OBJECTIVE_PREVIEW_CHARS = 220
 GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT = 2
+ENTITY_USAGE_AUDIT_SAMPLE_LIMIT = 4
+ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT = 3
+ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT = 2
+ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT = 1
+ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
+ENTITY_USAGE_TEXT_PREVIEW_CHARS = 80
 INVENTORY_SAMPLE_LABEL_CHARS = 64
 INVENTORY_TOTAL_SAMPLE_LIMIT = 12
 
@@ -630,6 +636,383 @@ def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
             if isinstance(event, dict)
         ]
         compact["omitted_sample_event_count"] = max(0, len(sample_events) - GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT)
+    return compact
+
+
+def _compact_usage_scalar(value: Any, *, limit: int = ENTITY_USAGE_TEXT_PREVIEW_CHARS) -> Any:
+    if value in (None, "", [], {}):
+        return None
+    if isinstance(value, (bool, int, float)):
+        return value
+    return _bounded_string(value, limit)
+
+
+def _compact_usage_list(value: Any, *, limit: int = 4, text_limit: int = ENTITY_USAGE_TEXT_PREVIEW_CHARS) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    compact: list[Any] = []
+    for item in value[:limit]:
+        if isinstance(item, dict):
+            compact.append(_compact_usage_mapping(item, text_limit=text_limit))
+        elif isinstance(item, list):
+            compact.append(_compact_usage_list(item, limit=limit, text_limit=text_limit))
+        else:
+            scalar = _compact_usage_scalar(item, limit=text_limit)
+            if scalar not in (None, "", [], {}):
+                compact.append(scalar)
+    return compact
+
+
+def _compact_usage_mapping(
+    value: Any,
+    *,
+    allowed_keys: tuple[str, ...] | None = None,
+    text_limit: int = ENTITY_USAGE_TEXT_PREVIEW_CHARS,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        scalar = _compact_usage_scalar(value, limit=text_limit)
+        return {"value": scalar} if scalar not in (None, "", [], {}) else {}
+    keys = allowed_keys or tuple(value.keys())
+    compact: dict[str, Any] = {}
+    omitted: list[str] = []
+    for key in keys:
+        if key not in value:
+            continue
+        item = value.get(key)
+        if item in (None, "", [], {}):
+            continue
+        if isinstance(item, dict):
+            nested = _compact_usage_mapping(item, text_limit=text_limit)
+            if nested:
+                compact[key] = nested
+        elif isinstance(item, list):
+            nested_list = _compact_usage_list(item, limit=4, text_limit=text_limit)
+            if nested_list:
+                compact[key] = nested_list
+                if len(item) > len(nested_list):
+                    compact[f"omitted_{key}_count"] = len(item) - len(nested_list)
+        else:
+            scalar = _compact_usage_scalar(item, limit=text_limit)
+            if scalar not in (None, "", [], {}):
+                compact[key] = scalar
+    for key in value.keys():
+        if key not in keys and value.get(key) not in (None, "", [], {}):
+            omitted.append(str(key))
+    if omitted:
+        compact["omitted_field_count"] = len(omitted)
+    return compact
+
+
+def _compact_usage_freshness(freshness: Any) -> dict[str, Any]:
+    if not isinstance(freshness, dict):
+        return {}
+    return {
+        key: freshness.get(key)
+        for key in (
+            "status",
+            "basis",
+            "live_verification",
+            "segment_index_live_check",
+            "target_dirty",
+            "target_deferred_live",
+        )
+        if freshness.get(key) not in (None, "", [], {})
+    }
+
+
+def _compact_usage_refs(refs: Any) -> dict[str, Any]:
+    return _compact_usage_mapping(
+        refs,
+        allowed_keys=(
+            "raw",
+            "raw_ref",
+            "segment",
+            "segment_ref",
+            "graph",
+            "graph_ref",
+            "line",
+            "value",
+            "kind",
+        ),
+    )
+
+
+def _compact_usage_provider_status(provider: Any) -> dict[str, Any]:
+    if not isinstance(provider, dict):
+        return {}
+    compact = {
+        key: provider.get(key)
+        for key in (
+            "schema_version",
+            "artifact_type",
+            "ok",
+            "status",
+            "recommendation",
+        )
+        if provider.get(key) not in (None, "", [], {})
+    }
+    providers = provider.get("providers")
+    if isinstance(providers, dict):
+        compact_providers: dict[str, Any] = {}
+        for name, value in providers.items():
+            if not isinstance(value, dict):
+                continue
+            provider_summary = {
+                key: value.get(key)
+                for key in ("ok", "status", "source", "provider")
+                if value.get(key) not in (None, "", [], {})
+            }
+            freshness = value.get("freshness")
+            if isinstance(freshness, dict):
+                provider_summary["freshness"] = {
+                    key: freshness.get(key)
+                    for key in (
+                        "status",
+                        "dirty_session_count",
+                        "actionable_dirty_session_count",
+                        "deferred_live_session_count",
+                        "missing_session_count",
+                    )
+                    if freshness.get(key) not in (None, "", [], {})
+                }
+            if provider_summary:
+                compact_providers[str(name)] = provider_summary
+        if compact_providers:
+            compact["providers"] = compact_providers
+    return compact
+
+
+def _compact_document_ref(ref: Any) -> dict[str, Any]:
+    return _compact_usage_mapping(
+        ref,
+        allowed_keys=(
+            "kind",
+            "value",
+            "path",
+            "repo",
+            "ref",
+            "raw",
+            "segment",
+            "session",
+            "route_signal",
+            "canonical_key",
+            "source_type",
+            "title",
+        ),
+    )
+
+
+def _compact_raw_preview(preview: Any) -> dict[str, Any]:
+    compact = _compact_usage_mapping(
+        preview,
+        allowed_keys=("status", "line", "path", "text", "reason"),
+        text_limit=ENTITY_USAGE_TEXT_PREVIEW_CHARS,
+    )
+    if "text" in compact:
+        compact["text_preview_chars"] = ENTITY_USAGE_TEXT_PREVIEW_CHARS
+    return compact
+
+
+def _compact_usage_event(event: Any) -> dict[str, Any]:
+    if not isinstance(event, dict):
+        scalar = _compact_usage_scalar(event)
+        return {"value": scalar} if scalar not in (None, "", [], {}) else {}
+    compact = _compact_usage_mapping(
+        event,
+        allowed_keys=(
+            "event_id",
+            "event_type",
+            "source_type",
+            "role",
+            "conversation_act",
+            "session_act",
+            "agent_event",
+            "task_episode_id",
+            "title",
+            "snippet",
+            "session_id",
+            "session_label",
+            "session_title",
+            "session_date",
+            "segment_id",
+            "route_layers",
+            "route_signals",
+            "matched_routes",
+            "relation",
+            "offset",
+            "correlation_id",
+            "status",
+            "outcome",
+            "refs",
+            "raw_preview",
+            "document_refs",
+        ),
+    )
+    freshness = _compact_usage_freshness(event.get("freshness"))
+    if freshness:
+        compact["freshness"] = freshness
+    refs = _compact_usage_refs(event.get("refs"))
+    if refs:
+        compact["refs"] = refs
+    raw_preview = _compact_raw_preview(event.get("raw_preview"))
+    if raw_preview:
+        compact["raw_preview"] = raw_preview
+    document_refs = event.get("document_refs")
+    if isinstance(document_refs, list):
+        selected = [_compact_document_ref(ref) for ref in document_refs[:ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT]]
+        compact["document_refs"] = [ref for ref in selected if ref]
+        compact["document_ref_count"] = len(document_refs)
+        compact["omitted_document_ref_count"] = max(0, len(document_refs) - len(compact["document_refs"]))
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _compact_usage_neighborhood(neighborhood: Any) -> dict[str, Any]:
+    if not isinstance(neighborhood, dict):
+        return _compact_usage_event(neighborhood)
+    compact = _compact_usage_mapping(
+        neighborhood,
+        allowed_keys=("ok", "source", "quality", "refs"),
+    )
+    freshness = _compact_usage_freshness(neighborhood.get("freshness"))
+    if freshness:
+        compact["freshness"] = freshness
+    if isinstance(neighborhood.get("source_usage_event"), dict):
+        compact["source_usage_event"] = _compact_usage_event(neighborhood["source_usage_event"])
+    for key in ("local_events", "consequence_events"):
+        events = neighborhood.get(key)
+        if isinstance(events, list):
+            selected = [_compact_usage_event(event) for event in events[:ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT]]
+            compact[key] = [event for event in selected if event]
+            compact[f"{key}_count"] = len(events)
+            compact[f"omitted_{key}_count"] = max(0, len(events) - len(compact[key]))
+    document_refs = neighborhood.get("document_refs")
+    if isinstance(document_refs, list):
+        selected_refs = [_compact_document_ref(ref) for ref in document_refs[:ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT]]
+        compact["document_refs"] = [ref for ref in selected_refs if ref]
+        compact["document_ref_count"] = len(document_refs)
+        compact["omitted_document_ref_count"] = max(0, len(document_refs) - len(compact["document_refs"]))
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: str) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    passthrough_keys = (
+        "schema_version",
+        "artifact_type",
+        "generated_at",
+        "ok",
+        "mutates",
+        "anchor",
+        "kind",
+        "requested_kind",
+        "session",
+        "event_count",
+        "entrypoint_event_count",
+        "usage_event_count",
+        "result_event_count",
+        "outcome_event_count",
+        "context_event_count",
+        "consequence_event_count",
+        "document_ref_count",
+        "quality",
+        "diagnostics",
+        "provider",
+    )
+    for key in passthrough_keys:
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    if isinstance(payload.get("provider"), dict):
+        compact["provider"] = _compact_usage_provider_status(payload["provider"])
+    usage_events = payload.get("usage_events")
+    if isinstance(usage_events, list):
+        selected = [_compact_usage_event(event) for event in usage_events[:ENTITY_USAGE_AUDIT_SAMPLE_LIMIT]]
+        compact["usage_events"] = [event for event in selected if event]
+        compact["usage_event_count"] = payload.get("usage_event_count", len(usage_events))
+        compact["omitted_usage_event_count"] = max(0, len(usage_events) - len(compact["usage_events"]))
+    consequence_events = payload.get("consequence_events")
+    if isinstance(consequence_events, list):
+        selected = [_compact_usage_event(event) for event in consequence_events[:ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT]]
+        compact["consequence_events"] = [event for event in selected if event]
+        compact["consequence_event_count"] = payload.get("consequence_event_count", len(consequence_events))
+        compact["omitted_consequence_event_count"] = max(0, len(consequence_events) - len(compact["consequence_events"]))
+    document_refs = payload.get("document_refs")
+    if isinstance(document_refs, list):
+        selected_refs = [_compact_document_ref(ref) for ref in document_refs[:ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT]]
+        compact["document_refs"] = [ref for ref in selected_refs if ref]
+        compact["document_ref_count"] = payload.get("document_ref_count", len(document_refs))
+        compact["omitted_document_ref_count"] = max(0, len(document_refs) - len(compact["document_refs"]))
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_evidence_route": full_route,
+            "authority_boundary": "MCP returns compact refs and samples; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "usage_event_sample_limit": ENTITY_USAGE_AUDIT_SAMPLE_LIMIT,
+        "consequence_event_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
+        "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
+        "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
+        "full_evidence_route": full_route,
+    }
+    compact["authority_boundary"] = "MCP returns compact refs and samples; raw/segment evidence remains authoritative."
+    return compact
+
+
+def _compact_entity_usage_neighborhood_payload(payload: dict[str, Any], *, full_route: str) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    passthrough_keys = (
+        "schema_version",
+        "artifact_type",
+        "generated_at",
+        "ok",
+        "mutates",
+        "anchor",
+        "kind",
+        "requested_kind",
+        "session",
+        "window_count",
+        "quality",
+        "route_attempts",
+        "provider",
+        "parameters",
+        "diagnostics",
+    )
+    for key in passthrough_keys:
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    if isinstance(payload.get("provider"), dict):
+        compact["provider"] = _compact_usage_provider_status(payload["provider"])
+    neighborhoods = payload.get("neighborhoods")
+    if isinstance(neighborhoods, list):
+        selected = [
+            _compact_usage_neighborhood(neighborhood)
+            for neighborhood in neighborhoods[:ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT]
+        ]
+        compact["neighborhoods"] = [neighborhood for neighborhood in selected if neighborhood]
+        compact["window_count"] = payload.get("window_count", len(neighborhoods))
+        compact["omitted_neighborhood_count"] = max(0, len(neighborhoods) - len(compact["neighborhoods"]))
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_evidence_route": full_route,
+            "authority_boundary": "MCP returns compact refs and samples; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "neighborhood_sample_limit": ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT,
+        "local_event_sample_limit": ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT,
+        "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
+        "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
+        "full_evidence_route": full_route,
+    }
+    compact["authority_boundary"] = "MCP returns compact refs and samples; raw/segment evidence remains authoritative."
     return compact
 
 
@@ -2126,6 +2509,7 @@ class AoASessionMemoryMCPState:
         consequence_window: int = 8,
         document_limit: int = 60,
         session: str = "",
+        full: bool = False,
     ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind)
@@ -2145,6 +2529,7 @@ class AoASessionMemoryMCPState:
         ]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
+        full_route = self._archive_command_line("entity-usage-audit", args)
         payload = self._archive_command(
             "entity-usage-audit",
             args,
@@ -2153,7 +2538,13 @@ class AoASessionMemoryMCPState:
         )
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["full_evidence_route"] = full_route
+            mcp_access["response_compacted"] = not full
+        if full:
+            return payload
+        return _compact_entity_usage_audit_payload(payload, full_route=full_route)
 
     def session_entity_usage_neighborhood(
         self,
@@ -2166,6 +2557,7 @@ class AoASessionMemoryMCPState:
         raw_preview_chars: int = 600,
         document_limit: int = 80,
         session: str = "",
+        full: bool = False,
     ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind)
@@ -2196,7 +2588,8 @@ class AoASessionMemoryMCPState:
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         if (
-            selected_raw_preview_chars == 0
+            not full
+            and selected_raw_preview_chars == 0
             and selected_limit <= 3
             and selected_per_route_limit <= 3
             and selected_document_limit <= 10
@@ -2215,6 +2608,7 @@ class AoASessionMemoryMCPState:
                 deep_args=args,
                 reason="lightweight_mcp_probe",
             )
+        full_route = self._archive_command_line("entity-usage-neighborhood", args)
         payload = self._archive_command(
             "entity-usage-neighborhood",
             args,
@@ -2223,6 +2617,10 @@ class AoASessionMemoryMCPState:
         )
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["full_evidence_route"] = full_route
+            mcp_access["response_compacted"] = not full
         if not payload.get("ok") or not payload.get("neighborhoods"):
             return self._usage_neighborhood_search_fast_path(
                 anchor=anchor_text,
@@ -2239,7 +2637,9 @@ class AoASessionMemoryMCPState:
                 reason="archive_route_unavailable",
                 archive_payload=payload,
             )
-        return payload
+        if full:
+            return payload
+        return _compact_entity_usage_neighborhood_payload(payload, full_route=full_route)
 
     def _usage_neighborhood_search_fast_path(
         self,

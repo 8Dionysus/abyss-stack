@@ -62,8 +62,8 @@ Tools:
 - `aoa_session_goal_lifecycles(target, session, goal_id, status, event_kind, limit, order)`
 - `aoa_session_answer_neighborhood(query, session, agent_events, episode, limit, before, after)`
 - `aoa_session_trace(anchor, kind, limit, per_route_limit, session, doc_type)`; the default `doc_type` is `session` for bounded live archive probes, and callers can request `event` when exact event-level evidence is needed.
-- `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session)`
-- `aoa_session_entity_usage_neighborhood(anchor, kind, limit, per_route_limit, before, after, raw_preview_chars, document_limit, session)`
+- `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session, full)`; returns compact samples, counts, refs, freshness, and a `full_evidence_route` by default. Set `full=true` only when the caller deliberately needs the full archive evidence packet.
+- `aoa_session_entity_usage_neighborhood(anchor, kind, limit, per_route_limit, before, after, raw_preview_chars, document_limit, session, full)`; returns bounded usage windows by default and keeps raw/segment evidence authoritative through refs plus `full_evidence_route`.
 - `aoa_session_entity_usage_scenario_audit(sample_size, seed, layers, min_postings, limit, per_route_limit, consequence_window, document_limit, raw_preview_limit, full)`
 - `aoa_session_route(axis, key, limit, include_entry_payloads)`
 - `aoa_session_brief(session, max_segments)`

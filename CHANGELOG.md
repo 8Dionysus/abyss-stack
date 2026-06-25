@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` entity usage audit and neighborhood routes now
+  return bounded MCP payloads by default, with compact samples, omitted counts,
+  freshness summaries, and a full-evidence expansion command instead of dumping
+  bulk archive events into agent context.
 - `aoa-session-memory-mcp` now exposes a read-only projection-status route over
   the latest `.aoa projection-catchup` completeness diagnostic, so agents can
   see post-classifier/schema projection coverage without running maintenance

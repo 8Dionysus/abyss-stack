@@ -2727,6 +2727,149 @@ def test_entity_usage_neighborhood_falls_back_to_search_when_archive_route_times
     assert runner.timeouts[0] == ("entity-usage-neighborhood", 10.0)
 
 
+def test_entity_usage_audit_compacts_heavy_archive_payload_for_mcp(tmp_path: Path) -> None:
+    class HeavyUsageRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "entity-usage-audit":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            long_text = "raw evidence " * 120
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_usage_audit",
+                "ok": True,
+                "anchor": "aoa-session-memory-mcp",
+                "kind": "mcp",
+                "usage_event_count": 20,
+                "consequence_event_count": 20,
+                "usage_events": [
+                    {
+                        "event_id": f"{idx:06d}",
+                        "event_type": "TOOL_CALL",
+                        "title": long_text,
+                        "snippet": long_text,
+                        "content": long_text,
+                        "refs": {
+                            "raw": f"raw:line:{idx}",
+                            "segment": f"000__initial-to-latest.md#event-{idx:06d}",
+                            "expanded_context": long_text,
+                        },
+                    }
+                    for idx in range(20)
+                ],
+                "consequence_events": [
+                    {
+                        "event_id": f"c{idx:06d}",
+                        "event_type": "ASSISTANT_MESSAGE",
+                        "title": long_text,
+                        "content": long_text,
+                    }
+                    for idx in range(20)
+                ],
+                "document_refs": [
+                    {"kind": "mentioned_path", "value": f"docs/{idx}.md", "preview": long_text}
+                    for idx in range(20)
+                ],
+            }
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, HeavyUsageRunner())
+
+    audit = state.session_entity_usage_audit("aoa-session-memory-mcp", kind="mcp", limit=20)
+    encoded = json.dumps(audit)
+
+    assert audit["mcp_payload_policy"]["response_compacted"] is True
+    assert audit["mcp_payload_policy"]["full_evidence_route"]
+    assert audit["mcp_access"]["response_compacted"] is True
+    assert audit["usage_event_count"] == 20
+    assert len(audit["usage_events"]) == 4
+    assert audit["omitted_usage_event_count"] == 16
+    assert len(audit["consequence_events"]) == 3
+    assert len(audit["document_refs"]) == 2
+    assert "content" not in audit["usage_events"][0]
+    assert len(audit["usage_events"][0]["title"]) <= 80
+    assert len(encoded) < 5500
+    assert ("raw evidence " * 20) not in encoded
+
+
+def test_entity_usage_neighborhood_compacts_heavy_archive_payload_for_mcp(tmp_path: Path) -> None:
+    class HeavyNeighborhoodRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "entity-usage-neighborhood":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            long_text = "neighbor evidence " * 120
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_usage_neighborhood",
+                "ok": True,
+                "anchor": "aoa-session-memory-mcp",
+                "kind": "mcp",
+                "window_count": 10,
+                "quality": {
+                    "usage_neighborhood_present": True,
+                    "consequence_present": True,
+                    "raw_preview_available": True,
+                },
+                "neighborhoods": [
+                    {
+                        "ok": True,
+                        "source_usage_event": {
+                            "event_id": f"{idx:06d}",
+                            "event_type": "TOOL_CALL",
+                            "raw_preview": {"status": "available", "line": idx, "text": long_text},
+                            "content": long_text,
+                            "refs": {"raw": f"raw:line:{idx}", "segment": f"seg#event-{idx:06d}"},
+                        },
+                        "local_events": [
+                            {"offset": offset, "event_type": "ASSISTANT_MESSAGE", "title": long_text, "content": long_text}
+                            for offset in range(14)
+                        ],
+                        "consequence_events": [
+                            {"offset": offset, "event_type": "TOOL_OUTPUT", "title": long_text, "content": long_text}
+                            for offset in range(14)
+                        ],
+                        "document_refs": [
+                            {"kind": "mentioned_path", "value": f"docs/{idx}-{doc_idx}.md", "preview": long_text}
+                            for doc_idx in range(20)
+                        ],
+                    }
+                    for idx in range(10)
+                ],
+            }
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, HeavyNeighborhoodRunner())
+
+    neighborhood = state.session_entity_usage_neighborhood(
+        "aoa-session-memory-mcp",
+        kind="mcp",
+        limit=10,
+        per_route_limit=10,
+        raw_preview_chars=600,
+    )
+    encoded = json.dumps(neighborhood)
+
+    assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
+    assert neighborhood["mcp_access"]["response_compacted"] is True
+    assert neighborhood["window_count"] == 10
+    assert len(neighborhood["neighborhoods"]) == 2
+    assert neighborhood["omitted_neighborhood_count"] == 8
+    first = neighborhood["neighborhoods"][0]
+    assert len(first["local_events"]) == 1
+    assert first["omitted_local_events_count"] == 13
+    assert len(first["consequence_events"]) == 1
+    assert len(first["document_refs"]) == 2
+    assert len(first["source_usage_event"]["raw_preview"]["text"]) <= 80
+    assert "content" not in first["source_usage_event"]
+    assert len(encoded) < 4500
+    assert ("neighbor evidence " * 12) not in encoded
+
+
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
