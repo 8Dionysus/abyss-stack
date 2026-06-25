@@ -91,6 +91,11 @@ ALLOWED_RETRIEVAL_RECIPES = {
     "process-lessons",
     "repeated-errors",
 }
+ENTITY_USAGE_RETRIEVAL_RECIPES = {"entity-usage", "entity_usage", "entity-usage-audit", "entity_usage_audit"}
+SEARCH_FILTER_ALIASES = {
+    "layer": "route_layer",
+}
+SEARCH_CONTROL_FILTERS = {"use_shards", "max_shards"}
 SEARCH_FILTER_FLAGS = {
     "session": "--session",
     "doc_type": "--doc-type",
@@ -410,6 +415,24 @@ def _normalize_agent_event_classes(values: list[str] | None, *, default: list[st
     if not classes and default:
         classes = list(default)
     return classes, requested
+
+
+def _normalize_search_filters(filters: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    normalized = dict(filters)
+    diagnostics: list[str] = []
+    for alias, canonical in SEARCH_FILTER_ALIASES.items():
+        alias_value = normalized.get(alias)
+        if alias_value in (None, ""):
+            continue
+        canonical_value = normalized.get(canonical)
+        if canonical_value in (None, ""):
+            normalized[canonical] = alias_value
+        elif canonical_value != alias_value:
+            diagnostics.append(
+                f"ignored filter alias {alias!r}={alias_value!r}; using {canonical!r}={canonical_value!r}"
+            )
+        normalized.pop(alias, None)
+    return normalized, diagnostics
 
 
 def _annotate_agent_event_payload(payload: dict[str, Any], *, requested: list[str], normalized: list[str]) -> dict[str, Any]:
@@ -1177,15 +1200,14 @@ class AoASessionMemoryMCPState:
         }
 
     def session_search(self, query: str, filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
-        filters = filters or {}
+        filters, diagnostics = _normalize_search_filters(filters or {})
         text = str(query or "").strip()
         active_filters = {
             key: value
             for key, value in filters.items()
             if key in SEARCH_FILTER_FLAGS and value not in (None, "")
         }
-        diagnostics: list[str] = []
-        supported_extra = {"provider", "explain"} | AGENT_ROUTE_SEARCH_FILTERS
+        supported_extra = {"provider", "explain"} | SEARCH_CONTROL_FILTERS | AGENT_ROUTE_SEARCH_FILTERS
         for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - supported_extra):
             diagnostics.append(f"ignored unsupported filter {key!r}")
         if text:
@@ -1204,8 +1226,10 @@ class AoASessionMemoryMCPState:
         elif self._can_use_local_session_filter_search(active_filters):
             return self._local_session_filter_search(filters=filters, limit=limit, diagnostics=diagnostics)
         args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
-        if text:
-            args.extend(["--use-shards", "--max-shards", str(DEFAULT_SEARCH_MAX_SHARDS)])
+        use_shards = _as_bool(filters.get("use_shards"), default=bool(text))
+        if use_shards:
+            max_shards = _coerce_bounded_int(filters.get("max_shards"), DEFAULT_SEARCH_MAX_SHARDS, 1, DEFAULT_SEARCH_MAX_SHARDS)
+            args.extend(["--use-shards", "--max-shards", str(max_shards)])
         provider = filters.get("provider")
         if provider:
             args.extend(["--provider", _safe_selector(str(provider), "provider", limit=64)])
@@ -2430,6 +2454,43 @@ class AoASessionMemoryMCPState:
         event_limit: int = 12,
     ) -> dict[str, Any]:
         recipe_text = _safe_selector(recipe, "recipe", limit=120)
+        if _route_key(recipe_text) in ENTITY_USAGE_RETRIEVAL_RECIPES:
+            if not str(query or "").strip():
+                payload = {
+                    "schema_version": 1,
+                    "artifact_type": "retrieval_packet",
+                    "ok": False,
+                    "recipe": recipe_text,
+                    "diagnostics": ["entity-usage retrieval requires query as the entity anchor"],
+                    "mcp_access": {
+                        "mutates": False,
+                        "archive_command": "entity-usage-audit",
+                        "archive_dispatched": False,
+                        "returncode": None,
+                        "elapsed_ms": 0,
+                        "timeout_seconds": self.timeout_seconds,
+                        "stderr": "",
+                        "authority_boundary": "MCP output routes to .aoa refs; it is not reviewed truth.",
+                        "reason": "missing entity anchor",
+                    },
+                }
+                payload.setdefault("authority_boundary", self.authority_boundary())
+                return payload
+            payload = self.session_entity_usage_audit(
+                anchor=_ensure_short_text(query, "query"),
+                kind="auto",
+                limit=_coerce_limit(limit, 8, 50),
+                per_route_limit=_coerce_limit(event_limit, 12, 60),
+                session=session,
+            )
+            payload["recipe"] = recipe_text
+            payload["retrieval_redirect"] = {
+                "requested_recipe": recipe_text,
+                "served_by": "aoa_session_entity_usage_audit",
+                "reason": "entity usage is a dedicated read-only MCP fast path, not a retrieve archive recipe",
+            }
+            payload.setdefault("diagnostics", []).append("served by entity-usage-audit retrieval redirect")
+            return payload
         if recipe_text not in ALLOWED_RETRIEVAL_RECIPES:
             payload = {
                 "schema_version": 1,
@@ -2823,7 +2884,12 @@ class AoASessionMemoryMCPState:
             sample_limit=selected_sample_limit,
         )
         if atlas_inventory is not None:
-            self._annotate_entity_inventory_payload(atlas_inventory, provider=provider)
+            self._annotate_entity_inventory_payload(
+                atlas_inventory,
+                provider=provider,
+                requested_layer=input_layer_key,
+                normalized_layer=layer_key,
+            )
             return atlas_inventory
         db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
         if not db_path.is_file():
@@ -2839,7 +2905,12 @@ class AoASessionMemoryMCPState:
                 "truth_status": "session route-signal inventory; not runtime installed inventory",
                 "authority_boundary": self.authority_boundary(),
             }
-            self._annotate_entity_inventory_payload(payload, provider=provider)
+            self._annotate_entity_inventory_payload(
+                payload,
+                provider=provider,
+                requested_layer=input_layer_key,
+                normalized_layer=layer_key,
+            )
             return payload
         filters = ["route_terms.layer = ?"]
         params: list[Any] = [layer_key]
@@ -2933,7 +3004,12 @@ class AoASessionMemoryMCPState:
                 "truth_status": "session route-signal inventory; not runtime installed inventory",
                 "authority_boundary": self.authority_boundary(),
             }
-            self._annotate_entity_inventory_payload(payload, provider=provider)
+            self._annotate_entity_inventory_payload(
+                payload,
+                provider=provider,
+                requested_layer=input_layer_key,
+                normalized_layer=layer_key,
+            )
             return payload
         finally:
             if conn is not None:
@@ -2952,10 +3028,25 @@ class AoASessionMemoryMCPState:
             "truth_status": "session route-signal inventory; not runtime installed inventory",
             "authority_boundary": self.authority_boundary(),
         }
-        self._annotate_entity_inventory_payload(payload, provider=provider)
+        self._annotate_entity_inventory_payload(
+            payload,
+            provider=provider,
+            requested_layer=input_layer_key,
+            normalized_layer=layer_key,
+        )
         return payload
 
-    def _annotate_entity_inventory_payload(self, payload: dict[str, Any], *, provider: dict[str, Any]) -> None:
+    def _annotate_entity_inventory_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        provider: dict[str, Any],
+        requested_layer: str,
+        normalized_layer: str,
+    ) -> None:
+        payload.setdefault("layer", normalized_layer)
+        payload["requested_layer"] = requested_layer
+        payload["normalized_layer"] = normalized_layer
         payload["provider"] = provider
         payload["mcp_access"] = {
             "mutates": False,
