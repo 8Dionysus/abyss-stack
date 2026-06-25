@@ -88,6 +88,96 @@ def _codex_config_path() -> Path:
     return Path.home() / ".codex" / "config.toml"
 
 
+def _linux_boot_epoch(proc_root: Path = Path("/proc")) -> float | None:
+    stat_path = proc_root / "stat"
+    try:
+        for line in stat_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("btime "):
+                return float(line.split()[1])
+    except OSError:
+        return None
+    return None
+
+
+def _process_start_epoch(pid: str, *, proc_root: Path = Path("/proc"), boot_epoch: float | None = None) -> float | None:
+    if boot_epoch is None:
+        boot_epoch = _linux_boot_epoch(proc_root)
+    if boot_epoch is None:
+        return None
+    try:
+        stat_text = (proc_root / pid / "stat").read_text(encoding="utf-8")
+        ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+        start_ticks = int(stat_text.split()[21])
+    except (OSError, ValueError, IndexError):
+        return None
+    return boot_epoch + (start_ticks / float(ticks))
+
+
+def _proc_cmdline(pid: str, proc_root: Path = Path("/proc")) -> list[str]:
+    try:
+        data = (proc_root / pid / "cmdline").read_bytes()
+    except OSError:
+        return []
+    return [part.decode("utf-8", errors="replace") for part in data.split(b"\0") if part]
+
+
+def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
+    if not proc_root.is_dir():
+        return {"available": False, "reason": "procfs_unavailable"}
+
+    watched_sources = [
+        REPO_ROOT / "src/aoa_session_memory_mcp/core.py",
+        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
+        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
+    ]
+    source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    boot_epoch = _linux_boot_epoch(proc_root)
+    processes: list[dict] = []
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        cmdline = _proc_cmdline(entry.name, proc_root=proc_root)
+        if not cmdline:
+            continue
+        joined = " ".join(cmdline)
+        if "aoa-session-memory-mcp-server.py" not in joined and "aoa_session_memory_mcp_server.py" not in joined:
+            continue
+        cwd = ""
+        try:
+            cwd = (proc_root / entry.name / "cwd").resolve().as_posix()
+        except OSError:
+            cwd = ""
+        started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
+        stale = bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime)
+        processes.append(
+            {
+                "pid": int(entry.name),
+                "cwd": cwd,
+                "cmdline": cmdline,
+                "started_at_epoch": started_at_epoch,
+                "started_before_current_source": stale,
+            }
+        )
+
+    stale_count = sum(1 for process in processes if process["started_before_current_source"])
+    return {
+        "available": True,
+        "source_mtime_epoch": source_mtime or None,
+        "process_count": len(processes),
+        "stale_process_count": stale_count,
+        "restart_advisory": stale_count > 0,
+        "advisory": (
+            "Some already-running Codex MCP transports started before the current source. "
+            "Configured stdio smoke proves a fresh server, but those transports need a Codex/MCP restart "
+            "before their live output is freshness proof."
+            if stale_count
+            else "No already-running aoa-session-memory MCP process is older than the watched source files."
+        ),
+        "processes": processes[:12],
+        "omitted_process_count": max(0, len(processes) - 12),
+    }
+
+
 def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServerParameters | None, dict]:
     config_path = _codex_config_path()
     if not config_path.exists():
@@ -756,6 +846,7 @@ def main() -> None:
         raise SystemExit("MCP server did not build")
     stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
     configured_stdio_smoke = asyncio.run(_configured_stdio_smoke(state))
+    running_processes = _running_mcp_process_advisory()
 
     print(
         json.dumps(
@@ -826,6 +917,7 @@ def main() -> None:
                 "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],
                 "configured_stdio": configured_stdio_smoke,
+                "running_processes": running_processes,
             },
             indent=2,
         )

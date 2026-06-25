@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now auto-reloads its `core.py` implementation for
+  existing tools and reports already-running stale Codex MCP transports in the
+  service validator, so freshness/provider packet fixes do not silently depend
+  on manual process restarts.
 - `aoa-session-memory-mcp` entity usage audit and neighborhood routes now
   return bounded MCP payloads by default, with compact samples, omitted counts,
   freshness summaries, and a full-evidence expansion command instead of dumping
