@@ -695,6 +695,40 @@ def validate_bundle(
     return _sanitize_public_payload(payload)
 
 
+def _failure_summary(payload: dict[str, Any], *, limit: int = 32) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+
+    def visit(path: str, value: Any) -> None:
+        if len(failures) >= limit:
+            return
+        if isinstance(value, dict):
+            if value.get("ok") is False:
+                entry: dict[str, Any] = {"path": path, "ok": False}
+                for key in (
+                    "verdict",
+                    "errors",
+                    "missing",
+                    "blockers",
+                    "reasons",
+                    "warnings",
+                    "manual_review",
+                    "returncode",
+                ):
+                    if key in value:
+                        entry[key] = value.get(key)
+                failures.append(_sanitize_public_payload(entry))
+            for key, child in value.items():
+                visit(f"{path}.{key}" if path else str(key), child)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                visit(f"{path}[{index}]", child)
+
+    visit("", payload)
+    if len(failures) >= limit:
+        failures.append({"path": "<truncated>", "reason": f"showing first {limit} failed nodes"})
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate rendered abyss-stack runtime config as an OS Abyss artifact bundle.")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -720,6 +754,22 @@ def main() -> int:
         print(
             "[ok] abyss-machine runtime config artifact bundle verified: "
             f"{payload['bundle_dir']} ({', '.join(payload['verified_controls'])}; registry={payload['registry_dir']})"
+        )
+    else:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "schema": "abyss_stack_runtime_config_artifact_bundle_failure_summary_v1",
+                    "bundle_dir": payload.get("bundle_dir"),
+                    "registry_dir": payload.get("registry_dir"),
+                    "abyss_machine_repo_root": payload.get("abyss_machine_repo_root"),
+                    "verified_controls": payload.get("verified_controls"),
+                    "failure_summary": _failure_summary(payload),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
         )
     return 0 if payload["ok"] else 1
 
