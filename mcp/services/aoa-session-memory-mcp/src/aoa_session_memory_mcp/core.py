@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -14,6 +15,17 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote, urlparse
 
+
+def _file_sha256(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+MCP_CORE_SOURCE_PATH = Path(__file__).resolve()
+MCP_CORE_LOADED_AT_EPOCH = time.time()
+MCP_CORE_LOADED_SHA256 = _file_sha256(MCP_CORE_SOURCE_PATH)
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
@@ -904,6 +916,21 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def runtime_identity(self) -> dict[str, Any]:
+        current_sha256 = _file_sha256(MCP_CORE_SOURCE_PATH)
+        source_matches_loaded = bool(current_sha256 and MCP_CORE_LOADED_SHA256 and current_sha256 == MCP_CORE_LOADED_SHA256)
+        return {
+            "schema": "aoa_session_memory_mcp_runtime_identity_v1",
+            "pid": os.getpid(),
+            "loaded_at_epoch": MCP_CORE_LOADED_AT_EPOCH,
+            "loaded_core_path": MCP_CORE_SOURCE_PATH.as_posix(),
+            "loaded_core_sha256": MCP_CORE_LOADED_SHA256,
+            "current_core_sha256": current_sha256,
+            "source_matches_loaded": source_matches_loaded,
+            "reload_required": not source_matches_loaded,
+            "reload_boundary": "Codex MCP stdio servers keep imported Python code until the MCP process is restarted.",
+        }
+
     def _archive_command(
         self,
         command: str,
@@ -1125,6 +1152,7 @@ class AoASessionMemoryMCPState:
             "workspace_root": self.workspace_root.as_posix(),
             "aoa_root": self.aoa_root.as_posix(),
             "script_path": self.script_path.as_posix(),
+            "runtime": self.runtime_identity(),
             "provider": provider,
             "atlas": atlas,
             "graph": self._graph_summary(maintenance),

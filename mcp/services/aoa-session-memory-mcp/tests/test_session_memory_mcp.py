@@ -1084,6 +1084,8 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["provider"]["status_mode"] == "fast_presence_probe"
     assert status["provider"]["providers"]["portable_sqlite"]["freshness"]["checked"] is False
     assert status["atlas"]["entry_count"] == 2
+    assert status["runtime"]["source_matches_loaded"] is True
+    assert status["runtime"]["reload_required"] is False
     assert status["maintenance_status"]["source"] == "maintenance-status"
     assert status["maintenance_status"]["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
     assert status["latest_route_readiness"]["reports"][0]["summary"]["ok"] is True
@@ -1096,6 +1098,23 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     provider_resource = state.read_resource("aoa-session-memory://provider/status")
     assert provider_resource["status_mode"] == "fast_presence_probe"
     assert not any(call[0] == "search-provider-status" for call in runner.calls)
+
+
+def test_runtime_identity_reports_reload_boundary(tmp_path: Path, monkeypatch: Any) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    state = state_with_fixture(tmp_path, FakeRunner())
+
+    fresh = state.runtime_identity()
+    assert fresh["source_matches_loaded"] is True
+    assert fresh["reload_required"] is False
+    assert fresh["loaded_core_path"].endswith("aoa_session_memory_mcp/core.py")
+
+    monkeypatch.setattr(module, "MCP_CORE_LOADED_SHA256", "stale-loaded-code")
+    stale = state.runtime_identity()
+
+    assert stale["source_matches_loaded"] is False
+    assert stale["reload_required"] is True
+    assert "MCP process is restarted" in stale["reload_boundary"]
 
 
 def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path: Path) -> None:
