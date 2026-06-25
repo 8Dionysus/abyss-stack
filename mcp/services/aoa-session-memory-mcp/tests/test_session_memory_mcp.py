@@ -1964,6 +1964,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "window_count": 0},
         {"ok": True, "entity_count": 1},
         {"kind": "mcp", "requested_kind": "mcp_service"},
+        {"kind": "agent_event", "outcome_event_count": 2},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
         {"recommendation": "use_graph_search"},
         tool_count=30,
@@ -1987,6 +1988,8 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["answer_neighborhood_count"] == 0
     assert summary["usage_alias_kind"] == "mcp"
     assert summary["usage_alias_requested_kind"] == "mcp_service"
+    assert summary["agent_event_usage_kind"] == "agent_event"
+    assert summary["agent_event_usage_outcome_count"] == 2
     assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
     assert summary["maintenance_recommendation"] == "use_graph_search"
 
@@ -2436,6 +2439,18 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     assert args[args.index("--consequence-window") + 1] == "3"
     assert "--full" in args
     assert runner.timeouts[-1] == ("entity-usage-audit", 90.0)
+
+    agent_event_audit = state.session_entity_usage_audit(
+        "assistant_answer",
+        kind="agent_event",
+        limit=2,
+        per_route_limit=2,
+    )
+    assert agent_event_audit["artifact_type"] == "session_memory_entity_usage_audit"
+    agent_event_call = [call for call in runner.calls if call[0] == "entity-usage-audit"][-1]
+    agent_event_args = agent_event_call[1]
+    assert agent_event_args[0] == "assistant_answer"
+    assert agent_event_args[agent_event_args.index("--kind") + 1] == "agent_event"
 
 
 def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:

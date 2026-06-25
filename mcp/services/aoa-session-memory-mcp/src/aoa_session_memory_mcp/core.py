@@ -58,6 +58,7 @@ ALLOWED_TRACE_KINDS = {
     "api",
     "plugin",
     "agent",
+    "agent_event",
     "script",
     "validator",
     "test",
