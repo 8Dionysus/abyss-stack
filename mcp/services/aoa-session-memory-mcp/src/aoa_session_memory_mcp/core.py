@@ -25,6 +25,9 @@ USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
+GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS = 320
+GOAL_LIFECYCLE_SAMPLE_OBJECTIVE_PREVIEW_CHARS = 220
+GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT = 2
 
 ALLOWED_TRACE_KINDS = {
     "auto",
@@ -542,16 +545,44 @@ def _compact_task_episode(episode: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def _bounded_text(value: Any, *, limit: int) -> tuple[str, int, bool]:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text, len(text), False
+    return text[: max(0, limit - 3)].rstrip() + "...", len(text), True
+
+
+def _compact_goal_event(event: dict[str, Any]) -> dict[str, Any]:
+    compact = dict(event)
+    if "objective" in compact:
+        preview, chars, omitted = _bounded_text(
+            compact.get("objective"),
+            limit=GOAL_LIFECYCLE_SAMPLE_OBJECTIVE_PREVIEW_CHARS,
+        )
+        compact["objective"] = preview
+        compact["objective_chars"] = chars
+        compact["objective_omitted"] = omitted
+    return compact
+
+
 def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
     compact = dict(lifecycle)
+    if "objective" in compact:
+        preview, chars, omitted = _bounded_text(
+            compact.get("objective"),
+            limit=GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS,
+        )
+        compact["objective"] = preview
+        compact["objective_chars"] = chars
+        compact["objective_omitted"] = omitted
     sample_events = compact.get("sample_events")
     if isinstance(sample_events, list):
         compact["sample_events"] = [
-            event
-            for event in sample_events[:4]
+            _compact_goal_event(event)
+            for event in sample_events[:GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT]
             if isinstance(event, dict)
         ]
-        compact["omitted_sample_event_count"] = max(0, len(sample_events) - 4)
+        compact["omitted_sample_event_count"] = max(0, len(sample_events) - GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT)
     return compact
 
 
@@ -1830,7 +1861,8 @@ class AoASessionMemoryMCPState:
             payload["results"] = [_compact_goal_lifecycle(item) for item in results if isinstance(item, dict)]
             payload["mcp_payload_policy"] = {
                 "response_compacted": True,
-                "sample_events_per_lifecycle": 4,
+                "sample_events_per_lifecycle": GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT,
+                "objective_preview_chars": GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS,
                 "full_refs_route": "Use .aoa goal-lifecycles CLI or session.index.json for full generated lifecycle refs.",
             }
             mcp_access = payload.get("mcp_access")

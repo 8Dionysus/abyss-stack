@@ -546,7 +546,7 @@ GOAL_LIFECYCLES = {
             "goal_id": "goal-0001",
             "goal_instance_id": "session-1:goal-0001",
             "status": "complete",
-            "objective": "Close goal lifecycle routing",
+            "objective": "Close goal lifecycle routing " * 40,
             "event_count": 5,
             "event_kinds": ["goal_created", "goal_updated", "goal_completed"],
             "event_ids": ["000002", "000003", "000004", "000005", "000006"],
@@ -561,7 +561,7 @@ GOAL_LIFECYCLES = {
             "raw_refs": ["raw:line:2", "raw:line:6"],
             "segment_refs": ["000__initial-to-latest.md#event-000002", "000__initial-to-latest.md#event-000006"],
             "sample_events": [
-                {"event_kind": "goal_created", "event_id": "000002", "raw_ref": "raw:line:2"},
+                {"event_kind": "goal_created", "event_id": "000002", "raw_ref": "raw:line:2", "objective": "Create goal with a deliberately long objective " * 20},
                 {"event_kind": "goal_updated", "event_id": "000003", "raw_ref": "raw:line:3"},
                 {"event_kind": "goal_updated", "event_id": "000004", "raw_ref": "raw:line:4"},
                 {"event_kind": "goal_updated", "event_id": "000005", "raw_ref": "raw:line:5"},
@@ -1706,9 +1706,15 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert lifecycles["results"][0]["status"] == "complete"
     assert lifecycles["results"][0]["task_episode_ids"] == ["task-0001"]
     assert lifecycles["results"][0]["refs"]["completed"]["raw_ref"] == "raw:line:6"
-    assert len(lifecycles["results"][0]["sample_events"]) == 4
-    assert lifecycles["results"][0]["omitted_sample_event_count"] == 1
+    assert lifecycles["results"][0]["objective"].endswith("...")
+    assert lifecycles["results"][0]["objective_omitted"] is True
+    assert lifecycles["results"][0]["objective_chars"] > 320
+    assert len(lifecycles["results"][0]["sample_events"]) == 2
+    assert lifecycles["results"][0]["sample_events"][0]["objective"].endswith("...")
+    assert lifecycles["results"][0]["sample_events"][0]["objective_omitted"] is True
+    assert lifecycles["results"][0]["omitted_sample_event_count"] == 3
     assert lifecycles["mcp_payload_policy"]["response_compacted"] is True
+    assert lifecycles["mcp_payload_policy"]["sample_events_per_lifecycle"] == 2
     calls = {call[0]: call[1] for call in runner.calls}
     args = calls["goal-lifecycles"]
     assert args[args.index("--session") + 1] == "session-1"
