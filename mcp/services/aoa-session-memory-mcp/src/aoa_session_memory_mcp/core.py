@@ -360,6 +360,9 @@ def _compact_hit(hit: dict[str, Any]) -> dict[str, Any]:
         "session_id": hit.get("session_id"),
         "session_label": hit.get("session_label"),
         "session_title": hit.get("session_title"),
+        "session_date": hit.get("session_date"),
+        "segment_id": hit.get("segment_id"),
+        "event_id": hit.get("event_id"),
         "event_type": hit.get("event_type"),
         "family": hit.get("family"),
         "conversation_act": hit.get("conversation_act"),
@@ -1023,7 +1026,8 @@ class AoASessionMemoryMCPState:
         elif self._can_use_local_session_filter_search(active_filters):
             return self._local_session_filter_search(filters=filters, limit=limit, diagnostics=diagnostics)
         args = ["--query", text, "--limit", str(_coerce_limit(limit, 20, 100))]
-        args.extend(["--use-shards", "--max-shards", str(DEFAULT_SEARCH_MAX_SHARDS)])
+        if text:
+            args.extend(["--use-shards", "--max-shards", str(DEFAULT_SEARCH_MAX_SHARDS)])
         provider = filters.get("provider")
         if provider:
             args.extend(["--provider", _safe_selector(str(provider), "provider", limit=64)])
@@ -2047,6 +2051,9 @@ class AoASessionMemoryMCPState:
                     "session_id",
                     "session_label",
                     "session_title",
+                    "session_date",
+                    "segment_id",
+                    "event_id",
                     "event_type",
                     "conversation_act",
                     "session_act",
@@ -2107,10 +2114,14 @@ class AoASessionMemoryMCPState:
             "window_count": len(neighborhoods),
             "neighborhoods": neighborhoods,
             "quality": {
-                "usage_neighborhood_present": bool(neighborhoods),
-                "consequence_present": False,
+                "usage_neighborhood_present": False,
+                "usage_refs_present": bool(neighborhoods),
+                "consequence_present": None,
+                "consequence_evaluated": False,
+                "consequence_status": "not_loaded_fast_path",
                 "raw_preview_available": False,
                 "neighborhood_count": len(neighborhoods),
+                "local_event_count": 0,
                 "consequence_event_count": 0,
                 "fast_path": True,
             },

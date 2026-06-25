@@ -453,6 +453,9 @@ SEARCH_RESULTS = {
             "doc_type": "event",
             "session_id": "session-1",
             "session_label": "2026-05-26__001__session-memory-mcp",
+            "session_date": "2026-05-26",
+            "segment_id": "000",
+            "event_id": "000001",
             "event_type": "USER_INTENT",
             "family": "communication",
             "conversation_act": "operator_request",
@@ -1229,6 +1232,8 @@ def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> No
     assert args[args.index("--query") + 1] == ""
     assert args[args.index("--route-signal") + 1] == "tool:exec_command"
     assert args[args.index("--doc-type") + 1] == "event"
+    assert "--use-shards" not in args
+    assert "--max-shards" not in args
 
 
 def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Path) -> None:
@@ -1313,8 +1318,8 @@ def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Pat
     search_calls = [call for call in runner.calls if call[0] == "search"]
     assert len(search_calls) == 1
     args = search_calls[0][1]
-    assert "--use-shards" in args
-    assert args[args.index("--max-shards") + 1] == "24"
+    assert "--use-shards" not in args
+    assert "--max-shards" not in args
     assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
     assert args[args.index("--task-episode-id") + 1] == "task-0001"
     assert args[args.index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
@@ -2035,13 +2040,20 @@ def test_entity_usage_neighborhood_light_probe_uses_search_fast_path(tmp_path: P
 
     assert neighborhood["ok"] is True
     assert neighborhood["quality"]["fast_path"] is True
+    assert neighborhood["quality"]["usage_neighborhood_present"] is False
+    assert neighborhood["quality"]["usage_refs_present"] is True
+    assert neighborhood["quality"]["consequence_present"] is None
+    assert neighborhood["quality"]["consequence_evaluated"] is False
+    assert neighborhood["quality"]["consequence_status"] == "not_loaded_fast_path"
     assert neighborhood["neighborhoods"][0]["source"] == "mcp_search_route_signal_fast_path"
+    assert neighborhood["neighborhoods"][0]["source_usage_event"]["event_id"] == "000001"
     assert neighborhood["mcp_access"]["archive_command"] is None
     assert neighborhood["mcp_access"]["selected_route_signal"] == "mcp:aoa_session_memory_mcp"
     assert not [call for call in runner.calls if call[0] == "entity-usage-neighborhood"]
     search_calls = [call for call in runner.calls if call[0] == "search"]
     assert search_calls
     assert search_calls[0][1][search_calls[0][1].index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
+    assert "--use-shards" not in search_calls[0][1]
 
 
 def test_entity_usage_neighborhood_falls_back_to_search_when_archive_route_times_out(tmp_path: Path) -> None:
@@ -2068,6 +2080,9 @@ def test_entity_usage_neighborhood_falls_back_to_search_when_archive_route_times
 
     assert neighborhood["ok"] is True
     assert neighborhood["quality"]["fast_path"] is True
+    assert neighborhood["quality"]["usage_neighborhood_present"] is False
+    assert neighborhood["quality"]["consequence_present"] is None
+    assert neighborhood["quality"]["consequence_status"] == "not_loaded_fast_path"
     assert neighborhood["mcp_access"]["fallback_reason"] == "archive_route_unavailable"
     assert neighborhood["mcp_access"]["fallback_from"]["returncode"] == 124
     assert neighborhood["mcp_access"]["selected_route_signal"] == "mcp:aoa_session_memory_mcp"

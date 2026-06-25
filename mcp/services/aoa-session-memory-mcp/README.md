@@ -119,7 +119,11 @@ consequence analysis are needed.
 probes: when `raw_preview_chars=0` with small limits, or when the deep archive
 route times out, MCP returns a search-backed route-signal packet with refs and
 a `next_expansion_command`. That keeps live agent audits bounded while leaving
-raw transcript evidence authoritative.
+raw transcript evidence authoritative. These lightweight packets are marked as
+search-only probes: they do not claim that local consequence evidence is absent
+unless the archive route has loaded the actual neighborhood window. Route-only
+searches without text stay on the current archive search read model instead of
+shard fanout so refs and freshness do not drift behind the monolith.
 
 `aoa_session_maintenance_status()` and
 `aoa-session-memory://maintenance/status` are the agent decision packet for
