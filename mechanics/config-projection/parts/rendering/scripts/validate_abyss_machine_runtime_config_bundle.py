@@ -26,7 +26,14 @@ DEFAULT_SUBJECT_DIR = REPO_ROOT / "dist" / "abyss-stack-runtime-config"
 DEFAULT_SUBJECT = DEFAULT_SUBJECT_DIR / "substrate.rendered.yml"
 DEFAULT_BUNDLE_DIR = REPO_ROOT / "dist" / "abyss-artifact-bundle" / "abyss-stack-runtime-config"
 DEFAULT_REGISTRY_DIR = REPO_ROOT / "dist" / "abyss-artifact-registry" / "abyss-stack-runtime-config"
+DEFAULT_SUBJECT_STORE_ROOT = REPO_ROOT / "dist" / "abyss-artifact-subjects" / "abyss-stack-runtime-config"
 PUBLIC_RUNTIME_ROOT = "/srv/AbyssOS/abyss-stack"
+ARTIFACT_CLASS = "abyss_stack_runtime_config_bundle"
+CONSUMER_INTENT = "runtime"
+CONSUMER_REF = "abyss-stack:config-projection-rendering"
+SOURCE_REPO = "abyss-stack"
+TRUST_ROOT_MODE = "host_managed"
+PRODUCER = "abyss-stack config rendering scripts from tracked compose modules and public-safe runtime route inputs"
 
 
 def _candidate_abyss_machine_roots() -> list[Path]:
@@ -93,6 +100,17 @@ def _path_ref(path: Path) -> str:
         return str(resolved)
 
 
+def _sanitize_public_payload(payload: Any) -> Any:
+    local_root = str(REPO_ROOT.resolve())
+    if isinstance(payload, dict):
+        return {key: _sanitize_public_payload(value) for key, value in payload.items()}
+    if isinstance(payload, list):
+        return [_sanitize_public_payload(item) for item in payload]
+    if isinstance(payload, str) and (payload == local_root or payload.startswith(local_root + os.sep)):
+        return _path_ref(Path(payload))
+    return payload
+
+
 def _sanitize_public_verify_sidecar(bundle_dir: Path) -> dict[str, Any]:
     sidecar = bundle_dir / "artifact.verify.json"
     if not sidecar.is_file():
@@ -114,6 +132,31 @@ def _sanitize_public_verify_sidecar(bundle_dir: Path) -> dict[str, Any]:
     if changed:
         _write_json(sidecar, payload)
     return payload
+
+
+def _sanitize_public_json_tree(root: Path) -> None:
+    for path in sorted(root.rglob("*")) if root.exists() else []:
+        if not path.is_file() or path.suffix not in {".json", ".jsonl"}:
+            continue
+        if path.suffix == ".jsonl":
+            lines = []
+            changed = False
+            for line in path.read_text(encoding="utf-8").splitlines():
+                payload = json.loads(line)
+                sanitized = _sanitize_public_payload(payload)
+                changed = changed or sanitized != payload
+                lines.append(json.dumps(sanitized, ensure_ascii=False, sort_keys=True))
+            if changed:
+                path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+            continue
+        payload = _load_json(path)
+        sanitized = _sanitize_public_payload(payload)
+        if sanitized != payload:
+            _write_json(path, sanitized)
+
+
+def _sanitize_public_registry(registry_dir: Path) -> None:
+    _sanitize_public_json_tree(registry_dir)
 
 
 def _render_public_subject(subject_path: Path) -> None:
@@ -176,6 +219,17 @@ def _assert_public_sidecars_do_not_leak_local_root(bundle_dir: Path) -> None:
         raise ValueError("public artifact sidecars leak local repo root: " + ", ".join(leaks))
 
 
+def _assert_public_registry_does_not_leak_local_root(registry_dir: Path) -> None:
+    local_root = str(REPO_ROOT.resolve())
+    leaks: list[str] = []
+    for path in sorted(registry_dir.rglob("*")) if registry_dir.exists() else []:
+        if path.is_file() and path.suffix in {".json", ".jsonl"}:
+            if local_root in path.read_text(encoding="utf-8"):
+                leaks.append(path.name)
+    if leaks:
+        raise ValueError("public artifact registry leaks local repo root: " + ", ".join(leaks))
+
+
 def _copy_bundle(bundle_dir: Path, target: Path) -> Path:
     if target.exists():
         shutil.rmtree(target)
@@ -229,24 +283,88 @@ def _registry_roundtrip(
     lifecycle_state: str,
     evidence_ref: str,
 ) -> dict[str, Any]:
-    registered = artifact_bundles.write_bundle_registry_record(
+    registered = artifact_bundles.promote_bundle_evidence(
         bundle_dir,
         registry_dir,
         lifecycle_state=lifecycle_state,
-        consumer_refs=["abyss-stack:config-projection-rendering"],
+        consumer_refs=[CONSUMER_REF],
         evidence_refs=[evidence_ref],
+        source_repo=SOURCE_REPO,
+        source_ref=_path_ref(DEFAULT_MANIFEST),
+        producer=PRODUCER,
+        trust_root_mode=TRUST_ROOT_MODE,
     )
-    latest = artifact_bundles.read_bundle_registry(registry_dir, artifact_class="abyss_stack_runtime_config_bundle")
-    latest_record = latest.get("latest_by_artifact_class", {}).get("abyss_stack_runtime_config_bundle")
+    latest = artifact_bundles.read_bundle_registry(registry_dir, artifact_class=ARTIFACT_CLASS)
+    latest_record = latest.get("latest_by_artifact_class", {}).get(ARTIFACT_CLASS)
     return {
         "ok": bool(
             registered.get("ok")
             and isinstance(latest_record, dict)
-            and latest_record.get("record_id") == registered.get("record", {}).get("record_id")
+            and latest_record.get("record_id") == registered.get("promotion", {}).get("record_id")
             and latest_record.get("lifecycle_state") == lifecycle_state
         ),
-        "registered": registered,
+        "promoted": registered,
         "latest": latest,
+    }
+
+
+def _registry_roundtrip_with_subject_store(
+    artifact_bundles: Any,
+    bundle_dir: Path,
+    registry_dir: Path,
+    store_root: Path,
+    *,
+    lifecycle_state: str,
+    evidence_ref: str,
+) -> dict[str, Any]:
+    env_root = "ABYSS_MACHINE_ARTIFACT_SUBJECT_STORE_ROOT"
+    env_roots = "ABYSS_MACHINE_ARTIFACT_SUBJECT_STORE_ROOTS"
+    old_root = os.environ.get(env_root)
+    old_roots = os.environ.get(env_roots)
+    os.environ[env_root] = str(store_root)
+    os.environ[env_roots] = str(store_root)
+    try:
+        return _registry_roundtrip(
+            artifact_bundles,
+            bundle_dir,
+            registry_dir,
+            lifecycle_state=lifecycle_state,
+            evidence_ref=evidence_ref,
+        )
+    finally:
+        if old_root is None:
+            os.environ.pop(env_root, None)
+        else:
+            os.environ[env_root] = old_root
+        if old_roots is None:
+            os.environ.pop(env_roots, None)
+        else:
+            os.environ[env_roots] = old_roots
+
+
+def _trust_gate_allow_latest(artifact_bundles: Any, registry_dir: Path, registry_roundtrip: dict[str, Any]) -> dict[str, Any]:
+    record = registry_roundtrip.get("promoted", {}).get("record", {})
+    trust_gate = artifact_bundles.trust_gate(
+        registry_dir,
+        artifact_class=ARTIFACT_CLASS,
+        subject_digest=str(record.get("subject_digest") or ""),
+        consumer_intent=CONSUMER_INTENT,
+        expected_source_repo=SOURCE_REPO,
+        expected_trust_root_mode=TRUST_ROOT_MODE,
+    )
+    inspected_claims = trust_gate.get("inspected_claims", {})
+    return {
+        "ok": bool(
+            trust_gate.get("ok")
+            and trust_gate.get("verdict") in {"allow", "warn"}
+            and trust_gate.get("decision", {}).get("model") == "fail_closed_consumer_admission"
+            and trust_gate.get("decision", {}).get("allow") is True
+            and inspected_claims.get("registry_latest", {}).get("selected_record_is_latest") is True
+            and inspected_claims.get("controls", {}).get("required_controls_missing") == []
+            and inspected_claims.get("source", {}).get("source_repo_matched") is True
+            and inspected_claims.get("trust_root", {}).get("trust_root_mode_matched") is True
+        ),
+        "trust_gate": trust_gate,
     }
 
 
@@ -264,17 +382,104 @@ def _verify_terminal_registry_state(artifact_bundles: Any, bundle_dir: Path, tmp
         registry_dir,
         lifecycle_state="revoked",
         revocation_reason="abyss-stack runtime config terminal-state rehearsal",
+        source_repo=SOURCE_REPO,
+        source_ref=_path_ref(DEFAULT_MANIFEST),
+        producer=PRODUCER,
+        trust_root_mode=TRUST_ROOT_MODE,
     )
-    after_revoke = artifact_bundles.read_bundle_registry(registry_dir, artifact_class="abyss_stack_runtime_config_bundle")
+    revoked_gate = artifact_bundles.trust_gate(
+        registry_dir,
+        artifact_class=ARTIFACT_CLASS,
+        record_id=str(release_ready.get("promoted", {}).get("record", {}).get("record_id") or ""),
+        consumer_intent=CONSUMER_INTENT,
+        expected_source_repo=SOURCE_REPO,
+        expected_trust_root_mode=TRUST_ROOT_MODE,
+    )
+    after_revoke = artifact_bundles.read_bundle_registry(registry_dir, artifact_class=ARTIFACT_CLASS)
     return {
-        "ok": bool(release_ready.get("ok") and revoked.get("ok") and not after_revoke.get("latest_by_artifact_class")),
+        "ok": bool(
+            release_ready.get("ok")
+            and revoked.get("ok")
+            and revoked_gate.get("verdict") == "deny"
+            and revoked_gate.get("decision", {}).get("allow") is False
+            and revoked_gate.get("inspected_claims", {}).get("lifecycle", {}).get("terminal_state") is True
+            and not after_revoke.get("latest_by_artifact_class")
+        ),
         "release_ready": release_ready,
         "revoked": revoked,
+        "revoked_trust_gate": revoked_gate,
         "after_revoke": after_revoke,
     }
 
 
-def _run_adversarial_checks(artifact_bundles: Any, abyss_repo_root: Path, subject_path: Path, bundle_dir: Path) -> dict[str, Any]:
+def _verify_materialized_subject_store(
+    artifact_bundles: Any,
+    manifest: Path,
+    bundle_dir: Path,
+    registry_dir: Path,
+    tmp_root: Path,
+    store_root: Path,
+) -> dict[str, Any]:
+    pre_registry = _registry_roundtrip(
+        artifact_bundles,
+        bundle_dir,
+        registry_dir,
+        lifecycle_state="release-ready",
+        evidence_ref="materialized-subject-store-precondition",
+    )
+    materialized = artifact_bundles.materialize_artifact_subjects(
+        bundle_dir,
+        store_root=store_root,
+        registry_dir=registry_dir,
+        manifest_ref=manifest,
+        consumer_intent=CONSUMER_INTENT,
+        expected_source_repo=SOURCE_REPO,
+        expected_trust_root_mode=TRUST_ROOT_MODE,
+    )
+    refreshed_registry = _registry_roundtrip_with_subject_store(
+        artifact_bundles,
+        bundle_dir,
+        registry_dir,
+        store_root,
+        lifecycle_state="release-ready",
+        evidence_ref="materialized-subject-store-rehearsal",
+    )
+    _sanitize_public_json_tree(store_root)
+    latest_record = refreshed_registry.get("latest", {}).get("latest_by_artifact_class", {}).get(ARTIFACT_CLASS, {})
+    store_status = latest_record.get("artifact_subject_store") if isinstance(latest_record, dict) else {}
+    gate = artifact_bundles.trust_gate(
+        registry_dir,
+        artifact_class=ARTIFACT_CLASS,
+        subject_digest=str(materialized.get("aggregate_digest") or ""),
+        consumer_intent=CONSUMER_INTENT,
+        expected_source_repo=SOURCE_REPO,
+        expected_trust_root_mode=TRUST_ROOT_MODE,
+    )
+    return _sanitize_public_payload({
+        "ok": bool(
+            pre_registry.get("ok")
+            and materialized.get("ok")
+            and refreshed_registry.get("ok")
+            and isinstance(store_status, dict)
+            and store_status.get("ok") is True
+            and gate.get("verdict") in {"allow", "warn"}
+        ),
+        "pre_registry": pre_registry,
+        "materialized": materialized,
+        "refreshed_registry": refreshed_registry,
+        "trust_gate": gate,
+    })
+
+
+def _run_adversarial_checks(
+    artifact_bundles: Any,
+    abyss_repo_root: Path,
+    manifest: Path,
+    subject_path: Path,
+    bundle_dir: Path,
+    registry_dir: Path,
+    subject_store_root: Path,
+) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="abyss-stack-runtime-config-negative-") as tmp:
         tmp_root = Path(tmp)
         checks = {
@@ -282,11 +487,19 @@ def _run_adversarial_checks(artifact_bundles: Any, abyss_repo_root: Path, subjec
             "wrong_slsa_subject": _verify_wrong_slsa_subject(artifact_bundles, abyss_repo_root, bundle_dir, tmp_root),
             "private_render_marker": _verify_private_render_marker(subject_path, tmp_root),
             "terminal_registry_state": _verify_terminal_registry_state(artifact_bundles, bundle_dir, tmp_root),
+            "materialized_subject_store": _verify_materialized_subject_store(
+                artifact_bundles,
+                manifest,
+                bundle_dir,
+                registry_dir,
+                tmp_root,
+                subject_store_root,
+            ),
         }
-    return {
+    return _sanitize_public_payload({
         "ok": all(bool(item.get("ok")) for item in checks.values()),
         "checks": checks,
-    }
+    })
 
 
 def validate_bundle(manifest: Path, subject_path: Path, bundle_dir: Path, registry_dir: Path, *, clean: bool) -> dict[str, Any]:
@@ -297,6 +510,8 @@ def validate_bundle(manifest: Path, subject_path: Path, bundle_dir: Path, regist
         shutil.rmtree(bundle_dir)
     if clean and registry_dir.exists():
         shutil.rmtree(registry_dir)
+    if clean and DEFAULT_SUBJECT_STORE_ROOT.exists():
+        shutil.rmtree(DEFAULT_SUBJECT_STORE_ROOT)
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
     abyss_repo_root = abyss_machine_root or artifact_bundles.REPO_ROOT
@@ -317,9 +532,21 @@ def validate_bundle(manifest: Path, subject_path: Path, bundle_dir: Path, regist
         lifecycle_state="release-ready",
         evidence_ref=f"{_path_ref(bundle_dir)}/artifact.verify.json",
     )
-    adversarial = _run_adversarial_checks(artifact_bundles, abyss_repo_root, subject_path, bundle_dir)
+    trust_gate = _trust_gate_allow_latest(artifact_bundles, registry_dir, registry)
+    adversarial = _run_adversarial_checks(
+        artifact_bundles,
+        abyss_repo_root,
+        manifest,
+        subject_path,
+        bundle_dir,
+        registry_dir,
+        DEFAULT_SUBJECT_STORE_ROOT,
+    )
     public_verify_sidecar = _sanitize_public_verify_sidecar(bundle_dir)
     _assert_public_sidecars_do_not_leak_local_root(bundle_dir)
+    _sanitize_public_registry(registry_dir)
+    _assert_public_registry_does_not_leak_local_root(registry_dir)
+    registry = artifact_bundles.read_bundle_registry(registry_dir, artifact_class=ARTIFACT_CLASS)
 
     manifest_payload = _load_json(manifest)
     return {
@@ -329,6 +556,7 @@ def validate_bundle(manifest: Path, subject_path: Path, bundle_dir: Path, regist
             and verify.get("ok")
             and release_check.get("ok")
             and registry.get("ok")
+            and trust_gate.get("ok")
             and adversarial.get("ok")
         ),
         "schema": "abyss_stack_runtime_config_artifact_bundle_validation_v1",
@@ -345,6 +573,7 @@ def validate_bundle(manifest: Path, subject_path: Path, bundle_dir: Path, regist
             "artifact_subject_resolution": public_verify_sidecar.get("artifact_subject_resolution", []),
         },
         "registry": registry,
+        "trust_gate": trust_gate,
         "adversarial_checks": adversarial,
         "steps": {
             "build_sidecars": build,

@@ -119,6 +119,13 @@ def test_runtime_config_bundle_hashes_rendered_subject() -> None:
         "published",
     ]
     assert manifest["consumer_contract"]["registry_required"] is True
+    command_text = "\n".join(manifest["consumer_command"])
+    assert "abyss-machine artifacts evidence-promote" in command_text
+    assert "abyss-machine artifacts materialize-subjects" in command_text
+    assert "abyss-machine artifacts trust-gate" in command_text
+    assert "abyss-machine artifacts registry-latest" in command_text
+    assert "--consumer-intent runtime" in command_text
+    assert "--trust-root-mode host_managed" in command_text
 
 
 def test_runtime_config_bundle_validator_reports_external_paths(tmp_path: Path) -> None:
