@@ -1541,6 +1541,7 @@ def test_generic_search_agent_event_fast_path_honors_shard_controls(tmp_path: Pa
     assert args[args.index("--query") + 1] == "answer"
     assert args[args.index("--agent-event") + 1] == "assistant_answer"
     assert "--use-shards" not in args
+    assert "--no-shards" in args
     assert "--max-shards" not in args
 
 

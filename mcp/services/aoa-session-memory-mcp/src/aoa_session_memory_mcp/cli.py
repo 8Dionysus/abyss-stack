@@ -51,6 +51,7 @@ def main() -> None:
     agent_responses.add_argument("--verification-state", default="any")
     agent_responses.add_argument("--failure-state", default="any")
     agent_responses.add_argument("--limit", type=int, default=20)
+    agent_responses.add_argument("--no-shards", action="store_true", help="Force monolithic search projection instead of shard-first agent-event routing.")
 
     agent_closeouts = sub.add_parser("agent-closeouts")
     agent_closeouts.add_argument("query", nargs="?", default="")
@@ -279,6 +280,7 @@ def main() -> None:
                 verification_state=args.verification_state,
                 failure_state=args.failure_state,
                 limit=args.limit,
+                use_shards=not args.no_shards,
             )
         )
     elif args.command == "agent-closeouts":
