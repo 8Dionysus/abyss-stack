@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import importlib.util
 import json
 import os
@@ -1347,7 +1348,8 @@ def test_runtime_identity_reports_reload_boundary(tmp_path: Path, monkeypatch: A
 
     assert stale["source_matches_loaded"] is False
     assert stale["reload_required"] is True
-    assert "MCP process is restarted" in stale["reload_boundary"]
+    assert "existing tools" in stale["reload_boundary"]
+    assert "tool list" in stale["reload_boundary"]
 
 
 def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path: Path) -> None:
@@ -2170,6 +2172,56 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["agent_event_usage_outcome_count"] == 2
     assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
     assert summary["maintenance_recommendation"] == "use_graph_search"
+
+
+def test_running_mcp_process_advisory_reports_stale_transports(tmp_path: Path, monkeypatch: Any) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    for relative in (
+        "src/aoa_session_memory_mcp/core.py",
+        "src/aoa_session_memory_mcp/server.py",
+        "scripts/aoa_session_memory_mcp_server.py",
+    ):
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (2_000.0, 2_000.0))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+
+    def write_process(pid: str, start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        cmdline = b"python3\0.codex/bin/aoa-session-memory-mcp-server.py\0"
+        (process_dir / "cmdline").write_bytes(cmdline)
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(python3)", "S", *(["0"] * 18), str(start_ticks)]
+        (process_dir / "stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process("101", 1_500.0)
+    write_process("102", 2_500.0)
+
+    advisory = validator._running_mcp_process_advisory(proc)
+
+    assert advisory["available"] is True
+    assert advisory["process_count"] == 2
+    assert advisory["stale_process_count"] == 1
+    assert advisory["restart_advisory"] is True
+    stale = [item for item in advisory["processes"] if item["started_before_current_source"]]
+    assert stale[0]["pid"] == 101
+
+
+def test_running_mcp_process_advisory_handles_missing_procfs(tmp_path: Path) -> None:
+    validator = load_validator_module()
+
+    advisory = validator._running_mcp_process_advisory(tmp_path / "missing-proc")
+
+    assert advisory["available"] is False
+    assert advisory["reason"] == "procfs_unavailable"
 
 
 def test_usage_neighborhood_probe_uses_indexed_candidate_session() -> None:
@@ -3006,3 +3058,19 @@ def test_read_resource_and_server_build(tmp_path: Path) -> None:
     assert graph_resource["artifact_type"] == "session_memory_graph_neighborhood"
     assert projection_resource["schema"] == "aoa_session_memory_projection_status_v1"
     assert build_server(workspace_root=tmp_path, aoa_root=tmp_path / ".aoa", script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py") is not None
+
+
+def test_server_auto_reloads_stale_core_implementation(monkeypatch: Any) -> None:
+    import aoa_session_memory_mcp.server as server_module
+
+    fresh_sha = server_module.core_module.MCP_CORE_LOADED_SHA256
+    monkeypatch.setattr(server_module.core_module, "MCP_CORE_LOADED_SHA256", "stale-loaded-code")
+
+    assert server_module._core_reload_required() is True
+
+    server_module._reload_core_if_changed()
+
+    assert server_module.core_module.MCP_CORE_LOADED_SHA256 == fresh_sha
+    assert server_module._core_reload_required() is False
+
+    importlib.reload(server_module.core_module)

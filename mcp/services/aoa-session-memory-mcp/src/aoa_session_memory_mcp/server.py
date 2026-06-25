@@ -3,13 +3,40 @@ from __future__ import annotations
 import json
 import logging
 import os
+import importlib
 from pathlib import Path
 from typing import Any
 
-from .core import AoASessionMemoryMCPState
+from . import core as core_module
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _core_auto_reload_enabled() -> bool:
+    value = os.environ.get("AOA_SESSION_MEMORY_MCP_AUTO_RELOAD", "1").strip().casefold()
+    return value not in {"0", "false", "no", "off"}
+
+
+def _core_reload_required() -> bool:
+    if not _core_auto_reload_enabled():
+        return False
+    current_sha256 = core_module._file_sha256(core_module.MCP_CORE_SOURCE_PATH)
+    return bool(
+        current_sha256
+        and core_module.MCP_CORE_LOADED_SHA256
+        and current_sha256 != core_module.MCP_CORE_LOADED_SHA256
+    )
+
+
+def _reload_core_if_changed() -> None:
+    if not _core_reload_required():
+        return
+    LOGGER.warning(
+        "Reloading aoa-session-memory MCP core implementation from %s",
+        core_module.MCP_CORE_SOURCE_PATH,
+    )
+    importlib.reload(core_module)
 
 
 def build_server(
@@ -24,8 +51,9 @@ def build_server(
 
     mcp = FastMCP("aoa-session-memory-mcp", json_response=True)
 
-    def current_state() -> AoASessionMemoryMCPState:
-        return AoASessionMemoryMCPState.discover(
+    def current_state() -> core_module.AoASessionMemoryMCPState:
+        _reload_core_if_changed()
+        return core_module.AoASessionMemoryMCPState.discover(
             workspace_root=workspace_root,
             aoa_root=aoa_root,
             script_path=script_path,

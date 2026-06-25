@@ -1348,7 +1348,10 @@ class AoASessionMemoryMCPState:
             "current_core_sha256": current_sha256,
             "source_matches_loaded": source_matches_loaded,
             "reload_required": not source_matches_loaded,
-            "reload_boundary": "Codex MCP stdio servers keep imported Python code until the MCP process is restarted.",
+            "reload_boundary": (
+                "MCP core implementation can auto-reload for existing tools; restart the Codex MCP "
+                "process when the tool list, schemas, import path, or server wrapper changes."
+            ),
         }
 
     def _archive_command(

@@ -177,12 +177,14 @@ When installed as a package, the direct server entry point is
 `aoa-session-memory-mcp-server`; `aoa-session-memory-mcp` remains the CLI entry
 point.
 
-Codex discovers MCP tools and imports this package at MCP server start. A
-running Codex session may keep an older tool registry and loaded Python code
-after local edits. After changing tools or route dispatch, restart the Codex
-session or MCP process before using live MCP output as proof. Source-local CLI
-smokes with `PYTHONPATH=mcp/services/aoa-session-memory-mcp/src` prove the code
-path, but they do not prove the already-open Codex MCP transport has reloaded.
+Codex discovers MCP tools at MCP server start. The server auto-reloads the
+`core.py` implementation for existing tools when the source file changes, so
+packet logic and provider/freshness fixes do not require a manual restart.
+Changes to the tool list, tool schemas, server wrapper, or import path still
+require restarting the Codex session or MCP process before using live MCP
+output as proof. Source-local CLI smokes with
+`PYTHONPATH=mcp/services/aoa-session-memory-mcp/src` prove the code path, while
+the configured stdio smoke proves a freshly started Codex-configured server.
 
 ## Agent Route
 
