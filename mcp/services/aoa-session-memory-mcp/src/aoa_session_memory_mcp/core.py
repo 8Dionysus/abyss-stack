@@ -54,6 +54,12 @@ ALLOWED_TRACE_KINDS = {
     "skill",
     "tool",
 }
+TRACE_KIND_ALIASES = {
+    "mcp_service": "mcp",
+    "mcp_services": "mcp",
+    "mcp_tool": "tool",
+    "mcp_tools": "tool",
+}
 ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
 ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
 DEFAULT_GRAPH_QUALITY_ANCHORS = [
@@ -302,6 +308,31 @@ def _safe_selector(value: str, field: str, limit: int = 160) -> str:
 
 def _route_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+
+
+def _normalize_trace_kind(kind: str | None) -> str:
+    normalized = _route_key(str(kind or "auto")) or "auto"
+    return TRACE_KIND_ALIASES.get(normalized, normalized)
+
+
+def _requested_trace_kind_key(kind: str | None) -> str:
+    return _route_key(str(kind or "auto")) or "auto"
+
+
+def _coerce_trace_kind(kind: str | None, *, error_label: str = "trace kind") -> str:
+    normalized = _normalize_trace_kind(kind)
+    if normalized not in ALLOWED_TRACE_KINDS:
+        requested = str(kind or "auto").strip() or "auto"
+        raise ValueError(f"unsupported {error_label}: {requested}")
+    return normalized
+
+
+def _annotate_trace_kind_payload(payload: dict[str, Any], *, requested_kind: str | None, normalized_kind: str) -> dict[str, Any]:
+    requested = _requested_trace_kind_key(requested_kind)
+    payload.setdefault("kind", normalized_kind)
+    if requested != normalized_kind:
+        payload.setdefault("requested_kind", requested)
+    return payload
 
 
 def _session_date_from_label(value: Any) -> str | None:
@@ -1848,14 +1879,13 @@ class AoASessionMemoryMCPState:
         explain: bool = True,
     ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported trace kind: {kind}")
+        route_kind = _coerce_trace_kind(kind)
         if doc_type not in ALLOWED_DOC_TYPES:
             raise ValueError(f"unsupported doc_type: {doc_type}")
         args = [
             anchor_text,
             "--kind",
-            kind,
+            route_kind,
             "--limit",
             str(_coerce_limit(limit, 20, 100)),
             "--per-route-limit",
@@ -1869,6 +1899,7 @@ class AoASessionMemoryMCPState:
         if explain:
             args.append("--explain")
         payload = self._archive_command("trace-route", args)
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1883,12 +1914,11 @@ class AoASessionMemoryMCPState:
         session: str = "",
     ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported trace kind: {kind}")
+        route_kind = _coerce_trace_kind(kind)
         args = [
             anchor_text,
             "--kind",
-            kind,
+            route_kind,
             "--limit",
             str(_coerce_limit(limit, 20, 200)),
             "--per-route-limit",
@@ -1907,6 +1937,7 @@ class AoASessionMemoryMCPState:
             allow_nonzero_json=True,
             timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
         )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1923,8 +1954,7 @@ class AoASessionMemoryMCPState:
         session: str = "",
     ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported trace kind: {kind}")
+        route_kind = _coerce_trace_kind(kind)
         selected_limit = _coerce_limit(limit, 6, 40)
         selected_per_route_limit = _coerce_limit(per_route_limit, 20, 100)
         selected_before = _coerce_bounded_int(before, 3, 0, 24)
@@ -1934,7 +1964,7 @@ class AoASessionMemoryMCPState:
         args = [
             anchor_text,
             "--kind",
-            kind,
+            route_kind,
             "--limit",
             str(selected_limit),
             "--per-route-limit",
@@ -1959,7 +1989,8 @@ class AoASessionMemoryMCPState:
         ):
             return self._usage_neighborhood_search_fast_path(
                 anchor=anchor_text,
-                kind=kind,
+                kind=route_kind,
+                requested_kind=kind,
                 limit=selected_limit,
                 per_route_limit=selected_per_route_limit,
                 before=selected_before,
@@ -1976,11 +2007,13 @@ class AoASessionMemoryMCPState:
             allow_nonzero_json=True,
             timeout_seconds=min(max(self.timeout_seconds, 10.0), USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS),
         )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         if not payload.get("ok") or not payload.get("neighborhoods"):
             return self._usage_neighborhood_search_fast_path(
                 anchor=anchor_text,
-                kind=kind,
+                kind=route_kind,
+                requested_kind=kind,
                 limit=selected_limit,
                 per_route_limit=selected_per_route_limit,
                 before=selected_before,
@@ -1999,6 +2032,7 @@ class AoASessionMemoryMCPState:
         *,
         anchor: str,
         kind: str,
+        requested_kind: str | None = None,
         limit: int,
         per_route_limit: int,
         before: int,
@@ -2110,6 +2144,11 @@ class AoASessionMemoryMCPState:
             "mutates": False,
             "anchor": anchor,
             "kind": kind,
+            **(
+                {"requested_kind": _requested_trace_kind_key(requested_kind)}
+                if requested_kind and _requested_trace_kind_key(requested_kind) != kind
+                else {}
+            ),
             "session": session or None,
             "window_count": len(neighborhoods),
             "neighborhoods": neighborhoods,
@@ -2143,7 +2182,7 @@ class AoASessionMemoryMCPState:
     def _usage_route_signal_candidates(self, *, kind: str, anchor: str) -> list[str]:
         anchor_text = str(anchor or "").strip()
         normalized_anchor = _route_key(anchor_text)
-        normalized_kind = _route_key(kind or "auto")
+        normalized_kind = _normalize_trace_kind(kind or "auto")
         candidates: list[str] = []
         if ":" in anchor_text:
             candidates.append(anchor_text)
@@ -3259,52 +3298,52 @@ class AoASessionMemoryMCPState:
 
     def graph_neighborhood(self, anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported graph kind: {kind}")
+        route_kind = _coerce_trace_kind(kind, error_label="graph kind")
         args = [
             anchor_text,
             "--kind",
-            kind,
+            route_kind,
             "--depth",
             str(_coerce_limit(depth, 1, 3)),
             "--limit",
             str(_coerce_limit(limit, 40, 200)),
         ]
         payload = self._archive_command("graph-neighborhood", args)
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
     def graph_timeline(self, anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported graph kind: {kind}")
+        route_kind = _coerce_trace_kind(kind, error_label="graph kind")
         payload = self._archive_command(
             "graph-timeline",
-            [anchor_text, "--kind", kind, "--limit", str(_coerce_limit(limit, 40, 200))],
+            [anchor_text, "--kind", route_kind, "--limit", str(_coerce_limit(limit, 40, 200))],
         )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
     def graph_shortest_path(self, source: str, target: str, kind: str = "auto", max_depth: int = 4) -> dict[str, Any]:
         source_text = _ensure_short_text(source, "source")
         target_text = _ensure_short_text(target, "target")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported graph kind: {kind}")
+        route_kind = _coerce_trace_kind(kind, error_label="graph kind")
         payload = self._archive_command(
             "graph-shortest-path",
-            [source_text, target_text, "--kind", kind, "--max-depth", str(_coerce_limit(max_depth, 4, 8))],
+            [source_text, target_text, "--kind", route_kind, "--max-depth", str(_coerce_limit(max_depth, 4, 8))],
         )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
     def graph_cooccurrence(self, anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
-        if kind not in ALLOWED_TRACE_KINDS:
-            raise ValueError(f"unsupported graph kind: {kind}")
+        route_kind = _coerce_trace_kind(kind, error_label="graph kind")
         payload = self._archive_command(
             "graph-cooccurrence",
-            [anchor_text, "--kind", kind, "--limit", str(_coerce_limit(limit, 30, 100))],
+            [anchor_text, "--kind", route_kind, "--limit", str(_coerce_limit(limit, 30, 100))],
         )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -3363,9 +3402,7 @@ class AoASessionMemoryMCPState:
         for item in selected[:8]:
             if isinstance(item, dict):
                 anchor = _ensure_short_text(str(item.get("anchor") or item.get("query") or ""), "anchor")
-                kind = str(item.get("kind") or "auto")
-                if kind not in ALLOWED_TRACE_KINDS:
-                    raise ValueError(f"unsupported graph quality kind: {kind}")
+                kind = _coerce_trace_kind(str(item.get("kind") or "auto"), error_label="graph quality kind")
                 anchor_id = _safe_selector(str(item.get("id") or ""), "anchor_id", limit=80) if item.get("id") else ""
                 args.extend(["--anchor", f"{anchor_id}:{kind}:{anchor}" if anchor_id else f"{kind}:{anchor}"])
                 continue

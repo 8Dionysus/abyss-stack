@@ -1219,6 +1219,48 @@ def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> No
     assert any(call[0] == "search" and "--route-layer" in call[1] for call in runner.calls)
 
 
+def test_trace_kind_aliases_bridge_entity_registry_and_usage_routes(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    trace = state.session_trace("aoa-session-memory-mcp", kind="mcp_service", limit=5)
+    audit = state.session_entity_usage_audit("aoa-session-memory-mcp", kind="mcp_service", limit=5)
+    neighborhood = state.session_entity_usage_neighborhood(
+        "aoa-session-memory-mcp",
+        kind="mcp_service",
+        limit=1,
+        per_route_limit=1,
+        raw_preview_chars=0,
+        document_limit=3,
+    )
+    timeline = state.graph_timeline("aoa_session_memory_search", kind="mcp_tool", limit=5)
+    quality = state.graph_quality_audit(
+        anchors=[{"id": "session_memory_mcp", "kind": "mcp_service", "anchor": "aoa-session-memory-mcp"}],
+        limit=1,
+    )
+
+    assert trace["kind"] == "mcp"
+    assert trace["requested_kind"] == "mcp_service"
+    assert audit["kind"] == "mcp"
+    assert audit["requested_kind"] == "mcp_service"
+    assert neighborhood["kind"] == "mcp"
+    assert neighborhood["requested_kind"] == "mcp_service"
+    assert neighborhood["mcp_access"]["selected_route_signal"] == "mcp:aoa_session_memory_mcp"
+    assert timeline["kind"] == "tool"
+    assert timeline["requested_kind"] == "mcp_tool"
+    assert quality["artifact_type"] == "session_memory_graph_quality_audit"
+
+    calls = runner.calls
+    trace_args = next(args for command, args in calls if command == "trace-route")
+    audit_args = next(args for command, args in calls if command == "entity-usage-audit")
+    timeline_args = next(args for command, args in calls if command == "graph-timeline")
+    quality_args = next(args for command, args in calls if command == "graph-quality-audit")
+    assert trace_args[trace_args.index("--kind") + 1] == "mcp"
+    assert audit_args[audit_args.index("--kind") + 1] == "mcp"
+    assert timeline_args[timeline_args.index("--kind") + 1] == "tool"
+    assert "session_memory_mcp:mcp:aoa-session-memory-mcp" in quality_args
+
+
 def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
