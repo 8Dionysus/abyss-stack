@@ -1873,12 +1873,15 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert skill_inventory["source"] == "atlas"
     assert skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert skill_inventory["entities"][0]["signal_count"] == 4
+    assert skill_inventory["entities"][0]["latest_session_date"] == "2026-05-26"
     assert skill_inventory["entities"][0]["samples"][0]["doc_type"] == "atlas_entry"
+    assert skill_inventory["entities"][0]["samples"][0]["session_date"] == "2026-05-26"
     assert skill_inventory["entities"][0]["samples"][0]["refs"]["raw"] == "raw:line:2"
     assert latest_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert explicit_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert mcp_inventory["source"] == "atlas"
     assert mcp_inventory["entities"][0]["key"] == "aoa_session_memory_mcp"
+    assert mcp_inventory["entities"][0]["latest_session_date"] == "2026-05-26"
     assert mcp_service_inventory["layer"] == "mcp"
     assert mcp_service_inventory["source"] == "atlas"
     assert mcp_service_inventory["entities"] == mcp_inventory["entities"]

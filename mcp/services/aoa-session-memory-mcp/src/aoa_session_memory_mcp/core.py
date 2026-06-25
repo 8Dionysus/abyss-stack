@@ -405,8 +405,12 @@ def _annotate_agent_event_payload(payload: dict[str, Any], *, requested: list[st
 
 
 def _session_date_from_label(value: Any) -> str | None:
-    match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", str(value or ""))
+    match = re.search(r"(?:^|[^0-9])(20\d{2}-\d{2}-\d{2})(?=$|[^0-9])", str(value or ""))
     return match.group(1) if match else None
+
+
+def _session_date_from_entry(entry: dict[str, Any]) -> str | None:
+    return str(entry.get("session_date") or "").strip() or _session_date_from_label(entry.get("session"))
 
 
 def _normalize_axis(axis: str) -> str:
@@ -1698,8 +1702,9 @@ class AoASessionMemoryMCPState:
         if episode:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
         normalized_agent_events, requested_agent_events = _normalize_agent_event_classes(agent_events, default=AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
-        for agent_event in normalized_agent_events:
-            args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
+        if command != "agent-reasoning-windows":
+            for agent_event in normalized_agent_events:
+                args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
         fast_payload = self._agent_event_sqlite_fast_path(
             command=command,
             query=text,
@@ -3063,7 +3068,7 @@ class AoASessionMemoryMCPState:
                 bucket["sessions"].add(session_id)
             elif session_label:
                 bucket["sessions"].add(session_label)
-            session_date = _session_date_from_label(session_label)
+            session_date = _session_date_from_entry(detail_entry or entry)
             if session_date and (bucket["latest_session_date"] is None or session_date > bucket["latest_session_date"]):
                 bucket["latest_session_date"] = session_date
             if len(bucket["samples"]) < sample_limit:
@@ -3117,7 +3122,7 @@ class AoASessionMemoryMCPState:
             "session_id": entry.get("session_id"),
             "session_label": entry.get("session"),
             "session_title": entry.get("session_title"),
-            "session_date": _session_date_from_label(entry.get("session")),
+            "session_date": _session_date_from_entry(entry),
             "event_type": entry.get("event_type"),
             "family": entry.get("family"),
             "title": entry.get("title") or entry.get("summary"),
