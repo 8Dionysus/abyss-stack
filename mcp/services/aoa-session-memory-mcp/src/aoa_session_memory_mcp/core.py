@@ -3735,6 +3735,23 @@ class AoASessionMemoryMCPState:
         graph = payload.get("graph") if isinstance(payload.get("graph"), dict) else {}
         route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
         entity_registry = payload.get("entity_registry") if isinstance(payload.get("entity_registry"), dict) else {}
+        operations = payload.get("operations") if isinstance(payload.get("operations"), dict) else {}
+        search_shards = operations.get("search_shards") if isinstance(operations.get("search_shards"), dict) else {}
+        raw_text_fallback = (
+            search_shards.get("raw_text_fallback_dependency")
+            if isinstance(search_shards.get("raw_text_fallback_dependency"), dict)
+            else {}
+        )
+        fast_path_defaults = (
+            search_shards.get("fast_path_defaults")
+            if isinstance(search_shards.get("fast_path_defaults"), dict)
+            else {}
+        )
+        agent_event_fast_path = (
+            fast_path_defaults.get("agent_event_routes")
+            if isinstance(fast_path_defaults.get("agent_event_routes"), dict)
+            else {}
+        )
         return {
             "ok": bool(payload.get("ok")),
             "source": "maintenance-status",
@@ -3769,6 +3786,42 @@ class AoASessionMemoryMCPState:
             "entity_registry": {
                 "status": entity_registry.get("status"),
                 "entity_count": entity_registry.get("entity_count"),
+            },
+            "search_shards": {
+                "status": search_shards.get("status"),
+                "shard_count": search_shards.get("shard_count"),
+                "materialized_shard_count": search_shards.get("materialized_shard_count"),
+                "raw_text_query_route": search_shards.get("raw_text_query_route"),
+                "fast_path_defaults": {
+                    "agent_event_routes": {
+                        "default_use_shards": agent_event_fast_path.get("default_use_shards"),
+                        "default_projection": agent_event_fast_path.get("default_projection"),
+                        "raw_text_query_projection": agent_event_fast_path.get("raw_text_query_projection"),
+                        "raw_text_fallback_dependency_status": agent_event_fast_path.get("raw_text_fallback_dependency_status"),
+                        "raw_text_fallback_dependency_next_route": agent_event_fast_path.get("raw_text_fallback_dependency_next_route"),
+                    }
+                },
+                "raw_text_fallback_dependency": {
+                    "status": raw_text_fallback.get("status"),
+                    "raw_text_query_support": raw_text_fallback.get("raw_text_query_support"),
+                    "monolith_fallback_db_path": raw_text_fallback.get("monolith_fallback_db_path"),
+                    "full_text_shard_count": raw_text_fallback.get("full_text_shard_count"),
+                    "structured_only_shard_count": raw_text_fallback.get("structured_only_shard_count"),
+                    "unsupported_shard_count": raw_text_fallback.get("unsupported_shard_count"),
+                    "nonmaterialized_shard_count": raw_text_fallback.get("nonmaterialized_shard_count"),
+                    "route_blocked_shard_count": raw_text_fallback.get("route_blocked_shard_count"),
+                    "route_blocked_shards": raw_text_fallback.get("route_blocked_shards", [])[:8]
+                    if isinstance(raw_text_fallback.get("route_blocked_shards"), list)
+                    else [],
+                    "scoped_full_text_next_commands": raw_text_fallback.get("scoped_full_text_next_commands", [])[:3]
+                    if isinstance(raw_text_fallback.get("scoped_full_text_next_commands"), list)
+                    else [],
+                    "global_full_text_next_command": raw_text_fallback.get("global_full_text_next_command"),
+                    "quality_tradeoff": raw_text_fallback.get("quality_tradeoff"),
+                    "weight_tradeoff": raw_text_fallback.get("weight_tradeoff"),
+                    "authority_boundary": raw_text_fallback.get("authority_boundary"),
+                    "next_route": raw_text_fallback.get("next_route"),
+                },
             },
             "next_actions": payload.get("next_actions", [])[:3] if isinstance(payload.get("next_actions"), list) else [],
             "exact_next_command": payload.get("exact_next_command"),
