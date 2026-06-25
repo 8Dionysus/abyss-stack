@@ -1327,6 +1327,35 @@ def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> No
     assert "--max-shards" not in args
 
 
+def test_search_normalizes_layer_alias_and_explicit_shard_controls(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "layer": "mcp",
+            "route_signal": "mcp:aoa_session_memory_mcp",
+            "doc_type": "event",
+            "use_shards": True,
+            "max_shards": 3,
+        },
+        limit=5,
+    )
+
+    assert search["results"][0]["freshness"]["status"] == "fresh"
+    assert not [item for item in search.get("diagnostics", []) if "unsupported filter" in item]
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--query") + 1] == ""
+    assert args[args.index("--route-layer") + 1] == "mcp"
+    assert args[args.index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
+    assert args[args.index("--doc-type") + 1] == "event"
+    assert args[args.index("--max-shards") + 1] == "3"
+    assert "--use-shards" in args
+
+
 def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -1342,6 +1371,34 @@ def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Pat
     assert payload["authority_boundary"]["mutation_posture"].startswith("no write")
     assert "continue-session" in payload["mcp_known_recipes"]
     assert not any(call[0] == "retrieve" for call in runner.calls)
+
+
+def test_retrieve_entity_usage_redirects_to_usage_audit(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_retrieve(
+        recipe="entity_usage",
+        query="aoa-session-memory-mcp",
+        session="session-1",
+        limit=5,
+        event_limit=4,
+    )
+
+    assert payload["ok"] is True
+    assert payload["artifact_type"] == "session_memory_entity_usage_audit"
+    assert payload["recipe"] == "entity_usage"
+    assert payload["retrieval_redirect"]["served_by"] == "aoa_session_entity_usage_audit"
+    assert "served by entity-usage-audit retrieval redirect" in payload["diagnostics"]
+    assert not any(call[0] == "retrieve" for call in runner.calls)
+    usage_calls = [call for call in runner.calls if call[0] == "entity-usage-audit"]
+    assert len(usage_calls) == 1
+    args = usage_calls[0][1]
+    assert args[0] == "aoa-session-memory-mcp"
+    assert args[args.index("--kind") + 1] == "auto"
+    assert args[args.index("--limit") + 1] == "5"
+    assert args[args.index("--per-route-limit") + 1] == "4"
+    assert args[args.index("--session") + 1] == "session-1"
 
 
 def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path: Path) -> None:
@@ -1778,6 +1835,8 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
 
     summary = validator._stdio_route_count_summary(
         {"entity_count": 1, "source": "atlas"},
+        {"layer": "mcp", "requested_layer": "mcp_service"},
+        {"result_count": 0, "search_projection": {"mode": "materialized_shard_fanout"}},
         {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
@@ -1786,12 +1845,17 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
         {"ok": True, "entity_count": 1},
+        {"kind": "mcp", "requested_kind": "mcp_service"},
+        {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
         {"recommendation": "use_graph_search"},
         tool_count=30,
     )
 
     assert summary["tool_count"] == 30
     assert summary["inventory_entity_count"] == 1
+    assert summary["mcp_service_inventory_layer"] == "mcp"
+    assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
+    assert summary["search_alias_projection_mode"] == "materialized_shard_fanout"
     assert summary["agent_response_count"] == 0
     assert summary["agent_closeout_count"] == 0
     assert summary["agent_progress_count"] == 0
@@ -1799,6 +1863,9 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["task_episode_count"] == 0
     assert summary["goal_lifecycle_count"] == 0
     assert summary["answer_neighborhood_count"] == 0
+    assert summary["usage_alias_kind"] == "mcp"
+    assert summary["usage_alias_requested_kind"] == "mcp_service"
+    assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
     assert summary["maintenance_recommendation"] == "use_graph_search"
 
 
@@ -1938,9 +2005,13 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert latest_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert explicit_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert mcp_inventory["source"] == "atlas"
+    assert mcp_inventory["requested_layer"] == "mcp"
+    assert mcp_inventory["normalized_layer"] == "mcp"
     assert mcp_inventory["entities"][0]["key"] == "aoa_session_memory_mcp"
     assert mcp_inventory["entities"][0]["latest_session_date"] == "2026-05-26"
     assert mcp_service_inventory["layer"] == "mcp"
+    assert mcp_service_inventory["requested_layer"] == "mcp_service"
+    assert mcp_service_inventory["normalized_layer"] == "mcp"
     assert mcp_service_inventory["source"] == "atlas"
     assert mcp_service_inventory["entities"] == mcp_inventory["entities"]
     assert eval_inventory["source"] == "portable_sqlite"

@@ -181,6 +181,8 @@ def _select_usage_neighborhood_probe(
 
 def _stdio_route_count_summary(
     inventory: dict,
+    mcp_service_inventory: dict,
+    search_alias: dict,
     responses: dict,
     closeouts: dict,
     progress: dict,
@@ -189,6 +191,8 @@ def _stdio_route_count_summary(
     goal_lifecycles: dict,
     neighborhood: dict,
     registry: dict,
+    usage_alias: dict,
+    retrieve_usage: dict,
     maintenance_status: dict,
     *,
     tool_count: int,
@@ -197,6 +201,12 @@ def _stdio_route_count_summary(
         "tool_count": tool_count,
         "inventory_entity_count": _payload_count(inventory, "entity_count"),
         "inventory_source": inventory.get("source"),
+        "mcp_service_inventory_layer": mcp_service_inventory.get("layer"),
+        "mcp_service_inventory_requested_layer": mcp_service_inventory.get("requested_layer"),
+        "search_alias_result_count": _payload_count(search_alias, "result_count"),
+        "search_alias_projection_mode": search_alias.get("search_projection", {}).get("mode")
+        if isinstance(search_alias.get("search_projection"), dict)
+        else None,
         "agent_response_count": _payload_count(responses, "result_count"),
         "agent_closeout_count": _payload_count(closeouts, "result_count"),
         "agent_progress_count": _payload_count(progress, "result_count"),
@@ -205,6 +215,11 @@ def _stdio_route_count_summary(
         "goal_lifecycle_count": _payload_count(goal_lifecycles, "result_count"),
         "answer_neighborhood_count": _payload_count(neighborhood, "window_count"),
         "registry_entity_count": _payload_count(registry, "entity_count"),
+        "usage_alias_kind": usage_alias.get("kind"),
+        "usage_alias_requested_kind": usage_alias.get("requested_kind"),
+        "retrieve_usage_served_by": retrieve_usage.get("retrieval_redirect", {}).get("served_by")
+        if isinstance(retrieve_usage.get("retrieval_redirect"), dict)
+        else None,
         "maintenance_recommendation": maintenance_status.get("recommendation"),
     }
 
@@ -257,6 +272,14 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_entity_inventory",
                 {"layer": "skill", "limit": 5, "sample_limit": 0},
             )
+            mcp_service_inventory = await call_json(
+                "aoa_session_entity_inventory",
+                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 5, "sample_limit": 0},
+            )
+            search_alias = await call_json(
+                "aoa_session_search",
+                {"query": "aoa-session-memory-mcp", "filters": {"layer": "mcp", "use_shards": True}, "limit": 3},
+            )
             registry = await call_json(
                 "aoa_session_entity_registry",
                 {"kind": "skill", "limit": 5},
@@ -274,6 +297,16 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_answer_neighborhood",
                 {"session": session, "limit": 1, "before": 1, "after": 2},
             )
+            usage_alias = await call_json(
+                "aoa_session_entity_usage_audit",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
+                timeout_seconds=90,
+            )
+            retrieve_usage = await call_json(
+                "aoa_session_retrieve",
+                {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
+                timeout_seconds=90,
+            )
             maintenance_status = await call_json(
                 "aoa_session_maintenance_status",
                 {"include_timers": False},
@@ -282,12 +315,27 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    if mcp_service_inventory.get("requested_layer") != "mcp_service" or mcp_service_inventory.get("normalized_layer") != "mcp":
+        raise SystemExit(f"stdio MCP mcp_service inventory alias contract failed: {mcp_service_inventory}")
+    unsupported_alias_diagnostics = [
+        item
+        for item in search_alias.get("diagnostics", [])
+        if "unsupported filter 'layer'" in str(item) or "unsupported filter 'use_shards'" in str(item)
+    ]
+    if unsupported_alias_diagnostics:
+        raise SystemExit(f"stdio MCP search alias contract failed: {unsupported_alias_diagnostics}")
     if registry.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity registry returned no entities: {registry.get('diagnostics')}")
+    if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
+        raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
+    if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_audit":
+        raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     return _stdio_route_count_summary(
         inventory,
+        mcp_service_inventory,
+        search_alias,
         responses,
         closeouts,
         progress,
@@ -296,6 +344,8 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         goal_lifecycles,
         neighborhood,
         registry,
+        usage_alias,
+        retrieve_usage,
         maintenance_status,
         tool_count=len(tools),
     )
@@ -312,6 +362,10 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
             required_tools = {
                 "aoa_session_memory_status",
+                "aoa_session_search",
+                "aoa_session_entity_inventory",
+                "aoa_session_entity_usage_audit",
+                "aoa_session_retrieve",
                 "aoa_session_entity_registry",
                 "aoa_session_agent_responses",
                 "aoa_session_agent_closeouts",
@@ -339,7 +393,82 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             if not isinstance(payload, dict) or not payload.get("ok"):
                 raise SystemExit(f"configured Codex MCP status returned not-ok payload: {payload}")
 
-    return {**meta, "ok": True, "skipped": False, "tool_count": len(tools), "status_ok": payload.get("ok")}
+            search_result = await mcp_session.call_tool(
+                "aoa_session_search",
+                {"query": "aoa-session-memory-mcp", "filters": {"layer": "mcp", "use_shards": True}, "limit": 2},
+                read_timeout_seconds=timedelta(seconds=60),
+            )
+            if search_result.isError or not search_result.content:
+                raise SystemExit(f"configured Codex MCP search alias call failed: {search_result.content}")
+            search_payload = json.loads(search_result.content[0].text)
+            search_diagnostics = search_payload.get("diagnostics", []) if isinstance(search_payload, dict) else []
+            unsupported_search_filters = [
+                item
+                for item in search_diagnostics
+                if "unsupported filter 'layer'" in str(item) or "unsupported filter 'use_shards'" in str(item)
+            ]
+            if unsupported_search_filters:
+                raise SystemExit(f"configured Codex MCP search alias contract failed: {unsupported_search_filters}")
+
+            inventory_result = await mcp_session.call_tool(
+                "aoa_session_entity_inventory",
+                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 3, "sample_limit": 0},
+                read_timeout_seconds=timedelta(seconds=20),
+            )
+            if inventory_result.isError or not inventory_result.content:
+                raise SystemExit(f"configured Codex MCP mcp_service inventory call failed: {inventory_result.content}")
+            inventory_payload = json.loads(inventory_result.content[0].text)
+            if (
+                not isinstance(inventory_payload, dict)
+                or inventory_payload.get("requested_layer") != "mcp_service"
+                or inventory_payload.get("normalized_layer") != "mcp"
+            ):
+                raise SystemExit(f"configured Codex MCP mcp_service inventory alias contract failed: {inventory_payload}")
+
+            usage_result = await mcp_session.call_tool(
+                "aoa_session_entity_usage_audit",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
+                read_timeout_seconds=timedelta(seconds=90),
+            )
+            if usage_result.isError or not usage_result.content:
+                raise SystemExit(f"configured Codex MCP usage alias call failed: {usage_result.content}")
+            usage_payload = json.loads(usage_result.content[0].text)
+            if (
+                not isinstance(usage_payload, dict)
+                or usage_payload.get("kind") != "mcp"
+                or usage_payload.get("requested_kind") != "mcp_service"
+            ):
+                raise SystemExit(f"configured Codex MCP usage kind alias contract failed: {usage_payload}")
+
+            retrieve_result = await mcp_session.call_tool(
+                "aoa_session_retrieve",
+                {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
+                read_timeout_seconds=timedelta(seconds=90),
+            )
+            if retrieve_result.isError or not retrieve_result.content:
+                raise SystemExit(f"configured Codex MCP retrieve entity_usage call failed: {retrieve_result.content}")
+            retrieve_payload = json.loads(retrieve_result.content[0].text)
+            if (
+                not isinstance(retrieve_payload, dict)
+                or retrieve_payload.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_audit"
+            ):
+                raise SystemExit(f"configured Codex MCP retrieve entity_usage redirect failed: {retrieve_payload}")
+
+    return {
+        **meta,
+        "ok": True,
+        "skipped": False,
+        "tool_count": len(tools),
+        "status_ok": payload.get("ok"),
+        "search_alias_result_count": search_payload.get("result_count") if isinstance(search_payload, dict) else None,
+        "mcp_service_inventory_requested_layer": inventory_payload.get("requested_layer")
+        if isinstance(inventory_payload, dict)
+        else None,
+        "usage_alias_kind": usage_payload.get("kind") if isinstance(usage_payload, dict) else None,
+        "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
+        if isinstance(retrieve_payload, dict) and isinstance(retrieve_payload.get("retrieval_redirect"), dict)
+        else None,
+    }
 
 
 def main() -> None:
@@ -467,6 +596,10 @@ def main() -> None:
                 "stdio_tool_count": stdio_smoke["tool_count"],
                 "stdio_inventory_entity_count": stdio_smoke["inventory_entity_count"],
                 "stdio_inventory_source": stdio_smoke["inventory_source"],
+                "stdio_mcp_service_inventory_layer": stdio_smoke["mcp_service_inventory_layer"],
+                "stdio_mcp_service_inventory_requested_layer": stdio_smoke["mcp_service_inventory_requested_layer"],
+                "stdio_search_alias_result_count": stdio_smoke["search_alias_result_count"],
+                "stdio_search_alias_projection_mode": stdio_smoke["search_alias_projection_mode"],
                 "stdio_agent_response_count": stdio_smoke["agent_response_count"],
                 "stdio_agent_closeout_count": stdio_smoke["agent_closeout_count"],
                 "stdio_agent_progress_count": stdio_smoke["agent_progress_count"],
@@ -474,6 +607,9 @@ def main() -> None:
                 "stdio_task_episode_count": stdio_smoke["task_episode_count"],
                 "stdio_goal_lifecycle_count": stdio_smoke["goal_lifecycle_count"],
                 "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
+                "stdio_usage_alias_kind": stdio_smoke["usage_alias_kind"],
+                "stdio_usage_alias_requested_kind": stdio_smoke["usage_alias_requested_kind"],
+                "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "configured_stdio": configured_stdio_smoke,
             },
             indent=2,

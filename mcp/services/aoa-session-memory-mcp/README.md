@@ -52,7 +52,7 @@ Resources:
 Tools:
 
 - `aoa_session_memory_status(include_live)`
-- `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied.
+- `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters.
 - `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
 - `aoa_session_agent_closeouts(query, session, episode, limit)`
 - `aoa_session_agent_progress_updates(query, session, episode, limit)`
@@ -66,7 +66,7 @@ Tools:
 - `aoa_session_entity_usage_scenario_audit(sample_size, seed, layers, min_postings, limit, per_route_limit, consequence_window, document_limit, raw_preview_limit, full)`
 - `aoa_session_route(axis, key, limit, include_entry_payloads)`
 - `aoa_session_brief(session, max_segments)`
-- `aoa_session_retrieve(recipe, query, session, limit, event_limit)`
+- `aoa_session_retrieve(recipe, query, session, limit, event_limit)`; `entity_usage`/`entity-usage-audit` requests are transparently served by the dedicated read-only `aoa_session_entity_usage_audit` route.
 - `aoa_session_evidence_packet(intent, query, anchors, refs, limit)`
 - `aoa_session_freshness_check(refs, session)`; pass `session` when checking session-relative refs such as `raw:line:412`.
 - `aoa_session_pattern_scan(pattern, filters, limit)`
