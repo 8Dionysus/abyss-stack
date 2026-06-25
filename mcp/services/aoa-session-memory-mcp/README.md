@@ -107,6 +107,11 @@ Entity inventory packets include a compact `provider` summary from
 `search-provider-status --provider portable_sqlite`, so agents can see whether
 the atlas/search read model is current before trusting skill/MCP/hook/tool/API
 inventory counts.
+Wide inventory packets are bounded route packets, not full atlas dumps. They
+return compact sample refs, a `route_packet`, `response_profile`, omitted
+sample counts when the request exceeds the MCP sample budget, and a
+`next_expansion` / `next_expansion_command` pointing to the explicit route or
+search expansion that can load heavier entry payloads.
 
 Scoped agent-event routes such as `aoa_session_agent_responses`,
 `aoa_session_agent_closeouts`, `aoa_session_agent_progress_updates`,

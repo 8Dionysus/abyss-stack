@@ -2119,6 +2119,12 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert skill_inventory["entities"][0]["samples"][0]["doc_type"] == "atlas_entry"
     assert skill_inventory["entities"][0]["samples"][0]["session_date"] == "2026-05-26"
     assert skill_inventory["entities"][0]["samples"][0]["refs"]["raw"] == "raw:line:2"
+    assert "segment_index" not in skill_inventory["entities"][0]["samples"][0]["refs"]
+    assert skill_inventory["route_packet"]["bounded"] is True
+    assert skill_inventory["route_packet"]["axis"] == "by-skill"
+    assert skill_inventory["route_packet"]["sample_refs"][0]["raw"] == "raw:line:2"
+    assert skill_inventory["response_profile"]["sample_shape"] == "compact_refs_only"
+    assert skill_inventory["next_expansion"]["mcp_tool"] == "aoa_session_route"
     assert latest_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert explicit_skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert mcp_inventory["source"] == "atlas"
@@ -2141,6 +2147,71 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     provider_calls = [args for command, args in runner.calls if command == "search-provider-status"]
     assert provider_calls
     assert all("--provider" in args for args in provider_calls)
+
+
+def test_entity_inventory_keeps_wide_atlas_response_bounded(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    index_path = aoa / "maps/by-skill/index.json"
+    entries = []
+    long_label = "2026-06-14__999__" + "long-session-title-" * 12
+    long_path_prefix = (aoa / "maps/by-skill/entries" / ("deep-" * 20)).as_posix()
+    for entity_idx in range(8):
+        for sample_idx in range(3):
+            entries.append(
+                {
+                    "axis": "by-skill",
+                    "route_key": f"aoa_session_memory_skill_{entity_idx}",
+                    "session": f"{long_label}-{entity_idx}-{sample_idx}",
+                    "session_id": f"session-{entity_idx}-{sample_idx}",
+                    "confidence": "medium",
+                    "signal_count": 100 - entity_idx,
+                    "json": f"{long_path_prefix}/aoa_session_memory_skill_{entity_idx}_{sample_idx}.json",
+                    "markdown": f"{long_path_prefix}/aoa_session_memory_skill_{entity_idx}_{sample_idx}.md",
+                    "title": "wide inventory title " + ("with repeated context " * 30),
+                    "evidence": {
+                        "session_ref": f"/srv/AbyssOS/.aoa/sessions/{long_label}/SESSION.md",
+                        "raw_ref": f"raw:line:{1000 + entity_idx * 10 + sample_idx}",
+                        "segment_ref": f"999__compaction-to-compaction.md#event-{entity_idx:06d}{sample_idx}",
+                        "generated_index_ref": f"/srv/AbyssOS/.aoa/sessions/{long_label}/segments/999__compaction-to-compaction.index.json",
+                    },
+                }
+            )
+    write_json(
+        index_path,
+        {
+            "schema_version": 1,
+            "artifact_type": "atlas_axis_index",
+            "generated_at": "2026-06-14T00:00:00Z",
+            "axis": "by-skill",
+            "entry_count": len(entries),
+            "entries": entries,
+        },
+    )
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+
+    inventory = state.session_entity_inventory(layer="skill", query="aoa-session-memory", limit=8, sample_limit=3)
+    serialized = json.dumps(inventory, ensure_ascii=False)
+
+    assert inventory["ok"] is True
+    assert inventory["entity_count"] == 8
+    assert inventory["route_packet"]["bounded"] is True
+    assert inventory["route_packet"]["sample_ref_count"] == 8
+    assert inventory["response_profile"]["sample_count"] == 12
+    assert inventory["response_profile"]["sample_omitted_count"] == 12
+    assert inventory["next_expansion"]["arguments"]["axis"] == "by-skill"
+    assert len(serialized) < 18000
+    for entity in inventory["entities"]:
+        for sample in entity["samples"]:
+            assert "doc_id" not in sample
+            assert "segment_index" not in sample["refs"]
+            assert "atlas_entry" not in sample["refs"]
+            assert "title" not in sample
 
 
 def test_entity_inventory_reports_runtime_reload_boundary(tmp_path: Path, monkeypatch: Any) -> None:

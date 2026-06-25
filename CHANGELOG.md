@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` entity inventory responses now stay bounded for
+  wide skill/MCP/hook/tool/API route probes by returning compact sample refs,
+  a route packet, sample budget/omitted counts, and an explicit expansion
+  command instead of heavy atlas entry paths in every sample.
 - Runtime config artifact validation now promotes release-ready evidence through
   the OS Abyss registry, materializes subject-store evidence under ignored
   `dist/`, requires source/trust-root matching and a fail-closed runtime
