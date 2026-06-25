@@ -1950,6 +1950,10 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     summary = validator._stdio_route_count_summary(
         {"entity_count": 1, "source": "atlas"},
         {"layer": "mcp", "requested_layer": "mcp_service"},
+        {"entity_count": 2},
+        {"entity_count": 3},
+        {"entity_count": 4},
+        {"result_count": 5},
         {"result_count": 0, "search_projection": {"mode": "materialized_shard_fanout"}},
         {"ok": True, "result_count": 0},
         {"ok": True, "result_count": 0},
@@ -1969,6 +1973,10 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
+    assert summary["hook_inventory_entity_count"] == 2
+    assert summary["tool_inventory_entity_count"] == 3
+    assert summary["api_inventory_entity_count"] == 4
+    assert summary["open_thread_result_count"] == 5
     assert summary["search_alias_projection_mode"] == "materialized_shard_fanout"
     assert summary["agent_response_count"] == 0
     assert summary["agent_closeout_count"] == 0
