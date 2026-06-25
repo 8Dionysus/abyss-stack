@@ -51,7 +51,7 @@
   },
   "consumer_contract": {
     "stable_interface": "python mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py --json and abyss-machine artifacts trust-gate --artifact-class abyss_stack_runtime_config_bundle --consumer-intent runtime --json",
-    "consumer_expectation": "Runtime consumers select an abyss_stack_runtime_config_bundle from the registry latest read-model only after ABI, SBOM, SLSA/in-toto verification, durable evidence promotion, materialized subject-store verification, source/trust-root matching, and fail-closed consumer trust-gate allow/warn succeeds.",
+    "consumer_expectation": "Runtime consumers select an abyss_stack_runtime_config_bundle from the registry latest read-model only after ABI, SBOM, SLSA/in-toto verification, durable evidence promotion, materialized subject-store verification, source/trust-root matching, and fail-closed consumer trust-gate allow/warn succeeds. Local host-managed validation may materialize the subject store as an agent rehearsal, but runtime admission remains manual_review_required until a release trust root is present.",
     "registry_required": true,
     "subject_store_required": true,
     "admission_gate": "fail_closed_consumer_admission",
@@ -63,7 +63,7 @@
     "abyss-machine artifacts verify BUNDLE_DIR",
     "abyss-machine artifacts release-check BUNDLE_DIR",
     "abyss-machine artifacts evidence-promote BUNDLE_DIR --registry-dir REGISTRY_DIR --lifecycle-state release-ready --consumer-ref abyss-stack:config-projection-rendering --evidence-ref BUNDLE_DIR/artifact.verify.json --source-repo abyss-stack --source-ref mechanics/config-projection/parts/rendering/manifests/runtime_config.bundle.json --producer abyss-stack-runtime-config-renderer --trust-root-mode host_managed --json",
-    "abyss-machine artifacts materialize-subjects BUNDLE_DIR --registry-dir REGISTRY_DIR --store-root SUBJECT_STORE_ROOT --manifest mechanics/config-projection/parts/rendering/manifests/runtime_config.bundle.json --consumer-intent runtime --source-repo abyss-stack --trust-root-mode host_managed --json",
+    "abyss-machine artifacts materialize-subjects BUNDLE_DIR --registry-dir REGISTRY_DIR --store-root SUBJECT_STORE_ROOT --manifest mechanics/config-projection/parts/rendering/manifests/runtime_config.bundle.json --consumer-intent agent --source-repo abyss-stack --trust-root-mode host_managed --json",
     "abyss-machine artifacts trust-gate --registry-dir REGISTRY_DIR --artifact-class abyss_stack_runtime_config_bundle --consumer-intent runtime --source-repo abyss-stack --trust-root-mode host_managed --json",
     "abyss-machine artifacts registry-latest --registry-dir REGISTRY_DIR --artifact-class abyss_stack_runtime_config_bundle --consumer-intent runtime --source-repo abyss-stack --trust-root-mode host_managed --json",
     "python mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py --json",
