@@ -1564,21 +1564,72 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
             WHERE id = 'event:session-1:000:000001'
             """
         )
+        conn.execute(
+            """
+            INSERT INTO documents (
+                id, doc_type, session_id, session_label, session_title, session_date, event_type, family,
+                title, segment_ref, segment_index_path, raw_ref, raw_block_ref, manifest_path,
+                freshness_status, stale_reason, conversation_act, session_act, agent_event,
+                task_episode_id, route_layers, route_signals, body
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "event:session-1:000:000002",
+                "event",
+                "session-1",
+                "2026-05-26__001__session-memory-mcp",
+                "Session memory MCP",
+                "2026-05-26",
+                "OPEN_THREAD",
+                "progress_state",
+                "Assistant open thread",
+                "000__initial-to-latest.md#event-000002",
+                (state.aoa_root / "sessions/2026-05-26__001__session-memory-mcp/segments/000.index.json").as_posix(),
+                "raw:line:2",
+                "raw/blocks/000__initial-to-latest.raw.jsonl#L2",
+                (state.aoa_root / "sessions/2026-05-26__001__session-memory-mcp/session.manifest.json").as_posix(),
+                "fresh",
+                "",
+                "assistant_open_thread",
+                "memory_signal",
+                "assistant_open_thread",
+                "task-0001",
+                "|agent_event|decision_thread|",
+                "|agent_event:assistant_open_thread|decision_thread:open_thread|",
+                "open thread body",
+            ),
+        )
         conn.commit()
     finally:
         conn.close()
 
     responses = state.session_agent_responses(session="session-1", limit=3)
+    answer_alias = state.session_agent_responses(session="session-1", agent_events=["answer"], limit=3)
+    open_thread_alias = state.session_agent_responses(session="session-1", agent_events=["open_thread"], limit=3)
     search = state.session_search(
         "",
         filters={"session": "session-1", "doc_type": "event", "agent_event": "assistant_answer"},
         limit=3,
     )
+    open_thread_search = state.session_search(
+        "",
+        filters={"session": "session-1", "doc_type": "event", "agent_event": "open_thread"},
+        limit=3,
+    )
     neighborhood = state.session_answer_neighborhood(session="session-1", limit=1)
 
     assert responses["source"] == "portable_sqlite_agent_event_fast_path"
-    assert responses["result_count"] == 1
-    assert responses["results"][0]["agent_event"] == "assistant_answer"
+    assert responses["result_count"] == 2
+    assert {item["agent_event"] for item in responses["results"]} == {"assistant_answer", "assistant_open_thread"}
+    assert answer_alias["agent_events"] == ["assistant_answer"]
+    assert answer_alias["requested_agent_events"] == ["answer"]
+    assert answer_alias["result_count"] == 1
+    assert answer_alias["results"][0]["agent_event"] == "assistant_answer"
+    assert open_thread_alias["agent_events"] == ["assistant_open_thread"]
+    assert open_thread_alias["requested_agent_events"] == ["open_thread"]
+    assert open_thread_alias["result_count"] == 1
+    assert open_thread_alias["results"][0]["agent_event"] == "assistant_open_thread"
     assert responses["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
     assert responses["search_projection"]["fallback_route"] == "archive_cli_shard_fanout"
     assert responses["cost_profile"]["lightweight_route"] is True
@@ -1586,6 +1637,11 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     assert responses["mcp_access"]["archive_command"] is None
     assert search["source"] == "portable_sqlite_agent_event_fast_path"
     assert "served by MCP agent-event route fast path" in search["diagnostics"]
+    assert open_thread_search["source"] == "portable_sqlite_agent_event_fast_path"
+    assert open_thread_search["agent_events"] == ["assistant_open_thread"]
+    assert open_thread_search["requested_agent_events"] == ["open_thread"]
+    assert open_thread_search["result_count"] == 1
+    assert open_thread_search["results"][0]["agent_event"] == "assistant_open_thread"
     assert neighborhood["source"] == "portable_sqlite_agent_event_window_fast_path"
     assert neighborhood["window_count"] == 1
     assert not any(call[0] in {"agent-responses", "answer-neighborhood"} for call in runner.calls)

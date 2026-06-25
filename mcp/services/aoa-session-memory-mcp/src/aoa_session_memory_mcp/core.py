@@ -210,6 +210,49 @@ AGENT_EVENT_DEFAULTS_BY_ROUTE = {
     "agent-reasoning-windows": ["assistant_reasoning_boundary", "assistant_reasoning"],
     "answer-neighborhood": ["assistant_answer", "assistant_closeout", "assistant_verification_report"],
 }
+AGENT_EVENT_ROUTE_ALIASES = {
+    "answer": "assistant_answer",
+    "assistant_answer": "assistant_answer",
+    "response": "assistant_answer",
+    "assistant_response": "assistant_answer",
+    "open_thread": "assistant_open_thread",
+    "assistant_open_thread": "assistant_open_thread",
+    "thread": "assistant_open_thread",
+    "remaining_gap": "assistant_open_thread",
+    "final": "assistant_final_closeout",
+    "closeout": "assistant_final_closeout",
+    "final_closeout": "assistant_final_closeout",
+    "assistant_final_closeout": "assistant_final_closeout",
+    "reasoning": "assistant_reasoning_boundary",
+    "reasoning_boundary": "assistant_reasoning_boundary",
+    "reasoning_window": "assistant_reasoning_boundary",
+    "assistant_reasoning_boundary": "assistant_reasoning_boundary",
+    "plan": "assistant_plan",
+    "assistant_plan": "assistant_plan",
+    "progress": "assistant_progress_update",
+    "progress_update": "assistant_progress_update",
+    "assistant_progress_update": "assistant_progress_update",
+    "verification": "assistant_verification_report",
+    "verification_report": "assistant_verification_report",
+    "assistant_verification_report": "assistant_verification_report",
+    "decision": "assistant_decision",
+    "assistant_decision": "assistant_decision",
+    "assumption": "assistant_assumption",
+    "assistant_assumption": "assistant_assumption",
+    "checkpoint": "assistant_checkpoint",
+    "assistant_checkpoint": "assistant_checkpoint",
+    "blocker": "assistant_blocker_report",
+    "blocked": "assistant_blocker_report",
+    "assistant_blocker_report": "assistant_blocker_report",
+    "handoff": "assistant_handoff_or_resume",
+    "resume": "assistant_handoff_or_resume",
+    "assistant_handoff_or_resume": "assistant_handoff_or_resume",
+    "correction": "assistant_correction_ack",
+    "correction_ack": "assistant_correction_ack",
+    "assistant_correction_ack": "assistant_correction_ack",
+    "process_lesson": "assistant_process_lesson",
+    "assistant_process_lesson": "assistant_process_lesson",
+}
 
 
 @dataclass(slots=True)
@@ -332,6 +375,32 @@ def _annotate_trace_kind_payload(payload: dict[str, Any], *, requested_kind: str
     payload.setdefault("kind", normalized_kind)
     if requested != normalized_kind:
         payload.setdefault("requested_kind", requested)
+    return payload
+
+
+def _normalize_agent_event_class(value: str | None) -> str:
+    slug = _route_key(str(value or ""))
+    if not slug:
+        return ""
+    return AGENT_EVENT_ROUTE_ALIASES.get(slug, slug)
+
+
+def _normalize_agent_event_classes(values: list[str] | None, *, default: list[str] | None = None) -> tuple[list[str], list[str]]:
+    requested = [str(item) for item in (values or []) if str(item or "").strip()]
+    classes: list[str] = []
+    for item in requested:
+        normalized = _normalize_agent_event_class(item)
+        if normalized and normalized not in classes:
+            classes.append(normalized)
+    if not classes and default:
+        classes = list(default)
+    return classes, requested
+
+
+def _annotate_agent_event_payload(payload: dict[str, Any], *, requested: list[str], normalized: list[str]) -> dict[str, Any]:
+    payload.setdefault("agent_events", normalized)
+    if requested and requested != normalized:
+        payload.setdefault("requested_agent_events", requested)
     return payload
 
 
@@ -1199,12 +1268,13 @@ class AoASessionMemoryMCPState:
         text = str(query or "").strip()
         if text:
             text = _ensure_short_text(text, "query")
+        normalized_agent_events, requested_agent_events = _normalize_agent_event_classes(agent_events)
         scoped = bool(
             text
             or session
             or episode
             or closeout_final
-            or (agent_events or [])
+            or normalized_agent_events
             or verification_state != "any"
             or failure_state != "any"
         )
@@ -1246,7 +1316,7 @@ class AoASessionMemoryMCPState:
             args.extend(["--session", _safe_selector(session, "session")])
         if episode:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
-        for agent_event in agent_events or []:
+        for agent_event in normalized_agent_events:
             args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
         if closeout_final:
             args.append("--closeout-final")
@@ -1262,13 +1332,15 @@ class AoASessionMemoryMCPState:
                 query=text,
                 session=session,
                 episode=episode,
-                agent_events=agent_events or [],
+                agent_events=normalized_agent_events,
+                requested_agent_events=requested_agent_events,
                 limit=_coerce_limit(limit, 20, 100),
                 archive_args=args,
             )
             if fast_payload is not None:
                 return fast_payload
         payload = self._archive_command("agent-responses", args, allow_nonzero_json=True)
+        _annotate_agent_event_payload(payload, requested=requested_agent_events, normalized=normalized_agent_events or payload.get("agent_events", []))
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
@@ -1366,8 +1438,10 @@ class AoASessionMemoryMCPState:
         agent_events: list[str],
         limit: int,
         archive_args: list[str],
+        requested_agent_events: list[str] | None = None,
     ) -> dict[str, Any] | None:
-        explicit_agent_events = [str(item) for item in agent_events if str(item or "").strip()]
+        explicit_agent_events, normalized_requested = _normalize_agent_event_classes(agent_events)
+        requested_events = list(requested_agent_events or normalized_requested)
         if not (session or episode or query or explicit_agent_events):
             return None
         if query:
@@ -1476,6 +1550,11 @@ class AoASessionMemoryMCPState:
             "session": session or None,
             "episode": episode or None,
             "agent_events": explicit_agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []),
+            **(
+                {"requested_agent_events": requested_events}
+                if requested_events and requested_events != (explicit_agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
+                else {}
+            ),
             "result_count": len(results),
             "results": results,
             "search_projection": {
@@ -1618,15 +1697,16 @@ class AoASessionMemoryMCPState:
             args.extend(["--session", _safe_selector(session, "session")])
         if episode:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
-        for agent_event in agent_events or []:
+        normalized_agent_events, requested_agent_events = _normalize_agent_event_classes(agent_events, default=AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
+        for agent_event in normalized_agent_events:
             args.extend(["--agent-event", _safe_selector(str(agent_event), "agent_event", limit=100)])
-        fast_events = list(agent_events or AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
         fast_payload = self._agent_event_sqlite_fast_path(
             command=command,
             query=text,
             session=session,
             episode=episode,
-            agent_events=fast_events,
+            agent_events=normalized_agent_events,
+            requested_agent_events=requested_agent_events,
             limit=_coerce_limit(limit, 10, 50),
             archive_args=args,
         )
