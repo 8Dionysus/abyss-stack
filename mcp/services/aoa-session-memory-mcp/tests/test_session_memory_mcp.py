@@ -1084,11 +1084,14 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["provider"]["status_mode"] == "fast_presence_probe"
     assert status["provider"]["providers"]["portable_sqlite"]["freshness"]["checked"] is False
     assert status["atlas"]["entry_count"] == 2
+    assert status["maintenance_status"]["source"] == "maintenance-status"
+    assert status["maintenance_status"]["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
     assert status["latest_route_readiness"]["reports"][0]["summary"]["ok"] is True
     assert status["readiness_policy"]["provider_status"]["freshness_checked"] is False
     assert status["readiness_policy"]["cached_route_readiness"]["status_field"] == "latest_route_readiness"
     assert status["authority_boundary"]["mutation_posture"].startswith("no write")
     assert not any(call[0] == "search-provider-status" for call in runner.calls)
+    assert any(call[0] == "maintenance-status" for call in runner.calls)
 
     provider_resource = state.read_resource("aoa-session-memory://provider/status")
     assert provider_resource["status_mode"] == "fast_presence_probe"
@@ -1158,7 +1161,11 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
 
     assert status["graph"]["status"] == "sqlite_live_store_present"
     assert status["graph"]["sidecar_status"] == "not_exported"
-    assert status["graph"]["needs_graph_maintenance"] is True
+    assert status["graph"]["decision_source"] == "maintenance_status"
+    assert status["graph"]["maintenance_status"] == "current"
+    assert status["graph"]["needs_graph_maintenance"] is False
+    assert status["graph"]["needs_index_maintenance"] is False
+    assert status["graph"]["cached_freshness_conflicts_with_maintenance"] is True
     assert status["graph"]["freshness"]["graph_status"] == "dirty"
     assert status["graph"]["freshness"]["dirty_count"] == 7
     assert status["graph"]["freshness"]["missing_count"] == 2
