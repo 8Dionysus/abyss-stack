@@ -1430,6 +1430,32 @@ def test_generic_search_routes_agent_event_filters_to_fast_agent_route(tmp_path:
     assert "--explain" not in args
 
 
+def test_generic_search_agent_event_fast_path_honors_shard_controls(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "answer",
+        filters={
+            "doc_type": "event",
+            "agent_event": "assistant_answer",
+            "use_shards": False,
+            "max_shards": 1,
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "agent_event_route_results"
+    assert "served by MCP agent-event route fast path" in search["diagnostics"]
+    assert not any(call[0] == "search" for call in runner.calls)
+    calls = {call[0]: call[1] for call in runner.calls}
+    args = calls["agent-responses"]
+    assert args[args.index("--query") + 1] == "answer"
+    assert args[args.index("--agent-event") + 1] == "assistant_answer"
+    assert "--use-shards" not in args
+    assert "--max-shards" not in args
+
+
 def test_unscoped_agent_responses_returns_route_guidance_without_archive_scan(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
