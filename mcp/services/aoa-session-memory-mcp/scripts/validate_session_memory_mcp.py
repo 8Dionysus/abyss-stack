@@ -134,6 +134,21 @@ def _payload_count(payload: dict, key: str) -> int:
     return value if isinstance(value, int) else 0
 
 
+def _first_entity(payload: dict) -> dict:
+    entities = payload.get("entities")
+    if isinstance(entities, list) and entities and isinstance(entities[0], dict):
+        return entities[0]
+    return {}
+
+
+def _runtime_reload_required(payload: dict) -> bool | None:
+    runtime = payload.get("runtime")
+    if isinstance(runtime, dict):
+        value = runtime.get("reload_required")
+        return value if isinstance(value, bool) else None
+    return None
+
+
 def _candidate_sessions(*payloads: dict) -> list[str]:
     sessions: list[str] = []
     for payload in payloads:
@@ -201,8 +216,12 @@ def _stdio_route_count_summary(
         "tool_count": tool_count,
         "inventory_entity_count": _payload_count(inventory, "entity_count"),
         "inventory_source": inventory.get("source"),
+        "inventory_latest_session_date": _first_entity(inventory).get("latest_session_date"),
+        "inventory_runtime_reload_required": _runtime_reload_required(inventory),
         "mcp_service_inventory_layer": mcp_service_inventory.get("layer"),
         "mcp_service_inventory_requested_layer": mcp_service_inventory.get("requested_layer"),
+        "mcp_service_inventory_latest_session_date": _first_entity(mcp_service_inventory).get("latest_session_date"),
+        "mcp_service_inventory_runtime_reload_required": _runtime_reload_required(mcp_service_inventory),
         "search_alias_result_count": _payload_count(search_alias, "result_count"),
         "search_alias_projection_mode": search_alias.get("search_projection", {}).get("mode")
         if isinstance(search_alias.get("search_projection"), dict)
@@ -315,8 +334,18 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    first_inventory_entity = _first_entity(inventory)
+    if not first_inventory_entity.get("latest_session_date"):
+        raise SystemExit(f"stdio MCP entity inventory did not report latest_session_date: {inventory}")
+    if _runtime_reload_required(inventory) is not False:
+        raise SystemExit(f"stdio MCP entity inventory runtime freshness failed: {inventory.get('runtime')}")
     if mcp_service_inventory.get("requested_layer") != "mcp_service" or mcp_service_inventory.get("normalized_layer") != "mcp":
         raise SystemExit(f"stdio MCP mcp_service inventory alias contract failed: {mcp_service_inventory}")
+    first_mcp_inventory_entity = _first_entity(mcp_service_inventory)
+    if not first_mcp_inventory_entity.get("latest_session_date"):
+        raise SystemExit(f"stdio MCP mcp_service inventory did not report latest_session_date: {mcp_service_inventory}")
+    if _runtime_reload_required(mcp_service_inventory) is not False:
+        raise SystemExit(f"stdio MCP mcp_service inventory runtime freshness failed: {mcp_service_inventory.get('runtime')}")
     unsupported_alias_diagnostics = [
         item
         for item in search_alias.get("diagnostics", [])
@@ -424,6 +453,11 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 or inventory_payload.get("normalized_layer") != "mcp"
             ):
                 raise SystemExit(f"configured Codex MCP mcp_service inventory alias contract failed: {inventory_payload}")
+            configured_inventory_entity = _first_entity(inventory_payload)
+            if not configured_inventory_entity.get("latest_session_date"):
+                raise SystemExit(f"configured Codex MCP mcp_service inventory did not report latest_session_date: {inventory_payload}")
+            if _runtime_reload_required(inventory_payload) is not False:
+                raise SystemExit(f"configured Codex MCP inventory runtime freshness failed: {inventory_payload.get('runtime')}")
 
             usage_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_audit",
@@ -464,6 +498,8 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         "mcp_service_inventory_requested_layer": inventory_payload.get("requested_layer")
         if isinstance(inventory_payload, dict)
         else None,
+        "mcp_service_inventory_latest_session_date": configured_inventory_entity.get("latest_session_date"),
+        "mcp_service_inventory_runtime_reload_required": _runtime_reload_required(inventory_payload),
         "usage_alias_kind": usage_payload.get("kind") if isinstance(usage_payload, dict) else None,
         "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_payload, dict) and isinstance(retrieve_payload.get("retrieval_redirect"), dict)
@@ -596,8 +632,16 @@ def main() -> None:
                 "stdio_tool_count": stdio_smoke["tool_count"],
                 "stdio_inventory_entity_count": stdio_smoke["inventory_entity_count"],
                 "stdio_inventory_source": stdio_smoke["inventory_source"],
+                "stdio_inventory_latest_session_date": stdio_smoke["inventory_latest_session_date"],
+                "stdio_inventory_runtime_reload_required": stdio_smoke["inventory_runtime_reload_required"],
                 "stdio_mcp_service_inventory_layer": stdio_smoke["mcp_service_inventory_layer"],
                 "stdio_mcp_service_inventory_requested_layer": stdio_smoke["mcp_service_inventory_requested_layer"],
+                "stdio_mcp_service_inventory_latest_session_date": stdio_smoke[
+                    "mcp_service_inventory_latest_session_date"
+                ],
+                "stdio_mcp_service_inventory_runtime_reload_required": stdio_smoke[
+                    "mcp_service_inventory_runtime_reload_required"
+                ],
                 "stdio_search_alias_result_count": stdio_smoke["search_alias_result_count"],
                 "stdio_search_alias_projection_mode": stdio_smoke["search_alias_projection_mode"],
                 "stdio_agent_response_count": stdio_smoke["agent_response_count"],

@@ -2021,6 +2021,9 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert skill_inventory["truth_status"] == "session route-signal inventory; not runtime installed inventory"
     assert skill_inventory["source"] == "atlas"
     assert skill_inventory["mcp_access"]["read_only_inventory_route"] is True
+    assert skill_inventory["mcp_access"]["runtime_reload_required"] is False
+    assert skill_inventory["runtime"]["source_matches_loaded"] is True
+    assert skill_inventory["runtime"]["reload_required"] is False
     assert skill_inventory["provider"]["providers"]["portable_sqlite"]["freshness"]["status"] == "current"
     assert skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert skill_inventory["entities"][0]["signal_count"] == 4
@@ -2050,6 +2053,19 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     provider_calls = [args for command, args in runner.calls if command == "search-provider-status"]
     assert provider_calls
     assert all("--provider" in args for args in provider_calls)
+
+
+def test_entity_inventory_reports_runtime_reload_boundary(tmp_path: Path, monkeypatch: Any) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    state = state_with_fixture(tmp_path, FakeRunner())
+
+    monkeypatch.setattr(module, "MCP_CORE_LOADED_SHA256", "stale-loaded-code")
+
+    inventory = state.session_entity_inventory(layer="skill", limit=5)
+
+    assert inventory["runtime"]["source_matches_loaded"] is False
+    assert inventory["runtime"]["reload_required"] is True
+    assert inventory["mcp_access"]["runtime_reload_required"] is True
 
 
 def test_entity_registry_reads_generated_snapshot_without_archive_command(tmp_path: Path) -> None:

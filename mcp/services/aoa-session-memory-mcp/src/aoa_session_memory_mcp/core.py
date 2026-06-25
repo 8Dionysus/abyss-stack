@@ -3061,6 +3061,7 @@ class AoASessionMemoryMCPState:
         payload.setdefault("layer", normalized_layer)
         payload["requested_layer"] = requested_layer
         payload["normalized_layer"] = normalized_layer
+        payload["runtime"] = self.runtime_identity()
         payload["provider"] = provider
         payload["mcp_access"] = {
             "mutates": False,
@@ -3070,6 +3071,7 @@ class AoASessionMemoryMCPState:
             if isinstance(provider.get("mcp_access"), dict)
             else provider.get("full_freshness_route"),
             "authority_boundary": "MCP inventory reads generated atlas/search route indexes; raw transcript refs remain authoritative.",
+            "runtime_reload_required": payload["runtime"].get("reload_required"),
         }
 
     def session_entity_registry(
