@@ -981,6 +981,19 @@ class AoASessionMemoryMCPState:
     def _archive_command_line(self, command: str, args: list[str] | None = None) -> str:
         return shlex.join(self._archive_argv(command, args))
 
+    def _compact_portable_provider_status(self) -> dict[str, Any]:
+        args = ["--provider", "portable_sqlite"]
+        payload = self._archive_command(
+            "search-provider-status",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+        )
+        return _compact_provider_status_for_mcp(
+            payload,
+            full_freshness_route=self._archive_command_line("search-provider-status", args),
+        )
+
     def _sqlite_table_exists(self, conn: sqlite3.Connection, name: str) -> bool:
         row = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1", (name,)).fetchone()
         return row is not None
@@ -2801,6 +2814,7 @@ class AoASessionMemoryMCPState:
         query_text = str(query or "").strip()
         if query_text:
             query_text = _ensure_short_text(query_text, "query", limit=120)
+        provider = self._compact_portable_provider_status()
         atlas_inventory = self._atlas_entity_inventory(
             layer_key=layer_key,
             query_text=query_text,
@@ -2809,10 +2823,11 @@ class AoASessionMemoryMCPState:
             sample_limit=selected_sample_limit,
         )
         if atlas_inventory is not None:
+            self._annotate_entity_inventory_payload(atlas_inventory, provider=provider)
             return atlas_inventory
         db_path = self.aoa_root / "search" / "aoa-search.sqlite3"
         if not db_path.is_file():
-            return {
+            payload = {
                 "schema": "aoa_session_memory_entity_inventory_v1",
                 "ok": False,
                 "mutates": False,
@@ -2824,6 +2839,8 @@ class AoASessionMemoryMCPState:
                 "truth_status": "session route-signal inventory; not runtime installed inventory",
                 "authority_boundary": self.authority_boundary(),
             }
+            self._annotate_entity_inventory_payload(payload, provider=provider)
+            return payload
         filters = ["route_terms.layer = ?"]
         params: list[Any] = [layer_key]
         if query_text:
@@ -2904,7 +2921,7 @@ class AoASessionMemoryMCPState:
                     }
                 )
         except sqlite3.Error as exc:
-            return {
+            payload = {
                 "schema": "aoa_session_memory_entity_inventory_v1",
                 "ok": False,
                 "mutates": False,
@@ -2916,10 +2933,12 @@ class AoASessionMemoryMCPState:
                 "truth_status": "session route-signal inventory; not runtime installed inventory",
                 "authority_boundary": self.authority_boundary(),
             }
+            self._annotate_entity_inventory_payload(payload, provider=provider)
+            return payload
         finally:
             if conn is not None:
                 conn.close()
-        return {
+        payload = {
             "schema": "aoa_session_memory_entity_inventory_v1",
             "ok": True,
             "mutates": False,
@@ -2932,6 +2951,20 @@ class AoASessionMemoryMCPState:
             "diagnostics": [],
             "truth_status": "session route-signal inventory; not runtime installed inventory",
             "authority_boundary": self.authority_boundary(),
+        }
+        self._annotate_entity_inventory_payload(payload, provider=provider)
+        return payload
+
+    def _annotate_entity_inventory_payload(self, payload: dict[str, Any], *, provider: dict[str, Any]) -> None:
+        payload["provider"] = provider
+        payload["mcp_access"] = {
+            "mutates": False,
+            "archive_command": None,
+            "read_only_inventory_route": True,
+            "provider_status_route": provider.get("mcp_access", {}).get("full_freshness_route")
+            if isinstance(provider.get("mcp_access"), dict)
+            else provider.get("full_freshness_route"),
+            "authority_boundary": "MCP inventory reads generated atlas/search route indexes; raw transcript refs remain authoritative.",
         }
 
     def session_entity_registry(

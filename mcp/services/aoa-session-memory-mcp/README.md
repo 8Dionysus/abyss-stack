@@ -103,6 +103,11 @@ diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
 
+Entity inventory packets include a compact `provider` summary from
+`search-provider-status --provider portable_sqlite`, so agents can see whether
+the atlas/search read model is current before trusting skill/MCP/hook/tool/API
+inventory counts.
+
 Scoped agent-event routes such as `aoa_session_agent_responses`,
 `aoa_session_agent_closeouts`, `aoa_session_agent_progress_updates`,
 `aoa_session_agent_reasoning_windows`, and
