@@ -34,6 +34,7 @@ Resources:
 - `aoa-session-memory://surfaces`
 - `aoa-session-memory://provider/status`
 - `aoa-session-memory://maintenance/status`
+- `aoa-session-memory://projection/status`
 - `aoa-session-memory://readiness/route-layer`
 - `aoa-session-memory://diagnostics/latest/{kind}`
 - `aoa-session-memory://entities/{layer}`
@@ -76,6 +77,7 @@ Tools:
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.
 - `aoa_session_maintenance_plan()`; compatibility entry that returns the same maintenance-status route without timers.
+- `aoa_session_projection_status(include_payload)`; reads the latest `projection-catchup` diagnostic and returns its `projection_completeness` block plus current maintenance summary. It does not run `projection-catchup`; that writer route stays outside MCP.
 - `aoa_session_graph_neighborhood(anchor, kind, depth, limit)`
 - `aoa_session_graph_timeline(anchor, kind, limit)`
 - `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
@@ -149,6 +151,13 @@ agent can see which session made maintenance slow before choosing an expansion
 route. The compact status packet keeps scoped full-text shard expansion
 commands visible while leaving shard materialization and maintenance outside
 MCP.
+
+`aoa_session_projection_status()` and
+`aoa-session-memory://projection/status` are the read-only orientation route for
+post-classifier/schema catch-up. They read the latest `projection-catchup`
+diagnostic, surface the compact `projection_completeness` rows, and include the
+current maintenance summary. If that diagnostic is missing or stale, MCP returns
+the operator command to run outside MCP instead of starting catch-up itself.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

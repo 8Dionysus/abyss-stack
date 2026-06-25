@@ -94,6 +94,8 @@ aoa_session_latest_diagnostics(kind)
 aoa_session_maintenance_status(deep=false, include_timers=true, full=false)
 aoa-session-memory://maintenance/status
 aoa_session_maintenance_plan()
+aoa_session_projection_status(include_payload=false)
+aoa-session-memory://projection/status
 ```
 
 The maintenance status is read-only. It is the canonical `.aoa
@@ -104,6 +106,12 @@ auto-maintenance profiles, and `why_maintenance_long`. It can name operator
 commands that would refresh `.aoa`, but the MCP does not run them.
 `aoa_session_maintenance_plan` is retained as a compatibility entry to the same
 status route.
+
+Projection catch-up is intentionally split. MCP may read the latest
+`projection-catchup` diagnostic and expose its `projection_completeness` rows,
+but MCP does not run `projection-catchup`, because even a plan path participates
+in the maintenance coordinator. The write route remains an explicit operator
+command outside MCP.
 
 The status path is intentionally cheap. By default it uses a fast presence probe
 over the fixed portable SQLite search read model and does not run global

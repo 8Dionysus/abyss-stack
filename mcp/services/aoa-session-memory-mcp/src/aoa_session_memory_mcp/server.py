@@ -375,6 +375,11 @@ def build_server(
         return current_state().maintenance_plan()
 
     @mcp.tool()
+    def aoa_session_projection_status(include_payload: bool = False) -> dict[str, Any]:
+        """Read the latest projection-catchup completeness diagnostic without running maintenance."""
+        return current_state().session_projection_status(include_payload=include_payload)
+
+    @mcp.tool()
     def aoa_session_graph_neighborhood(anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
         """Return graph nodes, edges, evidence refs, and freshness around an operational anchor."""
         return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit)
@@ -466,6 +471,10 @@ def build_server(
     @mcp.resource("aoa-session-memory://maintenance/status")
     def maintenance_status_resource() -> str:
         return json.dumps(current_state().read_resource("aoa-session-memory://maintenance/status"), ensure_ascii=False, indent=2)
+
+    @mcp.resource("aoa-session-memory://projection/status")
+    def projection_status_resource() -> str:
+        return json.dumps(current_state().read_resource("aoa-session-memory://projection/status"), ensure_ascii=False, indent=2)
 
     @mcp.resource("aoa-session-memory://readiness/route-layer")
     def readiness_resource() -> str:

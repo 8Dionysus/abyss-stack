@@ -344,6 +344,40 @@ def seed_archive(root: Path) -> Path:
             "remaining": [],
         },
     )
+    write_json(
+        aoa / "diagnostics/20260526T000100Z__projection-catchup-catchup.json",
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_projection_catchup",
+            "generated_at": "2026-05-26T00:01:00Z",
+            "ok": True,
+            "status": "nothing_to_do",
+            "mutates": False,
+            "apply": False,
+            "profile": "catchup",
+            "projection_completeness": {
+                "schema_version": 1,
+                "artifact_type": "session_memory_projection_completeness",
+                "status": "current",
+                "plan_only": True,
+                "actionable_surface_ids": [],
+                "deferred_surface_ids": [],
+                "surfaces": {
+                    "search_index": {"status": "current", "needs_maintenance": False},
+                    "search_shards": {"status": "current", "needs_maintenance": False},
+                    "atlas": {"status": "current", "needs_maintenance": False},
+                    "entity_registry": {"status": "current", "needs_maintenance": False, "entity_count": 12},
+                    "graph": {"status": "current", "needs_maintenance": False},
+                    "live_tail": {"status": "current", "needs_maintenance": False},
+                },
+            },
+            "next_route": {
+                "id": "verify_projection_status",
+                "status": "ready",
+                "command": ["python3", "scripts/aoa_session_memory.py", "maintenance-status", "--no-timers"],
+            },
+        },
+    )
     return aoa
 
 
@@ -1400,6 +1434,59 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert "--no-timers" in [arg for command, args in state.command_runner.calls if command == "maintenance-status" for arg in args]
 
 
+def test_projection_status_reads_latest_completeness_without_running_catchup(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    status = state.session_projection_status()
+
+    assert status["schema"] == "aoa_session_memory_projection_status_v1"
+    assert status["ok"] is True
+    assert status["mutates"] is False
+    assert status["source"] == "latest_projection_catchup_diagnostic"
+    assert status["projection_completeness"]["status"] == "current"
+    assert status["projection_completeness"]["surfaces"]["entity_registry"]["entity_count"] == 12
+    assert status["next_operator_route"]["id"] == "verify_projection_status"
+    assert status["mcp_access"]["archive_command"] is None
+    assert status["mcp_access"]["does_not_run_projection_catchup"] is True
+    assert any(call[0] == "maintenance-status" for call in runner.calls)
+    assert not any(call[0] == "projection-catchup" for call in runner.calls)
+
+    resource = state.read_resource("aoa-session-memory://projection/status")
+    assert resource["projection_completeness"]["surfaces"]["search_index"]["status"] == "current"
+
+
+def test_projection_status_flags_legacy_completeness_diagnostic(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    write_json(
+        aoa / "diagnostics/20260526T000200Z__projection-catchup-catchup.json",
+        {
+            "artifact_type": "session_memory_projection_catchup",
+            "ok": True,
+            "completeness_check": {
+                "freshness_before_after": True,
+                "schema_classifier_dirty_detection": "legacy string-only status",
+            },
+        },
+    )
+    runner = FakeRunner()
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=runner,
+        timeout_seconds=2,
+    )
+
+    status = state.session_projection_status()
+
+    assert status["ok"] is False
+    assert status["source"] == "legacy_projection_catchup_diagnostic"
+    assert status["next_operator_route"]["id"] == "run_projection_catchup_outside_mcp"
+    assert "projection_completeness_missing_or_legacy" in status["diagnostics"]
+    assert not any(call[0] == "projection-catchup" for call in runner.calls)
+
+
 def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -2057,6 +2144,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"kind": "agent_event", "outcome_event_count": 2},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
         {"recommendation": "use_graph_search"},
+        {"ok": True, "projection_completeness": {"status": "current"}},
         tool_count=30,
     )
 
@@ -2147,9 +2235,11 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
     assert "aoa_session_entity_registry" in tools
+    assert "aoa_session_projection_status" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
+    assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]["default"] == "recent"
 
@@ -2767,7 +2857,9 @@ def test_read_resource_and_server_build(tmp_path: Path) -> None:
     state = state_with_fixture(tmp_path)
     resource = state.read_resource("aoa-session-memory://route/mcp/aoa-session-memory-mcp")
     graph_resource = state.read_resource("aoa-session-memory://graph/neighborhood/aoa-session-memory-mcp")
+    projection_resource = state.read_resource("aoa-session-memory://projection/status")
 
     assert resource["match_count"] == 1
     assert graph_resource["artifact_type"] == "session_memory_graph_neighborhood"
+    assert projection_resource["schema"] == "aoa_session_memory_projection_status_v1"
     assert build_server(workspace_root=tmp_path, aoa_root=tmp_path / ".aoa", script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py") is not None
