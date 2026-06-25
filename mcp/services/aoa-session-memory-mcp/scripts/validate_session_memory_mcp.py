@@ -149,6 +149,38 @@ def _runtime_reload_required(payload: dict) -> bool | None:
     return None
 
 
+def _assert_bounded_inventory_packet(payload: dict, label: str, *, max_chars: int = 24000) -> None:
+    route_packet = payload.get("route_packet") if isinstance(payload.get("route_packet"), dict) else {}
+    response_profile = payload.get("response_profile") if isinstance(payload.get("response_profile"), dict) else {}
+    if route_packet.get("bounded") is not True:
+        raise SystemExit(f"{label} inventory missing bounded route_packet: {payload}")
+    if response_profile.get("bounded_mcp_packet") is not True:
+        raise SystemExit(f"{label} inventory missing bounded response_profile: {payload}")
+    sample_budget = response_profile.get("sample_budget")
+    sample_count = response_profile.get("sample_count")
+    if not isinstance(sample_budget, int) or not isinstance(sample_count, int) or sample_count > sample_budget:
+        raise SystemExit(f"{label} inventory sample budget contract failed: {response_profile}")
+    if response_profile.get("raw_text_loaded") is not False or response_profile.get("entry_payloads_loaded") is not False:
+        raise SystemExit(f"{label} inventory loaded heavy payloads on MCP route: {response_profile}")
+    if not payload.get("next_expansion"):
+        raise SystemExit(f"{label} inventory missing explicit next expansion route")
+    serialized = json.dumps(payload, ensure_ascii=False)
+    if len(serialized) > max_chars:
+        raise SystemExit(f"{label} inventory response is too large for bounded MCP route: {len(serialized)} > {max_chars}")
+    for entity in payload.get("entities", []):
+        if not isinstance(entity, dict):
+            continue
+        for sample in entity.get("samples", []):
+            if not isinstance(sample, dict):
+                continue
+            refs = sample.get("refs") if isinstance(sample.get("refs"), dict) else {}
+            heavy_refs = sorted({"atlas_entry", "atlas_markdown", "segment_index", "session"} & set(refs))
+            if heavy_refs:
+                raise SystemExit(f"{label} inventory sample carried heavy refs {heavy_refs}: {sample}")
+            if "doc_id" in sample or "title" in sample:
+                raise SystemExit(f"{label} inventory sample carried heavy display fields: {sample}")
+
+
 def _candidate_sessions(*payloads: dict) -> list[str]:
     sessions: list[str] = []
     for payload in payloads:
@@ -218,10 +250,19 @@ def _stdio_route_count_summary(
         "inventory_source": inventory.get("source"),
         "inventory_latest_session_date": _first_entity(inventory).get("latest_session_date"),
         "inventory_runtime_reload_required": _runtime_reload_required(inventory),
+        "inventory_sample_count": inventory.get("response_profile", {}).get("sample_count")
+        if isinstance(inventory.get("response_profile"), dict)
+        else None,
+        "inventory_sample_omitted_count": inventory.get("response_profile", {}).get("sample_omitted_count")
+        if isinstance(inventory.get("response_profile"), dict)
+        else None,
         "mcp_service_inventory_layer": mcp_service_inventory.get("layer"),
         "mcp_service_inventory_requested_layer": mcp_service_inventory.get("requested_layer"),
         "mcp_service_inventory_latest_session_date": _first_entity(mcp_service_inventory).get("latest_session_date"),
         "mcp_service_inventory_runtime_reload_required": _runtime_reload_required(mcp_service_inventory),
+        "mcp_service_inventory_sample_count": mcp_service_inventory.get("response_profile", {}).get("sample_count")
+        if isinstance(mcp_service_inventory.get("response_profile"), dict)
+        else None,
         "search_alias_result_count": _payload_count(search_alias, "result_count"),
         "search_alias_projection_mode": search_alias.get("search_projection", {}).get("mode")
         if isinstance(search_alias.get("search_projection"), dict)
@@ -289,11 +330,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
             inventory = await call_json(
                 "aoa_session_entity_inventory",
-                {"layer": "skill", "limit": 5, "sample_limit": 0},
+                {"layer": "skill", "query": "aoa-session-memory", "limit": 8, "sample_limit": 3},
             )
             mcp_service_inventory = await call_json(
                 "aoa_session_entity_inventory",
-                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 5, "sample_limit": 0},
+                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 5, "sample_limit": 3},
             )
             search_alias = await call_json(
                 "aoa_session_search",
@@ -334,6 +375,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
     if inventory.get("entity_count", 0) <= 0:
         raise SystemExit(f"stdio MCP entity inventory returned no entities: {inventory.get('diagnostics')}")
+    _assert_bounded_inventory_packet(inventory, "stdio MCP skill")
     first_inventory_entity = _first_entity(inventory)
     if not first_inventory_entity.get("latest_session_date"):
         raise SystemExit(f"stdio MCP entity inventory did not report latest_session_date: {inventory}")
@@ -341,6 +383,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP entity inventory runtime freshness failed: {inventory.get('runtime')}")
     if mcp_service_inventory.get("requested_layer") != "mcp_service" or mcp_service_inventory.get("normalized_layer") != "mcp":
         raise SystemExit(f"stdio MCP mcp_service inventory alias contract failed: {mcp_service_inventory}")
+    _assert_bounded_inventory_packet(mcp_service_inventory, "stdio MCP mcp_service")
     first_mcp_inventory_entity = _first_entity(mcp_service_inventory)
     if not first_mcp_inventory_entity.get("latest_session_date"):
         raise SystemExit(f"stdio MCP mcp_service inventory did not report latest_session_date: {mcp_service_inventory}")
@@ -441,7 +484,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
 
             inventory_result = await mcp_session.call_tool(
                 "aoa_session_entity_inventory",
-                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 3, "sample_limit": 0},
+                {"layer": "mcp_service", "query": "aoa-session-memory", "limit": 3, "sample_limit": 3},
                 read_timeout_seconds=timedelta(seconds=20),
             )
             if inventory_result.isError or not inventory_result.content:
@@ -458,6 +501,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 raise SystemExit(f"configured Codex MCP mcp_service inventory did not report latest_session_date: {inventory_payload}")
             if _runtime_reload_required(inventory_payload) is not False:
                 raise SystemExit(f"configured Codex MCP inventory runtime freshness failed: {inventory_payload.get('runtime')}")
+            _assert_bounded_inventory_packet(inventory_payload, "configured Codex MCP mcp_service")
 
             usage_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_audit",
@@ -500,6 +544,9 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         else None,
         "mcp_service_inventory_latest_session_date": configured_inventory_entity.get("latest_session_date"),
         "mcp_service_inventory_runtime_reload_required": _runtime_reload_required(inventory_payload),
+        "mcp_service_inventory_sample_count": inventory_payload.get("response_profile", {}).get("sample_count")
+        if isinstance(inventory_payload.get("response_profile"), dict)
+        else None,
         "usage_alias_kind": usage_payload.get("kind") if isinstance(usage_payload, dict) else None,
         "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_payload, dict) and isinstance(retrieve_payload.get("retrieval_redirect"), dict)
@@ -634,6 +681,8 @@ def main() -> None:
                 "stdio_inventory_source": stdio_smoke["inventory_source"],
                 "stdio_inventory_latest_session_date": stdio_smoke["inventory_latest_session_date"],
                 "stdio_inventory_runtime_reload_required": stdio_smoke["inventory_runtime_reload_required"],
+                "stdio_inventory_sample_count": stdio_smoke["inventory_sample_count"],
+                "stdio_inventory_sample_omitted_count": stdio_smoke["inventory_sample_omitted_count"],
                 "stdio_mcp_service_inventory_layer": stdio_smoke["mcp_service_inventory_layer"],
                 "stdio_mcp_service_inventory_requested_layer": stdio_smoke["mcp_service_inventory_requested_layer"],
                 "stdio_mcp_service_inventory_latest_session_date": stdio_smoke[
@@ -642,6 +691,7 @@ def main() -> None:
                 "stdio_mcp_service_inventory_runtime_reload_required": stdio_smoke[
                     "mcp_service_inventory_runtime_reload_required"
                 ],
+                "stdio_mcp_service_inventory_sample_count": stdio_smoke["mcp_service_inventory_sample_count"],
                 "stdio_search_alias_result_count": stdio_smoke["search_alias_result_count"],
                 "stdio_search_alias_projection_mode": stdio_smoke["search_alias_projection_mode"],
                 "stdio_agent_response_count": stdio_smoke["agent_response_count"],
