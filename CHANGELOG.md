@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Runtime config artifact validation now promotes release-ready evidence through
+  the OS Abyss registry, materializes subject-store evidence under ignored
+  `dist/`, and requires a fail-closed runtime trust-gate allow verdict before
+  exposing a latest bundle read-model.
 - Release validation now renders the public-safe `substrate` config as an OS
   Abyss artifact bundle and verifies ABI, SBOM, SLSA/in-toto, and
   signature-decision sidecars through `abyss-machine`.
