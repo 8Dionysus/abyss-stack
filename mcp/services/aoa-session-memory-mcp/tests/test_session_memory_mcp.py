@@ -451,14 +451,40 @@ MAINTENANCE_STATUS = {
             "documents_per_second": 535.92,
             "budget_exhausted": False,
         },
-        "search_shards": {
-            "status": "current",
-            "shard_count": 3,
-            "materialized_shard_count": 3,
-            "raw_text_query_route": "structured shards use monolith fallback for raw-text queries unless materialized with --full-text",
-            "fast_path_defaults": {
-                "agent_event_routes": {
-                    "default_use_shards": True,
+            "search_shards": {
+                "status": "current",
+                "shard_count": 3,
+                "materialized_shard_count": 3,
+                "raw_text_query_route": "structured shards use monolith fallback for raw-text queries unless materialized with --full-text",
+                "latest_materialization": {
+                    "exists": True,
+                    "ok": True,
+                    "status": "current",
+                    "target": "2026-06-01__001__что-сейчас-грузит-процессор",
+                    "processed_count": 1,
+                    "document_count": 3426,
+                    "elapsed_ms": 12612,
+                    "documents_per_second": 271.65,
+                    "sessions_per_second": 0.079,
+                    "slow_session_warning_count": 0,
+                    "slow_session_threshold_ms": 30000,
+                    "slow_sessions": [
+                        {
+                            "shard": "month/2026-06",
+                            "session_id": "019e80e6-9c6f-7600-8e46-cc87b4482a41",
+                            "session_label": "2026-06-01__001__что-сейчас-грузит-процессор",
+                            "status": "indexed",
+                            "raw_text_status": "skipped_structured_projection",
+                            "document_count": 3426,
+                            "elapsed_ms": 1102,
+                            "documents_per_second": 3108.89,
+                            "warning": False,
+                        }
+                    ],
+                },
+                "fast_path_defaults": {
+                    "agent_event_routes": {
+                        "default_use_shards": True,
                     "default_projection": "materialized_shard_fanout",
                     "raw_text_query_projection": "monolith_fallback",
                     "raw_text_fallback_dependency_status": "monolith_required_for_raw_text_query",
@@ -1245,6 +1271,10 @@ def test_status_reads_provider_atlas_and_latest_diagnostics(tmp_path: Path) -> N
     assert status["maintenance_status"]["source"] == "maintenance-status"
     assert status["maintenance_status"]["agent_route"]["action"] == "use_graph_search_for_stable_archive_wait_for_recent_live"
     assert status["maintenance_status"]["search_shards"]["status"] == "current"
+    latest_materialization = status["maintenance_status"]["search_shards"]["latest_materialization"]
+    assert latest_materialization["target"] == "2026-06-01__001__что-сейчас-грузит-процессор"
+    assert latest_materialization["slow_sessions"][0]["session_label"] == "2026-06-01__001__что-сейчас-грузит-процессор"
+    assert latest_materialization["slow_sessions"][0]["raw_text_status"] == "skipped_structured_projection"
     assert (
         status["maintenance_status"]["search_shards"]["fast_path_defaults"]["agent_event_routes"][
             "raw_text_fallback_dependency_status"

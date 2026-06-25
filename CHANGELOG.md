@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` compact status now preserves the latest
+  search-shard materialization timings and bounded slow-session samples, so
+  agents can see which real session made maintenance slow without opening the
+  full `.aoa` report.
 - `aoa-session-memory-mcp` compact status now preserves `.aoa` search-shard
   raw-text fallback dependency signals, including blocked shard counts and
   scoped full-text expansion commands, so agents can choose the right bounded
