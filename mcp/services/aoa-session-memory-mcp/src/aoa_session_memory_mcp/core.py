@@ -4014,9 +4014,40 @@ class AoASessionMemoryMCPState:
             str(display.get("label") or item.get("session_id") or ""),
         )
 
-    def _session_recency_key(self, item: dict[str, Any]) -> tuple[str, int, str]:
+    def _session_activity_mtime(self, item: dict[str, Any]) -> float:
+        raw = item.get("raw") if isinstance(item.get("raw"), dict) else {}
+        candidates = [
+            item.get("transcript_path"),
+            raw.get("source_path"),
+            raw.get("path"),
+        ]
+        session_path = self._session_path_from_registry(item)
+        if session_path is not None:
+            manifest = _read_json(session_path / "session.manifest.json")
+            manifest = manifest if isinstance(manifest, dict) else {}
+            manifest_raw = manifest.get("raw") if isinstance(manifest.get("raw"), dict) else {}
+            candidates.extend(
+                [
+                    manifest.get("transcript_path"),
+                    manifest_raw.get("source_path"),
+                    manifest_raw.get("path"),
+                ]
+            )
+        newest = 0.0
+        for candidate in candidates:
+            if not candidate:
+                continue
+            try:
+                path = Path(str(candidate)).expanduser()
+                if path.is_file():
+                    newest = max(newest, path.stat().st_mtime)
+            except OSError:
+                continue
+        return newest
+
+    def _session_recency_key(self, item: dict[str, Any]) -> tuple[float, str, int, str]:
         date, sequence, label = self._session_sort_key(item)
-        return (str(item.get("updated_at") or date), sequence, label)
+        return (self._session_activity_mtime(item), str(item.get("updated_at") or date), sequence, label)
 
     def _session_path_from_registry(self, item: dict[str, Any]) -> Path | None:
         display = item.get("display") if isinstance(item.get("display"), dict) else {}

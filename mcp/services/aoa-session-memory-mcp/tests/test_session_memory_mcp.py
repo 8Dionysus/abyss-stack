@@ -1055,10 +1055,98 @@ def test_latest_session_resolution_uses_registry_updated_at(tmp_path: Path) -> N
     assert brief["session"]["session_id"] == "session-1"
 
 
+def test_latest_session_resolution_prefers_live_transcript_activity(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    registry_path = aoa / "session-registry.json"
+    active_dir = aoa / "sessions/2026-06-04__003__active-long-session"
+    raw_unavailable_dir = aoa / "sessions/2026-06-25__001__raw-unavailable-latest"
+    transcript = tmp_path / "rollout-2026-06-04T10-48-00-active.jsonl"
+    raw_path = active_dir / "raw/session.raw.jsonl"
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_text('{"type":"session_meta"}\n', encoding="utf-8")
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path.write_text('{"type":"session_meta"}\n', encoding="utf-8")
+    os.utime(transcript, (200.0, 200.0))
+    os.utime(raw_path, (150.0, 150.0))
+    active_dir.mkdir(parents=True, exist_ok=True)
+    raw_unavailable_dir.mkdir(parents=True, exist_ok=True)
+    write_json(
+        active_dir / "session.manifest.json",
+        {
+            "session_id": "active-long-session",
+            "session_label": active_dir.name,
+            "session_title": "Active long session",
+            "archive_status": "indexed",
+            "raw": {
+                "path": raw_path.as_posix(),
+                "source_path": transcript.as_posix(),
+            },
+        },
+    )
+    write_json(
+        raw_unavailable_dir / "session.manifest.json",
+        {
+            "session_id": "raw-unavailable-latest",
+            "session_label": raw_unavailable_dir.name,
+            "session_title": "Raw unavailable latest",
+            "archive_status": "raw_unavailable",
+            "raw": {"path": None, "source_path": None},
+        },
+    )
+    write_json(
+        registry_path,
+        {
+            "sessions": [
+                {
+                    "session_id": "active-long-session",
+                    "display": {
+                        "date": "2026-06-04",
+                        "sequence": 3,
+                        "label": active_dir.name,
+                        "title": "Active long session",
+                        "path": active_dir.as_posix(),
+                    },
+                    "raw": {
+                        "path": raw_path.as_posix(),
+                        "source_path": transcript.as_posix(),
+                    },
+                },
+                {
+                    "session_id": "raw-unavailable-latest",
+                    "display": {
+                        "date": "2026-06-25",
+                        "sequence": 1,
+                        "label": raw_unavailable_dir.name,
+                        "title": "Raw unavailable latest",
+                        "path": raw_unavailable_dir.as_posix(),
+                    },
+                    "raw": {"path": None, "source_path": None},
+                },
+            ]
+        },
+    )
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=FakeRunner(),
+        timeout_seconds=2,
+    )
+
+    brief = state.session_brief("latest", max_segments=1)
+
+    assert brief["ok"] is True
+    assert brief["session"]["session_id"] == "active-long-session"
+
+
 def test_latest_session_resolution_falls_back_to_registry_date_sequence(tmp_path: Path) -> None:
     aoa = seed_archive(tmp_path)
     registry_path = aoa / "session-registry.json"
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    base_manifest_path = aoa / "sessions/2026-05-26__001__session-memory-mcp/session.manifest.json"
+    base_manifest = json.loads(base_manifest_path.read_text(encoding="utf-8"))
+    base_manifest["raw"] = {"path": None, "source_path": None}
+    write_json(base_manifest_path, base_manifest)
     fallback_latest = aoa / "sessions/2026-06-13__005__fallback-latest"
     fallback_latest.mkdir(parents=True)
     write_json(
