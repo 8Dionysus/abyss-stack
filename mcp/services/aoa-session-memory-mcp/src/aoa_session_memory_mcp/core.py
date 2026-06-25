@@ -1348,6 +1348,13 @@ class AoASessionMemoryMCPState:
             limit=limit,
             provider=str(filters.get("provider") or "portable_sqlite"),
             explain=_as_bool(filters.get("explain"), default=False),
+            use_shards=_as_bool(filters.get("use_shards"), default=True),
+            max_shards=_coerce_bounded_int(
+                filters.get("max_shards"),
+                DEFAULT_SEARCH_MAX_SHARDS,
+                1,
+                DEFAULT_SEARCH_MAX_SHARDS,
+            ),
         )
         payload.setdefault("diagnostics", []).extend(
             [*diagnostics, "served by MCP agent-event route fast path"]
@@ -1366,6 +1373,8 @@ class AoASessionMemoryMCPState:
         limit: int = 20,
         provider: str = "portable_sqlite",
         explain: bool = True,
+        use_shards: bool = True,
+        max_shards: int = DEFAULT_SEARCH_MAX_SHARDS,
     ) -> dict[str, Any]:
         text = str(query or "").strip()
         if text:
@@ -1410,10 +1419,15 @@ class AoASessionMemoryMCPState:
             str(_coerce_limit(limit, 20, 100)),
             "--provider",
             _safe_selector(provider, "provider", limit=64),
-            "--use-shards",
-            "--max-shards",
-            str(DEFAULT_SEARCH_MAX_SHARDS),
         ]
+        if use_shards:
+            args.extend(
+                [
+                    "--use-shards",
+                    "--max-shards",
+                    str(_coerce_bounded_int(max_shards, DEFAULT_SEARCH_MAX_SHARDS, 1, DEFAULT_SEARCH_MAX_SHARDS)),
+                ]
+            )
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         if episode:
