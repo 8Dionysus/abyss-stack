@@ -143,9 +143,12 @@ live catch-up, run operator maintenance outside MCP, or escalate to raw/deep
 checks. When `.aoa` provides an `operations` summary, MCP preserves warnings,
 latest search-index timings, recent problem jobs, last successful
 auto-maintenance profiles, `why_maintenance_long` evidence, and compact
-search-shard raw-text fallback dependency signals. The compact status packet
-keeps scoped full-text shard expansion commands visible while leaving shard
-materialization and maintenance outside MCP.
+search-shard raw-text fallback dependency signals. It also keeps the latest
+search-shard materialization timings and bounded `slow_sessions` samples so an
+agent can see which session made maintenance slow before choosing an expansion
+route. The compact status packet keeps scoped full-text shard expansion
+commands visible while leaving shard materialization and maintenance outside
+MCP.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

@@ -3752,6 +3752,16 @@ class AoASessionMemoryMCPState:
             if isinstance(fast_path_defaults.get("agent_event_routes"), dict)
             else {}
         )
+        latest_materialization = (
+            search_shards.get("latest_materialization")
+            if isinstance(search_shards.get("latest_materialization"), dict)
+            else {}
+        )
+        latest_slow_sessions = (
+            latest_materialization.get("slow_sessions")
+            if isinstance(latest_materialization.get("slow_sessions"), list)
+            else []
+        )
         return {
             "ok": bool(payload.get("ok")),
             "source": "maintenance-status",
@@ -3792,6 +3802,39 @@ class AoASessionMemoryMCPState:
                 "shard_count": search_shards.get("shard_count"),
                 "materialized_shard_count": search_shards.get("materialized_shard_count"),
                 "raw_text_query_route": search_shards.get("raw_text_query_route"),
+                "latest_materialization": {
+                    "exists": latest_materialization.get("exists"),
+                    "ok": latest_materialization.get("ok"),
+                    "status": latest_materialization.get("status"),
+                    "target": latest_materialization.get("target"),
+                    "requested_shard": latest_materialization.get("requested_shard"),
+                    "processed_count": latest_materialization.get("processed_count"),
+                    "document_count": latest_materialization.get("document_count"),
+                    "elapsed_ms": latest_materialization.get("elapsed_ms"),
+                    "documents_per_second": latest_materialization.get("documents_per_second"),
+                    "sessions_per_second": latest_materialization.get("sessions_per_second"),
+                    "slow_session_warning_count": latest_materialization.get("slow_session_warning_count"),
+                    "slow_session_threshold_ms": latest_materialization.get("slow_session_threshold_ms"),
+                    "slow_sessions": [
+                        {
+                            key: item.get(key)
+                            for key in (
+                                "shard",
+                                "session_id",
+                                "session_label",
+                                "status",
+                                "raw_text_status",
+                                "document_count",
+                                "elapsed_ms",
+                                "documents_per_second",
+                                "warning",
+                            )
+                            if isinstance(item, dict) and key in item
+                        }
+                        for item in latest_slow_sessions[:4]
+                        if isinstance(item, dict)
+                    ],
+                },
                 "fast_path_defaults": {
                     "agent_event_routes": {
                         "default_use_shards": agent_event_fast_path.get("default_use_shards"),
