@@ -350,9 +350,32 @@ def seed_archive(root: Path) -> Path:
 PROVIDER_STATUS = {
     "schema_version": 1,
     "artifact_type": "search_provider_status",
+    "provider_schema_version": 1,
     "ok": True,
     "default_provider": "portable_sqlite",
-    "providers": {"portable_sqlite": {"ok": True, "status": "ready", "document_count": 10}},
+    "selected_provider": "portable_sqlite",
+    "freshness_mode": "hot",
+    "authority_law": ".aoa owns schemas, raw refs, segment refs, and freshness.",
+    "providers": {
+        "portable_sqlite": {
+            "provider": "portable_sqlite",
+            "ok": True,
+            "status": "ready",
+            "document_count": 10,
+            "search_schema_version": "13",
+            "has_documents": True,
+            "has_route_index": True,
+            "has_route_terms": True,
+            "freshness": {
+                "status": "current",
+                "checked": True,
+                "mode": "hot_persisted_state",
+                "dirty_session_count": 0,
+                "dirty_session_ids": [],
+                "dirty_sessions": [],
+            },
+        }
+    },
 }
 
 ROUTE_READINESS_FAST_GATE = {
@@ -1888,7 +1911,8 @@ def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Pa
 
 
 def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: Path) -> None:
-    state = state_with_fixture(tmp_path)
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
 
     skill_inventory = state.session_entity_inventory(layer="skill", limit=5)
     latest_skill_inventory = state.session_entity_inventory(layer="skill", session="latest", limit=5)
@@ -1903,6 +1927,8 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
 
     assert skill_inventory["truth_status"] == "session route-signal inventory; not runtime installed inventory"
     assert skill_inventory["source"] == "atlas"
+    assert skill_inventory["mcp_access"]["read_only_inventory_route"] is True
+    assert skill_inventory["provider"]["providers"]["portable_sqlite"]["freshness"]["status"] == "current"
     assert skill_inventory["entities"][0]["key"] == "aoa_decision"
     assert skill_inventory["entities"][0]["signal_count"] == 4
     assert skill_inventory["entities"][0]["latest_session_date"] == "2026-05-26"
@@ -1918,11 +1944,15 @@ def test_entity_inventory_prefers_atlas_and_falls_back_to_route_terms(tmp_path: 
     assert mcp_service_inventory["source"] == "atlas"
     assert mcp_service_inventory["entities"] == mcp_inventory["entities"]
     assert eval_inventory["source"] == "portable_sqlite"
+    assert eval_inventory["provider"]["providers"]["portable_sqlite"]["freshness"]["status"] == "current"
     assert eval_inventory["entities"][0]["key"] == "inspect_ai"
     assert git_inventory["entities"][0]["key"] == "git"
     assert playbook_inventory["entities"][0]["key"] == "session_audit"
     assert technique_inventory["entities"][0]["key"] == "entity_routing"
     assert mechanic_inventory["entities"][0]["key"] == "route_maintenance"
+    provider_calls = [args for command, args in runner.calls if command == "search-provider-status"]
+    assert provider_calls
+    assert all("--provider" in args for args in provider_calls)
 
 
 def test_entity_registry_reads_generated_snapshot_without_archive_command(tmp_path: Path) -> None:

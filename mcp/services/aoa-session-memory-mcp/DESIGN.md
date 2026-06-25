@@ -52,6 +52,9 @@ The generated entity registry is a hot navigation read model. MCP reads
 inventory. Refreshing or rebuilding that registry remains an explicit `.aoa`
 operator route outside MCP, because source-surface scans can be materially
 slower than an agent health probe.
+Inventory packets also carry a compact portable SQLite provider summary. This
+keeps entity counts tied to search/atlas freshness without making MCP run
+maintenance or promote the generated atlas to archive truth.
 
 Session-level tracing is the default live probe because `.aoa` archives can be
 large. Event-level tracing remains available through an explicit
