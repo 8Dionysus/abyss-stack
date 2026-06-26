@@ -31,6 +31,23 @@ The manifest records source commit when available, generated time, required
 files, compact counts, and file digests. It is freshness evidence only; the
 mirror remains a read cache below `aoa-evals` source truth.
 
+Freshness is checked with:
+
+```bash
+scripts/aoa-sync-federation-surfaces --check --json --layer aoa-evals
+```
+
+When the source checkout `HEAD` differs from the manifest
+`source_git_commit`, the check returns `status:"stale"` and exits non-zero.
+Operator-side maintenance may repair that explicit stale state with:
+
+```bash
+scripts/aoa-sync-federation-surfaces --check --sync-if-stale --json --layer aoa-evals
+```
+
+This keeps MCP/read surfaces from mutating owner mirrors while still giving
+post-landing automation a safe refresh path.
+
 The current allowlist includes:
 - selected docs such as `TRACE_EVAL_BRIDGE.md` and `RUNTIME_BENCH_PROMOTION_GUIDE.md`
 - generated eval catalog, capsules, sections, comparison spine, and report index surfaces
