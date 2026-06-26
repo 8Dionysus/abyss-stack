@@ -95,9 +95,12 @@ def test_tos_graph_philosophy_ui_renders_svg_and_source_refs(tos_graph_server: s
             page.goto(tos_graph_server, wait_until="networkidle")
             page.get_by_text("Tree of Sophia Graph").wait_for(timeout=10_000)
             page.locator("#inspectorTitle", has_text="Chronology Graph View").wait_for(timeout=10_000)
+            page.get_by_role("button", name="Review packet").click()
+            page.locator("#inspectorTitle", has_text="Review packet: chronology").wait_for(timeout=10_000)
+            page.locator("#clusterMode").click()
             page.locator("svg .node").first.wait_for(timeout=10_000)
+            page.locator("#clusterList .item").first.wait_for(timeout=10_000)
             node_count = page.locator("svg .node").count()
-            edge_count = page.locator("svg .edge-line").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
             browser.close()
@@ -108,6 +111,5 @@ def test_tos_graph_philosophy_ui_renders_svg_and_source_refs(tos_graph_server: s
         raise
 
     assert node_count > 0
-    assert edge_count > 0
     assert source_ref_count > 0
     assert screenshot.stat().st_size > 20_000

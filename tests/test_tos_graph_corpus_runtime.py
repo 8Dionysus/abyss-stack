@@ -136,6 +136,69 @@ def write_philosophy_projection(root: Path) -> Path:
         "source_ref": "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
         "properties": {},
     }
+    cluster = {
+        "cluster_id": "cluster:region:test",
+        "cluster_kind": "region",
+        "label": "Region: West Asia",
+        "member_key": "properties.source_section",
+        "member_value": "West Asia",
+        "member_node_ids": ["atlas-row:A01", "dossier:A01"],
+        "member_edge_ids": ["edge:row:A01:has-dossier:A01"],
+        "view_ids": ["chronology"],
+        "graph_layers": ["historical-relation"],
+        "source_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+        "source_refs": [
+            "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+            "ToS/philosophy/dossiers/A01.md",
+        ],
+        "properties": {"review_use": "group by region"},
+    }
+    review_packet = {
+        "packet_id": "review-packet:chronology",
+        "view_id": "chronology",
+        "review_intent": "Review chronology without canonizing dates.",
+        "active_filters": {"node_types": ["atlas-row"]},
+        "counts": {
+            "nodes": 2,
+            "edges": 1,
+            "source_refs": 2,
+            "clusters": 1,
+            "weak_source_refs": 0,
+            "unresolved_diagnostics": 0,
+            "suspicious_dense_hubs": 0,
+            "isolated_nodes": 0,
+        },
+        "layer_counts": [
+            {
+                "layer_id": "historical-relation",
+                "node_count": 2,
+                "edge_count": 1,
+                "cluster_count": 1,
+                "source_ref_count": 2,
+            }
+        ],
+        "cluster_summaries": [
+            {
+                "cluster_id": "cluster:region:test",
+                "cluster_kind": "region",
+                "label": "Region: West Asia",
+                "node_count": 2,
+                "edge_count": 1,
+                "source_ref_count": 2,
+            }
+        ],
+        "weak_source_refs": [],
+        "unresolved_diagnostics": [],
+        "suspicious_dense_hubs": [],
+        "isolated_nodes": [],
+        "candidate_to_canon_pressure": {"C": 1},
+        "changed_subgraph": {"available": False, "reason": "test fixture"},
+        "recommended_human_review_route": "ToS/philosophy/graph-workbench/views/chronology.graph.md",
+        "source_refs": [
+            "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+            "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
+        ],
+    }
     payload = {
         "schema_version": "tos_philosophy_graph_projection_v1",
         "schema_ref": "ToS/contracts/philosophy-graph-projection.schema.json",
@@ -145,6 +208,9 @@ def write_philosophy_projection(root: Path) -> Path:
             "atlas_projection_ref": "ToS/derived-exports/philosophy_atlas_projection.min.json",
             "graph_view_catalog_ref": "ToS/derived-exports/philosophy_graph_views.min.json",
             "source_view_contract_ref": "ToS/philosophy/graph-workbench/views/view-contracts.json",
+            "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
+            "cluster_contract_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+            "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
         },
         "runtime_projection_boundary": {
             "runtime_owner": "abyss-stack",
@@ -152,12 +218,42 @@ def write_philosophy_projection(root: Path) -> Path:
             "tos_authority_scope": ["own source_refs"],
         },
         "validation_refs": ["scripts/build_philosophy_graph_projection.py"],
-        "counts": {"views": 1, "graph_layers": 1, "nodes": 2, "edges": 1, "source_refs": 3, "diagnostics": 0},
+        "counts": {
+            "views": 1,
+            "graph_layers": 1,
+            "nodes": 2,
+            "edges": 1,
+            "source_refs": 3,
+            "clusters": 1,
+            "review_packets": 1,
+            "unresolved_review_surfaces": 0,
+            "diagnostics": 0,
+        },
+        "visibility_model": {
+            "default_payload_mode": "cluster-first",
+            "default_depth": 1,
+            "default_limit": 200,
+            "layer_ids": ["historical-relation"],
+            "expand_returns": ["member_node_ids", "member_edge_ids", "source_refs"],
+            "cluster_contract_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+            "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
+            "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
+        },
         "graph_layers": [
             {
                 "layer_id": "historical-relation",
                 "use": "chronological branch relation",
                 "source_ref": "ToS/philosophy/trunk/graph-layers/README.md",
+            }
+        ],
+        "layer_counts": [
+            {
+                "layer_id": "historical-relation",
+                "node_count": 2,
+                "edge_count": 1,
+                "view_count": 1,
+                "cluster_count": 1,
+                "source_ref_count": 3,
             }
         ],
         "views": [
@@ -171,6 +267,12 @@ def write_philosophy_projection(root: Path) -> Path:
                 "graph_layers": ["historical-relation"],
                 "filters_applied": {"node_types": ["atlas-row"]},
                 "future_branch_filters": {},
+                "review_intent": "Review chronology without canonizing dates.",
+                "source_posture": "Rows and clusters route back to source refs.",
+                "evidence_posture": "Surface evidence before synthesis.",
+                "collapse_rule": {"default_cluster_kinds": ["region"], "expand_to": ["rows", "source_refs"]},
+                "ordering_hints": ["period"],
+                "agent_packet_hint": "Bring chronology cluster and source refs.",
                 "nodes": [node_a, node_b],
                 "edges": [edge],
                 "source_refs": [
@@ -182,6 +284,9 @@ def write_philosophy_projection(root: Path) -> Path:
         ],
         "nodes": [node_a, node_b],
         "edges": [edge],
+        "clusters": [cluster],
+        "review_packets": [review_packet],
+        "unresolved_review_surfaces": [],
         "diagnostics": [],
     }
     projection_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -271,15 +376,29 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     views = reader.views()
     view = reader.view("chronology")
     node = reader.node("atlas-row:A01")
-    neighborhood = reader.neighborhood("atlas-row:A01")
+    neighborhood = reader.neighborhood("atlas-row:A01", depth=1, layers={"historical-relation"})
+    layers = reader.layers()
+    clusters = reader.clusters(view_id="chronology")
+    review_packet = reader.review_packet("chronology")
+    unresolved = reader.unresolved()
+    path = reader.path_between("atlas-row:A01", "dossier:A01", layers={"historical-relation"})
 
     assert status["projection_exists"] is True
     assert status["counts"]["nodes"] == 2
+    assert status["visibility_model"]["default_payload_mode"] == "cluster-first"
     assert views["views"][0]["layout_hint"] == "timeline-lanes"
+    assert views["views"][0]["cluster_count"] == 1
     assert view["node_count"] == 2
     assert view["edge_count"] == 1
+    assert view["clusters"][0]["cluster_kind"] == "region"
     assert node["node"]["source_ref"].endswith("rows.jsonl")
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+    assert layers["layer_counts"][0]["cluster_count"] == 1
+    assert clusters["cluster_count"] == 1
+    assert review_packet["packet"]["packet_id"] == "review-packet:chronology"
+    assert unresolved["unresolved_count"] == 0
+    assert path["found"] is True
+    assert [item["node_id"] for item in path["nodes"]] == ["atlas-row:A01", "dossier:A01"]
 
 
 def test_philosophy_projection_preview_uses_projection_counts(tmp_path: Path) -> None:
@@ -313,6 +432,8 @@ def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: 
 
     node_rows = Neo4jProjectionStore._philosophy_rows(projection, "nodes", "node_id")
     edge_rows = Neo4jProjectionStore._philosophy_rows(projection, "edges", "edge_id")
+    cluster_rows = Neo4jProjectionStore._philosophy_rows(projection, "clusters", "cluster_id")
+    review_packet_rows = Neo4jProjectionStore._philosophy_rows(projection, "review_packets", "packet_id")
     source_rows = Neo4jProjectionStore._philosophy_source_rows(projection)
 
     assert node_rows[0]["id"] == "atlas-row:A01"
@@ -320,7 +441,11 @@ def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: 
     assert node_rows[0]["graph_layers"] == ["historical-relation"]
     assert edge_rows[0]["from_id"] == "atlas-row:A01"
     assert edge_rows[0]["to_id"] == "dossier:A01"
+    assert cluster_rows[0]["member_node_ids"] == ["atlas-row:A01", "dossier:A01"]
+    assert cluster_rows[0]["source_refs"]
+    assert review_packet_rows[0]["view_id"] == "chronology"
     assert any(row["id"].endswith("view-contracts.json") for row in source_rows)
+    assert any(row["id"].endswith("cluster-contracts.json") for row in source_rows)
 
 
 def test_settings_treats_unreadable_stack_env_as_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
