@@ -11,6 +11,7 @@ command -v python3 >/dev/null 2>&1 || aoa_die "python3 is required"
 layers=()
 check_mode=0
 json_mode=0
+sync_if_stale=0
 while (($#)); do
   case "$1" in
     --check)
@@ -18,6 +19,9 @@ while (($#)); do
       ;;
     --json)
       json_mode=1
+      ;;
+    --sync-if-stale)
+      sync_if_stale=1
       ;;
     --layer)
       shift || true
@@ -39,14 +43,27 @@ while (($#)); do
 if (( json_mode )) && ! (( check_mode )); then
   aoa_die "--json requires --check"
 fi
+if (( sync_if_stale )) && ! (( check_mode )); then
+  aoa_die "--sync-if-stale requires --check"
+fi
 
 emit_check_json() {
   local layer="$1"
   local status="$2"
   local source_root="$3"
   local mirror_target="$4"
-  shift 4
-  python3 - "$layer" "$status" "$source_root" "$mirror_target" "$@" <<'PY'
+  local source_commit="$5"
+  local mirror_commit="$6"
+  local mirror_generated_at_utc="$7"
+  local refresh_command="$8"
+  local sync_recommended="$9"
+  local synced="${10}"
+  local freshness_status="${11}"
+  local manifest_path="${12}"
+  shift 12
+  python3 - "$layer" "$status" "$source_root" "$mirror_target" \
+    "$source_commit" "$mirror_commit" "$mirror_generated_at_utc" "$refresh_command" \
+    "$sync_recommended" "$synced" "$freshness_status" "$manifest_path" "$@" <<'PY'
 from pathlib import Path
 import json
 import sys
@@ -55,7 +72,15 @@ layer = sys.argv[1]
 status = sys.argv[2]
 source_root = str(Path(sys.argv[3]))
 mirror_target = str(Path(sys.argv[4]))
-missing_files = [str(Path(item)) for item in sys.argv[5:]]
+source_commit = sys.argv[5] or None
+mirror_commit = sys.argv[6] or None
+mirror_generated_at_utc = sys.argv[7] or None
+refresh_command = sys.argv[8] or None
+sync_recommended = sys.argv[9] == "true"
+synced = sys.argv[10] == "true"
+freshness_status = sys.argv[11] or status
+manifest_path = str(Path(sys.argv[12]))
+missing_files = [str(Path(item)) for item in sys.argv[13:]]
 
 print(
     json.dumps(
@@ -64,12 +89,46 @@ print(
             "status": status,
             "source_root": source_root,
             "mirror_target": mirror_target,
+            "manifest_path": manifest_path,
+            "freshness_status": freshness_status,
+            "source_git_commit": source_commit,
+            "mirror_source_git_commit": mirror_commit,
+            "mirror_generated_at_utc": mirror_generated_at_utc,
+            "refresh_command": refresh_command,
+            "sync_recommended": sync_recommended,
+            "synced": synced,
             "missing_files": missing_files,
         },
         ensure_ascii=True,
         separators=(",", ":"),
     )
 )
+PY
+}
+
+git_commit_for_root() {
+  local root="$1"
+  [[ -e "${root}/.git" ]] || return 0
+  git -C "$root" rev-parse HEAD 2>/dev/null || true
+}
+
+read_manifest_metadata() {
+  local manifest_path="$1"
+  python3 - "$manifest_path" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+manifest_path = Path(sys.argv[1])
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+for key in ("source_git_commit", "generated_at_utc", "refresh_command"):
+    value = payload.get(key)
+    if value is None:
+        print("")
+    elif isinstance(value, str):
+        print(value)
+    else:
+        raise SystemExit(f"invalid manifest field {key}: {value!r}")
 PY
 }
 
@@ -388,7 +447,7 @@ sync_layer() {
   write_mirror_manifest "${layer}" "${source_root}" "${target_root}" "${tmp_root}" "${required_paths[@]}"
 
   mkdir -p "$(dirname -- "${target_root}")"
-  rsync -a --delete "${tmp_root}/" "${target_root}/"
+  rsync -a --checksum --delete "${tmp_root}/" "${target_root}/"
   rm -rf "${tmp_root}"
   trap - RETURN
 
@@ -397,9 +456,14 @@ sync_layer() {
 
 check_layer() {
   local layer="$1"
+  local synced="${2:-false}"
+  local emit="${3:-true}"
   local source_root target_root rel_path source_rel_path config_dir config_path
+  local manifest_path source_commit mirror_commit mirror_generated_at_utc refresh_command
+  local status freshness_status sync_recommended check_ok manifest_payload
   local -a required_paths=()
   local -a missing_paths=()
+  local -a manifest_fields=()
 
   case "$layer" in
     aoa-agents)
@@ -455,7 +519,7 @@ check_layer() {
   fi
   (( ${#required_paths[@]} > 0 )) || aoa_die "no required_files found in ${config_path}"
 
-  if (( ! json_mode )); then
+  if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
     aoa_note "check layer: ${layer}"
     aoa_note "source root: ${source_root}"
     aoa_note "mirror target: ${target_root}"
@@ -469,31 +533,103 @@ check_layer() {
     fi
   done
 
+  manifest_path="${target_root}/manifest/federation_mirror_manifest.json"
+  source_commit="$(git_commit_for_root "${source_root}")"
+  mirror_commit=""
+  mirror_generated_at_utc=""
+  refresh_command=""
+  status="ok"
+  freshness_status="current"
+  sync_recommended="false"
+  check_ok=0
+
   if (( ${#missing_paths[@]} > 0 )); then
-    if (( json_mode )); then
-      emit_check_json "${layer}" "missing" "${source_root}" "${target_root}" "${missing_paths[@]}"
-    else
+    status="missing"
+    freshness_status="missing_files"
+    sync_recommended="true"
+    check_ok=1
+    if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
       printf 'warning: missing mirrored files for %s:\n' "${layer}" >&2
       for rel_path in "${missing_paths[@]}"; do
         printf '  %s\n' "${rel_path}"
       done
     fi
-    return 1
+  elif [[ ! -f "$manifest_path" ]]; then
+    status="missing_manifest"
+    freshness_status="missing_manifest"
+    sync_recommended="true"
+    check_ok=1
+    if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
+      printf 'warning: mirror manifest missing for %s: %s\n' "${layer}" "${manifest_path}" >&2
+    fi
+  else
+    if ! manifest_payload="$(read_manifest_metadata "$manifest_path" 2>/dev/null)"; then
+      status="invalid_manifest"
+      freshness_status="invalid_manifest"
+      sync_recommended="true"
+      check_ok=1
+      if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
+        printf 'warning: mirror manifest invalid for %s: %s\n' "${layer}" "${manifest_path}" >&2
+      fi
+    else
+      mapfile -t manifest_fields <<< "$manifest_payload"
+      mirror_commit="${manifest_fields[0]:-}"
+      mirror_generated_at_utc="${manifest_fields[1]:-}"
+      refresh_command="${manifest_fields[2]:-}"
+      if [[ -n "$source_commit" && -z "$mirror_commit" ]]; then
+        status="missing_source_commit"
+        freshness_status="missing_source_commit"
+        sync_recommended="true"
+        check_ok=1
+        if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
+          printf 'warning: mirror manifest has no source_git_commit for %s: %s\n' "${layer}" "${manifest_path}" >&2
+        fi
+      elif [[ -n "$source_commit" && -n "$mirror_commit" && "$source_commit" != "$mirror_commit" ]]; then
+        status="stale"
+        freshness_status="source_commit_mismatch"
+        sync_recommended="true"
+        check_ok=1
+        if (( ! json_mode )) && [[ "$emit" == "true" ]]; then
+          printf 'warning: mirror manifest source_git_commit differs for %s\n' "${layer}" >&2
+          printf '  source checkout: %s\n' "${source_commit}" >&2
+          printf '  mirror manifest: %s\n' "${mirror_commit}" >&2
+        fi
+      elif [[ -z "$source_commit" ]]; then
+        freshness_status="source_commit_unavailable"
+      fi
+    fi
   fi
 
-  if (( json_mode )); then
-    emit_check_json "${layer}" "ok" "${source_root}" "${target_root}"
-  else
+  if (( json_mode )) && [[ "$emit" == "true" ]]; then
+    emit_check_json "${layer}" "${status}" "${source_root}" "${target_root}" \
+      "${source_commit}" "${mirror_commit}" "${mirror_generated_at_utc}" "${refresh_command}" \
+      "${sync_recommended}" "${synced}" "${freshness_status}" "${manifest_path}" "${missing_paths[@]}"
+  elif (( ! json_mode )) && [[ "$emit" == "true" ]] && (( check_ok == 0 )); then
     aoa_note "federation surface check complete for ${layer}"
   fi
-  return 0
+  return "${check_ok}"
 }
 
 overall_status=0
 for layer in "${layers[@]}"; do
   if (( check_mode )); then
-    if ! check_layer "$layer"; then
-      overall_status=1
+    if (( sync_if_stale )); then
+      if check_layer "$layer" false false; then
+        check_layer "$layer" false true || overall_status=1
+      else
+        if (( json_mode )); then
+          sync_layer "$layer" >&2
+        else
+          sync_layer "$layer"
+        fi
+        if ! check_layer "$layer" true true; then
+          overall_status=1
+        fi
+      fi
+    else
+      if ! check_layer "$layer" false true; then
+        overall_status=1
+      fi
     fi
   else
     sync_layer "$layer"
