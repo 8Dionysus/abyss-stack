@@ -10,6 +10,7 @@ from typing import Any
 DEFAULT_TOS_ROOT = Path("/srv/AbyssOS/Tree-of-Sophia")
 INDEX_RELATIVE_PATH = Path("ToS/derived-exports/tos_corpus_index.min.json")
 PHILOSOPHY_PROJECTION_RELATIVE_PATH = Path("ToS/derived-exports/philosophy_graph_projection.min.json")
+PHILOSOPHY_AUDIT_RELATIVE_PATH = Path("ToS/philosophy/graph-workbench/review-packets/table-i-post-planting-audit.json")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -55,6 +56,7 @@ class ToSCorpusMCPState:
     tos_root: Path
     index_path: Path
     philosophy_graph_projection_path: Path
+    philosophy_post_planting_audit_path: Path
 
     @classmethod
     def discover(
@@ -62,6 +64,7 @@ class ToSCorpusMCPState:
         tos_root: str | Path | None = None,
         index_path: str | Path | None = None,
         philosophy_graph_projection_path: str | Path | None = None,
+        philosophy_post_planting_audit_path: str | Path | None = None,
     ) -> "ToSCorpusMCPState":
         root = Path(
             tos_root
@@ -83,10 +86,18 @@ class ToSCorpusMCPState:
         ).expanduser()
         if not philosophy_projection.is_absolute():
             philosophy_projection = root / philosophy_projection
+        philosophy_audit = Path(
+            philosophy_post_planting_audit_path
+            or os.environ.get("TOS_PHILOSOPHY_POST_PLANTING_AUDIT_PATH")
+            or root / PHILOSOPHY_AUDIT_RELATIVE_PATH
+        ).expanduser()
+        if not philosophy_audit.is_absolute():
+            philosophy_audit = root / philosophy_audit
         return cls(
             tos_root=root,
             index_path=index.resolve(),
             philosophy_graph_projection_path=philosophy_projection.resolve(),
+            philosophy_post_planting_audit_path=philosophy_audit.resolve(),
         )
 
     def index_exists(self) -> bool:
@@ -102,6 +113,15 @@ class ToSCorpusMCPState:
         payload = _read_json(self.philosophy_graph_projection_path)
         if payload.get("schema_version") != "tos_philosophy_graph_projection_v1":
             raise RuntimeError("ToS philosophy graph projection schema_version must be tos_philosophy_graph_projection_v1")
+        return payload
+
+    def philosophy_audit_exists(self) -> bool:
+        return self.philosophy_post_planting_audit_path.is_file()
+
+    def philosophy_audit_payload(self) -> dict[str, Any]:
+        payload = _read_json(self.philosophy_post_planting_audit_path)
+        if payload.get("schema_version") != "tos_philosophy_post_planting_audit_v1":
+            raise RuntimeError("ToS philosophy post-planting audit schema_version must be tos_philosophy_post_planting_audit_v1")
         return payload
 
     def status(self) -> dict[str, Any]:
@@ -303,6 +323,7 @@ class ToSCorpusMCPState:
                 if isinstance(layer, dict) and layer.get("layer_id")
             ],
             "visibility_model": payload.get("visibility_model", {}),
+            "snapshot_review": payload.get("snapshot_review", {}),
             "runtime_projection_boundary": payload.get(
                 "runtime_projection_boundary",
                 {
@@ -444,6 +465,32 @@ class ToSCorpusMCPState:
             "authority_note": "Tree-of-Sophia owns review packet semantics; MCP serves the compact access packet.",
         }
 
+    def philosophy_snapshot(self) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        return {
+            "schema": "tos_philosophy_mcp_snapshot_v1",
+            "snapshot_review": payload.get("snapshot_review", {}),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns snapshot semantics; MCP serves fingerprints for review and diff routing.",
+        }
+
+    def philosophy_audit(self) -> dict[str, Any]:
+        if not self.philosophy_audit_exists():
+            return {
+                "schema": "tos_philosophy_mcp_audit_v1",
+                "audit_exists": False,
+                "audit_path": self.philosophy_post_planting_audit_path.as_posix(),
+                "audit": {},
+                "authority_note": "Tree-of-Sophia has not published the post-planting audit at this MCP path.",
+            }
+        return {
+            "schema": "tos_philosophy_mcp_audit_v1",
+            "audit_exists": True,
+            "audit_path": self.philosophy_post_planting_audit_path.as_posix(),
+            "audit": self.philosophy_audit_payload(),
+            "authority_note": "Tree-of-Sophia owns the audit; MCP serves it as an access packet.",
+        }
+
     def philosophy_unresolved(self, view_id: str | None = None) -> dict[str, Any]:
         payload = self.philosophy_projection()
         surfaces = [item for item in payload.get("unresolved_review_surfaces", []) if isinstance(item, dict)]
@@ -480,6 +527,29 @@ class ToSCorpusMCPState:
             "node": node,
             "related_edges": related_edges,
             "authority_note": "Node source_ref stays authoritative in Tree-of-Sophia; MCP exposes an access packet only.",
+        }
+
+    def philosophy_edge(self, edge_id: str) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        edge = next(
+            (item for item in payload.get("edges", []) if isinstance(item, dict) and item.get("edge_id") == edge_id),
+            None,
+        )
+        if edge is None:
+            raise KeyError(f"unknown ToS philosophy edge: {edge_id}")
+        endpoint_ids = {str(edge.get("from_id") or ""), str(edge.get("to_id") or "")}
+        endpoints = [
+            node
+            for node in payload.get("nodes", [])
+            if isinstance(node, dict) and str(node.get("node_id") or "") in endpoint_ids
+        ]
+        return {
+            "schema": "tos_philosophy_mcp_edge_v1",
+            "edge_id": edge_id,
+            "edge": edge,
+            "endpoints": endpoints,
+            "source_refs": _source_refs([edge] + endpoints),
+            "authority_note": "Edge source_ref stays authoritative in Tree-of-Sophia; MCP exposes an access packet only.",
         }
 
     def philosophy_neighborhood(
@@ -607,6 +677,10 @@ class ToSCorpusMCPState:
             return self.philosophy_views()
         if uri == "tos-philosophy://layers":
             return self.philosophy_layers()
+        if uri == "tos-philosophy://snapshot":
+            return self.philosophy_snapshot()
+        if uri == "tos-philosophy://audit":
+            return self.philosophy_audit()
         if uri == "tos-philosophy://clusters":
             return self.philosophy_clusters()
         if uri == "tos-philosophy://unresolved":
@@ -617,6 +691,9 @@ class ToSCorpusMCPState:
         philosophy_review_prefix = "tos-philosophy://review-packet/"
         if uri.startswith(philosophy_review_prefix):
             return self.philosophy_review_packet(uri.removeprefix(philosophy_review_prefix))
+        philosophy_edge_prefix = "tos-philosophy://edge/"
+        if uri.startswith(philosophy_edge_prefix):
+            return self.philosophy_edge(uri.removeprefix(philosophy_edge_prefix))
         philosophy_lens_prefix = "tos-philosophy://lens/"
         if uri.startswith(philosophy_lens_prefix):
             return self.philosophy_lens_packet(uri.removeprefix(philosophy_lens_prefix))

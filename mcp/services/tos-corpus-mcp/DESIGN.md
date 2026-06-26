@@ -13,6 +13,7 @@ ToS-owned meaning into `abyss-stack`.
 ```text
 ToS/derived-exports/tos_corpus_index.min.json
 ToS/derived-exports/philosophy_graph_projection.min.json
+ToS/philosophy/graph-workbench/review-packets/table-i-post-planting-audit.json
 ```
 
 `tos-corpus-mcp` reads that file and serves bounded packets:
@@ -26,7 +27,10 @@ ToS/derived-exports/philosophy_graph_projection.min.json
 - `philosophy_status`: graph projection path, counts, views, layers, and boundary
 - `philosophy_view`: one materialized philosophy graph view
 - `philosophy_node`: one projected philosophy node and related edges
+- `philosophy_edge`: one projected philosophy edge and endpoint nodes
 - `philosophy_neighborhood`: local projected graph context
+- `philosophy_snapshot`: graph projection fingerprints for diff-aware review
+- `philosophy_audit`: post-planting review packet when ToS publishes it
 - `philosophy_packet`: compact agent packet with optional search and view context
 
 ## Authority
