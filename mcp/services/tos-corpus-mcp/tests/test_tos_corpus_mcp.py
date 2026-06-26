@@ -129,11 +129,82 @@ def write_philosophy_projection(root: Path) -> Path:
         "source_ref": "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
         "properties": {},
     }
+    cluster = {
+        "cluster_id": "cluster:region:test",
+        "cluster_kind": "region",
+        "label": "Region: West Asia",
+        "member_key": "properties.source_section",
+        "member_value": "West Asia",
+        "member_node_ids": ["atlas-row:A01", "dossier:A01"],
+        "member_edge_ids": ["edge:row:A01:has-dossier:A01"],
+        "view_ids": ["chronology"],
+        "graph_layers": ["historical-relation"],
+        "source_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+        "source_refs": ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"],
+        "properties": {"review_use": "group by region"},
+    }
+    review_packet = {
+        "packet_id": "review-packet:chronology",
+        "view_id": "chronology",
+        "review_intent": "Review chronology without canonizing dates.",
+        "active_filters": {"node_types": ["atlas-row"]},
+        "counts": {
+            "nodes": 2,
+            "edges": 1,
+            "source_refs": 1,
+            "clusters": 1,
+            "weak_source_refs": 0,
+            "unresolved_diagnostics": 0,
+            "suspicious_dense_hubs": 0,
+            "isolated_nodes": 0,
+        },
+        "layer_counts": [
+            {"layer_id": "historical-relation", "node_count": 2, "edge_count": 1, "cluster_count": 1, "source_ref_count": 1}
+        ],
+        "cluster_summaries": [
+            {
+                "cluster_id": "cluster:region:test",
+                "cluster_kind": "region",
+                "label": "Region: West Asia",
+                "node_count": 2,
+                "edge_count": 1,
+                "source_ref_count": 1,
+            }
+        ],
+        "weak_source_refs": [],
+        "unresolved_diagnostics": [],
+        "suspicious_dense_hubs": [],
+        "isolated_nodes": [],
+        "candidate_to_canon_pressure": {"C": 1},
+        "changed_subgraph": {"available": False, "reason": "test fixture"},
+        "recommended_human_review_route": "ToS/philosophy/graph-workbench/views/chronology.graph.md",
+        "source_refs": ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"],
+    }
     payload = {
         "schema_version": "tos_philosophy_graph_projection_v1",
         "owner_repo": "Tree-of-Sophia",
         "surface_kind": "derived_philosophy_graph_projection",
-        "counts": {"views": 1, "graph_layers": 1, "nodes": 2, "edges": 1, "source_refs": 3, "diagnostics": 0},
+        "counts": {
+            "views": 1,
+            "graph_layers": 1,
+            "nodes": 2,
+            "edges": 1,
+            "source_refs": 3,
+            "clusters": 1,
+            "review_packets": 1,
+            "unresolved_review_surfaces": 0,
+            "diagnostics": 0,
+        },
+        "visibility_model": {
+            "default_payload_mode": "cluster-first",
+            "default_depth": 1,
+            "default_limit": 200,
+            "layer_ids": ["historical-relation"],
+            "expand_returns": ["member_node_ids", "member_edge_ids", "source_refs"],
+            "cluster_contract_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+            "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
+            "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
+        },
         "runtime_projection_boundary": {
             "runtime_owner": "abyss-stack",
             "runtime_scope": ["serve MCP packets"],
@@ -146,6 +217,16 @@ def write_philosophy_projection(root: Path) -> Path:
                 "source_ref": "ToS/philosophy/trunk/graph-layers/README.md",
             }
         ],
+        "layer_counts": [
+            {
+                "layer_id": "historical-relation",
+                "node_count": 2,
+                "edge_count": 1,
+                "view_count": 1,
+                "cluster_count": 1,
+                "source_ref_count": 3,
+            }
+        ],
         "views": [
             {
                 "view_id": "chronology",
@@ -154,6 +235,12 @@ def write_philosophy_projection(root: Path) -> Path:
                 "route_card": "ToS/philosophy/graph-workbench/views/AGENTS.md",
                 "layout_hint": "timeline-lanes",
                 "graph_layers": ["historical-relation"],
+                "review_intent": "Review chronology without canonizing dates.",
+                "source_posture": "Rows and clusters route back to source refs.",
+                "evidence_posture": "Surface evidence before synthesis.",
+                "collapse_rule": {"default_cluster_kinds": ["region"], "expand_to": ["rows", "source_refs"]},
+                "ordering_hints": ["period"],
+                "agent_packet_hint": "Bring chronology cluster and source refs.",
                 "nodes": [node, neighbor],
                 "edges": [edge],
                 "source_refs": ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"],
@@ -161,6 +248,9 @@ def write_philosophy_projection(root: Path) -> Path:
         ],
         "nodes": [node, neighbor],
         "edges": [edge],
+        "clusters": [cluster],
+        "review_packets": [review_packet],
+        "unresolved_review_surfaces": [],
     }
     projection_path.write_text(json.dumps(payload), encoding="utf-8")
     return projection_path
@@ -217,16 +307,32 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     status = state.philosophy_status()
     views = state.philosophy_views()
     view = state.philosophy_view("chronology")
+    layers = state.philosophy_layers()
+    clusters = state.philosophy_clusters(view_id="chronology")
     node = state.philosophy_node("atlas-row:A01")
-    neighborhood = state.philosophy_neighborhood("atlas-row:A01")
+    neighborhood = state.philosophy_neighborhood("atlas-row:A01", layers=["historical-relation"])
+    review = state.philosophy_review_packet("chronology")
+    unresolved = state.philosophy_unresolved()
+    lens = state.philosophy_lens_packet("chronology", limit=4)
     packet = state.philosophy_packet(query="dossier", view_id="chronology", limit=4)
 
     assert status["projection_exists"] is True
     assert status["counts"]["nodes"] == 2
+    assert status["visibility_model"]["default_payload_mode"] == "cluster-first"
     assert views["views"][0]["layout_hint"] == "timeline-lanes"
+    assert views["views"][0]["cluster_count"] == 1
     assert view["edge_count"] == 1
+    assert view["clusters"][0]["cluster_kind"] == "region"
+    assert layers["layer_counts"][0]["cluster_count"] == 1
+    assert clusters["cluster_count"] == 1
     assert node["related_edges"][0]["predicate_id"] == "has-dossier"
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+    assert review["packet"]["packet_id"] == "review-packet:chronology"
+    assert unresolved["unresolved_count"] == 0
+    assert lens["review_packet"]["view_id"] == "chronology"
     assert packet["result_count"] >= 1
+    assert packet["view"]["clusters"][0]["cluster_id"] == "cluster:region:test"
     assert json.loads(state.render_resource("tos-philosophy://status"))["counts"]["edges"] == 1
     assert state.read_resource("tos-philosophy://view/chronology")["node_count"] == 2
+    assert state.read_resource("tos-philosophy://layers")["layer_counts"][0]["cluster_count"] == 1
+    assert state.read_resource("tos-philosophy://review-packet/chronology")["packet"]["packet_id"] == "review-packet:chronology"

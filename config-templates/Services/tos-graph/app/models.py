@@ -69,6 +69,7 @@ class PhilosophyStatusResponse(BaseModel):
     counts: dict[str, int]
     views: list[str]
     graph_layers: list[str]
+    visibility_model: dict[str, Any] = {}
     runtime_projection_boundary: dict[str, Any]
 
 
@@ -77,6 +78,8 @@ class PhilosophyViewsResponse(BaseModel):
     views: list[dict[str, Any]]
     counts: dict[str, int]
     graph_layers: list[dict[str, Any]]
+    layer_counts: list[dict[str, Any]] = []
+    visibility_model: dict[str, Any] = {}
     runtime_projection_boundary: dict[str, Any]
 
 
@@ -85,10 +88,46 @@ class PhilosophyViewResponse(BaseModel):
     view: dict[str, Any]
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
+    clusters: list[dict[str, Any]] = []
+    review_packet: dict[str, Any] | None = None
     node_count: int
     edge_count: int
     source_refs: list[str]
     counts: dict[str, int]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyLayersResponse(BaseModel):
+    schema: str
+    graph_layers: list[dict[str, Any]]
+    layer_counts: list[dict[str, Any]]
+    visibility_model: dict[str, Any]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyClustersResponse(BaseModel):
+    schema: str
+    view_id: str | None
+    cluster_kind: str | None
+    clusters: list[dict[str, Any]]
+    cluster_count: int
+    counts: dict[str, int]
+    source_refs: list[str]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyReviewPacketResponse(BaseModel):
+    schema: str
+    packet: dict[str, Any]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
+class PhilosophyUnresolvedResponse(BaseModel):
+    schema: str
+    view_id: str | None
+    unresolved: list[dict[str, Any]]
+    unresolved_count: int
     runtime_projection_boundary: dict[str, Any]
 
 

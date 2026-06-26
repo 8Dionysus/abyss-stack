@@ -131,6 +131,13 @@ INDEX_TEMPLATE = """<!doctype html>
         padding: 8px;
         background: white;
       }
+      .mini-label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+      }
       .layer-toggle input { width: auto; }
       pre {
         white-space: pre-wrap;
@@ -169,6 +176,24 @@ INDEX_TEMPLATE = """<!doctype html>
           <div id="layerList" class="layer-list"></div>
         </div>
         <div class="stack">
+          <h2>Graph Mode</h2>
+          <div class="split">
+            <button id="clusterMode" type="button">Clusters</button>
+            <button id="nodeMode" type="button">Nodes</button>
+          </div>
+        </div>
+        <div class="stack">
+          <h2>Review</h2>
+          <button id="reviewButton" type="button">Review packet</button>
+          <button id="unresolvedButton" type="button">Unresolved</button>
+        </div>
+        <div class="stack">
+          <h2>Path</h2>
+          <label><span class="mini-label">from</span><input id="pathFrom" placeholder="atlas-row:A01"></label>
+          <label><span class="mini-label">to</span><input id="pathTo" placeholder="dossier:A01"></label>
+          <button id="pathButton" type="button">Find path</button>
+        </div>
+        <div class="stack">
           <h2>Search</h2>
           <input id="searchInput" placeholder="node, source_ref, predicate">
           <button id="searchButton" type="button">Search</button>
@@ -197,6 +222,8 @@ INDEX_TEMPLATE = """<!doctype html>
           <div id="inspectorMeta" class="muted">No selection.</div>
         </div>
         <div id="sourceRefs" class="list"></div>
+        <div id="clusterList" class="list"></div>
+        <div id="reviewList" class="list"></div>
         <div id="resultList" class="list"></div>
         <div class="item"><pre id="inspectorJson">{}</pre></div>
       </aside>
@@ -213,6 +240,8 @@ INDEX_TEMPLATE = """<!doctype html>
         philosophyViews: null,
         currentView: null,
         activeLayers: new Set(),
+        graphMode: "clusters",
+        expandedCluster: null,
         results: [],
       };
 
@@ -256,12 +285,19 @@ INDEX_TEMPLATE = """<!doctype html>
         q("modeState").textContent = mode;
       }
 
+      function setGraphMode(mode) {
+        state.graphMode = mode;
+        q("clusterMode").classList.toggle("active", mode === "clusters");
+        q("nodeMode").classList.toggle("active", mode === "nodes");
+        renderGraph();
+      }
+
       function renderMetrics() {
         const counts = state.mode === "philosophy"
           ? (state.status.philosophy?.counts || {})
           : (state.corpusSummary?.counts || {});
         const keys = state.mode === "philosophy"
-          ? ["views", "graph_layers", "nodes", "edges", "source_refs", "diagnostics"]
+          ? ["views", "graph_layers", "nodes", "edges", "clusters", "review_packets"]
           : ["branches", "manifests", "nodes", "relation_packs", "relation_edges", "resources"];
         q("metrics").innerHTML = keys.map((key) => `
           <div class="metric"><strong>${counts[key] ?? 0}</strong><span class="muted">${key.replaceAll("_", " ")}</span></div>
@@ -321,6 +357,47 @@ INDEX_TEMPLATE = """<!doctype html>
         `).join("");
       }
 
+      function renderClusters() {
+        if (state.mode !== "philosophy" || !state.currentView) {
+          q("clusterList").innerHTML = "";
+          return;
+        }
+        const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, 16);
+        q("clusterList").innerHTML = clusters.length ? clusters.map((cluster, index) => `
+          <button type="button" class="item" data-cluster="${index}">
+            <strong>${escapeHtml(short(cluster.label, 58))}</strong><br>
+            <span class="muted">${escapeHtml(cluster.cluster_kind)} · ${cluster.member_node_ids?.length || 0} nodes · ${cluster.source_refs?.length || 0} refs</span>
+          </button>
+        `).join("") : '<div class="item"><span class="muted">No clusters for this view.</span></div>';
+        for (const button of q("clusterList").querySelectorAll("[data-cluster]")) {
+          button.addEventListener("click", () => {
+            const cluster = clusters[Number(button.getAttribute("data-cluster"))];
+            state.expandedCluster = cluster;
+            setGraphMode("nodes");
+            inspect(cluster.label, cluster, cluster.source_refs || []);
+          });
+        }
+      }
+
+      function renderReview() {
+        if (state.mode !== "philosophy" || !state.currentView?.review_packet?.packet) {
+          q("reviewList").innerHTML = "";
+          return;
+        }
+        const packet = state.currentView.review_packet.packet;
+        q("reviewList").innerHTML = `
+          <div class="item">
+            <strong>Review packet</strong><br>
+            <span class="muted">${escapeHtml(short(packet.review_intent, 120))}</span>
+          </div>
+          <div class="item">
+            <strong>${packet.counts?.clusters ?? 0}</strong> clusters ·
+            <strong>${packet.counts?.unresolved_diagnostics ?? 0}</strong> unresolved ·
+            <strong>${packet.counts?.weak_source_refs ?? 0}</strong> weak refs
+          </div>
+        `;
+      }
+
       function renderResults() {
         q("resultList").innerHTML = state.results.slice(0, 40).map((entry, index) => {
           const item = entry.item || entry;
@@ -350,12 +427,22 @@ INDEX_TEMPLATE = """<!doctype html>
           renderCorpusGraph(svg);
           return;
         }
+        if (state.graphMode === "clusters" && (state.currentView.clusters || []).length) {
+          renderClusterGraph(svg);
+          return;
+        }
         const nodes = (state.currentView.nodes || []).filter(layerAllowed).slice(0, 180);
-        const nodeIds = new Set(nodes.map((node) => node.node_id));
+        const expandedIds = new Set(state.expandedCluster?.member_node_ids || []);
+        const visibleNodes = expandedIds.size ? nodes.filter((node) => expandedIds.has(node.node_id)) : nodes;
+        const nodeIds = new Set(visibleNodes.map((node) => node.node_id));
         const edges = (state.currentView.edges || [])
           .filter(layerAllowed)
           .filter((edge) => nodeIds.has(edge.from_id) && nodeIds.has(edge.to_id))
           .slice(0, 260);
+        renderNodeGraph(svg, visibleNodes, edges);
+      }
+
+      function renderNodeGraph(svg, nodes, edges) {
         const width = 1000;
         const height = 520;
         const cx = width / 2;
@@ -399,6 +486,41 @@ INDEX_TEMPLATE = """<!doctype html>
         }
       }
 
+      function renderClusterGraph(svg) {
+        const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, 90);
+        const width = 1000;
+        const height = 520;
+        const cx = width / 2;
+        const cy = height / 2;
+        const rx = 390;
+        const ry = 210;
+        const points = clusters.map((cluster, index) => {
+          const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / Math.max(clusters.length, 1));
+          return { cluster, x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry };
+        });
+        svg.innerHTML = points.map((point) => {
+          const size = Math.max(11, Math.min(34, 8 + (point.cluster.member_node_ids?.length || 0) * 0.18));
+          const color = point.cluster.cluster_kind === "source-witness" ? "#3e6fa3"
+            : point.cluster.cluster_kind === "canon-candidate-status" ? "#b1742f"
+            : point.cluster.cluster_kind === "evidence-status" ? "#a3483f"
+            : "#247865";
+          return `
+            <g class="node" data-cluster-node="${points.indexOf(point)}">
+              <circle cx="${point.x}" cy="${point.y}" r="${size}" fill="${color}" />
+              <text x="${point.x + size + 5}" y="${point.y + 4}">${escapeHtml(short(point.cluster.label, 38))}</text>
+            </g>
+          `;
+        }).join("");
+        for (const group of svg.querySelectorAll("[data-cluster-node]")) {
+          group.addEventListener("click", () => {
+            const cluster = points[Number(group.getAttribute("data-cluster-node"))].cluster;
+            state.expandedCluster = cluster;
+            inspect(cluster.label, cluster, cluster.source_refs || []);
+            renderClusters();
+          });
+        }
+      }
+
       function renderCorpusGraph(svg) {
         const items = (state.currentView.items || []).slice(0, 80);
         const width = 1000;
@@ -438,6 +560,8 @@ INDEX_TEMPLATE = """<!doctype html>
         renderMetrics();
         renderViews();
         renderLayers();
+        renderClusters();
+        renderReview();
         renderGraph();
         renderResults();
       }
@@ -447,13 +571,47 @@ INDEX_TEMPLATE = """<!doctype html>
         if (state.mode === "philosophy") {
           state.currentView = await fetchJson(`/api/philosophy/views/${encodeURIComponent(viewId)}`);
           state.activeLayers = new Set(state.currentView.view.graph_layers || []);
-          state.results = [...(state.currentView.nodes || []), ...(state.currentView.edges || [])];
+          state.graphMode = "clusters";
+          state.expandedCluster = null;
+          state.results = [
+            ...(state.currentView.clusters || []),
+            ...(state.currentView.nodes || []),
+            ...(state.currentView.edges || [])
+          ];
           inspect(state.currentView.view.title || viewId, state.currentView.view, state.currentView.source_refs || []);
         } else {
           state.currentView = await fetchJson(`/api/corpus/graph-views/${encodeURIComponent(viewId)}?limit=80`);
           state.results = state.currentView.items || [];
           inspect(viewId, state.currentView.view, [state.currentView.view.entry_surface]);
         }
+        renderAll();
+        setGraphMode(state.graphMode);
+      }
+
+      async function showReviewPacket() {
+        if (state.mode !== "philosophy" || !state.currentViewId) return;
+        const payload = await fetchJson(`/api/philosophy/review-packet?view_id=${encodeURIComponent(state.currentViewId)}`);
+        inspect(`Review packet: ${state.currentViewId}`, payload.packet, payload.packet.source_refs || []);
+      }
+
+      async function showUnresolved() {
+        if (state.mode !== "philosophy") return;
+        const suffix = state.currentViewId ? `?view_id=${encodeURIComponent(state.currentViewId)}` : "";
+        const payload = await fetchJson(`/api/philosophy/unresolved${suffix}`);
+        state.results = payload.unresolved || [];
+        inspect(`Unresolved: ${state.currentViewId || "all"}`, payload, []);
+        renderAll();
+      }
+
+      async function findPath() {
+        if (state.mode !== "philosophy") return;
+        const from = q("pathFrom").value.trim();
+        const to = q("pathTo").value.trim();
+        if (!from || !to) return;
+        const layers = [...state.activeLayers].join(",");
+        const payload = await fetchJson(`/api/philosophy/paths?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&layers=${encodeURIComponent(layers)}`);
+        state.results = [...(payload.nodes || []), ...(payload.edges || [])];
+        inspect(`Path: ${from} → ${to}`, payload, payload.source_refs || []);
         renderAll();
       }
 
@@ -502,6 +660,11 @@ INDEX_TEMPLATE = """<!doctype html>
       async function init() {
         q("modePhilosophy").addEventListener("click", () => loadMode("philosophy"));
         q("modeCorpus").addEventListener("click", () => loadMode("corpus"));
+        q("clusterMode").addEventListener("click", () => { state.expandedCluster = null; setGraphMode("clusters"); });
+        q("nodeMode").addEventListener("click", () => setGraphMode("nodes"));
+        q("reviewButton").addEventListener("click", showReviewPacket);
+        q("unresolvedButton").addEventListener("click", showUnresolved);
+        q("pathButton").addEventListener("click", findPath);
         q("searchButton").addEventListener("click", searchCurrentMode);
         q("searchInput").addEventListener("keydown", (event) => { if (event.key === "Enter") searchCurrentMode(); });
         q("syncButton").addEventListener("click", syncProjection);

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from .config import load_settings
@@ -13,9 +13,13 @@ from .models import (
     CorpusStatusResponse,
     CorpusSummaryResponse,
     HealthResponse,
+    PhilosophyClustersResponse,
+    PhilosophyLayersResponse,
     PhilosophyPacketResponse,
+    PhilosophyReviewPacketResponse,
     PhilosophySearchResponse,
     PhilosophyStatusResponse,
+    PhilosophyUnresolvedResponse,
     PhilosophyViewResponse,
     PhilosophyViewsResponse,
     ProjectSyncResponse,
@@ -43,6 +47,12 @@ def _handle_reader_error(exc: ToSCorpusReaderError) -> HTTPException:
 
 def _handle_philosophy_reader_error(exc: ToSPhilosophyReaderError) -> HTTPException:
     return HTTPException(status_code=404, detail=str(exc))
+
+
+def _layer_set(raw_layers: str | None) -> set[str]:
+    if not raw_layers:
+        return set()
+    return {layer.strip() for layer in raw_layers.split(",") if layer.strip()}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -129,10 +139,54 @@ def philosophy_views() -> PhilosophyViewsResponse:
         raise _handle_philosophy_reader_error(exc) from exc
 
 
+@app.get("/api/philosophy/layers", response_model=PhilosophyLayersResponse)
+def philosophy_layers() -> PhilosophyLayersResponse:
+    try:
+        return PhilosophyLayersResponse(**philosophy_reader.layers())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
 @app.get("/api/philosophy/views/{view_id}", response_model=PhilosophyViewResponse)
 def philosophy_view(view_id: str) -> PhilosophyViewResponse:
     try:
         return PhilosophyViewResponse(**philosophy_reader.view(view_id))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/views/{view_id}/clusters", response_model=PhilosophyClustersResponse)
+def philosophy_view_clusters(view_id: str, kind: str | None = None, limit: int = 80) -> PhilosophyClustersResponse:
+    try:
+        return PhilosophyClustersResponse(**philosophy_reader.clusters(view_id=view_id, cluster_kind=kind, limit=limit))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/clusters", response_model=PhilosophyClustersResponse)
+def philosophy_clusters(
+    view_id: str | None = None,
+    kind: str | None = None,
+    limit: int = 80,
+) -> PhilosophyClustersResponse:
+    try:
+        return PhilosophyClustersResponse(**philosophy_reader.clusters(view_id=view_id, cluster_kind=kind, limit=limit))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/review-packet", response_model=PhilosophyReviewPacketResponse)
+def philosophy_review_packet(view_id: str = "chronology") -> PhilosophyReviewPacketResponse:
+    try:
+        return PhilosophyReviewPacketResponse(**philosophy_reader.review_packet(view_id))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/unresolved", response_model=PhilosophyUnresolvedResponse)
+def philosophy_unresolved(view_id: str | None = None) -> PhilosophyUnresolvedResponse:
+    try:
+        return PhilosophyUnresolvedResponse(**philosophy_reader.unresolved(view_id=view_id))
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 
@@ -162,9 +216,22 @@ def philosophy_node(node_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/philosophy/neighborhood/{node_id:path}")
-def philosophy_neighborhood(node_id: str) -> dict[str, Any]:
+def philosophy_neighborhood(node_id: str, depth: int = 1, layers: str | None = None, limit: int = 120) -> dict[str, Any]:
     try:
-        return philosophy_reader.neighborhood(node_id)
+        return philosophy_reader.neighborhood(node_id, depth=depth, layers=_layer_set(layers), limit=limit)
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/paths")
+def philosophy_paths(
+    from_id: str = Query(alias="from"),
+    to_id: str = Query(alias="to"),
+    layers: str | None = None,
+    max_depth: int = 6,
+) -> dict[str, Any]:
+    try:
+        return philosophy_reader.path_between(from_id, to_id, layers=_layer_set(layers), max_depth=max_depth)
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 
