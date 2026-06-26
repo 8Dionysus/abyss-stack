@@ -90,7 +90,8 @@
         "scripts/aoa-up",
         "scripts/aoa-wait",
         "scripts/aoa-warmup",
-        "scripts/aoa.ps1"
+        "scripts/aoa.ps1",
+        "scripts/tos-up"
       ],
       "organ_lane": "runtime command surface",
       "owner_surface": "scripts/README.md",

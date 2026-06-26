@@ -4,10 +4,11 @@ set -euo pipefail
 MECHANIC_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_ROOT="$(cd -- "${MECHANIC_SCRIPT_DIR}/../../../.." && pwd)"
 SCRIPTS_DIR="${SOURCE_ROOT}/scripts"
+command_name="${TOS_GRAPH_COMMAND_NAME:-aoa-tos-graph}"
 
 usage() {
-  cat <<'EOF'
-Usage: aoa-tos-graph [--no-open] [--open] [--no-wait] [--force-start] [--status] [--down] [--] [compose args...]
+  cat <<EOF
+Usage: ${command_name} [--no-open] [--open] [--no-wait] [--force-start] [--status] [--down] [--] [compose args...]
 
 Start the Tree of Sophia graph review workbench through the curation profile,
 wait for the curation profile, and open it when a desktop opener is available.

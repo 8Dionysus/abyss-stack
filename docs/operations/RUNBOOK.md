@@ -45,6 +45,7 @@ aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selecti
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 aoa-a2a-return-closeout-dry-run --input-file /tmp/reviewed-closeout-request.json --write
 scripts/aoa-rpg-runtime-projection --check
+scripts/tos-up
 scripts/aoa-tos-graph
 scripts/aoa-governed-run audit <run-id>
 scripts/aoa-governed-run replay-review-packets <run-id>
@@ -126,6 +127,7 @@ scripts/aoa-rpg-runtime-projection --check
 For the Tree of Sophia graph review workbench:
 
 ```bash
+scripts/tos-up
 scripts/aoa-tos-graph
 scripts/aoa-tos-graph --status
 ```
