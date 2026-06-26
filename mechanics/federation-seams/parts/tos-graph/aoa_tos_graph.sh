@@ -7,15 +7,16 @@ SCRIPTS_DIR="${SOURCE_ROOT}/scripts"
 
 usage() {
   cat <<'EOF'
-Usage: aoa-tos-graph [--no-open] [--open] [--no-wait] [--status] [--down] [--] [compose args...]
+Usage: aoa-tos-graph [--no-open] [--open] [--no-wait] [--force-start] [--status] [--down] [--] [compose args...]
 
 Start the Tree of Sophia graph review workbench through the curation profile,
-wait for the localhost UI, and open it when a desktop opener is available.
+wait for the curation profile, and open it when a desktop opener is available.
 
 Options:
   --open       Try to open the UI after startup. This is the default.
   --no-open    Start and print the UI URL without opening a browser.
   --no-wait    Do not wait for the health endpoint after startup.
+  --force-start Run compose even when the workbench is already reachable.
   --status     Do not start containers; report the current health endpoint.
   --down       Stop the curation profile instead of starting it.
   -h, --help   Show this help.
@@ -26,6 +27,7 @@ open_requested=1
 wait_requested=1
 status_only=0
 down_requested=0
+force_start=0
 forward_args=()
 
 while (($#)); do
@@ -41,6 +43,9 @@ while (($#)); do
       ;;
     --status)
       status_only=1
+      ;;
+    --force-start)
+      force_start=1
       ;;
     --down)
       down_requested=1
@@ -84,19 +89,12 @@ except Exception:
 PY
 }
 
-wait_for_health() {
-  local timeout_s="${AOA_TOS_GRAPH_WAIT_TIMEOUT_S:-${AOA_WAIT_TIMEOUT_S:-120}}"
-  local interval_s="${AOA_TOS_GRAPH_WAIT_INTERVAL_S:-2}"
-  local deadline=$((SECONDS + timeout_s))
+wait_for_profile() {
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-wait" --profile curation >/dev/null
+}
 
-  while ((SECONDS < deadline)); do
-    if check_health; then
-      return 0
-    fi
-    sleep "$interval_s"
-  done
-
-  return 1
+profile_ready() {
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-smoke" --profile curation >/dev/null 2>&1
 }
 
 open_ui() {
@@ -134,12 +132,16 @@ if ((status_only)); then
 fi
 
 printf 'Starting ToS graph review workbench through profile: curation\n'
-AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-up" --profile curation "${forward_args[@]}"
+if ((force_start == 0)) && profile_ready; then
+  printf 'ToS graph curation profile is already reachable: %s\n' "$ui_url"
+else
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-up" --profile curation "${forward_args[@]}"
+fi
 
 if ((wait_requested)); then
-  printf 'Waiting for ToS graph health: %s\n' "$health_url"
-  if ! wait_for_health; then
-    printf 'error: timed out waiting for ToS graph health: %s\n' "$health_url" >&2
+  printf 'Waiting for ToS graph curation profile: %s\n' "$health_url"
+  if ! wait_for_profile; then
+    printf 'error: timed out waiting for ToS graph curation profile: %s\n' "$health_url" >&2
     exit 1
   fi
 fi
