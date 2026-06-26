@@ -97,6 +97,7 @@
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## federation/read-model
 
@@ -289,6 +290,10 @@
 ## runtime export
 
 - [ABYSS-STACK-D-0049 Federation Runtime Seams Validator Module](../ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md`)
+
+## runtime graph projection
+
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## runtime lifecycle
 

@@ -17,7 +17,10 @@ class HealthResponse(BaseModel):
     tos_root_exists: bool
     corpus_index_path: str
     corpus_index_exists: bool
+    philosophy_graph_projection_path: str
+    philosophy_graph_projection_exists: bool
     default_view: str
+    default_philosophy_view: str
 
 
 class CorpusStatusResponse(BaseModel):
@@ -55,6 +58,58 @@ class CorpusGraphViewResponse(BaseModel):
     items: list[dict[str, Any]]
     counts: dict[str, int]
     runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyStatusResponse(BaseModel):
+    schema: str
+    projection_exists: bool
+    projection_path: str
+    atlas_projection_path: str
+    graph_views_path: str
+    counts: dict[str, int]
+    views: list[str]
+    graph_layers: list[str]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyViewsResponse(BaseModel):
+    schema: str
+    views: list[dict[str, Any]]
+    counts: dict[str, int]
+    graph_layers: list[dict[str, Any]]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyViewResponse(BaseModel):
+    schema: str
+    view: dict[str, Any]
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    node_count: int
+    edge_count: int
+    source_refs: list[str]
+    counts: dict[str, int]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophySearchResponse(BaseModel):
+    schema: str
+    query: str
+    result_count: int
+    results: list[dict[str, Any]]
+    authority_note: str
+
+
+class PhilosophyPacketResponse(BaseModel):
+    schema: str
+    query: str
+    view_id: str | None
+    result_count: int
+    results: list[dict[str, Any]]
+    view: dict[str, Any] | None
+    counts: dict[str, int]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
 
 
 class ProjectSyncResponse(BaseModel):

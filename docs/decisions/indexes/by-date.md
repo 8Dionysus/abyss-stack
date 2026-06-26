@@ -118,3 +118,7 @@
 ## 2026-06-21
 
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
+
+## 2026-06-25
+
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)

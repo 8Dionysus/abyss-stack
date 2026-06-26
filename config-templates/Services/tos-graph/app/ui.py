@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from html import escape
 
 from .config import TosGraphSettings
 from .neo4j_store import Neo4jStoreStatus
@@ -16,14 +15,16 @@ INDEX_TEMPLATE = """<!doctype html>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f5f2ec;
-        --ink: #17231e;
-        --muted: #65736b;
-        --line: rgba(23, 35, 30, 0.16);
-        --panel: rgba(255, 255, 255, 0.78);
-        --accent: #2e7d66;
-        --accent-2: #b77938;
-        --warn: #a44b3f;
+        --bg: #f6f7f9;
+        --ink: #18211f;
+        --muted: #61706b;
+        --line: rgba(24, 33, 31, 0.16);
+        --panel: rgba(255, 255, 255, 0.9);
+        --tool: #eef2f5;
+        --accent: #247865;
+        --blue: #3e6fa3;
+        --gold: #b1742f;
+        --red: #a3483f;
       }
       * { box-sizing: border-box; }
       body {
@@ -31,19 +32,15 @@ INDEX_TEMPLATE = """<!doctype html>
         min-height: 100vh;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: var(--ink);
-        background:
-          linear-gradient(90deg, rgba(23,35,30,0.05) 1px, transparent 1px),
-          linear-gradient(rgba(23,35,30,0.05) 1px, transparent 1px),
-          var(--bg);
-        background-size: 28px 28px;
+        background: var(--bg);
       }
       main {
         display: grid;
-        grid-template-columns: 280px minmax(0, 1fr) 360px;
+        grid-template-columns: 292px minmax(0, 1fr) 376px;
         grid-template-areas: "rail viewport inspector";
-        gap: 14px;
+        gap: 12px;
         min-height: 100vh;
-        padding: 14px;
+        padding: 12px;
       }
       section, aside {
         border: 1px solid var(--line);
@@ -51,23 +48,33 @@ INDEX_TEMPLATE = """<!doctype html>
         border-radius: 8px;
         min-width: 0;
       }
-      .rail, .inspector { padding: 16px; overflow: auto; }
+      .rail, .inspector {
+        padding: 14px;
+        overflow: auto;
+      }
       .rail { grid-area: rail; }
-      .viewport { grid-area: viewport; padding: 16px; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 14px; }
+      .viewport {
+        grid-area: viewport;
+        padding: 14px;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 12px;
+      }
       .inspector { grid-area: inspector; }
       h1, h2, h3, p { margin-top: 0; }
-      h1 { font-size: 22px; line-height: 1.15; margin-bottom: 8px; }
-      h2 { font-size: 16px; margin-bottom: 10px; }
-      h3 { font-size: 13px; margin-bottom: 8px; }
-      p, .muted, button, input { font-size: 13px; }
+      h1 { font-size: 21px; line-height: 1.15; margin-bottom: 8px; }
+      h2 { font-size: 15px; margin-bottom: 9px; }
+      h3 { font-size: 13px; margin-bottom: 7px; }
+      p, .muted, button, input, label { font-size: 13px; }
       .muted { color: var(--muted); line-height: 1.45; }
       .stack { display: grid; gap: 10px; }
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .chip {
         border: 1px solid var(--line);
         border-radius: 999px;
         padding: 6px 9px;
-        background: rgba(255,255,255,0.62);
+        background: var(--tool);
         font-size: 12px;
       }
       button, input {
@@ -79,39 +86,52 @@ INDEX_TEMPLATE = """<!doctype html>
         color: var(--ink);
       }
       button { cursor: pointer; text-align: left; }
-      button.active { border-color: rgba(46,125,102,0.65); box-shadow: inset 3px 0 0 var(--accent); }
+      button.active { border-color: rgba(36, 120, 101, 0.72); box-shadow: inset 3px 0 0 var(--accent); }
       input { width: 100%; }
       .metric-grid {
         display: grid;
-        grid-template-columns: repeat(6, minmax(90px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(6, minmax(82px, 1fr));
+        gap: 8px;
       }
       .metric {
         border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 12px;
-        background: rgba(255,255,255,0.7);
+        padding: 10px;
+        background: white;
+        min-width: 0;
       }
-      .metric strong { display: block; font-size: 24px; line-height: 1; margin-bottom: 7px; }
+      .metric strong { display: block; font-size: 22px; line-height: 1; margin-bottom: 6px; }
       .canvas {
-        min-height: 460px;
+        min-height: 520px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: rgba(255,255,255,0.58);
+        background: white;
         overflow: hidden;
         position: relative;
       }
-      svg { width: 100%; height: 460px; display: block; }
-      .node circle { stroke: rgba(23,35,30,0.35); stroke-width: 1.2; }
+      svg { width: 100%; height: 520px; display: block; }
+      .node circle { stroke: rgba(24,33,31,0.35); stroke-width: 1.2; }
       .node text { font-size: 11px; fill: var(--ink); }
-      .edge { stroke: rgba(23,35,30,0.22); stroke-width: 1.1; fill: none; }
+      .edge-line { stroke: rgba(24,33,31,0.2); stroke-width: 1.2; fill: none; cursor: pointer; }
+      .edge-line:hover { stroke: var(--gold); stroke-width: 2.2; }
       .list { display: grid; gap: 8px; }
       .item {
         border: 1px solid var(--line);
         border-radius: 7px;
         padding: 10px;
-        background: rgba(255,255,255,0.62);
+        background: white;
       }
+      .layer-list { display: grid; gap: 6px; }
+      .layer-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 8px;
+        background: white;
+      }
+      .layer-toggle input { width: auto; }
       pre {
         white-space: pre-wrap;
         word-break: break-word;
@@ -119,8 +139,8 @@ INDEX_TEMPLATE = """<!doctype html>
         line-height: 1.45;
         margin: 0;
       }
-      .warn { color: var(--warn); }
-      @media (max-width: 1100px) {
+      .warn { color: var(--red); }
+      @media (max-width: 1120px) {
         main {
           grid-template-columns: 1fr;
           grid-template-areas: "rail" "viewport" "inspector";
@@ -133,40 +153,50 @@ INDEX_TEMPLATE = """<!doctype html>
     <main>
       <aside class="rail stack">
         <div>
-          <h1>Tree of Sophia Corpus Graph</h1>
-          <p class="muted">Runtime view over the ToS-owned corpus index. Tree of Sophia owns meaning; this surface owns projection and review access.</p>
+          <h1>Tree of Sophia Graph</h1>
+          <p class="muted">Tree of Sophia owns meaning. abyss-stack serves projection, cache, UI, and MCP access.</p>
+        </div>
+        <div class="split">
+          <button id="modePhilosophy" type="button">Philosophy</button>
+          <button id="modeCorpus" type="button">Corpus</button>
         </div>
         <div class="stack">
           <h2>Views</h2>
           <div id="viewList" class="stack"></div>
         </div>
         <div class="stack">
+          <h2>Layers</h2>
+          <div id="layerList" class="layer-list"></div>
+        </div>
+        <div class="stack">
           <h2>Search</h2>
-          <input id="searchInput" placeholder="node, path, branch, witness">
-          <button id="searchButton" type="button">Search corpus</button>
+          <input id="searchInput" placeholder="node, source_ref, predicate">
+          <button id="searchButton" type="button">Search</button>
         </div>
         <div class="stack">
           <h2>Projection</h2>
-          <button id="syncButton" type="button">Sync corpus projection</button>
+          <button id="syncButton" type="button">Sync projection</button>
           <div id="syncNote" class="muted"></div>
         </div>
       </aside>
       <section class="viewport">
         <div class="row">
-          <span class="chip">Index <span id="indexState">loading</span></span>
+          <span class="chip">Mode <span id="modeState">philosophy</span></span>
+          <span class="chip">Projection <span id="projectionState">loading</span></span>
           <span class="chip">Neo4j <span id="neo4jState">loading</span></span>
-          <span class="chip">Default <span id="defaultView">__DEFAULT_VIEW__</span></span>
+          <span class="chip">View <span id="viewState">loading</span></span>
         </div>
         <div id="metrics" class="metric-grid"></div>
         <div class="canvas">
-          <svg id="graphSvg" viewBox="0 0 960 460" role="img" aria-label="ToS corpus graph view"></svg>
+          <svg id="graphSvg" viewBox="0 0 1000 520" role="img" aria-label="ToS graph projection view"></svg>
         </div>
       </section>
       <aside class="inspector stack">
         <div>
           <h2 id="inspectorTitle">Selection</h2>
-          <div id="inspectorMeta" class="muted">Choose a graph view or search result.</div>
+          <div id="inspectorMeta" class="muted">No selection.</div>
         </div>
+        <div id="sourceRefs" class="list"></div>
         <div id="resultList" class="list"></div>
         <div class="item"><pre id="inspectorJson">{}</pre></div>
       </aside>
@@ -175,8 +205,16 @@ INDEX_TEMPLATE = """<!doctype html>
       window.__TOS_GRAPH_BOOT__ = __BOOT_PAYLOAD__;
 
       const boot = window.__TOS_GRAPH_BOOT__;
-      const state = { status: null, summary: null, view: null, query: "", results: [] };
       const q = (id) => document.getElementById(id);
+      const state = {
+        mode: "philosophy",
+        status: {},
+        corpusSummary: null,
+        philosophyViews: null,
+        currentView: null,
+        activeLayers: new Set(),
+        results: [],
+      };
 
       async function fetchJson(url, options = undefined) {
         const response = await fetch(url, options);
@@ -192,25 +230,52 @@ INDEX_TEMPLATE = """<!doctype html>
           .replaceAll('"', "&quot;");
       }
 
-      function short(value, length = 42) {
+      function short(value, length = 44) {
         const text = String(value ?? "");
         return text.length > length ? `${text.slice(0, length)}...` : text;
       }
 
+      function itemId(item) {
+        return item.node_id || item.edge_id || item.id || item.path || item.pack_id || item.view_id || item.layer_id || "item";
+      }
+
+      function itemTitle(item) {
+        return item.label || item.title || itemId(item);
+      }
+
+      function layerAllowed(item) {
+        const layers = item.graph_layers || [];
+        if (!layers.length || !state.activeLayers.size) return true;
+        return layers.some((layer) => state.activeLayers.has(layer));
+      }
+
+      function setMode(mode) {
+        state.mode = mode;
+        q("modePhilosophy").classList.toggle("active", mode === "philosophy");
+        q("modeCorpus").classList.toggle("active", mode === "corpus");
+        q("modeState").textContent = mode;
+      }
+
       function renderMetrics() {
-        const counts = state.summary?.counts || {};
-        const keys = ["branches", "manifests", "nodes", "relation_packs", "relation_edges", "resources"];
+        const counts = state.mode === "philosophy"
+          ? (state.status.philosophy?.counts || {})
+          : (state.corpusSummary?.counts || {});
+        const keys = state.mode === "philosophy"
+          ? ["views", "graph_layers", "nodes", "edges", "source_refs", "diagnostics"]
+          : ["branches", "manifests", "nodes", "relation_packs", "relation_edges", "resources"];
         q("metrics").innerHTML = keys.map((key) => `
           <div class="metric"><strong>${counts[key] ?? 0}</strong><span class="muted">${key.replaceAll("_", " ")}</span></div>
         `).join("");
       }
 
       function renderViews() {
-        const views = state.summary?.graph_views || [];
+        const views = state.mode === "philosophy"
+          ? (state.philosophyViews?.views || [])
+          : (state.corpusSummary?.graph_views || []);
         q("viewList").innerHTML = views.map((view) => `
-          <button type="button" data-view="${escapeHtml(view.view_id)}" class="${state.view?.view?.view_id === view.view_id ? "active" : ""}">
-            <strong>${escapeHtml(view.view_id)}</strong><br>
-            <span class="muted">${escapeHtml(view.layout_hint)}</span>
+          <button type="button" data-view="${escapeHtml(view.view_id)}" class="${state.currentViewId === view.view_id ? "active" : ""}">
+            <strong>${escapeHtml(view.title || view.view_id)}</strong><br>
+            <span class="muted">${escapeHtml(view.layout_hint || view.purpose || "")}</span>
           </button>
         `).join("");
         for (const button of q("viewList").querySelectorAll("[data-view]")) {
@@ -218,119 +283,229 @@ INDEX_TEMPLATE = """<!doctype html>
         }
       }
 
-      function itemLabel(item) {
-        return item.id || item.path || item.node_id || item.pack_id || item.edge_id || item.view_id || "item";
-      }
-
-      function renderGraph() {
-        const svg = q("graphSvg");
-        if (!state.view) {
-          svg.innerHTML = "";
+      function renderLayers() {
+        if (state.mode !== "philosophy") {
+          q("layerList").innerHTML = '<span class="muted">Corpus views do not expose projection layers.</span>';
           return;
         }
-        const items = state.view.items || [];
-        const width = 960;
-        const height = 460;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const radius = Math.min(320, 90 + items.length * 7);
-        const points = items.slice(0, 80).map((item, index) => {
-          const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / Math.max(items.length, 1));
-          return {
-            item,
-            x: centerX + Math.cos(angle) * radius,
-            y: centerY + Math.sin(angle) * Math.min(radius, 170),
-          };
-        });
-        const edges = points.map((point) => `
-          <path class="edge" d="M ${centerX} ${centerY} L ${point.x} ${point.y}" />
+        const layers = state.currentView?.view?.graph_layers || [];
+        if (!layers.length) {
+          q("layerList").innerHTML = '<span class="muted">No layers.</span>';
+          return;
+        }
+        q("layerList").innerHTML = layers.map((layer) => `
+          <label class="layer-toggle">
+            <input type="checkbox" data-layer="${escapeHtml(layer)}" ${state.activeLayers.has(layer) ? "checked" : ""}>
+            <span>${escapeHtml(layer)}</span>
+          </label>
         `).join("");
-        const nodes = points.map((point, index) => {
-          const color = ["#2e7d66", "#b77938", "#547aa5", "#8b6fb6", "#b8554a", "#6b8f4f"][index % 6];
-          return `
-            <g class="node" data-index="${index}">
-              <circle cx="${point.x}" cy="${point.y}" r="10" fill="${color}" />
-              ${index < 18 ? `<text x="${point.x + 13}" y="${point.y + 4}">${escapeHtml(short(itemLabel(point.item), 30))}</text>` : ""}
-            </g>
-          `;
-        }).join("");
-        svg.innerHTML = `
-          <circle cx="${centerX}" cy="${centerY}" r="18" fill="rgba(46,125,102,0.18)" stroke="rgba(46,125,102,0.55)"></circle>
-          <text x="${centerX + 24}" y="${centerY + 4}">${escapeHtml(state.view.view.view_id)}</text>
-          ${edges}
-          ${nodes}
-        `;
-        for (const group of svg.querySelectorAll("[data-index]")) {
-          group.addEventListener("click", () => {
-            const item = points[Number(group.getAttribute("data-index"))]?.item;
-            inspect(itemLabel(item), item);
+        for (const input of q("layerList").querySelectorAll("[data-layer]")) {
+          input.addEventListener("change", () => {
+            const layer = input.getAttribute("data-layer");
+            if (input.checked) state.activeLayers.add(layer);
+            else state.activeLayers.delete(layer);
+            renderGraph();
           });
         }
       }
 
-      function inspect(title, payload) {
+      function inspect(title, payload, sourceRefs = []) {
         q("inspectorTitle").textContent = title;
-        q("inspectorMeta").textContent = "ToS source path and authority layer stay in the payload.";
+        q("inspectorMeta").textContent = state.mode === "philosophy"
+          ? "Philosophy projection packet. Source authority stays in Tree of Sophia."
+          : "Corpus projection packet. Source authority stays in Tree of Sophia.";
         q("inspectorJson").textContent = JSON.stringify(payload, null, 2);
+        const refs = [...new Set(sourceRefs.filter(Boolean))];
+        q("sourceRefs").innerHTML = refs.map((ref) => `
+          <div class="item"><strong>source_ref</strong><br><span class="muted">${escapeHtml(ref)}</span></div>
+        `).join("");
       }
 
       function renderResults() {
-        q("resultList").innerHTML = state.results.map((entry, index) => {
+        q("resultList").innerHTML = state.results.slice(0, 40).map((entry, index) => {
           const item = entry.item || entry;
           return `
             <button type="button" class="item" data-result="${index}">
-              <strong>${escapeHtml(short(itemLabel(item), 52))}</strong><br>
-              <span class="muted">${escapeHtml(entry.collection || item.authority_layer || "result")}</span>
+              <strong>${escapeHtml(short(itemTitle(item), 54))}</strong><br>
+              <span class="muted">${escapeHtml(entry.collection || item.node_type || item.predicate_id || item.source_ref || "result")}</span>
             </button>
           `;
         }).join("");
         for (const button of q("resultList").querySelectorAll("[data-result]")) {
           button.addEventListener("click", () => {
             const entry = state.results[Number(button.getAttribute("data-result"))];
-            inspect(itemLabel(entry.item || entry), entry.item || entry);
+            const item = entry.item || entry;
+            inspect(itemTitle(item), item, [item.source_ref]);
           });
         }
       }
 
-      function renderAll() {
-        q("indexState").textContent = state.status?.index_exists ? "present" : "missing";
+      function renderGraph() {
+        const svg = q("graphSvg");
+        if (!state.currentView) {
+          svg.innerHTML = "";
+          return;
+        }
+        if (state.mode === "corpus") {
+          renderCorpusGraph(svg);
+          return;
+        }
+        const nodes = (state.currentView.nodes || []).filter(layerAllowed).slice(0, 180);
+        const nodeIds = new Set(nodes.map((node) => node.node_id));
+        const edges = (state.currentView.edges || [])
+          .filter(layerAllowed)
+          .filter((edge) => nodeIds.has(edge.from_id) && nodeIds.has(edge.to_id))
+          .slice(0, 260);
+        const width = 1000;
+        const height = 520;
+        const cx = width / 2;
+        const cy = height / 2;
+        const rx = Math.min(390, 120 + nodes.length * 4);
+        const ry = Math.min(205, 80 + nodes.length * 2);
+        const positions = new Map();
+        nodes.forEach((node, index) => {
+          const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / Math.max(nodes.length, 1));
+          positions.set(node.node_id, { x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry });
+        });
+        const edgeMarkup = edges.map((edge, index) => {
+          const from = positions.get(edge.from_id);
+          const to = positions.get(edge.to_id);
+          if (!from || !to) return "";
+          return `<path class="edge-line" data-edge="${index}" d="M ${from.x} ${from.y} L ${to.x} ${to.y}" />`;
+        }).join("");
+        const nodeMarkup = nodes.map((node, index) => {
+          const point = positions.get(node.node_id);
+          const palette = ["#247865", "#3e6fa3", "#b1742f", "#8a5fa2", "#a3483f", "#5f7f3d"];
+          const color = palette[index % palette.length];
+          return `
+            <g class="node" data-node="${index}">
+              <circle cx="${point.x}" cy="${point.y}" r="10" fill="${color}" />
+              ${index < 42 ? `<text x="${point.x + 13}" y="${point.y + 4}">${escapeHtml(short(itemTitle(node), 34))}</text>` : ""}
+            </g>
+          `;
+        }).join("");
+        svg.innerHTML = `${edgeMarkup}${nodeMarkup}`;
+        for (const group of svg.querySelectorAll("[data-node]")) {
+          group.addEventListener("click", () => {
+            const node = nodes[Number(group.getAttribute("data-node"))];
+            inspect(itemTitle(node), node, [node.source_ref]);
+          });
+        }
+        for (const path of svg.querySelectorAll("[data-edge]")) {
+          path.addEventListener("click", () => {
+            const edge = edges[Number(path.getAttribute("data-edge"))];
+            inspect(edge.edge_id, edge, [edge.source_ref]);
+          });
+        }
+      }
+
+      function renderCorpusGraph(svg) {
+        const items = (state.currentView.items || []).slice(0, 80);
+        const width = 1000;
+        const height = 520;
+        const cx = width / 2;
+        const cy = height / 2;
+        const radius = Math.min(360, 100 + items.length * 6);
+        const points = items.map((item, index) => {
+          const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / Math.max(items.length, 1));
+          return { item, x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * 180 };
+        });
+        svg.innerHTML = points.map((point) => `<path class="edge-line" d="M ${cx} ${cy} L ${point.x} ${point.y}" />`).join("") +
+          points.map((point, index) => `
+            <g class="node" data-node="${index}">
+              <circle cx="${point.x}" cy="${point.y}" r="10" fill="${index % 2 ? "#3e6fa3" : "#247865"}" />
+              ${index < 30 ? `<text x="${point.x + 13}" y="${point.y + 4}">${escapeHtml(short(itemTitle(point.item), 32))}</text>` : ""}
+            </g>
+          `).join("");
+        for (const group of svg.querySelectorAll("[data-node]")) {
+          group.addEventListener("click", () => {
+            const item = points[Number(group.getAttribute("data-node"))].item;
+            inspect(itemTitle(item), item, [item.source_ref || item.source_path || item.path]);
+          });
+        }
+      }
+
+      function updateStatusChips() {
+        q("projectionState").textContent = state.mode === "philosophy"
+          ? (state.status.philosophy?.projection_exists ? "present" : "missing")
+          : (state.status.corpus?.index_exists ? "present" : "missing");
         q("neo4jState").textContent = boot.neo4j.ready ? "ready" : (boot.neo4j.configured ? "preview" : "deferred");
+        q("viewState").textContent = state.currentViewId || "none";
+      }
+
+      function renderAll() {
+        updateStatusChips();
         renderMetrics();
         renderViews();
+        renderLayers();
         renderGraph();
         renderResults();
       }
 
       async function loadView(viewId) {
-        state.view = await fetchJson(`/api/corpus/graph-views/${encodeURIComponent(viewId)}?limit=80`);
-        state.results = state.view.items || [];
-        inspect(viewId, state.view.view);
+        state.currentViewId = viewId;
+        if (state.mode === "philosophy") {
+          state.currentView = await fetchJson(`/api/philosophy/views/${encodeURIComponent(viewId)}`);
+          state.activeLayers = new Set(state.currentView.view.graph_layers || []);
+          state.results = [...(state.currentView.nodes || []), ...(state.currentView.edges || [])];
+          inspect(state.currentView.view.title || viewId, state.currentView.view, state.currentView.source_refs || []);
+        } else {
+          state.currentView = await fetchJson(`/api/corpus/graph-views/${encodeURIComponent(viewId)}?limit=80`);
+          state.results = state.currentView.items || [];
+          inspect(viewId, state.currentView.view, [state.currentView.view.entry_surface]);
+        }
         renderAll();
       }
 
-      async function searchCorpus() {
-        state.query = q("searchInput").value.trim();
-        const payload = await fetchJson(`/api/corpus/search?query=${encodeURIComponent(state.query)}&limit=40`);
-        state.results = payload.results || [];
-        inspect(`Search: ${state.query || "all"}`, payload);
+      async function searchCurrentMode() {
+        const query = q("searchInput").value.trim();
+        if (state.mode === "philosophy") {
+          const payload = await fetchJson(`/api/philosophy/search?query=${encodeURIComponent(query)}&limit=40`);
+          state.results = payload.results || [];
+          inspect(`Search: ${query || "all"}`, payload, []);
+        } else {
+          const payload = await fetchJson(`/api/corpus/search?query=${encodeURIComponent(query)}&limit=40`);
+          state.results = payload.results || [];
+          inspect(`Search: ${query || "all"}`, payload, []);
+        }
         renderAll();
       }
 
-      async function syncCorpus() {
+      async function syncProjection() {
         q("syncNote").textContent = "syncing...";
-        const payload = await fetchJson("/api/project/sync", { method: "POST" });
-        q("syncNote").textContent = `${payload.status}: ${payload.node_count} nodes, ${payload.edge_count} edges, ${payload.resource_count} resources`;
-        inspect("Projection sync", payload);
+        const url = state.mode === "philosophy" ? "/api/philosophy/project/sync" : "/api/project/sync";
+        const payload = await fetchJson(url, { method: "POST" });
+        q("syncNote").textContent = `${payload.status}: ${payload.node_count} nodes, ${payload.edge_count} edges`;
+        inspect("Projection sync", payload, []);
+      }
+
+      async function loadMode(mode) {
+        setMode(mode);
+        state.currentView = null;
+        state.results = [];
+        if (mode === "philosophy") {
+          state.status.philosophy = await fetchJson("/api/philosophy/status");
+          if (!state.status.philosophy.projection_exists) {
+            inspect("Missing projection", state.status.philosophy, []);
+            renderAll();
+            return;
+          }
+          state.philosophyViews = await fetchJson("/api/philosophy/views");
+          await loadView(boot.default_philosophy_view);
+        } else {
+          state.status.corpus = await fetchJson("/api/corpus/status");
+          state.corpusSummary = await fetchJson("/api/corpus/summary");
+          await loadView(boot.default_view);
+        }
       }
 
       async function init() {
-        state.status = await fetchJson("/api/corpus/status");
-        state.summary = await fetchJson("/api/corpus/summary");
-        q("searchButton").addEventListener("click", searchCorpus);
-        q("searchInput").addEventListener("keydown", (event) => { if (event.key === "Enter") searchCorpus(); });
-        q("syncButton").addEventListener("click", syncCorpus);
-        await loadView(boot.default_view);
-        renderAll();
+        q("modePhilosophy").addEventListener("click", () => loadMode("philosophy"));
+        q("modeCorpus").addEventListener("click", () => loadMode("corpus"));
+        q("searchButton").addEventListener("click", searchCurrentMode);
+        q("searchInput").addEventListener("keydown", (event) => { if (event.key === "Enter") searchCurrentMode(); });
+        q("syncButton").addEventListener("click", syncProjection);
+        await loadMode("philosophy");
       }
 
       init().catch((error) => {
@@ -347,7 +522,9 @@ def render_index(settings: TosGraphSettings, neo4j_status: Neo4jStoreStatus) -> 
     boot_payload = {
         "service": settings.service_name,
         "corpus_index_path": settings.corpus_index_path.as_posix(),
+        "philosophy_graph_projection_path": settings.philosophy_graph_projection_path.as_posix(),
         "default_view": settings.default_view,
+        "default_philosophy_view": settings.default_philosophy_view,
         "write_enabled": settings.write_enabled,
         "projection_mode": settings.projection_mode,
         "neo4j": {
@@ -357,7 +534,4 @@ def render_index(settings: TosGraphSettings, neo4j_status: Neo4jStoreStatus) -> 
             "note": neo4j_status.note,
         },
     }
-    html = INDEX_TEMPLATE
-    html = html.replace("__BOOT_PAYLOAD__", json.dumps(boot_payload, ensure_ascii=False))
-    html = html.replace("__DEFAULT_VIEW__", escape(settings.default_view))
-    return html
+    return INDEX_TEMPLATE.replace("__BOOT_PAYLOAD__", json.dumps(boot_payload, ensure_ascii=False))

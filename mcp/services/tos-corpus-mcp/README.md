@@ -6,6 +6,7 @@ stack-owned MCP access plane.
 It reads:
 
 - `Tree-of-Sophia/ToS/derived-exports/tos_corpus_index.min.json`
+- `Tree-of-Sophia/ToS/derived-exports/philosophy_graph_projection.min.json`
 
 It returns:
 
@@ -14,12 +15,14 @@ It returns:
 - graph-view packets
 - resource and node search
 - relation-pack packets
+- philosophy graph status, views, nodes, neighborhoods, and compact packets
 
 ## Boundary
 
-Tree of Sophia owns the corpus resource. `abyss-stack` owns this MCP access
-plane, runtime projection, and visualization support. MCP packets help agents
-review and navigate the corpus; they do not become ToS source truth.
+Tree of Sophia owns the corpus and philosophy graph resources. `abyss-stack`
+owns this MCP access plane, runtime projection, and visualization support. MCP
+packets help agents review and navigate the corpus and projected philosophy
+graph; they do not become ToS source truth.
 
 ## Local Checks
 
