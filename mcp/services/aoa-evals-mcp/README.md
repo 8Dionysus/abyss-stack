@@ -13,6 +13,7 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 - which generated section or comparison read model matters;
 - what candidate runtime evidence template fits;
 - whether source or approved mirror readers are fresh enough to use;
+- what the current Eval Forge front door exposes for a new eval session;
 - whether a candidate evidence packet is schema-shaped and review-routed;
 - which stack-owned private runtime candidate exports are waiting for review;
 - which sibling repositories expose repo-local `evals/` ports;
@@ -29,6 +30,7 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 | `aoa-evals` source bundle | bounded claim, object under evaluation, verdict logic, blind spots, and report contract |
 | `aoa-evals/generated/` | catalog, capsule, section, comparison, and report read models |
 | `aoa-evals` runtime-candidate readers | candidate evidence and artifact hook templates |
+| `aoa-evals` readiness dashboard | Eval Forge front-door refs, commands, candidate queue routes, and non-proof stop lines |
 | `abyss-stack/Logs/eval-exports` | private runtime candidate exports produced by governed execution |
 | sibling repo `evals/` ports | repo-local eval pressure, suite notes, report notes, and intake drafts |
 | `aoa-evals-mcp` | live MCP access plane over those surfaces, with narrow local-port write gates |
@@ -43,6 +45,7 @@ Resources:
 - `aoa-evals://comparison-spine`
 - `aoa-evals://runtime-candidate-templates`
 - `aoa-evals://runtime-status`
+- `aoa-evals://forge-access`
 - `aoa-evals://runtime-evidence/schema`
 - `aoa-evals://runtime-candidate-exports`
 - `aoa-evals://runtime-candidate-export/{record_id}`
@@ -62,6 +65,7 @@ Tools:
 - `aoa_evals_comparison(baseline_mode)`
 - `aoa_evals_runtime_evidence_template(name)`
 - `aoa_evals_runtime_status()`
+- `aoa_evals_forge_access_packet()`
 - `aoa_evals_validate_evidence_candidate(packet)`
 - `aoa_evals_runtime_candidate_exports(limit)`
 - `aoa_evals_read_runtime_candidate_export(record_id, include_payload)`
@@ -79,6 +83,7 @@ Prompts:
 - `eval-find-or-propose`
 - `eval-review`
 - `evidence-packet`
+- `eval-forge-access`
 - `local-eval-port`
 - `report-skeleton`
 
@@ -96,6 +101,14 @@ authority, promotion, central mutation, verdicts, or scoring.
 The service does not run evals, compute verdicts, publish receipts, promote
 bundles, ingest or accept evidence, approve proposals, create central bundles,
 or mutate `aoa-evals`.
+
+`aoa_evals_forge_access_packet` and `aoa-evals://forge-access` expose the
+current Eval Forge front door as access-plane data: selected `aoa-evals` root
+and freshness state, readiness summary, active local-port routes, candidate
+queue hints, Forge docs refs, exact route commands, stop-lines, and explicit
+non-proof fields. The packet is read-only and candidate-only; it cannot write
+worksheets, local ports, central bundles, verdicts, scores, receipts, or proof
+promotion.
 
 `aoa_evals_local_ports` is an OS Abyss-wide routing inventory, not just a list
 of present `PORT.yaml` files. It scans Git roots below the workspace, skips

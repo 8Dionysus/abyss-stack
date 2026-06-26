@@ -7,7 +7,7 @@
 | `aoa-evals` | bounded proof bundles, verdict logic, generated reader contracts, runtime-candidate posture | runtime service execution |
 | generated readers | deterministic catalog, capsule, section, comparison, and report read models | proof interpretation stronger than source bundles |
 | runtime-candidate readers | candidate evidence and artifact hook templates | accepted proof or verdicts |
-| `aoa-evals-mcp` | read access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, candidate packet validation, runtime candidate export read-model, report skeletons, and gated sibling repo-local eval-port writes | eval running, verdict computation, receipt publication, bundle promotion, central `aoa-evals` source mutation, proposal approval, evidence acceptance, arbitrary sibling path mutation |
+| `aoa-evals-mcp` | read access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, Eval Forge front-door access packets, candidate packet validation, runtime candidate export read-model, report skeletons, and gated sibling repo-local eval-port writes | eval running, verdict computation, receipt publication, bundle promotion, central `aoa-evals` source mutation, proposal approval, evidence acceptance, worksheet acceptance, arbitrary sibling path mutation |
 | `abyss-stack` | runnable MCP package and stdio service topology | proof meaning |
 
 ## Interface
@@ -22,6 +22,12 @@ support a bounded report.
 
 Runtime status is below source truth. It may reveal missing, stale, or
 unmanifested mirrors, but a fresh mirror never becomes proof authority.
+
+Eval Forge access packets are below authoring and review. They may surface
+operating-path refs, criteria refs, local-port matrix refs, exact route
+commands, candidate queue hints, and active local-port routes. They do not
+write worksheets, accept candidates, approve owner-review decisions, or create
+central/local proof.
 
 Candidate validation is below ingestion. It means a packet is schema-shaped and
 review-routed, not accepted evidence.
@@ -59,6 +65,7 @@ proof/promotion/verdict/scoring/central-mutation effects.
 - No bundle promotion.
 - No `aoa-evals` source mutation.
 - No proposal approval or source bundle creation.
+- No worksheet acceptance or Eval Forge route promotion from MCP.
 - No arbitrary sibling path writes outside repo-local `evals/` ports.
 - No treating MCP/generated/runtime output as stronger than source bundles.
 - No moving proof authority into `abyss-stack`.

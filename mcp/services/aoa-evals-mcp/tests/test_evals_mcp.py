@@ -264,6 +264,104 @@ def seed_evals(root: Path) -> None:
             ],
         },
     )
+    write_json(
+        evals / "generated/eval_readiness_dashboard.json",
+        {
+            "schema_version": "os_abyss_eval_readiness_dashboard_v1",
+            "generated_at_utc": "2026-06-26T00:00:00+00:00",
+            "source_of_truth": {
+                "session_start_tool": "scripts/aoa_eval_session_start.py",
+                "eval_forge_operating_path": "mechanics/proof-object/parts/eval-authoring/docs/EVAL_FORGE_OPERATING_PATH.md",
+                "eval_forge_session_mining_criteria": "mechanics/proof-object/parts/eval-authoring/docs/SESSION_MINING_CRITERIA.md",
+                "eval_forge_local_port_matrix": "mechanics/proof-object/parts/eval-authoring/docs/LOCAL_PORT_DECISION_MATRIX.md",
+                "eval_forge_router": "mechanics/proof-object/parts/eval-authoring/scripts/eval_forge_route.py",
+            },
+            "eval_forge_readiness": {
+                "schema_version": "os_abyss_eval_forge_readiness_v1",
+                "archetype_count": 3,
+                "registry_validation": {"valid": True, "errors": []},
+                "authority_boundary": "Eval Forge is a design router and worksheet layer, not proof authority.",
+                "front_door_refs": {
+                    "operating_path_ref": "mechanics/proof-object/parts/eval-authoring/docs/EVAL_FORGE_OPERATING_PATH.md",
+                    "session_mining_criteria_ref": "mechanics/proof-object/parts/eval-authoring/docs/SESSION_MINING_CRITERIA.md",
+                    "local_port_decision_matrix_ref": "mechanics/proof-object/parts/eval-authoring/docs/LOCAL_PORT_DECISION_MATRIX.md",
+                    "latest_route_review_report_ref": "mechanics/proof-object/parts/eval-authoring/reports/eval-forge/example.md",
+                    "worksheet_example_ref": "mechanics/proof-object/parts/eval-authoring/examples/example.eval_design_worksheet.json",
+                    "candidate_packet_schema_ref": "mechanics/audit/parts/candidate-readers/schemas/aoa-eval-candidate-packet.schema.json",
+                },
+                "front_door_commands": [
+                    {
+                        "command": "python scripts/aoa_eval_session_start.py --json",
+                        "purpose": "raise the per-session Eval Forge front door",
+                    },
+                    {
+                        "command": "python scripts/check_eval_forge_readiness.py --json",
+                        "purpose": "check front-door readiness gates and blockers",
+                    },
+                    {
+                        "command": "python mechanics/proof-object/parts/eval-authoring/scripts/eval_forge_route.py --candidate-packet <path> --json",
+                        "purpose": "route a session candidate packet through Eval Forge",
+                    },
+                ],
+                "front_door_surface_status": {
+                    "valid": True,
+                    "missing_refs": [],
+                    "proof_authority": False,
+                    "promotion_allowed": False,
+                },
+                "candidate_archetype_hints": [
+                    {
+                        "candidate_id": "packet:session:front-door-gap",
+                        "owner_repo": "abyss-stack",
+                        "selected_archetype_id": "runtime-smoke",
+                        "route_key": "runtime_owner_smoke_then_candidate_review",
+                        "exact_next_command": "python mechanics/proof-object/parts/eval-authoring/scripts/eval_forge_route.py --candidate-packet mechanics/audit/packet.json --json",
+                        "proof_authority": False,
+                        "promotion_allowed": False,
+                    }
+                ],
+                "stop_lines": [
+                    "keep candidate packets, local ports, MCP exports, and dashboards non-proof",
+                ],
+            },
+            "candidate_queue": {
+                "allowed_states": ["needs_owner_review", "rejected"],
+                "authority_boundary": "Central queue is a read-only candidate index and cannot promote proof.",
+                "anti_promotion_checks": ["candidate.promotion_allowed must stay false in this read-model"],
+                "candidate_packet_import": {
+                    "packet_count": 1,
+                    "summary": {"by_state": {"needs_owner_review": 1}},
+                },
+                "entries": [
+                    {
+                        "candidate_id": "packet:session:front-door-gap",
+                        "source_kind": "session_episode",
+                        "state": "needs_owner_review",
+                        "owner_repo": "abyss-stack",
+                        "next_route": "runtime smoke before owner review",
+                        "packet_ref": "mechanics/audit/packet.json",
+                        "proof_authority": False,
+                        "promotion_allowed": False,
+                    }
+                ],
+            },
+            "local_eval_ports": {
+                "summary": {"active": 1, "skeleton": 0},
+                "authority_boundary": "Repo-local eval ports are local pressure only.",
+            },
+            "freshness_sentinel": {"status": "ok"},
+            "aoa_session_memory_freshness": {"status": "not_checked_in_unit_fixture"},
+        },
+    )
+    for rel in (
+        "mechanics/proof-object/parts/eval-authoring/docs/EVAL_FORGE_OPERATING_PATH.md",
+        "mechanics/proof-object/parts/eval-authoring/docs/SESSION_MINING_CRITERIA.md",
+        "mechanics/proof-object/parts/eval-authoring/docs/LOCAL_PORT_DECISION_MATRIX.md",
+        "mechanics/proof-object/parts/eval-authoring/reports/eval-forge/example.md",
+        "mechanics/proof-object/parts/eval-authoring/examples/example.eval_design_worksheet.json",
+        "mechanics/audit/parts/candidate-readers/schemas/aoa-eval-candidate-packet.schema.json",
+    ):
+        write_text(evals / rel, "fixture\n")
     template = {
         "template_kind": "artifact_to_verdict_hook",
         "template_name": "bounded-change-hook",
@@ -663,6 +761,45 @@ def test_resources_and_runtime_templates(tmp_path: Path) -> None:
     assert status["catalog_count"] == 1
     schemas = state.read_resource("aoa-evals://runtime-evidence/schema")
     assert schemas["schemas"]["runtime_evidence_selection"]["present"] is True
+
+def test_eval_forge_access_packet_exposes_front_door_without_proof_promotion(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="active")
+    write_json(
+        tmp_path / "aoa-memo/evals/intake/memory-guardrail.eval_need.json",
+        valid_eval_need_packet(),
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    packet = state.eval_forge_access_packet()
+
+    assert packet["schema"] == "aoa_evals_forge_access_packet_v1"
+    assert packet["read_only"] is True
+    assert packet["candidate_only"] is True
+    assert packet["source_mutation_allowed"] is False
+    assert packet["proof_authority"] is False
+    assert packet["promotion_allowed"] is False
+    assert packet["eval_forge_front_door"]["proof_authority"] is False
+    assert packet["eval_forge_front_door"]["promotion_allowed"] is False
+    refs = packet["eval_forge_front_door"]["surface_refs"]
+    assert refs["operating_path_ref"].endswith("EVAL_FORGE_OPERATING_PATH.md")
+    assert refs["session_mining_criteria_ref"].endswith("SESSION_MINING_CRITERIA.md")
+    assert refs["local_port_decision_matrix_ref"].endswith("LOCAL_PORT_DECISION_MATRIX.md")
+    commands = [entry["command"] for entry in packet["exact_route_commands"]]
+    assert "python scripts/aoa_eval_session_start.py --json" in commands
+    assert any("eval_forge_route.py --candidate-packet" in command for command in commands)
+    assert packet["readiness_summary"]["archetype_count"] == 3
+    assert packet["freshness"]["runtime_status"]["mirror_is_authority"] is False
+    assert packet["local_ports"]["summary"]["active"] == 1
+    assert packet["local_ports"]["active_ports"][0]["repo"] == "aoa-memo"
+    assert packet["candidate_queue"]["top_candidate_routes"][0]["candidate_id"] == "packet:session:front-door-gap"
+    assert packet["candidate_queue"]["top_candidate_routes"][0]["proof_authority"] is False
+    assert packet["candidate_queue"]["forge_archetype_hints"][0]["selected_archetype_id"] == "runtime-smoke"
+    assert any("Do not mutate aoa-evals source from MCP." == line for line in packet["stop_lines"])
+
+    resource = state.read_resource("aoa-evals://forge-access")
+    assert resource["schema"] == "aoa_evals_forge_access_packet_v1"
+    assert resource["forge_docs_refs"] == packet["forge_docs_refs"]
 
 
 def test_runtime_status_flags_stale_mirror_when_source_is_selected(

@@ -58,6 +58,7 @@ def main() -> None:
     template.add_argument("name")
 
     sub.add_parser("runtime-status")
+    sub.add_parser("forge-access")
 
     validate = sub.add_parser("validate-evidence-candidate")
     validate.add_argument("--candidate-file", required=True)
@@ -137,6 +138,8 @@ def main() -> None:
         _print(state.runtime_evidence_template(args.name))
     elif args.command == "runtime-status":
         _print(state.runtime_status())
+    elif args.command == "forge-access":
+        _print(state.eval_forge_access_packet())
     elif args.command == "validate-evidence-candidate":
         packet = json.loads(Path(args.candidate_file).read_text(encoding="utf-8"))
         _print(state.validate_evidence_candidate(packet))
