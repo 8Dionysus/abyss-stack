@@ -22,3 +22,13 @@ write-enable defaults, or machine-local paths in this template. When explicit
 `TOS_GRAPH_NEO4J_*` overrides are absent, the service may reuse `NEO4J_AUTH`
 from the mounted runtime `stack.env` so graph projection can remain
 operator-local without duplicating secrets into git.
+
+Operator entrypoint:
+
+```bash
+scripts/aoa-tos-graph
+```
+
+That command starts the `curation` profile, waits for the localhost health
+endpoint, and opens the switchable philosophy/corpus graph workbench when a
+desktop opener is available.

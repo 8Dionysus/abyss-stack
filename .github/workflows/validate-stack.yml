@@ -133,6 +133,7 @@ jobs:
           scripts/aoa-render-config --profile substrate,intel-worker >/dev/null
           scripts/aoa-render-config --profile substrate,fallback-gateway >/dev/null
           scripts/aoa-render-config --profile core >/dev/null
+          scripts/aoa-tos-graph --help >/dev/null
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT" --check
           python scripts/aoa-rpg-runtime-projection --stack-root "$AOA_STACK_ROOT"
           scripts/aoa-render-config --profile substrate --profile local-worker --write "$RUNNER_TEMP/abyss-local-worker.rendered.yml"

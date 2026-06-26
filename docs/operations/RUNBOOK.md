@@ -45,6 +45,7 @@ aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selecti
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 aoa-a2a-return-closeout-dry-run --input-file /tmp/reviewed-closeout-request.json --write
 scripts/aoa-rpg-runtime-projection --check
+scripts/aoa-tos-graph
 scripts/aoa-governed-run audit <run-id>
 scripts/aoa-governed-run replay-review-packets <run-id>
 curl http://127.0.0.1:5402/playbooks/activation
@@ -120,6 +121,13 @@ For filesystem-first RPG runtime projection refresh and parity check:
 ```bash
 scripts/aoa-rpg-runtime-projection
 scripts/aoa-rpg-runtime-projection --check
+```
+
+For the Tree of Sophia graph review workbench:
+
+```bash
+scripts/aoa-tos-graph
+scripts/aoa-tos-graph --status
 ```
 
 For governed-run review-packet audit and replay from stored context only:

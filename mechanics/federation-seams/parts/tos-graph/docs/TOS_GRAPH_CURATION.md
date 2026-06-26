@@ -30,6 +30,8 @@ The first-class repo-local anchors for this slice are:
 - `compose/profiles/curation.txt`
 - `config-templates/Configs/tos-graph/config.yaml`
 - `config-templates/Services/tos-graph/`
+- `scripts/aoa-tos-graph`
+- `mechanics/federation-seams/parts/tos-graph/aoa_tos_graph.sh`
 
 The active runtime route is:
 
@@ -37,6 +39,7 @@ The active runtime route is:
 - read `ToS/derived-exports/tos_corpus_index.min.json`
 - read `ToS/derived-exports/philosophy_graph_projection.min.json`
 - expose switchable corpus and philosophy graph views through a localhost-only helper UI and API
+- expose one operator command, `aoa-tos-graph`, that starts the curation profile, waits for `tos-graph`, and opens `http://127.0.0.1:5410/` when a desktop opener is available
 - project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
 
@@ -80,6 +83,8 @@ Any later write path must keep these conditions explicit:
 The first owner-repo slice should verify with:
 
 ```bash
+scripts/aoa-tos-graph --no-open --no-wait
+scripts/aoa-tos-graph --status
 python scripts/validate_stack.py
 scripts/aoa-profile-modules --profile curation --paths
 scripts/aoa-profile-endpoints --profile curation
