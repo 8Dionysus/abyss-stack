@@ -25,6 +25,7 @@ CAPSULES = Path("generated/eval_capsules.json")
 SECTIONS = Path("generated/eval_sections.full.json")
 COMPARISON_SPINE = Path("generated/comparison_spine.json")
 REPORT_INDEX = Path("generated/eval_report_index.min.json")
+READINESS_DASHBOARD = Path("generated/eval_readiness_dashboard.json")
 RUNTIME_TEMPLATE_INDEX = Path(
     "mechanics/audit/parts/candidate-readers/generated/runtime_candidate_template_index.min.json"
 )
@@ -47,6 +48,14 @@ RUNTIME_TEMPLATE_SCHEMA = Path(
 RUNTIME_TEMPLATE_SCHEMA_MIRROR = Path("schemas/runtime-candidate-template-index.schema.json")
 EVAL_NEED_SCHEMA = Path("mechanics/proof-object/parts/eval-authoring/schemas/eval-need.schema.json")
 EVAL_NEED_SCHEMA_MIRROR = Path("schemas/eval-need.schema.json")
+EVAL_FORGE_OPERATING_PATH = Path("mechanics/proof-object/parts/eval-authoring/docs/EVAL_FORGE_OPERATING_PATH.md")
+EVAL_FORGE_SESSION_MINING_CRITERIA = Path(
+    "mechanics/proof-object/parts/eval-authoring/docs/SESSION_MINING_CRITERIA.md"
+)
+EVAL_FORGE_LOCAL_PORT_MATRIX = Path(
+    "mechanics/proof-object/parts/eval-authoring/docs/LOCAL_PORT_DECISION_MATRIX.md"
+)
+EVAL_FORGE_ROUTE_SCRIPT = Path("mechanics/proof-object/parts/eval-authoring/scripts/eval_forge_route.py")
 MIRROR_MANIFEST = Path("manifest/federation_mirror_manifest.json")
 MIRROR_REFRESH_COMMAND = "scripts/aoa-sync-federation-surfaces --layer aoa-evals"
 MIRROR_AUTHORITY_WARNING = (
@@ -239,6 +248,7 @@ STOP_LINES = [
     "Do not publish receipts.",
     "Do not promote bundles.",
     "Do not mutate aoa-evals source from MCP.",
+    "Do not write or promote Eval Forge worksheets, packets, local ports, or bundles from MCP.",
     "Do not treat runtime evidence, generated readers, or MCP output as stronger than bundle-local EVAL.md and eval.yaml.",
     "Do not move proof authority into abyss-stack.",
 ]
@@ -293,6 +303,10 @@ def _read_json_first(root: Path, rels: tuple[Path, ...]) -> tuple[Any, Path | No
         if path.is_file():
             return _read_json(path), rel
     return None, None
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _list_from(payload: Any, key: str) -> list[dict[str, Any]]:
@@ -2377,6 +2391,181 @@ class AoAEvalsMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def _eval_forge_dashboard_payload(self) -> dict[str, Any]:
+        payload = self._payload(READINESS_DASHBOARD)
+        return payload if isinstance(payload, dict) else {}
+
+    def _eval_forge_front_door_from_dashboard(self, dashboard: dict[str, Any]) -> dict[str, Any]:
+        forge = _as_dict(dashboard.get("eval_forge_readiness"))
+        refs = _as_dict(forge.get("front_door_refs"))
+        commands = forge.get("front_door_commands")
+        if not isinstance(commands, list):
+            commands = []
+        status = _as_dict(forge.get("front_door_surface_status"))
+        missing_refs = [
+            key
+            for key, rel in refs.items()
+            if isinstance(rel, str) and rel and not (self.evals_root / rel).exists()
+        ]
+        if refs and not status:
+            status = {
+                "valid": not missing_refs,
+                "missing_refs": missing_refs,
+                "proof_authority": False,
+                "promotion_allowed": False,
+            }
+        return {
+            "surface_refs": refs,
+            "exact_commands": commands,
+            "surface_status": status,
+            "proof_authority": False,
+            "promotion_allowed": False,
+        }
+
+    def eval_forge_access_packet(self) -> dict[str, Any]:
+        dashboard = self._eval_forge_dashboard_payload()
+        forge = _as_dict(dashboard.get("eval_forge_readiness"))
+        candidate_queue = _as_dict(dashboard.get("candidate_queue"))
+        runtime = self.runtime_status()
+        try:
+            local_ports = self.local_ports()
+            local_port_error = None
+        except Exception as exc:  # pragma: no cover - defensive access packet guard
+            local_ports = {
+                "schema": "aoa_evals_local_ports_v1",
+                "summary": {},
+                "ports": [],
+                "inventory_contract": {},
+            }
+            local_port_error = str(exc)
+
+        active_ports = [
+            {
+                "repo": port.get("repo"),
+                "repo_id": port.get("repo_id"),
+                "inventory_status": port.get("inventory_status"),
+                "route_recommendation": port.get("route_recommendation"),
+                "proof_authority": False,
+                "promotion_allowed": False,
+            }
+            for port in local_ports.get("ports", [])
+            if isinstance(port, dict) and port.get("inventory_status") == "active"
+        ]
+        queue_entries = [
+            {
+                "candidate_id": entry.get("candidate_id"),
+                "source_kind": entry.get("source_kind"),
+                "state": entry.get("state"),
+                "owner_repo": entry.get("owner_repo"),
+                "next_route": entry.get("next_route"),
+                "packet_ref": entry.get("packet_ref"),
+                "proof_authority": bool(entry.get("proof_authority", False)),
+                "promotion_allowed": bool(entry.get("promotion_allowed", False)),
+            }
+            for entry in candidate_queue.get("entries", [])
+            if isinstance(entry, dict)
+        ]
+        forge_hints = [
+            {
+                "candidate_id": hint.get("candidate_id"),
+                "owner_repo": hint.get("owner_repo"),
+                "selected_archetype_id": hint.get("selected_archetype_id"),
+                "route_key": hint.get("route_key"),
+                "exact_next_command": hint.get("exact_next_command"),
+                "proof_authority": bool(hint.get("proof_authority", False)),
+                "promotion_allowed": bool(hint.get("promotion_allowed", False)),
+            }
+            for hint in forge.get("candidate_archetype_hints", [])
+            if isinstance(hint, dict)
+        ]
+        stop_lines = _unique_strings(
+            [
+                *STOP_LINES,
+                *[str(line) for line in forge.get("stop_lines", []) if isinstance(line, str)],
+                *[
+                    str(line)
+                    for line in candidate_queue.get("anti_promotion_checks", [])
+                    if isinstance(line, str)
+                ],
+            ]
+        )
+        source_of_truth = _as_dict(dashboard.get("source_of_truth"))
+        front_door = self._eval_forge_front_door_from_dashboard(dashboard)
+        return {
+            "schema": "aoa_evals_forge_access_packet_v1",
+            "read_only": True,
+            "candidate_only": True,
+            "source_mutation_allowed": False,
+            "proof_authority": False,
+            "promotion_allowed": False,
+            "workspace_root": self.workspace_root.as_posix(),
+            "selected_root": self.evals_root.as_posix(),
+            "root_kind": self.root_kind,
+            "source_root": self.source_root.as_posix() if self.source_root else None,
+            "mirror_root": self.mirror_root.as_posix() if self.mirror_root else None,
+            "dashboard_reader": (self.evals_root / READINESS_DASHBOARD).as_posix(),
+            "dashboard_present": bool(dashboard),
+            "readiness_summary": {
+                "dashboard_schema_version": dashboard.get("schema_version"),
+                "dashboard_generated_at_utc": dashboard.get("generated_at_utc"),
+                "forge_schema_version": forge.get("schema_version"),
+                "archetype_count": forge.get("archetype_count", 0),
+                "registry_validation": forge.get("registry_validation"),
+                "front_door_surface_status": front_door["surface_status"],
+                "candidate_queue_entries": candidate_queue.get("entries", 0)
+                if not isinstance(candidate_queue.get("entries"), list)
+                else len(candidate_queue.get("entries", [])),
+                "local_eval_port_summary": _as_dict(dashboard.get("local_eval_ports")).get("summary"),
+            },
+            "freshness": {
+                "runtime_status": runtime.get("freshness"),
+                "freshness_sentinel": dashboard.get("freshness_sentinel"),
+                "aoa_session_memory_freshness": dashboard.get("aoa_session_memory_freshness"),
+            },
+            "eval_forge_front_door": front_door,
+            "forge_docs_refs": front_door["surface_refs"],
+            "exact_route_commands": front_door["exact_commands"],
+            "local_ports": {
+                "summary": local_ports.get("summary", {}),
+                "active_ports": active_ports,
+                "inventory_contract": local_ports.get("inventory_contract", {}),
+                "error": local_port_error,
+                "proof_authority": False,
+                "promotion_allowed": False,
+            },
+            "candidate_queue": {
+                "summary": {
+                    "allowed_states": candidate_queue.get("allowed_states", []),
+                    "candidate_packet_import": candidate_queue.get("candidate_packet_import", {}),
+                    "authority_boundary": candidate_queue.get("authority_boundary"),
+                    "entry_count": len(queue_entries),
+                },
+                "top_candidate_routes": queue_entries[:10],
+                "forge_archetype_hints": forge_hints[:10],
+                "proof_authority": False,
+                "promotion_allowed": False,
+            },
+            "source_of_truth": {
+                "session_start_tool": source_of_truth.get("session_start_tool", "scripts/aoa_eval_session_start.py"),
+                "readiness_dashboard": READINESS_DASHBOARD.as_posix(),
+                "eval_forge_operating_path": source_of_truth.get(
+                    "eval_forge_operating_path",
+                    EVAL_FORGE_OPERATING_PATH.as_posix(),
+                ),
+                "eval_forge_session_mining_criteria": source_of_truth.get(
+                    "eval_forge_session_mining_criteria",
+                    EVAL_FORGE_SESSION_MINING_CRITERIA.as_posix(),
+                ),
+                "eval_forge_local_port_matrix": source_of_truth.get(
+                    "eval_forge_local_port_matrix",
+                    EVAL_FORGE_LOCAL_PORT_MATRIX.as_posix(),
+                ),
+                "eval_forge_router": source_of_truth.get("eval_forge_router", EVAL_FORGE_ROUTE_SCRIPT.as_posix()),
+            },
+            "stop_lines": stop_lines,
+            "authority_boundary": self.authority_boundary(),
+        }
+
     def _runtime_candidate_export_root(self) -> Path | None:
         if self.stack_runtime_root is None:
             return None
@@ -2724,6 +2913,8 @@ class AoAEvalsMCPState:
         parts = [unquote(part) for part in route.split("/") if part]
         if parts == ["catalog"]:
             return self.build_catalog()
+        if parts == ["forge-access"]:
+            return self.eval_forge_access_packet()
         if parts == ["comparison-spine"]:
             return self.comparison()
         if parts == ["runtime-candidate-templates"]:

@@ -112,6 +112,26 @@ def main() -> None:
     status = state.runtime_status()
     if status["catalog_count"] <= 0:
         raise SystemExit("runtime status lost catalog count")
+    forge_packet = state.eval_forge_access_packet()
+    if forge_packet["schema"] != "aoa_evals_forge_access_packet_v1":
+        raise SystemExit("Eval Forge access packet schema drifted")
+    if not forge_packet["read_only"] or forge_packet["source_mutation_allowed"]:
+        raise SystemExit("Eval Forge access packet must stay read-only and source-nonmutating")
+    if forge_packet["proof_authority"] or forge_packet["promotion_allowed"]:
+        raise SystemExit("Eval Forge access packet must not carry proof or promotion authority")
+    forge_front_door = forge_packet.get("eval_forge_front_door", {})
+    forge_refs = forge_front_door.get("surface_refs", {}) if isinstance(forge_front_door, dict) else {}
+    for key in ("operating_path_ref", "session_mining_criteria_ref", "local_port_decision_matrix_ref"):
+        if not forge_refs.get(key):
+            raise SystemExit(f"Eval Forge access packet missing {key}")
+    forge_commands = forge_packet.get("exact_route_commands", [])
+    if not any(
+        isinstance(command, dict) and "aoa_eval_session_start.py --json" in str(command.get("command"))
+        for command in forge_commands
+    ):
+        raise SystemExit("Eval Forge access packet lost session-start command")
+    if forge_packet.get("local_ports", {}).get("proof_authority") is not False:
+        raise SystemExit("Eval Forge access packet local-port surface must stay non-proof")
     packet = {
         "surface_type": "runtime_evidence_selection",
         "selection_id": "aoa-evals-mcp-validator-smoke",
@@ -172,6 +192,9 @@ def main() -> None:
                 "evals_root": catalog["evals_root"],
                 "catalog_count": catalog["count"],
                 "freshness_status": status["freshness"]["status"],
+                "forge_access_packet": True,
+                "forge_front_door_valid": forge_front_door.get("surface_status", {}).get("valid"),
+                "forge_candidate_routes": forge_packet.get("candidate_queue", {}).get("summary", {}).get("entry_count"),
                 "find_or_propose_valid": proposal_route["proposal_validation"]["valid"],
                 "local_eval_port_count": local_ports["count"],
                 "local_eval_port_smoke_repo": local_port_repo,

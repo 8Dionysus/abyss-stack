@@ -6,11 +6,11 @@ Local route card for `mcp/services/aoa-evals-mcp/`.
 
 `aoa-evals-mcp` is the thin MCP access plane for OS Abyss bounded proof
 surfaces. It lets agents select, inspect, expand, compare, check runtime
-freshness, find-or-propose eval-need routes, validate candidate evidence packet
-shape, read stack-owned runtime candidate exports, and prepare candidate
-evidence/report skeletons without turning MCP into proof authority. It also
-federates sibling repository `evals/` ports and can perform explicitly gated
-repo-local port writes.
+  freshness, find-or-propose eval-need routes, validate candidate evidence packet
+shape, expose the Eval Forge front door, read stack-owned runtime candidate
+exports, and prepare candidate evidence/report skeletons without turning MCP
+into proof authority. It also federates sibling repository `evals/` ports and
+can perform explicitly gated repo-local port writes.
 
 ## Owner Lane
 
@@ -23,6 +23,8 @@ This stack-owned MCP surface owns:
 - Read-only find-or-propose routing into `aoa-evals` `eval_need_v1` authoring
   protocol.
 - Candidate-only report skeleton and runtime evidence template helpers.
+- Read-only Eval Forge access packet over readiness, candidate queue, local
+  ports, route commands, and stop-lines.
 - Read-only runtime status and schema-backed candidate packet validation.
 - Read-only metadata/detail access for private stack-owned runtime candidate
   exports under `Logs/eval-exports/`.
@@ -62,6 +64,7 @@ It does not own:
 | candidate runtime evidence posture | `aoa-evals:mechanics/audit/parts/candidate-readers/` |
 | stack runtime candidate exports | `abyss-stack:mechanics/governed-execution/parts/candidate-exports/` and `Logs/eval-exports/` |
 | source/mirror freshness | `src/aoa_evals_mcp/core.py` and `mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh` |
+| Eval Forge access packet | `src/aoa_evals_mcp/core.py` and `aoa-evals:generated/eval_readiness_dashboard.json` |
 | report skeleton behavior | `src/aoa_evals_mcp/core.py` and source bundle report contract |
 | repo-local eval ports | `src/aoa_evals_mcp/core.py` and `aoa-evals:docs/guides/LOCAL_EVAL_PORT_STANDARD.md` |
 | Codex-plane registration | `8Dionysus:config/codex_plane/runtime_manifest.v1.json` |
@@ -69,6 +72,8 @@ It does not own:
 ## AGENTS Stack Law
 
 - MCP exposes access; it does not promote proof.
+- Forge access packets are read-only routing evidence; they must not accept
+  worksheets, promote candidates, or write local/central proof.
 - Generated readers and MCP responses stay weaker than bundle-local `EVAL.md`
   and `eval.yaml`.
 - Runtime evidence templates stay candidate-only until bundle-local review.
@@ -108,6 +113,7 @@ PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli inspect ao
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli expand aoa-bounded-change-quality --section-key intent
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-evidence-template aoa-bounded-change-quality
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-status
+PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli forge-access
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli validate-evidence-candidate --candidate-file /tmp/runtime-evidence-selection.json
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli runtime-candidate-exports --limit 5
 PYTHONPATH=mcp/services/aoa-evals-mcp/src python -m aoa_evals_mcp.cli local-ports

@@ -64,6 +64,11 @@ def build_server(
         return current_state().runtime_status()
 
     @mcp.tool()
+    def aoa_evals_forge_access_packet() -> dict[str, Any]:
+        """Return the read-only Eval Forge front-door/access packet."""
+        return current_state().eval_forge_access_packet()
+
+    @mcp.tool()
     def aoa_evals_validate_evidence_candidate(packet: dict[str, Any]) -> dict[str, Any]:
         """Validate a candidate evidence packet without ingesting or accepting it."""
         return current_state().validate_evidence_candidate(packet)
@@ -192,6 +197,10 @@ def build_server(
     def runtime_status_resource() -> str:
         return json.dumps(current_state().runtime_status(), ensure_ascii=False, indent=2)
 
+    @mcp.resource("aoa-evals://forge-access")
+    def forge_access_resource() -> str:
+        return json.dumps(current_state().eval_forge_access_packet(), ensure_ascii=False, indent=2)
+
     @mcp.resource("aoa-evals://runtime-evidence/schema")
     def runtime_evidence_schema_resource() -> str:
         return json.dumps(current_state().runtime_evidence_schema_resource(), ensure_ascii=False, indent=2)
@@ -243,6 +252,15 @@ def build_server(
             f"Use aoa_evals_find_or_propose(proof_question={proof_question!r}, proposal={{}}). "
             "Inspect existing matches first. If a new eval is still needed, carry only the returned "
             "eval_need_v1 packet into the repo-local scaffold helper; MCP must not write source."
+        )
+
+    @mcp.prompt(name="eval-forge-access")
+    def eval_forge_access() -> str:
+        """Prompt route for starting from the Eval Forge front door."""
+        return (
+            "Use aoa_evals_forge_access_packet() or read aoa-evals://forge-access first. "
+            "Treat Forge refs, candidate queue routes, local-port inventory, and MCP data as access-plane "
+            "routing evidence only; proof authority, promotion, verdicts, and bundle writes stay outside MCP."
         )
 
     @mcp.prompt(name="eval-review")

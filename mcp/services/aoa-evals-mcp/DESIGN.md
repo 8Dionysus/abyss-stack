@@ -46,11 +46,18 @@ Comparison and runtime evidence use separate bounded routes:
 aoa_evals_comparison(baseline_mode)
 aoa_evals_runtime_evidence_template(name)
 aoa_evals_runtime_status()
+aoa_evals_forge_access_packet()
 aoa_evals_validate_evidence_candidate(packet)
 aoa_evals_runtime_candidate_exports(limit)
 aoa_evals_read_runtime_candidate_export(record_id, include_payload=false)
 aoa_evals_report_skeleton(name, evidence_refs)
 ```
+
+The Forge access packet is a session-start access route. It reads the selected
+`aoa-evals` readiness dashboard and returns Forge docs refs, exact commands,
+freshness, active local-port routes, candidate queue hints, and stop-lines. It
+does not write worksheets, mutate local ports, create central bundles, compute
+verdicts, or promote proof.
 
 The skeleton route leaves the verdict unset. It exists to preserve report shape
 and source refs before a reviewer reads the source bundle.
@@ -130,6 +137,8 @@ The first layer is ready when:
 - candidate validation keeps `human_review_required`/`review_required` true;
 - runtime candidate export listing does not include private payloads by default;
 - runtime status exposes missing or unmanifested mirrors;
+- Forge access exposes the front-door refs and commands while keeping
+  `proof_authority=false` and `promotion_allowed=false`;
 - local-port inventory covers top-level and nested Git roots without scanning
   runtime-heavy stack state;
 - local-port inventory route keys and summary keys match the central
