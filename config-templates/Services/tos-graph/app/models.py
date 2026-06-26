@@ -19,6 +19,8 @@ class HealthResponse(BaseModel):
     corpus_index_exists: bool
     philosophy_graph_projection_path: str
     philosophy_graph_projection_exists: bool
+    philosophy_post_planting_audit_path: str
+    philosophy_post_planting_audit_exists: bool
     default_view: str
     default_philosophy_view: str
 
@@ -70,6 +72,7 @@ class PhilosophyStatusResponse(BaseModel):
     views: list[str]
     graph_layers: list[str]
     visibility_model: dict[str, Any] = {}
+    snapshot_review: dict[str, Any] = {}
     runtime_projection_boundary: dict[str, Any]
 
 
@@ -120,6 +123,21 @@ class PhilosophyReviewPacketResponse(BaseModel):
     schema: str
     packet: dict[str, Any]
     runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
+class PhilosophySnapshotResponse(BaseModel):
+    schema: str
+    snapshot_review: dict[str, Any]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
+class PhilosophyAuditResponse(BaseModel):
+    schema: str
+    audit_exists: bool
+    audit_path: str
+    audit: dict[str, Any]
     authority_note: str
 
 

@@ -205,6 +205,29 @@ def write_philosophy_projection(root: Path) -> Path:
             "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
             "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
         },
+        "snapshot_review": {
+            "snapshot_schema_version": "tos_philosophy_graph_projection_snapshot_v1",
+            "current_snapshot": {
+                "projection_fingerprint": "a" * 64,
+                "count_fingerprint": "b" * 64,
+                "view_fingerprints": [
+                    {
+                        "view_id": "chronology",
+                        "fingerprint": "c" * 64,
+                        "node_count": 2,
+                        "edge_count": 1,
+                        "cluster_count": 1,
+                        "source_ref_count": 1,
+                    }
+                ],
+            },
+            "diff_route": {
+                "mode": "fingerprint-ready",
+                "changed_subgraph_available": False,
+                "previous_snapshot_ref": None,
+                "next_route": "compare against previous snapshot",
+            },
+        },
         "runtime_projection_boundary": {
             "runtime_owner": "abyss-stack",
             "runtime_scope": ["serve MCP packets"],
@@ -256,6 +279,19 @@ def write_philosophy_projection(root: Path) -> Path:
     return projection_path
 
 
+def write_post_planting_audit(root: Path) -> Path:
+    audit_path = root / "ToS" / "philosophy" / "graph-workbench" / "review-packets" / "table-i-post-planting-audit.json"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "tos_philosophy_post_planting_audit_v1",
+        "owner_repo": "Tree-of-Sophia",
+        "counts": {"prepared_dossiers": 30, "errors": 0, "warnings": 0},
+        "review_readiness": {"status": "ready_for_first_graph_review"},
+    }
+    audit_path.write_text(json.dumps(payload), encoding="utf-8")
+    return audit_path
+
+
 def state_for(root: Path) -> ToSCorpusMCPState:
     return ToSCorpusMCPState.discover(tos_root=root)
 
@@ -302,6 +338,7 @@ def test_resources_and_server_build(tmp_path: Path) -> None:
 def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     write_index(tmp_path)
     write_philosophy_projection(tmp_path)
+    write_post_planting_audit(tmp_path)
     state = state_for(tmp_path)
 
     status = state.philosophy_status()
@@ -310,8 +347,11 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     layers = state.philosophy_layers()
     clusters = state.philosophy_clusters(view_id="chronology")
     node = state.philosophy_node("atlas-row:A01")
+    edge = state.philosophy_edge("edge:row:A01:has-dossier:A01")
     neighborhood = state.philosophy_neighborhood("atlas-row:A01", layers=["historical-relation"])
     review = state.philosophy_review_packet("chronology")
+    snapshot = state.philosophy_snapshot()
+    audit = state.philosophy_audit()
     unresolved = state.philosophy_unresolved()
     lens = state.philosophy_lens_packet("chronology", limit=4)
     packet = state.philosophy_packet(query="dossier", view_id="chronology", limit=4)
@@ -326,8 +366,11 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     assert layers["layer_counts"][0]["cluster_count"] == 1
     assert clusters["cluster_count"] == 1
     assert node["related_edges"][0]["predicate_id"] == "has-dossier"
+    assert edge["edge"]["to_id"] == "dossier:A01"
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
     assert review["packet"]["packet_id"] == "review-packet:chronology"
+    assert snapshot["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
+    assert audit["audit"]["review_readiness"]["status"] == "ready_for_first_graph_review"
     assert unresolved["unresolved_count"] == 0
     assert lens["review_packet"]["view_id"] == "chronology"
     assert packet["result_count"] >= 1
@@ -335,4 +378,7 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     assert json.loads(state.render_resource("tos-philosophy://status"))["counts"]["edges"] == 1
     assert state.read_resource("tos-philosophy://view/chronology")["node_count"] == 2
     assert state.read_resource("tos-philosophy://layers")["layer_counts"][0]["cluster_count"] == 1
+    assert state.read_resource("tos-philosophy://snapshot")["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
+    assert state.read_resource("tos-philosophy://audit")["audit_exists"] is True
+    assert state.read_resource("tos-philosophy://edge/edge:row:A01:has-dossier:A01")["edge"]["from_id"] == "atlas-row:A01"
     assert state.read_resource("tos-philosophy://review-packet/chronology")["packet"]["packet_id"] == "review-packet:chronology"

@@ -15,6 +15,7 @@ def build_server(
     tos_root: str | Path | None = None,
     index_path: str | Path | None = None,
     philosophy_graph_projection_path: str | Path | None = None,
+    philosophy_post_planting_audit_path: str | Path | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -28,6 +29,7 @@ def build_server(
             tos_root=tos_root,
             index_path=index_path,
             philosophy_graph_projection_path=philosophy_graph_projection_path,
+            philosophy_post_planting_audit_path=philosophy_post_planting_audit_path,
         )
 
     @mcp.tool()
@@ -109,6 +111,11 @@ def build_server(
         return current_state().philosophy_node(node_id=node_id)
 
     @mcp.tool()
+    def tos_philosophy_graph_edge(edge_id: str) -> dict[str, Any]:
+        """Return one projected ToS philosophy edge and its endpoint nodes."""
+        return current_state().philosophy_edge(edge_id=edge_id)
+
+    @mcp.tool()
     def tos_philosophy_graph_neighborhood(
         node_id: str,
         depth: int = 1,
@@ -122,6 +129,16 @@ def build_server(
     def tos_philosophy_graph_review_packet(view_id: str = "chronology") -> dict[str, Any]:
         """Return one compact ToS-owned review packet for a philosophy graph lens."""
         return current_state().philosophy_review_packet(view_id=view_id)
+
+    @mcp.tool()
+    def tos_philosophy_graph_snapshot() -> dict[str, Any]:
+        """Return ToS-owned philosophy graph snapshot fingerprints for diff-aware review."""
+        return current_state().philosophy_snapshot()
+
+    @mcp.tool()
+    def tos_philosophy_graph_audit() -> dict[str, Any]:
+        """Return the ToS-owned post-planting audit packet when present."""
+        return current_state().philosophy_audit()
 
     @mcp.tool()
     def tos_philosophy_graph_unresolved(view_id: str | None = None) -> dict[str, Any]:
@@ -176,6 +193,14 @@ def build_server(
     def philosophy_layers_resource() -> str:
         return current_state().render_resource("tos-philosophy://layers")
 
+    @mcp.resource("tos-philosophy://snapshot")
+    def philosophy_snapshot_resource() -> str:
+        return current_state().render_resource("tos-philosophy://snapshot")
+
+    @mcp.resource("tos-philosophy://audit")
+    def philosophy_audit_resource() -> str:
+        return current_state().render_resource("tos-philosophy://audit")
+
     @mcp.resource("tos-philosophy://clusters")
     def philosophy_clusters_resource() -> str:
         return current_state().render_resource("tos-philosophy://clusters")
@@ -191,6 +216,10 @@ def build_server(
     @mcp.resource("tos-philosophy://review-packet/{view_id}")
     def philosophy_review_packet_resource(view_id: str) -> str:
         return current_state().render_resource(f"tos-philosophy://review-packet/{view_id}")
+
+    @mcp.resource("tos-philosophy://edge/{edge_id}")
+    def philosophy_edge_resource(edge_id: str) -> str:
+        return current_state().render_resource(f"tos-philosophy://edge/{edge_id}")
 
     @mcp.resource("tos-philosophy://lens/{view_id}")
     def philosophy_lens_resource(view_id: str) -> str:

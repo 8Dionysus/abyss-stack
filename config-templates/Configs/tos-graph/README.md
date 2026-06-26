@@ -1,8 +1,8 @@
 # tos-graph config
 
 This directory stores the public-safe config template for the ToS graph helper.
-The helper reads the corpus index and materialized philosophy graph projection
-published by Tree of Sophia.
+The helper reads the corpus index, materialized philosophy graph projection,
+and source-side review audit packets published by Tree of Sophia.
 
 Bootstrapped runtime path:
 

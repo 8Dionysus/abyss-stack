@@ -185,6 +185,8 @@ INDEX_TEMPLATE = """<!doctype html>
         <div class="stack">
           <h2>Review</h2>
           <button id="reviewButton" type="button">Review packet</button>
+          <button id="snapshotButton" type="button">Snapshot</button>
+          <button id="auditButton" type="button">Planting audit</button>
           <button id="unresolvedButton" type="button">Unresolved</button>
         </div>
         <div class="stack">
@@ -594,6 +596,22 @@ INDEX_TEMPLATE = """<!doctype html>
         inspect(`Review packet: ${state.currentViewId}`, payload.packet, payload.packet.source_refs || []);
       }
 
+      async function showSnapshot() {
+        if (state.mode !== "philosophy") return;
+        const payload = await fetchJson("/api/philosophy/snapshot");
+        const snapshot = payload.snapshot_review?.current_snapshot || {};
+        inspect("Snapshot", payload, []);
+        q("inspectorMeta").textContent = `projection ${short(snapshot.projection_fingerprint || "missing", 18)} · ${payload.snapshot_review?.diff_route?.mode || "no diff route"}`;
+      }
+
+      async function showAudit() {
+        if (state.mode !== "philosophy") return;
+        const payload = await fetchJson("/api/philosophy/audit");
+        const audit = payload.audit || {};
+        inspect("Planting audit", payload, []);
+        q("inspectorMeta").textContent = audit.review_readiness?.status || (payload.audit_exists ? "audit loaded" : "audit missing");
+      }
+
       async function showUnresolved() {
         if (state.mode !== "philosophy") return;
         const suffix = state.currentViewId ? `?view_id=${encodeURIComponent(state.currentViewId)}` : "";
@@ -663,6 +681,8 @@ INDEX_TEMPLATE = """<!doctype html>
         q("clusterMode").addEventListener("click", () => { state.expandedCluster = null; setGraphMode("clusters"); });
         q("nodeMode").addEventListener("click", () => setGraphMode("nodes"));
         q("reviewButton").addEventListener("click", showReviewPacket);
+        q("snapshotButton").addEventListener("click", showSnapshot);
+        q("auditButton").addEventListener("click", showAudit);
         q("unresolvedButton").addEventListener("click", showUnresolved);
         q("pathButton").addEventListener("click", findPath);
         q("searchButton").addEventListener("click", searchCurrentMode);

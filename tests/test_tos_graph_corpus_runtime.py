@@ -239,6 +239,29 @@ def write_philosophy_projection(root: Path) -> Path:
             "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
             "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
         },
+        "snapshot_review": {
+            "snapshot_schema_version": "tos_philosophy_graph_projection_snapshot_v1",
+            "current_snapshot": {
+                "projection_fingerprint": "a" * 64,
+                "count_fingerprint": "b" * 64,
+                "view_fingerprints": [
+                    {
+                        "view_id": "chronology",
+                        "fingerprint": "c" * 64,
+                        "node_count": 2,
+                        "edge_count": 1,
+                        "cluster_count": 1,
+                        "source_ref_count": 2,
+                    }
+                ],
+            },
+            "diff_route": {
+                "mode": "fingerprint-ready",
+                "changed_subgraph_available": False,
+                "previous_snapshot_ref": None,
+                "next_route": "compare against previous snapshot",
+            },
+        },
         "graph_layers": [
             {
                 "layer_id": "historical-relation",
@@ -293,6 +316,20 @@ def write_philosophy_projection(root: Path) -> Path:
     return projection_path
 
 
+def write_post_planting_audit(root: Path) -> Path:
+    audit_path = root / "ToS" / "philosophy" / "graph-workbench" / "review-packets" / "table-i-post-planting-audit.json"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "tos_philosophy_post_planting_audit_v1",
+        "owner_repo": "Tree-of-Sophia",
+        "counts": {"prepared_dossiers": 30, "errors": 0, "warnings": 0},
+        "review_readiness": {"status": "ready_for_first_graph_review"},
+        "graph_projection_audit": {"snapshot_ready": True, "views": 1, "review_packets": 1},
+    }
+    audit_path.write_text(json.dumps(payload), encoding="utf-8")
+    return audit_path
+
+
 def settings_for(root: Path) -> TosGraphSettings:
     return TosGraphSettings(
         service_name="tos-graph",
@@ -305,6 +342,12 @@ def settings_for(root: Path) -> TosGraphSettings:
         philosophy_atlas_projection_path=root / "ToS" / "derived-exports" / "philosophy_atlas_projection.min.json",
         philosophy_graph_views_path=root / "ToS" / "derived-exports" / "philosophy_graph_views.min.json",
         philosophy_graph_projection_path=root / "ToS" / "derived-exports" / "philosophy_graph_projection.min.json",
+        philosophy_post_planting_audit_path=root
+        / "ToS"
+        / "philosophy"
+        / "graph-workbench"
+        / "review-packets"
+        / "table-i-post-planting-audit.json",
         default_view="corpus-topology",
         default_philosophy_view="chronology",
         write_enabled=False,
@@ -370,6 +413,7 @@ def test_corpus_relation_edge_projection_ids_include_pack_id() -> None:
 
 def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) -> None:
     write_philosophy_projection(tmp_path)
+    write_post_planting_audit(tmp_path)
     reader = ToSPhilosophyProjectionReader(settings_for(tmp_path))
 
     status = reader.status()
@@ -380,6 +424,9 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     layers = reader.layers()
     clusters = reader.clusters(view_id="chronology")
     review_packet = reader.review_packet("chronology")
+    snapshot = reader.snapshot()
+    audit = reader.audit()
+    edge = reader.edge("edge:row:A01:has-dossier:A01")
     unresolved = reader.unresolved()
     path = reader.path_between("atlas-row:A01", "dossier:A01", layers={"historical-relation"})
 
@@ -396,6 +443,10 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     assert layers["layer_counts"][0]["cluster_count"] == 1
     assert clusters["cluster_count"] == 1
     assert review_packet["packet"]["packet_id"] == "review-packet:chronology"
+    assert snapshot["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
+    assert audit["audit"]["review_readiness"]["status"] == "ready_for_first_graph_review"
+    assert edge["edge"]["from_id"] == "atlas-row:A01"
+    assert [item["node_id"] for item in edge["endpoints"]] == ["atlas-row:A01", "dossier:A01"]
     assert unresolved["unresolved_count"] == 0
     assert path["found"] is True
     assert [item["node_id"] for item in path["nodes"]] == ["atlas-row:A01", "dossier:A01"]

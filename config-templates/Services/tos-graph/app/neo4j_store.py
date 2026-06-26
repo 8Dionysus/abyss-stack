@@ -252,6 +252,7 @@ class Neo4jProjectionStore:
             "projected_at": projected_at,
             "counts_json": _json_dump(counts),
             "source_refs_json": _json_dump(projection.get("source_refs", {})),
+            "snapshot_review_json": _json_dump(projection.get("snapshot_review", {})),
             "runtime_projection_boundary_json": _json_dump(projection.get("runtime_projection_boundary", {})),
         }
         view_rows = self._philosophy_rows(projection, "views", "view_id")

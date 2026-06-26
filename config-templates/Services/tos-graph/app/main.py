@@ -15,9 +15,11 @@ from .models import (
     HealthResponse,
     PhilosophyClustersResponse,
     PhilosophyLayersResponse,
+    PhilosophyAuditResponse,
     PhilosophyPacketResponse,
     PhilosophyReviewPacketResponse,
     PhilosophySearchResponse,
+    PhilosophySnapshotResponse,
     PhilosophyStatusResponse,
     PhilosophyUnresolvedResponse,
     PhilosophyViewResponse,
@@ -76,6 +78,8 @@ def health() -> HealthResponse:
         corpus_index_exists=settings.corpus_index_path.exists(),
         philosophy_graph_projection_path=settings.philosophy_graph_projection_path.as_posix(),
         philosophy_graph_projection_exists=settings.philosophy_graph_projection_path.exists(),
+        philosophy_post_planting_audit_path=settings.philosophy_post_planting_audit_path.as_posix(),
+        philosophy_post_planting_audit_exists=settings.philosophy_post_planting_audit_path.exists(),
         default_view=settings.default_view,
         default_philosophy_view=settings.default_philosophy_view,
     )
@@ -183,6 +187,22 @@ def philosophy_review_packet(view_id: str = "chronology") -> PhilosophyReviewPac
         raise _handle_philosophy_reader_error(exc) from exc
 
 
+@app.get("/api/philosophy/snapshot", response_model=PhilosophySnapshotResponse)
+def philosophy_snapshot() -> PhilosophySnapshotResponse:
+    try:
+        return PhilosophySnapshotResponse(**philosophy_reader.snapshot())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/audit", response_model=PhilosophyAuditResponse)
+def philosophy_audit() -> PhilosophyAuditResponse:
+    try:
+        return PhilosophyAuditResponse(**philosophy_reader.audit())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
 @app.get("/api/philosophy/unresolved", response_model=PhilosophyUnresolvedResponse)
 def philosophy_unresolved(view_id: str | None = None) -> PhilosophyUnresolvedResponse:
     try:
@@ -211,6 +231,14 @@ def philosophy_packet(query: str = "", view_id: str | None = None, limit: int = 
 def philosophy_node(node_id: str) -> dict[str, Any]:
     try:
         return philosophy_reader.node(node_id)
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/edges/{edge_id:path}")
+def philosophy_edge(edge_id: str) -> dict[str, Any]:
+    try:
+        return philosophy_reader.edge(edge_id)
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 

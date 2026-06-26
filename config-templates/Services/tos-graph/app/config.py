@@ -63,6 +63,7 @@ class TosGraphSettings:
     philosophy_atlas_projection_path: Path
     philosophy_graph_views_path: Path
     philosophy_graph_projection_path: Path
+    philosophy_post_planting_audit_path: Path
     default_view: str
     default_philosophy_view: str
     write_enabled: bool
@@ -111,6 +112,11 @@ def load_settings() -> TosGraphSettings:
         "philosophy_graph_projection",
         "ToS/derived-exports/philosophy_graph_projection.min.json",
     )
+    philosophy_post_planting_audit_path = source_path(
+        "TOS_GRAPH_PHILOSOPHY_POST_PLANTING_AUDIT_PATH",
+        "philosophy_post_planting_audit",
+        "ToS/philosophy/graph-workbench/review-packets/table-i-post-planting-audit.json",
+    )
 
     return TosGraphSettings(
         service_name=str(service_cfg.get("name", "tos-graph")),
@@ -123,6 +129,7 @@ def load_settings() -> TosGraphSettings:
         philosophy_atlas_projection_path=philosophy_atlas_projection_path,
         philosophy_graph_views_path=philosophy_graph_views_path,
         philosophy_graph_projection_path=philosophy_graph_projection_path,
+        philosophy_post_planting_audit_path=philosophy_post_planting_audit_path,
         default_view=str(os.environ.get("TOS_GRAPH_DEFAULT_VIEW", ui_cfg.get("default_view", "corpus-topology"))),
         default_philosophy_view=str(
             os.environ.get("TOS_GRAPH_DEFAULT_PHILOSOPHY_VIEW", ui_cfg.get("default_philosophy_view", "chronology"))

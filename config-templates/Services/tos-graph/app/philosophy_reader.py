@@ -50,8 +50,15 @@ class ToSPhilosophyProjectionReader:
     def projection_path(self) -> Path:
         return self.settings.philosophy_graph_projection_path
 
+    @property
+    def audit_path(self) -> Path:
+        return self.settings.philosophy_post_planting_audit_path
+
     def projection_exists(self) -> bool:
         return self.projection_path.is_file()
+
+    def audit_exists(self) -> bool:
+        return self.audit_path.is_file()
 
     def load_projection(self) -> dict[str, Any]:
         if not self.projection_exists():
@@ -64,6 +71,20 @@ class ToSPhilosophyProjectionReader:
         if payload.get("schema_version") != "tos_philosophy_graph_projection_v1":
             raise ToSPhilosophyReaderError(
                 "ToS philosophy graph projection schema_version must be tos_philosophy_graph_projection_v1"
+            )
+        return payload
+
+    def load_audit(self) -> dict[str, Any]:
+        if not self.audit_exists():
+            raise ToSPhilosophyReaderError(f"missing ToS philosophy post-planting audit: {self.audit_path.as_posix()}")
+        payload = json.loads(self.audit_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ToSPhilosophyReaderError(
+                f"ToS philosophy post-planting audit must be a JSON object: {self.audit_path.as_posix()}"
+            )
+        if payload.get("schema_version") != "tos_philosophy_post_planting_audit_v1":
+            raise ToSPhilosophyReaderError(
+                "ToS philosophy post-planting audit schema_version must be tos_philosophy_post_planting_audit_v1"
             )
         return payload
 
@@ -98,6 +119,7 @@ class ToSPhilosophyProjectionReader:
                 if isinstance(layer, dict) and layer.get("layer_id")
             ],
             "visibility_model": payload.get("visibility_model", {}),
+            "snapshot_review": payload.get("snapshot_review", {}),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
         }
 
@@ -225,6 +247,32 @@ class ToSPhilosophyProjectionReader:
             "authority_note": "Tree-of-Sophia owns review packet semantics; tos-graph serves the compact access packet.",
         }
 
+    def snapshot(self) -> dict[str, Any]:
+        payload = self.load_projection()
+        return {
+            "schema": "tos_graph_philosophy_snapshot_v1",
+            "snapshot_review": payload.get("snapshot_review", {}),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns snapshot semantics; tos-graph serves fingerprints for review and diff routing.",
+        }
+
+    def audit(self) -> dict[str, Any]:
+        if not self.audit_exists():
+            return {
+                "schema": "tos_graph_philosophy_audit_v1",
+                "audit_exists": False,
+                "audit_path": self.audit_path.as_posix(),
+                "audit": {},
+                "authority_note": "Tree-of-Sophia has not published the post-planting audit at this runtime path.",
+            }
+        return {
+            "schema": "tos_graph_philosophy_audit_v1",
+            "audit_exists": True,
+            "audit_path": self.audit_path.as_posix(),
+            "audit": self.load_audit(),
+            "authority_note": "Tree-of-Sophia owns the audit; tos-graph serves it for operator review.",
+        }
+
     def unresolved(self, view_id: str | None = None) -> dict[str, Any]:
         payload = self.load_projection()
         surfaces = [item for item in payload.get("unresolved_review_surfaces", []) if isinstance(item, dict)]
@@ -270,6 +318,40 @@ class ToSPhilosophyProjectionReader:
             "views": views,
             "source_refs": _source_refs([node] + related_edges),
             "authority_note": "Tree-of-Sophia owns the source_ref surfaces; tos-graph only serves this projection packet.",
+        }
+
+    def edge(self, edge_id: str) -> dict[str, Any]:
+        payload = self.load_projection()
+        edge = next(
+            (item for item in payload.get("edges", []) if isinstance(item, dict) and item.get("edge_id") == edge_id),
+            None,
+        )
+        if edge is None:
+            raise ToSPhilosophyReaderError(f"unknown ToS philosophy edge: {edge_id}")
+        endpoint_ids = {str(edge.get("from_id") or ""), str(edge.get("to_id") or "")}
+        endpoints = [
+            node
+            for node in payload.get("nodes", [])
+            if isinstance(node, dict) and str(node.get("node_id") or "") in endpoint_ids
+        ]
+        views = [
+            {
+                "view_id": view.get("view_id"),
+                "title": view.get("title"),
+                "layout_hint": view.get("layout_hint"),
+                "graph_layers": view.get("graph_layers", []),
+            }
+            for view in payload.get("views", [])
+            if isinstance(view, dict) and view.get("view_id") in set(edge.get("view_ids", []))
+        ]
+        return {
+            "schema": "tos_graph_philosophy_edge_v1",
+            "edge_id": edge_id,
+            "edge": edge,
+            "endpoints": endpoints,
+            "views": views,
+            "source_refs": _source_refs([edge] + endpoints),
+            "authority_note": "Tree-of-Sophia owns the edge source_ref; tos-graph only serves this projection packet.",
         }
 
     def neighborhood(self, node_id: str, depth: int = 1, layers: set[str] | None = None, limit: int = 120) -> dict[str, Any]:
