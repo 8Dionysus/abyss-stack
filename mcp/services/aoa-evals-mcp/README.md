@@ -88,6 +88,10 @@ read-only. Local write tools are gated by `apply=false` by default and may only
 write repo-local `evals/intake/*.eval_need.json`,
 `evals/suites/*.suite.md`, `evals/reports/*.report.md`, and the matching
 `PORT.yaml` activation from `skeleton` to `active`.
+Every write response includes a `write_receipt` that records dry-run/apply
+state, target path confinement, allowed local-port globs, validation issues,
+`PORT.yaml` activation, side effects, and the explicit absence of proof
+authority, promotion, central mutation, verdicts, or scoring.
 
 The service does not run evals, compute verdicts, publish receipts, promote
 bundles, ingest or accept evidence, approve proposals, create central bundles,

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import aoa_evals_mcp.core as core
 from aoa_evals_mcp.core import AoAEvalsMCPState
 from aoa_evals_mcp.server import build_server
 
@@ -391,6 +392,32 @@ def seed_evals(root: Path) -> None:
     )
 
 
+def seed_evals_mirror(root: Path, *, source_git_commit: str | None = "source-commit") -> Path:
+    mirror = root / "abyss-stack" / "Knowledge" / "federation" / "aoa-evals"
+    write_json(
+        mirror / "generated/eval_catalog.min.json",
+        {"catalog_version": "mirror", "source_of_truth": ["aoa-evals"], "evals": []},
+    )
+    if source_git_commit is not None:
+        write_json(
+            mirror / "manifest/federation_mirror_manifest.json",
+            {
+                "schema": "abyss_stack_federation_mirror_manifest_v1",
+                "layer": "aoa-evals",
+                "generated_at_utc": "2026-06-25T00:00:00+00:00",
+                "source_root": (root / "aoa-evals").as_posix(),
+                "target_root": mirror.as_posix(),
+                "source_git_commit": source_git_commit,
+                "required_file_count": 1,
+                "required_files": ["generated/eval_catalog.min.json"],
+                "file_sha256": {},
+                "mirror_is_authority": False,
+                "refresh_command": "scripts/aoa-sync-federation-surfaces --layer aoa-evals",
+            },
+        )
+    return mirror
+
+
 def seed_runtime_candidate_export(root: Path) -> dict[str, object]:
     packet = {
         "surface_type": "runtime_evidence_selection",
@@ -638,6 +665,83 @@ def test_resources_and_runtime_templates(tmp_path: Path) -> None:
     assert schemas["schemas"]["runtime_evidence_selection"]["present"] is True
 
 
+def test_runtime_status_flags_stale_mirror_when_source_is_selected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    seed_evals_mirror(tmp_path, source_git_commit="old-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "new-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+    status = state.runtime_status()
+
+    assert status["root_kind"] == "source"
+    assert status["freshness"]["status"] == "source_with_stale_mirror"
+    assert status["freshness"]["source_git_commit"] == "new-source"
+    assert status["freshness"]["mirror_source_git_commit"] == "old-source"
+    assert status["freshness"]["mirror_generated_at_utc"] == "2026-06-25T00:00:00+00:00"
+    assert status["freshness"]["mirror_is_stale"] is True
+    assert status["freshness"]["refresh_command"] == "scripts/aoa-sync-federation-surfaces --layer aoa-evals"
+    assert status["mirror_freshness"]["authority_warning"].startswith("federation mirror is a runtime read cache")
+
+
+def test_runtime_status_flags_current_mirror_when_manifest_commit_matches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    seed_evals_mirror(tmp_path, source_git_commit="same-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "same-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+    status = state.runtime_status()
+
+    assert status["freshness"]["status"] == "source_with_current_mirror"
+    assert status["freshness"]["mirror_status"] == "current"
+    assert status["freshness"]["mirror_is_current"] is True
+    assert status["freshness"]["mirror_is_authority"] is False
+
+
+def test_runtime_status_flags_approved_mirror_source_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    mirror = seed_evals_mirror(tmp_path, source_git_commit="old-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "new-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState(
+        workspace_root=tmp_path,
+        evals_root=mirror,
+        root_kind="approved_mirror",
+        source_root=source_root,
+        mirror_root=mirror,
+        stack_runtime_root=tmp_path / "abyss-stack",
+    )
+    status = state.runtime_status()
+
+    assert status["freshness"]["status"] == "mirror_source_mismatch"
+    assert status["freshness"]["mirror_status"] == "stale"
+    assert status["freshness"]["mirror_is_stale"] is True
+    assert any("differs from source checkout" in note for note in status["freshness"]["notes"])
+
+
 def test_validate_evidence_candidate_is_shape_only(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
@@ -706,6 +810,63 @@ def test_runtime_candidate_exports_are_read_only_validated_records(tmp_path: Pat
     payload_detail = state.read_runtime_candidate_export("bounded-change-smoke", include_payload=True)
     assert payload_detail["candidate_payload_included"] is True
     assert payload_detail["candidate_payload"]["selection_id"] == "bounded-change-smoke"
+
+
+def test_runtime_candidate_exports_adapt_legacy_shortcut_candidates_for_shape_validation(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    legacy_payload = {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": "run-1--workhorse-q4-vs-q6-latency-tradeoff",
+        "template_name": "workhorse-q4-vs-q6-latency-tradeoff",
+        "candidate_eval_refs": [],
+        "selected_evidence": [
+            {"artifact_ref": "governed-run:run-1:summary", "evidence_role": "summary"},
+            {"artifact_ref": "governed-run:run-1:comparison-note", "evidence_role": "comparison-note"},
+        ],
+        "selection_rationale": "Bounded governed-run review packet candidate assembled from advisory trace.",
+        "review_required": True,
+        "changed_files": ["scripts/build_router.py"],
+        "advisory_trace_ref": "local:/tmp/advisory_trace.json",
+    }
+    export = {
+        "artifact_kind": "aoa.runtime-eval-evidence-selection-candidate",
+        "schema_version": "1",
+        "capture_mode": "private",
+        "exported_at": "2026-05-25T00:02:00Z",
+        "exported_by": "scripts/aoa-export-runtime-evidence-selection",
+        "record_id": "2026-05-25T000200Z__runtime-evidence-selection__run-1-workhorse",
+        "title": "runtime evidence selection run-1 workhorse",
+        "summary": "Legacy shortcut private candidate for adapter validation.",
+        "selection_id": "run-1--workhorse-q4-vs-q6-latency-tradeoff",
+        "source_input_ref": "local:/tmp/run-1-workhorse.json",
+        "source_input_sha256": "4" * 64,
+        "aoa_evals_contract_refs": [
+            "local:/srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-evals/schemas/runtime-evidence-selection.schema.json"
+        ],
+        "candidate_payload": legacy_payload,
+    }
+    write_json(
+        tmp_path / "abyss-stack/Logs/eval-exports/latest/runtime-evidence-selection/run-1-workhorse.private.json",
+        export,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    listing = state.runtime_candidate_exports()
+
+    assert listing["count"] == 1
+    assert listing["candidate_validation"]["valid_shape_count"] == 1
+    assert listing["candidate_validation"]["adapter_valid_shape_count"] == 1
+    assert listing["candidate_validation"]["invalid_shape_count"] == 0
+    candidate = listing["candidates"][0]
+    assert candidate["validation"]["valid"] is True
+    assert candidate["validation"]["adapter_applied"] is True
+    assert candidate["validation"]["adapter"]["adapter"] == "runtime_evidence_selection_shortcut_v1_to_current"
+    assert candidate["candidate_posture"] == "runtime_export_is_private_candidate_not_accepted_proof"
+
+    detail = state.read_runtime_candidate_export(str(export["record_id"]), include_payload=True)
+    assert detail["validation"]["valid"] is True
+    assert detail["validation"]["adapter_applied"] is True
+    assert detail["candidate_payload"]["template_name"] == "workhorse-q4-vs-q6-latency-tradeoff"
 
 
 def test_runtime_candidate_exports_report_shape_invalid_private_candidates(tmp_path: Path) -> None:
@@ -894,6 +1055,13 @@ def test_write_local_intake_dry_run_does_not_mutate(tmp_path: Path) -> None:
     assert result["write_allowed"] is True
     assert result["applied"] is False
     assert result["port_activation_needed"] is True
+    assert result["write_receipt"]["schema"] == "aoa_evals_local_write_receipt_v1"
+    assert result["write_receipt"]["receipt_status"] == "dry_run_allowed"
+    assert result["write_receipt"]["dry_run"] is True
+    assert result["write_receipt"]["target_under_evals"] is True
+    assert result["write_receipt"]["proof_authority"] is False
+    assert result["write_receipt"]["promotion_allowed"] is False
+    assert result["write_receipt"]["side_effects"] == []
     assert not Path(result["target_path"]).exists()
     assert "status: skeleton" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
 
@@ -962,6 +1130,14 @@ def test_write_local_intake_apply_writes_and_activates_port(tmp_path: Path) -> N
     result = state.write_local_intake("aoa-memo", valid_eval_need_packet(), apply=True)
 
     assert result["applied"] is True
+    assert result["write_receipt"]["receipt_status"] == "applied"
+    assert result["write_receipt"]["dry_run"] is False
+    assert result["write_receipt"]["port_activation"]["needed"] is True
+    assert result["write_receipt"]["port_activation"]["applied"] is True
+    assert result["write_receipt"]["central_mutation"] is False
+    assert result["write_receipt"]["verdict_or_scoring"] is False
+    assert "wrote:evals/intake/aoa-memory-guardrail-pressure.eval_need.json" in result["write_receipt"]["side_effects"]
+    assert "activated:evals/PORT.yaml" in result["write_receipt"]["side_effects"]
     assert Path(result["target_path"]).is_file()
     assert "status: active" in (repo_root / "evals/PORT.yaml").read_text(encoding="utf-8")
     detail = state.local_port("aoa-memo")
@@ -1090,6 +1266,11 @@ def test_write_local_suite_and_report_notes_are_local_only(tmp_path: Path) -> No
 
     assert suite["applied"] is True
     assert report["applied"] is True
+    assert suite["write_receipt"]["schema"] == "aoa_evals_local_write_receipt_v1"
+    assert suite["write_receipt"]["target_relative_path"] == "evals/suites/memory-guardrail.suite.md"
+    assert suite["write_receipt"]["proof_authority"] is False
+    assert report["write_receipt"]["target_relative_path"] == "evals/reports/memory-guardrail.report.md"
+    assert report["write_receipt"]["promotion_allowed"] is False
     assert (repo_root / "evals/suites/memory-guardrail.suite.md").is_file()
     assert (repo_root / "evals/reports/memory-guardrail.report.md").is_file()
     detail = state.local_port("aoa-memo")
