@@ -75,7 +75,8 @@ def build_server(
         return (
             f"Use aoa_4pda_connector_answer(query={query!r}, run={run!r}) first. "
             "Treat agent_answer as the cited brief and inspect evidence_chain, nuance_report, "
-            "answer_report, source URLs, post ids, and freshness before making stronger claims."
+            "answer_report, conflict_report, freshness_report, applicability_report, "
+            "warning_report, source URLs, post ids, and claim ids before making stronger claims."
         )
 
     LOGGER.info("AoA 4PDA connector MCP server ready")
