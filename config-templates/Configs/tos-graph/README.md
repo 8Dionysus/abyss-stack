@@ -1,7 +1,8 @@
 # tos-graph config
 
-This directory stores the public-safe config template for the corpus-index ToS
-graph helper.
+This directory stores the public-safe config template for the ToS graph helper.
+The helper reads the corpus index and materialized philosophy graph projection
+published by Tree of Sophia.
 
 Bootstrapped runtime path:
 
@@ -15,9 +16,9 @@ Runtime stack-env mount used for Neo4j auth fallback:
 
 - `${AOA_STACK_ROOT}/Configs/stack.env`
 
-The helper stays corpus-index-first, localhost-only, and read-first in this slice.
+The helper stays localhost-only, read-first, and projection-only in this slice.
 Keep canonical ToS authority in `Tree-of-Sophia`; do not place credentials,
 write-enable defaults, or machine-local paths in this template. When explicit
 `TOS_GRAPH_NEO4J_*` overrides are absent, the service may reuse `NEO4J_AUTH`
-from the mounted runtime `stack.env` so corpus projection can remain
+from the mounted runtime `stack.env` so graph projection can remain
 operator-local without duplicating secrets into git.

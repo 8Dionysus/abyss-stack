@@ -148,6 +148,7 @@
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## federation seams
 
@@ -175,6 +176,7 @@
 ## Tree of Sophia access
 
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## agent surface
 
@@ -207,3 +209,7 @@
 
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
+## tos-graph
+
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)

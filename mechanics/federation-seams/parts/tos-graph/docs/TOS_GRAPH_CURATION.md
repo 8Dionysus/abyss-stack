@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note defines the owner-repo contract for a corpus-index ToS graph
+This note defines the owner-repo contract for a corpus and philosophy graph
 curation surface in `abyss-stack`.
 
 The surface belongs here only as runtime body, helper UI, compose/profile
@@ -12,9 +12,10 @@ It does not move ToS canonical meaning into `abyss-stack`.
 ## Source and authority split
 
 - `Tree-of-Sophia` remains the canonical source of truth for authored nodes,
-  relation packs, registries, validator law, and the checked whole-corpus index
-- `abyss-stack` may project that corpus index into Neo4j and present it through
-  a localhost helper service and MCP access planes
+  source refs, relation packs, registries, validator law, the checked
+  whole-corpus index, and the materialized philosophy graph projection
+- `abyss-stack` may project those derived exports into Neo4j and present them
+  through a localhost helper service and MCP access planes
 - Neo4j stays a projection and query surface only
 - mirrored `tos-source` federation surfaces stay advisory and must not be
   treated as canonical edit input
@@ -34,22 +35,23 @@ The active runtime route is:
 
 - mount the real `Tree-of-Sophia` source checkout through `AOA_TOS_ROOT`
 - read `ToS/derived-exports/tos_corpus_index.min.json`
-- expose switchable corpus graph views through a localhost-only helper UI and API
-- project the whole corpus index into Neo4j when credentials are ready
+- read `ToS/derived-exports/philosophy_graph_projection.min.json`
+- expose switchable corpus and philosophy graph views through a localhost-only helper UI and API
+- project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
 
 ## Dry-run-first landing order
 
 This owner-repo landing stays projection-first:
 
-1. define the corpus-index contract in Tree of Sophia
-2. expose the read-only corpus graph surface in `abyss-stack`
-3. verify corpus projection sync, graph-view posture, and localhost bind
+1. define the derived graph contracts in Tree of Sophia
+2. expose the read-only corpus and philosophy graph surfaces in `abyss-stack`
+3. verify projection sync, graph-view posture, and localhost bind
 4. keep curation-profile launch narrow even when unrelated machine-fit overlays exist
 5. only then consider any validator-gated write route as a separate reviewed change
 
-The current landed slice is corpus-index driven. Writeback remains intentionally
-absent.
+The current landed slice is derived-export driven. Writeback remains
+intentionally absent.
 
 Do not jump straight to canonical writeback from a staging bundle.
 

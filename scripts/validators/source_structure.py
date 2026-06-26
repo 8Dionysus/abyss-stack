@@ -99,6 +99,7 @@ REQUIRED_FILE_PATHS = tuple(
         "config-templates/Services/tos-graph/app/main.py",
         "config-templates/Services/tos-graph/app/models.py",
         "config-templates/Services/tos-graph/app/neo4j_store.py",
+        "config-templates/Services/tos-graph/app/philosophy_reader.py",
         "config-templates/Services/tos-graph/app/projector.py",
         "config-templates/Services/tos-graph/app/ui.py",
         "config-templates/Services/tos-graph/requirements.txt",

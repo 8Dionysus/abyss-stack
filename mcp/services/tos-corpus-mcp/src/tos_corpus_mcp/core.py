@@ -9,6 +9,7 @@ from typing import Any
 
 DEFAULT_TOS_ROOT = Path("/srv/AbyssOS/Tree-of-Sophia")
 INDEX_RELATIVE_PATH = Path("ToS/derived-exports/tos_corpus_index.min.json")
+PHILOSOPHY_PROJECTION_RELATIVE_PATH = Path("ToS/derived-exports/philosophy_graph_projection.min.json")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -32,12 +33,14 @@ def _contains(value: Any, needle: str) -> bool:
 class ToSCorpusMCPState:
     tos_root: Path
     index_path: Path
+    philosophy_graph_projection_path: Path
 
     @classmethod
     def discover(
         cls,
         tos_root: str | Path | None = None,
         index_path: str | Path | None = None,
+        philosophy_graph_projection_path: str | Path | None = None,
     ) -> "ToSCorpusMCPState":
         root = Path(
             tos_root
@@ -52,13 +55,33 @@ class ToSCorpusMCPState:
         ).expanduser()
         if not index.is_absolute():
             index = root / index
-        return cls(tos_root=root, index_path=index.resolve())
+        philosophy_projection = Path(
+            philosophy_graph_projection_path
+            or os.environ.get("TOS_PHILOSOPHY_GRAPH_PROJECTION_PATH")
+            or root / PHILOSOPHY_PROJECTION_RELATIVE_PATH
+        ).expanduser()
+        if not philosophy_projection.is_absolute():
+            philosophy_projection = root / philosophy_projection
+        return cls(
+            tos_root=root,
+            index_path=index.resolve(),
+            philosophy_graph_projection_path=philosophy_projection.resolve(),
+        )
 
     def index_exists(self) -> bool:
         return self.index_path.is_file()
 
     def index(self) -> dict[str, Any]:
         return _read_json(self.index_path)
+
+    def philosophy_projection_exists(self) -> bool:
+        return self.philosophy_graph_projection_path.is_file()
+
+    def philosophy_projection(self) -> dict[str, Any]:
+        payload = _read_json(self.philosophy_graph_projection_path)
+        if payload.get("schema_version") != "tos_philosophy_graph_projection_v1":
+            raise RuntimeError("ToS philosophy graph projection schema_version must be tos_philosophy_graph_projection_v1")
+        return payload
 
     def status(self) -> dict[str, Any]:
         exists = self.index_exists()
@@ -241,6 +264,174 @@ class ToSCorpusMCPState:
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
         }
 
+    def philosophy_status(self) -> dict[str, Any]:
+        exists = self.philosophy_projection_exists()
+        payload = self.philosophy_projection() if exists else {}
+        return {
+            "schema": "tos_philosophy_mcp_status_v1",
+            "projection_exists": exists,
+            "tos_root": self.tos_root.as_posix(),
+            "projection_path": self.philosophy_graph_projection_path.as_posix(),
+            "owner_repo": payload.get("owner_repo"),
+            "surface_kind": payload.get("surface_kind"),
+            "counts": payload.get("counts", {}),
+            "views": [view.get("view_id") for view in payload.get("views", []) if isinstance(view, dict)],
+            "graph_layers": [
+                layer.get("layer_id")
+                for layer in payload.get("graph_layers", [])
+                if isinstance(layer, dict) and layer.get("layer_id")
+            ],
+            "runtime_projection_boundary": payload.get(
+                "runtime_projection_boundary",
+                {
+                    "runtime_owner": "abyss-stack",
+                    "missing_state": "ToS philosophy graph projection is not present at this MCP path",
+                },
+            ),
+            "authority_note": "Tree-of-Sophia owns philosophy meaning; this MCP packet is an abyss-stack access aid.",
+        }
+
+    def philosophy_views(self) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        views = []
+        for view in payload.get("views", []):
+            if not isinstance(view, dict):
+                continue
+            views.append(
+                {
+                    "view_id": view.get("view_id"),
+                    "title": view.get("title"),
+                    "layout_hint": view.get("layout_hint"),
+                    "graph_layers": view.get("graph_layers", []),
+                    "node_count": len(view.get("nodes", [])) if isinstance(view.get("nodes"), list) else 0,
+                    "edge_count": len(view.get("edges", [])) if isinstance(view.get("edges"), list) else 0,
+                    "source_ref": view.get("source_ref"),
+                    "route_card": view.get("route_card"),
+                }
+            )
+        return {
+            "schema": "tos_philosophy_mcp_views_v1",
+            "views": views,
+            "counts": payload.get("counts", {}),
+            "graph_layers": payload.get("graph_layers", []),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def philosophy_view(self, view_id: str) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        view = next(
+            (item for item in payload.get("views", []) if isinstance(item, dict) and item.get("view_id") == view_id),
+            None,
+        )
+        if view is None:
+            raise KeyError(f"unknown ToS philosophy graph view: {view_id}")
+        return {
+            "schema": "tos_philosophy_mcp_view_v1",
+            "view": view,
+            "node_count": len(view.get("nodes", [])) if isinstance(view.get("nodes"), list) else 0,
+            "edge_count": len(view.get("edges", [])) if isinstance(view.get("edges"), list) else 0,
+            "nodes": view.get("nodes", []),
+            "edges": view.get("edges", []),
+            "source_refs": view.get("source_refs", []),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def philosophy_node(self, node_id: str) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        node = next(
+            (item for item in payload.get("nodes", []) if isinstance(item, dict) and item.get("node_id") == node_id),
+            None,
+        )
+        if node is None:
+            raise KeyError(f"unknown ToS philosophy node: {node_id}")
+        related_edges = [
+            edge
+            for edge in payload.get("edges", [])
+            if isinstance(edge, dict) and (edge.get("from_id") == node_id or edge.get("to_id") == node_id)
+        ]
+        return {
+            "schema": "tos_philosophy_mcp_node_v1",
+            "node_id": node_id,
+            "node": node,
+            "related_edges": related_edges,
+            "authority_note": "Node source_ref stays authoritative in Tree-of-Sophia; MCP exposes an access packet only.",
+        }
+
+    def philosophy_neighborhood(self, node_id: str) -> dict[str, Any]:
+        node_packet = self.philosophy_node(node_id)
+        payload = self.philosophy_projection()
+        related_edges = node_packet["related_edges"]
+        neighbor_ids = {
+            str(edge.get("from_id"))
+            for edge in related_edges
+            if edge.get("from_id") != node_id
+        } | {
+            str(edge.get("to_id"))
+            for edge in related_edges
+            if edge.get("to_id") != node_id
+        }
+        neighbors = [
+            node
+            for node in payload.get("nodes", [])
+            if isinstance(node, dict) and node.get("node_id") in neighbor_ids
+        ]
+        return {
+            "schema": "tos_philosophy_mcp_neighborhood_v1",
+            "node": node_packet["node"],
+            "neighbors": neighbors,
+            "edges": related_edges,
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def philosophy_search(self, query: str, limit: int = 20) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        needle = query.lower().strip()
+        results: list[dict[str, Any]] = []
+        for collection_name in ("views", "nodes", "edges", "graph_layers"):
+            for item in payload.get(collection_name, []):
+                if not isinstance(item, dict):
+                    continue
+                if needle and not _contains(item, needle):
+                    continue
+                results.append({"collection": collection_name, "item": item})
+                if len(results) >= limit:
+                    return self._philosophy_search_payload(query, results)
+        return self._philosophy_search_payload(query, results)
+
+    @staticmethod
+    def _philosophy_search_payload(query: str, results: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "schema": "tos_philosophy_mcp_search_v1",
+            "query": query,
+            "result_count": len(results),
+            "results": results,
+            "authority_note": "Tree-of-Sophia owns philosophy meaning; this MCP search result is an access-plane packet.",
+        }
+
+    def philosophy_packet(self, query: str = "", view_id: str | None = None, limit: int = 20) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        search = self.philosophy_search(query=query, limit=limit) if query else {"result_count": 0, "results": []}
+        view_packet = self.philosophy_view(view_id) if view_id else None
+        compact_view = None
+        if view_packet:
+            compact_view = {
+                "view": view_packet["view"],
+                "nodes": view_packet["nodes"][:limit],
+                "edges": view_packet["edges"][:limit],
+                "source_refs": view_packet["source_refs"],
+            }
+        return {
+            "schema": "tos_philosophy_mcp_packet_v1",
+            "query": query,
+            "view_id": view_id,
+            "result_count": search["result_count"],
+            "results": search["results"],
+            "view": compact_view,
+            "counts": payload.get("counts", {}),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Packets are access aids; ToS owns meaning and Neo4j/UI/MCP remain projections.",
+        }
+
     def read_resource(self, uri: str) -> dict[str, Any]:
         if uri == "tos-corpus://status":
             return self.status()
@@ -252,6 +443,13 @@ class ToSCorpusMCPState:
         prefix = "tos-corpus://graph-view/"
         if uri.startswith(prefix):
             return self.graph_view(uri.removeprefix(prefix))
+        if uri == "tos-philosophy://status":
+            return self.philosophy_status()
+        if uri == "tos-philosophy://views":
+            return self.philosophy_views()
+        philosophy_view_prefix = "tos-philosophy://view/"
+        if uri.startswith(philosophy_view_prefix):
+            return self.philosophy_view(uri.removeprefix(philosophy_view_prefix))
         raise KeyError(f"unknown ToS corpus resource URI: {uri}")
 
     def render_resource(self, uri: str) -> str:

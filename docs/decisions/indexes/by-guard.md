@@ -96,6 +96,7 @@
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## service selection
 
@@ -288,6 +289,10 @@
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 
+## projection-only cache
+
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
+
 ## release governance
 
 - [ABYSS-STACK-D-0054 Branch Policy Validator Module](../ABYSS-STACK-D-0054-branch-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0054-branch-policy-validator-module.md`)
@@ -373,6 +378,7 @@
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 
 ## stale path hygiene
 

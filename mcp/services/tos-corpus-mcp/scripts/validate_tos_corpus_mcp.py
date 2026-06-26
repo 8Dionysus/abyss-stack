@@ -121,12 +121,83 @@ def write_source_safe_fixture(root: Path) -> Path:
     return index_path
 
 
+def write_philosophy_projection_fixture(root: Path) -> Path:
+    projection_path = root / "ToS" / "derived-exports" / "philosophy_graph_projection.min.json"
+    projection_path.parent.mkdir(parents=True, exist_ok=True)
+    node = {
+        "node_id": "atlas-row:A01",
+        "label": "A01",
+        "node_type": "atlas-row",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+        "properties": {},
+    }
+    neighbor = {
+        "node_id": "dossier:A01",
+        "label": "A01 dossier",
+        "node_type": "dossier",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/dossiers/A01.md",
+        "properties": {},
+    }
+    edge = {
+        "edge_id": "edge:row:A01:has-dossier:A01",
+        "from_id": "atlas-row:A01",
+        "to_id": "dossier:A01",
+        "predicate_id": "has-dossier",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
+        "properties": {},
+    }
+    payload = {
+        "schema_version": "tos_philosophy_graph_projection_v1",
+        "owner_repo": "Tree-of-Sophia",
+        "surface_kind": "derived_philosophy_graph_projection",
+        "counts": {"views": 1, "graph_layers": 1, "nodes": 2, "edges": 1, "source_refs": 3, "diagnostics": 0},
+        "runtime_projection_boundary": {
+            "runtime_owner": "abyss-stack",
+            "runtime_scope": ["serve MCP packets"],
+            "tos_authority_scope": ["own source_refs"],
+        },
+        "graph_layers": [
+            {
+                "layer_id": "historical-relation",
+                "use": "chronological branch relation",
+                "source_ref": "ToS/philosophy/trunk/graph-layers/README.md",
+            }
+        ],
+        "views": [
+            {
+                "view_id": "chronology",
+                "title": "Chronology",
+                "source_ref": "ToS/philosophy/graph-workbench/views/chronology.graph.md",
+                "route_card": "ToS/philosophy/graph-workbench/views/AGENTS.md",
+                "layout_hint": "timeline-lanes",
+                "graph_layers": ["historical-relation"],
+                "nodes": [node, neighbor],
+                "edges": [edge],
+                "source_refs": ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"],
+            }
+        ],
+        "nodes": [node, neighbor],
+        "edges": [edge],
+    }
+    projection_path.write_text(json.dumps(payload, ensure_ascii=True, sort_keys=True), encoding="utf-8")
+    return projection_path
+
+
 def discover_source_safe_state(fixture_root: Path) -> tuple[ToSCorpusMCPState, str]:
     live_state = ToSCorpusMCPState.discover()
-    if live_state.index_exists():
+    if live_state.index_exists() and live_state.philosophy_projection_exists():
         return live_state, "live"
     write_source_safe_fixture(fixture_root)
+    write_philosophy_projection_fixture(fixture_root)
     return ToSCorpusMCPState.discover(tos_root=fixture_root), "fixture"
+
+
 def main() -> None:
     required = [
         "AGENTS.md",
@@ -162,6 +233,17 @@ def main() -> None:
         if view["view"]["layout_hint"] != "elk-layered-or-graphviz-dot":
             raise SystemExit("corpus-topology view lost its layout hint")
 
+        philosophy_status = state.philosophy_status()
+        if not philosophy_status["projection_exists"]:
+            raise SystemExit(f"missing ToS philosophy graph projection: {philosophy_status['projection_path']}")
+        if int(philosophy_status["counts"].get("nodes") or 0) == 0:
+            raise SystemExit("ToS philosophy graph projection reports no nodes")
+        philosophy_packet = state.philosophy_packet(query="dossier", view_id="chronology", limit=8)
+        if not philosophy_packet["view"]:
+            raise SystemExit("ToS philosophy graph packet returned no chronology view")
+        if philosophy_packet["result_count"] == 0:
+            raise SystemExit("ToS philosophy graph packet returned no dossier results")
+
         server = build_server(tos_root=state.tos_root, index_path=state.index_path)
         if server is None:
             raise SystemExit("MCP server did not build")
@@ -173,6 +255,8 @@ def main() -> None:
                     "resources": status["counts"].get("resources"),
                     "nodes": status["counts"].get("nodes"),
                     "graph_views": len(status["graph_views"]),
+                    "philosophy_nodes": philosophy_status["counts"].get("nodes"),
+                    "philosophy_views": len(philosophy_status["views"]),
                     "validation_source": validation_source,
                 },
                 indent=2,

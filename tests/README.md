@@ -25,6 +25,8 @@ roadmap checks.
 - `test_schema_contracts.py`: active JSON Schema meta-validation, schema
   registry coverage, example validation, and generated artifact validation.
 - `test_sync_parity_entrypoint_contracts.py`: source/deployed parity behavior.
+- `test_tos_graph_ui_browser.py`: opt-in Playwright browser smoke for the
+  `tos-graph` philosophy UI; run with `RUN_TOS_GRAPH_UI_BROWSER_TEST=1`.
 - `test_questbook_surface_contracts.py`: questbook schemas, examples, and RPG
   runtime routes.
 - `test_federation_required_files_validator_module.py`: federation template requirements.

@@ -28,7 +28,12 @@ def _load_env_file(path: Path) -> dict[str, str]:
         return {}
 
     loaded: dict[str, str] = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+
+    for raw in lines:
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -55,7 +60,11 @@ class TosGraphSettings:
     tos_root: Path
     log_root: Path
     corpus_index_path: Path
+    philosophy_atlas_projection_path: Path
+    philosophy_graph_views_path: Path
+    philosophy_graph_projection_path: Path
     default_view: str
+    default_philosophy_view: str
     write_enabled: bool
     neo4j_uri: str | None
     neo4j_user: str | None
@@ -78,13 +87,30 @@ def load_settings() -> TosGraphSettings:
     )
 
     tos_root = Path(os.environ.get("TOS_GRAPH_TOS_ROOT", "/workspace/Tree-of-Sophia"))
-    raw_corpus_index_path = Path(
-        os.environ.get(
-            "TOS_GRAPH_CORPUS_INDEX_PATH",
-            source_cfg.get("corpus_index", "ToS/derived-exports/tos_corpus_index.min.json"),
-        )
+    def source_path(env_name: str, config_key: str, default: str) -> Path:
+        raw_path = Path(os.environ.get(env_name, source_cfg.get(config_key, default)))
+        return raw_path if raw_path.is_absolute() else tos_root / raw_path
+
+    corpus_index_path = source_path(
+        "TOS_GRAPH_CORPUS_INDEX_PATH",
+        "corpus_index",
+        "ToS/derived-exports/tos_corpus_index.min.json",
     )
-    corpus_index_path = raw_corpus_index_path if raw_corpus_index_path.is_absolute() else tos_root / raw_corpus_index_path
+    philosophy_atlas_projection_path = source_path(
+        "TOS_GRAPH_PHILOSOPHY_ATLAS_PROJECTION_PATH",
+        "philosophy_atlas_projection",
+        "ToS/derived-exports/philosophy_atlas_projection.min.json",
+    )
+    philosophy_graph_views_path = source_path(
+        "TOS_GRAPH_PHILOSOPHY_GRAPH_VIEWS_PATH",
+        "philosophy_graph_views",
+        "ToS/derived-exports/philosophy_graph_views.min.json",
+    )
+    philosophy_graph_projection_path = source_path(
+        "TOS_GRAPH_PHILOSOPHY_GRAPH_PROJECTION_PATH",
+        "philosophy_graph_projection",
+        "ToS/derived-exports/philosophy_graph_projection.min.json",
+    )
 
     return TosGraphSettings(
         service_name=str(service_cfg.get("name", "tos-graph")),
@@ -94,7 +120,13 @@ def load_settings() -> TosGraphSettings:
         tos_root=tos_root,
         log_root=Path(os.environ.get("TOS_GRAPH_LOG_ROOT", "/app/logs")),
         corpus_index_path=corpus_index_path,
+        philosophy_atlas_projection_path=philosophy_atlas_projection_path,
+        philosophy_graph_views_path=philosophy_graph_views_path,
+        philosophy_graph_projection_path=philosophy_graph_projection_path,
         default_view=str(os.environ.get("TOS_GRAPH_DEFAULT_VIEW", ui_cfg.get("default_view", "corpus-topology"))),
+        default_philosophy_view=str(
+            os.environ.get("TOS_GRAPH_DEFAULT_PHILOSOPHY_VIEW", ui_cfg.get("default_philosophy_view", "chronology"))
+        ),
         write_enabled=_parse_bool(os.environ.get("TOS_GRAPH_WRITE_ENABLED"), False),
         neo4j_uri=os.environ.get("TOS_GRAPH_NEO4J_URI"),
         neo4j_user=os.environ.get("TOS_GRAPH_NEO4J_USER") or fallback_user,

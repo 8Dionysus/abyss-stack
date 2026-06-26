@@ -4,16 +4,19 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_ROOT = ROOT / "config-templates" / "Services" / "tos-graph"
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.config import TosGraphSettings  # noqa: E402
+from app.config import TosGraphSettings, load_settings  # noqa: E402
 from app.corpus_reader import ToSCorpusReader  # noqa: E402
 from app.neo4j_store import Neo4jProjectionStore, Neo4jStoreStatus  # noqa: E402
-from app.projector import CorpusProjector  # noqa: E402
+from app.philosophy_reader import ToSPhilosophyProjectionReader  # noqa: E402
+from app.projector import CorpusProjector, PhilosophyProjector  # noqa: E402
 
 
 def write_index(root: Path) -> Path:
@@ -102,6 +105,89 @@ def write_index(root: Path) -> Path:
     return index_path
 
 
+def write_philosophy_projection(root: Path) -> Path:
+    projection_path = root / "ToS" / "derived-exports" / "philosophy_graph_projection.min.json"
+    projection_path.parent.mkdir(parents=True, exist_ok=True)
+    node_a = {
+        "node_id": "atlas-row:A01",
+        "label": "A01",
+        "node_type": "atlas-row",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+        "properties": {"period": "early writing"},
+    }
+    node_b = {
+        "node_id": "dossier:A01",
+        "label": "A01 dossier",
+        "node_type": "dossier",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/dossiers/A01.md",
+        "properties": {},
+    }
+    edge = {
+        "edge_id": "edge:row:A01:has-dossier:A01",
+        "from_id": "atlas-row:A01",
+        "to_id": "dossier:A01",
+        "predicate_id": "has-dossier",
+        "graph_layers": ["historical-relation"],
+        "view_ids": ["chronology"],
+        "source_ref": "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
+        "properties": {},
+    }
+    payload = {
+        "schema_version": "tos_philosophy_graph_projection_v1",
+        "schema_ref": "ToS/contracts/philosophy-graph-projection.schema.json",
+        "owner_repo": "Tree-of-Sophia",
+        "surface_kind": "derived_philosophy_graph_projection",
+        "source_refs": {
+            "atlas_projection_ref": "ToS/derived-exports/philosophy_atlas_projection.min.json",
+            "graph_view_catalog_ref": "ToS/derived-exports/philosophy_graph_views.min.json",
+            "source_view_contract_ref": "ToS/philosophy/graph-workbench/views/view-contracts.json",
+        },
+        "runtime_projection_boundary": {
+            "runtime_owner": "abyss-stack",
+            "runtime_scope": ["serve projection"],
+            "tos_authority_scope": ["own source_refs"],
+        },
+        "validation_refs": ["scripts/build_philosophy_graph_projection.py"],
+        "counts": {"views": 1, "graph_layers": 1, "nodes": 2, "edges": 1, "source_refs": 3, "diagnostics": 0},
+        "graph_layers": [
+            {
+                "layer_id": "historical-relation",
+                "use": "chronological branch relation",
+                "source_ref": "ToS/philosophy/trunk/graph-layers/README.md",
+            }
+        ],
+        "views": [
+            {
+                "view_id": "chronology",
+                "title": "Chronology",
+                "source_ref": "ToS/philosophy/graph-workbench/views/chronology.graph.md",
+                "route_card": "ToS/philosophy/graph-workbench/views/AGENTS.md",
+                "order": 10,
+                "layout_hint": "timeline-lanes",
+                "graph_layers": ["historical-relation"],
+                "filters_applied": {"node_types": ["atlas-row"]},
+                "future_branch_filters": {},
+                "nodes": [node_a, node_b],
+                "edges": [edge],
+                "source_refs": [
+                    "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+                    "ToS/philosophy/atlas/master-tables/table-i/edges.csv",
+                ],
+                "diagnostics": [],
+            }
+        ],
+        "nodes": [node_a, node_b],
+        "edges": [edge],
+        "diagnostics": [],
+    }
+    projection_path.write_text(json.dumps(payload), encoding="utf-8")
+    return projection_path
+
+
 def settings_for(root: Path) -> TosGraphSettings:
     return TosGraphSettings(
         service_name="tos-graph",
@@ -111,7 +197,11 @@ def settings_for(root: Path) -> TosGraphSettings:
         tos_root=root,
         log_root=root / "logs",
         corpus_index_path=root / "ToS" / "derived-exports" / "tos_corpus_index.min.json",
+        philosophy_atlas_projection_path=root / "ToS" / "derived-exports" / "philosophy_atlas_projection.min.json",
+        philosophy_graph_views_path=root / "ToS" / "derived-exports" / "philosophy_graph_views.min.json",
+        philosophy_graph_projection_path=root / "ToS" / "derived-exports" / "philosophy_graph_projection.min.json",
         default_view="corpus-topology",
+        default_philosophy_view="chronology",
         write_enabled=False,
         neo4j_uri=None,
         neo4j_user=None,
@@ -157,3 +247,101 @@ def test_corpus_projection_preview_uses_whole_index_counts(tmp_path: Path) -> No
     assert result["node_count"] == 1
     assert result["edge_count"] == 1
     assert result["resource_count"] == 2
+
+
+def test_corpus_relation_edge_projection_ids_include_pack_id() -> None:
+    rows = Neo4jProjectionStore._corpus_rows(
+        {
+            "relation_edges": [
+                {"pack_id": "canon/relations/a", "edge_id": "m001", "from_id": "a", "to_id": "b"},
+                {"pack_id": "canon/relations/b", "edge_id": "m001", "from_id": "c", "to_id": "d"},
+            ]
+        },
+        "relation_edges",
+    )
+
+    assert [row["id"] for row in rows] == ["canon/relations/a::m001", "canon/relations/b::m001"]
+
+
+def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) -> None:
+    write_philosophy_projection(tmp_path)
+    reader = ToSPhilosophyProjectionReader(settings_for(tmp_path))
+
+    status = reader.status()
+    views = reader.views()
+    view = reader.view("chronology")
+    node = reader.node("atlas-row:A01")
+    neighborhood = reader.neighborhood("atlas-row:A01")
+
+    assert status["projection_exists"] is True
+    assert status["counts"]["nodes"] == 2
+    assert views["views"][0]["layout_hint"] == "timeline-lanes"
+    assert view["node_count"] == 2
+    assert view["edge_count"] == 1
+    assert node["node"]["source_ref"].endswith("rows.jsonl")
+    assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+
+
+def test_philosophy_projection_preview_uses_projection_counts(tmp_path: Path) -> None:
+    write_philosophy_projection(tmp_path)
+    settings = settings_for(tmp_path)
+    reader = ToSPhilosophyProjectionReader(settings)
+    status = Neo4jStoreStatus(
+        configured=False,
+        ready=False,
+        uri=None,
+        user=None,
+        database="neo4j",
+        projection_mode="corpus_and_philosophy_sync",
+        note="preview",
+    )
+    projector = PhilosophyProjector(reader, status, Neo4jProjectionStore(settings, status))
+
+    result = projector.sync_philosophy()
+
+    assert result["surface"] == "ToS/derived-exports/philosophy_graph_projection.min.json"
+    assert result["status"] == "preview_only"
+    assert result["node_count"] == 2
+    assert result["edge_count"] == 1
+    assert result["resource_count"] == 3
+    assert result["branch_count"] == 1
+
+
+def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: Path) -> None:
+    projection_path = write_philosophy_projection(tmp_path)
+    projection = json.loads(projection_path.read_text(encoding="utf-8"))
+
+    node_rows = Neo4jProjectionStore._philosophy_rows(projection, "nodes", "node_id")
+    edge_rows = Neo4jProjectionStore._philosophy_rows(projection, "edges", "edge_id")
+    source_rows = Neo4jProjectionStore._philosophy_source_rows(projection)
+
+    assert node_rows[0]["id"] == "atlas-row:A01"
+    assert json.loads(node_rows[0]["props"]["payload_json"])["properties"]["period"] == "early writing"
+    assert node_rows[0]["graph_layers"] == ["historical-relation"]
+    assert edge_rows[0]["from_id"] == "atlas-row:A01"
+    assert edge_rows[0]["to_id"] == "dossier:A01"
+    assert any(row["id"].endswith("view-contracts.json") for row in source_rows)
+
+
+def test_settings_treats_unreadable_stack_env_as_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    stack_env_path = tmp_path / "stack.env"
+    config_path.write_text("service:\n  name: tos-graph\n  port: 5410\n", encoding="utf-8")
+    stack_env_path.write_text("NEO4J_AUTH=neo4j/not-used\n", encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def guarded_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self == stack_env_path:
+            raise PermissionError("stack env is mounted but unreadable")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+    monkeypatch.setenv("TOS_GRAPH_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("TOS_GRAPH_STACK_ENV_PATH", str(stack_env_path))
+    monkeypatch.delenv("NEO4J_AUTH", raising=False)
+    monkeypatch.delenv("TOS_GRAPH_NEO4J_PASSWORD", raising=False)
+
+    settings = load_settings()
+
+    assert settings.service_name == "tos-graph"
+    assert settings.neo4j_password is None

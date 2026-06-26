@@ -50,8 +50,8 @@ in `.aoa`.
 
 For Tree of Sophia corpus graph context work,
 `mcp/services/tos-corpus-mcp/` exposes ToS corpus index status, graph-view
-packets, resources, nodes, and relation packs while keeping corpus authority in
-`Tree-of-Sophia`.
+packets, resources, nodes, relation packs, and philosophy graph projection
+packets while keeping corpus and philosophy authority in `Tree-of-Sophia`.
 
 For 4PDA connector evidence work,
 `mcp/services/aoa-4pda-connector-mcp/` exposes local connector status,

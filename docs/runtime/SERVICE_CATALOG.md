@@ -158,10 +158,10 @@ This file maps the first migrated runtime modules to their intended services.
 
 ## `52-tos-graph.yml`
 
-- `tos-graph` — corpus-index localhost helper for Tree of Sophia graph curation on `5410`
-- reads the ToS-owned whole-corpus index from the mounted `AOA_TOS_ROOT`
+- `tos-graph` — corpus and philosophy graph localhost helper for Tree of Sophia graph curation on `5410`
+- reads the ToS-owned whole-corpus index and materialized philosophy graph projection from the mounted `AOA_TOS_ROOT`
 - keeps Neo4j in projection-only posture and does not treat mirrored `tos-source` advisory surfaces as canonical edit input
-- current slice exposes a corpus-first localhost UI, health and `/api/corpus/*` inspection APIs, and whole-corpus Neo4j projection sync while writeback remains absent
+- current slice exposes a switchable localhost UI, health, `/api/corpus/*`, `/api/philosophy/*`, and corpus/philosophy Neo4j projection sync while writeback remains absent
 
 ## `53-babelvox-tts.yml`
 

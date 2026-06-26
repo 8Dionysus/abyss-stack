@@ -13,23 +13,35 @@ from .models import (
     CorpusStatusResponse,
     CorpusSummaryResponse,
     HealthResponse,
+    PhilosophyPacketResponse,
+    PhilosophySearchResponse,
+    PhilosophyStatusResponse,
+    PhilosophyViewResponse,
+    PhilosophyViewsResponse,
     ProjectSyncResponse,
 )
 from .neo4j_store import Neo4jProjectionStore, describe_neo4j_store
-from .projector import CorpusProjector
+from .philosophy_reader import ToSPhilosophyProjectionReader, ToSPhilosophyReaderError
+from .projector import CorpusProjector, PhilosophyProjector
 from .ui import render_index
 
 
 settings = load_settings()
 reader = ToSCorpusReader(settings)
+philosophy_reader = ToSPhilosophyProjectionReader(settings)
 neo4j_status = describe_neo4j_store(settings)
 neo4j_store = Neo4jProjectionStore(settings, neo4j_status)
 projector = CorpusProjector(reader, neo4j_status, neo4j_store)
+philosophy_projector = PhilosophyProjector(philosophy_reader, neo4j_status, neo4j_store)
 
 app = FastAPI(title="tos-graph", version="0.2.0")
 
 
 def _handle_reader_error(exc: ToSCorpusReaderError) -> HTTPException:
+    return HTTPException(status_code=404, detail=str(exc))
+
+
+def _handle_philosophy_reader_error(exc: ToSPhilosophyReaderError) -> HTTPException:
     return HTTPException(status_code=404, detail=str(exc))
 
 
@@ -52,7 +64,10 @@ def health() -> HealthResponse:
         tos_root_exists=settings.tos_root.exists(),
         corpus_index_path=settings.corpus_index_path.as_posix(),
         corpus_index_exists=settings.corpus_index_path.exists(),
+        philosophy_graph_projection_path=settings.philosophy_graph_projection_path.as_posix(),
+        philosophy_graph_projection_exists=settings.philosophy_graph_projection_path.exists(),
         default_view=settings.default_view,
+        default_philosophy_view=settings.default_philosophy_view,
     )
 
 
@@ -101,9 +116,70 @@ def relation_pack_detail(pack_id: str) -> dict[str, Any]:
         raise _handle_reader_error(exc) from exc
 
 
+@app.get("/api/philosophy/status", response_model=PhilosophyStatusResponse)
+def philosophy_status() -> PhilosophyStatusResponse:
+    return PhilosophyStatusResponse(**philosophy_reader.status())
+
+
+@app.get("/api/philosophy/views", response_model=PhilosophyViewsResponse)
+def philosophy_views() -> PhilosophyViewsResponse:
+    try:
+        return PhilosophyViewsResponse(**philosophy_reader.views())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/views/{view_id}", response_model=PhilosophyViewResponse)
+def philosophy_view(view_id: str) -> PhilosophyViewResponse:
+    try:
+        return PhilosophyViewResponse(**philosophy_reader.view(view_id))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/search", response_model=PhilosophySearchResponse)
+def philosophy_search(query: str = "", limit: int = 40) -> PhilosophySearchResponse:
+    try:
+        return PhilosophySearchResponse(**philosophy_reader.search(query=query, limit=limit))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/packet", response_model=PhilosophyPacketResponse)
+def philosophy_packet(query: str = "", view_id: str | None = None, limit: int = 20) -> PhilosophyPacketResponse:
+    try:
+        return PhilosophyPacketResponse(**philosophy_reader.packet(query=query, view_id=view_id, limit=limit))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/nodes/{node_id:path}")
+def philosophy_node(node_id: str) -> dict[str, Any]:
+    try:
+        return philosophy_reader.node(node_id)
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/neighborhood/{node_id:path}")
+def philosophy_neighborhood(node_id: str) -> dict[str, Any]:
+    try:
+        return philosophy_reader.neighborhood(node_id)
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
 @app.post("/api/project/sync", response_model=ProjectSyncResponse)
 def project_sync() -> ProjectSyncResponse:
     try:
         return ProjectSyncResponse(**projector.sync_corpus())
     except ToSCorpusReaderError as exc:
         raise _handle_reader_error(exc) from exc
+
+
+@app.post("/api/philosophy/project/sync", response_model=ProjectSyncResponse)
+def philosophy_project_sync() -> ProjectSyncResponse:
+    try:
+        return ProjectSyncResponse(**philosophy_projector.sync_philosophy())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc

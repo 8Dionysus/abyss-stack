@@ -52,6 +52,7 @@
         "tests/test_service_selection_validator_module.py",
         "tests/test_sync_parity_validator_module.py",
         "tests/test_tos_graph_corpus_runtime.py",
+        "tests/test_tos_graph_ui_browser.py",
         "tests/test_validate_nested_agents.py",
         "tests/test_federation_required_files_validator_module.py",
         "tests/test_sync_parity_entrypoint_contracts.py",
