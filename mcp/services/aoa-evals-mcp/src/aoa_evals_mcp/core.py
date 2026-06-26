@@ -48,11 +48,28 @@ RUNTIME_TEMPLATE_SCHEMA_MIRROR = Path("schemas/runtime-candidate-template-index.
 EVAL_NEED_SCHEMA = Path("mechanics/proof-object/parts/eval-authoring/schemas/eval-need.schema.json")
 EVAL_NEED_SCHEMA_MIRROR = Path("schemas/eval-need.schema.json")
 MIRROR_MANIFEST = Path("manifest/federation_mirror_manifest.json")
+MIRROR_REFRESH_COMMAND = "scripts/aoa-sync-federation-surfaces --layer aoa-evals"
+MIRROR_AUTHORITY_WARNING = (
+    "federation mirror is a runtime read cache only; aoa-evals source remains proof authority"
+)
 RUNTIME_CANDIDATE_EXPORT_ROOT = Path("Logs/eval-exports")
 RUNTIME_CANDIDATE_LATEST_DIRS = (
     "runtime-evidence-selection",
     "artifact-hook",
 )
+RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF = (
+    "repo:abyss-stack/mechanics/governed-execution/parts/candidate-exports/"
+    "schemas/runtime-eval-evidence-selection-candidate.schema.json"
+)
+RUNTIME_EVIDENCE_ROLES = {
+    "summary",
+    "case-breakdown",
+    "environment-note",
+    "comparison-note",
+    "integrity-sidecar",
+}
+RUNTIME_EVIDENCE_COMPARISON_MODES = {"none", "fixed-baseline", "peer-compare", "longitudinal-window"}
+RUNTIME_EVIDENCE_PROMOTION_TARGETS = {"local-only", "evidence-sidecar", "bundle-candidate"}
 LOCAL_PORT_REQUIRED_FILES = (
     "AGENTS.md",
     "README.md",
@@ -72,6 +89,12 @@ LOCAL_PORT_REQUIRED_FIELDS = (
 )
 LOCAL_PORT_BOUNDARY_TOKENS = ("verdict", "scoring", "regression", "proof doctrine")
 LOCAL_WRITE_AUTHORITY_BOUNDARY = "no verdict, scoring, regression, or proof doctrine authority"
+LOCAL_WRITE_ALLOWED_GLOBS = (
+    "evals/intake/*.eval_need.json",
+    "evals/suites/*.suite.md",
+    "evals/reports/*.report.md",
+    "evals/PORT.yaml status skeleton-to-active activation with first pressure",
+)
 LOCAL_PORT_AUTHORITY_BOUNDARY = (
     "Repo-local eval ports carry intake, suites, reports, and pressure evidence only. "
     "Central verdict, scoring, regression, proof doctrine, and central bundle adoption "
@@ -411,6 +434,164 @@ def _bounded_text(value: Any, fallback: str) -> str:
 def _enum_value(value: Any, allowed: set[str], fallback: str) -> str:
     text = str(value or "").strip()
     return text if text in allowed else fallback
+
+
+def _unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def _runtime_evidence_comparison_mode(selection_id: str, template_name: str) -> str:
+    joined = f"{selection_id} {template_name}".casefold()
+    if "tradeoff" in joined or "latency" in joined or "compare" in joined:
+        return "fixed-baseline"
+    if "window" in joined or "rerun" in joined:
+        return "longitudinal-window"
+    return "none"
+
+
+def _runtime_evidence_selected_entries(packet: dict[str, Any], source_input_ref: str | None) -> list[dict[str, Any]] | None:
+    raw_entries = packet.get("selected_evidence")
+    if not isinstance(raw_entries, list):
+        return None
+    entries: list[dict[str, Any]] = []
+    for raw_entry in raw_entries:
+        if not isinstance(raw_entry, dict):
+            return None
+        artifact_ref = raw_entry.get("artifact_ref")
+        evidence_role = raw_entry.get("evidence_role")
+        if not isinstance(artifact_ref, str) or not artifact_ref:
+            return None
+        if not isinstance(evidence_role, str) or evidence_role not in RUNTIME_EVIDENCE_ROLES:
+            return None
+        entries.append(
+            {
+                "artifact_ref": artifact_ref,
+                "evidence_role": evidence_role,
+                "summary_only": bool(raw_entry.get("summary_only", True)),
+            }
+        )
+    if entries:
+        return entries
+    if isinstance(source_input_ref, str) and source_input_ref:
+        return [{"artifact_ref": source_input_ref, "evidence_role": "summary", "summary_only": True}]
+    return None
+
+
+def _adapt_runtime_evidence_shortcut(
+    packet: dict[str, Any],
+    *,
+    source_input_ref: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    if packet.get("surface_type") != "runtime_evidence_selection":
+        return packet, None
+
+    shortcut_keys = {
+        "advisory_trace_ref",
+        "changed_files",
+        "playbook_id",
+        "review_required",
+        "selection_rationale",
+        "source_example_ref",
+        "template_name",
+    }
+    required_current_keys = {
+        "source_repo",
+        "source_schema_ref",
+        "source_manifests",
+        "bounded_claim",
+        "promotion_target",
+        "comparison_mode",
+        "environment_invariants",
+        "do_not_overread",
+        "review_posture",
+    }
+    has_shortcut_shape = bool(shortcut_keys.intersection(packet)) or any(
+        key not in packet for key in required_current_keys
+    )
+    if not has_shortcut_shape:
+        return packet, None
+
+    selected_evidence = _runtime_evidence_selected_entries(packet, source_input_ref)
+    if selected_evidence is None:
+        return packet, None
+
+    selection_id = str(packet.get("selection_id") or "runtime-evidence-selection")
+    template_name = str(packet.get("template_name") or "")
+    comparison_mode = _enum_value(
+        packet.get("comparison_mode"),
+        RUNTIME_EVIDENCE_COMPARISON_MODES,
+        _runtime_evidence_comparison_mode(selection_id, template_name),
+    )
+    promotion_target = _enum_value(packet.get("promotion_target"), RUNTIME_EVIDENCE_PROMOTION_TARGETS, "evidence-sidecar")
+    manifests = _string_list(packet.get("source_manifests"))
+    advisory_trace_ref = packet.get("advisory_trace_ref")
+    if isinstance(advisory_trace_ref, str) and advisory_trace_ref:
+        manifests.append(advisory_trace_ref)
+    if isinstance(source_input_ref, str) and source_input_ref:
+        manifests.append(source_input_ref)
+    if not manifests:
+        manifests.append(f"runtime-candidate-shortcut:{selection_id}")
+
+    candidate_eval_refs = _string_list(packet.get("candidate_eval_refs"))
+    target_eval = packet.get("target_eval")
+    if not isinstance(target_eval, str):
+        for ref in candidate_eval_refs:
+            if ref.startswith("candidate:aoa-"):
+                target_eval = ref[len("candidate:") :]
+                break
+
+    review_posture = packet.get("review_posture") if isinstance(packet.get("review_posture"), dict) else {}
+    adapted: dict[str, Any] = {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": selection_id,
+        "source_repo": str(packet.get("source_repo") or "abyss-stack"),
+        "source_schema_ref": str(packet.get("source_schema_ref") or RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF),
+        "source_manifests": _unique_strings(manifests),
+        "bounded_claim": _bounded_text(
+            packet.get("bounded_claim"),
+            f"Private governed-run runtime evidence selection for {selection_id}. "
+            "This is candidate routing evidence only and requires bundle-local review before any proof claim.",
+        ),
+        "promotion_target": promotion_target,
+        "comparison_mode": comparison_mode,
+        "selected_evidence": selected_evidence,
+        "environment_invariants": _string_list(packet.get("environment_invariants"))
+        or ["same governed-run review-packet generation context"],
+        "do_not_overread": _string_list(packet.get("do_not_overread"))
+        or [
+            "does not compute or imply an aoa-evals verdict",
+            "does not accept runtime evidence without bundle-local review",
+            "does not transfer proof authority into abyss-stack",
+        ],
+        "review_posture": {
+            "portable_enough": bool(review_posture.get("portable_enough", False)),
+            "comparison_hygiene_named": bool(review_posture.get("comparison_hygiene_named", comparison_mode != "none")),
+            "human_review_required": True,
+        },
+    }
+    if candidate_eval_refs:
+        adapted["candidate_eval_refs"] = _unique_strings(candidate_eval_refs)
+    if isinstance(target_eval, str) and target_eval:
+        adapted["target_eval"] = target_eval
+    memory_context_boundary = packet.get("memory_context_boundary")
+    if isinstance(memory_context_boundary, dict):
+        adapted["memory_context_boundary"] = memory_context_boundary
+    for optional_key in ("environment_deltas", "excluded_artifacts"):
+        optional_values = _string_list(packet.get(optional_key))
+        if optional_values:
+            adapted[optional_key] = _unique_strings(optional_values)
+    return adapted, {
+        "adapter": "runtime_evidence_selection_shortcut_v1_to_current",
+        "source_shape": "legacy_shortcut_private_candidate",
+        "posture": "shape_adapter_only_not_proof_acceptance",
+    }
 
 
 def _eval_need_name(proof_question: str, proposal: dict[str, Any], matches: list[dict[str, Any]]) -> str:
@@ -1289,6 +1470,59 @@ class AoAEvalsMCPState:
         (repo_root / "evals" / "PORT.yaml").write_text(updated, encoding="utf-8")
         return True
 
+    def _local_write_receipt(
+        self,
+        *,
+        repo_root: Path,
+        target: Path,
+        apply: bool,
+        applied: bool,
+        write_allowed: bool,
+        replace_existing: bool,
+        port_activation_needed: bool,
+        port_activation_applied: bool,
+        validation_issues: list[str],
+    ) -> dict[str, Any]:
+        if applied:
+            receipt_status = "applied"
+        elif write_allowed:
+            receipt_status = "dry_run_allowed"
+        else:
+            receipt_status = "blocked"
+        side_effects: list[str] = []
+        if applied:
+            side_effects.append(f"wrote:{_relative_repo_path(target, repo_root)}")
+        if port_activation_applied:
+            side_effects.append("activated:evals/PORT.yaml")
+        return {
+            "schema": "aoa_evals_local_write_receipt_v1",
+            "receipt_status": receipt_status,
+            "dry_run": not apply,
+            "apply_requested": apply,
+            "applied": applied,
+            "write_allowed": write_allowed,
+            "replace_existing": replace_existing,
+            "repo": repo_root.name,
+            "target_relative_path": _relative_repo_path(target, repo_root),
+            "target_under_evals": _within(repo_root / "evals", target),
+            "allowed_relative_globs": list(LOCAL_WRITE_ALLOWED_GLOBS),
+            "port_activation": {
+                "needed": port_activation_needed,
+                "applied": port_activation_applied,
+                "only_allowed_transition": "evals/PORT.yaml status skeleton -> active",
+            },
+            "validation": {
+                "valid": write_allowed,
+                "issues": validation_issues,
+            },
+            "side_effects": side_effects,
+            "proof_authority": False,
+            "promotion_allowed": False,
+            "central_mutation": False,
+            "verdict_or_scoring": False,
+            "authority_boundary": LOCAL_WRITE_AUTHORITY_BOUNDARY,
+        }
+
     def find_or_propose_local(
         self,
         repo: str,
@@ -1338,17 +1572,20 @@ class AoAEvalsMCPState:
         if target.exists() and not replace_existing:
             issues.append("target file already exists; set replace_existing=True to overwrite")
         write_allowed = validation["valid"] and not issues
+        applied = bool(apply and write_allowed)
+        port_activation_applied = False
         if apply and write_allowed:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(packet, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            activated = self._maybe_activate_port(repo_root, apply=True)
+            port_activation_applied = self._maybe_activate_port(repo_root, apply=True)
+            activated = port_activation_applied
         return {
             "schema": "aoa_evals_local_intake_write_v1",
             "repo": repo_root.name,
             "target_path": target.as_posix(),
             "relative_path": _relative_repo_path(target, repo_root),
             "apply": apply,
-            "applied": bool(apply and write_allowed),
+            "applied": applied,
             "write_allowed": write_allowed,
             "replace_existing": replace_existing,
             "port_activation_needed": activated,
@@ -1357,6 +1594,17 @@ class AoAEvalsMCPState:
                 "valid": write_allowed,
                 "issues": issues,
             },
+            "write_receipt": self._local_write_receipt(
+                repo_root=repo_root,
+                target=target,
+                apply=apply,
+                applied=applied,
+                write_allowed=write_allowed,
+                replace_existing=replace_existing,
+                port_activation_needed=activated,
+                port_activation_applied=port_activation_applied,
+                validation_issues=issues,
+            ),
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -1387,6 +1635,8 @@ class AoAEvalsMCPState:
         if target.exists() and not replace_existing:
             issues.append("target file already exists; set replace_existing=True to overwrite")
         write_allowed = not issues
+        applied = bool(apply and write_allowed)
+        port_activation_applied = False
         frontmatter = {
             "schema_version": config["schema_version"],
             "owner_repo": repo_root.name,
@@ -1399,14 +1649,15 @@ class AoAEvalsMCPState:
         if apply and write_allowed:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(_note_markdown(frontmatter, str(title).strip(), body_markdown), encoding="utf-8")
-            activated = self._maybe_activate_port(repo_root, apply=True)
+            port_activation_applied = self._maybe_activate_port(repo_root, apply=True)
+            activated = port_activation_applied
         return {
             "schema": f"aoa_evals_local_{directory_name[:-1]}_write_v1",
             "repo": repo_root.name,
             "target_path": target.as_posix(),
             "relative_path": _relative_repo_path(target, repo_root),
             "apply": apply,
-            "applied": bool(apply and write_allowed),
+            "applied": applied,
             "write_allowed": write_allowed,
             "replace_existing": replace_existing,
             "port_activation_needed": activated,
@@ -1416,6 +1667,17 @@ class AoAEvalsMCPState:
                 "issues": issues,
                 "warnings": [],
             },
+            "write_receipt": self._local_write_receipt(
+                repo_root=repo_root,
+                target=target,
+                apply=apply,
+                applied=applied,
+                write_allowed=write_allowed,
+                replace_existing=replace_existing,
+                port_activation_needed=activated,
+                port_activation_applied=port_activation_applied,
+                validation_issues=issues,
+            ),
             "authority_boundary": self.authority_boundary(),
         }
 
@@ -1990,31 +2252,97 @@ class AoAEvalsMCPState:
             "missing_groups": missing,
         }
 
+    def _mirror_freshness_contract(
+        self,
+        *,
+        source: dict[str, Any],
+        mirror: dict[str, Any],
+        manifest: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        source_commit = source.get("git_commit") if isinstance(source.get("git_commit"), str) else None
+        mirror_commit = manifest.get("source_git_commit") if isinstance(manifest, dict) else None
+        if not isinstance(mirror_commit, str) or not mirror_commit:
+            mirror_commit = None
+        generated_at = manifest.get("generated_at_utc") if isinstance(manifest, dict) else None
+        if not isinstance(generated_at, str) or not generated_at:
+            generated_at = None
+        refresh_command = manifest.get("refresh_command") if isinstance(manifest, dict) else None
+        if not isinstance(refresh_command, str) or not refresh_command:
+            refresh_command = MIRROR_REFRESH_COMMAND
+
+        notes: list[str] = []
+        status = "unavailable"
+        if not mirror.get("exists"):
+            status = "missing"
+            notes.append("mirror path is missing")
+        elif not manifest:
+            status = "missing_manifest"
+            notes.append("mirror exists but lacks manifest/federation_mirror_manifest.json")
+        elif source_commit and mirror_commit and source_commit != mirror_commit:
+            status = "stale"
+            notes.append("mirror manifest source_git_commit differs from source checkout")
+        elif source_commit and mirror_commit == source_commit:
+            status = "current"
+        elif not source_commit:
+            status = "source_commit_unavailable"
+            notes.append("source git commit is unavailable, so mirror freshness cannot be proven")
+        elif not mirror_commit:
+            status = "mirror_commit_unavailable"
+            notes.append("mirror manifest lacks source_git_commit")
+        else:
+            status = "unverified"
+            notes.append("mirror freshness could not be proven from source and manifest commits")
+
+        return {
+            "status": status,
+            "is_current": status == "current",
+            "is_stale": status == "stale",
+            "source_git_commit": source_commit,
+            "mirror_source_git_commit": mirror_commit,
+            "mirror_generated_at_utc": generated_at,
+            "latest_reader_mtime_utc": mirror.get("latest_reader_mtime_utc"),
+            "refresh_command": refresh_command,
+            "authority_warning": MIRROR_AUTHORITY_WARNING,
+            "notes": notes,
+        }
+
+    def _runtime_freshness_status(self, mirror_freshness: dict[str, Any]) -> tuple[str, list[str]]:
+        mirror_status = str(mirror_freshness.get("status") or "unverified")
+        notes = list(mirror_freshness.get("notes") or [])
+
+        if self.root_kind == "approved_mirror":
+            if mirror_status == "missing":
+                return "mirror_missing", notes
+            if mirror_status == "missing_manifest":
+                return "mirror_missing_manifest", notes
+            if mirror_status == "stale":
+                return "mirror_source_mismatch", notes
+            if mirror_status == "current":
+                return "mirror_manifest_ok", notes
+            return "mirror_freshness_unverified", notes
+
+        if mirror_status == "missing":
+            return "source_without_mirror", notes
+        if mirror_status == "missing_manifest":
+            return "source_with_unmanifested_mirror", notes
+        if mirror_status == "stale":
+            return "source_with_stale_mirror", notes
+        if mirror_status == "current":
+            return "source_with_current_mirror", notes
+        return "source_with_mirror_unverified", notes
+
     def runtime_status(self) -> dict[str, Any]:
         selected = self._root_reader_status(self.evals_root)
         source = self._root_reader_status(self.source_root)
         mirror = self._root_reader_status(self.mirror_root)
         manifest = _read_json(self.mirror_root / MIRROR_MANIFEST) if self.mirror_root and (self.mirror_root / MIRROR_MANIFEST).is_file() else None
         candidate_exports = self.runtime_candidate_exports(limit=0)
-
-        freshness_status = "source"
-        freshness_notes: list[str] = []
-        if self.root_kind == "approved_mirror":
-            if not self.mirror_root or not self.mirror_root.exists():
-                freshness_status = "mirror_missing"
-                freshness_notes.append("approved mirror path is missing")
-            elif not manifest:
-                freshness_status = "mirror_missing_manifest"
-                freshness_notes.append("approved mirror lacks manifest/federation_mirror_manifest.json")
-            elif source.get("git_commit") and manifest.get("source_git_commit") != source.get("git_commit"):
-                freshness_status = "mirror_source_mismatch"
-                freshness_notes.append("mirror manifest source_git_commit differs from source checkout")
-            else:
-                freshness_status = "mirror_manifest_ok"
-        elif self.mirror_root and self.mirror_root.exists():
-            freshness_status = "source_with_mirror_available" if manifest else "source_with_unmanifested_mirror"
-            if not manifest:
-                freshness_notes.append("mirror exists but lacks provenance manifest")
+        mirror_freshness = self._mirror_freshness_contract(
+            source=source,
+            mirror=mirror,
+            manifest=manifest,
+        )
+        freshness_status, freshness_notes = self._runtime_freshness_status(mirror_freshness)
 
         return {
             "schema": "aoa_evals_runtime_status_v1",
@@ -2027,6 +2355,7 @@ class AoAEvalsMCPState:
             "source": source,
             "mirror": mirror,
             "mirror_manifest": manifest,
+            "mirror_freshness": mirror_freshness,
             "catalog_count": len(self.catalog_records()),
             "runtime_candidate_template_count": len(self.runtime_intake_templates() or self.runtime_templates()),
             "runtime_candidate_export_count": candidate_exports["count"],
@@ -2034,8 +2363,16 @@ class AoAEvalsMCPState:
             "freshness": {
                 "status": freshness_status,
                 "notes": freshness_notes,
-                "refresh_command": "scripts/aoa-sync-federation-surfaces --layer aoa-evals",
+                "source_git_commit": mirror_freshness["source_git_commit"],
+                "mirror_source_git_commit": mirror_freshness["mirror_source_git_commit"],
+                "mirror_generated_at_utc": mirror_freshness["mirror_generated_at_utc"],
+                "mirror_latest_reader_mtime_utc": mirror_freshness["latest_reader_mtime_utc"],
+                "mirror_status": mirror_freshness["status"],
+                "mirror_is_current": mirror_freshness["is_current"],
+                "mirror_is_stale": mirror_freshness["is_stale"],
+                "refresh_command": mirror_freshness["refresh_command"],
                 "mirror_is_authority": False,
+                "authority_warning": MIRROR_AUTHORITY_WARNING,
             },
             "authority_boundary": self.authority_boundary(),
         }
@@ -2072,7 +2409,7 @@ class AoAEvalsMCPState:
                     pass
         return files
 
-    def _candidate_validation_summary(self, candidate_payload: Any) -> dict[str, Any]:
+    def _candidate_validation_summary(self, candidate_payload: Any, *, source_input_ref: str | None = None) -> dict[str, Any]:
         if not isinstance(candidate_payload, dict):
             return {
                 "valid": False,
@@ -2081,7 +2418,7 @@ class AoAEvalsMCPState:
                 "issues": ["candidate_payload must be an object"],
                 "warnings": [],
             }
-        validation = self.validate_evidence_candidate(candidate_payload)
+        validation = self.validate_evidence_candidate(candidate_payload, source_input_ref=source_input_ref)
         return {
             "valid": validation["valid"],
             "surface_type": validation.get("surface_type"),
@@ -2090,6 +2427,8 @@ class AoAEvalsMCPState:
             "unknown_eval_refs": validation.get("unknown_eval_refs", []),
             "issues": validation.get("issues", []),
             "warnings": validation.get("warnings", []),
+            "adapter_applied": validation.get("adapter_applied", False),
+            "adapter": validation.get("adapter"),
         }
 
     def _runtime_candidate_export_summary(
@@ -2104,7 +2443,11 @@ class AoAEvalsMCPState:
         if not isinstance(payload, dict):
             raise ValueError(f"candidate export must be a JSON object: {path}")
         candidate_payload = payload.get("candidate_payload")
-        validation = self._candidate_validation_summary(candidate_payload)
+        source_input_ref = payload.get("source_input_ref")
+        validation = self._candidate_validation_summary(
+            candidate_payload,
+            source_input_ref=source_input_ref if isinstance(source_input_ref, str) else None,
+        )
         candidate_id = (
             validation.get("candidate_id")
             or payload.get("selection_id")
@@ -2174,6 +2517,13 @@ class AoAEvalsMCPState:
             for entry in entries
             if isinstance(entry.get("validation"), dict) and entry["validation"].get("valid") is not True
         ]
+        adapter_valid_entries = [
+            entry
+            for entry in entries
+            if isinstance(entry.get("validation"), dict)
+            and entry["validation"].get("valid") is True
+            and entry["validation"].get("adapter_applied") is True
+        ]
         limit_value = max(0, min(int(limit if limit is not None else 20), 100))
         visible = entries[:limit_value] if limit_value else []
         return {
@@ -2185,6 +2535,7 @@ class AoAEvalsMCPState:
             "invalid_exports": invalid_exports,
             "candidate_validation": {
                 "valid_shape_count": len(entries) - len(invalid_shape_entries),
+                "adapter_valid_shape_count": len(adapter_valid_entries),
                 "invalid_shape_count": len(invalid_shape_entries),
                 "latest_invalid_shape": [
                     {
@@ -2271,7 +2622,12 @@ class AoAEvalsMCPState:
         payload, rel = self._payload_first(*rels)
         return (payload if isinstance(payload, dict) else None), rel
 
-    def validate_evidence_candidate(self, packet: dict[str, Any]) -> dict[str, Any]:
+    def validate_evidence_candidate(
+        self,
+        packet: dict[str, Any],
+        *,
+        source_input_ref: str | None = None,
+    ) -> dict[str, Any]:
         issues: list[str] = []
         warnings: list[str] = []
         if not isinstance(packet, dict):
@@ -2282,16 +2638,17 @@ class AoAEvalsMCPState:
                 "warnings": [],
                 "authority_boundary": self.authority_boundary(),
             }
+        validation_packet, adapter = _adapt_runtime_evidence_shortcut(packet, source_input_ref=source_input_ref)
 
-        surface_type = str(packet.get("surface_type") or "")
-        candidate_id = str(packet.get("selection_id") or packet.get("hook_id") or "")
+        surface_type = str(validation_packet.get("surface_type") or "")
+        candidate_id = str(validation_packet.get("selection_id") or validation_packet.get("hook_id") or "")
         candidate_id_slug = _slug(candidate_id)
         schema_payload, schema_rel = self._schema_for_candidate(surface_type)
         if schema_payload is None:
             issues.append(f"unsupported or missing schema for surface_type {surface_type!r}")
         else:
             validator = Draft202012Validator(schema_payload)
-            for error in sorted(validator.iter_errors(packet), key=lambda item: list(item.path)):
+            for error in sorted(validator.iter_errors(validation_packet), key=lambda item: list(item.path)):
                 location = "/".join(str(part) for part in error.path) or "<root>"
                 issues.append(f"{location}: {error.message}")
 
@@ -2300,12 +2657,12 @@ class AoAEvalsMCPState:
         template_eval_anchors = {str(template.get("eval_anchor") or "") for template in self.runtime_intake_templates() or self.runtime_templates()}
 
         eval_refs: list[str] = []
-        if isinstance(packet.get("target_eval"), str):
-            eval_refs.append(str(packet["target_eval"]))
-        if isinstance(packet.get("eval_anchor"), str):
-            eval_refs.append(str(packet["eval_anchor"]))
-        if isinstance(packet.get("candidate_eval_refs"), list):
-            eval_refs.extend(str(item) for item in packet["candidate_eval_refs"] if isinstance(item, str))
+        if isinstance(validation_packet.get("target_eval"), str):
+            eval_refs.append(str(validation_packet["target_eval"]))
+        if isinstance(validation_packet.get("eval_anchor"), str):
+            eval_refs.append(str(validation_packet["eval_anchor"]))
+        if isinstance(validation_packet.get("candidate_eval_refs"), list):
+            eval_refs.extend(str(item) for item in validation_packet["candidate_eval_refs"] if isinstance(item, str))
 
         matched_eval_refs = [
             ref for ref in eval_refs if ref in known_eval_names or ref in template_eval_anchors
@@ -2319,11 +2676,19 @@ class AoAEvalsMCPState:
             warnings.append("unknown eval refs require bundle-local review: " + ", ".join(sorted(set(unknown_eval_refs))))
 
         if surface_type == "runtime_evidence_selection":
-            review_posture = packet.get("review_posture") if isinstance(packet.get("review_posture"), dict) else {}
+            review_posture = (
+                validation_packet.get("review_posture")
+                if isinstance(validation_packet.get("review_posture"), dict)
+                else {}
+            )
             if review_posture.get("human_review_required") is not True:
                 issues.append("review_posture/human_review_required must be true")
         elif surface_type == "artifact_to_verdict_hook":
-            report_expectation = packet.get("report_expectation") if isinstance(packet.get("report_expectation"), dict) else {}
+            report_expectation = (
+                validation_packet.get("report_expectation")
+                if isinstance(validation_packet.get("report_expectation"), dict)
+                else {}
+            )
             if report_expectation.get("review_required") is not True:
                 issues.append("report_expectation/review_required must be true")
 
@@ -2344,6 +2709,8 @@ class AoAEvalsMCPState:
             "matched_templates": sorted(set(matched_templates)),
             "issues": issues,
             "warnings": warnings,
+            "adapter_applied": adapter is not None,
+            "adapter": adapter,
             "candidate_posture": "valid_shape_only_until_bundle_local_review",
             "next_route": "bundle-local review before bounded report or optional receipt",
             "authority_boundary": self.authority_boundary(),

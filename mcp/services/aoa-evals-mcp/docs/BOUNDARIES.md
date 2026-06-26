@@ -47,7 +47,9 @@ adoption. They may prepare or apply only `evals/intake/*.eval_need.json`,
 `evals/suites/*.suite.md`, `evals/reports/*.report.md`, and first-pressure
 `PORT.yaml` activation from `skeleton` to `active`. They default to dry-run,
 reject workspace escape and path-like explicit slugs, and require explicit
-overwrite permission.
+overwrite permission. Their responses include audit receipts for dry-run/apply
+state, target confinement, validation, activation, side effects, and forbidden
+proof/promotion/verdict/scoring/central-mutation effects.
 
 ## Stop Lines
 

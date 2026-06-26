@@ -134,6 +134,9 @@ The first layer is ready when:
   runtime-heavy stack state;
 - local-port inventory route keys and summary keys match the central
   `aoa-evals` inventory contract;
+- local-port write tools return audit receipts that keep dry-run, path
+  confinement, validation, activation, side effects, and proof-forbidden fields
+  visible to agents;
 - the Codex plane can resolve `aoa_evals`;
 - validation proves the service did not become a runner, publisher, promoter,
   or source writer.
