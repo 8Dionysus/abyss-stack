@@ -26,9 +26,10 @@ operator-local without duplicating secrets into git.
 Operator entrypoint:
 
 ```bash
+scripts/tos-up
 scripts/aoa-tos-graph
 ```
 
-That command starts the `curation` profile, waits for the localhost health
-endpoint, and opens the switchable philosophy/corpus graph workbench when a
+Those commands start the `curation` profile, wait for the localhost health
+endpoint, and open the switchable philosophy/corpus graph workbench when a
 desktop opener is available.

@@ -59,6 +59,7 @@ REQUIRED_SCRIPTS = {
     "aoa.ps1",
     "aoa-doctor-win.ps1",
     "aoa-bootstrap-wsl.ps1",
+    "tos-up",
 }
 
 OPERATOR_BACKEND_SCRIPTS = {
@@ -110,6 +111,7 @@ OPERATOR_BACKEND_SCRIPTS = {
     "aoa-logs": "mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh",
     "aoa-status": "mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh",
     "aoa.ps1": "mechanics/machine-fit/parts/windows-bridge/aoa_windows_bridge.ps1",
+    "tos-up": "mechanics/federation-seams/parts/tos-graph/tos_up.sh",
 }
 
 
