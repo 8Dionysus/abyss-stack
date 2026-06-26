@@ -341,6 +341,8 @@ class AoA4PDAConnectorMCPState:
             boundary_errors.append("source packet schema is not aoa_4pda_answer_packet_v1")
         if payload.get("network_touched") is not False:
             boundary_errors.append("source answer packet did not preserve network_touched=false")
+        if payload.get("read_only") is not True:
+            boundary_errors.append("source answer packet did not preserve read_only=true")
 
         return {
             "schema": "aoa_4pda_connector_mcp_answer_v1",
@@ -355,6 +357,10 @@ class AoA4PDAConnectorMCPState:
             "evidence_chain": payload.get("evidence_chain", []),
             "nuance_report": payload.get("nuance_report", {}),
             "answer_report": payload.get("answer_report", {}),
+            "conflict_report": payload.get("conflict_report", {}),
+            "freshness_report": payload.get("freshness_report", {}),
+            "applicability_report": payload.get("applicability_report", {}),
+            "warning_report": payload.get("warning_report", {}),
             "answers": payload.get("answers", []),
             "query_report": payload.get("query_report", {}),
             "policy": payload.get("policy", {}),
@@ -362,6 +368,7 @@ class AoA4PDAConnectorMCPState:
             "boundary_errors": boundary_errors,
             "command": _compact_command(command, include_payload=False),
             "read_only": True,
+            "source_read_only": payload.get("read_only"),
         }
 
     def query_graph(self, query: str, run: str | None = None, limit: int | None = 5) -> dict[str, Any]:

@@ -18,7 +18,9 @@ It returns:
 - source-route and owner-boundary notes
 - graph/hybrid query packets
 - compact answer packets preserving `agent_answer`, `evidence_chain`,
-  `nuance_report`, `answer_report`, and `network_touched=false`
+  `nuance_report`, `answer_report`, `conflict_report`, `freshness_report`,
+  `applicability_report`, `warning_report`, claim ids,
+  `network_touched=false`, and `read_only=true`
 
 ## Boundary
 

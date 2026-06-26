@@ -53,14 +53,24 @@ def answer_packet() -> dict[str, object]:
                 "role": "primary",
                 "post_id": "128964413",
                 "source_url": "https://4pda.to/forum/index.php?showtopic=1076859&st=2140#entry128964413",
+                "claim_ids": ["claim:xiaomi-13t:128964413:method:flash_recovery_img"],
             }
         ],
         "nuance_report": {"source_count": 1, "relation_kinds": ["recovery_targets_file"]},
         "answer_report": {"answer_status": "answered"},
+        "conflict_report": {
+            "status": "conflict_detected",
+            "primary_claim_id": "claim:xiaomi-13t:128964413:method:flash_recovery_img",
+            "conflicting_claim_ids": ["claim:xiaomi-13t:128965000:warning:do_not_flash"],
+        },
+        "freshness_report": {"state": "conflicting_evidence", "newer_related_claims_visible": True},
+        "applicability_report": {"status": "context_available", "context_labels": ["HyperOS"]},
+        "warning_report": {"warning_supported": True, "warning_claim_ids": ["claim:xiaomi-13t:128965000:warning:do_not_flash"]},
         "answers": [{"answer_kind": "recovery", "post_id": "128964413"}],
         "query_report": {"algorithm": "bm25_exact_v1"},
         "policy": {"internal_search_used": False},
         "network_touched": False,
+        "read_only": True,
     }
 
 
@@ -96,9 +106,16 @@ def test_answer_preserves_connector_packet_fields(tmp_path: Path) -> None:
     assert packet["source_packet_schema"] == "aoa_4pda_answer_packet_v1"
     assert packet["agent_answer"]["status"] == "answered"
     assert packet["evidence_chain"][0]["post_id"] == "128964413"
+    assert packet["evidence_chain"][0]["claim_ids"] == ["claim:xiaomi-13t:128964413:method:flash_recovery_img"]
     assert packet["nuance_report"]["source_count"] == 1
     assert packet["answer_report"]["answer_status"] == "answered"
+    assert packet["conflict_report"]["status"] == "conflict_detected"
+    assert packet["freshness_report"]["state"] == "conflicting_evidence"
+    assert packet["applicability_report"]["status"] == "context_available"
+    assert packet["warning_report"]["warning_supported"] is True
     assert packet["network_touched"] is False
+    assert packet["read_only"] is True
+    assert packet["source_read_only"] is True
     assert packet["boundary_errors"] == []
 
 
