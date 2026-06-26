@@ -15,7 +15,7 @@ projection:
   neo4j_shadow: true
 
 ui:
-  mode: api_plus_minimal_html
+  mode: philosophy_review_workbench
   corpus_first: false
   default_view: corpus-topology
   default_philosophy_view: chronology

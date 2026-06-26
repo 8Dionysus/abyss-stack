@@ -86,6 +86,7 @@
         "scripts/aoa-status",
         "scripts/aoa-sync-configs",
         "scripts/aoa-sync-federation-surfaces",
+        "scripts/aoa-tos-graph",
         "scripts/aoa-up",
         "scripts/aoa-wait",
         "scripts/aoa-warmup",

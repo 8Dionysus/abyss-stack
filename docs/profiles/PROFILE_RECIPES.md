@@ -311,6 +311,18 @@ automatically in this profile, so it does not silently pull in `llama-cpp`.
 
 ### First checks
 
+For the normal operator path, use the focused command:
+
+```bash
+scripts/aoa-tos-graph
+```
+
+It starts the curation profile, waits for `tos-graph`, and opens the
+mouse-switchable philosophy/corpus graph workbench when a desktop opener is
+available.
+
+For profile-level inspection:
+
 ```bash
 scripts/aoa-profile-endpoints --profile curation
 scripts/aoa-render-services --profile curation
