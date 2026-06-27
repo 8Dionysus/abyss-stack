@@ -78,7 +78,7 @@ def tos_graph_server() -> Iterator[str]:
             process.kill()
 
 
-def test_tos_graph_philosophy_ui_renders_svg_and_source_refs(tos_graph_server: str, tmp_path: Path) -> None:
+def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server: str, tmp_path: Path) -> None:
     try:
         from playwright.sync_api import Error as PlaywrightError
         from playwright.sync_api import sync_playwright
@@ -94,13 +94,13 @@ def test_tos_graph_philosophy_ui_renders_svg_and_source_refs(tos_graph_server: s
             page = browser.new_page(viewport={"width": 1440, "height": 960})
             page.goto(tos_graph_server, wait_until="networkidle")
             page.get_by_text("Tree of Sophia Graph").wait_for(timeout=10_000)
-            page.locator("#inspectorTitle", has_text="Chronology Graph View").wait_for(timeout=10_000)
+            page.locator("#inspector-title", has_text="Chronology Graph View").wait_for(timeout=10_000)
             page.get_by_role("button", name="Review packet").click()
-            page.locator("#inspectorTitle", has_text="Review packet: chronology").wait_for(timeout=10_000)
-            page.locator("#clusterMode").click()
-            page.locator("svg .node").first.wait_for(timeout=10_000)
-            page.locator("#clusterList .item").first.wait_for(timeout=10_000)
-            node_count = page.locator("svg .node").count()
+            page.locator("#inspector-title", has_text="Review packet: chronology").wait_for(timeout=10_000)
+            page.locator("#clusters-button").click()
+            page.locator("#graph canvas").first.wait_for(timeout=10_000)
+            page.locator(".result-card").first.wait_for(timeout=10_000)
+            node_count = page.locator("#graph canvas").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
             browser.close()

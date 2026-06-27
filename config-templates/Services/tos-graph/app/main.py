@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
 from .corpus_reader import ToSCorpusReader, ToSCorpusReaderError
@@ -41,6 +43,11 @@ projector = CorpusProjector(reader, neo4j_status, neo4j_store)
 philosophy_projector = PhilosophyProjector(philosophy_reader, neo4j_status, neo4j_store)
 
 app = FastAPI(title="tos-graph", version="0.2.0")
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).resolve().parent / "static", check_dir=False),
+    name="static",
+)
 
 
 def _handle_reader_error(exc: ToSCorpusReaderError) -> HTTPException:

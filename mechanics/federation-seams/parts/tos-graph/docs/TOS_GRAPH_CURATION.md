@@ -30,6 +30,7 @@ The first-class repo-local anchors for this slice are:
 - `compose/profiles/curation.txt`
 - `config-templates/Configs/tos-graph/config.yaml`
 - `config-templates/Services/tos-graph/`
+- `config-templates/Services/tos-graph/frontend/`
 - `scripts/tos-up`
 - `scripts/aoa-tos-graph`
 - `mechanics/federation-seams/parts/tos-graph/tos_up.sh`
@@ -41,6 +42,7 @@ The active runtime route is:
 - read `ToS/derived-exports/tos_corpus_index.min.json`
 - read `ToS/derived-exports/philosophy_graph_projection.min.json`
 - expose switchable corpus and philosophy graph views through a localhost-only helper UI and API
+- render the graph workbench through a bundled WebGL frontend rather than an inline diagnostic SVG
 - expose `tos-up` as the short operator command for the same workbench route; `aoa-tos-graph` remains the explicit stack command
 - project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
@@ -93,6 +95,8 @@ scripts/aoa-profile-modules --profile curation --paths
 scripts/aoa-profile-endpoints --profile curation
 scripts/aoa-profile-modules --profile substrate --profile curation --paths
 scripts/aoa-profile-endpoints --profile substrate --profile curation
+npm --prefix config-templates/Services/tos-graph/frontend run typecheck
+npm --prefix config-templates/Services/tos-graph/frontend run build
 ```
 
 Any later write-capable slice must also pass the relevant `Tree-of-Sophia`

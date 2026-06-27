@@ -31,6 +31,9 @@ htmlcov/
 
 # Heavy model/build/archive artifacts
 /dist/
+node_modules/
+config-templates/Services/tos-graph/frontend/dist/
+config-templates/Services/tos-graph/app/static/
 *.gguf
 *.safetensors
 *.pt
