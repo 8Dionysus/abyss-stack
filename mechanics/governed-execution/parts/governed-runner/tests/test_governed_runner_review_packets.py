@@ -79,6 +79,23 @@ class GovernedRunnerReviewPacketTests(GovernedRunnerTestCase):
                 / "run-review-packets--workhorse-q4-vs-q6-latency-tradeoff.private.json"
             ).exists()
         )
+        evidence_candidate = json.loads(
+            (
+                stack_root
+                / "Logs"
+                / "eval-exports"
+                / "latest"
+                / "runtime-evidence-selection"
+                / "run-review-packets--workhorse-q4-vs-q6-latency-tradeoff.private.json"
+            ).read_text(encoding="utf-8")
+        )["candidate_payload"]
+        self.assertEqual(evidence_candidate["source_repo"], "abyss-stack")
+        self.assertIn("source_schema_ref", evidence_candidate)
+        self.assertTrue(evidence_candidate["source_manifests"])
+        self.assertTrue(all(entry["summary_only"] is True for entry in evidence_candidate["selected_evidence"]))
+        self.assertIs(evidence_candidate["review_posture"]["human_review_required"], True)
+        self.assertNotIn("source_example_ref", evidence_candidate)
+        self.assertNotIn("template_name", evidence_candidate)
         hook_ref = next(
             entry["artifact_ref"]
             for entry in manifest["emitted_candidate_artifact_refs"]
