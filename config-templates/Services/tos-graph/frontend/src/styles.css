@@ -311,6 +311,63 @@ input:focus {
   max-width: min(520px, calc(100% - 24px));
 }
 
+.node-tooltip {
+  position: absolute;
+  z-index: 4;
+  width: min(360px, calc(100% - 20px));
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 36px rgba(23, 32, 29, 0.18);
+  padding: 10px 11px;
+  pointer-events: none;
+}
+
+.node-tooltip-title {
+  font-size: 14px;
+  font-weight: 820;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.node-tooltip-meta {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.node-tooltip-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.node-tooltip-tags span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 3px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.node-tooltip-refs {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.28;
+}
+
+.node-tooltip-refs span {
+  overflow-wrap: anywhere;
+}
+
 .inspector-title {
   margin: 0 0 5px;
   font-size: 18px;
