@@ -3095,6 +3095,23 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     assert agent_event_args[0] == "assistant_answer"
     assert agent_event_args[agent_event_args.index("--kind") + 1] == "agent_event"
 
+    receipt_audit = state.session_entity_usage_audit("userpromptsubmit", kind="receipt", limit=2)
+    error_audit = state.session_entity_usage_audit("test_failure", kind="error", limit=2)
+    owner_route_audit = state.session_entity_usage_audit("abyss_stack", kind="owner_route", limit=2)
+    next_action_audit = state.session_entity_usage_audit("repair", kind="route_next_action", limit=2)
+
+    assert receipt_audit["artifact_type"] == "session_memory_entity_usage_audit"
+    assert error_audit["artifact_type"] == "session_memory_entity_usage_audit"
+    assert owner_route_audit["artifact_type"] == "session_memory_entity_usage_audit"
+    assert next_action_audit["artifact_type"] == "session_memory_entity_usage_audit"
+    recent_usage_calls = [call for call in runner.calls if call[0] == "entity-usage-audit"][-4:]
+    assert [call[1][call[1].index("--kind") + 1] for call in recent_usage_calls] == [
+        "receipt",
+        "error",
+        "owner_route",
+        "route_next_action",
+    ]
+
 
 def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
