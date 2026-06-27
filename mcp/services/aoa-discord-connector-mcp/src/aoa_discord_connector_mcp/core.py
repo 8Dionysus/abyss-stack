@@ -146,9 +146,8 @@ def _boundary_errors(payload: Any) -> list[str]:
         return errors
     if _as_bool(payload.get("network_touched")) is not False:
         errors.append("connector packet did not prove network_touched=false")
-    read_only = payload.get("read_only")
-    if read_only is not None and _as_bool(read_only) is not True:
-        errors.append("connector packet did not preserve read_only=true")
+    if _as_bool(payload.get("read_only")) is not True:
+        errors.append("connector packet did not prove read_only=true")
     policy = payload.get("policy")
     if isinstance(policy, dict) and policy.get("internal_search_used") is not False:
         errors.append("connector policy did not prove internal_search_used=false")
@@ -343,10 +342,11 @@ class AoADiscordConnectorMCPState:
         selected_run = _selected_run(run, self.default_run)
         result = self._run_cli(["query-graph", query, "--run", selected_run, "--limit", str(limit)])
         payload = result.payload if isinstance(result.payload, dict) else {}
+        boundary_errors = _boundary_errors(payload)
         return {
             "schema": "aoa_discord_connector_mcp_query_graph_v1",
             "service_name": SERVICE_NAME,
-            "status": "ok" if result.ok else "error",
+            "status": "ok" if result.ok and not boundary_errors else "error",
             "query": query,
             "run": selected_run,
             "limit": limit,
@@ -360,7 +360,7 @@ class AoADiscordConnectorMCPState:
             "graph_report": payload.get("graph_report", {}),
             "policy": payload.get("policy", {}),
             "command": _compact_command(result, include_payload=False),
-            "boundary_errors": _boundary_errors(payload),
+            "boundary_errors": boundary_errors,
         }
 
     def read_resource(self, uri: str) -> dict[str, Any]:

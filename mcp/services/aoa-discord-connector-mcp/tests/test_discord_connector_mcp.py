@@ -161,6 +161,36 @@ def test_boundary_error_marks_live_network_packets(tmp_path: Path) -> None:
     assert "network_touched=false" in packet["boundary_errors"][0]
 
 
+def test_boundary_error_requires_source_read_only_proof(tmp_path: Path) -> None:
+    def bad_runner(argv: Sequence[str], env: dict[str, str], timeout: float, cwd: Path | None) -> subprocess.CompletedProcess[str]:
+        payload = _answer_payload()
+        payload.pop("read_only")
+        return subprocess.CompletedProcess(list(argv), 0, json.dumps(payload), "")
+
+    state = AoADiscordConnectorMCPState(connector_repo=tmp_path, runner=bad_runner)
+    packet = state.answer("bootloop")
+    assert packet["status"] == "error"
+    assert "read_only=true" in packet["boundary_errors"][0]
+
+
+def test_query_graph_status_errors_on_boundary_failure(tmp_path: Path) -> None:
+    def bad_runner(argv: Sequence[str], env: dict[str, str], timeout: float, cwd: Path | None) -> subprocess.CompletedProcess[str]:
+        payload = {
+            "schema": "aoa_discord_evidence_packet_v1",
+            "status": "ok",
+            "results": [_result()],
+            "permission_report": {"status": "ok"},
+            "policy": {"source": "local_message_index_plus_graph", "internal_search_used": False},
+            "network_touched": False,
+        }
+        return subprocess.CompletedProcess(list(argv), 0, json.dumps(payload), "")
+
+    state = AoADiscordConnectorMCPState(connector_repo=tmp_path, runner=bad_runner)
+    packet = state.query_graph("bootloop")
+    assert packet["status"] == "error"
+    assert "read_only=true" in packet["boundary_errors"][0]
+
+
 def test_read_resources_and_server_build(tmp_path: Path) -> None:
     state = _state(tmp_path)
     assert state.read_resource("aoa-discord://source-route")["service_name"] == "aoa-discord-connector-mcp"
