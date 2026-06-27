@@ -169,6 +169,10 @@ def main() -> None:
     live_scenario.add_argument("--recent-days", type=int, default=7)
     live_scenario.add_argument("--limit", type=int, default=3)
 
+    live_scenario_corpus = sub.add_parser("live-scenario-corpus-check")
+    live_scenario_corpus.add_argument("--case-limit", type=int, default=0)
+    live_scenario_corpus.add_argument("--full", action="store_true")
+
     route = sub.add_parser("route")
     route.add_argument("axis")
     route.add_argument("key", nargs="?", default="")
@@ -456,6 +460,13 @@ def main() -> None:
                 sample_size=args.sample_size,
                 recent_days=args.recent_days,
                 limit=args.limit,
+            )
+        )
+    elif args.command == "live-scenario-corpus-check":
+        _print(
+            state.session_live_scenario_corpus_check(
+                case_limit=args.case_limit,
+                full=args.full,
             )
         )
     elif args.command == "brief":

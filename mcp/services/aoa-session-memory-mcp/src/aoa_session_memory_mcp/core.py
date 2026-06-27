@@ -2331,6 +2331,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_entity_inventory",
                 "aoa_session_entity_registry",
                 "aoa_session_hook_receipts",
+                "aoa_session_live_scenario_corpus_check",
                 "aoa_session_latest_diagnostics",
                 "aoa_session_maintenance_status",
                 "aoa_session_maintenance_plan",
@@ -4864,6 +4865,35 @@ class AoASessionMemoryMCPState:
             "next_route": "Open first_ref raw/segment/receipt refs for any warn/failed scenario before treating this packet as quality proof.",
             "authority_boundary": self.authority_boundary(),
         }
+
+    def session_live_scenario_corpus_check(
+        self,
+        case_limit: int = 0,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        args = [
+            "check",
+            "--case-limit",
+            str(_coerce_bounded_int(case_limit, 0, 0, 50)),
+        ]
+        if full:
+            args.append("--full")
+        payload = self._archive_command(
+            "live-scenario-corpus",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        payload.setdefault(
+            "mcp_route",
+            {
+                "canonical_corpus": "config/live-scenario-regression-corpus.json",
+                "does_not_accept_arbitrary_corpus_path": True,
+                "next_route": "Use full=true only when per-case observed route summaries are needed.",
+            },
+        )
+        return payload
 
     def session_retrieve(
         self,
