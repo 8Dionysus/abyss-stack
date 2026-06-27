@@ -203,6 +203,11 @@ the configured stdio smoke proves a freshly started Codex-configured server.
 The validator checks `aoa_session_maintenance_status` through the direct source
 route; stdio smoke verifies that the tool is registered but does not call that
 heavy route, so freshness proof does not stall behind maintenance work.
+It also reports a `codex_session` block that distinguishes a healthy fresh
+stdio server from an already-running Codex process that predates current MCP
+config/source or has no direct `aoa-session-memory-mcp` child; in that case
+direct in-session MCP calls need a Codex/MCP restart before they can be used as
+freshness proof.
 
 ## Agent Route
 

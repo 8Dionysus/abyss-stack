@@ -2615,6 +2615,58 @@ def test_running_mcp_process_advisory_handles_missing_procfs(tmp_path: Path) -> 
     assert advisory["reason"] == "procfs_unavailable"
 
 
+def test_codex_session_advisory_reports_current_stale_transport(tmp_path: Path, monkeypatch: Any) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    for relative in (
+        "src/aoa_session_memory_mcp/core.py",
+        "src/aoa_session_memory_mcp/server.py",
+        "scripts/aoa_session_memory_mcp_server.py",
+    ):
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (3_000.0, 3_000.0))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text("[mcp_servers.aoa_session_memory]\ncommand = \"python3\"\n", encoding="utf-8")
+    os.utime(config_path, (2_000.0, 2_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "validate_session_memory_mcp.py"], 3_500.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 1_500.0)
+    write_process("201", "1", ["/home/dionysus/.local/bin/codex", "resume"], 3_500.0)
+    write_process("301", "201", ["python3", ".codex/bin/aoa-session-memory-mcp-server.py"], 3_600.0)
+
+    advisory = validator._codex_session_advisory(proc)
+
+    assert advisory["available"] is True
+    assert advisory["current_codex_process_count"] == 1
+    assert advisory["current_session_predates_config"] is True
+    assert advisory["current_session_predates_current_source"] is True
+    assert advisory["current_session_has_aoa_session_memory_child"] is False
+    assert advisory["live_transport_restart_advisory"] is True
+    assert advisory["current_codex_processes"][0]["pid"] == 200
+
+
 def test_usage_neighborhood_probe_uses_indexed_candidate_session() -> None:
     validator = load_validator_module()
 

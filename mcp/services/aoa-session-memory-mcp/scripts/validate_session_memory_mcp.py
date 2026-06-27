@@ -147,6 +147,118 @@ def _proc_cmdline(pid: str, proc_root: Path = Path("/proc")) -> list[str]:
     return [part.decode("utf-8", errors="replace") for part in data.split(b"\0") if part]
 
 
+def _proc_ppid(pid: str, proc_root: Path = Path("/proc")) -> int | None:
+    try:
+        for line in (proc_root / pid / "status").read_text(encoding="utf-8").splitlines():
+            if line.startswith("PPid:"):
+                return int(line.split()[1])
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def _proc_cwd(pid: str, proc_root: Path = Path("/proc")) -> str:
+    try:
+        return (proc_root / pid / "cwd").resolve().as_posix()
+    except OSError:
+        return ""
+
+
+def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
+    if not proc_root.is_dir():
+        return {"available": False, "reason": "procfs_unavailable"}
+
+    watched_sources = [
+        REPO_ROOT / "src/aoa_session_memory_mcp/core.py",
+        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
+        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
+    ]
+    source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    config_path = _codex_config_path()
+    config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
+    boot_epoch = _linux_boot_epoch(proc_root)
+
+    ancestor_pids: set[int] = set()
+    parent = os.getpid()
+    while parent:
+        ancestor_pids.add(parent)
+        next_parent = _proc_ppid(str(parent), proc_root=proc_root)
+        if not next_parent or next_parent == parent:
+            break
+        parent = next_parent
+
+    mcp_children_by_parent: dict[int, list[int]] = {}
+    codex_processes: list[dict] = []
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        cmdline = _proc_cmdline(entry.name, proc_root=proc_root)
+        if not cmdline:
+            continue
+        joined = " ".join(cmdline)
+        if "aoa-session-memory-mcp-server.py" in joined or "aoa_session_memory_mcp_server.py" in joined:
+            ppid = _proc_ppid(entry.name, proc_root=proc_root)
+            if ppid is not None:
+                mcp_children_by_parent.setdefault(ppid, []).append(pid)
+            continue
+        if "codex" not in joined or "resume" not in joined:
+            continue
+
+        started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
+        codex_processes.append(
+            {
+                "pid": pid,
+                "ppid": _proc_ppid(entry.name, proc_root=proc_root),
+                "cwd": _proc_cwd(entry.name, proc_root=proc_root),
+                "cmdline": cmdline,
+                "started_at_epoch": started_at_epoch,
+                "is_current_validator_ancestor": pid in ancestor_pids,
+                "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
+                "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+            }
+        )
+
+    for process in codex_processes:
+        child_pids = sorted(mcp_children_by_parent.get(process["pid"], []))
+        process["aoa_session_memory_child_pids"] = child_pids
+        process["has_aoa_session_memory_child"] = bool(child_pids)
+
+    current_codex = [process for process in codex_processes if process["is_current_validator_ancestor"]]
+    current_predates_config = any(process["started_before_config"] for process in current_codex)
+    current_predates_source = any(process["started_before_current_source"] for process in current_codex)
+    current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
+    configured = config_path.exists()
+    live_transport_advisory = bool(
+        current_codex
+        and configured
+        and (current_predates_config or current_predates_source or not current_has_mcp_child)
+    )
+
+    return {
+        "available": True,
+        "config_path": config_path.as_posix(),
+        "config_mtime_epoch": config_mtime or None,
+        "source_mtime_epoch": source_mtime or None,
+        "current_codex_process_count": len(current_codex),
+        "current_session_predates_config": current_predates_config,
+        "current_session_predates_current_source": current_predates_source,
+        "current_session_has_aoa_session_memory_child": current_has_mcp_child,
+        "live_transport_restart_advisory": live_transport_advisory,
+        "advisory": (
+            "This Codex session started before the current aoa-session-memory MCP config/source "
+            "or has no direct aoa-session-memory MCP child. Fresh configured stdio can prove the "
+            "server, but direct in-session MCP calls need a Codex/MCP restart before they are "
+            "freshness proof."
+            if live_transport_advisory
+            else "Current Codex session is not older than the watched aoa-session-memory MCP config/source and has a direct MCP child when configured."
+        ),
+        "current_codex_processes": current_codex[:6],
+        "processes": codex_processes[:12],
+        "omitted_process_count": max(0, len(codex_processes) - 12),
+    }
+
+
 def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
     if not proc_root.is_dir():
         return {"available": False, "reason": "procfs_unavailable"}
@@ -948,6 +1060,7 @@ def main(argv: list[str] | None = None) -> None:
     stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
     configured_stdio_smoke = asyncio.run(_configured_stdio_smoke(state))
     running_processes = _running_mcp_process_advisory()
+    codex_session = _codex_session_advisory()
 
     print(
         json.dumps(
@@ -1026,6 +1139,7 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],
                 "configured_stdio": configured_stdio_smoke,
                 "running_processes": running_processes,
+                "codex_session": codex_session,
             },
             indent=2,
         )
