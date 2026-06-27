@@ -81,6 +81,8 @@ GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT = 2
 GOAL_LIFECYCLE_OBSERVATION_LIMIT = 2
 ENTITY_USAGE_AUDIT_SAMPLE_LIMIT = 4
 ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT = 3
+ENTITY_USAGE_CHAIN_SAMPLE_LIMIT = 3
+ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT = 2
 ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT = 2
 ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT = 1
 ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
@@ -156,7 +158,7 @@ ALLOWED_RETRIEVAL_RECIPES = {
     "process-lessons",
     "repeated-errors",
 }
-ENTITY_USAGE_RETRIEVAL_RECIPES = {"entity-usage", "entity_usage", "entity-usage-audit", "entity_usage_audit"}
+ENTITY_USAGE_RETRIEVAL_RECIPES = {"entity-usage", "entity_usage", "entity-usage-chain", "entity_usage_chain", "entity-usage-audit", "entity_usage_audit"}
 SEARCH_FILTER_ALIASES = {
     "layer": "route_layer",
 }
@@ -1799,6 +1801,114 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
     return compact
 
 
+def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: str) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    passthrough_keys = (
+        "schema_version",
+        "artifact_type",
+        "generated_at",
+        "ok",
+        "mutates",
+        "anchor",
+        "kind",
+        "requested_kind",
+        "session",
+        "normalized_entity",
+        "counts",
+        "quality",
+        "freshness",
+        "noise_flags",
+        "next_expansion_command",
+        "performance_contract",
+        "diagnostics",
+    )
+    for key in passthrough_keys:
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    usage_chain = payload.get("usage_chain") if isinstance(payload.get("usage_chain"), dict) else {}
+    compact_chain: dict[str, Any] = {}
+    entrypoints = usage_chain.get("entrypoint_events")
+    if isinstance(entrypoints, list):
+        selected = [_compact_usage_event(event) for event in entrypoints[:ENTITY_USAGE_CHAIN_SAMPLE_LIMIT]]
+        compact_chain["entrypoint_events"] = [event for event in selected if event]
+        compact_chain["entrypoint_event_count"] = len(entrypoints)
+        compact_chain["omitted_entrypoint_event_count"] = max(0, len(entrypoints) - len(compact_chain["entrypoint_events"]))
+    chains = usage_chain.get("chains")
+    if isinstance(chains, list):
+        selected_chains: list[dict[str, Any]] = []
+        for chain in chains[:ENTITY_USAGE_CHAIN_SAMPLE_LIMIT]:
+            if not isinstance(chain, dict):
+                continue
+            compact_item: dict[str, Any] = {
+                key: chain.get(key)
+                for key in ("result_or_consequence_count", "has_result_or_consequence")
+                if chain.get(key) not in (None, "", [], {})
+            }
+            if isinstance(chain.get("usage_event"), dict):
+                compact_item["usage_event"] = _compact_usage_event(chain["usage_event"])
+            result_events = chain.get("result_or_consequence_events")
+            if isinstance(result_events, list):
+                selected_results = [
+                    _compact_usage_event(event)
+                    for event in result_events[:ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT]
+                ]
+                compact_item["result_or_consequence_events"] = [event for event in selected_results if event]
+                compact_item["omitted_result_or_consequence_event_count"] = max(
+                    0,
+                    len(result_events) - len(compact_item["result_or_consequence_events"]),
+                )
+            selected_chains.append(compact_item)
+        compact_chain["chains"] = selected_chains
+        compact_chain["chain_count"] = len(chains)
+        compact_chain["omitted_chain_count"] = max(0, len(chains) - len(selected_chains))
+    for key in ("unmatched_consequence_events", "result_events", "outcome_events", "context_events"):
+        events = usage_chain.get(key)
+        if isinstance(events, list):
+            selected = [_compact_usage_event(event) for event in events[:ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT]]
+            compact_chain[key] = [event for event in selected if event]
+            compact_chain[f"{key}_count"] = len(events)
+            compact_chain[f"omitted_{key}_count"] = max(0, len(events) - len(compact_chain[key]))
+    if compact_chain:
+        compact["usage_chain"] = _without_omitted_field_counts(compact_chain)
+    for key, limit in (
+        ("document_refs", ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT),
+        ("evidence_refs", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+        ("route_candidates", ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT),
+        ("sessions", ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT),
+    ):
+        values = payload.get(key)
+        if isinstance(values, list):
+            selected = [_compact_usage_mapping(item) for item in values[:limit]]
+            compact[key] = [_without_omitted_field_counts(item) for item in selected if item]
+            compact[f"{key}_count"] = len(values)
+            compact[f"omitted_{key}_count"] = max(0, len(values) - len(compact[key]))
+    next_expansion = payload.get("next_expansion")
+    if isinstance(next_expansion, list):
+        selected = [_compact_usage_mapping(item, text_limit=160) for item in next_expansion[:4]]
+        compact["next_expansion"] = [_without_omitted_field_counts(item) for item in selected if item]
+        compact["next_expansion_count"] = len(next_expansion)
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_evidence_route": full_route,
+            "authority_boundary": "MCP returns compact usage-chain refs and samples; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "chain_sample_limit": ENTITY_USAGE_CHAIN_SAMPLE_LIMIT,
+        "chain_consequence_sample_limit": ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT,
+        "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
+        "evidence_ref_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
+        "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
+        "full_evidence_route": full_route,
+    }
+    compact["authority_boundary"] = "MCP returns compact usage-chain refs and samples; raw/segment evidence remains authoritative."
+    return compact
+
+
 def _compact_entity_usage_neighborhood_payload(payload: dict[str, Any], *, full_route: str) -> dict[str, Any]:
     compact: dict[str, Any] = {}
     passthrough_keys = (
@@ -2319,6 +2429,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_answer_neighborhood",
                 "aoa_session_trace",
                 "aoa_session_entity_dossier",
+                "aoa_session_entity_usage_chain",
                 "aoa_session_entity_usage_audit",
                 "aoa_session_entity_usage_neighborhood",
                 "aoa_session_entity_usage_scenario_audit",
@@ -3787,6 +3898,53 @@ class AoASessionMemoryMCPState:
             return payload
         return _compact_entity_usage_audit_payload(payload, full_route=full_route)
 
+    def session_entity_usage_chain(
+        self,
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 6,
+        per_route_limit: int = 12,
+        consequence_window: int = 6,
+        document_limit: int = 24,
+        session: str = "",
+        full: bool = False,
+    ) -> dict[str, Any]:
+        anchor_text = _ensure_short_text(anchor, "anchor")
+        route_kind = _coerce_trace_kind(kind)
+        base_args = [
+            anchor_text,
+            "--kind",
+            route_kind,
+            "--limit",
+            str(_coerce_limit(limit, 6, 50)),
+            "--per-route-limit",
+            str(_coerce_limit(per_route_limit, 12, 100)),
+            "--consequence-window",
+            str(_coerce_limit(consequence_window, 6, 24)),
+            "--document-limit",
+            str(_coerce_limit(document_limit, 24, 100)),
+        ]
+        if session:
+            base_args.extend(["--session", _safe_selector(session, "session")])
+        full_args = [*base_args, "--full"]
+        run_args = full_args if full else base_args
+        full_route = self._archive_command_line("usage-chain", full_args)
+        payload = self._archive_command(
+            "usage-chain",
+            run_args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["full_evidence_route"] = full_route
+            mcp_access["response_compacted"] = not full
+        if full:
+            return payload
+        return _compact_entity_usage_chain_payload(payload, full_route=full_route)
+
     def session_entity_usage_neighborhood(
         self,
         anchor: str,
@@ -4385,7 +4543,7 @@ class AoASessionMemoryMCPState:
                     "diagnostics": ["entity-usage retrieval requires query as the entity anchor"],
                     "mcp_access": {
                         "mutates": False,
-                        "archive_command": "entity-usage-audit",
+                        "archive_command": "usage-chain",
                         "archive_dispatched": False,
                         "returncode": None,
                         "elapsed_ms": 0,
@@ -4397,7 +4555,7 @@ class AoASessionMemoryMCPState:
                 }
                 payload.setdefault("authority_boundary", self.authority_boundary())
                 return payload
-            payload = self.session_entity_usage_audit(
+            payload = self.session_entity_usage_chain(
                 anchor=_ensure_short_text(query, "query"),
                 kind="auto",
                 limit=_coerce_limit(limit, 8, 50),
@@ -4407,10 +4565,10 @@ class AoASessionMemoryMCPState:
             payload["recipe"] = recipe_text
             payload["retrieval_redirect"] = {
                 "requested_recipe": recipe_text,
-                "served_by": "aoa_session_entity_usage_audit",
-                "reason": "entity usage is a dedicated read-only MCP fast path, not a retrieve archive recipe",
+                "served_by": "aoa_session_entity_usage_chain",
+                "reason": "entity usage is served by the compact read-only MCP usage-chain fast path, not a retrieve archive recipe",
             }
-            payload.setdefault("diagnostics", []).append("served by entity-usage-audit retrieval redirect")
+            payload.setdefault("diagnostics", []).append("served by entity-usage-chain retrieval redirect")
             return payload
         if recipe_text not in ALLOWED_RETRIEVAL_RECIPES:
             payload = {

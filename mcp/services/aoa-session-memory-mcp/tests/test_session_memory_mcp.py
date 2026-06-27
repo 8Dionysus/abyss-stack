@@ -638,12 +638,13 @@ LITERAL_QUERY_PLAN = {
     "kind": "mcp",
     "query_shape": {"primary": "entity_anchor", "signals": ["entity_anchor"]},
     "primary_route": {
-        "route_id": "entity_usage_audit",
+        "route_id": "entity_usage_chain",
         "reason": "query resolves to a typed operational anchor",
         "estimated_cost": "low",
-        "command": "python3 scripts/aoa_session_memory.py entity-usage-audit aoa-session-memory-mcp --kind mcp",
+        "command": "python3 scripts/aoa_session_memory.py usage-chain aoa-session-memory-mcp --kind mcp",
     },
     "ordered_routes": [
+        {"route_id": "entity_usage_chain", "estimated_cost": "low"},
         {"route_id": "entity_usage_audit", "estimated_cost": "low"},
         {"route_id": "trace_route", "estimated_cost": "low"},
         {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
@@ -687,7 +688,7 @@ def literal_query_plan_fixture(query: str) -> dict[str, Any]:
         payload["primary_route"] = {"route_id": "command_structured_search", "estimated_cost": "low"}
         payload["ordered_routes"] = [
             {"route_id": "command_structured_search", "estimated_cost": "low"},
-            {"route_id": "entity_usage_audit", "estimated_cost": "low"},
+            {"route_id": "entity_usage_chain", "estimated_cost": "low"},
             {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
         ]
     return payload
@@ -907,6 +908,57 @@ ENTITY_USAGE_AUDIT = {
             "refs": {"raw": "raw:line:3", "segment": "000__initial-to-latest.md#event-000003"},
         }
     ],
+}
+
+ENTITY_USAGE_CHAIN = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_entity_usage_chain",
+    "ok": True,
+    "anchor": "aoa-session-memory-mcp",
+    "kind": "mcp",
+    "counts": {
+        "usage_event_count": 1,
+        "consequence_event_count": 1,
+        "chain_count": 1,
+        "chain_with_result_or_consequence_count": 1,
+        "evidence_ref_count": 2,
+    },
+    "quality": {
+        "direct_usage_present": True,
+        "result_or_consequence_present": True,
+        "raw_or_segment_ref_present": True,
+        "skipped_graph_rag_packet": True,
+        "skipped_graph_neighborhood": True,
+        "skipped_raw_preview_neighborhood": True,
+        "noise_flag_count": 0,
+    },
+    "usage_chain": {
+        "entrypoint_events": [],
+        "chains": [
+            {
+                "usage_event": {
+                    "event_type": "TOOL_CALL",
+                    "title": "Tool call: aoa_session_memory_search",
+                    "refs": {"raw": "raw:line:2", "segment": "000__initial-to-latest.md#event-000002"},
+                },
+                "result_or_consequence_events": [
+                    {
+                        "event_type": "TOOL_OUTPUT",
+                        "relation": "same_correlation_id",
+                        "refs": {"raw": "raw:line:3", "segment": "000__initial-to-latest.md#event-000003"},
+                    }
+                ],
+                "result_or_consequence_count": 1,
+                "has_result_or_consequence": True,
+            }
+        ],
+    },
+    "document_refs": [{"kind": "mentioned_path", "value": "docs/decisions/README.md"}],
+    "evidence_refs": [
+        {"kind": "raw_line", "value": "raw:line:2"},
+        {"kind": "segment_markdown", "value": "000__initial-to-latest.md#event-000002"},
+    ],
+    "diagnostics": [],
 }
 
 ENTITY_USAGE_NEIGHBORHOOD = {
@@ -1249,6 +1301,8 @@ class FakeRunner:
             payload = ENTITY_REGISTRY
         elif command == "entity-usage-audit":
             payload = ENTITY_USAGE_AUDIT
+        elif command == "usage-chain":
+            payload = ENTITY_USAGE_CHAIN
         elif command == "entity-usage-neighborhood":
             payload = ENTITY_USAGE_NEIGHBORHOOD
         elif command == "entity-usage-scenario-audit":
@@ -2039,7 +2093,7 @@ def test_literal_query_plan_routes_to_allowlisted_archive_command(tmp_path: Path
     assert plan["artifact_type"] == "session_memory_literal_query_plan"
     assert plan["kind"] == "mcp"
     assert plan["requested_kind"] == "mcp_service"
-    assert plan["primary_route"]["route_id"] == "entity_usage_audit"
+    assert plan["primary_route"]["route_id"] == "entity_usage_chain"
     assert plan["cost_profile"]["structured_first"] is True
     plan_calls = [call for call in runner.calls if call[0] == "literal-query-plan"]
     assert len(plan_calls) == 1
@@ -2069,7 +2123,7 @@ def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Pat
     assert not any(call[0] == "retrieve" for call in runner.calls)
 
 
-def test_retrieve_entity_usage_redirects_to_usage_audit(tmp_path: Path) -> None:
+def test_retrieve_entity_usage_redirects_to_usage_chain(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
@@ -2082,12 +2136,12 @@ def test_retrieve_entity_usage_redirects_to_usage_audit(tmp_path: Path) -> None:
     )
 
     assert payload["ok"] is True
-    assert payload["artifact_type"] == "session_memory_entity_usage_audit"
+    assert payload["artifact_type"] == "session_memory_entity_usage_chain"
     assert payload["recipe"] == "entity_usage"
-    assert payload["retrieval_redirect"]["served_by"] == "aoa_session_entity_usage_audit"
-    assert "served by entity-usage-audit retrieval redirect" in payload["diagnostics"]
+    assert payload["retrieval_redirect"]["served_by"] == "aoa_session_entity_usage_chain"
+    assert "served by entity-usage-chain retrieval redirect" in payload["diagnostics"]
     assert not any(call[0] == "retrieve" for call in runner.calls)
-    usage_calls = [call for call in runner.calls if call[0] == "entity-usage-audit"]
+    usage_calls = [call for call in runner.calls if call[0] == "usage-chain"]
     assert len(usage_calls) == 1
     args = usage_calls[0][1]
     assert args[0] == "aoa-session-memory-mcp"
@@ -2667,20 +2721,21 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
         {"ok": True, "entity_count": 1},
-        {"primary_route": {"route_id": "entity_usage_audit"}, "cost_profile": {"structured_first": True}},
+        {"primary_route": {"route_id": "entity_usage_chain"}, "cost_profile": {"structured_first": True}},
         {"quality": {"usage_event_count": 2, "graph_node_count": 3, "raw_or_segment_ref_present": True}},
+        {"counts": {"usage_event_count": 2, "chain_with_result_or_consequence_count": 2}},
         {"kind": "mcp", "requested_kind": "mcp_service"},
         {"kind": "agent_event", "outcome_event_count": 2},
         {"node_count": 3, "edge_count": 2},
-        {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
+        {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_chain"}},
         {"quality": {"scenario_count": 1, "warn_count": 1}},
         {"case_count": 1, "actionable_gap_count": 0},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
-        tool_count=32,
+        tool_count=33,
     )
 
-    assert summary["tool_count"] == 32
+    assert summary["tool_count"] == 33
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
@@ -2696,11 +2751,13 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["task_episode_count"] == 0
     assert summary["goal_lifecycle_count"] == 0
     assert summary["answer_neighborhood_count"] == 0
-    assert summary["literal_plan_primary_route"] == "entity_usage_audit"
+    assert summary["literal_plan_primary_route"] == "entity_usage_chain"
     assert summary["literal_plan_structured_first"] is True
     assert summary["entity_dossier_usage_count"] == 2
     assert summary["entity_dossier_graph_node_count"] == 3
     assert summary["entity_dossier_raw_or_segment_ref_present"] is True
+    assert summary["entity_usage_chain_usage_count"] == 2
+    assert summary["entity_usage_chain_success_count"] == 2
     assert summary["usage_alias_kind"] == "mcp"
     assert summary["usage_alias_requested_kind"] == "mcp_service"
     assert summary["agent_event_usage_kind"] == "agent_event"
@@ -2711,7 +2768,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["live_scenario_corpus_case_count"] == 1
     assert summary["live_scenario_corpus_actionable_gap_count"] == 0
     assert summary["agent_event_usage_outcome_count"] == 2
-    assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
+    assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_chain"
     assert summary["maintenance_recommendation"] == "use_graph_search"
 
 
@@ -2720,6 +2777,7 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
 
     assert "aoa_session_literal_query_plan" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_dossier" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_entity_usage_chain" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
@@ -2899,6 +2957,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_goal_lifecycles" in tools
     assert "aoa_session_answer_neighborhood" in tools
     assert "aoa_session_entity_dossier" in tools
+    assert "aoa_session_entity_usage_chain" in tools
     assert "aoa_session_entity_usage_neighborhood" in tools
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
@@ -2918,14 +2977,18 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
+    assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["limit"]["default"] == 6
+    assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["per_route_limit"]["default"] == 12
     assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["usage_limit"]["default"] == 4
     assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["graph_edge_limit"]["default"] == 24
     literal_description = tools["aoa_session_literal_query_plan"].description or ""
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
+    usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
     assert "one compact registry, usage, consequence" in dossier_description
+    assert "usage-to-consequence chains" in usage_chain_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
     assert "compact bridge packet" in bridge_description
@@ -3346,6 +3409,40 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
     ]
 
 
+def test_entity_usage_chain_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    chain = state.session_entity_usage_chain(
+        "aoa-session-memory-mcp",
+        kind="mcp_service",
+        limit=5,
+        per_route_limit=7,
+        consequence_window=4,
+        document_limit=9,
+        session="session-1",
+    )
+
+    assert chain["artifact_type"] == "session_memory_entity_usage_chain"
+    assert chain["kind"] == "mcp"
+    assert chain["requested_kind"] == "mcp_service"
+    assert chain["counts"]["usage_event_count"] == 1
+    assert chain["quality"]["skipped_graph_rag_packet"] is True
+    assert chain["mcp_access"]["response_compacted"] is True
+    assert "full_evidence_route" in chain["mcp_access"]
+    usage_calls = [call for call in runner.calls if call[0] == "usage-chain"]
+    assert len(usage_calls) == 1
+    args = usage_calls[0][1]
+    assert args[0] == "aoa-session-memory-mcp"
+    assert args[args.index("--kind") + 1] == "mcp"
+    assert args[args.index("--limit") + 1] == "5"
+    assert args[args.index("--per-route-limit") + 1] == "7"
+    assert args[args.index("--consequence-window") + 1] == "4"
+    assert args[args.index("--document-limit") + 1] == "9"
+    assert args[args.index("--session") + 1] == "session-1"
+    assert runner.timeouts[-1] == ("usage-chain", 90.0)
+
+
 def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -3554,6 +3651,92 @@ def test_entity_usage_audit_compacts_heavy_archive_payload_for_mcp(tmp_path: Pat
     assert "omitted_field_count" not in encoded
     assert len(encoded) < 5500
     assert ("raw evidence " * 20) not in encoded
+
+
+def test_entity_usage_chain_compacts_heavy_archive_payload_for_mcp(tmp_path: Path) -> None:
+    class HeavyChainRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "usage-chain":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            long_text = "chain raw evidence " * 120
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_usage_chain",
+                "ok": True,
+                "anchor": "aoa-session-memory-mcp",
+                "kind": "mcp",
+                "counts": {
+                    "usage_event_count": 10,
+                    "consequence_event_count": 10,
+                    "chain_count": 10,
+                    "chain_with_result_or_consequence_count": 10,
+                },
+                "quality": {
+                    "direct_usage_present": True,
+                    "result_or_consequence_present": True,
+                    "raw_or_segment_ref_present": True,
+                    "skipped_graph_rag_packet": True,
+                    "noise_flag_count": 0,
+                },
+                "usage_chain": {
+                    "chains": [
+                        {
+                            "usage_event": {
+                                "event_id": f"{idx:06d}",
+                                "event_type": "TOOL_CALL",
+                                "title": long_text,
+                                "snippet": long_text,
+                                "content": long_text,
+                                "refs": {"raw": f"raw:line:{idx}", "segment": f"000.md#event-{idx:06d}"},
+                            },
+                            "result_or_consequence_events": [
+                                {
+                                    "event_id": f"c{idx:06d}",
+                                    "event_type": "COMMAND_OUTPUT",
+                                    "title": long_text,
+                                    "content": long_text,
+                                    "refs": {"raw": f"raw:line:{idx + 100}", "segment": f"000.md#event-c{idx:06d}"},
+                                }
+                                for _ in range(4)
+                            ],
+                            "result_or_consequence_count": 4,
+                            "has_result_or_consequence": True,
+                        }
+                        for idx in range(10)
+                    ]
+                },
+                "document_refs": [
+                    {"kind": "mentioned_path", "value": f"docs/{idx}.md", "preview": long_text}
+                    for idx in range(10)
+                ],
+                "evidence_refs": [
+                    {"kind": "raw_line", "value": f"raw:line:{idx}", "preview": long_text}
+                    for idx in range(10)
+                ],
+            }
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, HeavyChainRunner())
+
+    chain = state.session_entity_usage_chain("aoa-session-memory-mcp", kind="mcp", limit=10)
+    encoded = json.dumps(chain)
+
+    assert chain["mcp_payload_policy"]["response_compacted"] is True
+    assert chain["mcp_access"]["response_compacted"] is True
+    assert chain["counts"]["usage_event_count"] == 10
+    assert len(chain["usage_chain"]["chains"]) == 3
+    assert chain["usage_chain"]["omitted_chain_count"] == 7
+    assert len(chain["usage_chain"]["chains"][0]["result_or_consequence_events"]) == 2
+    assert len(chain["document_refs"]) == 2
+    assert len(chain["evidence_refs"]) == 3
+    assert "content" not in chain["usage_chain"]["chains"][0]["usage_event"]
+    assert len(chain["usage_chain"]["chains"][0]["usage_event"]["title"]) <= 80
+    assert "omitted_field_count" not in encoded
+    assert len(encoded) < 7000
+    assert ("chain raw evidence " * 20) not in encoded
 
 
 def test_entity_usage_neighborhood_compacts_heavy_archive_payload_for_mcp(tmp_path: Path) -> None:

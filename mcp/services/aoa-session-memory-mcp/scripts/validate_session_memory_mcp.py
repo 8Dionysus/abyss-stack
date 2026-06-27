@@ -35,6 +35,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_answer_neighborhood",
     "aoa_session_trace",
     "aoa_session_entity_dossier",
+    "aoa_session_entity_usage_chain",
     "aoa_session_entity_usage_audit",
     "aoa_session_entity_usage_neighborhood",
     "aoa_session_entity_registry",
@@ -488,6 +489,7 @@ def _stdio_route_count_summary(
     registry: dict,
     literal_plan: dict,
     entity_dossier: dict,
+    usage_chain: dict,
     usage_alias: dict,
     agent_event_usage: dict,
     graph_neighborhood: dict,
@@ -548,6 +550,12 @@ def _stdio_route_count_summary(
         else None,
         "entity_dossier_raw_or_segment_ref_present": entity_dossier.get("quality", {}).get("raw_or_segment_ref_present")
         if isinstance(entity_dossier.get("quality"), dict)
+        else None,
+        "entity_usage_chain_usage_count": usage_chain.get("counts", {}).get("usage_event_count")
+        if isinstance(usage_chain.get("counts"), dict)
+        else None,
+        "entity_usage_chain_success_count": usage_chain.get("counts", {}).get("chain_with_result_or_consequence_count")
+        if isinstance(usage_chain.get("counts"), dict)
         else None,
         "usage_alias_kind": usage_alias.get("kind"),
         "usage_alias_requested_kind": usage_alias.get("requested_kind"),
@@ -668,6 +676,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
                 timeout_seconds=90,
             )
+            usage_chain = await call_json(
+                "aoa_session_entity_usage_chain",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 3},
+                timeout_seconds=90,
+            )
             entity_dossier = await call_json(
                 "aoa_session_entity_dossier",
                 {
@@ -768,8 +781,16 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP literal query plan returned invalid payload: {literal_plan.get('diagnostics')}")
     if literal_plan.get("kind") != "mcp" or literal_plan.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP literal query kind alias contract failed: {literal_plan}")
-    if literal_plan.get("primary_route", {}).get("route_id") != "entity_usage_audit":
-        raise SystemExit(f"stdio MCP literal query plan did not choose entity usage first: {literal_plan}")
+    if literal_plan.get("primary_route", {}).get("route_id") != "entity_usage_chain":
+        raise SystemExit(f"stdio MCP literal query plan did not choose entity usage chain first: {literal_plan}")
+    if usage_chain.get("artifact_type") != "session_memory_entity_usage_chain":
+        raise SystemExit(f"stdio MCP usage-chain returned invalid payload: {usage_chain.get('diagnostics')}")
+    if usage_chain.get("kind") != "mcp" or usage_chain.get("requested_kind") != "mcp_service":
+        raise SystemExit(f"stdio MCP usage-chain kind alias contract failed: {usage_chain}")
+    usage_chain_counts = usage_chain.get("counts") if isinstance(usage_chain.get("counts"), dict) else {}
+    usage_chain_quality = usage_chain.get("quality") if isinstance(usage_chain.get("quality"), dict) else {}
+    if usage_chain_counts.get("usage_event_count", 0) <= 0 or usage_chain_quality.get("raw_or_segment_ref_present") is not True:
+        raise SystemExit(f"stdio MCP usage-chain quality contract failed: {usage_chain}")
     if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
     if entity_dossier.get("artifact_type") != "session_memory_entity_dossier":
@@ -783,7 +804,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP agent_event usage route failed: {agent_event_usage.get('diagnostics')}")
     if graph_neighborhood.get("artifact_type") != "session_memory_graph_neighborhood" or graph_neighborhood.get("ok") is not True:
         raise SystemExit(f"stdio MCP graph neighborhood returned invalid payload: {graph_neighborhood.get('diagnostics')}")
-    if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_audit":
+    if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_chain":
         raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if live_scenario.get("artifact_type") != "session_memory_live_scenario_audit":
         raise SystemExit(f"stdio MCP live scenario audit returned invalid payload: {live_scenario.get('diagnostics')}")
@@ -817,6 +838,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         registry,
         literal_plan,
         entity_dossier,
+        usage_chain,
         usage_alias,
         agent_event_usage,
         graph_neighborhood,
@@ -888,9 +910,27 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 not isinstance(literal_plan_payload, dict)
                 or literal_plan_payload.get("kind") != "mcp"
                 or literal_plan_payload.get("requested_kind") != "mcp_service"
-                or literal_plan_payload.get("primary_route", {}).get("route_id") != "entity_usage_audit"
+                or literal_plan_payload.get("primary_route", {}).get("route_id") != "entity_usage_chain"
             ):
                 raise SystemExit(f"configured Codex MCP literal query plan contract failed: {literal_plan_payload}")
+
+            usage_chain_result = await mcp_session.call_tool(
+                "aoa_session_entity_usage_chain",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 3},
+                read_timeout_seconds=timedelta(seconds=90),
+            )
+            if usage_chain_result.isError or not usage_chain_result.content:
+                raise SystemExit(f"configured Codex MCP usage-chain call failed: {usage_chain_result.content}")
+            usage_chain_payload = json.loads(usage_chain_result.content[0].text)
+            usage_chain_counts = usage_chain_payload.get("counts") if isinstance(usage_chain_payload, dict) and isinstance(usage_chain_payload.get("counts"), dict) else {}
+            if (
+                not isinstance(usage_chain_payload, dict)
+                or usage_chain_payload.get("artifact_type") != "session_memory_entity_usage_chain"
+                or usage_chain_payload.get("kind") != "mcp"
+                or usage_chain_payload.get("requested_kind") != "mcp_service"
+                or usage_chain_counts.get("usage_event_count", 0) <= 0
+            ):
+                raise SystemExit(f"configured Codex MCP usage-chain contract failed: {usage_chain_payload}")
 
             inventory_result = await mcp_session.call_tool(
                 "aoa_session_entity_inventory",
@@ -979,7 +1019,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             retrieve_payload = json.loads(retrieve_result.content[0].text)
             if (
                 not isinstance(retrieve_payload, dict)
-                or retrieve_payload.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_audit"
+                or retrieve_payload.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_chain"
             ):
                 raise SystemExit(f"configured Codex MCP retrieve entity_usage redirect failed: {retrieve_payload}")
 
@@ -1010,6 +1050,9 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         else None,
         "literal_plan_structured_first": literal_plan_payload.get("cost_profile", {}).get("structured_first")
         if isinstance(literal_plan_payload, dict) and isinstance(literal_plan_payload.get("cost_profile"), dict)
+        else None,
+        "usage_chain_usage_count": usage_chain_counts.get("usage_event_count")
+        if isinstance(usage_chain_counts, dict)
         else None,
         "mcp_service_inventory_requested_layer": inventory_payload.get("requested_layer")
         if isinstance(inventory_payload, dict)

@@ -257,6 +257,29 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_entity_usage_chain(
+        anchor: str,
+        kind: str = "auto",
+        limit: int = 6,
+        per_route_limit: int = 12,
+        consequence_window: int = 6,
+        document_limit: int = 24,
+        session: str = "",
+        full: bool = False,
+    ) -> dict[str, Any]:
+        """Return compact usage-to-consequence chains for an operational entity without graph or raw-preview expansion."""
+        return current_state().session_entity_usage_chain(
+            anchor=anchor,
+            kind=kind,
+            limit=limit,
+            per_route_limit=per_route_limit,
+            consequence_window=consequence_window,
+            document_limit=document_limit,
+            session=session,
+            full=full,
+        )
+
+    @mcp.tool()
     def aoa_session_entity_registry(kind: str = "all", query: str = "", lookup: str = "", limit: int = 50) -> dict[str, Any]:
         """Read generated entity registry or lookup one skill/MCP/tool/hook/API/etc anchor."""
         return current_state().session_entity_registry(kind=kind, query=query, lookup=lookup, limit=limit)
