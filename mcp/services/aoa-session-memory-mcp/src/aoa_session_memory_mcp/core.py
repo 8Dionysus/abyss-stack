@@ -5331,11 +5331,14 @@ class AoASessionMemoryMCPState:
             timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
         )
         payload.setdefault("mutates", False)
+        payload.setdefault("runtime", self.runtime_identity())
         payload.setdefault("authority_boundary", self.authority_boundary())
         mcp_access = payload.get("mcp_access")
         if isinstance(mcp_access, dict):
             mcp_access["response_compacted"] = not full
             mcp_access["full_status_route"] = self._archive_command_line("maintenance-status", [*args, "--full"] if not full else args)
+            runtime = payload.get("runtime") if isinstance(payload.get("runtime"), dict) else {}
+            mcp_access["runtime_reload_required"] = runtime.get("reload_required")
         return payload
 
     def _maintenance_summary_for_status(self) -> dict[str, Any]:
