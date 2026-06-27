@@ -323,7 +323,7 @@ def build_server(
         recent_days: int = 7,
         limit: int = 3,
     ) -> dict[str, Any]:
-        """Run a bounded multi-profile live scenario audit across entity, hook, goal, answer, literal, and graph routes."""
+        """Run a bounded multi-profile live scenario audit across dossier, entity, hook, goal, answer, literal, and graph routes."""
         return current_state().session_live_scenario_audit(
             seed=seed,
             profiles=profiles,

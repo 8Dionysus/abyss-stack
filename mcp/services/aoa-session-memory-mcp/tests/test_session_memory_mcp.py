@@ -657,6 +657,41 @@ LITERAL_QUERY_PLAN = {
     "authority_boundary": "This planner chooses a cheap first route; raw transcript and segment indexes remain evidence authority.",
 }
 
+
+def literal_query_plan_fixture(query: str) -> dict[str, Any]:
+    payload = json.loads(json.dumps(LITERAL_QUERY_PLAN))
+    payload["query"] = query
+    if "raw_unavailable" in query:
+        payload["query_shape"] = {"primary": "error_text", "signals": ["error_text"]}
+        payload["primary_route"] = {"route_id": "route_signal_structured_search", "estimated_cost": "low"}
+        payload["ordered_routes"] = [
+            {"route_id": "route_signal_structured_search", "estimated_cost": "low"},
+            {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
+        ]
+    elif "найди все MCP" in query:
+        payload["query_shape"] = {"primary": "entity_class", "signals": ["entity_class"]}
+        payload["route_anchor"] = "mcp"
+        payload["route_anchor_source"] = "broad_entity_class_query"
+        payload["broad_entity_class"] = {"layer": "mcp", "usage_intent": True}
+        payload["primary_route"] = {"route_id": "entity_inventory", "estimated_cost": "low"}
+        payload["ordered_routes"] = [
+            {"route_id": "entity_inventory", "estimated_cost": "low"},
+            {"route_id": "entity_registry_class", "estimated_cost": "low"},
+            {"route_id": "entity_usage_scenario_audit", "estimated_cost": "medium"},
+            {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
+        ]
+    elif query.startswith("python3 "):
+        payload["query_shape"] = {"primary": "command", "signals": ["command"], "command_anchor": "scripts/aoa_session_memory.py"}
+        payload["route_anchor"] = "scripts/aoa_session_memory.py"
+        payload["route_anchor_source"] = "command_anchor"
+        payload["primary_route"] = {"route_id": "command_structured_search", "estimated_cost": "low"}
+        payload["ordered_routes"] = [
+            {"route_id": "command_structured_search", "estimated_cost": "low"},
+            {"route_id": "entity_usage_audit", "estimated_cost": "low"},
+            {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
+        ]
+    return payload
+
 AGENT_RESPONSES = {
     "schema_version": 1,
     "artifact_type": "agent_event_route_results",
@@ -1109,7 +1144,8 @@ class FakeRunner:
         elif command == "search":
             payload = SEARCH_RESULTS
         elif command == "literal-query-plan":
-            payload = LITERAL_QUERY_PLAN
+            query = args[args.index("--query") + 1] if "--query" in args else ""
+            payload = literal_query_plan_fixture(query)
         elif command in {"agent-responses", "agent-closeouts", "agent-progress-updates"}:
             payload = AGENT_RESPONSES
         elif command in {"agent-reasoning-windows", "answer-neighborhood"}:
@@ -3519,6 +3555,7 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     audit = state.session_live_scenario_audit(
         seed="fixture-live",
         profiles=[
+            "entity_dossier",
             "entity_usage",
             "hook_failure",
             "goal_lifecycle",
@@ -3535,16 +3572,22 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert audit["ok"] is True
     assert audit["truth_status"] == "bounded_live_scenario_audit_not_reviewed_truth"
     assert audit["parameters"]["limit"] == 2
-    assert audit["quality"]["scenario_count"] == 6
+    assert audit["quality"]["scenario_count"] == 7
     assert audit["quality"]["failed_count"] == 0
-    assert audit["quality"]["raw_or_segment_ref_scenario_count"] >= 4
+    assert audit["quality"]["raw_or_segment_ref_scenario_count"] >= 5
     scenarios = {item["profile"]: item for item in audit["scenarios"]}
+    assert scenarios["entity_dossier"]["sample_count"] == 2
+    assert scenarios["entity_dossier"]["one_short_route_sample_count"] == 2
     assert scenarios["entity_usage"]["sample_count"] == 2
     assert scenarios["hook_failure"]["total_receipt_count"] == 1
     assert scenarios["hook_failure"]["date_semantics"]["filter_basis"] == "hook_receipt_timestamp"
     assert scenarios["goal_lifecycle"]["result_count"] == 1
     assert scenarios["agent_closeout"]["result_count"] == 1
-    assert scenarios["literal_planner"]["primary_route_id"] == "entity_usage_audit"
+    assert scenarios["literal_planner"]["sample_count"] == 4
+    assert scenarios["literal_planner"]["failed_count"] == 0
+    assert scenarios["literal_planner"]["primary_route_counts"]["entity_inventory"] == 1
+    assert scenarios["literal_planner"]["primary_route_counts"]["route_signal_structured_search"] == 1
+    assert scenarios["literal_planner"]["shape_counts"]["entity_class"] == 1
     assert scenarios["graph_neighborhood"]["node_count"] == 3
     assert scenarios["graph_neighborhood"]["evidence_ref_count"] == 1
     assert scenarios["hook_failure"]["first_ref"]["receipt"].endswith("hooks/receipts.jsonl#L2")
@@ -3556,12 +3599,15 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert "agent-closeouts" in commands
     assert "literal-query-plan" in commands
     assert "graph-neighborhood" in commands
-    usage_args = next(args for command, args in runner.calls if command == "entity-usage-scenario-audit")
-    assert usage_args[usage_args.index("--seed") + 1] == "fixture-live"
-    assert usage_args[usage_args.index("--sample-size") + 1] == "2"
+    usage_scenario_args = [args for command, args in runner.calls if command == "entity-usage-scenario-audit"]
+    assert [args[args.index("--seed") + 1] for args in usage_scenario_args] == [
+        "fixture-live:entity-dossier",
+        "fixture-live",
+    ]
+    assert all(args[args.index("--sample-size") + 1] == "2" for args in usage_scenario_args)
 
 
-def test_live_scenario_audit_warns_when_literal_planner_starts_with_monolith(tmp_path: Path) -> None:
+def test_live_scenario_audit_fails_when_literal_planner_starts_with_monolith(tmp_path: Path) -> None:
     class MonolithLiteralRunner(FakeRunner):
         def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
             command = argv[2]
@@ -3584,12 +3630,39 @@ def test_live_scenario_audit_warns_when_literal_planner_starts_with_monolith(tmp
 
     audit = state.session_live_scenario_audit(profiles=["literal_planner"], limit=2)
 
-    assert audit["ok"] is True
-    assert audit["quality"]["warn_count"] == 1
+    assert audit["ok"] is False
+    assert audit["quality"]["failed_count"] == 1
     scenario = audit["scenarios"][0]
-    assert scenario["status"] == "warn"
-    assert scenario["primary_route_id"] == "monolith_raw_text_fallback"
-    assert "literal_planner_used_monolith_fallback_first" in scenario["quality_flags"]
+    assert scenario["status"] == "failed"
+    assert scenario["failed_count"] == 4
+    assert scenario["primary_route_counts"]["monolith_raw_text_fallback"] == 4
+
+
+def test_live_scenario_audit_fails_empty_entity_dossier_profile(tmp_path: Path) -> None:
+    class EmptyDossierCandidateRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "entity-usage-scenario-audit":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_usage_scenario_audit",
+                "ok": False,
+                "quality": {"sample_count": 0, "passed_count": 0, "warn_count": 0, "failed_count": 0},
+                "samples": [],
+                "diagnostics": ["empty_fixture"],
+            }
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, EmptyDossierCandidateRunner())
+
+    audit = state.session_live_scenario_audit(profiles=["entity_dossier"], sample_size=1, limit=1)
+
+    assert audit["ok"] is False
+    assert audit["quality"]["failed_count"] == 1
+    assert audit["scenarios"][0]["status"] == "failed"
 
 
 def test_route_reads_generated_axis_without_arbitrary_paths(tmp_path: Path) -> None:

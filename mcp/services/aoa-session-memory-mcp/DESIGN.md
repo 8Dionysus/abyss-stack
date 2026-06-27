@@ -65,7 +65,10 @@ Literal-query planning is a read-only route selector. It should run before a
 broad raw-text query when the caller is unsure whether the text is a skill,
 MCP, hook, tool, path, command, error, goal, or plain phrase. The planner does
 not prove evidence; it explains whether to start with typed usage/trace/graph,
-structured search filters, scoped full-text shards, or monolith fallback.
+typed registry/inventory for broad entity-class questions, structured search
+filters, scoped full-text shards, or monolith fallback. Class questions with
+use/error/consequence intent include a bounded entity-usage scenario route
+before broad raw-text recall.
 
 Agent-event and lightweight usage-neighborhood routes have MCP-local fast
 paths over the portable SQLite projection. They are deliberately bounded:
