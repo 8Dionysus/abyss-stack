@@ -1141,6 +1141,27 @@ def _compact_usage_refs(refs: Any) -> dict[str, Any]:
     )
 
 
+def _compact_first_ref(ref: Any) -> dict[str, Any]:
+    return _without_omitted_field_counts(
+        _compact_usage_mapping(
+            ref,
+            allowed_keys=(
+                "raw",
+                "raw_ref",
+                "raw_block",
+                "segment",
+                "segment_ref",
+                "segment_index",
+                "session",
+                "session_ref",
+                "line",
+                "value",
+                "kind",
+            ),
+        )
+    )
+
+
 def _without_omitted_field_counts(value: Any) -> Any:
     if isinstance(value, dict):
         return {
@@ -1825,6 +1846,9 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
     for key in passthrough_keys:
         if payload.get(key) not in (None, "", [], {}):
             compact[key] = payload.get(key)
+    first_ref = _compact_first_ref(payload.get("first_ref"))
+    if first_ref:
+        compact["first_ref"] = first_ref
     usage_chain = payload.get("usage_chain") if isinstance(payload.get("usage_chain"), dict) else {}
     compact_chain: dict[str, Any] = {}
     entrypoints = usage_chain.get("entrypoint_events")
