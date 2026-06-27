@@ -98,6 +98,18 @@ profile_ready() {
   AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-smoke" --profile curation >/dev/null 2>&1
 }
 
+substrate_ready() {
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-smoke" --profile substrate >/dev/null 2>&1
+}
+
+start_profile() {
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-up" --profile curation "${forward_args[@]}"
+}
+
+start_tos_graph_only() {
+  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-up" --profile curation -- --no-deps tos-graph
+}
+
 open_ui() {
   [[ "$open_requested" == "1" ]] || return 0
   case "${AOA_TOS_GRAPH_OPEN:-true}" in
@@ -135,8 +147,11 @@ fi
 printf 'Starting ToS graph review workbench through profile: curation\n'
 if ((force_start == 0)) && profile_ready; then
   printf 'ToS graph curation profile is already reachable: %s\n' "$ui_url"
+elif ((${#forward_args[@]} == 0)) && substrate_ready; then
+  printf 'Storage substrate is already reachable; starting only tos-graph\n'
+  start_tos_graph_only
 else
-  AOA_STACK_PRESET="" AOA_STACK_PROFILE="" "${SCRIPTS_DIR}/aoa-up" --profile curation "${forward_args[@]}"
+  start_profile
 fi
 
 if ((wait_requested)); then
