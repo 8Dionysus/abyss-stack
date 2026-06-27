@@ -258,6 +258,15 @@ def main() -> None:
     graph_path.add_argument("--kind", default="auto")
     graph_path.add_argument("--max-depth", type=int, default=4)
 
+    graph_bridge = sub.add_parser("graph-bridge")
+    graph_bridge.add_argument("source")
+    graph_bridge.add_argument("target")
+    graph_bridge.add_argument("--kind", default="auto")
+    graph_bridge.add_argument("--source-kind", default="auto")
+    graph_bridge.add_argument("--target-kind", default="auto")
+    graph_bridge.add_argument("--max-depth", type=int, default=4)
+    graph_bridge.add_argument("--limit", type=int, default=8)
+
     graph_cooccurrence = sub.add_parser("graph-cooccurrence")
     graph_cooccurrence.add_argument("anchor")
     graph_cooccurrence.add_argument("--kind", default="auto")
@@ -522,6 +531,18 @@ def main() -> None:
         _print(state.graph_timeline(anchor=args.anchor, kind=args.kind, limit=args.limit))
     elif args.command == "graph-shortest-path":
         _print(state.graph_shortest_path(source=args.source, target=args.target, kind=args.kind, max_depth=args.max_depth))
+    elif args.command == "graph-bridge":
+        _print(
+            state.graph_bridge(
+                source=args.source,
+                target=args.target,
+                kind=args.kind,
+                source_kind=args.source_kind,
+                target_kind=args.target_kind,
+                max_depth=args.max_depth,
+                limit=args.limit,
+            )
+        )
     elif args.command == "graph-cooccurrence":
         _print(state.graph_cooccurrence(anchor=args.anchor, kind=args.kind, limit=args.limit))
     elif args.command == "graphrag-packet":

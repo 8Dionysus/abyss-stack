@@ -41,6 +41,7 @@ aoa_session_literal_query_plan(query, kind="auto", filters={...})
 aoa_session_search(query, filters)
 aoa_session_route(axis, key)
 aoa_session_graph_neighborhood(anchor, edge_limit=...)
+aoa_session_graph_bridge(source, target, source_kind="mcp", target_kind="tool")
 ```
 
 The anchor may be a skill, MCP, hook, tool, path, repo, command, config,
@@ -94,6 +95,9 @@ Graph and GraphRAG calls are evidence-packet builders. They may expand from
 lexical hits into route-signal neighborhoods, timelines, shortest paths, and
 cooccurrence clusters, but they still return raw/segment/session refs instead
 of final claims.
+For relation questions between two anchors, the bridge route wraps shortest
+path plus source/target timeline evidence into one compact packet so agents do
+not have to manually stitch several graph calls before opening refs.
 For exact route anchors, graph neighborhood first reads the generated
 `graph/graph.sqlite3` store directly through indexed node and edge lookups. The
 fast path is still a read-only MCP evidence packet: it reports truncation,

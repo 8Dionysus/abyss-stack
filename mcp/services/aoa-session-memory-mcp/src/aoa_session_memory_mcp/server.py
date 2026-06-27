@@ -480,6 +480,27 @@ def build_server(
         return current_state().graph_shortest_path(source=source, target=target, kind=kind, max_depth=max_depth)
 
     @mcp.tool()
+    def aoa_session_graph_bridge(
+        source: str,
+        target: str,
+        kind: str = "auto",
+        source_kind: str = "auto",
+        target_kind: str = "auto",
+        max_depth: int = 4,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Return a compact bridge packet between two operational anchors with path, timeline, refs, freshness, and next expansion."""
+        return current_state().graph_bridge(
+            source=source,
+            target=target,
+            kind=kind,
+            source_kind=source_kind,
+            target_kind=target_kind,
+            max_depth=max_depth,
+            limit=limit,
+        )
+
+    @mcp.tool()
     def aoa_session_graph_cooccurrence(anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
         """Aggregate route-signal cooccurrences around an anchor with evidence samples."""
         return current_state().graph_cooccurrence(anchor=anchor, kind=kind, limit=limit)

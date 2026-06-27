@@ -1041,6 +1041,48 @@ GRAPH_PATH = {
     "evidence_refs": GRAPH_NEIGHBORHOOD["evidence_refs"],
 }
 
+GRAPH_BRIDGE = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_graph_bridge",
+    "ok": True,
+    "mutates": False,
+    "source_anchor": "aoa-session-memory-mcp",
+    "target_anchor": "exec_command",
+    "kind": "auto",
+    "source_kind": "mcp",
+    "target_kind": "tool",
+    "normalized_entities": {
+        "source": {"anchor": "aoa-session-memory-mcp", "kind": "mcp", "route_key": "aoa_session_memory_mcp"},
+        "target": {"anchor": "exec_command", "kind": "tool", "route_key": "exec_command"},
+    },
+    "bridge": {
+        "path_found": True,
+        "path_length": 1,
+        "max_depth": 4,
+        "nodes": GRAPH_NEIGHBORHOOD["nodes"],
+        "edges": GRAPH_NEIGHBORHOOD["edges"],
+        "evidence_refs": GRAPH_NEIGHBORHOOD["evidence_refs"],
+        "next_expansion_command": "python3 scripts/aoa_session_memory.py graph-shortest-path aoa-session-memory-mcp exec_command --kind auto --max-depth 5",
+    },
+    "usage_chain": {
+        "source_event_count": 1,
+        "target_event_count": 1,
+        "source_events": GRAPH_NEIGHBORHOOD["nodes"][1:],
+        "target_events": GRAPH_NEIGHBORHOOD["nodes"][1:],
+    },
+    "evidence_refs": GRAPH_NEIGHBORHOOD["evidence_refs"],
+    "quality": {
+        "one_short_route": True,
+        "path_found": True,
+        "path_length": 1,
+        "evidence_ref_count": 1,
+        "raw_or_segment_ref_present": True,
+    },
+    "next_command": "python3 scripts/aoa_session_memory.py graph-bridge aoa-session-memory-mcp exec_command --kind auto --source-kind mcp --target-kind tool --limit 4 --max-depth 4",
+    "next_expansion_command": "python3 scripts/aoa_session_memory.py graph-bridge aoa-session-memory-mcp exec_command --kind auto --source-kind mcp --target-kind tool --limit 8 --max-depth 5",
+    "next_expansion": [{"id": "shortest_path", "command": "python3 scripts/aoa_session_memory.py graph-shortest-path aoa-session-memory-mcp exec_command --kind auto --max-depth 5"}],
+}
+
 GRAPH_COOCCURRENCE = {
     "schema_version": 1,
     "artifact_type": "session_memory_graph_cooccurrence",
@@ -1174,6 +1216,8 @@ class FakeRunner:
             payload = GRAPH_TIMELINE
         elif command == "graph-shortest-path":
             payload = GRAPH_PATH
+        elif command == "graph-bridge":
+            payload = GRAPH_BRIDGE
         elif command == "graph-cooccurrence":
             payload = GRAPH_COOCCURRENCE
         elif command == "graphrag-packet":
@@ -2797,6 +2841,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_graph_neighborhood" in tools
     assert "aoa_session_graph_timeline" in tools
     assert "aoa_session_graph_shortest_path" in tools
+    assert "aoa_session_graph_bridge" in tools
     assert "aoa_session_graph_cooccurrence" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
@@ -2809,10 +2854,12 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     literal_description = tools["aoa_session_literal_query_plan"].description or ""
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
+    bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
     assert "one compact registry, usage, consequence" in dossier_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
+    assert "compact bridge packet" in bridge_description
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
     goal_order_schema = tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]
     assert goal_order_schema["default"] == "recent"
@@ -3562,6 +3609,7 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
             "agent_closeout",
             "literal_planner",
             "graph_neighborhood",
+            "graph_bridge",
         ],
         sample_size=2,
         recent_days=4000,
@@ -3572,7 +3620,7 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert audit["ok"] is True
     assert audit["truth_status"] == "bounded_live_scenario_audit_not_reviewed_truth"
     assert audit["parameters"]["limit"] == 2
-    assert audit["quality"]["scenario_count"] == 7
+    assert audit["quality"]["scenario_count"] == 8
     assert audit["quality"]["failed_count"] == 0
     assert audit["quality"]["raw_or_segment_ref_scenario_count"] >= 5
     scenarios = {item["profile"]: item for item in audit["scenarios"]}
@@ -3590,8 +3638,11 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert scenarios["literal_planner"]["shape_counts"]["entity_class"] == 1
     assert scenarios["graph_neighborhood"]["node_count"] == 3
     assert scenarios["graph_neighborhood"]["evidence_ref_count"] == 1
+    assert scenarios["graph_bridge"]["path_found"] is True
+    assert scenarios["graph_bridge"]["evidence_ref_count"] == 1
     assert scenarios["hook_failure"]["first_ref"]["receipt"].endswith("hooks/receipts.jsonl#L2")
     assert scenarios["graph_neighborhood"]["first_ref"]["raw"] == "raw:line:1"
+    assert scenarios["graph_bridge"]["first_ref"]["raw"] == "raw:line:1"
 
     commands = [call[0] for call in runner.calls]
     assert "entity-usage-scenario-audit" in commands
@@ -3599,6 +3650,7 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert "agent-closeouts" in commands
     assert "literal-query-plan" in commands
     assert "graph-neighborhood" in commands
+    assert "graph-bridge" in commands
     usage_scenario_args = [args for command, args in runner.calls if command == "entity-usage-scenario-audit"]
     assert [args[args.index("--seed") + 1] for args in usage_scenario_args] == [
         "fixture-live:entity-dossier",
@@ -3891,6 +3943,7 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=20, edge_limit=7)
     timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp", limit=10)
     path = state.graph_shortest_path("aoa-session-memory-mcp", "exec_command", max_depth=4)
+    bridge = state.graph_bridge("aoa-session-memory-mcp", "exec_command", source_kind="mcp", target_kind="tool", limit=4)
     cooccurrence = state.graph_cooccurrence("aoa-session-memory-mcp", kind="mcp", limit=10)
     graphrag = state.graphrag_packet("aoa-session-memory-mcp", anchor="aoa-session-memory-mcp", limit=4)
     explain = state.explain_graph_packet("debug aoa-session-memory-mcp", anchor="aoa-session-memory-mcp", limit=4)
@@ -3922,6 +3975,13 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     assert timeline["events"][0]["type"] == "event"
     assert timeline["mcp_payload_policy"]["response_compacted"] is True
     assert path["edges"][0]["type"] == "mentions_route_signal"
+    assert bridge["artifact_type"] == "session_memory_graph_bridge"
+    assert bridge["bridge"]["path_found"] is True
+    assert bridge["normalized_entities"]["source"]["kind"] == "mcp"
+    assert bridge["normalized_entities"]["target"]["kind"] == "tool"
+    assert bridge["quality"]["raw_or_segment_ref_present"] is True
+    assert bridge["mcp_payload_policy"]["response_compacted"] is True
+    assert "graph-bridge" in bridge["mcp_access"]["full_graph_route"]
     assert cooccurrence["cooccurrences"][0]["node"]["type"] == "tool"
     assert graphrag["artifact_type"] == "session_memory_graphrag_packet"
     assert explain["artifact_type"] == "session_memory_graph_explain_packet"
@@ -3932,6 +3992,7 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
         "graph-neighborhood",
         "graph-timeline",
         "graph-shortest-path",
+        "graph-bridge",
         "graph-cooccurrence",
         "graphrag-packet",
         "graph-explain-packet",

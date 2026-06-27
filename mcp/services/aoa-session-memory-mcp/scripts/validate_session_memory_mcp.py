@@ -45,6 +45,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_maintenance_status",
     "aoa_session_projection_status",
     "aoa_session_graph_neighborhood",
+    "aoa_session_graph_bridge",
 }
 
 
