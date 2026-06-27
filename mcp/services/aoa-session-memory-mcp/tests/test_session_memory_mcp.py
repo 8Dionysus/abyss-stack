@@ -1653,7 +1653,10 @@ def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) ->
     assert [timeout for command, timeout in runner.timeouts if command == "maintenance-status"] == [60.0]
     assert payload["artifact_type"] == "session_memory_maintenance_status"
     assert payload["mutates"] is False
+    assert payload["runtime"]["source_matches_loaded"] is True
+    assert payload["runtime"]["reload_required"] is False
     assert payload["mcp_access"]["mutates"] is False
+    assert payload["mcp_access"]["runtime_reload_required"] is False
     assert payload["mcp_access"]["response_compacted"] is False
     assert payload["operations"]["mutates"] is False
     assert payload["operations"]["warnings"][0]["code"] == "search_db_large"
