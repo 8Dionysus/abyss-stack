@@ -138,6 +138,16 @@ def main() -> None:
     usage.add_argument("--session", default="")
     usage.add_argument("--full", action="store_true")
 
+    usage_chain = sub.add_parser("usage-chain")
+    usage_chain.add_argument("anchor")
+    usage_chain.add_argument("--kind", default="auto")
+    usage_chain.add_argument("--limit", type=int, default=6)
+    usage_chain.add_argument("--per-route-limit", type=int, default=12)
+    usage_chain.add_argument("--consequence-window", type=int, default=6)
+    usage_chain.add_argument("--document-limit", type=int, default=24)
+    usage_chain.add_argument("--session", default="")
+    usage_chain.add_argument("--full", action="store_true")
+
     usage_neighborhood = sub.add_parser("usage-neighborhood")
     usage_neighborhood.add_argument("anchor")
     usage_neighborhood.add_argument("--kind", default="auto")
@@ -412,6 +422,19 @@ def main() -> None:
     elif args.command == "usage-audit":
         _print(
             state.session_entity_usage_audit(
+                anchor=args.anchor,
+                kind=args.kind,
+                limit=args.limit,
+                per_route_limit=args.per_route_limit,
+                consequence_window=args.consequence_window,
+                document_limit=args.document_limit,
+                session=args.session,
+                full=args.full,
+            )
+        )
+    elif args.command == "usage-chain":
+        _print(
+            state.session_entity_usage_chain(
                 anchor=args.anchor,
                 kind=args.kind,
                 limit=args.limit,

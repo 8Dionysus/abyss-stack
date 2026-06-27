@@ -38,6 +38,7 @@ An agent should be able to start from a stable operational anchor:
 ```text
 aoa_session_trace(anchor, kind="auto", doc_type="session")
 aoa_session_literal_query_plan(query, kind="auto", filters={...})
+aoa_session_entity_usage_chain(anchor, kind="auto")
 aoa_session_search(query, filters)
 aoa_session_route(axis, key)
 aoa_session_graph_neighborhood(anchor, edge_limit=...)
@@ -65,7 +66,7 @@ large. Event-level tracing remains available through an explicit
 Literal-query planning is a read-only route selector. It should run before a
 broad raw-text query when the caller is unsure whether the text is a skill,
 MCP, hook, tool, path, command, error, goal, or plain phrase. The planner does
-not prove evidence; it explains whether to start with typed usage/trace/graph,
+not prove evidence; it explains whether to start with typed usage-chain,
 typed registry/inventory for broad entity-class questions, structured search
 filters, scoped full-text shards, or monolith fallback. Class questions with
 use/error/consequence intent include a bounded entity-usage scenario route
