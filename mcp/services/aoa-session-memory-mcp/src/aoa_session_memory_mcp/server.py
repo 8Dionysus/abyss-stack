@@ -333,6 +333,17 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_live_scenario_corpus_check(
+        case_limit: int = 0,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        """Check the source-owned live-scenario regression corpus against current route behavior."""
+        return current_state().session_live_scenario_corpus_check(
+            case_limit=case_limit,
+            full=full,
+        )
+
+    @mcp.tool()
     def aoa_session_route(
         axis: str,
         key: str = "",

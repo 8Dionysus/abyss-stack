@@ -1156,6 +1156,23 @@ GRAPH_QUALITY_AUDIT = {
     ],
 }
 
+LIVE_SCENARIO_CORPUS_CHECK = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_live_scenario_regression_check",
+    "ok": True,
+    "mutates": False,
+    "truth_status": "reviewed_live_scenario_route_controls_not_memory_truth",
+    "corpus_path": "/srv/AbyssOS/.aoa/config/live-scenario-regression-corpus.json",
+    "case_count": 1,
+    "available_case_count": 3,
+    "passed_count": 1,
+    "skipped_count": 0,
+    "failed_count": 0,
+    "actionable_gap_count": 0,
+    "actionable_gaps": [],
+    "diagnostics": [],
+}
+
 GRAPH_EXPLAIN = {
     "schema_version": 1,
     "artifact_type": "session_memory_graph_explain_packet",
@@ -1228,6 +1245,8 @@ class FakeRunner:
             payload = GRAPH_EVAL
         elif command == "graph-quality-audit":
             payload = GRAPH_QUALITY_AUDIT
+        elif command == "live-scenario-corpus":
+            payload = LIVE_SCENARIO_CORPUS_CHECK
         else:
             return CommandOutput(argv, 2, "{}", f"unexpected command {command}", 1.0)
         return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
@@ -2623,12 +2642,13 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"node_count": 3, "edge_count": 2},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
         {"quality": {"scenario_count": 1, "warn_count": 1}},
+        {"case_count": 1, "actionable_gap_count": 0},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
-        tool_count=31,
+        tool_count=32,
     )
 
-    assert summary["tool_count"] == 31
+    assert summary["tool_count"] == 32
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
@@ -2656,6 +2676,8 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["graph_neighborhood_edge_count"] == 2
     assert summary["live_scenario_count"] == 1
     assert summary["live_scenario_warn_count"] == 1
+    assert summary["live_scenario_corpus_case_count"] == 1
+    assert summary["live_scenario_corpus_actionable_gap_count"] == 0
     assert summary["agent_event_usage_outcome_count"] == 2
     assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
     assert summary["maintenance_recommendation"] == "use_graph_search"
@@ -2837,6 +2859,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_inventory" in tools
     assert "aoa_session_entity_registry" in tools
     assert "aoa_session_live_scenario_audit" in tools
+    assert "aoa_session_live_scenario_corpus_check" in tools
     assert "aoa_session_projection_status" in tools
     assert "aoa_session_graph_neighborhood" in tools
     assert "aoa_session_graph_timeline" in tools
@@ -2847,6 +2870,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
+    assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
     assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["usage_limit"]["default"] == 4
@@ -3657,6 +3681,25 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
         "fixture-live",
     ]
     assert all(args[args.index("--sample-size") + 1] == "2" for args in usage_scenario_args)
+
+
+def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_live_scenario_corpus_check(case_limit=1, full=True)
+
+    assert payload["artifact_type"] == "session_memory_live_scenario_regression_check"
+    assert payload["ok"] is True
+    assert payload["case_count"] == 1
+    assert payload["mcp_route"]["canonical_corpus"] == "config/live-scenario-regression-corpus.json"
+    assert payload["mcp_route"]["does_not_accept_arbitrary_corpus_path"] is True
+    command, args = runner.calls[-1]
+    assert command == "live-scenario-corpus"
+    assert args[0] == "check"
+    assert args[args.index("--case-limit") + 1] == "1"
+    assert "--full" in args
+    assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
 
 
 def test_live_scenario_audit_fails_when_literal_planner_starts_with_monolith(tmp_path: Path) -> None:

@@ -42,6 +42,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_hook_receipts",
     "aoa_session_retrieve",
     "aoa_session_live_scenario_audit",
+    "aoa_session_live_scenario_corpus_check",
     "aoa_session_maintenance_status",
     "aoa_session_projection_status",
     "aoa_session_graph_neighborhood",
@@ -479,6 +480,7 @@ def _stdio_route_count_summary(
     graph_neighborhood: dict,
     retrieve_usage: dict,
     live_scenario: dict,
+    live_scenario_corpus: dict,
     maintenance_status: dict,
     projection_status: dict,
     *,
@@ -549,6 +551,8 @@ def _stdio_route_count_summary(
         "live_scenario_warn_count": live_scenario.get("quality", {}).get("warn_count")
         if isinstance(live_scenario.get("quality"), dict)
         else None,
+        "live_scenario_corpus_case_count": live_scenario_corpus.get("case_count"),
+        "live_scenario_corpus_actionable_gap_count": live_scenario_corpus.get("actionable_gap_count"),
         "maintenance_recommendation": maintenance_status.get("recommendation"),
         "maintenance_smoke_skipped": maintenance_status.get("mcp_access", {}).get("skipped_in_stdio_smoke")
         if isinstance(maintenance_status.get("mcp_access"), dict)
@@ -689,6 +693,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 },
                 timeout_seconds=90,
             )
+            live_scenario_corpus = await call_json(
+                "aoa_session_live_scenario_corpus_check",
+                {"case_limit": 1},
+                timeout_seconds=90,
+            )
             projection_status = await call_json(
                 "aoa_session_projection_status",
                 {},
@@ -767,6 +776,10 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP live scenario audit returned invalid payload: {live_scenario.get('diagnostics')}")
     if live_scenario.get("quality", {}).get("scenario_count") != 1:
         raise SystemExit(f"stdio MCP live scenario audit did not run the requested bounded profile: {live_scenario}")
+    if live_scenario_corpus.get("artifact_type") != "session_memory_live_scenario_regression_check":
+        raise SystemExit(f"stdio MCP live scenario corpus returned invalid payload: {live_scenario_corpus.get('diagnostics')}")
+    if live_scenario_corpus.get("case_count") != 1:
+        raise SystemExit(f"stdio MCP live scenario corpus did not honor case_limit=1: {live_scenario_corpus}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     if projection_status.get("schema") != "aoa_session_memory_projection_status_v1" or projection_status.get("mutates") is not False:
@@ -796,6 +809,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         graph_neighborhood,
         retrieve_usage,
         live_scenario,
+        live_scenario_corpus,
         maintenance_status,
         projection_status,
         tool_count=len(tools),
@@ -1198,6 +1212,10 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "stdio_live_scenario_count": stdio_smoke["live_scenario_count"],
                 "stdio_live_scenario_warn_count": stdio_smoke["live_scenario_warn_count"],
+                "stdio_live_scenario_corpus_case_count": stdio_smoke["live_scenario_corpus_case_count"],
+                "stdio_live_scenario_corpus_actionable_gap_count": stdio_smoke[
+                    "live_scenario_corpus_actionable_gap_count"
+                ],
                 "stdio_maintenance_smoke_skipped": stdio_smoke["maintenance_smoke_skipped"],
                 "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],
