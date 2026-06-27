@@ -14,6 +14,8 @@ route card, and validation path.
 | [`aoa-session-memory-mcp`](aoa-session-memory-mcp/README.md) | `.aoa` session search, route traces, atlas map lookup, graph/GraphRAG evidence packets, quality samples, freshness checks, and diagnostics |
 | [`tos-corpus-mcp`](tos-corpus-mcp/README.md) | Tree of Sophia corpus index and philosophy graph projection status, graph-view packets, resource search, node lookup, relation-pack access, and philosophy neighborhoods |
 | [`aoa-4pda-connector-mcp`](aoa-4pda-connector-mcp/README.md) | local 4PDA connector status, source-route, graph/hybrid query, and answer packets preserving evidence-chain fields |
+| [`aoa-telegram-connector-mcp`](aoa-telegram-connector-mcp/README.md) | local Telegram connector status, source-route, graph query, and answer packets preserving permission/evidence reports |
+| [`aoa-discord-connector-mcp`](aoa-discord-connector-mcp/README.md) | local Discord connector status, source-route, graph query, and answer packets preserving permission/evidence reports |
 
 For district law, read [AGENTS](AGENTS.md). For the parent access-plane route,
 read [mcp/AGENTS](../AGENTS.md).

@@ -145,6 +145,8 @@
         "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
         "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
         "mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py",
+        "mcp/services/aoa-telegram-connector-mcp/tests/test_telegram_connector_mcp.py",
+        "mcp/services/aoa-discord-connector-mcp/tests/test_discord_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py"
       ],
       "home_scope": "mcp-service",

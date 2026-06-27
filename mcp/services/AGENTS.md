@@ -74,6 +74,20 @@ python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.p
 python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
 ```
 
+For `aoa-telegram-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
+python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
+```
+
+For `aoa-discord-connector-mcp`, run:
+
+```bash
+python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
+python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
+```
+
 When a service path, local route card, or root district route changes, also run:
 
 ```bash

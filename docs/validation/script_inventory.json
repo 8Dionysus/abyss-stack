@@ -222,6 +222,10 @@
         "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
         "mcp/services/aoa-4pda-connector-mcp/scripts/aoa_4pda_connector_mcp_server.py",
         "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
+        "mcp/services/aoa-telegram-connector-mcp/scripts/aoa_telegram_connector_mcp_server.py",
+        "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py",
+        "mcp/services/aoa-discord-connector-mcp/scripts/aoa_discord_connector_mcp_server.py",
+        "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py",
         "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
         "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py"
       ],

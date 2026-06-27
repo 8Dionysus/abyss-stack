@@ -58,6 +58,18 @@ For 4PDA connector evidence work,
 source-route, graph/hybrid query, and answer packets while keeping source
 policy, packet truth, and generated storage in `aoa-4pda-connector`.
 
+For Telegram connector evidence work,
+`mcp/services/aoa-telegram-connector-mcp/` exposes local connector status,
+source-route, graph query, and answer packets while keeping
+source policy, packet truth, account/session handling, and generated storage in
+`aoa-telegram-connector`.
+
+For Discord connector evidence work,
+`mcp/services/aoa-discord-connector-mcp/` exposes local connector status,
+source-route, graph query, and answer packets while keeping
+source policy, packet truth, token/session handling, and generated storage in
+`aoa-discord-connector`.
+
 ## Validation
 
 For `aoa-memo-mcp` changes, run:
@@ -102,6 +114,20 @@ For `aoa-4pda-connector-mcp` changes, run:
 ```bash
 python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
 python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
+```
+
+For `aoa-telegram-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
+python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
+```
+
+For `aoa-discord-connector-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
+python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
 ```
 
 For release-facing stack changes, also run:

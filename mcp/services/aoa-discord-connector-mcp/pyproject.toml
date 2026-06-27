@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aoa-discord-connector-mcp"
+version = "0.1.0"
+description = "MCP access plane for the AoA Discord connector"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.0",
+]
+
+[project.scripts]
+aoa-discord-connector-mcp = "aoa_discord_connector_mcp.cli:main"
+aoa-discord-connector-mcp-server = "aoa_discord_connector_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
