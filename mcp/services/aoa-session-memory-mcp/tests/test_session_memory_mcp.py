@@ -3681,6 +3681,14 @@ def test_entity_usage_chain_compacts_heavy_archive_payload_for_mcp(tmp_path: Pat
                     "skipped_graph_rag_packet": True,
                     "noise_flag_count": 0,
                 },
+                "first_ref": {
+                    "raw": "raw:line:0",
+                    "raw_block": "raw:block:0-4",
+                    "segment": "000.md#event-000000",
+                    "segment_index": "000.md",
+                    "session": "session:000",
+                    "content": long_text,
+                },
                 "usage_chain": {
                     "chains": [
                         {
@@ -3727,6 +3735,13 @@ def test_entity_usage_chain_compacts_heavy_archive_payload_for_mcp(tmp_path: Pat
     assert chain["mcp_payload_policy"]["response_compacted"] is True
     assert chain["mcp_access"]["response_compacted"] is True
     assert chain["counts"]["usage_event_count"] == 10
+    assert chain["first_ref"] == {
+        "raw": "raw:line:0",
+        "raw_block": "raw:block:0-4",
+        "segment": "000.md#event-000000",
+        "segment_index": "000.md",
+        "session": "session:000",
+    }
     assert len(chain["usage_chain"]["chains"]) == 3
     assert chain["usage_chain"]["omitted_chain_count"] == 7
     assert len(chain["usage_chain"]["chains"][0]["result_or_consequence_events"]) == 2

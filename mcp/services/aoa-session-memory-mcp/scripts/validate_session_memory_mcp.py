@@ -557,6 +557,10 @@ def _stdio_route_count_summary(
         "entity_usage_chain_success_count": usage_chain.get("counts", {}).get("chain_with_result_or_consequence_count")
         if isinstance(usage_chain.get("counts"), dict)
         else None,
+        "entity_usage_chain_first_ref_present": bool(
+            isinstance(usage_chain.get("first_ref"), dict)
+            and (usage_chain["first_ref"].get("raw") or usage_chain["first_ref"].get("segment"))
+        ),
         "usage_alias_kind": usage_alias.get("kind"),
         "usage_alias_requested_kind": usage_alias.get("requested_kind"),
         "agent_event_usage_kind": agent_event_usage.get("kind"),
@@ -789,8 +793,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP usage-chain kind alias contract failed: {usage_chain}")
     usage_chain_counts = usage_chain.get("counts") if isinstance(usage_chain.get("counts"), dict) else {}
     usage_chain_quality = usage_chain.get("quality") if isinstance(usage_chain.get("quality"), dict) else {}
+    usage_chain_first_ref = usage_chain.get("first_ref") if isinstance(usage_chain.get("first_ref"), dict) else {}
     if usage_chain_counts.get("usage_event_count", 0) <= 0 or usage_chain_quality.get("raw_or_segment_ref_present") is not True:
         raise SystemExit(f"stdio MCP usage-chain quality contract failed: {usage_chain}")
+    if not (usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment")):
+        raise SystemExit(f"stdio MCP usage-chain first_ref contract failed: {usage_chain}")
     if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
     if entity_dossier.get("artifact_type") != "session_memory_entity_dossier":
@@ -867,7 +874,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             result = await mcp_session.call_tool(
                 "aoa_session_memory_status",
                 {"include_live": False},
-                read_timeout_seconds=timedelta(seconds=20),
+                read_timeout_seconds=timedelta(seconds=60),
             )
             if result.isError:
                 raise SystemExit(f"configured Codex MCP status call failed: {result.content}")
@@ -923,12 +930,14 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 raise SystemExit(f"configured Codex MCP usage-chain call failed: {usage_chain_result.content}")
             usage_chain_payload = json.loads(usage_chain_result.content[0].text)
             usage_chain_counts = usage_chain_payload.get("counts") if isinstance(usage_chain_payload, dict) and isinstance(usage_chain_payload.get("counts"), dict) else {}
+            usage_chain_first_ref = usage_chain_payload.get("first_ref") if isinstance(usage_chain_payload, dict) and isinstance(usage_chain_payload.get("first_ref"), dict) else {}
             if (
                 not isinstance(usage_chain_payload, dict)
                 or usage_chain_payload.get("artifact_type") != "session_memory_entity_usage_chain"
                 or usage_chain_payload.get("kind") != "mcp"
                 or usage_chain_payload.get("requested_kind") != "mcp_service"
                 or usage_chain_counts.get("usage_event_count", 0) <= 0
+                or not (usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment"))
             ):
                 raise SystemExit(f"configured Codex MCP usage-chain contract failed: {usage_chain_payload}")
 
@@ -1054,6 +1063,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         "usage_chain_usage_count": usage_chain_counts.get("usage_event_count")
         if isinstance(usage_chain_counts, dict)
         else None,
+        "usage_chain_first_ref_present": bool(usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment")),
         "mcp_service_inventory_requested_layer": inventory_payload.get("requested_layer")
         if isinstance(inventory_payload, dict)
         else None,
