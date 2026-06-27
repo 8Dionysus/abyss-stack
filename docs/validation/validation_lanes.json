@@ -194,6 +194,22 @@
       {
         "label": "test aoa 4pda connector mcp",
         "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-4pda-connector-mcp/tests"]
+      },
+      {
+        "label": "validate aoa telegram connector mcp",
+        "command": ["python", "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa telegram connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-telegram-connector-mcp/tests"]
+      },
+      {
+        "label": "validate aoa discord connector mcp",
+        "command": ["python", "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py"]
+      },
+      {
+        "label": "test aoa discord connector mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-discord-connector-mcp/tests"]
       }
     ],
     "shellcheck": [
