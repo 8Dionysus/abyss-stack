@@ -246,10 +246,20 @@ def seed_archive(root: Path) -> Path:
             "generated_at": "2026-05-26T00:00:00Z",
             "ok": True,
             "mutates": False,
-            "entity_count": 1,
-            "counts_by_kind": {"skill": 1},
-            "counts_by_status": {"active": 1},
+            "entity_count": 2,
+            "counts_by_kind": {"mcp": 1, "skill": 1},
+            "counts_by_status": {"active": 2},
             "entries": [
+                {
+                    "entity_id": "mcp:aoa_session_memory_mcp",
+                    "kind": "mcp",
+                    "canonical_key": "aoa_session_memory_mcp",
+                    "aliases": ["aoa-session-memory-mcp", "mcp:aoa_session_memory_mcp"],
+                    "status": "active",
+                    "route_layer": "mcp",
+                    "route_signal": "mcp:aoa_session_memory_mcp",
+                    "source_refs": [{"source_type": "mcp_service", "path": "/tmp/abyss-stack/mcp/services/aoa-session-memory-mcp"}],
+                },
                 {
                     "entity_id": "skill:aoa_decision",
                     "kind": "skill",
@@ -815,8 +825,17 @@ ENTITY_REGISTRY = {
     "artifact_type": "entity_registry_snapshot",
     "ok": True,
     "mutates": False,
-    "entity_count": 1,
+    "entity_count": 2,
     "entries": [
+        {
+            "entity_id": "mcp:aoa_session_memory_mcp",
+            "kind": "mcp",
+            "canonical_key": "aoa_session_memory_mcp",
+            "status": "active",
+            "route_layer": "mcp",
+            "route_signal": "mcp:aoa_session_memory_mcp",
+            "source_refs": [{"source_type": "mcp_service", "path": "/tmp/abyss-stack/mcp/services/aoa-session-memory-mcp"}],
+        },
         {
             "entity_id": "skill:aoa_decision",
             "kind": "skill",
@@ -2518,6 +2537,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "window_count": 0},
         {"ok": True, "entity_count": 1},
         {"primary_route": {"route_id": "entity_usage_audit"}, "cost_profile": {"structured_first": True}},
+        {"quality": {"usage_event_count": 2, "graph_node_count": 3, "raw_or_segment_ref_present": True}},
         {"kind": "mcp", "requested_kind": "mcp_service"},
         {"kind": "agent_event", "outcome_event_count": 2},
         {"node_count": 3, "edge_count": 2},
@@ -2525,10 +2545,10 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"quality": {"scenario_count": 1, "warn_count": 1}},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
-        tool_count=30,
+        tool_count=31,
     )
 
-    assert summary["tool_count"] == 30
+    assert summary["tool_count"] == 31
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
@@ -2546,6 +2566,9 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["answer_neighborhood_count"] == 0
     assert summary["literal_plan_primary_route"] == "entity_usage_audit"
     assert summary["literal_plan_structured_first"] is True
+    assert summary["entity_dossier_usage_count"] == 2
+    assert summary["entity_dossier_graph_node_count"] == 3
+    assert summary["entity_dossier_raw_or_segment_ref_present"] is True
     assert summary["usage_alias_kind"] == "mcp"
     assert summary["usage_alias_requested_kind"] == "mcp_service"
     assert summary["agent_event_usage_kind"] == "agent_event"
@@ -2562,6 +2585,7 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     validator = load_validator_module()
 
     assert "aoa_session_literal_query_plan" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_entity_dossier" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
@@ -2727,6 +2751,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_task_episodes" in tools
     assert "aoa_session_goal_lifecycles" in tools
     assert "aoa_session_answer_neighborhood" in tools
+    assert "aoa_session_entity_dossier" in tools
     assert "aoa_session_entity_usage_neighborhood" in tools
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
@@ -2743,9 +2768,13 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
+    assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["usage_limit"]["default"] == 4
+    assert tools["aoa_session_entity_dossier"].inputSchema["properties"]["graph_edge_limit"]["default"] == 24
     literal_description = tools["aoa_session_literal_query_plan"].description or ""
+    dossier_description = tools["aoa_session_entity_dossier"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
+    assert "one compact registry, usage, consequence" in dossier_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
@@ -3163,6 +3192,54 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
         "owner_route",
         "route_next_action",
     ]
+
+
+def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    registry_path = state.aoa_root / "maps/entity-registry.json"
+    registry_snapshot = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry_snapshot["counts_by_kind"]["graph"] = 5
+    write_json(registry_path, registry_snapshot)
+
+    dossier = state.session_entity_dossier(
+        "aoa-session-memory-mcp",
+        kind="mcp_service",
+        usage_limit=2,
+        neighborhood_limit=1,
+        graph_limit=6,
+        graph_edge_limit=6,
+    )
+
+    assert dossier["artifact_type"] == "session_memory_entity_dossier"
+    assert dossier["ok"] is True
+    assert dossier["kind"] == "mcp"
+    assert dossier["requested_kind"] == "mcp_service"
+    assert dossier["normalized_entity"]["route_signal"] == "mcp:aoa_session_memory_mcp"
+    assert dossier["source_identity"]["entry"]["entity_id"] == "mcp:aoa_session_memory_mcp"
+    assert dossier["usage"]["usage_event_count"] == 1
+    assert dossier["consequence_chain"]["usage_consequence_event_count"] == 1
+    assert dossier["neighborhood"]["window_count"] == 1
+    assert dossier["graph_neighborhood"]["node_count"] == 3
+    assert dossier["evidence"]["raw_or_segment_ref_present"] is True
+    assert not any(isinstance(ref.get("graph"), int) for ref in dossier["evidence"]["refs"])
+    assert dossier["quality"]["one_short_route"] is True
+    assert dossier["quality"]["source_identity_present"] is True
+    assert "source_identity_not_found_in_generated_entity_registry" not in dossier["noise_flags"]
+    assert dossier["mcp_access"]["read_only_composite_route"] is True
+    assert dossier["mcp_access"]["source_tools"] == [
+        "aoa_session_entity_registry",
+        "aoa_session_entity_usage_audit",
+        "aoa_session_entity_usage_neighborhood",
+        "aoa_session_graph_neighborhood",
+    ]
+    next_ids = {item["id"] for item in dossier["next_expansion"]}
+    assert {"full_usage_audit", "usage_neighborhood", "graph_neighborhood", "source_identity"} <= next_ids
+    assert dossier["next_expansion_command"]
+    commands = [command for command, _args in runner.calls]
+    assert "entity-usage-audit" in commands
+    assert "entity-usage-neighborhood" in commands
+    assert "graph-neighborhood" in commands
 
 
 def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:

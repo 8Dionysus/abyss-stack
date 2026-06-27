@@ -213,6 +213,27 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_entity_dossier(
+        anchor: str,
+        kind: str = "auto",
+        session: str = "",
+        usage_limit: int = 4,
+        neighborhood_limit: int = 2,
+        graph_limit: int = 12,
+        graph_edge_limit: int = 24,
+    ) -> dict[str, Any]:
+        """Return one compact registry, usage, consequence, neighborhood, graph, and refs packet for an operational entity."""
+        return current_state().session_entity_dossier(
+            anchor=anchor,
+            kind=kind,
+            session=session,
+            usage_limit=usage_limit,
+            neighborhood_limit=neighborhood_limit,
+            graph_limit=graph_limit,
+            graph_edge_limit=graph_edge_limit,
+        )
+
+    @mcp.tool()
     def aoa_session_entity_usage_audit(
         anchor: str,
         kind: str = "auto",

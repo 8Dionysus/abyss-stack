@@ -85,6 +85,11 @@ ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT = 2
 ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT = 1
 ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
 ENTITY_USAGE_TEXT_PREVIEW_CHARS = 80
+ENTITY_DOSSIER_USAGE_LIMIT = 4
+ENTITY_DOSSIER_NEIGHBORHOOD_LIMIT = 2
+ENTITY_DOSSIER_GRAPH_LIMIT = 12
+ENTITY_DOSSIER_GRAPH_EDGE_LIMIT = 24
+ENTITY_DOSSIER_EVIDENCE_REF_LIMIT = 10
 GRAPH_NODE_SAMPLE_LIMIT = 8
 GRAPH_EDGE_SAMPLE_LIMIT = 8
 GRAPH_EVENT_SAMPLE_LIMIT = 8
@@ -1755,6 +1760,201 @@ def _compact_entity_usage_neighborhood_payload(payload: dict[str, Any], *, full_
     return compact
 
 
+def _compact_entity_registry_entry(entry: Any) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        return {}
+    compact = _compact_usage_mapping(
+        entry,
+        allowed_keys=(
+            "entity_id",
+            "kind",
+            "canonical_key",
+            "status",
+            "route_layer",
+            "route_signal",
+            "owner",
+            "source_surface",
+            "source",
+            "truth_status",
+        ),
+    )
+    aliases = entry.get("aliases")
+    if isinstance(aliases, list):
+        compact["aliases"] = [str(item) for item in aliases[:5] if item not in (None, "")]
+        compact["alias_count"] = len(aliases)
+    source_refs = entry.get("source_refs")
+    if isinstance(source_refs, list):
+        selected_refs = [_compact_document_ref(ref) for ref in source_refs[:ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT]]
+        compact["source_refs"] = [ref for ref in selected_refs if ref]
+        compact["source_ref_count"] = len(source_refs)
+    return _without_omitted_field_counts({key: value for key, value in compact.items() if value not in (None, "", [], {})})
+
+
+def _first_registry_entry(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        return {}
+    for entry in entries:
+        compact = _compact_entity_registry_entry(entry)
+        if compact:
+            return compact
+    return {}
+
+
+def _payload_int(payload: Any, key: str, default: int = 0) -> int:
+    if not isinstance(payload, dict):
+        return default
+    value = payload.get(key)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _direct_ref_bundle(item: dict[str, Any]) -> dict[str, Any]:
+    bundle: dict[str, Any] = {}
+    refs = _compact_usage_refs(item.get("refs"))
+    if refs:
+        bundle.update(refs)
+    aliases = (
+        ("raw", "raw_ref"),
+        ("raw", "raw"),
+        ("segment", "segment_ref"),
+        ("segment", "segment"),
+        ("session", "session_ref"),
+        ("session", "session"),
+        ("graph", "graph_ref"),
+        ("graph", "graph"),
+    )
+    for target, source in aliases:
+        value = item.get(source)
+        if isinstance(value, str) and value and target not in bundle:
+            bundle[target] = value
+    for key in ("session_id", "session_label", "segment_id", "event_id", "line", "kind", "value"):
+        value = item.get(key)
+        if value not in (None, "", [], {}):
+            bundle[key] = value
+    return _without_omitted_field_counts({key: value for key, value in bundle.items() if value not in (None, "", [], {})})
+
+
+def _collect_evidence_refs(payloads: list[tuple[str, Any]], *, limit: int = ENTITY_DOSSIER_EVIDENCE_REF_LIMIT) -> dict[str, Any]:
+    refs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    visited = 0
+
+    def add_ref(source_packet: str, bundle: dict[str, Any]) -> None:
+        if len(refs) >= limit:
+            return
+        if not bundle:
+            return
+        if not any(bundle.get(key) for key in ("raw", "raw_ref", "segment", "segment_ref", "session", "session_ref", "graph", "graph_ref")):
+            return
+        key = json.dumps(bundle, sort_keys=True, ensure_ascii=True, default=str)
+        if key in seen:
+            return
+        seen.add(key)
+        refs.append({"source_packet": source_packet, **bundle})
+
+    def walk(source_packet: str, value: Any) -> None:
+        nonlocal visited
+        if len(refs) >= limit or visited > 600:
+            return
+        visited += 1
+        if isinstance(value, dict):
+            add_ref(source_packet, _direct_ref_bundle(value))
+            for child in value.values():
+                walk(source_packet, child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(source_packet, child)
+
+    for source_packet, payload in payloads:
+        walk(source_packet, payload)
+    return {
+        "refs": refs,
+        "ref_count": len(refs),
+        "raw_or_segment_ref_present": any(ref.get("raw") or ref.get("raw_ref") or ref.get("segment") or ref.get("segment_ref") for ref in refs),
+        "truncated": len(refs) >= limit,
+    }
+
+
+def _compact_dossier_usage(payload: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: payload.get(key)
+        for key in (
+            "ok",
+            "event_count",
+            "entrypoint_event_count",
+            "usage_event_count",
+            "result_event_count",
+            "outcome_event_count",
+            "context_event_count",
+            "consequence_event_count",
+            "document_ref_count",
+            "quality",
+            "provider",
+            "diagnostics",
+        )
+        if payload.get(key) not in (None, "", [], {})
+    }
+    for key in ("usage_events", "consequence_events", "document_refs"):
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
+    for key in ("full_evidence_route", "response_compacted"):
+        if mcp_access.get(key) not in (None, "", [], {}):
+            compact[key] = mcp_access.get(key)
+    return _without_omitted_field_counts(compact)
+
+
+def _compact_dossier_neighborhood(payload: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: payload.get(key)
+        for key in ("ok", "window_count", "quality", "provider", "parameters", "diagnostics", "neighborhoods")
+        if payload.get(key) not in (None, "", [], {})
+    }
+    mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
+    for key in ("full_evidence_route", "response_compacted", "fallback_reason", "selected_route_signal"):
+        if mcp_access.get(key) not in (None, "", [], {}):
+            compact[key] = mcp_access.get(key)
+    return _without_omitted_field_counts(compact)
+
+
+def _compact_dossier_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: payload.get(key)
+        for key in (
+            "ok",
+            "source",
+            "node_count",
+            "edge_count",
+            "truncated",
+            "omitted_node_count",
+            "omitted_edge_count",
+            "nodes",
+            "edges",
+            "evidence_refs",
+            "evidence_ref_count",
+            "unique_evidence_ref_count",
+            "omitted_evidence_ref_count",
+            "quality",
+            "freshness",
+            "provider",
+            "next_expansion_command",
+            "next_expansion_reason",
+            "diagnostics",
+        )
+        if payload.get(key) not in (None, "", [], {})
+    }
+    mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
+    for key in ("full_graph_route", "response_compacted", "read_model"):
+        if mcp_access.get(key) not in (None, "", [], {}):
+            compact[key] = mcp_access.get(key)
+    return _without_omitted_field_counts(compact)
+
+
 def _compact_diagnostic(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"ok": False, "diagnostic": "unreadable"}
@@ -2025,6 +2225,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_goal_lifecycles",
                 "aoa_session_answer_neighborhood",
                 "aoa_session_trace",
+                "aoa_session_entity_dossier",
                 "aoa_session_entity_usage_audit",
                 "aoa_session_entity_usage_neighborhood",
                 "aoa_session_entity_usage_scenario_audit",
@@ -3586,6 +3787,190 @@ class AoASessionMemoryMCPState:
         if full:
             return payload
         return _compact_entity_usage_neighborhood_payload(payload, full_route=full_route)
+
+    def session_entity_dossier(
+        self,
+        anchor: str,
+        kind: str = "auto",
+        session: str = "",
+        usage_limit: int = ENTITY_DOSSIER_USAGE_LIMIT,
+        neighborhood_limit: int = ENTITY_DOSSIER_NEIGHBORHOOD_LIMIT,
+        graph_limit: int = ENTITY_DOSSIER_GRAPH_LIMIT,
+        graph_edge_limit: int = ENTITY_DOSSIER_GRAPH_EDGE_LIMIT,
+    ) -> dict[str, Any]:
+        anchor_text = _ensure_short_text(anchor, "anchor")
+        route_kind = _coerce_trace_kind(kind)
+        selected_usage_limit = _coerce_limit(usage_limit, ENTITY_DOSSIER_USAGE_LIMIT, 40)
+        selected_neighborhood_limit = _coerce_limit(neighborhood_limit, ENTITY_DOSSIER_NEIGHBORHOOD_LIMIT, 12)
+        selected_graph_limit = _coerce_limit(graph_limit, ENTITY_DOSSIER_GRAPH_LIMIT, 80)
+        selected_graph_edge_limit = _coerce_limit(graph_edge_limit, ENTITY_DOSSIER_GRAPH_EDGE_LIMIT, 240)
+        safe_session = _safe_selector(session, "session") if session else ""
+        registry_kind = route_kind if route_kind != "auto" else "all"
+        route_key = _route_key(anchor_text)
+
+        registry = self.session_entity_registry(kind=registry_kind, lookup=anchor_text, limit=5)
+        usage = self.session_entity_usage_audit(
+            anchor_text,
+            kind=route_kind,
+            limit=selected_usage_limit,
+            per_route_limit=max(2, selected_usage_limit),
+            consequence_window=6,
+            document_limit=24,
+            session=safe_session,
+            full=False,
+        )
+        neighborhood = self.session_entity_usage_neighborhood(
+            anchor_text,
+            kind=route_kind,
+            limit=selected_neighborhood_limit,
+            per_route_limit=max(3, selected_usage_limit),
+            before=2,
+            after=6,
+            raw_preview_chars=160,
+            document_limit=24,
+            session=safe_session,
+            full=False,
+        )
+        graph = self.graph_neighborhood(
+            anchor_text,
+            kind=route_kind,
+            depth=1,
+            limit=selected_graph_limit,
+            edge_limit=selected_graph_edge_limit,
+        )
+
+        source_entry = _first_registry_entry(registry)
+        inferred_route_signal = source_entry.get("route_signal")
+        if not inferred_route_signal and route_kind != "auto" and route_key:
+            inferred_route_signal = f"{route_kind}:{route_key}"
+        evidence = _collect_evidence_refs(
+            [
+                ("entity_registry", registry),
+                ("entity_usage_audit", usage),
+                ("entity_usage_neighborhood", neighborhood),
+                ("graph_neighborhood", graph),
+            ],
+            limit=ENTITY_DOSSIER_EVIDENCE_REF_LIMIT,
+        )
+        usage_count = _payload_int(usage, "usage_event_count")
+        consequence_count = _payload_int(usage, "consequence_event_count")
+        window_count = _payload_int(neighborhood, "window_count")
+        graph_node_count = _payload_int(graph, "node_count")
+        graph_edge_count = _payload_int(graph, "edge_count")
+        noise_flags: list[str] = []
+        if not source_entry:
+            noise_flags.append("source_identity_not_found_in_generated_entity_registry")
+        if usage_count <= 0:
+            noise_flags.append("no_usage_events_returned_by_usage_audit")
+        if consequence_count <= 0:
+            noise_flags.append("no_consequence_events_returned_by_usage_audit")
+        if not evidence["raw_or_segment_ref_present"]:
+            noise_flags.append("no_raw_or_segment_refs_in_compact_packet")
+        graph_freshness = graph.get("freshness") if isinstance(graph.get("freshness"), dict) else {}
+        if graph_freshness.get("needs_maintenance") or graph_freshness.get("status") in {"stale", "graph_store_stale"}:
+            noise_flags.append("graph_freshness_requires_attention")
+
+        usage_mcp_access = usage.get("mcp_access") if isinstance(usage.get("mcp_access"), dict) else {}
+        neighborhood_mcp_access = neighborhood.get("mcp_access") if isinstance(neighborhood.get("mcp_access"), dict) else {}
+        graph_mcp_access = graph.get("mcp_access") if isinstance(graph.get("mcp_access"), dict) else {}
+        next_expansion = [
+            {
+                "id": "full_usage_audit",
+                "tool": "aoa_session_entity_usage_audit",
+                "command": usage_mcp_access.get("full_evidence_route"),
+                "use_when": "usage/consequence samples are insufficient or exact event refs need expansion",
+            },
+            {
+                "id": "usage_neighborhood",
+                "tool": "aoa_session_entity_usage_neighborhood",
+                "command": neighborhood_mcp_access.get("full_evidence_route"),
+                "use_when": "before/after event windows or local consequence chains need inspection",
+            },
+            {
+                "id": "graph_neighborhood",
+                "tool": "aoa_session_graph_neighborhood",
+                "command": graph.get("next_expansion_command") or graph_mcp_access.get("full_graph_route"),
+                "use_when": "relation topology or adjacent operational anchors matter",
+            },
+            {
+                "id": "source_identity",
+                "tool": "aoa_session_entity_registry",
+                "command": None,
+                "use_when": "source surface identity or installed/known entity status matters",
+            },
+        ]
+        next_expansion = [item for item in next_expansion if item.get("tool") or item.get("command")]
+        packet = {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_dossier",
+            "ok": any(payload.get("ok") for payload in (registry, usage, neighborhood, graph) if isinstance(payload, dict)),
+            "mutates": False,
+            "anchor": anchor_text,
+            "kind": route_kind,
+            "requested_kind": kind,
+            "session": safe_session,
+            "normalized_entity": {
+                "anchor": anchor_text,
+                "route_key": route_key,
+                "kind": route_kind,
+                "requested_kind": kind,
+                "route_signal": inferred_route_signal,
+                "source_entity_id": source_entry.get("entity_id"),
+                "canonical_key": source_entry.get("canonical_key") or route_key,
+            },
+            "source_identity": {
+                "registry_status": registry.get("truth_status"),
+                "registry_entity_count": registry.get("entity_count"),
+                "registry_total_entity_count": registry.get("total_entity_count"),
+                "registry_generated_at": registry.get("generated_at"),
+                "entry": source_entry,
+                "next_route": registry.get("next_route"),
+            },
+            "usage": _compact_dossier_usage(usage),
+            "consequence_chain": {
+                "usage_consequence_event_count": consequence_count,
+                "neighborhood_window_count": window_count,
+                "usage_consequence_events": usage.get("consequence_events", []),
+                "neighborhoods": neighborhood.get("neighborhoods", []),
+            },
+            "neighborhood": _compact_dossier_neighborhood(neighborhood),
+            "graph_neighborhood": _compact_dossier_graph(graph),
+            "evidence": evidence,
+            "freshness": {
+                "registry_generated_at": registry.get("generated_at"),
+                "usage_provider": usage.get("provider"),
+                "neighborhood_provider": neighborhood.get("provider"),
+                "graph": graph_freshness,
+            },
+            "quality": {
+                "source_identity_present": bool(source_entry),
+                "usage_event_count": usage_count,
+                "consequence_event_count": consequence_count,
+                "neighborhood_window_count": window_count,
+                "graph_node_count": graph_node_count,
+                "graph_edge_count": graph_edge_count,
+                "raw_or_segment_ref_present": evidence["raw_or_segment_ref_present"],
+                "noise_flag_count": len(noise_flags),
+                "one_short_route": True,
+            },
+            "noise_flags": noise_flags,
+            "next_expansion": next_expansion,
+            "next_expansion_command": next((item.get("command") for item in next_expansion if item.get("command")), None),
+            "mcp_access": {
+                "mutates": False,
+                "source_tools": [
+                    "aoa_session_entity_registry",
+                    "aoa_session_entity_usage_audit",
+                    "aoa_session_entity_usage_neighborhood",
+                    "aoa_session_graph_neighborhood",
+                ],
+                "response_compacted": True,
+                "read_only_composite_route": True,
+                "authority_boundary": "MCP composes compact route packets; .aoa raw/segment refs and owner source surfaces remain stronger.",
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+        return _without_omitted_field_counts(packet)
 
     def _usage_neighborhood_search_fast_path(
         self,
