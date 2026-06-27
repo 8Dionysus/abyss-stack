@@ -2723,6 +2723,19 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
+def test_validator_search_alias_smoke_is_route_only() -> None:
+    validator = load_validator_module()
+
+    arguments = validator._search_alias_smoke_arguments(limit=2)
+
+    assert arguments["query"] == ""
+    assert arguments["limit"] == 2
+    assert arguments["filters"]["route_signal"] == "mcp:aoa-session-memory-mcp"
+    assert arguments["filters"]["doc_type"] == "event"
+    assert arguments["filters"]["layer"] == "mcp"
+    assert arguments["filters"]["use_shards"] is True
+
+
 def test_running_mcp_process_advisory_reports_stale_transports(tmp_path: Path, monkeypatch: Any) -> None:
     validator = load_validator_module()
     repo_root = tmp_path / "aoa-session-memory-mcp"

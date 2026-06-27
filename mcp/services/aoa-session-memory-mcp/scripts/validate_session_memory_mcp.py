@@ -50,6 +50,19 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
 }
 
 
+def _search_alias_smoke_arguments(limit: int = 3) -> dict:
+    return {
+        "query": "",
+        "filters": {
+            "route_signal": "mcp:aoa-session-memory-mcp",
+            "doc_type": "event",
+            "layer": "mcp",
+            "use_shards": True,
+        },
+        "limit": limit,
+    }
+
+
 def _select_freshness_smoke_brief(state: AoASessionMemoryMCPState, latest_brief: dict) -> dict:
     latest_status = latest_brief.get("session", {}).get("archive_status")
     if latest_brief.get("ok") and latest_status == "indexed":
@@ -622,7 +635,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
             )
             search_alias = await call_json(
                 "aoa_session_search",
-                {"query": "aoa-session-memory-mcp", "filters": {"layer": "mcp", "use_shards": True}, "limit": 3},
+                _search_alias_smoke_arguments(limit=3),
             )
             registry = await call_json(
                 "aoa_session_entity_registry",
@@ -844,7 +857,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
 
             search_result = await mcp_session.call_tool(
                 "aoa_session_search",
-                {"query": "aoa-session-memory-mcp", "filters": {"layer": "mcp", "use_shards": True}, "limit": 2},
+                _search_alias_smoke_arguments(limit=2),
                 read_timeout_seconds=timedelta(seconds=60),
             )
             if search_result.isError or not search_result.content:
