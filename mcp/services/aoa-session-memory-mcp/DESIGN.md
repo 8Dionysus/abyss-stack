@@ -37,9 +37,10 @@ An agent should be able to start from a stable operational anchor:
 
 ```text
 aoa_session_trace(anchor, kind="auto", doc_type="session")
+aoa_session_literal_query_plan(query, kind="auto", filters={...})
 aoa_session_search(query, filters)
 aoa_session_route(axis, key)
-aoa_session_graph_neighborhood(anchor)
+aoa_session_graph_neighborhood(anchor, edge_limit=...)
 ```
 
 The anchor may be a skill, MCP, hook, tool, path, repo, command, config,
@@ -59,6 +60,12 @@ maintenance or promote the generated atlas to archive truth.
 Session-level tracing is the default live probe because `.aoa` archives can be
 large. Event-level tracing remains available through an explicit
 `doc_type="event"` request when exact event evidence is needed.
+
+Literal-query planning is a read-only route selector. It should run before a
+broad raw-text query when the caller is unsure whether the text is a skill,
+MCP, hook, tool, path, command, error, goal, or plain phrase. The planner does
+not prove evidence; it explains whether to start with typed usage/trace/graph,
+structured search filters, scoped full-text shards, or monolith fallback.
 
 Agent-event and lightweight usage-neighborhood routes have MCP-local fast
 paths over the portable SQLite projection. They are deliberately bounded:
@@ -84,6 +91,11 @@ Graph and GraphRAG calls are evidence-packet builders. They may expand from
 lexical hits into route-signal neighborhoods, timelines, shortest paths, and
 cooccurrence clusters, but they still return raw/segment/session refs instead
 of final claims.
+For exact route anchors, graph neighborhood first reads the generated
+`graph/graph.sqlite3` store directly through indexed node and edge lookups. The
+fast path is still a read-only MCP evidence packet: it reports truncation,
+omitted counts, quality/freshness hints, and an archive `graph-neighborhood`
+expansion command instead of treating the generated graph as reviewed truth.
 
 Freshness and readiness stay explicit:
 
@@ -153,6 +165,8 @@ The first layer is ready when:
 - route maps can be read by axis/key;
 - graph neighborhoods, timelines, paths, cooccurrences, and GraphRAG packets
   return evidence refs without becoming authority;
+- graph neighborhoods stay compact by default and expose `edge_limit`,
+  `truncated`, and omitted counts so agents can expand deliberately;
 - session briefs are compact and avoid bulk raw transcript output;
 - retrieval and evidence packets preserve raw/segment/session refs;
 - freshness checks do not claim more than they can prove;

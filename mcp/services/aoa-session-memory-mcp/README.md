@@ -53,7 +53,8 @@ Resources:
 Tools:
 
 - `aoa_session_memory_status(include_live)`
-- `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters.
+- `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters. MCP returns compact hits, `mcp_route_plan`, and a provider freshness summary by default; follow `full_search_route` for the full archive CLI packet. `date_from`/`date_to` filter indexed search document/session dates; hook receipt timestamp checks should follow the returned `hook_receipts_route`.
+- `aoa_session_literal_query_plan(query="", kind="auto", filters)`; plans the cheapest reliable route before broad literal raw-text search. It prefers entity usage/trace/graph for typed operational anchors, structured filters for exact route reads, scoped full-text shards when available, and monolith fallback only as a bounded recall safety net.
 - `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
 - `aoa_session_agent_closeouts(query, session, episode, limit)`
 - `aoa_session_agent_progress_updates(query, session, episode, limit)`
@@ -73,12 +74,13 @@ Tools:
 - `aoa_session_pattern_scan(pattern, filters, limit)`
 - `aoa_session_entity_inventory(layer, query, session, limit, sample_limit)`; aggregates typed session entities such as `skill`, `mcp`, `hook`, `tool`, `api`, `plugin`, `agent`, `script`, `validator`, `test`, `eval`, `git`, `playbook`, `technique`, `mechanic`, `graph`, and `memory` from route-signal indexes. Entity-registry kind names such as `mcp_service` are normalized to the matching route layer (`mcp`) on input. This is session evidence inventory, not installed runtime inventory.
 - `aoa_session_entity_registry(kind, query, lookup, limit)`; reads the generated entity registry snapshot directly for known skills, MCP services/tools, tools, APIs, hooks, scripts, validators, tests, evals, graph, and memory entities. This is a fast read-only navigation registry; `--write` refresh stays outside MCP.
-- `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets.
+- `aoa_session_live_scenario_audit(seed, profiles, sample_size, recent_days, limit)`; runs a bounded multi-profile live quality loop across entity usage, hook failures, goal lifecycles, agent closeouts, literal planning, and graph neighborhood packets.
+- `aoa_session_hook_receipts(event_name, session, date_from, only_errors, limit)`; reads hook receipt evidence directly from `hooks/receipts.jsonl` so hook failures do not depend on noisy search or graph packets. `date_from` filters receipt timestamps (`timestamp`, `received_at`, `generated_at`), not session dates.
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.
 - `aoa_session_maintenance_plan()`; compatibility entry that returns the same maintenance-status route without timers.
 - `aoa_session_projection_status(include_payload)`; reads the latest `projection-catchup` diagnostic and returns its `projection_completeness` block plus current maintenance summary. It does not run `projection-catchup`; that writer route stays outside MCP.
-- `aoa_session_graph_neighborhood(anchor, kind, depth, limit)`
+- `aoa_session_graph_neighborhood(anchor, kind, depth, limit, edge_limit)`; returns compact graph packets by default. Raise `edge_limit` only when a deeper relation walk is explicitly needed.
 - `aoa_session_graph_timeline(anchor, kind, limit)`
 - `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
 - `aoa_session_graph_cooccurrence(anchor, kind, limit)`
@@ -120,9 +122,13 @@ Scoped agent-event routes such as `aoa_session_agent_responses`,
 `aoa_session_agent_reasoning_windows`, and
 `aoa_session_answer_neighborhood` use the portable SQLite projection as a fast
 MCP read path when the live schema supports it. These packets expose
-`cost_profile`, `search_projection`, and evidence refs, remain bounded and
-read-only, and may return zero results for a session without classified agent
-events instead of starting a slow archive scan. Text-query fallbacks and
+`cost_profile`, `search_projection`, `quality`, and evidence refs, remain
+bounded and read-only, and may return zero results for a session without
+classified agent events instead of starting a slow archive scan. `quality`
+reports agent-event counts, freshness buckets, source/read-model counts,
+conversation-act counts, raw/segment ref coverage, and the latest returned
+event so MCP callers can judge whether the fast packet is sufficient or should
+be expanded through raw refs. Text-query fallbacks and
 `next_expansion_command` use the `.aoa` shard-aware archive route
 (`--use-shards --max-shards 24`) when raw before/after windows or richer
 consequence analysis are needed.
@@ -159,6 +165,15 @@ diagnostic, surface the compact `projection_completeness` rows, and include the
 current maintenance summary. If that diagnostic is missing or stale, MCP returns
 the operator command to run outside MCP instead of starting catch-up itself.
 
+`aoa_session_graph_neighborhood(...)` first tries the generated
+`graph/graph.sqlite3` store for exact route nodes such as
+`route:mcp:mcp:aoa_session_memory_mcp`. That fast path follows indexed
+source/target edges, compacts nodes/edges/evidence refs, reports truncation and
+omitted counts, and keeps the archive `graph-neighborhood` command as
+`next_expansion_command`. If the exact node or graph store is unavailable, MCP
+falls back to the `.aoa` archive route. The packet remains route evidence, not
+reviewed truth.
+
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report
 `current_with_deferred_live_updates` and the provider may report
@@ -185,6 +200,9 @@ require restarting the Codex session or MCP process before using live MCP
 output as proof. Source-local CLI smokes with
 `PYTHONPATH=mcp/services/aoa-session-memory-mcp/src` prove the code path, while
 the configured stdio smoke proves a freshly started Codex-configured server.
+The validator checks `aoa_session_maintenance_status` through the direct source
+route; stdio smoke verifies that the tool is registered but does not call that
+heavy route, so freshness proof does not stall behind maintenance work.
 
 ## Agent Route
 

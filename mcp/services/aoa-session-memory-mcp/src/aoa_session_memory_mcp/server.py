@@ -5,7 +5,7 @@ import logging
 import os
 import importlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import core as core_module
 
@@ -70,6 +70,11 @@ def build_server(
         return current_state().session_search(query=query, filters=filters, limit=limit)
 
     @mcp.tool()
+    def aoa_session_literal_query_plan(query: str = "", kind: str = "auto", filters: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Plan the cheapest reliable route for a literal skill/MCP/hook/tool/API/path/query before raw-text fallback."""
+        return current_state().session_literal_query_plan(query=query, kind=kind, filters=filters)
+
+    @mcp.tool()
     def aoa_session_agent_responses(
         query: str = "",
         session: str = "",
@@ -110,6 +115,7 @@ def build_server(
         limit: int = 10,
         before: int = 3,
         after: int = 6,
+        explain: bool = True,
     ) -> dict[str, Any]:
         """Find reasoning boundary events and bounded neighboring events."""
         return current_state().session_agent_reasoning_windows(
@@ -119,6 +125,7 @@ def build_server(
             limit=limit,
             before=before,
             after=after,
+            explain=explain,
         )
 
     @mcp.tool()
@@ -150,7 +157,7 @@ def build_server(
         status: str = "",
         event_kind: str = "",
         limit: int = 20,
-        order: str = "recent",
+        order: Literal["recent", "chronological"] = "recent",
     ) -> dict[str, Any]:
         """List generated Codex goal lifecycles with refs, task episodes, graph refs, and ambiguity flags."""
         return current_state().session_goal_lifecycles(
@@ -172,6 +179,7 @@ def build_server(
         limit: int = 10,
         before: int = 3,
         after: int = 6,
+        explain: bool = True,
     ) -> dict[str, Any]:
         """Find assistant answer-like events and return bounded neighboring events."""
         return current_state().session_answer_neighborhood(
@@ -182,6 +190,7 @@ def build_server(
             limit=limit,
             before=before,
             after=after,
+            explain=explain,
         )
 
     @mcp.tool()
@@ -283,6 +292,23 @@ def build_server(
             document_limit=document_limit,
             raw_preview_limit=raw_preview_limit,
             full=full,
+        )
+
+    @mcp.tool()
+    def aoa_session_live_scenario_audit(
+        seed: str = "live-scenario-audit",
+        profiles: list[str] | None = None,
+        sample_size: int = 4,
+        recent_days: int = 7,
+        limit: int = 3,
+    ) -> dict[str, Any]:
+        """Run a bounded multi-profile live scenario audit across entity, hook, goal, answer, literal, and graph routes."""
+        return current_state().session_live_scenario_audit(
+            seed=seed,
+            profiles=profiles,
+            sample_size=sample_size,
+            recent_days=recent_days,
+            limit=limit,
         )
 
     @mcp.tool()
@@ -412,9 +438,15 @@ def build_server(
         return current_state().session_projection_status(include_payload=include_payload)
 
     @mcp.tool()
-    def aoa_session_graph_neighborhood(anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
-        """Return graph nodes, edges, evidence refs, and freshness around an operational anchor."""
-        return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit)
+    def aoa_session_graph_neighborhood(
+        anchor: str,
+        kind: str = "auto",
+        depth: int = 1,
+        limit: int = 40,
+        edge_limit: int | None = None,
+    ) -> dict[str, Any]:
+        """Return a graph route neighborhood for a skill, MCP, hook, tool, API, path, goal, or other operational anchor."""
+        return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit, edge_limit=edge_limit)
 
     @mcp.tool()
     def aoa_session_graph_timeline(anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
