@@ -4216,6 +4216,7 @@ class AoASessionMemoryMCPState:
     ) -> dict[str, Any]:
         seed_text = _ensure_short_text(seed, "seed", limit=120)
         allowed_profiles = {
+            "entity_dossier",
             "entity_usage",
             "hook_failure",
             "goal_lifecycle",
@@ -4224,6 +4225,7 @@ class AoASessionMemoryMCPState:
             "graph_neighborhood",
         }
         default_profiles = [
+            "entity_dossier",
             "entity_usage",
             "hook_failure",
             "goal_lifecycle",
@@ -4300,7 +4302,30 @@ class AoASessionMemoryMCPState:
                 "evidence_ref_counts": counts,
                 "first_ref": first_ref(payload),
             }
-            if profile == "entity_usage":
+            if profile == "entity_dossier":
+                quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
+                failed = int(quality.get("failed_count") or 0)
+                warned = int(quality.get("warn_count") or 0)
+                sample_count = int(quality.get("sample_count") or 0)
+                result.update(
+                    {
+                        "sample_count": sample_count,
+                        "passed_count": int(quality.get("passed_count") or 0),
+                        "warn_count": warned,
+                        "failed_count": failed,
+                        "kind_counts": quality.get("kind_counts"),
+                        "one_short_route_sample_count": quality.get("one_short_route_sample_count"),
+                        "raw_or_segment_ref_sample_count": quality.get("raw_or_segment_ref_sample_count"),
+                        "usage_event_sample_count": quality.get("usage_event_sample_count"),
+                        "consequence_event_sample_count": quality.get("consequence_event_sample_count"),
+                        "graph_neighbor_sample_count": quality.get("graph_neighbor_sample_count"),
+                    }
+                )
+                if failed:
+                    result["status"] = "failed"
+                elif warned or not sample_count:
+                    result["status"] = "warn"
+            elif profile == "entity_usage":
                 quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
                 failed = int(quality.get("failed_count") or 0)
                 warned = int(quality.get("warn_count") or 0)
@@ -4344,14 +4369,29 @@ class AoASessionMemoryMCPState:
             elif profile == "literal_planner":
                 primary_route = payload.get("primary_route") if isinstance(payload.get("primary_route"), dict) else {}
                 cost_profile = payload.get("cost_profile") if isinstance(payload.get("cost_profile"), dict) else {}
+                quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
                 result.update(
                     {
                         "primary_route_id": primary_route.get("route_id"),
                         "structured_first": cost_profile.get("structured_first"),
                         "monolith_fallback_first": cost_profile.get("monolith_fallback_first"),
+                        "sample_count": int(quality.get("sample_count") or 0),
+                        "passed_count": int(quality.get("passed_count") or 0),
+                        "warn_count": int(quality.get("warn_count") or 0),
+                        "failed_count": int(quality.get("failed_count") or 0),
+                        "primary_route_counts": quality.get("primary_route_counts"),
+                        "shape_counts": quality.get("shape_counts"),
                     }
                 )
-                if ok and not primary_route:
+                if isinstance(payload.get("samples"), list):
+                    failed = int(quality.get("failed_count") or 0)
+                    warned = int(quality.get("warn_count") or 0)
+                    sample_count = int(quality.get("sample_count") or 0)
+                    if failed:
+                        result["status"] = "failed"
+                    elif warned or not sample_count:
+                        result["status"] = "warn"
+                elif ok and not primary_route:
                     result["status"] = "warn"
                     result.setdefault("quality_flags", []).append("literal_planner_missing_primary_route")
                 elif ok and cost_profile.get("monolith_fallback_first") is True:
@@ -4367,11 +4407,231 @@ class AoASessionMemoryMCPState:
                 )
                 if ok and not (result["node_count"] or result["edge_count"] or result["evidence_ref_count"]):
                     result["status"] = "warn"
+            if not ok:
+                result["status"] = "failed"
             if not counts and profile not in {"literal_planner"}:
                 result.setdefault("quality_flags", []).append("no_raw_or_segment_refs_detected")
                 if result["status"] == "passed":
                     result["status"] = "warn"
             return {key: value for key, value in result.items() if value not in (None, "", [], {})}
+
+        def entity_dossier_scenario() -> dict[str, Any]:
+            scenario_started = time.monotonic()
+            candidate_packet = self.session_entity_usage_scenario_audit(
+                sample_size=selected_sample_size,
+                seed=f"{seed_text}:entity-dossier",
+                limit=selected_limit,
+                per_route_limit=selected_limit,
+                raw_preview_limit=1,
+                full=False,
+            )
+            samples: list[dict[str, Any]] = []
+            status_counts: Counter[str] = Counter()
+            kind_counts: Counter[str] = Counter()
+            for source_sample in (candidate_packet.get("samples") or [])[:selected_sample_size]:
+                if not isinstance(source_sample, dict):
+                    continue
+                candidate = source_sample.get("candidate") if isinstance(source_sample.get("candidate"), dict) else {}
+                anchor = str(candidate.get("anchor") or source_sample.get("anchor") or "")
+                route_kind = _coerce_trace_kind(str(candidate.get("kind") or source_sample.get("kind") or "auto"))
+                if not anchor:
+                    continue
+                sample_started = time.monotonic()
+                dossier = self.session_entity_dossier(
+                    anchor,
+                    kind=route_kind,
+                    usage_limit=selected_limit,
+                    neighborhood_limit=min(2, selected_limit),
+                    graph_limit=max(selected_limit * 4, 8),
+                    graph_edge_limit=max(selected_limit * 6, 12),
+                )
+                quality = dossier.get("quality") if isinstance(dossier.get("quality"), dict) else {}
+                evidence = dossier.get("evidence") if isinstance(dossier.get("evidence"), dict) else {}
+                noise_flags = list(dossier.get("noise_flags", []) if isinstance(dossier.get("noise_flags"), list) else [])
+                sample_counts = evidence_counts(dossier)
+                status = "failed" if not dossier.get("ok") else "passed"
+                sample_quality_flags: list[str] = []
+                if not quality.get("one_short_route"):
+                    sample_quality_flags.append("dossier_missing_one_short_route_flag")
+                if not evidence.get("raw_or_segment_ref_present") and not sample_counts:
+                    sample_quality_flags.append("dossier_missing_evidence_refs")
+                if int(quality.get("usage_event_count") or 0) <= 0:
+                    sample_quality_flags.append("dossier_no_usage_events")
+                if int(quality.get("consequence_event_count") or 0) <= 0:
+                    sample_quality_flags.append("dossier_no_consequence_events")
+                if int(quality.get("graph_node_count") or 0) <= 0 and int(quality.get("graph_edge_count") or 0) <= 0:
+                    sample_quality_flags.append("dossier_no_graph_neighborhood")
+                sample_quality_flags.extend(str(flag) for flag in noise_flags if flag)
+                if status == "passed" and sample_quality_flags:
+                    status = "warn"
+                status_counts[status] += 1
+                kind_counts[route_kind] += 1
+                samples.append(
+                    {
+                        "status": status,
+                        "anchor": anchor,
+                        "kind": route_kind,
+                        "candidate": candidate,
+                        "ok": dossier.get("ok"),
+                        "elapsed_ms": int((time.monotonic() - sample_started) * 1000),
+                        "first_ref": first_ref(dossier),
+                        "evidence_ref_counts": sample_counts,
+                        "quality_flags": sample_quality_flags,
+                        "strong_ref_count": evidence.get("ref_count"),
+                        "usage_event_count": quality.get("usage_event_count"),
+                        "consequence_event_count": quality.get("consequence_event_count"),
+                        "graph_node_count": quality.get("graph_node_count"),
+                        "graph_edge_count": quality.get("graph_edge_count"),
+                    }
+                )
+            return {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_dossier_scenario_audit",
+                "generated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                "ok": bool(samples) and status_counts.get("failed", 0) == 0,
+                "mutates": False,
+                "truth_status": "randomized_entity_dossier_route_audit_not_reviewed_truth",
+                "seed": seed_text,
+                "sample_count": len(samples),
+                "quality": {
+                    "elapsed_ms": int((time.monotonic() - scenario_started) * 1000),
+                    "sample_count": len(samples),
+                    "passed_count": status_counts.get("passed", 0),
+                    "warn_count": status_counts.get("warn", 0),
+                    "failed_count": status_counts.get("failed", 0),
+                    "kind_counts": dict(sorted(kind_counts.items())),
+                    "one_short_route_sample_count": sum(1 for sample in samples if "dossier_missing_one_short_route_flag" not in sample.get("quality_flags", [])),
+                    "raw_or_segment_ref_sample_count": sum(
+                        1
+                        for sample in samples
+                        if any(
+                            int((sample.get("evidence_ref_counts") or {}).get(key) or 0) > 0
+                            for key in ("raw_ref", "segment_ref", "receipt_ref")
+                        )
+                    ),
+                    "usage_event_sample_count": sum(1 for sample in samples if int(sample.get("usage_event_count") or 0) > 0),
+                    "consequence_event_sample_count": sum(1 for sample in samples if int(sample.get("consequence_event_count") or 0) > 0),
+                    "graph_neighbor_sample_count": sum(1 for sample in samples if int(sample.get("graph_node_count") or 0) > 0 or int(sample.get("graph_edge_count") or 0) > 0),
+                },
+                "samples": samples,
+                "candidate_source": {
+                    "ok": candidate_packet.get("ok"),
+                    "artifact_type": candidate_packet.get("artifact_type"),
+                    "quality": candidate_packet.get("quality"),
+                    "diagnostics": candidate_packet.get("diagnostics", []),
+                },
+                "diagnostics": candidate_packet.get("diagnostics", []) if isinstance(candidate_packet.get("diagnostics"), list) else [],
+                "next_route": "Open warning sample first_ref/raw refs or rerun aoa_session_entity_dossier for the sampled anchor before trusting dossier quality.",
+                "authority_boundary": self.authority_boundary(),
+            }
+
+        def literal_planner_scenario() -> dict[str, Any]:
+            scenario_started = time.monotonic()
+            probes = [
+                {
+                    "name": "noisy_route_signal",
+                    "query": "aoa session memory hook failure raw_unavailable",
+                    "expected_shape": "error_text",
+                    "expected_primary_route": "route_signal_structured_search",
+                },
+                {
+                    "name": "broad_class_usage",
+                    "query": "найди все MCP которые агент использовал и ошибки рядом",
+                    "expected_shape": "entity_class",
+                    "expected_primary_route": "entity_inventory",
+                },
+                {
+                    "name": "concrete_entity",
+                    "query": "как агент использовал aoa-session-memory-mcp и к чему это привело",
+                    "expected_shape": "entity_anchor",
+                    "expected_primary_route": "entity_usage_audit",
+                },
+                {
+                    "name": "command_literal",
+                    "query": "python3 scripts/aoa_session_memory.py agent-event-audit latest --probe-routes",
+                    "expected_shape": "command",
+                    "expected_primary_route": "command_structured_search",
+                },
+            ]
+            samples: list[dict[str, Any]] = []
+            status_counts: Counter[str] = Counter()
+            primary_route_counts: Counter[str] = Counter()
+            shape_counts: Counter[str] = Counter()
+            for probe in probes:
+                sample_started = time.monotonic()
+                plan = self.session_literal_query_plan(
+                    str(probe["query"]),
+                    kind="auto",
+                    filters={"max_shards": 2},
+                )
+                primary_route = plan.get("primary_route") if isinstance(plan.get("primary_route"), dict) else {}
+                cost_profile = plan.get("cost_profile") if isinstance(plan.get("cost_profile"), dict) else {}
+                query_shape = plan.get("query_shape") if isinstance(plan.get("query_shape"), dict) else {}
+                route_id = str(primary_route.get("route_id") or "")
+                shape = str(query_shape.get("primary") or "")
+                quality_flags: list[str] = []
+                if not plan.get("ok"):
+                    quality_flags.append("literal_planner_payload_not_ok")
+                if not route_id:
+                    quality_flags.append("literal_planner_missing_primary_route")
+                if cost_profile.get("monolith_fallback_first") is True:
+                    quality_flags.append("literal_planner_used_monolith_fallback_first")
+                if cost_profile.get("uses_fts_first") is True:
+                    quality_flags.append("literal_planner_used_fts_first")
+                if route_id != probe["expected_primary_route"]:
+                    quality_flags.append(f"literal_planner_unexpected_primary_route:{route_id or '<missing>'}")
+                if shape != probe["expected_shape"]:
+                    quality_flags.append(f"literal_planner_unexpected_shape:{shape or '<missing>'}")
+                status = "failed" if not plan.get("ok") or any(flag.startswith("literal_planner_unexpected_") for flag in quality_flags) else "passed"
+                if status == "passed" and quality_flags:
+                    status = "warn"
+                status_counts[status] += 1
+                if route_id:
+                    primary_route_counts[route_id] += 1
+                if shape:
+                    shape_counts[shape] += 1
+                samples.append(
+                    {
+                        "name": probe["name"],
+                        "status": status,
+                        "query": probe["query"],
+                        "expected_shape": probe["expected_shape"],
+                        "actual_shape": shape,
+                        "expected_primary_route": probe["expected_primary_route"],
+                        "primary_route_id": route_id,
+                        "structured_first": cost_profile.get("structured_first"),
+                        "uses_fts_first": cost_profile.get("uses_fts_first"),
+                        "monolith_fallback_first": cost_profile.get("monolith_fallback_first"),
+                        "route_anchor": plan.get("route_anchor"),
+                        "route_anchor_source": plan.get("route_anchor_source"),
+                        "quality_flags": quality_flags,
+                        "elapsed_ms": int((time.monotonic() - sample_started) * 1000),
+                    }
+                )
+            return {
+                "schema_version": 1,
+                "artifact_type": "session_memory_literal_planner_scenario_audit",
+                "generated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                "ok": bool(samples) and status_counts.get("failed", 0) == 0,
+                "mutates": False,
+                "truth_status": "literal_planner_live_route_contract_not_evidence_truth",
+                "sample_count": len(samples),
+                "quality": {
+                    "elapsed_ms": int((time.monotonic() - scenario_started) * 1000),
+                    "sample_count": len(samples),
+                    "passed_count": status_counts.get("passed", 0),
+                    "warn_count": status_counts.get("warn", 0),
+                    "failed_count": status_counts.get("failed", 0),
+                    "primary_route_counts": dict(sorted(primary_route_counts.items())),
+                    "shape_counts": dict(sorted(shape_counts.items())),
+                    "monolith_fallback_first_sample_count": sum(1 for sample in samples if sample.get("monolith_fallback_first") is True),
+                    "fts_first_sample_count": sum(1 for sample in samples if sample.get("uses_fts_first") is True),
+                },
+                "samples": samples,
+                "diagnostics": [],
+                "next_route": "Open a failed sample route plan before changing literal search, route-signal, or entity-registry behavior.",
+                "authority_boundary": self.authority_boundary(),
+            }
 
         def run(profile: str, func: Callable[[], dict[str, Any]]) -> dict[str, Any]:
             profile_started = time.monotonic()
@@ -4389,7 +4649,9 @@ class AoASessionMemoryMCPState:
 
         scenarios: list[dict[str, Any]] = []
         for profile in selected_profiles:
-            if profile == "entity_usage":
+            if profile == "entity_dossier":
+                scenarios.append(run(profile, entity_dossier_scenario))
+            elif profile == "entity_usage":
                 scenarios.append(
                     run(
                         profile,
@@ -4425,11 +4687,7 @@ class AoASessionMemoryMCPState:
                 scenarios.append(
                     run(
                         profile,
-                        lambda: self.session_literal_query_plan(
-                            "aoa session memory hook failure raw_unavailable",
-                            kind="auto",
-                            filters={"max_shards": 2},
-                        ),
+                        literal_planner_scenario,
                     )
                 )
             elif profile == "graph_neighborhood":
