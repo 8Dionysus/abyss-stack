@@ -84,6 +84,7 @@ Tools:
 - `aoa_session_graph_neighborhood(anchor, kind, depth, limit, edge_limit)`; returns compact graph packets by default. Raise `edge_limit` only when a deeper relation walk is explicitly needed.
 - `aoa_session_graph_timeline(anchor, kind, limit)`
 - `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
+- `aoa_session_graph_bridge(source, target, kind, source_kind, target_kind, max_depth, limit)`; first compact route for "how are these two operational anchors connected?", wrapping bounded path, source/target timeline samples, refs, freshness, and next expansion.
 - `aoa_session_graph_cooccurrence(anchor, kind, limit)`
 - `aoa_session_graphrag_packet(query, anchor, mode, limit, include_semantic_context, rerank_local)`
 - `aoa_session_explain_graph_packet(intent, anchor, query, limit)`
@@ -174,6 +175,10 @@ omitted counts, and keeps the archive `graph-neighborhood` command as
 `next_expansion_command`. If the exact node or graph store is unavailable, MCP
 falls back to the `.aoa` archive route. The packet remains route evidence, not
 reviewed truth.
+`aoa_session_graph_bridge(...)` is the MCP first move for a relation question
+between two anchors. It delegates to `.aoa graph-bridge`, keeps the result
+compact, and returns path/timeline refs plus freshness/noise posture instead of
+claiming the graph relation as reviewed truth.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

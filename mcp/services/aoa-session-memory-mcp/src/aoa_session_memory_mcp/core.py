@@ -1477,6 +1477,99 @@ def _compact_graph_payload(
     return compact
 
 
+def _compact_graph_bridge_payload(payload: dict[str, Any], *, full_route: str) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "artifact_type",
+        "generated_at",
+        "ok",
+        "mutates",
+        "source_anchor",
+        "target_anchor",
+        "kind",
+        "requested_kind",
+        "source_kind",
+        "target_kind",
+        "truth_status",
+        "next_route",
+        "next_command",
+        "next_expansion_command",
+        "quality",
+        "freshness",
+        "noise_flags",
+        "diagnostics",
+    ):
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    if isinstance(payload.get("normalized_entities"), dict):
+        compact["normalized_entities"] = payload["normalized_entities"]
+
+    bridge = payload.get("bridge") if isinstance(payload.get("bridge"), dict) else {}
+    if bridge:
+        bridge_nodes, omitted_bridge_nodes = _compact_graph_sequence(bridge.get("nodes"), limit=GRAPH_NODE_SAMPLE_LIMIT)
+        bridge_edges, omitted_bridge_edges = _compact_graph_sequence(bridge.get("edges"), limit=GRAPH_EDGE_SAMPLE_LIMIT)
+        bridge_refs, bridge_ref_meta = _compact_graph_refs(bridge.get("evidence_refs"), limit=GRAPH_EVIDENCE_REF_SAMPLE_LIMIT)
+        compact["bridge"] = {
+            key: bridge.get(key)
+            for key in ("path_found", "path_length", "max_depth", "next_expansion_command")
+            if bridge.get(key) not in (None, "", [], {})
+        }
+        if bridge_nodes:
+            compact["bridge"]["nodes"] = bridge_nodes
+            compact["bridge"]["omitted_node_count"] = omitted_bridge_nodes
+        if bridge_edges:
+            compact["bridge"]["edges"] = bridge_edges
+            compact["bridge"]["omitted_edge_count"] = omitted_bridge_edges
+        if bridge_refs:
+            compact["bridge"]["evidence_refs"] = bridge_refs
+        if bridge_ref_meta.get("evidence_ref_count"):
+            compact["bridge"]["evidence_ref_count"] = bridge_ref_meta["evidence_ref_count"]
+
+    usage_chain = payload.get("usage_chain") if isinstance(payload.get("usage_chain"), dict) else {}
+    if usage_chain:
+        source_events, omitted_source_events = _compact_graph_sequence(usage_chain.get("source_events"), limit=GRAPH_EVENT_SAMPLE_LIMIT)
+        target_events, omitted_target_events = _compact_graph_sequence(usage_chain.get("target_events"), limit=GRAPH_EVENT_SAMPLE_LIMIT)
+        compact["usage_chain"] = {
+            "source_event_count": usage_chain.get("source_event_count"),
+            "target_event_count": usage_chain.get("target_event_count"),
+        }
+        if source_events:
+            compact["usage_chain"]["source_events"] = source_events
+            compact["usage_chain"]["omitted_source_event_count"] = omitted_source_events
+        if target_events:
+            compact["usage_chain"]["target_events"] = target_events
+            compact["usage_chain"]["omitted_target_event_count"] = omitted_target_events
+
+    evidence_refs, ref_meta = _compact_graph_refs(payload.get("evidence_refs"), limit=GRAPH_EVIDENCE_REF_SAMPLE_LIMIT)
+    if evidence_refs:
+        compact["evidence_refs"] = evidence_refs
+    for key, value in ref_meta.items():
+        if value:
+            compact[key] = value
+
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_graph_route": full_route,
+            "authority_boundary": "MCP returns compact graph bridge refs; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "node_sample_limit": GRAPH_NODE_SAMPLE_LIMIT,
+        "edge_sample_limit": GRAPH_EDGE_SAMPLE_LIMIT,
+        "event_sample_limit": GRAPH_EVENT_SAMPLE_LIMIT,
+        "evidence_ref_sample_limit": GRAPH_EVIDENCE_REF_SAMPLE_LIMIT,
+        "text_preview_chars": GRAPH_ITEM_TEXT_PREVIEW_CHARS,
+        "full_graph_route": full_route,
+    }
+    compact["authority_boundary"] = "MCP returns compact graph bridge topology and refs; raw/segment evidence remains authoritative."
+    return compact
+
+
 def _compact_usage_provider_status(provider: Any) -> dict[str, Any]:
     if not isinstance(provider, dict):
         return {}
@@ -4223,6 +4316,7 @@ class AoASessionMemoryMCPState:
             "agent_closeout",
             "literal_planner",
             "graph_neighborhood",
+            "graph_bridge",
         }
         default_profiles = [
             "entity_dossier",
@@ -4232,6 +4326,7 @@ class AoASessionMemoryMCPState:
             "agent_closeout",
             "literal_planner",
             "graph_neighborhood",
+            "graph_bridge",
         ]
         selected_profiles: list[str] = []
         diagnostics: list[str] = []
@@ -4406,6 +4501,19 @@ class AoASessionMemoryMCPState:
                     }
                 )
                 if ok and not (result["node_count"] or result["edge_count"] or result["evidence_ref_count"]):
+                    result["status"] = "warn"
+            elif profile == "graph_bridge":
+                quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
+                result.update(
+                    {
+                        "path_found": quality.get("path_found"),
+                        "path_length": int(quality.get("path_length") or 0),
+                        "source_event_count": int(quality.get("source_event_count") or 0),
+                        "target_event_count": int(quality.get("target_event_count") or 0),
+                        "evidence_ref_count": int(quality.get("evidence_ref_count") or len(payload.get("evidence_refs") or [])),
+                    }
+                )
+                if ok and not result["evidence_ref_count"]:
                     result["status"] = "warn"
             if not ok:
                 result["status"] = "failed"
@@ -4699,6 +4807,20 @@ class AoASessionMemoryMCPState:
                             kind="mcp",
                             limit=max(selected_limit, 4),
                             edge_limit=max(selected_limit * 4, 8),
+                        ),
+                    )
+                )
+            elif profile == "graph_bridge":
+                scenarios.append(
+                    run(
+                        profile,
+                        lambda: self.graph_bridge(
+                            "aoa-session-memory-mcp",
+                            "exec_command",
+                            source_kind="mcp",
+                            target_kind="tool",
+                            limit=max(selected_limit, 4),
+                            max_depth=4,
                         ),
                     )
                 )
@@ -6507,6 +6629,48 @@ class AoASessionMemoryMCPState:
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
+
+    def graph_bridge(
+        self,
+        source: str,
+        target: str,
+        kind: str = "auto",
+        source_kind: str = "auto",
+        target_kind: str = "auto",
+        max_depth: int = 4,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        source_text = _ensure_short_text(source, "source")
+        target_text = _ensure_short_text(target, "target")
+        route_kind = _coerce_trace_kind(kind, error_label="graph kind")
+        selected_source_kind = _coerce_trace_kind(source_kind or route_kind, error_label="source graph kind")
+        selected_target_kind = _coerce_trace_kind(target_kind or route_kind, error_label="target graph kind")
+        selected_max_depth = _coerce_limit(max_depth, 4, 8)
+        selected_limit = _coerce_limit(limit, 8, 30)
+        args = [
+            source_text,
+            target_text,
+            "--kind",
+            route_kind,
+            "--source-kind",
+            selected_source_kind,
+            "--target-kind",
+            selected_target_kind,
+            "--max-depth",
+            str(selected_max_depth),
+            "--limit",
+            str(selected_limit),
+        ]
+        payload = self._archive_command(
+            "graph-bridge",
+            args,
+        )
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        return _compact_graph_bridge_payload(
+            payload,
+            full_route=self._archive_command_line("graph-bridge", args),
+        )
 
     def graph_cooccurrence(self, anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
