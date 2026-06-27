@@ -963,6 +963,36 @@ ENTITY_USAGE_SCENARIO_AUDIT = {
     ],
 }
 
+LIVE_SCENARIO_AUDIT = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_live_scenario_audit",
+    "ok": True,
+    "mutates": False,
+    "truth_status": "bounded_live_scenario_audit_not_reviewed_truth",
+    "seed": "fixture-live",
+    "profiles": ["literal_planner"],
+    "parameters": {"sample_size": 2, "recent_days": 90, "limit": 2},
+    "quality": {
+        "scenario_count": 1,
+        "passed_count": 1,
+        "warn_count": 0,
+        "failed_count": 0,
+        "actionable_gap_count": 0,
+        "raw_or_segment_ref_scenario_count": 0,
+    },
+    "scenarios": [
+        {
+            "profile": "literal_planner",
+            "status": "passed",
+            "sample_count": 5,
+            "failed_count": 0,
+            "primary_route_counts": {"session_rehydrate": 1},
+            "shape_counts": {"session_id": 1},
+        }
+    ],
+    "actionable_gaps": [],
+}
+
 RETRIEVAL_PACKET = {
     "schema_version": 1,
     "artifact_type": "retrieval_packet",
@@ -1223,6 +1253,8 @@ class FakeRunner:
             payload = ENTITY_USAGE_NEIGHBORHOOD
         elif command == "entity-usage-scenario-audit":
             payload = ENTITY_USAGE_SCENARIO_AUDIT
+        elif command == "live-scenario-audit":
+            payload = LIVE_SCENARIO_AUDIT
         elif command == "retrieve":
             payload = RETRIEVAL_PACKET
         elif command == "rehydrate":
@@ -3619,7 +3651,7 @@ def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_p
     assert runner.timeouts[-1] == ("entity-usage-scenario-audit", 90.0)
 
 
-def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> None:
+def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
@@ -3643,44 +3675,24 @@ def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> Non
     assert audit["artifact_type"] == "session_memory_live_scenario_audit"
     assert audit["ok"] is True
     assert audit["truth_status"] == "bounded_live_scenario_audit_not_reviewed_truth"
+    assert audit["mcp_route"]["canonical_route"] == "scripts/aoa_session_memory.py live-scenario-audit"
+    assert audit["mcp_route"]["source_of_truth"] == ".aoa"
     assert audit["parameters"]["limit"] == 2
-    assert audit["quality"]["scenario_count"] == 8
+    assert audit["parameters"]["recent_days"] == 90
+    assert audit["quality"]["scenario_count"] == 1
     assert audit["quality"]["failed_count"] == 0
-    assert audit["quality"]["raw_or_segment_ref_scenario_count"] >= 5
-    scenarios = {item["profile"]: item for item in audit["scenarios"]}
-    assert scenarios["entity_dossier"]["sample_count"] == 2
-    assert scenarios["entity_dossier"]["one_short_route_sample_count"] == 2
-    assert scenarios["entity_usage"]["sample_count"] == 2
-    assert scenarios["hook_failure"]["total_receipt_count"] == 1
-    assert scenarios["hook_failure"]["date_semantics"]["filter_basis"] == "hook_receipt_timestamp"
-    assert scenarios["goal_lifecycle"]["result_count"] == 1
-    assert scenarios["agent_closeout"]["result_count"] == 1
-    assert scenarios["literal_planner"]["sample_count"] == 4
-    assert scenarios["literal_planner"]["failed_count"] == 0
-    assert scenarios["literal_planner"]["primary_route_counts"]["entity_inventory"] == 1
-    assert scenarios["literal_planner"]["primary_route_counts"]["route_signal_structured_search"] == 1
-    assert scenarios["literal_planner"]["shape_counts"]["entity_class"] == 1
-    assert scenarios["graph_neighborhood"]["node_count"] == 3
-    assert scenarios["graph_neighborhood"]["evidence_ref_count"] == 1
-    assert scenarios["graph_bridge"]["path_found"] is True
-    assert scenarios["graph_bridge"]["evidence_ref_count"] == 1
-    assert scenarios["hook_failure"]["first_ref"]["receipt"].endswith("hooks/receipts.jsonl#L2")
-    assert scenarios["graph_neighborhood"]["first_ref"]["raw"] == "raw:line:1"
-    assert scenarios["graph_bridge"]["first_ref"]["raw"] == "raw:line:1"
+    assert audit["quality"]["actionable_gap_count"] == 0
+    assert audit["scenarios"][0]["primary_route_counts"]["session_rehydrate"] == 1
 
-    commands = [call[0] for call in runner.calls]
-    assert "entity-usage-scenario-audit" in commands
-    assert "goal-lifecycles" in commands
-    assert "agent-closeouts" in commands
-    assert "literal-query-plan" in commands
-    assert "graph-neighborhood" in commands
-    assert "graph-bridge" in commands
-    usage_scenario_args = [args for command, args in runner.calls if command == "entity-usage-scenario-audit"]
-    assert [args[args.index("--seed") + 1] for args in usage_scenario_args] == [
-        "fixture-live:entity-dossier",
-        "fixture-live",
-    ]
-    assert all(args[args.index("--sample-size") + 1] == "2" for args in usage_scenario_args)
+    assert [command for command, _args in runner.calls] == ["live-scenario-audit"]
+    command, args = runner.calls[0]
+    assert command == "live-scenario-audit"
+    assert args[args.index("--seed") + 1] == "fixture-live"
+    assert args[args.index("--sample-size") + 1] == "2"
+    assert args[args.index("--recent-days") + 1] == "90"
+    assert args[args.index("--limit") + 1] == "2"
+    assert args.count("--profile") == 8
+    assert runner.timeouts[-1] == ("live-scenario-audit", 90.0)
 
 
 def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> None:
@@ -3702,62 +3714,59 @@ def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> 
     assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
 
 
-def test_live_scenario_audit_fails_when_literal_planner_starts_with_monolith(tmp_path: Path) -> None:
-    class MonolithLiteralRunner(FakeRunner):
+def test_live_scenario_audit_preserves_failed_archive_payload(tmp_path: Path) -> None:
+    class FailedLiveScenarioRunner(FakeRunner):
         def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
             command = argv[2]
-            if command != "literal-query-plan":
-                return super().__call__(argv, timeout)
-            self.calls.append((command, tuple(argv[3:])))
-            self.timeouts.append((command, timeout))
-            payload = {
-                **LITERAL_QUERY_PLAN,
-                "primary_route": {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
-                "cost_profile": {
-                    "structured_first": False,
-                    "uses_fts_first": False,
-                    "monolith_fallback_first": True,
-                },
-            }
-            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
-
-    state = state_with_fixture(tmp_path, MonolithLiteralRunner())
-
-    audit = state.session_live_scenario_audit(profiles=["literal_planner"], limit=2)
-
-    assert audit["ok"] is False
-    assert audit["quality"]["failed_count"] == 1
-    scenario = audit["scenarios"][0]
-    assert scenario["status"] == "failed"
-    assert scenario["failed_count"] == 4
-    assert scenario["primary_route_counts"]["monolith_raw_text_fallback"] == 4
-
-
-def test_live_scenario_audit_fails_empty_entity_dossier_profile(tmp_path: Path) -> None:
-    class EmptyDossierCandidateRunner(FakeRunner):
-        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
-            command = argv[2]
-            if command != "entity-usage-scenario-audit":
+            if command != "live-scenario-audit":
                 return super().__call__(argv, timeout)
             self.calls.append((command, tuple(argv[3:])))
             self.timeouts.append((command, timeout))
             payload = {
                 "schema_version": 1,
-                "artifact_type": "session_memory_entity_usage_scenario_audit",
+                "artifact_type": "session_memory_live_scenario_audit",
                 "ok": False,
-                "quality": {"sample_count": 0, "passed_count": 0, "warn_count": 0, "failed_count": 0},
-                "samples": [],
-                "diagnostics": ["empty_fixture"],
+                "mutates": False,
+                "truth_status": "bounded_live_scenario_audit_not_reviewed_truth",
+                "quality": {
+                    "scenario_count": 1,
+                    "passed_count": 0,
+                    "warn_count": 0,
+                    "failed_count": 1,
+                    "actionable_gap_count": 1,
+                },
+                "scenarios": [
+                    {
+                        "profile": "literal_planner",
+                        "status": "failed",
+                        "failed_count": 4,
+                        "primary_route_counts": {"monolith_raw_text_fallback": 4},
+                    }
+                ],
+                "actionable_gaps": [
+                    {
+                        "profile": "literal_planner",
+                        "status": "failed",
+                        "reasons": ["literal_planner_used_monolith_fallback_first"],
+                    }
+                ],
             }
-            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+            return CommandOutput(argv, 1, json.dumps(payload), "live scenario failed", 1.0)
 
-    state = state_with_fixture(tmp_path, EmptyDossierCandidateRunner())
+    state = state_with_fixture(tmp_path, FailedLiveScenarioRunner())
 
-    audit = state.session_live_scenario_audit(profiles=["entity_dossier"], sample_size=1, limit=1)
+    audit = state.session_live_scenario_audit(profiles=["literal_planner"], limit=2)
 
     assert audit["ok"] is False
     assert audit["quality"]["failed_count"] == 1
-    assert audit["scenarios"][0]["status"] == "failed"
+    assert audit["quality"]["actionable_gap_count"] == 1
+    scenario = audit["scenarios"][0]
+    assert scenario["status"] == "failed"
+    assert scenario["failed_count"] == 4
+    assert scenario["primary_route_counts"]["monolith_raw_text_fallback"] == 4
+    assert audit["actionable_gaps"][0]["reasons"] == ["literal_planner_used_monolith_fallback_first"]
+    assert audit["mcp_access"]["returncode"] == 1
+    assert audit["mcp_access"]["stderr"] == "live scenario failed"
 
 
 def test_route_reads_generated_axis_without_arbitrary_paths(tmp_path: Path) -> None:
