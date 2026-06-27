@@ -879,6 +879,123 @@ def test_runtime_status_flags_approved_mirror_source_mismatch(
     assert any("differs from source checkout" in note for note in status["freshness"]["notes"])
 
 
+def test_eval_forge_access_packet_exposes_front_door_without_proof_promotion(tmp_path: Path) -> None:
+    seed_evals(tmp_path)
+    seed_local_eval_port(tmp_path, status="active")
+    write_json(
+        tmp_path / "aoa-memo/evals/intake/memory-guardrail.eval_need.json",
+        valid_eval_need_packet(),
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    packet = state.eval_forge_access_packet()
+
+    assert packet["schema"] == "aoa_evals_forge_access_packet_v1"
+    assert packet["read_only"] is True
+    assert packet["candidate_only"] is True
+    assert packet["source_mutation_allowed"] is False
+    assert packet["proof_authority"] is False
+    assert packet["promotion_allowed"] is False
+    assert packet["eval_forge_front_door"]["proof_authority"] is False
+    assert packet["eval_forge_front_door"]["promotion_allowed"] is False
+    refs = packet["eval_forge_front_door"]["surface_refs"]
+    assert refs["operating_path_ref"].endswith("EVAL_FORGE_OPERATING_PATH.md")
+    assert refs["session_mining_criteria_ref"].endswith("SESSION_MINING_CRITERIA.md")
+    assert refs["local_port_decision_matrix_ref"].endswith("LOCAL_PORT_DECISION_MATRIX.md")
+    commands = [entry["command"] for entry in packet["exact_route_commands"]]
+    assert "python scripts/aoa_eval_session_start.py --json" in commands
+    assert any("eval_forge_route.py --candidate-packet" in command for command in commands)
+    assert packet["readiness_summary"]["archetype_count"] == 3
+    assert packet["freshness"]["runtime_status"]["mirror_is_authority"] is False
+    assert packet["local_ports"]["summary"]["active"] == 1
+    assert packet["local_ports"]["active_ports"][0]["repo"] == "aoa-memo"
+    assert packet["candidate_queue"]["top_candidate_routes"][0]["candidate_id"] == "packet:session:front-door-gap"
+    assert packet["candidate_queue"]["top_candidate_routes"][0]["proof_authority"] is False
+    assert packet["candidate_queue"]["forge_archetype_hints"][0]["selected_archetype_id"] == "runtime-smoke"
+    assert any("Do not mutate aoa-evals source from MCP." == line for line in packet["stop_lines"])
+
+    resource = state.read_resource("aoa-evals://forge-access")
+    assert resource["schema"] == "aoa_evals_forge_access_packet_v1"
+    assert resource["forge_docs_refs"] == packet["forge_docs_refs"]
+
+
+def test_runtime_status_flags_stale_mirror_when_source_is_selected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    seed_evals_mirror(tmp_path, source_git_commit="old-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "new-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+    status = state.runtime_status()
+
+    assert status["root_kind"] == "source"
+    assert status["freshness"]["status"] == "source_with_stale_mirror"
+    assert status["freshness"]["source_git_commit"] == "new-source"
+    assert status["freshness"]["mirror_source_git_commit"] == "old-source"
+    assert status["freshness"]["mirror_generated_at_utc"] == "2026-06-25T00:00:00+00:00"
+    assert status["freshness"]["mirror_is_stale"] is True
+    assert status["freshness"]["refresh_command"] == "scripts/aoa-sync-federation-surfaces --layer aoa-evals"
+    assert status["mirror_freshness"]["authority_warning"].startswith("federation mirror is a runtime read cache")
+
+
+def test_runtime_status_flags_current_mirror_when_manifest_commit_matches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    seed_evals_mirror(tmp_path, source_git_commit="same-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "same-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+    status = state.runtime_status()
+
+    assert status["freshness"]["status"] == "source_with_current_mirror"
+    assert status["freshness"]["mirror_status"] == "current"
+    assert status["freshness"]["mirror_is_current"] is True
+    assert status["freshness"]["mirror_is_authority"] is False
+
+
+def test_runtime_status_flags_approved_mirror_source_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals(tmp_path)
+    mirror = seed_evals_mirror(tmp_path, source_git_commit="old-source")
+    source_root = (tmp_path / "aoa-evals").resolve()
+
+    def fake_git_commit(root: Path) -> str | None:
+        return "new-source" if root.resolve() == source_root else None
+
+    monkeypatch.setattr(core, "_git_commit", fake_git_commit)
+
+    state = AoAEvalsMCPState(
+        workspace_root=tmp_path,
+        evals_root=mirror,
+        root_kind="approved_mirror",
+        source_root=source_root,
+        mirror_root=mirror,
+        stack_runtime_root=tmp_path / "abyss-stack",
+    )
+    status = state.runtime_status()
+
+    assert status["freshness"]["status"] == "mirror_source_mismatch"
+    assert status["freshness"]["mirror_status"] == "stale"
+    assert status["freshness"]["mirror_is_stale"] is True
+    assert any("differs from source checkout" in note for note in status["freshness"]["notes"])
+
+
 def test_validate_evidence_candidate_is_shape_only(tmp_path: Path) -> None:
     seed_evals(tmp_path)
     state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
