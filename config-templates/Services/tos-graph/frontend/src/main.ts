@@ -126,7 +126,10 @@ const appRoot = app;
 let graph = new Graph({ multi: true, type: "directed" });
 let renderer: Sigma | null = null;
 let graphContainer: HTMLDivElement | null = null;
+let nodeTooltip: HTMLDivElement | null = null;
 let lastGraphItems = new Map<string, AnyItem>();
+let hoveredNodeId: string | null = null;
+const lastPointer = { x: 0, y: 0 };
 
 function text(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
@@ -135,6 +138,15 @@ function text(value: unknown): string {
 function short(value: unknown, length = 58): string {
   const raw = text(value);
   return raw.length > length ? `${raw.slice(0, length - 1)}...` : raw;
+}
+
+function escapeHtml(value: unknown): string {
+  return text(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function itemId(item: AnyItem): string {
@@ -157,6 +169,43 @@ function itemSubtitle(item: AnyItem): string {
       item.purpose ||
       "",
   );
+}
+
+function humanKind(value: unknown): string {
+  return text(value).replaceAll("_", " ").replaceAll("-", " ").trim();
+}
+
+function displayTitle(item: AnyItem): string {
+  const raw = itemTitle(item).trim();
+  const canon = raw.match(/^Canon Or Candidate Status:\s*(.+)$/i);
+  if (canon) return `Status ${canon[1].trim()}`;
+  const concept = raw.match(/^Concept Or Problem:\s*(.+)$/i);
+  if (concept) return concept[1].trim();
+  const corpus = raw.match(/^Corpus Or Prepared Source Document:\s*(.+)$/i);
+  const title = corpus ? corpus[1].trim() : raw;
+  return (
+    title
+      .replace(/^ToS Deep Research[_ ]*/i, "")
+      .replace(/\.docx$/i, "")
+      .replace(/\s+/g, " ")
+      .trim() || raw
+  );
+}
+
+function displaySubtitle(item: AnyItem): string {
+  const kind = humanKind(item.cluster_kind || item.node_type || item.predicate_id);
+  const subtitle = itemSubtitle(item);
+  const pieces = [kind, subtitle === kind || subtitle.replaceAll("-", " ") === kind ? "" : humanKind(subtitle)].filter(Boolean);
+  return [...new Set(pieces)].join(" · ");
+}
+
+function compactGraphLabel(item: AnyItem): string {
+  const kind = text(item.cluster_kind || item.node_type || item.predicate_id);
+  if (kind === "corpus") return "Corpus";
+  if (kind === "canon-candidate-status") return displayTitle(item);
+  if (kind === "concept-problem") return short(displayTitle(item), 18);
+  if (kind) return short(humanKind(kind), 18);
+  return short(displayTitle(item), 18);
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -236,6 +285,7 @@ function renderShell(): void {
           <div id="graph"></div>
           <div id="graph-empty" class="graph-empty" hidden>No graph payload for this view.</div>
           <div id="graph-caption" class="graph-caption"></div>
+          <div id="node-tooltip" class="node-tooltip" hidden></div>
         </div>
       </main>
       <aside class="panel right-rail">
@@ -255,6 +305,7 @@ function renderShell(): void {
   `;
 
   graphContainer = document.querySelector<HTMLDivElement>("#graph");
+  nodeTooltip = document.querySelector<HTMLDivElement>("#node-tooltip");
   bindShellEvents();
 }
 
@@ -281,6 +332,13 @@ function bindShellEvents(): void {
   searchInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") void search();
   });
+  graphContainer?.addEventListener("pointermove", (event) => {
+    lastPointer.x = event.clientX;
+    lastPointer.y = event.clientY;
+    if (hoveredNodeId) positionNodeTooltip();
+  });
+  graphContainer?.addEventListener("pointerleave", hideNodeTooltip);
+  graphContainer?.addEventListener("wheel", hideNodeTooltip, { passive: true });
 }
 
 function byId(id: string): HTMLElement {
@@ -372,10 +430,10 @@ function renderLayers(): void {
 }
 
 function renderInspector(): void {
-  const title = state.selected ? itemTitle(state.selected) : state.currentView?.view?.title || state.currentViewId || "Selection";
+  const title = state.selected ? displayTitle(state.selected) : state.currentView?.view?.title || state.currentViewId || "Selection";
   byId("inspector-title").textContent = title;
   byId("inspector-meta").textContent = state.selected
-    ? itemSubtitle(state.selected)
+    ? displaySubtitle(state.selected)
     : "Select a graph node, cluster, result, review packet, snapshot, or audit entry.";
 
   const cards: string[] = [];
@@ -392,8 +450,8 @@ function renderInspector(): void {
       ...state.results.slice(0, 48).map(
         (item, index) => `
           <button class="result-card" data-result="${index}" type="button">
-            <span class="result-title">${short(itemTitle(item), 70)}</span>
-            <span class="result-subtitle">${short(itemSubtitle(item), 94)}</span>
+            <span class="result-title">${escapeHtml(short(displayTitle(item), 82))}</span>
+            <span class="result-subtitle">${escapeHtml(short(displaySubtitle(item), 98))}</span>
           </button>
         `,
       ),
@@ -424,8 +482,56 @@ function collectRefs(item: AnyItem): string[] {
   return [...refs].filter(Boolean);
 }
 
+function showNodeTooltip(nodeId: string): void {
+  const item = lastGraphItems.get(nodeId);
+  if (!nodeTooltip || !item) return;
+  hoveredNodeId = nodeId;
+  const refs = collectRefs(item).slice(0, 3);
+  const layers = itemLayers(item).slice(0, 4);
+  const memberIds = item.member_node_ids;
+  const members = Array.isArray(memberIds) ? `${memberIds.length} members` : "";
+  const meta = [displaySubtitle(item), members].filter(Boolean).join(" · ");
+  nodeTooltip.innerHTML = `
+    <div class="node-tooltip-title">${escapeHtml(displayTitle(item))}</div>
+    ${meta ? `<div class="node-tooltip-meta">${escapeHtml(meta)}</div>` : ""}
+    ${
+      layers.length
+        ? `<div class="node-tooltip-tags">${layers.map((layer) => `<span>${escapeHtml(layer)}</span>`).join("")}</div>`
+        : ""
+    }
+    ${
+      refs.length
+        ? `<div class="node-tooltip-refs">${refs.map((ref) => `<span>${escapeHtml(short(ref, 128))}</span>`).join("")}</div>`
+        : ""
+    }
+  `;
+  nodeTooltip.hidden = false;
+  positionNodeTooltip();
+}
+
+function hideNodeTooltip(): void {
+  hoveredNodeId = null;
+  if (nodeTooltip) nodeTooltip.hidden = true;
+}
+
+function positionNodeTooltip(): void {
+  if (!nodeTooltip || nodeTooltip.hidden) return;
+  const rect = nodeTooltip.parentElement?.getBoundingClientRect();
+  if (!rect) return;
+  const margin = 10;
+  const width = nodeTooltip.offsetWidth || 320;
+  const height = nodeTooltip.offsetHeight || 140;
+  const preferredLeft = lastPointer.x - rect.left + 16;
+  const preferredTop = lastPointer.y - rect.top + 16;
+  const left = Math.max(margin, Math.min(preferredLeft, rect.width - width - margin));
+  const top = Math.max(margin, Math.min(preferredTop, rect.height - height - margin));
+  nodeTooltip.style.left = `${left}px`;
+  nodeTooltip.style.top = `${top}px`;
+}
+
 function renderGraph(): void {
   if (!graphContainer) return;
+  hideNodeTooltip();
   renderer?.kill();
   graph.clear();
   lastGraphItems = new Map();
@@ -449,14 +555,25 @@ function renderGraph(): void {
     allowInvalidContainer: true,
     defaultNodeColor: palette.default,
     defaultEdgeColor: "rgba(23,32,29,0.22)",
-    labelDensity: 0.025,
-    labelGridCellSize: 140,
-    labelRenderedSizeThreshold: 16,
+    labelDensity: 0.008,
+    labelGridCellSize: 220,
+    labelRenderedSizeThreshold: 24,
     minCameraRatio: 0.08,
     maxCameraRatio: 8,
     renderEdgeLabels: false,
+    defaultDrawNodeHover: (context, data) => {
+      context.beginPath();
+      context.arc(data.x, data.y, data.size + 4, 0, Math.PI * 2);
+      context.fillStyle = "rgba(255, 255, 255, 0.9)";
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = "rgba(23, 32, 29, 0.26)";
+      context.stroke();
+    },
     zIndex: true,
   });
+  renderer.on("enterNode", ({ node }) => showNodeTooltip(node));
+  renderer.on("leaveNode", hideNodeTooltip);
   renderer.on("clickNode", ({ node }) => {
     const payload = lastGraphItems.get(node);
     if (payload) selectItem(payload);
@@ -544,7 +661,7 @@ function addGraphNode(id: string, item: AnyItem, index: number, size: number): v
   if (graph.hasNode(id)) return;
   lastGraphItems.set(id, item);
   graph.addNode(id, {
-    label: short(itemTitle(item), 30),
+    label: compactGraphLabel(item),
     size,
     color: colorFor(item, index),
     x: Math.cos(index) * (1 + index / 40),
