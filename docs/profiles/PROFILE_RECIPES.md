@@ -319,7 +319,7 @@ scripts/aoa-tos-graph
 ```
 
 They start the curation profile, wait for `tos-graph`, and open the
-mouse-switchable philosophy/corpus graph workbench when a desktop opener is
+mouse-switchable WebGL philosophy/corpus graph workbench when a desktop opener is
 available.
 
 For profile-level inspection:
