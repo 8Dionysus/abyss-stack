@@ -102,6 +102,7 @@ const palette = {
   red: "#a3483f",
   violet: "#765fa2",
   grey: "#66736e",
+  line: "rgba(23,32,29,0.22)",
 };
 
 const state: AppState = {
@@ -193,6 +194,9 @@ function displayTitle(item: AnyItem): string {
 }
 
 function displaySubtitle(item: AnyItem): string {
+  if (item.relation_count) {
+    return `${humanKind(item.primary_predicate || item.predicate_id || "relation")} · ${text(item.relation_count)} relations`;
+  }
   const kind = humanKind(item.cluster_kind || item.node_type || item.predicate_id);
   const subtitle = itemSubtitle(item);
   const pieces = [kind, subtitle === kind || subtitle.replaceAll("-", " ") === kind ? "" : humanKind(subtitle)].filter(Boolean);
@@ -223,6 +227,10 @@ function itemLayers(item: AnyItem): string[] {
   return Array.isArray(layers) ? layers.map(text) : [];
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(text).filter(Boolean) : [];
+}
+
 function layerAllowed(item: AnyItem): boolean {
   const layers = itemLayers(item);
   if (state.activeLayers.size === 0 || layers.length === 0) return true;
@@ -236,6 +244,23 @@ function colorFor(item: AnyItem, index: number): string {
   if (kind.includes("evidence") || kind.includes("unresolved")) return palette.red;
   if (kind.includes("concept") || kind.includes("lineage")) return palette.violet;
   return [palette.default, palette.blue, palette.gold, palette.violet, palette.grey][index % 5];
+}
+
+function edgeColorFor(item: AnyItem): string {
+  const predicate = text(item.predicate_id || item.primary_predicate || "");
+  const layers = itemLayers(item).join(" ");
+  const signal = `${predicate} ${layers}`;
+  if (signal.includes("source") || signal.includes("prepared") || signal.includes("contains")) return "rgba(66,111,163,0.55)";
+  if (signal.includes("canon") || signal.includes("candidate")) return "rgba(177,116,47,0.56)";
+  if (signal.includes("evidence") || signal.includes("unresolved")) return "rgba(163,72,63,0.52)";
+  if (signal.includes("concept") || signal.includes("lineage")) return "rgba(118,95,162,0.54)";
+  return palette.line;
+}
+
+function relationWeight(item: AnyItem): number {
+  const count = Number(item.relation_count || item.member_count || item.count || 1);
+  if (!Number.isFinite(count) || count <= 1) return 1.05;
+  return Math.min(5.2, 1.05 + Math.log2(count + 1) * 0.52);
 }
 
 function renderShell(): void {
@@ -554,10 +579,12 @@ function renderGraph(): void {
   renderer = new Sigma(graph, graphContainer, {
     allowInvalidContainer: true,
     defaultNodeColor: palette.default,
-    defaultEdgeColor: "rgba(23,32,29,0.22)",
+    defaultEdgeColor: palette.line,
+    enableEdgeEvents: true,
     labelDensity: 0.008,
     labelGridCellSize: 220,
     labelRenderedSizeThreshold: 24,
+    minEdgeThickness: 0.7,
     minCameraRatio: 0.08,
     maxCameraRatio: 8,
     renderEdgeLabels: false,
@@ -578,6 +605,10 @@ function renderGraph(): void {
     const payload = lastGraphItems.get(node);
     if (payload) selectItem(payload);
   });
+  renderer.on("clickEdge", ({ edge }) => {
+    const payload = lastGraphItems.get(edge);
+    if (payload) selectItem(payload);
+  });
   renderer.getCamera().animatedReset({ duration: 220 });
 }
 
@@ -587,16 +618,18 @@ function setGraphEmpty(empty: boolean, message = ""): void {
   emptyNode.textContent = message || "No graph payload.";
   const caption = byId("graph-caption");
   const view = state.currentView?.view;
-  caption.textContent = `${view?.title || state.currentViewId || "View"} · ${view?.layout_hint || view?.purpose || boot.projection_mode}`;
+  const graphSummary = graph.order > 0 ? ` · ${graph.order} nodes · ${graph.size} links` : "";
+  caption.textContent = `${view?.title || state.currentViewId || "View"} · ${view?.layout_hint || view?.purpose || boot.projection_mode}${graphSummary}`;
 }
 
 function buildClusterGraph(): void {
   if (!isPhilosophyView(state.currentView)) return;
   const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, 360);
   const nodes = (state.currentView.nodes || []).filter(layerAllowed);
+  const edges = (state.currentView.edges || []).filter(layerAllowed);
   const nodeToCluster = new Map<string, string[]>();
   clusters.forEach((cluster) => {
-    (cluster.member_node_ids || []).forEach((nodeId) => {
+    stringList(cluster.member_node_ids).forEach((nodeId) => {
       const ids = nodeToCluster.get(nodeId) || [];
       ids.push(cluster.cluster_id);
       nodeToCluster.set(nodeId, ids);
@@ -606,6 +639,8 @@ function buildClusterGraph(): void {
   clusters.forEach((cluster, index) => {
     addGraphNode(cluster.cluster_id, cluster, index, Math.max(8, Math.min(30, 8 + (cluster.member_node_ids?.length || 0) * 0.16)));
   });
+  const relationBuild = addClusterRelationEdges(edges, nodeToCluster, clusters);
+  const relationPairs = relationBuild.relationPairs;
   const linked = new Set<string>();
   nodes.slice(0, 900).forEach((node) => {
     const ids = nodeToCluster.get(node.node_id) || [];
@@ -614,6 +649,7 @@ function buildClusterGraph(): void {
         const key = [ids[i], ids[j]].sort().join("::");
         if (linked.has(key)) continue;
         linked.add(key);
+        if (relationPairs.has(key)) continue;
         graph.addDirectedEdgeWithKey(`cluster-edge:${key}`, ids[i], ids[j], {
           size: 0.6,
           color: "rgba(23,32,29,0.14)",
@@ -622,7 +658,87 @@ function buildClusterGraph(): void {
     }
   });
   layoutGraph();
-  state.results = clusters;
+  state.results = [...clusters, ...relationBuild.relationItems.slice(0, 24)];
+}
+
+function addClusterRelationEdges(
+  edges: GraphEdge[],
+  nodeToCluster: Map<string, string[]>,
+  clusters: Cluster[],
+): { relationPairs: Set<string>; relationItems: AnyItem[] } {
+  const clusterById = new Map(clusters.map((cluster) => [cluster.cluster_id, cluster]));
+  const aggregates = new Map<
+    string,
+    {
+      from_id: string;
+      to_id: string;
+      relation_count: number;
+      predicates: Map<string, number>;
+      graph_layers: Set<string>;
+      source_refs: Set<string>;
+      member_edge_ids: string[];
+    }
+  >();
+  const relationPairs = new Set<string>();
+  const relationItems: AnyItem[] = [];
+
+  edges.forEach((edge) => {
+    const fromClusterIds = nodeToCluster.get(edge.from_id) || [];
+    const toClusterIds = nodeToCluster.get(edge.to_id) || [];
+    fromClusterIds.forEach((fromId) => {
+      toClusterIds.forEach((toId) => {
+        if (fromId === toId) return;
+        const key = `${fromId}->${toId}`;
+        const existing =
+          aggregates.get(key) ||
+          {
+            from_id: fromId,
+            to_id: toId,
+            relation_count: 0,
+            predicates: new Map<string, number>(),
+            graph_layers: new Set<string>(),
+            source_refs: new Set<string>(),
+            member_edge_ids: [],
+          };
+        existing.relation_count += 1;
+        const predicate = edge.predicate_id || "relation";
+        existing.predicates.set(predicate, (existing.predicates.get(predicate) || 0) + 1);
+        itemLayers(edge).forEach((layer) => existing.graph_layers.add(layer));
+        collectRefs(edge).forEach((ref) => existing.source_refs.add(ref));
+        if (edge.edge_id) existing.member_edge_ids.push(edge.edge_id);
+        aggregates.set(key, existing);
+        relationPairs.add([fromId, toId].sort().join("::"));
+      });
+    });
+  });
+
+  [...aggregates.values()]
+    .sort((left, right) => right.relation_count - left.relation_count)
+    .slice(0, 420)
+    .forEach((aggregate, index) => {
+      const predicates = Object.fromEntries(aggregate.predicates.entries());
+      const primaryPredicate =
+        [...aggregate.predicates.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "relation";
+      const fromCluster = clusterById.get(aggregate.from_id);
+      const toCluster = clusterById.get(aggregate.to_id);
+      const payload: AnyItem = {
+        edge_id: `cluster-relation:${index}`,
+        from_id: aggregate.from_id,
+        to_id: aggregate.to_id,
+        predicate_id: primaryPredicate,
+        primary_predicate: primaryPredicate,
+        relation_count: aggregate.relation_count,
+        predicates,
+        graph_layers: [...aggregate.graph_layers],
+        source_refs: [...aggregate.source_refs],
+        member_edge_ids: aggregate.member_edge_ids.slice(0, 80),
+        label: `${displayTitle(fromCluster || { label: aggregate.from_id })} -> ${displayTitle(toCluster || { label: aggregate.to_id })}`,
+      };
+      addGraphEdge(payload.edge_id as string, aggregate.from_id, aggregate.to_id, payload);
+      relationItems.push(payload);
+    });
+
+  return { relationPairs, relationItems };
 }
 
 function buildNodeGraph(): void {
@@ -674,8 +790,8 @@ function addGraphEdge(id: string, from: string, to: string, item: AnyItem): void
   if (!graph.hasNode(from) || !graph.hasNode(to) || graph.hasEdge(id)) return;
   lastGraphItems.set(id, item);
   graph.addDirectedEdgeWithKey(id, from, to, {
-    size: 0.8,
-    color: "rgba(23,32,29,0.18)",
+    size: relationWeight(item),
+    color: edgeColorFor(item),
   });
 }
 

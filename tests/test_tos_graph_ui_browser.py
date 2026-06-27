@@ -101,6 +101,8 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.locator("#graph canvas").first.wait_for(timeout=10_000)
             page.locator(".result-card").first.wait_for(timeout=10_000)
             first_result_title = page.locator(".result-card .result-title").first.inner_text(timeout=10_000)
+            graph_caption = page.locator("#graph-caption").inner_text(timeout=10_000)
+            relation_card_count = page.locator(".result-card .result-subtitle").filter(has_text="relations").count()
             node_count = page.locator("#graph canvas").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
@@ -114,4 +116,6 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
     assert node_count > 0
     assert source_ref_count > 0
     assert "Corpus Or Prepared Source Document" not in first_result_title
+    assert "links" in graph_caption
+    assert relation_card_count > 0
     assert screenshot.stat().st_size > 20_000
