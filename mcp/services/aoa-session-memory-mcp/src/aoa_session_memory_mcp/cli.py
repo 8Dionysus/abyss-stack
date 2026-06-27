@@ -42,6 +42,11 @@ def main() -> None:
     search.add_argument("--filter", action="append")
     search.add_argument("--limit", type=int, default=20)
 
+    literal_plan = sub.add_parser("literal-query-plan")
+    literal_plan.add_argument("query", nargs="?", default="")
+    literal_plan.add_argument("--kind", default="auto")
+    literal_plan.add_argument("--filter", action="append")
+
     agent_responses = sub.add_parser("agent-responses")
     agent_responses.add_argument("query", nargs="?", default="")
     agent_responses.add_argument("--session", default="")
@@ -72,6 +77,9 @@ def main() -> None:
     reasoning_windows.add_argument("--limit", type=int, default=10)
     reasoning_windows.add_argument("--before", type=int, default=3)
     reasoning_windows.add_argument("--after", type=int, default=6)
+    reasoning_windows.set_defaults(explain=True)
+    reasoning_windows.add_argument("--explain", dest="explain", action="store_true")
+    reasoning_windows.add_argument("--no-explain", dest="explain", action="store_false")
 
     task_episodes = sub.add_parser("task-episodes")
     task_episodes.add_argument("target", nargs="?", default="all")
@@ -99,6 +107,9 @@ def main() -> None:
     answer_neighborhood.add_argument("--limit", type=int, default=10)
     answer_neighborhood.add_argument("--before", type=int, default=3)
     answer_neighborhood.add_argument("--after", type=int, default=6)
+    answer_neighborhood.set_defaults(explain=True)
+    answer_neighborhood.add_argument("--explain", dest="explain", action="store_true")
+    answer_neighborhood.add_argument("--no-explain", dest="explain", action="store_false")
 
     trace = sub.add_parser("trace")
     trace.add_argument("anchor")
@@ -141,6 +152,13 @@ def main() -> None:
     usage_scenario.add_argument("--document-limit", type=int, default=24)
     usage_scenario.add_argument("--raw-preview-limit", type=int, default=3)
     usage_scenario.add_argument("--full", action="store_true")
+
+    live_scenario = sub.add_parser("live-scenario-audit")
+    live_scenario.add_argument("--seed", default="live-scenario-audit")
+    live_scenario.add_argument("--profile", action="append")
+    live_scenario.add_argument("--sample-size", type=int, default=4)
+    live_scenario.add_argument("--recent-days", type=int, default=7)
+    live_scenario.add_argument("--limit", type=int, default=3)
 
     route = sub.add_parser("route")
     route.add_argument("axis")
@@ -218,6 +236,7 @@ def main() -> None:
     graph_neighborhood.add_argument("--kind", default="auto")
     graph_neighborhood.add_argument("--depth", type=int, default=1)
     graph_neighborhood.add_argument("--limit", type=int, default=40)
+    graph_neighborhood.add_argument("--edge-limit", type=int, default=None)
 
     graph_timeline = sub.add_parser("graph-timeline")
     graph_timeline.add_argument("anchor")
@@ -274,6 +293,8 @@ def main() -> None:
         _print(state.session_memory_status(include_live=args.include_live))
     elif args.command == "search":
         _print(state.session_search(args.query, filters=_parse_filter(args.filter), limit=args.limit))
+    elif args.command == "literal-query-plan":
+        _print(state.session_literal_query_plan(args.query, kind=args.kind, filters=_parse_filter(args.filter)))
     elif args.command == "agent-responses":
         _print(
             state.session_agent_responses(
@@ -301,6 +322,7 @@ def main() -> None:
                 limit=args.limit,
                 before=args.before,
                 after=args.after,
+                explain=args.explain,
             )
         )
     elif args.command == "task-episodes":
@@ -337,6 +359,7 @@ def main() -> None:
                 limit=args.limit,
                 before=args.before,
                 after=args.after,
+                explain=args.explain,
             )
         )
     elif args.command == "trace":
@@ -393,6 +416,16 @@ def main() -> None:
                 document_limit=args.document_limit,
                 raw_preview_limit=args.raw_preview_limit,
                 full=args.full,
+            )
+        )
+    elif args.command == "live-scenario-audit":
+        _print(
+            state.session_live_scenario_audit(
+                seed=args.seed,
+                profiles=args.profile,
+                sample_size=args.sample_size,
+                recent_days=args.recent_days,
+                limit=args.limit,
             )
         )
     elif args.command == "brief":
@@ -455,7 +488,15 @@ def main() -> None:
     elif args.command == "projection-status":
         _print(state.session_projection_status(include_payload=args.include_payload))
     elif args.command == "graph-neighborhood":
-        _print(state.graph_neighborhood(anchor=args.anchor, kind=args.kind, depth=args.depth, limit=args.limit))
+        _print(
+            state.graph_neighborhood(
+                anchor=args.anchor,
+                kind=args.kind,
+                depth=args.depth,
+                limit=args.limit,
+                edge_limit=args.edge_limit,
+            )
+        )
     elif args.command == "graph-timeline":
         _print(state.graph_timeline(anchor=args.anchor, kind=args.kind, limit=args.limit))
     elif args.command == "graph-shortest-path":

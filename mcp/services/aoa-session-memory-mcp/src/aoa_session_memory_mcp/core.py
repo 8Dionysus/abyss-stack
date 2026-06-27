@@ -23,9 +23,47 @@ def _file_sha256(path: Path) -> str:
         return ""
 
 
+def _source_mtime_epoch(*paths: Path) -> float | None:
+    mtimes = []
+    for path in paths:
+        try:
+            mtimes.append(path.stat().st_mtime)
+        except OSError:
+            continue
+    return max(mtimes) if mtimes else None
+
+
+def _linux_boot_epoch(proc_root: Path = Path("/proc")) -> float | None:
+    try:
+        for line in (proc_root / "stat").read_text(encoding="utf-8").splitlines():
+            if line.startswith("btime "):
+                return float(line.split()[1])
+    except OSError:
+        return None
+    return None
+
+
+def _process_start_epoch(pid: int, *, proc_root: Path = Path("/proc"), boot_epoch: float | None = None) -> float | None:
+    if boot_epoch is None:
+        boot_epoch = _linux_boot_epoch(proc_root)
+    if boot_epoch is None:
+        return None
+    try:
+        stat_text = (proc_root / str(pid) / "stat").read_text(encoding="utf-8")
+        ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+        start_ticks = int(stat_text.split()[21])
+    except (OSError, ValueError, IndexError):
+        return None
+    return boot_epoch + (start_ticks / float(ticks))
+
+
 MCP_CORE_SOURCE_PATH = Path(__file__).resolve()
+MCP_SERVER_SOURCE_PATH = MCP_CORE_SOURCE_PATH.with_name("server.py")
 MCP_CORE_LOADED_AT_EPOCH = time.time()
 MCP_CORE_LOADED_SHA256 = _file_sha256(MCP_CORE_SOURCE_PATH)
+# Preserve the server-wrapper hash across core auto-reloads; tool schemas are
+# registered by the already-running server process and need a process restart.
+MCP_SERVER_LOADED_SHA256 = globals().get("MCP_SERVER_LOADED_SHA256") or _file_sha256(MCP_SERVER_SOURCE_PATH)
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
@@ -40,12 +78,18 @@ PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
 GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS = 320
 GOAL_LIFECYCLE_SAMPLE_OBJECTIVE_PREVIEW_CHARS = 220
 GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT = 2
+GOAL_LIFECYCLE_OBSERVATION_LIMIT = 2
 ENTITY_USAGE_AUDIT_SAMPLE_LIMIT = 4
 ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT = 3
 ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT = 2
 ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT = 1
 ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
 ENTITY_USAGE_TEXT_PREVIEW_CHARS = 80
+GRAPH_NODE_SAMPLE_LIMIT = 8
+GRAPH_EDGE_SAMPLE_LIMIT = 8
+GRAPH_EVENT_SAMPLE_LIMIT = 8
+GRAPH_EVIDENCE_REF_SAMPLE_LIMIT = 6
+GRAPH_ITEM_TEXT_PREVIEW_CHARS = 64
 INVENTORY_SAMPLE_LABEL_CHARS = 64
 INVENTORY_TOTAL_SAMPLE_LIMIT = 12
 
@@ -539,6 +583,211 @@ def _compact_hit(hit: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_search_provider(provider: Any) -> dict[str, Any]:
+    if not isinstance(provider, dict):
+        return {}
+    compact: dict[str, Any] = {
+        key: provider.get(key)
+        for key in (
+            "selected",
+            "authoritative_result_provider",
+            "accelerator_provider",
+            "accelerator_status",
+        )
+        if provider.get(key) not in (None, "", [], {})
+    }
+    status = provider.get("status")
+    if isinstance(status, dict):
+        compact["status"] = _compact_usage_provider_status(status)
+    elif status not in (None, "", [], {}):
+        compact["status"] = status
+    for key in ("semantic_overlay", "local_rerank"):
+        value = provider.get(key)
+        if isinstance(value, dict):
+            compact[key] = {
+                subkey: value.get(subkey)
+                for subkey in ("ok", "status", "provider", "mode")
+                if value.get(subkey) not in (None, "", [], {})
+            }
+        elif value not in (None, "", [], {}):
+            compact[key] = value
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _compact_search_projection(projection: Any) -> dict[str, Any]:
+    if not isinstance(projection, dict):
+        return {}
+    return {
+        key: projection.get(key)
+        for key in (
+            "mode",
+            "fallback_mode",
+            "source",
+            "provider",
+            "uses_shards",
+            "max_shards",
+            "fallback_route",
+            "next_expansion_command",
+        )
+        if projection.get(key) not in (None, "", [], {})
+    }
+
+
+def _hook_event_from_search_filters(filters: dict[str, Any]) -> tuple[bool, str]:
+    route_layers = [item.casefold() for item in _split_filter_values(filters.get("route_layer"))]
+    hook_route = "hook" in route_layers
+    hook_event = ""
+    for signal in _split_filter_values(filters.get("route_signal")):
+        if signal.casefold().startswith("hook:"):
+            hook_route = True
+            hook_event = signal.split(":", 1)[1].strip()
+            break
+    return hook_route, hook_event
+
+
+def _search_date_semantics(filters: dict[str, Any]) -> dict[str, Any]:
+    date_filters = {
+        key: str(filters.get(key)).strip()
+        for key in ("date_from", "date_to")
+        if filters.get(key) not in (None, "")
+    }
+    if not date_filters:
+        return {}
+    semantics: dict[str, Any] = {
+        "filter_basis": "indexed_search_document_or_session_date",
+        "date_filters": date_filters,
+        "does_not_filter": ["hook_receipt_timestamp"],
+        "authority_boundary": (
+            "Search date filters constrain the generated .aoa search read model; "
+            "raw/segment evidence and hook receipt timestamps remain separate evidence routes."
+        ),
+    }
+    hook_route, hook_event = _hook_event_from_search_filters(filters)
+    if hook_route:
+        hook_args: dict[str, Any] = {
+            "event_name": hook_event or "UserPromptSubmit",
+            "only_errors": False,
+        }
+        if date_filters.get("date_from"):
+            hook_args["date_from"] = date_filters["date_from"]
+        semantics["hook_receipts_route"] = {
+            "mcp_tool": "aoa_session_hook_receipts",
+            "why": "Use this route when the date question is about hooks/receipts.jsonl receipt timestamps.",
+            "args": hook_args,
+            "date_filter_basis": "hook_receipt_timestamp",
+        }
+        if date_filters.get("date_to"):
+            semantics["hook_receipts_route"]["date_to_supported"] = False
+            semantics["hook_receipts_route"]["date_to_note"] = (
+                "aoa_session_hook_receipts currently exposes date_from only; use a bounded raw receipt ref "
+                "inspection if an upper timestamp bound is required."
+            )
+    return semantics
+
+
+def _hook_receipt_date_semantics(date_from: str) -> dict[str, Any]:
+    semantics: dict[str, Any] = {
+        "filter_basis": "hook_receipt_timestamp",
+        "timestamp_fields": ["timestamp", "received_at", "generated_at"],
+        "not_session_date": True,
+        "search_date_filter_note": (
+            "aoa_session_search date_from/date_to filter indexed search document/session dates, "
+            "not hooks/receipts.jsonl receipt timestamps."
+        ),
+    }
+    if date_from:
+        semantics["date_filters"] = {"date_from": date_from}
+    return semantics
+
+
+def _search_mcp_route_plan(payload: dict[str, Any], *, filters: dict[str, Any], full_route: str) -> dict[str, Any]:
+    text = str(payload.get("query") or payload.get("normalized_query") or "").strip()
+    active_filters = {
+        key: str(value).strip()
+        for key, value in filters.items()
+        if key in SEARCH_FILTER_FLAGS and value not in (None, "")
+    }
+    if not text and not active_filters:
+        return {}
+    projection = payload.get("search_projection")
+    archive_projection_mode = projection.get("mode") if isinstance(projection, dict) else None
+    cost_profile = payload.get("cost_profile")
+    plan: dict[str, Any] = {
+        "route_kind": "structured_filter_search" if active_filters and not text else "text_search",
+        "uses_text_query": bool(text),
+        "structured_filters": sorted(active_filters),
+        "archive_projection_mode": archive_projection_mode,
+        "lightweight_route": (cost_profile or {}).get("lightweight_route") if isinstance(cost_profile, dict) else None,
+        "next_expansion": "full_search_route",
+        "full_search_route": full_route,
+    }
+    if active_filters.get("route_signal"):
+        plan["typed_route_signal"] = True
+    if plan["route_kind"] == "structured_filter_search" and archive_projection_mode == "monolith_fallback":
+        plan["projection_note"] = (
+            "Archive projection mode is provider metadata; this MCP call used structured filters "
+            "and did not run a broad literal text query."
+        )
+    return {key: value for key, value in plan.items() if value not in (None, "", [], {})}
+
+
+def _compact_search_payload(payload: dict[str, Any], *, full_route: str, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    search_filters = filters or {}
+    passthrough_keys = (
+        "schema_version",
+        "artifact_type",
+        "search_schema_version",
+        "generated_at",
+        "ok",
+        "query",
+        "normalized_query",
+        "index_generated_at",
+        "aoa_root",
+        "result_count",
+        "diagnostics",
+        "cost_profile",
+    )
+    for key in passthrough_keys:
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    search_projection = _compact_search_projection(payload.get("search_projection"))
+    if search_projection:
+        compact["search_projection"] = search_projection
+    provider = _compact_search_provider(payload.get("provider"))
+    if provider:
+        compact["provider"] = provider
+    results = payload.get("results")
+    if isinstance(results, list):
+        compact["results"] = [_compact_hit(hit) for hit in results if isinstance(hit, dict)]
+        compact["result_count"] = payload.get("result_count", len(results))
+    route_plan = _search_mcp_route_plan(payload, filters=search_filters, full_route=full_route)
+    if route_plan:
+        compact["mcp_route_plan"] = route_plan
+    date_semantics = _search_date_semantics(search_filters)
+    if date_semantics:
+        compact["date_semantics"] = date_semantics
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_search_route": full_route,
+            "authority_boundary": "MCP returns compact search hits and provider summary; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "result_count": compact.get("result_count", 0),
+        "provider_summary_compacted": bool(provider),
+        "full_search_route": full_route,
+        "mcp_route_plan_exposed": bool(route_plan),
+        "date_semantics_exposed": bool(date_semantics),
+    }
+    compact["authority_boundary"] = "MCP returns compact search hits and provider summary; raw/segment evidence remains authoritative."
+    return compact
+
+
 def _compact_episode_ref(ref: Any) -> dict[str, Any]:
     if not isinstance(ref, dict):
         return {"ref": str(ref)}
@@ -606,7 +855,26 @@ def _bounded_text(value: Any, *, limit: int) -> tuple[str, int, bool]:
 
 
 def _compact_goal_event(event: dict[str, Any]) -> dict[str, Any]:
-    compact = dict(event)
+    compact = {
+        key: event.get(key)
+        for key in (
+            "schema_version",
+            "event_id",
+            "kind",
+            "tool_name",
+            "tool_namespace",
+            "objective",
+            "status_arg",
+            "usage",
+            "timestamp",
+            "line",
+            "task_episode_id",
+            "route_signals",
+        )
+        if event.get(key) not in (None, "", [], {})
+    }
+    if isinstance(event.get("refs"), dict):
+        compact["refs"] = _compact_episode_ref(event["refs"])
     if "objective" in compact:
         preview, chars, omitted = _bounded_text(
             compact.get("objective"),
@@ -619,7 +887,26 @@ def _compact_goal_event(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
-    compact = dict(lifecycle)
+    compact = {
+        key: lifecycle.get(key)
+        for key in (
+            "schema_version",
+            "session_label",
+            "session_id",
+            "goal_id",
+            "goal_instance_id",
+            "status",
+            "event_count",
+            "event_kinds",
+            "event_ids",
+            "task_episode_ids",
+            "ambiguity_flags",
+            "usage",
+            "objective_source",
+            "truth_level",
+        )
+        if lifecycle.get(key) not in (None, "", [], {})
+    }
     if "objective" in compact:
         preview, chars, omitted = _bounded_text(
             compact.get("objective"),
@@ -628,7 +915,54 @@ def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
         compact["objective"] = preview
         compact["objective_chars"] = chars
         compact["objective_omitted"] = omitted
+    elif "objective" in lifecycle:
+        preview, chars, omitted = _bounded_text(
+            lifecycle.get("objective"),
+            limit=GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS,
+        )
+        compact["objective"] = preview
+        compact["objective_chars"] = chars
+        compact["objective_omitted"] = omitted
+    refs = lifecycle.get("refs")
+    if isinstance(refs, dict):
+        compact["refs"] = {
+            key: _compact_episode_ref(value)
+            for key, value in refs.items()
+            if isinstance(value, dict) and _compact_episode_ref(value)
+        }
+    observed_goal = lifecycle.get("observed_goal")
+    if isinstance(observed_goal, dict):
+        compact_goal = _compact_goal_state(observed_goal)
+        if compact_goal:
+            compact["observed_goal"] = compact_goal
+    state_observations = lifecycle.get("state_observations")
+    if isinstance(state_observations, list):
+        compact["state_observations"] = [
+            compacted
+            for item in state_observations[:GOAL_LIFECYCLE_OBSERVATION_LIMIT]
+            if isinstance(item, dict)
+            for compacted in [_compact_goal_state_observation(item)]
+            if compacted
+        ]
+        compact["omitted_state_observation_count"] = max(0, len(state_observations) - GOAL_LIFECYCLE_OBSERVATION_LIMIT)
+    usage_observations = lifecycle.get("usage_observations")
+    if isinstance(usage_observations, list):
+        compact["usage_observations"] = [
+            compacted
+            for item in usage_observations[:GOAL_LIFECYCLE_OBSERVATION_LIMIT]
+            if isinstance(item, dict)
+            for compacted in [_compact_goal_usage_observation(item)]
+            if compacted
+        ]
+        compact["omitted_usage_observation_count"] = max(0, len(usage_observations) - GOAL_LIFECYCLE_OBSERVATION_LIMIT)
+    for key, limit in (("raw_refs", 8), ("segment_refs", 4), ("graph_refs", 8)):
+        values = lifecycle.get(key)
+        if isinstance(values, list):
+            compact[key] = values[:limit]
+            compact[f"omitted_{key}_count"] = max(0, len(values) - limit)
     sample_events = compact.get("sample_events")
+    if not isinstance(sample_events, list):
+        sample_events = lifecycle.get("sample_events")
     if isinstance(sample_events, list):
         compact["sample_events"] = [
             _compact_goal_event(event)
@@ -636,6 +970,60 @@ def _compact_goal_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
             if isinstance(event, dict)
         ]
         compact["omitted_sample_event_count"] = max(0, len(sample_events) - GOAL_LIFECYCLE_SAMPLE_EVENT_LIMIT)
+    return compact
+
+
+def _compact_goal_state(state: dict[str, Any]) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    for key in ("threadId", "status", "createdAt", "updatedAt"):
+        if state.get(key) not in (None, "", [], {}):
+            compact[key] = state.get(key)
+    if state.get("objective") not in (None, "", [], {}):
+        preview, chars, omitted = _bounded_text(
+            state.get("objective"),
+            limit=GOAL_LIFECYCLE_OBJECTIVE_PREVIEW_CHARS,
+        )
+        compact["objective"] = preview
+        compact["objective_chars"] = chars
+        compact["objective_omitted"] = omitted
+    return compact
+
+
+def _compact_goal_state_observation(observation: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: observation.get(key)
+        for key in ("source", "event_id")
+        if observation.get(key) not in (None, "", [], {})
+    }
+    state = observation.get("state")
+    if isinstance(state, dict):
+        compact_state = _compact_goal_state(state)
+        if compact_state:
+            compact["state"] = compact_state
+    refs = observation.get("refs")
+    if isinstance(refs, dict):
+        compact_ref = _compact_episode_ref(refs)
+        if compact_ref:
+            compact["refs"] = compact_ref
+    return compact
+
+
+def _compact_goal_usage_observation(observation: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: observation.get(key)
+        for key in ("source", "event_id")
+        if observation.get(key) not in (None, "", [], {})
+    }
+    usage = observation.get("usage")
+    if isinstance(usage, dict):
+        compact_usage = _compact_usage_mapping(usage)
+        if compact_usage:
+            compact["usage"] = compact_usage
+    refs = observation.get("refs")
+    if isinstance(refs, dict):
+        compact_ref = _compact_episode_ref(refs)
+        if compact_ref:
+            compact["refs"] = compact_ref
     return compact
 
 
@@ -728,6 +1116,8 @@ def _compact_usage_refs(refs: Any) -> dict[str, Any]:
             "raw_ref",
             "segment",
             "segment_ref",
+            "session",
+            "session_ref",
             "graph",
             "graph_ref",
             "line",
@@ -735,6 +1125,344 @@ def _compact_usage_refs(refs: Any) -> dict[str, Any]:
             "kind",
         ),
     )
+
+
+def _without_omitted_field_counts(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _without_omitted_field_counts(item)
+            for key, item in value.items()
+            if key != "omitted_field_count"
+        }
+    if isinstance(value, list):
+        return [_without_omitted_field_counts(item) for item in value]
+    return value
+
+
+def _compact_graph_freshness(freshness: Any) -> dict[str, Any]:
+    if not isinstance(freshness, dict):
+        return {}
+    compact = {
+        key: freshness.get(key)
+        for key in (
+            "status",
+            "warning",
+            "graph_source",
+            "graph_generated_at",
+            "search_index_generated_at",
+            "basis",
+            "live_verification",
+            "target_dirty",
+            "target_deferred_live",
+            "hot_gate_status",
+            "needs_maintenance",
+            "needs_full_rebuild",
+            "actionable_graph_source_count",
+            "actionable_count",
+            "deferred_live_source_count",
+            "ledger_store_missing_count",
+            "latest_maintenance_remaining_count",
+            "blocked_source_count",
+        )
+        if freshness.get(key) not in (None, "", [], {})
+    }
+    for key in ("diagnostics", "hot_gate_diagnostics"):
+        diagnostics = _compact_usage_list(freshness.get(key), limit=4, text_limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS)
+        if diagnostics:
+            compact[key] = diagnostics
+            source_len = len(freshness.get(key)) if isinstance(freshness.get(key), list) else 0
+            if source_len > len(diagnostics):
+                compact[f"omitted_{key}_count"] = source_len - len(diagnostics)
+    recommendation = _compact_usage_mapping(
+        freshness.get("maintenance_recommendation"),
+        allowed_keys=(
+            "route",
+            "reason",
+            "source_count",
+            "existing_source_count",
+            "actionable_count",
+            "deferred_live_source_count",
+            "blocked_count",
+            "dominant_reason",
+            "command",
+            "notes",
+        ),
+        text_limit=220,
+    )
+    if recommendation:
+        compact["maintenance_recommendation"] = _without_omitted_field_counts(recommendation)
+    return compact
+
+
+def _compact_graph_ref(ref: Any) -> dict[str, Any]:
+    if not isinstance(ref, dict):
+        scalar = _compact_usage_scalar(ref, limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS)
+        return {"ref": scalar} if scalar not in (None, "", [], {}) else {}
+    compact = _compact_usage_mapping(
+        ref,
+        allowed_keys=(
+            "session_id",
+            "session_label",
+            "segment_id",
+            "event_id",
+            "node_id",
+            "edge_id",
+            "line",
+            "source",
+            "target",
+            "type",
+            "raw",
+            "raw_ref",
+            "segment",
+            "segment_ref",
+            "session",
+            "graph",
+            "graph_ref",
+            "refs",
+        ),
+        text_limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS,
+    )
+    refs = _compact_usage_refs(ref.get("refs"))
+    if refs:
+        compact["refs"] = refs
+    return _without_omitted_field_counts(compact)
+
+
+def _graph_ref_dedupe_key(ref: dict[str, Any]) -> str:
+    keys = (
+        "session_id",
+        "session_label",
+        "segment_id",
+        "event_id",
+        "node_id",
+        "edge_id",
+        "line",
+        "source",
+        "target",
+        "type",
+        "raw",
+        "raw_ref",
+        "segment",
+        "segment_ref",
+        "session",
+        "graph",
+        "graph_ref",
+    )
+    parts: list[str] = []
+    for key in keys:
+        value = ref.get(key)
+        if value not in (None, "", [], {}):
+            parts.append(f"{key}={value}")
+    refs = ref.get("refs")
+    if isinstance(refs, dict):
+        for key in ("raw", "raw_ref", "segment", "segment_ref", "session", "graph", "graph_ref"):
+            value = refs.get(key)
+            if value not in (None, "", [], {}):
+                parts.append(f"refs.{key}={value}")
+    if parts:
+        return "|".join(parts)
+    return json.dumps(ref, sort_keys=True, ensure_ascii=True, default=str)
+
+
+def _compact_graph_refs(refs: Any, *, limit: int = GRAPH_EVIDENCE_REF_SAMPLE_LIMIT) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    if not isinstance(refs, list):
+        return [], {"evidence_ref_count": 0, "omitted_evidence_ref_count": 0, "deduplicated_evidence_ref_count": 0}
+    compact_refs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    duplicate_count = 0
+    for ref in refs:
+        compact = _compact_graph_ref(ref)
+        if not compact:
+            continue
+        key = _graph_ref_dedupe_key(compact)
+        if key in seen:
+            duplicate_count += 1
+            continue
+        seen.add(key)
+        compact_refs.append(compact)
+    selected = compact_refs[:limit]
+    return selected, {
+        "evidence_ref_count": len(refs),
+        "unique_evidence_ref_count": len(compact_refs),
+        "omitted_evidence_ref_count": max(0, len(compact_refs) - len(selected)),
+        "deduplicated_evidence_ref_count": duplicate_count,
+    }
+
+
+def _compact_graph_item(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        scalar = _compact_usage_scalar(item, limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS)
+        return {"value": scalar} if scalar not in (None, "", [], {}) else {}
+    compact = _compact_usage_mapping(
+        item,
+        allowed_keys=(
+            "id",
+            "type",
+            "label",
+            "title",
+            "source",
+            "target",
+            "kind",
+            "anchor",
+            "canonical_key",
+            "route_layer",
+            "route_signal",
+            "route_signals",
+            "matched_routes",
+            "session_id",
+            "session_label",
+            "session_title",
+            "session_date",
+            "segment_id",
+            "event_id",
+            "event_type",
+            "source_type",
+            "role",
+            "family",
+            "phase",
+            "actor",
+            "action",
+            "object",
+            "outcome",
+            "conversation_act",
+            "session_act",
+            "agent_event",
+            "task_episode_id",
+            "timestamp",
+            "line",
+            "relation",
+            "offset",
+            "correlation_id",
+            "status",
+            "confidence",
+            "count",
+            "weight",
+            "refs",
+            "freshness",
+            "route_signal_count",
+            "registered_entity_edge_count",
+            "route_signal_edge_count",
+        ),
+        text_limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS,
+    )
+    refs = _compact_usage_refs(item.get("refs"))
+    if refs:
+        compact["refs"] = refs
+    evidence_refs, ref_meta = _compact_graph_refs(item.get("evidence_refs"), limit=1)
+    if evidence_refs:
+        compact["evidence_ref_count"] = ref_meta["evidence_ref_count"]
+        if "refs" not in compact:
+            compact["refs"] = evidence_refs[0].get("refs") or evidence_refs[0]
+    if isinstance(item.get("freshness"), dict):
+        compact["freshness"] = _compact_graph_freshness(item.get("freshness"))
+    compact = _without_omitted_field_counts(compact)
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _compact_graph_sequence(items: Any, *, limit: int) -> tuple[list[dict[str, Any]], int]:
+    if not isinstance(items, list):
+        return [], 0
+    selected = [_compact_graph_item(item) for item in items[:limit]]
+    compact = [item for item in selected if item]
+    return compact, max(0, len(items) - len(compact))
+
+
+def _compact_graph_payload(
+    payload: dict[str, Any],
+    *,
+    full_route: str,
+    event_limit: int | None = None,
+    node_limit: int = GRAPH_NODE_SAMPLE_LIMIT,
+    edge_limit: int = GRAPH_EDGE_SAMPLE_LIMIT,
+) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    passthrough_keys = (
+        "schema_version",
+        "artifact_type",
+        "generated_at",
+        "ok",
+        "mutates",
+        "anchor",
+        "kind",
+        "requested_kind",
+        "source",
+        "target",
+        "max_depth",
+        "depth",
+        "path_found",
+        "distance",
+        "node_count",
+        "edge_count",
+        "event_count",
+        "cooccurrence_count",
+        "truncated",
+        "next_command",
+        "next_expansion_command",
+        "next_expansion_reason",
+        "quality",
+        "freshness",
+        "provider",
+        "parameters",
+        "diagnostics",
+    )
+    for key in passthrough_keys:
+        if payload.get(key) not in (None, "", [], {}):
+            compact[key] = payload.get(key)
+    if isinstance(payload.get("freshness"), dict):
+        compact["freshness"] = _compact_graph_freshness(payload.get("freshness"))
+    if isinstance(payload.get("provider"), dict):
+        compact["provider"] = _compact_usage_provider_status(payload["provider"])
+
+    effective_event_limit = _coerce_limit(event_limit, GRAPH_EVENT_SAMPLE_LIMIT, GRAPH_EVENT_SAMPLE_LIMIT)
+    nodes, omitted_nodes = _compact_graph_sequence(payload.get("nodes"), limit=node_limit)
+    if nodes:
+        compact["nodes"] = nodes
+        compact["node_count"] = payload.get("node_count", len(payload.get("nodes", [])))
+        compact["omitted_node_count"] = max(omitted_nodes, int(payload.get("omitted_node_count") or 0))
+    edges, omitted_edges = _compact_graph_sequence(payload.get("edges"), limit=edge_limit)
+    if edges:
+        compact["edges"] = edges
+        compact["edge_count"] = payload.get("edge_count", len(payload.get("edges", [])))
+        compact["omitted_edge_count"] = max(omitted_edges, int(payload.get("omitted_edge_count") or 0))
+    events, omitted_events = _compact_graph_sequence(payload.get("events"), limit=effective_event_limit)
+    if events:
+        compact["events"] = events
+        compact["event_count"] = payload.get("event_count", len(payload.get("events", [])))
+        compact["omitted_event_count"] = omitted_events
+    cooccurrences = payload.get("cooccurrences")
+    if isinstance(cooccurrences, list):
+        selected = [_compact_usage_mapping(item, text_limit=GRAPH_ITEM_TEXT_PREVIEW_CHARS) for item in cooccurrences[:node_limit]]
+        compact["cooccurrences"] = [item for item in selected if item]
+        compact["cooccurrence_count"] = payload.get("cooccurrence_count", len(cooccurrences))
+        compact["omitted_cooccurrence_count"] = max(0, len(cooccurrences) - len(compact["cooccurrences"]))
+
+    evidence_refs, ref_meta = _compact_graph_refs(payload.get("evidence_refs"), limit=GRAPH_EVIDENCE_REF_SAMPLE_LIMIT)
+    if evidence_refs:
+        compact["evidence_refs"] = evidence_refs
+    for key, value in ref_meta.items():
+        if value:
+            compact[key] = value
+
+    mcp_access = dict(payload.get("mcp_access")) if isinstance(payload.get("mcp_access"), dict) else {}
+    mcp_access.update(
+        {
+            "response_compacted": True,
+            "full_graph_route": full_route,
+            "authority_boundary": "MCP returns compact graph topology and refs; raw/segment evidence remains authoritative.",
+        }
+    )
+    compact["mcp_access"] = mcp_access
+    compact["mcp_payload_policy"] = {
+        "response_compacted": True,
+        "node_sample_limit": node_limit,
+        "edge_sample_limit": edge_limit,
+        "event_sample_limit": effective_event_limit,
+        "evidence_ref_sample_limit": GRAPH_EVIDENCE_REF_SAMPLE_LIMIT,
+        "text_preview_chars": GRAPH_ITEM_TEXT_PREVIEW_CHARS,
+        "full_graph_route": full_route,
+    }
+    compact["authority_boundary"] = "MCP returns compact graph topology and refs; raw/segment evidence remains authoritative."
+    return compact
 
 
 def _compact_usage_provider_status(provider: Any) -> dict[str, Any]:
@@ -783,22 +1511,24 @@ def _compact_usage_provider_status(provider: Any) -> dict[str, Any]:
 
 
 def _compact_document_ref(ref: Any) -> dict[str, Any]:
-    return _compact_usage_mapping(
-        ref,
-        allowed_keys=(
-            "kind",
-            "value",
-            "path",
-            "repo",
-            "ref",
-            "raw",
-            "segment",
-            "session",
-            "route_signal",
-            "canonical_key",
-            "source_type",
-            "title",
-        ),
+    return _without_omitted_field_counts(
+        _compact_usage_mapping(
+            ref,
+            allowed_keys=(
+                "kind",
+                "value",
+                "path",
+                "repo",
+                "ref",
+                "raw",
+                "segment",
+                "session",
+                "route_signal",
+                "canonical_key",
+                "source_type",
+                "title",
+            ),
+        )
     )
 
 
@@ -810,7 +1540,7 @@ def _compact_raw_preview(preview: Any) -> dict[str, Any]:
     )
     if "text" in compact:
         compact["text_preview_chars"] = ENTITY_USAGE_TEXT_PREVIEW_CHARS
-    return compact
+    return _without_omitted_field_counts(compact)
 
 
 def _compact_usage_event(event: Any) -> dict[str, Any]:
@@ -863,6 +1593,7 @@ def _compact_usage_event(event: Any) -> dict[str, Any]:
         compact["document_refs"] = [ref for ref in selected if ref]
         compact["document_ref_count"] = len(document_refs)
         compact["omitted_document_ref_count"] = max(0, len(document_refs) - len(compact["document_refs"]))
+    compact = _without_omitted_field_counts(compact)
     return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
 
 
@@ -891,6 +1622,7 @@ def _compact_usage_neighborhood(neighborhood: Any) -> dict[str, Any]:
         compact["document_refs"] = [ref for ref in selected_refs if ref]
         compact["document_ref_count"] = len(document_refs)
         compact["omitted_document_ref_count"] = max(0, len(document_refs) - len(compact["document_refs"]))
+    compact = _without_omitted_field_counts(compact)
     return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
 
 
@@ -1337,16 +2069,46 @@ class AoASessionMemoryMCPState:
         }
 
     def runtime_identity(self) -> dict[str, Any]:
-        current_sha256 = _file_sha256(MCP_CORE_SOURCE_PATH)
-        source_matches_loaded = bool(current_sha256 and MCP_CORE_LOADED_SHA256 and current_sha256 == MCP_CORE_LOADED_SHA256)
+        current_core_sha256 = _file_sha256(MCP_CORE_SOURCE_PATH)
+        current_server_sha256 = _file_sha256(MCP_SERVER_SOURCE_PATH)
+        core_source_matches_loaded = bool(
+            current_core_sha256
+            and MCP_CORE_LOADED_SHA256
+            and current_core_sha256 == MCP_CORE_LOADED_SHA256
+        )
+        server_source_matches_loaded = bool(
+            current_server_sha256
+            and MCP_SERVER_LOADED_SHA256
+            and current_server_sha256 == MCP_SERVER_LOADED_SHA256
+        )
+        pid = os.getpid()
+        process_started_at_epoch = _process_start_epoch(pid)
+        server_source_mtime_epoch = _source_mtime_epoch(MCP_SERVER_SOURCE_PATH)
+        process_started_before_server_source = bool(
+            process_started_at_epoch is not None
+            and server_source_mtime_epoch is not None
+            and process_started_at_epoch < server_source_mtime_epoch
+        )
+        tool_schema_reload_required = (not server_source_matches_loaded) or process_started_before_server_source
+        source_matches_loaded = core_source_matches_loaded and server_source_matches_loaded and not process_started_before_server_source
         return {
             "schema": "aoa_session_memory_mcp_runtime_identity_v1",
-            "pid": os.getpid(),
+            "pid": pid,
+            "process_started_at_epoch": process_started_at_epoch,
             "loaded_at_epoch": MCP_CORE_LOADED_AT_EPOCH,
             "loaded_core_path": MCP_CORE_SOURCE_PATH.as_posix(),
             "loaded_core_sha256": MCP_CORE_LOADED_SHA256,
-            "current_core_sha256": current_sha256,
+            "current_core_sha256": current_core_sha256,
+            "loaded_server_path": MCP_SERVER_SOURCE_PATH.as_posix(),
+            "loaded_server_sha256": MCP_SERVER_LOADED_SHA256,
+            "current_server_sha256": current_server_sha256,
+            "server_source_mtime_epoch": server_source_mtime_epoch,
+            "process_started_before_server_source": process_started_before_server_source,
+            "core_source_matches_loaded": core_source_matches_loaded,
+            "server_source_matches_loaded": server_source_matches_loaded,
             "source_matches_loaded": source_matches_loaded,
+            "implementation_reload_required": not core_source_matches_loaded,
+            "tool_schema_reload_required": tool_schema_reload_required,
             "reload_required": not source_matches_loaded,
             "reload_boundary": (
                 "MCP core implementation can auto-reload for existing tools; restart the Codex MCP "
@@ -1424,6 +2186,12 @@ class AoASessionMemoryMCPState:
     def _sqlite_table_columns(self, conn: sqlite3.Connection, name: str) -> set[str]:
         try:
             return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({name})").fetchall()}
+        except sqlite3.Error:
+            return set()
+
+    def _sqlite_index_names(self, conn: sqlite3.Connection, table: str) -> set[str]:
+        try:
+            return {str(row[1]) for row in conn.execute(f"PRAGMA index_list({table})").fetchall()}
         except sqlite3.Error:
             return set()
 
@@ -1654,6 +2422,71 @@ class AoASessionMemoryMCPState:
         if diagnostics:
             payload.setdefault("diagnostics", []).extend(diagnostics)
         payload.setdefault("authority_boundary", self.authority_boundary())
+        return _compact_search_payload(payload, full_route=self._archive_command_line("search", args), filters=filters)
+
+    def session_literal_query_plan(
+        self,
+        query: str = "",
+        kind: str = "auto",
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        filters, diagnostics = _normalize_search_filters(filters or {})
+        text = str(query or "").strip()
+        if text:
+            text = _ensure_short_text(text, "query")
+        route_kind = _coerce_trace_kind(kind, error_label="literal query kind")
+        supported_filters = {
+            "session",
+            "doc_type",
+            "route_layer",
+            "route_signal",
+            "agent_event",
+            "usage_role",
+            "task_episode_id",
+            "episode",
+            "date_from",
+            "date_to",
+            "max_shards",
+            "query_timeout_ms",
+        }
+        for key in sorted(set(filters) - supported_filters):
+            diagnostics.append(f"ignored unsupported filter {key!r}")
+        args = ["--query", text, "--kind", route_kind]
+        for key, flag in (
+            ("session", "--session"),
+            ("doc_type", "--doc-type"),
+            ("route_layer", "--route-layer"),
+            ("route_signal", "--route-signal"),
+            ("agent_event", "--agent-event"),
+            ("usage_role", "--usage-role"),
+            ("task_episode_id", "--task-episode-id"),
+            ("date_from", "--date-from"),
+            ("date_to", "--date-to"),
+        ):
+            value = filters.get(key)
+            if value in (None, ""):
+                continue
+            if key == "doc_type" and str(value) not in ALLOWED_SEARCH_DOC_TYPES:
+                diagnostics.append(f"ignored unsupported doc_type={value!r}")
+                continue
+            args.extend([flag, _safe_selector(str(value), key)])
+        episode = filters.get("episode")
+        if episode not in (None, "") and filters.get("task_episode_id") in (None, ""):
+            args.extend(["--task-episode-id", _safe_selector(str(episode), "episode")])
+        max_shards = _coerce_bounded_int(filters.get("max_shards"), DEFAULT_SEARCH_MAX_SHARDS, 1, DEFAULT_SEARCH_MAX_SHARDS)
+        args.extend(["--max-shards", str(max_shards)])
+        query_timeout_ms = filters.get("query_timeout_ms")
+        if query_timeout_ms not in (None, ""):
+            args.extend(["--query-timeout-ms", str(_coerce_bounded_int(query_timeout_ms, 250, 0, 300_000))])
+        payload = self._archive_command(
+            "literal-query-plan",
+            args,
+            timeout_seconds=max(self.timeout_seconds, SEARCH_TIMEOUT_SECONDS),
+        )
+        if diagnostics:
+            payload.setdefault("diagnostics", []).extend(diagnostics)
+        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
+        payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
 
     def _agent_route_filter_search(
@@ -1809,9 +2642,12 @@ class AoASessionMemoryMCPState:
                     "authority_boundary": (
                         "MCP returns route guidance only; no archive scan was started."
                     ),
-                },
+            },
                 "authority_boundary": self.authority_boundary(),
             }
+        fast_agent_events = list(normalized_agent_events)
+        if closeout_final and not fast_agent_events:
+            fast_agent_events = ["assistant_final_closeout"]
         args = [
             "--query",
             text,
@@ -1844,13 +2680,13 @@ class AoASessionMemoryMCPState:
             args.extend(["--failure-state", _safe_selector(failure_state, "failure_state", limit=32)])
         if explain:
             args.append("--explain")
-        if not closeout_final and verification_state == "any" and failure_state == "any":
+        if verification_state == "any" and failure_state == "any":
             fast_payload = self._agent_event_sqlite_fast_path(
                 command="agent-responses",
                 query=text,
                 session=session,
                 episode=episode,
-                agent_events=normalized_agent_events,
+                agent_events=fast_agent_events,
                 requested_agent_events=requested_agent_events,
                 limit=_coerce_limit(limit, 20, 100),
                 archive_args=args,
@@ -1979,15 +2815,20 @@ class AoASessionMemoryMCPState:
             filters = ["doc_type = 'event'"]
             params: list[Any] = []
             table_expr = "documents"
+            indexes = self._sqlite_index_names(conn, "documents")
             session_dir = self._resolve_session_dir(session) if session else None
             if session:
                 if "session_label" not in columns:
                     return None
-                table_expr = "documents INDEXED BY idx_documents_session_agent_event"
+                if "idx_documents_session_agent_event" in indexes:
+                    table_expr = "documents INDEXED BY idx_documents_session_agent_event"
                 filters.append("session_label = ?")
                 params.append(session_dir.name if session_dir is not None else session)
             elif explicit_agent_events and "agent_event" in columns:
-                table_expr = "documents INDEXED BY idx_documents_agent_event"
+                if "idx_documents_agent_event" in indexes:
+                    table_expr = "documents INDEXED BY idx_documents_agent_event"
+                elif "idx_documents_agent_event_date" in indexes:
+                    table_expr = "documents INDEXED BY idx_documents_agent_event_date"
             if episode and "task_episode_id" in columns:
                 filters.append("task_episode_id = ?")
                 params.append(episode)
@@ -2057,6 +2898,7 @@ class AoASessionMemoryMCPState:
             if conn is not None:
                 conn.close()
         results = [self._agent_event_hit_from_sqlite_row(row) for row in rows]
+        quality = self._agent_event_sqlite_quality_summary(results)
         return {
             "schema_version": 1,
             "artifact_type": "agent_event_route_results",
@@ -2075,6 +2917,7 @@ class AoASessionMemoryMCPState:
             ),
             "result_count": len(results),
             "results": results,
+            "quality": quality,
             "search_projection": {
                 "mode": "mcp_sqlite_agent_event_fast_path",
                 "read_model": db_path.as_posix(),
@@ -2103,6 +2946,73 @@ class AoASessionMemoryMCPState:
                 "authority_boundary": "MCP fast path reads generated search projection; raw transcript refs remain authoritative.",
             },
             "authority_boundary": self.authority_boundary(),
+        }
+
+    def _agent_event_sqlite_quality_summary(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+        agent_event_counts: Counter[str] = Counter()
+        freshness_counts: Counter[str] = Counter()
+        source_counts: Counter[str] = Counter()
+        conversation_act_counts: Counter[str] = Counter()
+        event_type_counts: Counter[str] = Counter()
+        raw_ref_present_count = 0
+        segment_ref_present_count = 0
+        for item in results:
+            agent_event_counts[str(item.get("agent_event") or "unknown")] += 1
+            conversation_act = str(item.get("conversation_act") or "unknown")
+            event_type = str(item.get("event_type") or "unknown")
+            conversation_act_counts[conversation_act] += 1
+            event_type_counts[event_type] += 1
+            source_counts["mcp_sqlite_projection"] += 1
+            freshness = item.get("freshness") if isinstance(item.get("freshness"), dict) else {}
+            status = str(freshness.get("status") or "unverifiable")
+            if status == "fresh":
+                freshness_bucket = "fresh"
+            elif status in {"stale", "not_current", "dirty", "missing"} or status.startswith("stale"):
+                freshness_bucket = "stale"
+            else:
+                freshness_bucket = "unverifiable"
+            freshness_counts[freshness_bucket] += 1
+            refs = item.get("refs") if isinstance(item.get("refs"), dict) else {}
+            if refs.get("raw"):
+                raw_ref_present_count += 1
+            if refs.get("segment"):
+                segment_ref_present_count += 1
+        latest = results[0] if results else {}
+        latest_refs = latest.get("refs") if isinstance(latest.get("refs"), dict) else {}
+        latest_event_id = ""
+        latest_segment_id = ""
+        doc_id = str(latest.get("doc_id") or "")
+        match = re.search(r":([^:]+):([^:]+)$", doc_id)
+        if match:
+            latest_segment_id = match.group(1)
+            latest_event_id = match.group(2)
+        latest_freshness = latest.get("freshness") if isinstance(latest.get("freshness"), dict) else {}
+        return {
+            "result_count": len(results),
+            "ordered_by": "sqlite_rowid_desc_agent_event_fast_path",
+            "query_rank_active": False,
+            "agent_event_counts": dict(sorted(agent_event_counts.items())),
+            "freshness_counts": dict(sorted(freshness_counts.items())),
+            "fresh_result_count": freshness_counts.get("fresh", 0),
+            "stale_result_count": freshness_counts.get("stale", 0),
+            "unverifiable_result_count": freshness_counts.get("unverifiable", 0),
+            "stale_result_present": freshness_counts.get("stale", 0) > 0,
+            "source_counts": dict(sorted(source_counts.items())),
+            "conversation_act_counts": dict(sorted(conversation_act_counts.items())),
+            "event_type_counts": dict(sorted(event_type_counts.items())),
+            "raw_ref_present_count": raw_ref_present_count,
+            "segment_ref_present_count": segment_ref_present_count,
+            "latest_result": {
+                "doc_id": latest.get("doc_id"),
+                "event_id": latest_event_id,
+                "segment_id": latest_segment_id,
+                "agent_event": latest.get("agent_event"),
+                "freshness": latest_freshness.get("status"),
+                "raw": latest_refs.get("raw"),
+                "segment": latest_refs.get("segment"),
+            }
+            if latest
+            else {},
         }
 
     def _agent_event_hit_from_sqlite_row(self, row: sqlite3.Row) -> dict[str, Any]:
@@ -2145,6 +3055,7 @@ class AoASessionMemoryMCPState:
         before: int = 3,
         after: int = 6,
         provider: str = "portable_sqlite",
+        explain: bool = True,
     ) -> dict[str, Any]:
         return self._agent_event_window_route(
             command="agent-reasoning-windows",
@@ -2155,6 +3066,7 @@ class AoASessionMemoryMCPState:
             before=before,
             after=after,
             provider=provider,
+            explain=explain,
         )
 
     def session_answer_neighborhood(
@@ -2167,6 +3079,7 @@ class AoASessionMemoryMCPState:
         before: int = 3,
         after: int = 6,
         provider: str = "portable_sqlite",
+        explain: bool = True,
     ) -> dict[str, Any]:
         return self._agent_event_window_route(
             command="answer-neighborhood",
@@ -2178,6 +3091,7 @@ class AoASessionMemoryMCPState:
             before=before,
             after=after,
             provider=provider,
+            explain=explain,
         )
 
     def _agent_event_window_route(
@@ -2192,6 +3106,7 @@ class AoASessionMemoryMCPState:
         before: int = 3,
         after: int = 6,
         provider: str = "portable_sqlite",
+        explain: bool = True,
     ) -> dict[str, Any]:
         text = str(query or "").strip()
         if text:
@@ -2215,6 +3130,7 @@ class AoASessionMemoryMCPState:
             args.extend(["--session", _safe_selector(session, "session")])
         if episode:
             args.extend(["--task-episode-id", _safe_selector(episode, "episode", limit=80)])
+        args.append("--explain" if explain else "--no-explain")
         normalized_agent_events, requested_agent_events = _normalize_agent_event_classes(agent_events, default=AGENT_EVENT_DEFAULTS_BY_ROUTE.get(command, []))
         if command != "agent-reasoning-windows":
             for agent_event in normalized_agent_events:
@@ -2327,6 +3243,24 @@ class AoASessionMemoryMCPState:
         limit: int = 20,
         order: str = "recent",
     ) -> dict[str, Any]:
+        if order not in {"recent", "chronological"}:
+            return {
+                "schema_version": 1,
+                "artifact_type": "goal_lifecycle_route_error",
+                "ok": False,
+                "mutates": False,
+                "diagnostics": [
+                    "invalid order; expected one of: recent, chronological"
+                ],
+                "received_order": order,
+                "allowed_order_values": ["recent", "chronological"],
+                "mcp_access": {
+                    "mutates": False,
+                    "archive_command": None,
+                    "authority_boundary": "MCP rejected invalid route parameters before invoking the archive CLI.",
+                },
+                "authority_boundary": self.authority_boundary(),
+            }
         args = [_safe_selector(target or "all", "target", limit=160), "--limit", str(_coerce_limit(limit, 20, 100))]
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
@@ -2339,6 +3273,8 @@ class AoASessionMemoryMCPState:
         if order:
             args.extend(["--order", _safe_selector(order, "order", limit=32)])
         payload = self._archive_command("goal-lifecycles", args, allow_nonzero_json=True)
+        if isinstance(payload.get("provider"), dict):
+            payload["provider"] = _compact_provider_status_for_mcp(payload["provider"])
         results = payload.get("results")
         if isinstance(results, list):
             payload["results"] = [_compact_goal_lifecycle(item) for item in results if isinstance(item, dict)]
@@ -2877,6 +3813,285 @@ class AoASessionMemoryMCPState:
         )
         payload.setdefault("authority_boundary", self.authority_boundary())
         return payload
+
+    def session_live_scenario_audit(
+        self,
+        seed: str = "live-scenario-audit",
+        profiles: list[str] | None = None,
+        sample_size: int = 4,
+        recent_days: int = 7,
+        limit: int = 3,
+    ) -> dict[str, Any]:
+        seed_text = _ensure_short_text(seed, "seed", limit=120)
+        allowed_profiles = {
+            "entity_usage",
+            "hook_failure",
+            "goal_lifecycle",
+            "agent_closeout",
+            "literal_planner",
+            "graph_neighborhood",
+        }
+        default_profiles = [
+            "entity_usage",
+            "hook_failure",
+            "goal_lifecycle",
+            "agent_closeout",
+            "literal_planner",
+            "graph_neighborhood",
+        ]
+        selected_profiles: list[str] = []
+        diagnostics: list[str] = []
+        for profile in profiles or default_profiles:
+            normalized = _route_key(str(profile or ""))
+            if normalized in allowed_profiles and normalized not in selected_profiles:
+                selected_profiles.append(normalized)
+            elif normalized:
+                diagnostics.append(f"ignored unsupported live scenario profile {profile!r}")
+        if not selected_profiles:
+            selected_profiles = list(default_profiles)
+        selected_limit = _coerce_limit(limit, 3, 10)
+        selected_sample_size = _coerce_limit(sample_size, 4, 12)
+        selected_recent_days = _coerce_limit(recent_days, 7, 90)
+        date_from = (dt.datetime.now(dt.UTC) - dt.timedelta(days=selected_recent_days)).date().isoformat()
+        started = time.monotonic()
+
+        def evidence_counts(value: Any) -> dict[str, int]:
+            counts: Counter[str] = Counter()
+
+            def walk(item: Any, depth: int = 0) -> None:
+                if depth > 8:
+                    return
+                if isinstance(item, dict):
+                    for key, nested in item.items():
+                        if nested in (None, "", [], {}):
+                            continue
+                        if key in {"raw", "raw_ref"}:
+                            counts["raw_ref"] += 1
+                        elif key in {"segment", "segment_ref", "segment_index"}:
+                            counts["segment_ref"] += 1
+                        elif key == "session":
+                            counts["session_ref"] += 1
+                        elif key == "receipt":
+                            counts["receipt_ref"] += 1
+                        walk(nested, depth + 1)
+                elif isinstance(item, list):
+                    for nested in item[:20]:
+                        walk(nested, depth + 1)
+
+            walk(value)
+            return dict(counts)
+
+        def first_ref(value: Any) -> dict[str, Any]:
+            if isinstance(value, dict):
+                refs = value.get("refs")
+                if isinstance(refs, dict) and refs:
+                    return {key: refs.get(key) for key in ("raw", "segment", "segment_index", "session", "receipt") if refs.get(key)}
+                for nested in value.values():
+                    found = first_ref(nested)
+                    if found:
+                        return found
+            elif isinstance(value, list):
+                for nested in value[:20]:
+                    found = first_ref(nested)
+                    if found:
+                        return found
+            return {}
+
+        def scenario_result(profile: str, payload: dict[str, Any], *, elapsed_ms: int) -> dict[str, Any]:
+            ok = bool(payload.get("ok", True))
+            counts = evidence_counts(payload)
+            result: dict[str, Any] = {
+                "profile": profile,
+                "status": "passed" if ok else "failed",
+                "ok": ok,
+                "elapsed_ms": elapsed_ms,
+                "evidence_ref_counts": counts,
+                "first_ref": first_ref(payload),
+            }
+            if profile == "entity_usage":
+                quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
+                failed = int(quality.get("failed_count") or 0)
+                warned = int(quality.get("warn_count") or 0)
+                sample_count = int(quality.get("sample_count") or 0)
+                result.update(
+                    {
+                        "sample_count": sample_count,
+                        "passed_count": int(quality.get("passed_count") or 0),
+                        "warn_count": warned,
+                        "failed_count": failed,
+                        "raw_preview_counts": quality.get("raw_preview_counts"),
+                        "provider_freshness_status": quality.get("provider_freshness_status"),
+                    }
+                )
+                if failed:
+                    result["status"] = "failed"
+                elif warned or not sample_count:
+                    result["status"] = "warn"
+            elif profile == "hook_failure":
+                total = int(payload.get("total_receipt_count") or 0)
+                result.update(
+                    {
+                        "date_from": payload.get("date_from"),
+                        "total_receipt_count": total,
+                        "returned_receipt_count": int(payload.get("returned_receipt_count") or 0),
+                        "scanned_line_count": int(payload.get("scanned_line_count") or 0),
+                        "date_semantics": payload.get("date_semantics"),
+                    }
+                )
+                if ok and total == 0:
+                    result["status"] = "warn"
+                    result["quality_flags"] = ["route_ok_no_recent_hook_errors"]
+            elif profile == "goal_lifecycle":
+                result["result_count"] = int(payload.get("result_count") or len(payload.get("results") or []))
+                if ok and result["result_count"] == 0:
+                    result["status"] = "warn"
+            elif profile == "agent_closeout":
+                result["result_count"] = int(payload.get("result_count") or len(payload.get("results") or []))
+                if ok and result["result_count"] == 0:
+                    result["status"] = "warn"
+            elif profile == "literal_planner":
+                primary_route = payload.get("primary_route") if isinstance(payload.get("primary_route"), dict) else {}
+                cost_profile = payload.get("cost_profile") if isinstance(payload.get("cost_profile"), dict) else {}
+                result.update(
+                    {
+                        "primary_route_id": primary_route.get("route_id"),
+                        "structured_first": cost_profile.get("structured_first"),
+                        "monolith_fallback_first": cost_profile.get("monolith_fallback_first"),
+                    }
+                )
+                if ok and not primary_route:
+                    result["status"] = "warn"
+                    result.setdefault("quality_flags", []).append("literal_planner_missing_primary_route")
+                elif ok and cost_profile.get("monolith_fallback_first") is True:
+                    result["status"] = "warn"
+                    result.setdefault("quality_flags", []).append("literal_planner_used_monolith_fallback_first")
+            elif profile == "graph_neighborhood":
+                result.update(
+                    {
+                        "node_count": int(payload.get("node_count") or len(payload.get("nodes") or [])),
+                        "edge_count": int(payload.get("edge_count") or len(payload.get("edges") or [])),
+                        "evidence_ref_count": int(payload.get("evidence_ref_count") or len(payload.get("evidence_refs") or [])),
+                    }
+                )
+                if ok and not (result["node_count"] or result["edge_count"] or result["evidence_ref_count"]):
+                    result["status"] = "warn"
+            if not counts and profile not in {"literal_planner"}:
+                result.setdefault("quality_flags", []).append("no_raw_or_segment_refs_detected")
+                if result["status"] == "passed":
+                    result["status"] = "warn"
+            return {key: value for key, value in result.items() if value not in (None, "", [], {})}
+
+        def run(profile: str, func: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+            profile_started = time.monotonic()
+            try:
+                payload = func()
+            except Exception as exc:  # pragma: no cover - defensive route packet
+                return {
+                    "profile": profile,
+                    "status": "failed",
+                    "ok": False,
+                    "elapsed_ms": int((time.monotonic() - profile_started) * 1000),
+                    "error": str(exc)[:500],
+                }
+            return scenario_result(profile, payload, elapsed_ms=int((time.monotonic() - profile_started) * 1000))
+
+        scenarios: list[dict[str, Any]] = []
+        for profile in selected_profiles:
+            if profile == "entity_usage":
+                scenarios.append(
+                    run(
+                        profile,
+                        lambda: self.session_entity_usage_scenario_audit(
+                            sample_size=selected_sample_size,
+                            seed=seed_text,
+                            limit=selected_limit,
+                            per_route_limit=selected_limit,
+                            consequence_window=4,
+                            document_limit=max(6, selected_limit * 3),
+                            raw_preview_limit=2,
+                            full=False,
+                        ),
+                    )
+                )
+            elif profile == "hook_failure":
+                scenarios.append(
+                    run(
+                        profile,
+                        lambda: self.session_hook_receipts(
+                            event_name="UserPromptSubmit",
+                            date_from=date_from,
+                            only_errors=True,
+                            limit=selected_limit,
+                        ),
+                    )
+                )
+            elif profile == "goal_lifecycle":
+                scenarios.append(run(profile, lambda: self.session_goal_lifecycles(limit=selected_limit)))
+            elif profile == "agent_closeout":
+                scenarios.append(run(profile, lambda: self.session_agent_closeouts(limit=selected_limit)))
+            elif profile == "literal_planner":
+                scenarios.append(
+                    run(
+                        profile,
+                        lambda: self.session_literal_query_plan(
+                            "aoa session memory hook failure raw_unavailable",
+                            kind="auto",
+                            filters={"max_shards": 2},
+                        ),
+                    )
+                )
+            elif profile == "graph_neighborhood":
+                scenarios.append(
+                    run(
+                        profile,
+                        lambda: self.graph_neighborhood(
+                            "aoa-session-memory-mcp",
+                            kind="mcp",
+                            limit=max(selected_limit, 4),
+                            edge_limit=max(selected_limit * 4, 8),
+                        ),
+                    )
+                )
+
+        status_counts = Counter(str(item.get("status") or "unknown") for item in scenarios)
+        quality = {
+            "scenario_count": len(scenarios),
+            "passed_count": status_counts.get("passed", 0),
+            "warn_count": status_counts.get("warn", 0),
+            "failed_count": status_counts.get("failed", 0),
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+            "profile_status_counts": dict(status_counts),
+            "first_useful_packet_ms": min((int(item.get("elapsed_ms") or 0) for item in scenarios), default=0),
+            "raw_or_segment_ref_scenario_count": sum(
+                1
+                for item in scenarios
+                if any(
+                    int((item.get("evidence_ref_counts") or {}).get(key) or 0) > 0
+                    for key in ("raw_ref", "segment_ref", "receipt_ref")
+                )
+            ),
+        }
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_live_scenario_audit",
+            "generated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "ok": quality["failed_count"] == 0,
+            "mutates": False,
+            "truth_status": "bounded_live_scenario_audit_not_reviewed_truth",
+            "seed": seed_text,
+            "profiles": selected_profiles,
+            "parameters": {
+                "sample_size": selected_sample_size,
+                "recent_days": selected_recent_days,
+                "date_from": date_from,
+                "limit": selected_limit,
+            },
+            "quality": quality,
+            "scenarios": scenarios,
+            "diagnostics": diagnostics,
+            "next_route": "Open first_ref raw/segment/receipt refs for any warn/failed scenario before treating this packet as quality proof.",
+            "authority_boundary": self.authority_boundary(),
+        }
 
     def session_retrieve(
         self,
@@ -4040,6 +5255,7 @@ class AoASessionMemoryMCPState:
             "event_name": event_filter or None,
             "session": session or None,
             "date_from": date_from or None,
+            "date_semantics": _hook_receipt_date_semantics(date_from),
             "only_errors": only_errors,
             "scanned_receipt_files": scanned_receipt_files,
             "scanned_line_count": scanned_line_count,
@@ -4338,33 +5554,294 @@ class AoASessionMemoryMCPState:
         }
         return payload
 
-    def graph_neighborhood(self, anchor: str, kind: str = "auto", depth: int = 1, limit: int = 40) -> dict[str, Any]:
+    def graph_neighborhood(
+        self,
+        anchor: str,
+        kind: str = "auto",
+        depth: int = 1,
+        limit: int = 40,
+        edge_limit: int | None = None,
+    ) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
+        bounded_depth = _coerce_limit(depth, 1, 3)
+        bounded_limit = _coerce_limit(limit, 40, 200)
         args = [
             anchor_text,
             "--kind",
             route_kind,
             "--depth",
-            str(_coerce_limit(depth, 1, 3)),
+            str(bounded_depth),
             "--limit",
-            str(_coerce_limit(limit, 40, 200)),
+            str(bounded_limit),
         ]
+        bounded_edge_limit = GRAPH_EDGE_SAMPLE_LIMIT
+        if edge_limit is not None:
+            bounded_edge_limit = _coerce_limit(edge_limit, 40, 2000)
+            args.extend(["--edge-limit", str(bounded_edge_limit)])
+        fast_payload = self._graph_neighborhood_sqlite_fast_path(
+            anchor=anchor_text,
+            kind=route_kind,
+            depth=bounded_depth,
+            limit=bounded_limit,
+            edge_limit=bounded_edge_limit,
+            full_route=self._archive_command_line("graph-neighborhood", args),
+        )
+        if fast_payload is not None:
+            return fast_payload
         payload = self._archive_command("graph-neighborhood", args)
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        return _compact_graph_payload(
+            payload,
+            full_route=self._archive_command_line("graph-neighborhood", args),
+            node_limit=min(bounded_limit, GRAPH_NODE_SAMPLE_LIMIT),
+            edge_limit=min(bounded_edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
+        )
+
+    def _graph_neighborhood_node_candidates(self, *, anchor: str, kind: str) -> list[str]:
+        if anchor.startswith("route:") or anchor.startswith("event:") or anchor.startswith("session:") or anchor.startswith("segment:"):
+            return [anchor]
+        key = _route_key(anchor)
+        if not key:
+            return []
+        kinds = [kind]
+        if kind == "auto":
+            kinds = ["mcp", "skill", "tool", "hook", "api", "script", "validator", "test", "eval", "graph", "memory", "goal", "git"]
+        candidates: list[str] = []
+        for route_kind in kinds:
+            route_key = _route_key(route_kind)
+            if not route_key:
+                continue
+            candidates.append(f"route:{route_key}:{route_key}:{key}")
+            candidates.append(f"route:{route_key}:entity:entity_{key}")
+        return list(dict.fromkeys(candidates))
+
+    def _loads_graph_payload(self, value: Any) -> dict[str, Any]:
+        if not value:
+            return {}
+        try:
+            payload = json.loads(str(value))
+        except (TypeError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _graph_sqlite_row_payload(self, row: sqlite3.Row, *, kind: str) -> dict[str, Any]:
+        payload = self._loads_graph_payload(row["payload_json"])
+        result = {
+            "id": row["id"],
+            "type": payload.get("type") or payload.get("node_type") or kind,
+            "count": row["count"],
+            **payload,
+        }
+        result.setdefault("id", row["id"])
+        result.setdefault("type", kind)
+        result.setdefault("count", row["count"])
+        return result
+
+    def _graph_sqlite_edge_payload(self, row: sqlite3.Row) -> dict[str, Any]:
+        payload = self._loads_graph_payload(row["payload_json"])
+        result = {
+            "id": row["id"],
+            "type": payload.get("type") or row["edge_type"],
+            "source": row["source_node"],
+            "target": row["target_node"],
+            "count": row["count"],
+            **payload,
+        }
+        result.setdefault("id", row["id"])
+        result.setdefault("type", row["edge_type"])
+        result.setdefault("source", row["source_node"])
+        result.setdefault("target", row["target_node"])
+        result.setdefault("count", row["count"])
+        return result
+
+    def _graph_sqlite_evidence_refs(self, conn: sqlite3.Connection, *, node_ids: list[str], edge_ids: list[str], limit: int = 50) -> list[dict[str, Any]]:
+        refs: list[dict[str, Any]] = []
+        if node_ids and self._sqlite_table_exists(conn, "node_contribs"):
+            placeholders = ", ".join("?" for _ in node_ids)
+            for row in conn.execute(
+                f"""
+                SELECT payload_json
+                FROM node_contribs
+                WHERE node_id IN ({placeholders})
+                LIMIT ?
+                """,
+                [*node_ids, limit],
+            ).fetchall():
+                payload = self._loads_graph_payload(row["payload_json"])
+                payload_refs = payload.get("evidence_refs")
+                if isinstance(payload_refs, list):
+                    refs.extend(ref for ref in payload_refs if isinstance(ref, dict))
+                    if len(refs) >= limit:
+                        return refs[:limit]
+        if edge_ids and self._sqlite_table_exists(conn, "edge_contribs"):
+            placeholders = ", ".join("?" for _ in edge_ids)
+            for row in conn.execute(
+                f"""
+                SELECT payload_json
+                FROM edge_contribs
+                WHERE edge_id IN ({placeholders})
+                LIMIT ?
+                """,
+                [*edge_ids, limit],
+            ).fetchall():
+                payload = self._loads_graph_payload(row["payload_json"])
+                payload_refs = payload.get("evidence_refs")
+                if isinstance(payload_refs, list):
+                    refs.extend(ref for ref in payload_refs if isinstance(ref, dict))
+                    if len(refs) >= limit:
+                        return refs[:limit]
+        return refs[:limit]
+
+    def _graph_neighborhood_sqlite_fast_path(
+        self,
+        *,
+        anchor: str,
+        kind: str,
+        depth: int,
+        limit: int,
+        edge_limit: int,
+        full_route: str,
+    ) -> dict[str, Any] | None:
+        db_path = self.aoa_root / "graph" / "graph.sqlite3"
+        if not db_path.is_file():
+            return None
+        candidates = self._graph_neighborhood_node_candidates(anchor=anchor, kind=kind)
+        if not candidates:
+            return None
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            if not self._sqlite_table_exists(conn, "nodes") or not self._sqlite_table_exists(conn, "edges"):
+                return None
+            placeholders = ", ".join("?" for _ in candidates)
+            start_rows = conn.execute(
+                f"""
+                SELECT id, node_type, payload_json, count
+                FROM nodes
+                WHERE id IN ({placeholders})
+                LIMIT ?
+                """,
+                [*candidates, min(max(1, limit), 20)],
+            ).fetchall()
+            if not start_rows:
+                return None
+            start_ids = [str(row["id"]) for row in start_rows]
+            edge_budget = max(1, min(edge_limit, 400))
+            edge_rows = conn.execute(
+                f"""
+                SELECT id, edge_type, source_node, target_node, payload_json, count
+                FROM edges
+                WHERE source_node IN ({", ".join("?" for _ in start_ids)})
+                   OR target_node IN ({", ".join("?" for _ in start_ids)})
+                ORDER BY count DESC, id
+                LIMIT ?
+                """,
+                [*start_ids, *start_ids, edge_budget + 1],
+            ).fetchall()
+            selected_edge_rows = edge_rows[:edge_budget]
+            node_ids = list(start_ids)
+            for row in selected_edge_rows:
+                for key in ("source_node", "target_node"):
+                    node_id = str(row[key])
+                    if node_id not in node_ids:
+                        node_ids.append(node_id)
+            node_limit = max(1, min(limit, 200))
+            selected_node_ids = node_ids[:node_limit]
+            node_placeholders = ", ".join("?" for _ in selected_node_ids)
+            node_rows = conn.execute(
+                f"""
+                SELECT id, node_type, payload_json, count
+                FROM nodes
+                WHERE id IN ({node_placeholders})
+                """,
+                selected_node_ids,
+            ).fetchall()
+            node_by_id = {str(row["id"]): row for row in node_rows}
+            ordered_nodes = [self._graph_sqlite_row_payload(node_by_id[node_id], kind=kind) for node_id in selected_node_ids if node_id in node_by_id]
+            edges = [self._graph_sqlite_edge_payload(row) for row in selected_edge_rows]
+            evidence_refs = self._graph_sqlite_evidence_refs(
+                conn,
+                node_ids=selected_node_ids,
+                edge_ids=[str(row["id"]) for row in selected_edge_rows],
+            )
+        except sqlite3.Error:
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "session_memory_graph_neighborhood",
+            "ok": True,
+            "mutates": False,
+            "anchor": anchor,
+            "kind": kind,
+            "depth": depth,
+            "source": "mcp_sqlite_graph_fast_path",
+            "node_count": len(node_ids),
+            "edge_count": len(selected_edge_rows),
+            "truncated": len(edge_rows) > len(selected_edge_rows) or len(node_ids) > len(selected_node_ids),
+            "omitted_node_count": max(0, len(node_ids) - len(selected_node_ids)),
+            "omitted_edge_count": max(0, len(edge_rows) - len(selected_edge_rows)),
+            "nodes": ordered_nodes,
+            "edges": edges,
+            "evidence_refs": evidence_refs,
+            "freshness": {
+                "status": "graph_store_read_model",
+                "read_model": db_path.as_posix(),
+            },
+            "provider": {
+                "selected": "sqlite_graph_store",
+                "status": "mcp_sqlite_graph_fast_path",
+                "db_path": db_path.as_posix(),
+            },
+            "quality": {
+                "route": "exact_graph_node_then_indexed_adjacent_edges",
+                "start_node_count": len(start_ids),
+                "direct_sqlite_fast_path": True,
+                "raw_or_segment_ref_present": any(
+                    isinstance(ref.get("refs"), dict) and (ref["refs"].get("raw") or ref["refs"].get("segment"))
+                    for ref in evidence_refs
+                    if isinstance(ref, dict)
+                ),
+            },
+            "next_expansion_command": full_route,
+            "next_expansion_reason": "raise graph limit/edge_limit or run archive graph-neighborhood for a deeper relation walk",
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": db_path.as_posix(),
+                "response_compacted": True,
+                "next_expansion_command": full_route,
+                "authority_boundary": "MCP fast path reads generated graph store; raw/segment evidence remains authoritative.",
+            },
+        }
+        return _compact_graph_payload(
+            payload,
+            full_route=full_route,
+            node_limit=min(limit, GRAPH_NODE_SAMPLE_LIMIT),
+            edge_limit=min(edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
+        )
 
     def graph_timeline(self, anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
+        bounded_limit = _coerce_limit(limit, 40, 200)
+        args = [anchor_text, "--kind", route_kind, "--limit", str(bounded_limit)]
         payload = self._archive_command(
             "graph-timeline",
-            [anchor_text, "--kind", route_kind, "--limit", str(_coerce_limit(limit, 40, 200))],
+            args,
         )
         _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
         payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        return _compact_graph_payload(
+            payload,
+            full_route=self._archive_command_line("graph-timeline", args),
+            event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT),
+        )
 
     def graph_shortest_path(self, source: str, target: str, kind: str = "auto", max_depth: int = 4) -> dict[str, Any]:
         source_text = _ensure_short_text(source, "source")

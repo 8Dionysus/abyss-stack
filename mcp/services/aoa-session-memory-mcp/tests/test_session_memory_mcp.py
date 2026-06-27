@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -26,6 +27,21 @@ def load_validator_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_validator_help_does_not_run_live_smoke() -> None:
+    result = subprocess.run(
+        [sys.executable, VALIDATOR_PATH.as_posix(), "--help"],
+        cwd=VALIDATOR_PATH.parents[1],
+        text=True,
+        capture_output=True,
+        timeout=5,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Validate the aoa-session-memory MCP service" in result.stdout
+    assert "usage:" in result.stdout
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -603,6 +619,34 @@ SEARCH_RESULTS = {
     ],
 }
 
+LITERAL_QUERY_PLAN = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_literal_query_plan",
+    "ok": True,
+    "mutates": False,
+    "query": "aoa-session-memory-mcp",
+    "kind": "mcp",
+    "query_shape": {"primary": "entity_anchor", "signals": ["entity_anchor"]},
+    "primary_route": {
+        "route_id": "entity_usage_audit",
+        "reason": "query resolves to a typed operational anchor",
+        "estimated_cost": "low",
+        "command": "python3 scripts/aoa_session_memory.py entity-usage-audit aoa-session-memory-mcp --kind mcp",
+    },
+    "ordered_routes": [
+        {"route_id": "entity_usage_audit", "estimated_cost": "low"},
+        {"route_id": "trace_route", "estimated_cost": "low"},
+        {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
+    ],
+    "cost_profile": {
+        "structured_first": True,
+        "uses_fts_first": False,
+        "monolith_fallback_first": False,
+    },
+    "route_candidates": [{"layer": "mcp", "key": "aoa_session_memory_mcp", "route_signal": "mcp:aoa_session_memory_mcp"}],
+    "authority_boundary": "This planner chooses a cheap first route; raw transcript and segment indexes remain evidence authority.",
+}
+
 AGENT_RESPONSES = {
     "schema_version": 1,
     "artifact_type": "agent_event_route_results",
@@ -658,7 +702,7 @@ TASK_EPISODES = {
 GOAL_LIFECYCLES = {
     "schema_version": 1,
     "artifact_type": "goal_lifecycle_route_results",
-    "goal_lifecycle_schema_version": 1,
+    "goal_lifecycle_schema_version": 2,
     "ok": True,
     "target": "all",
     "session": "session-1",
@@ -669,13 +713,21 @@ GOAL_LIFECYCLES = {
     "result_count": 1,
     "results": [
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "session_label": "2026-05-26__001__session-memory-mcp",
             "session_id": "session-1",
             "goal_id": "goal-0001",
             "goal_instance_id": "session-1:goal-0001",
             "status": "complete",
             "objective": "Close goal lifecycle routing " * 40,
+            "objective_source": "goal_tool_output",
+            "observed_goal": {
+                "threadId": "session-1",
+                "objective": "Observed goal state objective " * 30,
+                "status": "complete",
+                "createdAt": 1780000000,
+                "updatedAt": 1780000100,
+            },
             "event_count": 5,
             "event_kinds": ["goal_created", "goal_updated", "goal_completed"],
             "event_ids": ["000002", "000003", "000004", "000005", "000006"],
@@ -689,6 +741,47 @@ GOAL_LIFECYCLES = {
             "graph_refs": ["graph:node:goal_lifecycle:session-1:goal-0001"],
             "raw_refs": ["raw:line:2", "raw:line:6"],
             "segment_refs": ["000__initial-to-latest.md#event-000002", "000__initial-to-latest.md#event-000006"],
+            "state_observations": [
+                {
+                    "source": "goal_tool_output",
+                    "event_id": "000007",
+                    "state": {
+                        "threadId": "session-1",
+                        "objective": "Observed goal state objective " * 30,
+                        "status": "complete",
+                        "createdAt": 1780000000,
+                        "updatedAt": 1780000100,
+                    },
+                    "refs": {"raw_ref": "raw:line:7", "segment_ref": "000__initial-to-latest.md#event-000007"},
+                },
+                {
+                    "source": "goal_tool_output",
+                    "event_id": "000008",
+                    "state": {"status": "complete", "updatedAt": 1780000200},
+                    "refs": {"raw_ref": "raw:line:8", "segment_ref": "000__initial-to-latest.md#event-000008"},
+                },
+                {
+                    "source": "goal_tool_output",
+                    "event_id": "000009",
+                    "state": {"status": "complete", "updatedAt": 1780000300},
+                    "refs": {"raw_ref": "raw:line:9", "segment_ref": "000__initial-to-latest.md#event-000009"},
+                },
+            ],
+            "usage_observations": [
+                {"source": "goal_tool_args", "event_id": "000006", "usage": {"status": "complete"}},
+                {
+                    "source": "goal_tool_output",
+                    "event_id": "000007",
+                    "usage": {"goal": {"tokensUsed": 1234, "timeUsedSeconds": 56}},
+                    "refs": {"raw_ref": "raw:line:7", "segment_ref": "000__initial-to-latest.md#event-000007"},
+                },
+                {
+                    "source": "goal_tool_output",
+                    "event_id": "000008",
+                    "usage": {"goal": {"tokensUsed": 1300}},
+                    "refs": {"raw_ref": "raw:line:8", "segment_ref": "000__initial-to-latest.md#event-000008"},
+                },
+            ],
             "sample_events": [
                 {"event_kind": "goal_created", "event_id": "000002", "raw_ref": "raw:line:2", "objective": "Create goal with a deliberately long objective " * 20},
                 {"event_kind": "goal_updated", "event_id": "000003", "raw_ref": "raw:line:3"},
@@ -833,6 +926,10 @@ GRAPH_NEIGHBORHOOD = {
     "anchor": "aoa-session-memory-mcp",
     "node_count": 3,
     "edge_count": 2,
+    "truncated": True,
+    "next_command": "python3 scripts/aoa_session_memory.py graph-neighborhood aoa-session-memory-mcp --kind mcp --depth 1 --limit 20 --edge-limit 7",
+    "next_expansion_command": "python3 scripts/aoa_session_memory.py graph-neighborhood aoa-session-memory-mcp --kind mcp --depth 2 --limit 40 --edge-limit 14",
+    "next_expansion_reason": "increase depth or edge budget only when relation context is still insufficient",
     "nodes": [
         {"id": "route:mcp:mcp:aoa_session_memory_mcp", "type": "mcp", "label": "mcp:aoa_session_memory_mcp"},
         {"id": "event:session-1:000:000001", "type": "event", "title": "debug mcp"},
@@ -846,7 +943,29 @@ GRAPH_NEIGHBORHOOD = {
             "refs": {"raw": "raw:line:1", "segment": "000__initial-to-latest.md#event-000001"},
         }
     ],
-    "freshness": {"status": "fresh"},
+    "freshness": {
+        "status": "graph_store_stale",
+        "warning": "graph store has stale hot-gate state; verify through raw refs",
+        "hot_gate_status": "stale",
+        "needs_maintenance": True,
+        "needs_full_rebuild": False,
+        "actionable_graph_source_count": 2531,
+        "deferred_live_source_count": 1139,
+        "ledger_store_missing_count": 52,
+        "latest_maintenance_remaining_count": 2452,
+        "hot_gate_diagnostics": ["maintenance_queue_empty_but_ledger_actionable_sources_present"],
+        "maintenance_recommendation": {
+            "route": "budgeted_graph_maintenance",
+            "reason": "graph_store_ledger_mismatch_budgeted_recovery",
+            "source_count": 5536,
+            "existing_source_count": 5400,
+            "actionable_count": 2531,
+            "blocked_count": 10,
+            "dominant_reason": "ledger_actionable_sources_not_queued",
+            "command": "python3 scripts/aoa_session_memory.py graph-maintenance all --apply --batch-limit 25",
+            "notes": ["blocked_sources_need_lower_layer_repair"],
+        },
+    },
 }
 
 GRAPH_TIMELINE = {
@@ -970,6 +1089,8 @@ class FakeRunner:
             payload = MAINTENANCE_STATUS
         elif command == "search":
             payload = SEARCH_RESULTS
+        elif command == "literal-query-plan":
+            payload = LITERAL_QUERY_PLAN
         elif command in {"agent-responses", "agent-closeouts", "agent-progress-updates"}:
             payload = AGENT_RESPONSES
         elif command in {"agent-reasoning-windows", "answer-neighborhood"}:
@@ -1341,15 +1462,43 @@ def test_runtime_identity_reports_reload_boundary(tmp_path: Path, monkeypatch: A
     fresh = state.runtime_identity()
     assert fresh["source_matches_loaded"] is True
     assert fresh["reload_required"] is False
+    assert fresh["implementation_reload_required"] is False
+    assert fresh["tool_schema_reload_required"] is False
     assert fresh["loaded_core_path"].endswith("aoa_session_memory_mcp/core.py")
+    assert fresh["loaded_server_path"].endswith("aoa_session_memory_mcp/server.py")
 
     monkeypatch.setattr(module, "MCP_CORE_LOADED_SHA256", "stale-loaded-code")
     stale = state.runtime_identity()
 
     assert stale["source_matches_loaded"] is False
     assert stale["reload_required"] is True
+    assert stale["implementation_reload_required"] is True
+    assert stale["tool_schema_reload_required"] is False
     assert "existing tools" in stale["reload_boundary"]
     assert "tool list" in stale["reload_boundary"]
+
+    monkeypatch.setattr(module, "MCP_CORE_LOADED_SHA256", stale["current_core_sha256"])
+    monkeypatch.setattr(module, "MCP_SERVER_LOADED_SHA256", "stale-loaded-server")
+    stale_schema = state.runtime_identity()
+
+    assert stale_schema["source_matches_loaded"] is False
+    assert stale_schema["reload_required"] is True
+    assert stale_schema["implementation_reload_required"] is False
+    assert stale_schema["tool_schema_reload_required"] is True
+
+    server_source = tmp_path / "server.py"
+    server_source.write_text("# fresh server source\n", encoding="utf-8")
+    server_hash = module._file_sha256(server_source)
+    os.utime(server_source, (2_000_000_000, 2_000_000_000))
+    monkeypatch.setattr(module, "MCP_SERVER_SOURCE_PATH", server_source)
+    monkeypatch.setattr(module, "MCP_SERVER_LOADED_SHA256", server_hash)
+    monkeypatch.setattr(module, "_process_start_epoch", lambda pid: 1_000_000_000.0)
+    stale_process = state.runtime_identity()
+
+    assert stale_process["server_source_matches_loaded"] is True
+    assert stale_process["process_started_before_server_source"] is True
+    assert stale_process["tool_schema_reload_required"] is True
+    assert stale_process["reload_required"] is True
 
 
 def test_status_live_readiness_uses_fast_gate_without_evidence_samples(tmp_path: Path) -> None:
@@ -1593,6 +1742,108 @@ def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> No
     assert "--max-shards" not in args
 
 
+def test_hook_route_search_with_dates_exposes_receipt_timestamp_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "route_signal": "hook:UserPromptSubmit",
+            "doc_type": "event",
+            "date_from": "2026-05-26",
+        },
+        limit=5,
+    )
+
+    assert search["date_semantics"]["filter_basis"] == "indexed_search_document_or_session_date"
+    assert search["date_semantics"]["does_not_filter"] == ["hook_receipt_timestamp"]
+    hook_route = search["date_semantics"]["hook_receipts_route"]
+    assert hook_route["mcp_tool"] == "aoa_session_hook_receipts"
+    assert hook_route["date_filter_basis"] == "hook_receipt_timestamp"
+    assert hook_route["args"] == {
+        "event_name": "UserPromptSubmit",
+        "only_errors": False,
+        "date_from": "2026-05-26",
+    }
+    assert search["mcp_route_plan"]["route_kind"] == "structured_filter_search"
+    assert search["mcp_route_plan"]["uses_text_query"] is False
+    assert search["mcp_route_plan"]["typed_route_signal"] is True
+    assert search["mcp_route_plan"]["structured_filters"] == ["date_from", "doc_type", "route_signal"]
+    assert search["mcp_payload_policy"]["mcp_route_plan_exposed"] is True
+    assert search["mcp_payload_policy"]["date_semantics_exposed"] is True
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--route-signal") + 1] == "hook:UserPromptSubmit"
+    assert args[args.index("--date-from") + 1] == "2026-05-26"
+
+
+def test_search_compacts_heavy_provider_status_for_mcp(tmp_path: Path) -> None:
+    class HeavySearchRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "search":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            payload = {
+                **SEARCH_RESULTS,
+                "provider": {
+                    "selected": "portable_sqlite",
+                    "authoritative_result_provider": "portable_sqlite",
+                    "status": {
+                        "schema_version": 1,
+                        "artifact_type": "search_provider_status",
+                        "ok": True,
+                        "providers": {
+                            "portable_sqlite": {
+                                "provider": "portable_sqlite",
+                                "ok": True,
+                                "status": "ready_with_deferred_live_updates",
+                                "freshness": {
+                                    "status": "current_with_deferred_live_updates",
+                                    "dirty_session_count": 2,
+                                    "actionable_dirty_session_count": 0,
+                                    "deferred_live_session_count": 2,
+                                    "dirty_sessions": [
+                                        {
+                                            "session_id": f"session-{idx}",
+                                            "session_label": f"2026-06-{idx:02d}__heavy",
+                                            "live_transcript_path": f"/tmp/live-{idx}.jsonl",
+                                            "source_fingerprint": "x" * 128,
+                                        }
+                                        for idx in range(20)
+                                    ],
+                                },
+                                "metadata": {"large": "provider metadata " * 100},
+                            }
+                        },
+                    },
+                    "authority_law": ".aoa owns evidence " * 100,
+                },
+            }
+            payload["results"] = [{**SEARCH_RESULTS["results"][0], "body": "raw body " * 200}]
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, HeavySearchRunner())
+
+    search = state.session_search("", filters={"route_signal": "tool:exec_command", "doc_type": "event"}, limit=5)
+    encoded = json.dumps(search)
+
+    assert search["mcp_payload_policy"]["response_compacted"] is True
+    assert search["mcp_access"]["response_compacted"] is True
+    assert search["provider"]["status"]["providers"]["portable_sqlite"]["freshness"]["dirty_session_count"] == 2
+    assert search["results"][0]["refs"]["raw"] == "raw:line:1"
+    assert "body" not in search["results"][0]
+    assert "dirty_sessions" not in encoded
+    assert "live_transcript_path" not in encoded
+    assert "source_fingerprint" not in encoded
+    assert "provider metadata " not in encoded
+    assert "full_search_route" in search["mcp_access"]
+    assert len(encoded) < 5500
+
+
 def test_search_normalizes_layer_alias_and_explicit_shard_controls(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -1620,6 +1871,32 @@ def test_search_normalizes_layer_alias_and_explicit_shard_controls(tmp_path: Pat
     assert args[args.index("--doc-type") + 1] == "event"
     assert args[args.index("--max-shards") + 1] == "3"
     assert "--use-shards" in args
+
+
+def test_literal_query_plan_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    plan = state.session_literal_query_plan(
+        "aoa-session-memory-mcp",
+        kind="mcp_service",
+        filters={"doc_type": "event", "layer": "mcp", "max_shards": 3},
+    )
+
+    assert plan["artifact_type"] == "session_memory_literal_query_plan"
+    assert plan["kind"] == "mcp"
+    assert plan["requested_kind"] == "mcp_service"
+    assert plan["primary_route"]["route_id"] == "entity_usage_audit"
+    assert plan["cost_profile"]["structured_first"] is True
+    plan_calls = [call for call in runner.calls if call[0] == "literal-query-plan"]
+    assert len(plan_calls) == 1
+    args = plan_calls[0][1]
+    assert args[args.index("--query") + 1] == "aoa-session-memory-mcp"
+    assert args[args.index("--kind") + 1] == "mcp"
+    assert args[args.index("--doc-type") + 1] == "event"
+    assert args[args.index("--route-layer") + 1] == "mcp"
+    assert args[args.index("--max-shards") + 1] == "3"
+    assert not any(call[0] == "search" for call in runner.calls)
 
 
 def test_retrieve_unsupported_recipe_returns_structured_diagnostic(tmp_path: Path) -> None:
@@ -1926,10 +2203,21 @@ def test_agent_event_and_task_episode_routes_wrap_archive_cli(tmp_path: Path) ->
     assert response_args[response_args.index("--task-episode-id") + 1] == "task-0001"
     assert "agent-progress-updates" in calls
     assert "agent-reasoning-windows" in calls
+    reasoning_args = calls["agent-reasoning-windows"]
+    assert "--explain" in reasoning_args
     assert "answer-neighborhood" in calls
+    neighborhood_args = calls["answer-neighborhood"]
+    assert "--explain" in neighborhood_args
     episode_args = calls["task-episodes"]
     assert episode_args[episode_args.index("--status") + 1] == "closed"
     assert episode_args[episode_args.index("--verification-state") + 1] == "verified"
+
+    runner.calls.clear()
+    state.session_agent_reasoning_windows(session="session-1", explain=False)
+    state.session_answer_neighborhood(session="session-1", explain=False)
+    no_explain_calls = {call[0]: call[1] for call in runner.calls}
+    assert "--no-explain" in no_explain_calls["agent-reasoning-windows"]
+    assert "--no-explain" in no_explain_calls["answer-neighborhood"]
 
 
 def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_path: Path) -> None:
@@ -2006,6 +2294,7 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     responses = state.session_agent_responses(session="session-1", limit=3)
     answer_alias = state.session_agent_responses(session="session-1", agent_events=["answer"], limit=3)
     open_thread_alias = state.session_agent_responses(session="session-1", agent_events=["open_thread"], limit=3)
+    closeout_final = state.session_agent_responses(session="session-1", closeout_final=True, limit=3)
     search = state.session_search(
         "",
         filters={"session": "session-1", "doc_type": "event", "agent_event": "assistant_answer"},
@@ -2029,11 +2318,30 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     assert open_thread_alias["requested_agent_events"] == ["open_thread"]
     assert open_thread_alias["result_count"] == 1
     assert open_thread_alias["results"][0]["agent_event"] == "assistant_open_thread"
+    assert closeout_final["source"] == "portable_sqlite_agent_event_fast_path"
+    assert closeout_final["agent_events"] == ["assistant_final_closeout"]
+    assert closeout_final["result_count"] == 0
     assert responses["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
     assert responses["search_projection"]["fallback_route"] == "archive_cli_shard_fanout"
     assert responses["cost_profile"]["lightweight_route"] is True
     assert responses["cost_profile"]["uses_fts"] is False
     assert responses["mcp_access"]["archive_command"] is None
+    assert responses["quality"]["ordered_by"] == "sqlite_rowid_desc_agent_event_fast_path"
+    assert responses["quality"]["result_count"] == 2
+    assert responses["quality"]["agent_event_counts"] == {
+        "assistant_answer": 1,
+        "assistant_open_thread": 1,
+    }
+    assert responses["quality"]["freshness_counts"] == {"fresh": 2}
+    assert responses["quality"]["source_counts"] == {"mcp_sqlite_projection": 2}
+    assert responses["quality"]["conversation_act_counts"] == {
+        "assistant_open_thread": 1,
+        "assistant_response": 1,
+    }
+    assert responses["quality"]["raw_ref_present_count"] == 2
+    assert responses["quality"]["segment_ref_present_count"] == 2
+    assert responses["quality"]["latest_result"]["event_id"] == "000002"
+    assert responses["quality"]["latest_result"]["raw"] == "raw:line:2"
     assert search["source"] == "portable_sqlite_agent_event_fast_path"
     assert "served by MCP agent-event route fast path" in search["diagnostics"]
     assert open_thread_search["source"] == "portable_sqlite_agent_event_fast_path"
@@ -2087,6 +2395,47 @@ def test_text_agent_event_route_uses_archive_shard_path_even_when_sqlite_fast_sc
     assert args[args.index("--session") + 1] == "session-1"
 
 
+def test_agent_event_fast_path_accepts_live_agent_event_date_index(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    conn = sqlite3.connect(state.aoa_root / "search/aoa-search.sqlite3")
+    try:
+        conn.executescript(
+            """
+            ALTER TABLE documents ADD COLUMN conversation_act TEXT;
+            ALTER TABLE documents ADD COLUMN session_act TEXT;
+            ALTER TABLE documents ADD COLUMN agent_event TEXT;
+            ALTER TABLE documents ADD COLUMN task_episode_id TEXT;
+            ALTER TABLE documents ADD COLUMN route_layers TEXT;
+            ALTER TABLE documents ADD COLUMN route_signals TEXT;
+            CREATE INDEX idx_documents_agent_event_date ON documents(agent_event, session_date);
+            """
+        )
+        conn.execute(
+            """
+            UPDATE documents
+            SET conversation_act = 'assistant_final_closeout',
+                session_act = 'assistant_closeout',
+                agent_event = 'assistant_final_closeout',
+                task_episode_id = 'task-0001',
+                route_layers = '|agent_event|',
+                route_signals = '|agent_event:assistant_final_closeout|'
+            WHERE id = 'event:session-1:000:000001'
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    responses = state.session_agent_responses(closeout_final=True, limit=3)
+
+    assert responses["source"] == "portable_sqlite_agent_event_fast_path"
+    assert responses["agent_events"] == ["assistant_final_closeout"]
+    assert responses["result_count"] == 1
+    assert responses["results"][0]["agent_event"] == "assistant_final_closeout"
+    assert runner.calls == []
+
+
 def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -2108,6 +2457,16 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert lifecycles["results"][0]["objective"].endswith("...")
     assert lifecycles["results"][0]["objective_omitted"] is True
     assert lifecycles["results"][0]["objective_chars"] > 320
+    assert lifecycles["results"][0]["objective_source"] == "goal_tool_output"
+    assert lifecycles["results"][0]["observed_goal"]["objective"].endswith("...")
+    assert lifecycles["results"][0]["observed_goal"]["objective_omitted"] is True
+    assert lifecycles["results"][0]["observed_goal"]["createdAt"] == 1780000000
+    assert len(lifecycles["results"][0]["state_observations"]) == 2
+    assert lifecycles["results"][0]["state_observations"][0]["refs"]["raw_ref"] == "raw:line:7"
+    assert lifecycles["results"][0]["omitted_state_observation_count"] == 1
+    assert len(lifecycles["results"][0]["usage_observations"]) == 2
+    assert lifecycles["results"][0]["usage_observations"][1]["refs"]["raw_ref"] == "raw:line:7"
+    assert lifecycles["results"][0]["omitted_usage_observation_count"] == 1
     assert len(lifecycles["results"][0]["sample_events"]) == 2
     assert lifecycles["results"][0]["sample_events"][0]["objective"].endswith("...")
     assert lifecycles["results"][0]["sample_events"][0]["objective_omitted"] is True
@@ -2121,6 +2480,19 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert args[args.index("--status") + 1] == "complete"
     assert args[args.index("--event-kind") + 1] == "goal_completed"
     assert args[args.index("--order") + 1] == "chronological"
+
+
+def test_goal_lifecycle_route_rejects_invalid_order_before_cli(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    lifecycles = state.session_goal_lifecycles(order="desc")
+
+    assert lifecycles["ok"] is False
+    assert lifecycles["artifact_type"] == "goal_lifecycle_route_error"
+    assert lifecycles["allowed_order_values"] == ["recent", "chronological"]
+    assert lifecycles["mcp_access"]["archive_command"] is None
+    assert runner.calls == []
 
 
 def test_stdio_route_count_summary_allows_empty_route_results() -> None:
@@ -2142,9 +2514,12 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "result_count": 0},
         {"ok": True, "window_count": 0},
         {"ok": True, "entity_count": 1},
+        {"primary_route": {"route_id": "entity_usage_audit"}, "cost_profile": {"structured_first": True}},
         {"kind": "mcp", "requested_kind": "mcp_service"},
         {"kind": "agent_event", "outcome_event_count": 2},
+        {"node_count": 3, "edge_count": 2},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_audit"}},
+        {"quality": {"scenario_count": 1, "warn_count": 1}},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
         tool_count=30,
@@ -2166,12 +2541,25 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["task_episode_count"] == 0
     assert summary["goal_lifecycle_count"] == 0
     assert summary["answer_neighborhood_count"] == 0
+    assert summary["literal_plan_primary_route"] == "entity_usage_audit"
+    assert summary["literal_plan_structured_first"] is True
     assert summary["usage_alias_kind"] == "mcp"
     assert summary["usage_alias_requested_kind"] == "mcp_service"
     assert summary["agent_event_usage_kind"] == "agent_event"
+    assert summary["graph_neighborhood_node_count"] == 3
+    assert summary["graph_neighborhood_edge_count"] == 2
+    assert summary["live_scenario_count"] == 1
+    assert summary["live_scenario_warn_count"] == 1
     assert summary["agent_event_usage_outcome_count"] == 2
     assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_audit"
     assert summary["maintenance_recommendation"] == "use_graph_search"
+
+
+def test_validator_requires_literal_and_graph_mcp_tools() -> None:
+    validator = load_validator_module()
+
+    assert "aoa_session_literal_query_plan" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
 def test_running_mcp_process_advisory_reports_stale_transports(tmp_path: Path, monkeypatch: Any) -> None:
@@ -2276,6 +2664,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
 
     query_schema = tools["aoa_session_search"].inputSchema["properties"]["query"]
     assert query_schema["default"] == ""
+    assert "aoa_session_literal_query_plan" in tools
     assert "aoa_session_agent_responses" in tools
     assert "aoa_session_agent_closeouts" in tools
     assert "aoa_session_agent_progress_updates" in tools
@@ -2287,13 +2676,29 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_hook_receipts" in tools
     assert "aoa_session_entity_inventory" in tools
     assert "aoa_session_entity_registry" in tools
+    assert "aoa_session_live_scenario_audit" in tools
     assert "aoa_session_projection_status" in tools
+    assert "aoa_session_graph_neighborhood" in tools
+    assert "aoa_session_graph_timeline" in tools
+    assert "aoa_session_graph_shortest_path" in tools
+    assert "aoa_session_graph_cooccurrence" in tools
     assert tools["aoa_session_hook_receipts"].inputSchema["properties"]["event_name"]["default"] == "UserPromptSubmit"
     assert tools["aoa_session_entity_inventory"].inputSchema["properties"]["layer"]["default"] == "skill"
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
+    assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
+    assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
+    literal_description = tools["aoa_session_literal_query_plan"].description or ""
+    graph_description = tools["aoa_session_graph_neighborhood"].description or ""
+    assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
+    assert "graph route neighborhood" in graph_description
+    assert "skill, MCP, hook, tool" in graph_description
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
-    assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]["default"] == "recent"
+    goal_order_schema = tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]
+    assert goal_order_schema["default"] == "recent"
+    rendered_goal_order_schema = json.dumps(goal_order_schema, sort_keys=True)
+    assert "recent" in rendered_goal_order_schema
+    assert "chronological" in rendered_goal_order_schema
 
 
 def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Path) -> None:
@@ -2633,6 +3038,9 @@ def test_hook_receipts_are_first_class_session_evidence(tmp_path: Path) -> None:
     assert receipts["schema"] == "aoa_session_memory_hook_receipts_v1"
     assert receipts["ok"] is True
     assert receipts["total_receipt_count"] == 2
+    assert receipts["date_semantics"]["filter_basis"] == "hook_receipt_timestamp"
+    assert receipts["date_semantics"]["timestamp_fields"] == ["timestamp", "received_at", "generated_at"]
+    assert receipts["date_semantics"]["not_session_date"] is True
     assert receipts["summary"]["error_receipt_count"] == 1
     assert receipts["summary"]["typing_bridge_failure_count"] == 1
     assert receipts["summary"]["action_counts"][0]["key"] == "hook_event_recorded"
@@ -2842,6 +3250,7 @@ def test_entity_usage_audit_compacts_heavy_archive_payload_for_mcp(tmp_path: Pat
     assert len(audit["document_refs"]) == 2
     assert "content" not in audit["usage_events"][0]
     assert len(audit["usage_events"][0]["title"]) <= 80
+    assert "omitted_field_count" not in encoded
     assert len(encoded) < 5500
     assert ("raw evidence " * 20) not in encoded
 
@@ -2918,6 +3327,7 @@ def test_entity_usage_neighborhood_compacts_heavy_archive_payload_for_mcp(tmp_pa
     assert len(first["document_refs"]) == 2
     assert len(first["source_usage_event"]["raw_preview"]["text"]) <= 80
     assert "content" not in first["source_usage_event"]
+    assert "omitted_field_count" not in encoded
     assert len(encoded) < 4500
     assert ("neighbor evidence " * 12) not in encoded
 
@@ -2951,6 +3361,86 @@ def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_p
     assert args[args.index("--raw-preview-limit") + 1] == "2"
     assert "--full" in args
     assert runner.timeouts[-1] == ("entity-usage-scenario-audit", 90.0)
+
+
+def test_live_scenario_audit_runs_multiple_bounded_routes(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    audit = state.session_live_scenario_audit(
+        seed="fixture-live",
+        profiles=[
+            "entity_usage",
+            "hook_failure",
+            "goal_lifecycle",
+            "agent_closeout",
+            "literal_planner",
+            "graph_neighborhood",
+        ],
+        sample_size=2,
+        recent_days=4000,
+        limit=2,
+    )
+
+    assert audit["artifact_type"] == "session_memory_live_scenario_audit"
+    assert audit["ok"] is True
+    assert audit["truth_status"] == "bounded_live_scenario_audit_not_reviewed_truth"
+    assert audit["parameters"]["limit"] == 2
+    assert audit["quality"]["scenario_count"] == 6
+    assert audit["quality"]["failed_count"] == 0
+    assert audit["quality"]["raw_or_segment_ref_scenario_count"] >= 4
+    scenarios = {item["profile"]: item for item in audit["scenarios"]}
+    assert scenarios["entity_usage"]["sample_count"] == 2
+    assert scenarios["hook_failure"]["total_receipt_count"] == 1
+    assert scenarios["hook_failure"]["date_semantics"]["filter_basis"] == "hook_receipt_timestamp"
+    assert scenarios["goal_lifecycle"]["result_count"] == 1
+    assert scenarios["agent_closeout"]["result_count"] == 1
+    assert scenarios["literal_planner"]["primary_route_id"] == "entity_usage_audit"
+    assert scenarios["graph_neighborhood"]["node_count"] == 3
+    assert scenarios["graph_neighborhood"]["evidence_ref_count"] == 1
+    assert scenarios["hook_failure"]["first_ref"]["receipt"].endswith("hooks/receipts.jsonl#L2")
+    assert scenarios["graph_neighborhood"]["first_ref"]["raw"] == "raw:line:1"
+
+    commands = [call[0] for call in runner.calls]
+    assert "entity-usage-scenario-audit" in commands
+    assert "goal-lifecycles" in commands
+    assert "agent-closeouts" in commands
+    assert "literal-query-plan" in commands
+    assert "graph-neighborhood" in commands
+    usage_args = next(args for command, args in runner.calls if command == "entity-usage-scenario-audit")
+    assert usage_args[usage_args.index("--seed") + 1] == "fixture-live"
+    assert usage_args[usage_args.index("--sample-size") + 1] == "2"
+
+
+def test_live_scenario_audit_warns_when_literal_planner_starts_with_monolith(tmp_path: Path) -> None:
+    class MonolithLiteralRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command != "literal-query-plan":
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            payload = {
+                **LITERAL_QUERY_PLAN,
+                "primary_route": {"route_id": "monolith_raw_text_fallback", "estimated_cost": "high"},
+                "cost_profile": {
+                    "structured_first": False,
+                    "uses_fts_first": False,
+                    "monolith_fallback_first": True,
+                },
+            }
+            return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+
+    state = state_with_fixture(tmp_path, MonolithLiteralRunner())
+
+    audit = state.session_live_scenario_audit(profiles=["literal_planner"], limit=2)
+
+    assert audit["ok"] is True
+    assert audit["quality"]["warn_count"] == 1
+    scenario = audit["scenarios"][0]
+    assert scenario["status"] == "warn"
+    assert scenario["primary_route_id"] == "monolith_raw_text_fallback"
+    assert "literal_planner_used_monolith_fallback_first" in scenario["quality_flags"]
 
 
 def test_route_reads_generated_axis_without_arbitrary_paths(tmp_path: Path) -> None:
@@ -3014,11 +3504,169 @@ def test_pattern_scan_aggregates_route_signals(tmp_path: Path) -> None:
     assert scan["aggregates"]["route_signal"][0]["key"] == "entity:aoa_session_memory_mcp"
 
 
+def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    graph_db = state.aoa_root / "graph/graph.sqlite3"
+    graph_db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(graph_db)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE nodes (
+                id TEXT PRIMARY KEY,
+                node_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE edges (
+                id TEXT PRIMARY KEY,
+                edge_type TEXT NOT NULL,
+                source_node TEXT NOT NULL,
+                target_node TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX idx_edges_source ON edges(source_node);
+            CREATE INDEX idx_edges_target ON edges(target_node);
+            CREATE TABLE node_contribs (
+                source_key TEXT NOT NULL,
+                node_id TEXT NOT NULL,
+                node_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_key, node_id)
+            );
+            CREATE INDEX idx_node_contribs_node ON node_contribs(node_id);
+            CREATE TABLE edge_contribs (
+                source_key TEXT NOT NULL,
+                edge_id TEXT NOT NULL,
+                edge_type TEXT NOT NULL,
+                source_node TEXT NOT NULL,
+                target_node TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_key, edge_id)
+            );
+            CREATE INDEX idx_edge_contribs_edge ON edge_contribs(edge_id);
+            """
+        )
+        route_node = {
+            "id": "route:mcp:mcp:aoa_session_memory_mcp",
+            "type": "mcp",
+            "label": "mcp:aoa_session_memory_mcp",
+            "route_layer": "mcp",
+            "route_signal": "mcp:aoa_session_memory_mcp",
+        }
+        event_node = {"id": "event:session-1:000:000001", "type": "event", "title": "debug mcp"}
+        session_node = {"id": "session:session-1", "type": "session", "label": "session-1"}
+        conn.executemany(
+            "INSERT INTO nodes (id, node_type, payload_json, count) VALUES (?, ?, ?, ?)",
+            [
+                (route_node["id"], "mcp", json.dumps(route_node), 9),
+                (event_node["id"], "event", json.dumps(event_node), 1),
+                (session_node["id"], "session", json.dumps(session_node), 3),
+            ],
+        )
+        edge_payloads = [
+            (
+                "edge:1",
+                "mentions_route_signal",
+                event_node["id"],
+                route_node["id"],
+                {
+                    "type": "mentions_route_signal",
+                    "event_id": "000001",
+                    "segment_id": "000",
+                    "session_id": "session-1",
+                    "evidence_refs": [
+                        {
+                            "session_id": "session-1",
+                            "segment_id": "000",
+                            "event_id": "000001",
+                            "refs": {"raw": "raw:line:1", "segment": "000__initial-to-latest.md#event-000001"},
+                        }
+                    ],
+                },
+                5,
+            ),
+            (
+                "edge:2",
+                "session_has_route_signal",
+                session_node["id"],
+                route_node["id"],
+                {"type": "session_has_route_signal", "session_id": "session-1"},
+                3,
+            ),
+            (
+                "edge:3",
+                "mentions_route_signal",
+                "event:session-1:000:000002",
+                route_node["id"],
+                {"type": "mentions_route_signal", "event_id": "000002"},
+                1,
+            ),
+        ]
+        conn.executemany(
+            "INSERT INTO edges (id, edge_type, source_node, target_node, payload_json, count) VALUES (?, ?, ?, ?, ?, ?)",
+            [(edge_id, edge_type, source, target, json.dumps(payload), count) for edge_id, edge_type, source, target, payload, count in edge_payloads],
+        )
+        conn.execute(
+            "INSERT INTO node_contribs (source_key, node_id, node_type, payload_json, count) VALUES (?, ?, ?, ?, ?)",
+            (
+                "session:session-1",
+                route_node["id"],
+                "mcp",
+                json.dumps(
+                    {
+                        "evidence_refs": [
+                            {
+                                "session_id": "session-1",
+                                "refs": {"session": "sessions/2026-05-26__001__session-memory-mcp/session.manifest.json"},
+                            }
+                        ]
+                    }
+                ),
+                1,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO edge_contribs (source_key, edge_id, edge_type, source_node, target_node, payload_json, count) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "event:session-1:000:000001",
+                "edge:1",
+                "mentions_route_signal",
+                event_node["id"],
+                route_node["id"],
+                json.dumps(edge_payloads[0][4]),
+                1,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=1, limit=4, edge_limit=2)
+
+    assert neighborhood["source"] == "mcp_sqlite_graph_fast_path"
+    assert neighborhood["quality"]["direct_sqlite_fast_path"] is True
+    assert neighborhood["quality"]["raw_or_segment_ref_present"] is True
+    assert neighborhood["node_count"] == 3
+    assert neighborhood["edge_count"] == 2
+    assert neighborhood["omitted_edge_count"] == 1
+    assert neighborhood["truncated"] is True
+    assert any(str(ref.get("refs", {}).get("session", "")).endswith("session.manifest.json") for ref in neighborhood["evidence_refs"])
+    assert any(ref.get("refs", {}).get("raw") == "raw:line:1" for ref in neighborhood["evidence_refs"])
+    assert neighborhood["mcp_access"]["archive_command"] is None
+    assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
+    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
+
+
 def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
-    neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=20)
+    neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=20, edge_limit=7)
     timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp", limit=10)
     path = state.graph_shortest_path("aoa-session-memory-mcp", "exec_command", max_depth=4)
     cooccurrence = state.graph_cooccurrence("aoa-session-memory-mcp", kind="mcp", limit=10)
@@ -3028,7 +3676,29 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     quality = state.graph_quality_audit(limit=4)
 
     assert neighborhood["evidence_refs"][0]["refs"]["raw"] == "raw:line:1"
+    assert neighborhood["truncated"] is True
+    assert neighborhood["next_command"].startswith("python3 scripts/aoa_session_memory.py graph-neighborhood")
+    assert neighborhood["next_expansion_command"].startswith(
+        "python3 scripts/aoa_session_memory.py graph-neighborhood"
+    )
+    assert neighborhood["next_expansion_reason"]
+    assert neighborhood["freshness"]["status"] == "graph_store_stale"
+    assert neighborhood["freshness"]["warning"].startswith("graph store")
+    assert neighborhood["freshness"]["actionable_graph_source_count"] == 2531
+    assert neighborhood["freshness"]["deferred_live_source_count"] == 1139
+    assert neighborhood["freshness"]["ledger_store_missing_count"] == 52
+    assert neighborhood["freshness"]["latest_maintenance_remaining_count"] == 2452
+    assert neighborhood["freshness"]["hot_gate_diagnostics"] == [
+        "maintenance_queue_empty_but_ledger_actionable_sources_present"
+    ]
+    assert neighborhood["freshness"]["maintenance_recommendation"]["route"] == "budgeted_graph_maintenance"
+    assert neighborhood["freshness"]["maintenance_recommendation"]["command"].startswith(
+        "python3 scripts/aoa_session_memory.py graph-maintenance"
+    )
+    assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
+    assert neighborhood["mcp_access"]["response_compacted"] is True
     assert timeline["events"][0]["type"] == "event"
+    assert timeline["mcp_payload_policy"]["response_compacted"] is True
     assert path["edges"][0]["type"] == "mentions_route_signal"
     assert cooccurrence["cooccurrences"][0]["node"]["type"] == "tool"
     assert graphrag["artifact_type"] == "session_memory_graphrag_packet"
@@ -3046,6 +3716,139 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
         "graph-eval",
         "graph-quality-audit",
     }
+    graph_call_args = next(args for command, args in runner.calls if command == "graph-neighborhood")
+    assert "--edge-limit" in graph_call_args
+
+
+def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path) -> None:
+    long_text = "heavy graph evidence " * 80
+
+    class HeavyGraphRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            args = tuple(argv[3:])
+            self.calls.append((command, args))
+            self.timeouts.append((command, timeout))
+            if command == "graph-neighborhood":
+                evidence_refs = [
+                    {
+                        "session_id": "session-1",
+                        "segment_id": "000",
+                        "event_id": f"{idx:06d}",
+                        "node_id": f"event:session-1:000:{idx:06d}",
+                        "refs": {"raw": f"raw:line:{idx}", "segment": f"seg#event-{idx:06d}"},
+                    }
+                    for idx in range(30)
+                ] + [
+                    {
+                        "session_id": "session-1",
+                        "segment_id": "000",
+                        "event_id": "000001",
+                        "node_id": "event:session-1:000:000001",
+                        "refs": {"raw": "raw:line:1", "segment": "seg#event-000001"},
+                    }
+                    for _ in range(10)
+                ]
+                payload = {
+                    "schema_version": 1,
+                    "artifact_type": "session_memory_graph_neighborhood",
+                    "ok": True,
+                    "mutates": False,
+                    "anchor": "aoa-session-memory-mcp",
+                    "node_count": 60,
+                    "edge_count": 100,
+                    "nodes": [
+                        {
+                            "id": f"event:session-1:000:{idx:06d}",
+                            "type": "event",
+                            "title": long_text,
+                            "content": long_text,
+                            "evidence_refs": [evidence_refs[idx % len(evidence_refs)]],
+                        }
+                        for idx in range(60)
+                    ],
+                    "edges": [
+                        {
+                            "source": f"event:session-1:000:{idx % 60:06d}",
+                            "target": "route:mcp:mcp:aoa_session_memory_mcp",
+                            "type": "mentions_route_signal",
+                            "content": long_text,
+                        }
+                        for idx in range(100)
+                    ],
+                    "evidence_refs": evidence_refs,
+                    "freshness": {"status": "fresh"},
+                }
+                return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+            if command == "graph-timeline":
+                payload = {
+                    "schema_version": 1,
+                    "artifact_type": "session_memory_graph_timeline",
+                    "ok": True,
+                    "mutates": False,
+                    "anchor": "aoa-session-memory-mcp",
+                    "events": [
+                        {
+                            "id": f"event:session-1:000:{idx:06d}",
+                            "type": "event",
+                            "event_id": f"{idx:06d}",
+                            "title": long_text,
+                            "content": long_text,
+                            "evidence_refs": [
+                                {
+                                    "session_id": "session-1",
+                                    "segment_id": "000",
+                                    "event_id": f"{idx:06d}",
+                                    "refs": {"raw": f"raw:line:{idx}", "segment": f"seg#event-{idx:06d}"},
+                                }
+                            ],
+                        }
+                        for idx in range(60)
+                    ],
+                    "evidence_refs": [
+                        {
+                            "session_id": "session-1",
+                            "segment_id": "000",
+                            "event_id": f"{idx:06d}",
+                            "refs": {"raw": f"raw:line:{idx}", "segment": f"seg#event-{idx:06d}"},
+                        }
+                        for idx in range(60)
+                    ],
+                }
+                return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
+            return super().__call__(argv, timeout)
+
+    runner = HeavyGraphRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", limit=60, edge_limit=80)
+    timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp", limit=50)
+    encoded = json.dumps({"neighborhood": neighborhood, "timeline": timeline})
+
+    assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
+    assert neighborhood["mcp_access"]["response_compacted"] is True
+    assert len(neighborhood["nodes"]) == 8
+    assert neighborhood["omitted_node_count"] == 52
+    assert len(neighborhood["edges"]) == 8
+    assert neighborhood["omitted_edge_count"] == 92
+    assert len(neighborhood["evidence_refs"]) == 6
+    assert neighborhood["evidence_ref_count"] == 40
+    assert neighborhood["unique_evidence_ref_count"] == 30
+    assert neighborhood["deduplicated_evidence_ref_count"] == 10
+    assert neighborhood["omitted_evidence_ref_count"] == 24
+    assert neighborhood["nodes"][0]["refs"]["raw"] == "raw:line:0"
+    assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
+
+    assert timeline["mcp_payload_policy"]["response_compacted"] is True
+    assert len(timeline["events"]) == 8
+    assert timeline["omitted_event_count"] == 52
+    assert timeline["events"][0]["refs"]["raw"] == "raw:line:0"
+    assert "graph-timeline" in timeline["mcp_access"]["full_graph_route"]
+    assert "content" not in encoded
+    assert "omitted_field_count" not in encoded
+    assert len(encoded) < 14000
+    graph_call_args = next(args for command, args in runner.calls if command == "graph-neighborhood")
+    assert graph_call_args[graph_call_args.index("--edge-limit") + 1] == "80"
 
 
 def test_read_resource_and_server_build(tmp_path: Path) -> None:
