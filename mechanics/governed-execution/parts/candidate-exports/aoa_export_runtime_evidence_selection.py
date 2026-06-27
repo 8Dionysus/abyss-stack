@@ -9,6 +9,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
 def slugify(text: str) -> str:
@@ -24,6 +25,19 @@ def default_title(selection_id: str) -> str:
 
 BRIDGE_CONFIG_RELATIVE_PATH = Path("config-templates/Configs/federation/upstream-compatibility-bridge.json")
 RUNTIME_BRIDGE_CONFIG_RELATIVE_PATH = Path("Configs/federation/upstream-compatibility-bridge.json")
+RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF = (
+    "repo:abyss-stack/mechanics/governed-execution/parts/candidate-exports/"
+    "schemas/runtime-eval-evidence-selection-candidate.schema.json"
+)
+RUNTIME_EVIDENCE_ROLES = {
+    "summary",
+    "case-breakdown",
+    "environment-note",
+    "comparison-note",
+    "integrity-sidecar",
+}
+COMPARISON_MODES = {"none", "fixed-baseline", "peer-compare", "longitudinal-window"}
+PROMOTION_TARGETS = {"local-only", "evidence-sidecar", "bundle-candidate"}
 
 
 def find_repo_root(start: Path) -> Path:
@@ -65,6 +79,140 @@ def compatibility_source_refs(compatibility: dict[str, dict[str, Any]], name: st
 def compatibility_selection_ids(compatibility: dict[str, dict[str, Any]], name: str) -> set[str]:
     entry = compatibility[name]
     return {str(entry["canonical_selection_id"]), str(entry["upstream_selection_id"])}
+
+
+def selection_id_matches(selection_id: str, candidates: set[str]) -> bool:
+    selection_slug = slugify(selection_id)
+    return any(slugify(candidate) in selection_slug for candidate in candidates)
+
+
+def infer_comparison_mode(selection_id: str, template_name: str) -> str:
+    joined = f"{selection_id} {template_name}".lower()
+    if "tradeoff" in joined or "latency" in joined or "compare" in joined:
+        return "fixed-baseline"
+    if "window" in joined or "rerun" in joined:
+        return "longitudinal-window"
+    return "none"
+
+
+def string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, str) and item]
+
+
+def unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def selected_evidence_entries(candidate_payload: dict[str, Any], source_input_ref: str) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    raw_entries = candidate_payload.get("selected_evidence")
+    if isinstance(raw_entries, list):
+        for raw_entry in raw_entries:
+            if not isinstance(raw_entry, dict):
+                continue
+            artifact_ref = raw_entry.get("artifact_ref")
+            if not isinstance(artifact_ref, str) or not artifact_ref:
+                continue
+            role = str(raw_entry.get("evidence_role") or "summary")
+            if role not in RUNTIME_EVIDENCE_ROLES:
+                role = "summary"
+            entries.append(
+                {
+                    "artifact_ref": artifact_ref,
+                    "evidence_role": role,
+                    "summary_only": bool(raw_entry.get("summary_only", True)),
+                }
+            )
+    if not entries:
+        entries.append(
+            {
+                "artifact_ref": source_input_ref,
+                "evidence_role": "summary",
+                "summary_only": True,
+            }
+        )
+    return entries
+
+
+def canonical_runtime_evidence_selection(
+    candidate_payload: dict[str, Any],
+    *,
+    source_input_ref: str,
+) -> dict[str, Any]:
+    selection_id = str(candidate_payload.get("selection_id") or "runtime-evidence-selection")
+    template_name = str(candidate_payload.get("template_name") or "")
+    comparison_mode = str(candidate_payload.get("comparison_mode") or "")
+    if comparison_mode not in COMPARISON_MODES:
+        comparison_mode = infer_comparison_mode(selection_id, template_name)
+    promotion_target = str(candidate_payload.get("promotion_target") or "")
+    if promotion_target not in PROMOTION_TARGETS:
+        promotion_target = "evidence-sidecar"
+
+    manifests = string_list(candidate_payload.get("source_manifests"))
+    advisory_trace_ref = candidate_payload.get("advisory_trace_ref")
+    if isinstance(advisory_trace_ref, str) and advisory_trace_ref:
+        manifests.append(advisory_trace_ref)
+    manifests.append(source_input_ref)
+
+    target_eval = candidate_payload.get("target_eval")
+    candidate_eval_refs = string_list(candidate_payload.get("candidate_eval_refs"))
+    if not isinstance(target_eval, str):
+        for ref in candidate_eval_refs:
+            if ref.startswith("candidate:aoa-"):
+                target_eval = ref[len("candidate:") :]
+                break
+
+    review_posture = candidate_payload.get("review_posture")
+    review_posture = dict(review_posture) if isinstance(review_posture, dict) else {}
+    normalized: dict[str, Any] = {
+        "surface_type": "runtime_evidence_selection",
+        "selection_id": selection_id,
+        "source_repo": str(candidate_payload.get("source_repo") or "abyss-stack"),
+        "source_schema_ref": str(candidate_payload.get("source_schema_ref") or RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF),
+        "source_manifests": unique_strings(manifests),
+        "bounded_claim": str(
+            candidate_payload.get("bounded_claim")
+            or f"Private governed-run runtime evidence selection for {selection_id}. "
+            "This is candidate routing evidence only and requires bundle-local review before any proof claim."
+        ),
+        "promotion_target": promotion_target,
+        "comparison_mode": comparison_mode,
+        "selected_evidence": selected_evidence_entries(candidate_payload, source_input_ref),
+        "environment_invariants": string_list(candidate_payload.get("environment_invariants"))
+        or ["same governed-run review-packet generation context"],
+        "do_not_overread": string_list(candidate_payload.get("do_not_overread"))
+        or [
+            "does not compute or imply an aoa-evals verdict",
+            "does not accept runtime evidence without bundle-local review",
+            "does not transfer proof authority into abyss-stack",
+        ],
+        "review_posture": {
+            "portable_enough": bool(review_posture.get("portable_enough", False)),
+            "comparison_hygiene_named": bool(review_posture.get("comparison_hygiene_named", comparison_mode != "none")),
+            "human_review_required": True,
+        },
+    }
+    if candidate_eval_refs:
+        normalized["candidate_eval_refs"] = unique_strings(candidate_eval_refs)
+    if isinstance(target_eval, str) and target_eval:
+        normalized["target_eval"] = target_eval
+    memory_context_boundary = candidate_payload.get("memory_context_boundary")
+    if isinstance(memory_context_boundary, dict):
+        normalized["memory_context_boundary"] = memory_context_boundary
+    for optional_key in ("environment_deltas", "excluded_artifacts"):
+        optional_values = string_list(candidate_payload.get(optional_key))
+        if optional_values:
+            normalized[optional_key] = unique_strings(optional_values)
+    return normalized
 
 
 def read_json(path: Path) -> dict:
@@ -116,13 +264,15 @@ def main() -> int:
     )
 
     input_path = Path(args.input_file).resolve()
-    candidate_payload = read_json(input_path)
-    if candidate_payload.get("surface_type") != "runtime_evidence_selection":
+    raw_candidate_payload = read_json(input_path)
+    if raw_candidate_payload.get("surface_type") != "runtime_evidence_selection":
         raise SystemExit("error: candidate payload must use surface_type runtime_evidence_selection")
 
-    selection_id = candidate_payload.get("selection_id")
+    selection_id = raw_candidate_payload.get("selection_id")
     if not isinstance(selection_id, str) or not selection_id:
         raise SystemExit("error: candidate payload must include selection_id")
+    source_input_ref = f"local:{input_path}"
+    candidate_payload = canonical_runtime_evidence_selection(raw_candidate_payload, source_input_ref=source_input_ref)
 
     captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
@@ -130,9 +280,9 @@ def main() -> int:
     summary = args.summary or f"Bounded aoa-evals runtime evidence selection candidate for {selection_id}."
     record_id = args.record_id or f"{timestamp}__runtime-evidence-selection__{slugify(selection_id)}"
 
-    candidate_eval_refs = candidate_payload.get("candidate_eval_refs", [])
+    candidate_eval_refs = raw_candidate_payload.get("candidate_eval_refs", [])
     ref_paths = [f"local:{schema_path}", f"local:{bench_guide_path}"]
-    source_example_ref = candidate_payload.get("source_example_ref")
+    source_example_ref = raw_candidate_payload.get("source_example_ref")
     example_contract_refs = {
         "examples/runtime_evidence_selection.workhorse-local.example.json": [workhorse_example_path],
         "examples/runtime_evidence_selection.return-anchor-integrity.example.json": [
@@ -153,15 +303,15 @@ def main() -> int:
         ref_paths.extend([f"local:{recurrence_path}", f"local:{return_example_path}"])
     elif (
         any(ref == "candidate:aoa-memo-recall-integrity" for ref in candidate_eval_refs)
-        or selection_id in memo_recall_selection_ids
+        or selection_id_matches(selection_id, memo_recall_selection_ids)
     ):
         ref_paths.append(f"local:{memo_recall_example_path}")
     elif (
         any(ref == "candidate:aoa-memo-contradiction-integrity" for ref in candidate_eval_refs)
-        or selection_id in memo_contradiction_gap_selection_ids
-        or selection_id in memo_contradiction_rerun_selection_ids
+        or selection_id_matches(selection_id, memo_contradiction_gap_selection_ids)
+        or selection_id_matches(selection_id, memo_contradiction_rerun_selection_ids)
     ):
-        if selection_id in memo_contradiction_rerun_selection_ids:
+        if selection_id_matches(selection_id, memo_contradiction_rerun_selection_ids):
             ref_paths.append(f"local:{memo_contradiction_rerun_example_path}")
         else:
             ref_paths.append(f"local:{memo_contradiction_gap_example_path}")
@@ -179,7 +329,7 @@ def main() -> int:
         "title": title,
         "summary": summary,
         "selection_id": selection_id,
-        "source_input_ref": f"local:{input_path}",
+        "source_input_ref": source_input_ref,
         "source_input_sha256": hashlib.sha256(rendered_input).hexdigest(),
         "aoa_evals_contract_refs": ref_paths,
         "candidate_payload": candidate_payload,

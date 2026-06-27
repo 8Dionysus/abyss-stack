@@ -154,6 +154,17 @@ EVAL_RUNTIME_CANDIDATE_INTAKE_SOURCE_REF = "aoa-evals/generated/runtime_candidat
 MEMO_RUNTIME_WRITEBACK_INTAKE_SOURCE_REF = (
     "aoa-memo/mechanics/writeback/parts/runtime-and-temperature/generated/runtime_writeback_intake.min.json"
 )
+RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF = (
+    "repo:abyss-stack/mechanics/governed-execution/parts/candidate-exports/"
+    "schemas/runtime-eval-evidence-selection-candidate.schema.json"
+)
+RUNTIME_EVIDENCE_ROLES = {
+    "summary",
+    "case-breakdown",
+    "environment-note",
+    "comparison-note",
+    "integrity-sidecar",
+}
 
 
 def load_trials_module() -> Any:
@@ -3561,27 +3572,71 @@ def build_runtime_evidence_selection_payload(
     required_runtime_artifacts = [
         artifact for artifact in template.get("required_runtime_artifacts", []) if isinstance(artifact, str) and artifact
     ]
-    return {
+    selected_evidence = []
+    for artifact in required_runtime_artifacts:
+        evidence_role = artifact if artifact in RUNTIME_EVIDENCE_ROLES else "summary"
+        selected_evidence.append(
+            {
+                "evidence_role": evidence_role,
+                "artifact_ref": f"governed-run:{run_id}:{artifact}",
+                "summary_only": True,
+            }
+        )
+    if not selected_evidence:
+        selected_evidence.append(
+            {
+                "evidence_role": "summary",
+                "artifact_ref": f"governed-run:{run_id}:summary",
+                "summary_only": True,
+            }
+        )
+
+    template_name = str(template.get("template_name") or "")
+    comparison_mode = "fixed-baseline" if any(token in template_name for token in ("tradeoff", "latency")) else "none"
+    if "window" in template_name or "rerun" in template_name:
+        comparison_mode = "longitudinal-window"
+
+    payload: dict[str, Any] = {
         "surface_type": "runtime_evidence_selection",
         "selection_id": selection_id,
-        "playbook_id": playbook_contract.get("playbook_id"),
-        "template_name": template.get("template_name"),
+        "source_repo": "abyss-stack",
+        "source_schema_ref": RUNTIME_EVIDENCE_SOURCE_SCHEMA_REF,
+        "source_manifests": [
+            f"local:{advisory_trace_ref}",
+            f"governed-run:{run_id}:review-packet-manifest",
+        ],
+        "bounded_claim": (
+            f"Private governed-run runtime evidence selection for {selection_id}. "
+            "This is candidate routing evidence only and requires bundle-local review before any proof claim."
+        ),
+        "promotion_target": "evidence-sidecar",
+        "comparison_mode": comparison_mode,
         "candidate_eval_refs": (
             [f"candidate:{template['eval_anchor']}"] if isinstance(template.get("eval_anchor"), str) else []
         ),
-        "selected_evidence": [
-            {
-                "evidence_role": artifact,
-                "artifact_ref": f"governed-run:{run_id}:{artifact}",
-            }
-            for artifact in required_runtime_artifacts
+        "selected_evidence": selected_evidence,
+        "environment_invariants": [
+            "same governed-run review-packet generation context",
+            f"playbook_id={playbook_contract.get('playbook_id')}",
         ],
-        "selection_rationale": "Bounded governed-run review packet candidate assembled from advisory trace and contract matches.",
-        "review_required": bool(template.get("review_required", True)),
-        "source_example_ref": template.get("source_example_ref"),
-        "changed_files": changed_files,
-        "advisory_trace_ref": f"local:{advisory_trace_ref}",
+        "do_not_overread": [
+            "does not compute or imply an aoa-evals verdict",
+            "does not accept runtime evidence without bundle-local review",
+            "does not transfer proof authority into abyss-stack",
+        ],
+        "review_posture": {
+            "portable_enough": False,
+            "comparison_hygiene_named": comparison_mode != "none",
+            "human_review_required": True,
+        },
     }
+    if isinstance(template.get("eval_anchor"), str):
+        payload["target_eval"] = template["eval_anchor"]
+    if isinstance(template.get("memory_context_boundary"), dict):
+        payload["memory_context_boundary"] = template["memory_context_boundary"]
+    if changed_files:
+        payload["environment_deltas"] = [f"changed_files:{','.join(changed_files)}"]
+    return payload
 
 
 def build_artifact_hook_payload(
