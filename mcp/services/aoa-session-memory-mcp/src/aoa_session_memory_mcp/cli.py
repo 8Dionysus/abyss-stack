@@ -119,6 +119,15 @@ def main() -> None:
     trace.add_argument("--session", default="")
     trace.add_argument("--doc-type", default="session")
 
+    dossier = sub.add_parser("entity-dossier")
+    dossier.add_argument("anchor")
+    dossier.add_argument("--kind", default="auto")
+    dossier.add_argument("--session", default="")
+    dossier.add_argument("--usage-limit", type=int, default=4)
+    dossier.add_argument("--neighborhood-limit", type=int, default=2)
+    dossier.add_argument("--graph-limit", type=int, default=12)
+    dossier.add_argument("--graph-edge-limit", type=int, default=24)
+
     usage = sub.add_parser("usage-audit")
     usage.add_argument("anchor")
     usage.add_argument("--kind", default="auto")
@@ -371,6 +380,18 @@ def main() -> None:
                 per_route_limit=args.per_route_limit,
                 session=args.session,
                 doc_type=args.doc_type,
+            )
+        )
+    elif args.command == "entity-dossier":
+        _print(
+            state.session_entity_dossier(
+                anchor=args.anchor,
+                kind=args.kind,
+                session=args.session,
+                usage_limit=args.usage_limit,
+                neighborhood_limit=args.neighborhood_limit,
+                graph_limit=args.graph_limit,
+                graph_edge_limit=args.graph_edge_limit,
             )
         )
     elif args.command == "route":

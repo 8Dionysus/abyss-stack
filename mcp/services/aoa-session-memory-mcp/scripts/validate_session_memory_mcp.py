@@ -34,6 +34,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_goal_lifecycles",
     "aoa_session_answer_neighborhood",
     "aoa_session_trace",
+    "aoa_session_entity_dossier",
     "aoa_session_entity_usage_audit",
     "aoa_session_entity_usage_neighborhood",
     "aoa_session_entity_registry",
@@ -471,6 +472,7 @@ def _stdio_route_count_summary(
     neighborhood: dict,
     registry: dict,
     literal_plan: dict,
+    entity_dossier: dict,
     usage_alias: dict,
     agent_event_usage: dict,
     graph_neighborhood: dict,
@@ -521,6 +523,15 @@ def _stdio_route_count_summary(
         else None,
         "literal_plan_structured_first": literal_plan.get("cost_profile", {}).get("structured_first")
         if isinstance(literal_plan.get("cost_profile"), dict)
+        else None,
+        "entity_dossier_usage_count": entity_dossier.get("quality", {}).get("usage_event_count")
+        if isinstance(entity_dossier.get("quality"), dict)
+        else None,
+        "entity_dossier_graph_node_count": entity_dossier.get("quality", {}).get("graph_node_count")
+        if isinstance(entity_dossier.get("quality"), dict)
+        else None,
+        "entity_dossier_raw_or_segment_ref_present": entity_dossier.get("quality", {}).get("raw_or_segment_ref_present")
+        if isinstance(entity_dossier.get("quality"), dict)
         else None,
         "usage_alias_kind": usage_alias.get("kind"),
         "usage_alias_requested_kind": usage_alias.get("requested_kind"),
@@ -639,6 +650,18 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 2, "per_route_limit": 2},
                 timeout_seconds=90,
             )
+            entity_dossier = await call_json(
+                "aoa_session_entity_dossier",
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "usage_limit": 2,
+                    "neighborhood_limit": 1,
+                    "graph_limit": 6,
+                    "graph_edge_limit": 6,
+                },
+                timeout_seconds=90,
+            )
             agent_event_usage = await call_json(
                 "aoa_session_entity_usage_audit",
                 {"anchor": "assistant_answer", "kind": "agent_event", "limit": 3, "per_route_limit": 5},
@@ -726,6 +749,13 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP literal query plan did not choose entity usage first: {literal_plan}")
     if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
+    if entity_dossier.get("artifact_type") != "session_memory_entity_dossier":
+        raise SystemExit(f"stdio MCP entity dossier returned invalid payload: {entity_dossier.get('diagnostics')}")
+    if entity_dossier.get("kind") != "mcp" or entity_dossier.get("requested_kind") != "mcp_service":
+        raise SystemExit(f"stdio MCP entity dossier kind alias contract failed: {entity_dossier}")
+    dossier_quality = entity_dossier.get("quality") if isinstance(entity_dossier.get("quality"), dict) else {}
+    if dossier_quality.get("usage_event_count", 0) <= 0 or dossier_quality.get("raw_or_segment_ref_present") is not True:
+        raise SystemExit(f"stdio MCP entity dossier quality contract failed: {entity_dossier}")
     if agent_event_usage.get("kind") != "agent_event" or agent_event_usage.get("outcome_event_count", 0) <= 0:
         raise SystemExit(f"stdio MCP agent_event usage route failed: {agent_event_usage.get('diagnostics')}")
     if graph_neighborhood.get("artifact_type") != "session_memory_graph_neighborhood" or graph_neighborhood.get("ok") is not True:
@@ -759,6 +789,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         neighborhood,
         registry,
         literal_plan,
+        entity_dossier,
         usage_alias,
         agent_event_usage,
         graph_neighborhood,
@@ -869,6 +900,32 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             ):
                 raise SystemExit(f"configured Codex MCP usage kind alias contract failed: {usage_payload}")
 
+            dossier_result = await mcp_session.call_tool(
+                "aoa_session_entity_dossier",
+                {
+                    "anchor": "aoa-session-memory-mcp",
+                    "kind": "mcp_service",
+                    "usage_limit": 2,
+                    "neighborhood_limit": 1,
+                    "graph_limit": 6,
+                    "graph_edge_limit": 6,
+                },
+                read_timeout_seconds=timedelta(seconds=90),
+            )
+            if dossier_result.isError or not dossier_result.content:
+                raise SystemExit(f"configured Codex MCP entity dossier call failed: {dossier_result.content}")
+            dossier_payload = json.loads(dossier_result.content[0].text)
+            dossier_quality = dossier_payload.get("quality") if isinstance(dossier_payload, dict) else {}
+            if (
+                not isinstance(dossier_payload, dict)
+                or dossier_payload.get("artifact_type") != "session_memory_entity_dossier"
+                or dossier_payload.get("kind") != "mcp"
+                or dossier_payload.get("requested_kind") != "mcp_service"
+                or dossier_quality.get("usage_event_count", 0) <= 0
+                or dossier_quality.get("raw_or_segment_ref_present") is not True
+            ):
+                raise SystemExit(f"configured Codex MCP entity dossier contract failed: {dossier_payload}")
+
             agent_event_usage_result = await mcp_session.call_tool(
                 "aoa_session_entity_usage_audit",
                 {"anchor": "assistant_answer", "kind": "agent_event", "limit": 3, "per_route_limit": 5},
@@ -919,7 +976,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         "skipped": False,
         "tool_count": len(tools),
         "status_ok": payload.get("ok"),
-            "search_alias_result_count": search_payload.get("result_count") if isinstance(search_payload, dict) else None,
+        "search_alias_result_count": search_payload.get("result_count") if isinstance(search_payload, dict) else None,
         "literal_plan_primary_route": literal_plan_payload.get("primary_route", {}).get("route_id")
         if isinstance(literal_plan_payload, dict) and isinstance(literal_plan_payload.get("primary_route"), dict)
         else None,
@@ -935,6 +992,9 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         if isinstance(inventory_payload.get("response_profile"), dict)
         else None,
         "usage_alias_kind": usage_payload.get("kind") if isinstance(usage_payload, dict) else None,
+        "entity_dossier_usage_count": dossier_quality.get("usage_event_count"),
+        "entity_dossier_graph_node_count": dossier_quality.get("graph_node_count"),
+        "entity_dossier_raw_or_segment_ref_present": dossier_quality.get("raw_or_segment_ref_present"),
         "agent_event_usage_kind": agent_event_usage_payload.get("kind") if isinstance(agent_event_usage_payload, dict) else None,
         "agent_event_usage_outcome_count": agent_event_usage_payload.get("outcome_event_count") if isinstance(agent_event_usage_payload, dict) else None,
         "retrieve_usage_served_by": retrieve_payload.get("retrieval_redirect", {}).get("served_by")
@@ -1125,6 +1185,9 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_answer_neighborhood_count": stdio_smoke["answer_neighborhood_count"],
                 "stdio_literal_plan_primary_route": stdio_smoke["literal_plan_primary_route"],
                 "stdio_literal_plan_structured_first": stdio_smoke["literal_plan_structured_first"],
+                "stdio_entity_dossier_usage_count": stdio_smoke["entity_dossier_usage_count"],
+                "stdio_entity_dossier_graph_node_count": stdio_smoke["entity_dossier_graph_node_count"],
+                "stdio_entity_dossier_raw_or_segment_ref_present": stdio_smoke["entity_dossier_raw_or_segment_ref_present"],
                 "stdio_usage_alias_kind": stdio_smoke["usage_alias_kind"],
                 "stdio_usage_alias_requested_kind": stdio_smoke["usage_alias_requested_kind"],
                 "stdio_agent_event_usage_kind": stdio_smoke["agent_event_usage_kind"],
