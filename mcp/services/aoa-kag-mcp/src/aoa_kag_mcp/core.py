@@ -192,39 +192,46 @@ class AoAKagMCPState:
     def freshness_check(self, repo: str | None = None) -> dict[str, Any]:
         providers = [self._provider(repo)] if repo else self._providers()
         rows: list[dict[str, Any]] = []
-        missing: list[str] = []
+        missing_handles: list[str] = []
+        missing_receipts: list[str] = []
         for provider in providers:
             if not isinstance(provider, dict):
                 if repo:
-                    missing.append(repo)
+                    missing_handles.append(repo)
                 continue
             provider_repo = str(provider.get("repo"))
             root = self._provider_root(provider_repo)
             for handle in provider.get("freshness_handles", []):
                 if not isinstance(handle, dict):
+                    missing_handles.append(f"{provider_repo}:invalid-handle")
                     continue
                 receipt_ref = str(handle.get("receipt_ref", ""))
                 receipt_path = root / receipt_ref
+                receipt_exists = bool(receipt_ref) and receipt_path.is_file()
                 rows.append(
                     {
                         "repo": provider_repo,
                         "receipt_ref": receipt_ref,
-                        "receipt_exists": receipt_path.is_file(),
+                        "provider_root_exists": root.is_dir(),
+                        "receipt_exists": receipt_exists,
                         "checked_ref": handle.get("checked_ref"),
                         "state": handle.get("state"),
                         "validator": handle.get("validator"),
                         "owner_return_route": handle.get("owner_return_route"),
                     }
                 )
-                if receipt_ref and not receipt_path.is_file():
-                    missing.append(f"{provider_repo}:{receipt_ref}")
+                if not receipt_ref:
+                    missing_handles.append(f"{provider_repo}:missing-receipt-ref")
+                elif not receipt_exists:
+                    missing_receipts.append(f"{provider_repo}:{receipt_ref}")
         return {
             "schema": "aoa_kag_freshness_check_v1",
             "repo": repo,
-            "ok": not missing,
-            "missing": missing,
+            "ok": not missing_handles,
+            "missing": missing_handles,
+            "missing_receipts": missing_receipts,
             "freshness": rows,
-            "authority_boundary": "Freshness handles point to provider receipts and owner validators; MCP does not run validators as a hidden side effect.",
+            "authority_boundary": "Freshness handles point to provider receipts and owner validators; MCP reports local receipt materialization without running validators as a hidden side effect.",
         }
 
     def source_return_lookup(

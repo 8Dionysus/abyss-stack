@@ -110,6 +110,20 @@ def test_freshness_check_reads_receipt_handles(tmp_path: Path) -> None:
     assert all(row["receipt_exists"] for row in freshness["freshness"])
 
 
+def test_freshness_check_reports_unmaterialized_receipts_without_failing(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+    receipt = tmp_path / "repo-a" / "kag" / "receipts" / "validation_receipt.json"
+    receipt.unlink()
+
+    freshness = state.freshness_check()
+
+    assert freshness["ok"] is True
+    assert "repo-a:kag/receipts/validation_receipt.json" in freshness["missing_receipts"]
+    row = next(item for item in freshness["freshness"] if item["repo"] == "repo-a")
+    assert row["provider_root_exists"] is True
+    assert row["receipt_exists"] is False
+
+
 def test_source_return_lookup_can_filter_provider_records(tmp_path: Path) -> None:
     packet = seed_workspace(tmp_path).source_return_lookup("repo-a", local_id="repo-a-source-home")
 
