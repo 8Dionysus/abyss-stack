@@ -57,6 +57,18 @@ type GraphEdge = AnyItem & {
   graph_layers?: string[];
 };
 
+type RelationDirection = "outgoing" | "incoming" | "internal" | "adjacent";
+
+type RelationRow = GraphEdge & {
+  direction?: RelationDirection;
+  from_label?: string;
+  to_label?: string;
+  primary_predicate?: string;
+  relation_count?: number;
+  member_edge_ids?: string[];
+  source_refs?: string[];
+};
+
 type PhilosophyViewPayload = {
   view: ViewCard;
   nodes?: GraphNode[];
@@ -152,6 +164,11 @@ function short(value: unknown, length = 58): string {
   return raw.length > length ? `${raw.slice(0, length - 1)}...` : raw;
 }
 
+function unwrapItem(item: AnyItem): AnyItem {
+  const nested = item.item;
+  return nested && typeof nested === "object" && !Array.isArray(nested) ? (nested as AnyItem) : item;
+}
+
 function escapeHtml(value: unknown): string {
   return text(value)
     .replace(/&/g, "&amp;")
@@ -162,23 +179,38 @@ function escapeHtml(value: unknown): string {
 }
 
 function itemId(item: AnyItem): string {
-  return text(item.node_id || item.edge_id || item.cluster_id || item.packet_id || item.pack_id || item.id || item.path || item.view_id || "item");
+  const source = unwrapItem(item);
+  return text(
+    source.node_id ||
+      source.edge_id ||
+      source.cluster_id ||
+      source.packet_id ||
+      source.pack_id ||
+      source.id ||
+      source.path ||
+      source.view_id ||
+      item.collection ||
+      "item",
+  );
 }
 
 function itemTitle(item: AnyItem): string {
-  return text(item.label || item.title || item.name || item.view_id || itemId(item));
+  const source = unwrapItem(item);
+  return text(source.label || source.title || source.name || source.view_id || itemId(source));
 }
 
 function itemSubtitle(item: AnyItem): string {
+  const source = unwrapItem(item);
   return text(
-    item.node_type ||
-      item.cluster_kind ||
-      item.predicate_id ||
-      item.source_ref ||
-      item.source_path ||
-      item.path ||
-      item.layout_hint ||
-      item.purpose ||
+    source.node_type ||
+      source.cluster_kind ||
+      source.predicate_id ||
+      source.source_ref ||
+      source.source_path ||
+      source.path ||
+      source.layout_hint ||
+      source.purpose ||
+      item.collection ||
       "",
   );
 }
@@ -242,6 +274,14 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 }
 
+function itemContains(value: unknown, needle: string): boolean {
+  if (!needle) return true;
+  if (typeof value === "string") return value.toLowerCase().includes(needle);
+  if (Array.isArray(value)) return value.some((item) => itemContains(item, needle));
+  if (value && typeof value === "object") return Object.values(value).some((item) => itemContains(item, needle));
+  return false;
+}
+
 function layerAllowed(item: AnyItem): boolean {
   const layers = itemLayers(item);
   if (state.activeLayers.size === 0 || layers.length === 0) return true;
@@ -266,8 +306,41 @@ function predicateAllowed(item: AnyItem): boolean {
   return state.activePredicates.has(predicateId(item));
 }
 
+function currentItemsById(): Map<string, AnyItem> {
+  const items = new Map<string, AnyItem>();
+  if (!isPhilosophyView(state.currentView)) return items;
+  (state.currentView.nodes || []).forEach((node) => items.set(node.node_id, node));
+  (state.currentView.clusters || []).forEach((cluster) => items.set(cluster.cluster_id, cluster));
+  return items;
+}
+
+function endpointLabel(id: unknown): string {
+  const key = text(id);
+  const item = currentItemsById().get(key);
+  return item ? displayTitle(item) : key;
+}
+
+function relationSearchAllowed(item: AnyItem): boolean {
+  const needle = state.searchQuery.toLowerCase().trim();
+  if (!needle) return true;
+  const routeText = [
+    displayTitle(item),
+    displaySubtitle(item),
+    text(item.from_id),
+    endpointLabel(item.from_id),
+    text(item.to_id),
+    endpointLabel(item.to_id),
+    humanKind(predicateId(item)),
+    itemLayers(item).join(" "),
+    collectRefs(item).join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return routeText.includes(needle) || itemContains(item, needle);
+}
+
 function relationAllowed(item: AnyItem): boolean {
-  return layerAllowed(item) && predicateAllowed(item);
+  return layerAllowed(item) && predicateAllowed(item) && relationSearchAllowed(item);
 }
 
 function relationLimit(): number {
@@ -601,8 +674,13 @@ function renderInspector(): void {
     : "Select a graph node, cluster, result, review packet, snapshot, or audit entry.";
 
   const cards: string[] = [];
+  const selectedRelationRows = state.selected ? relationRowsForSelection(state.selected) : [];
   if (state.selected) {
     cards.push(...relationDetailCards(state.selected));
+    if (selectedRelationRows.length) {
+      cards.push(...relationReadingCards(selectedRelationRows));
+      cards.push(relationRowsSection("Selected relations", selectedRelationRows));
+    }
     const refs = collectRefs(state.selected);
     if (refs.length) {
       cards.push(detailCard("Source refs", refs.slice(0, 8).join("\n")));
@@ -642,6 +720,13 @@ function renderInspector(): void {
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-relation]").forEach((button) => {
     button.addEventListener("click", () => selectItem(state.relationItems[Number(button.dataset.relation)]));
   });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-selected-relation]").forEach((button) => {
+    button.addEventListener("click", () => selectItem(selectedRelationRows[Number(button.dataset.selectedRelation)]));
+  });
+}
+
+function scrollInspectorTop(): void {
+  document.querySelector<HTMLDivElement>(".inspector-scroll")?.scrollTo({ top: 0 });
 }
 
 function detailCard(title: string, body: string, pre = false): string {
@@ -656,7 +741,8 @@ function detailCard(title: string, body: string, pre = false): string {
 }
 
 function relationDetailCards(item: AnyItem): string[] {
-  if (!item.relation_count) return [];
+  const source = unwrapItem(item);
+  if (!source.from_id || !source.to_id) return [];
   const predicates = item.predicates && typeof item.predicates === "object" ? (item.predicates as Record<string, unknown>) : {};
   const predicateText = Object.entries(predicates)
     .sort((left, right) => Number(right[1]) - Number(left[1]))
@@ -666,11 +752,12 @@ function relationDetailCards(item: AnyItem): string[] {
   const layers = itemLayers(item).join("\n");
   const memberEdges = stringList(item.member_edge_ids).slice(0, 12).join("\n");
   const cards = [
-    detailCard("From", text(item.from_label || item.from_id)),
-    detailCard("To", text(item.to_label || item.to_id)),
-    detailCard("Predicate", humanKind(item.primary_predicate || item.predicate_id)),
-    detailCard("Relation count", text(item.relation_count)),
+    detailCard("Relation route", `${text(source.from_label || endpointLabel(source.from_id))}\n-> ${humanKind(source.primary_predicate || source.predicate_id)}\n-> ${text(source.to_label || endpointLabel(source.to_id))}`),
+    detailCard("From", text(source.from_label || endpointLabel(source.from_id))),
+    detailCard("To", text(source.to_label || endpointLabel(source.to_id))),
+    detailCard("Predicate", humanKind(source.primary_predicate || source.predicate_id)),
   ];
+  if (source.relation_count) cards.push(detailCard("Relation count", text(source.relation_count)));
   if (predicateText) cards.push(detailCard("Predicate mix", predicateText));
   if (layers) cards.push(detailCard("Graph layers", layers));
   if (memberEdges) cards.push(detailCard("Member edges", memberEdges));
@@ -678,13 +765,106 @@ function relationDetailCards(item: AnyItem): string[] {
 }
 
 function collectRefs(item: AnyItem): string[] {
+  const source = unwrapItem(item);
   const refs = new Set<string>();
   for (const key of ["source_ref", "source_path", "path"]) {
-    if (item[key]) refs.add(text(item[key]));
+    if (source[key]) refs.add(text(source[key]));
   }
-  const sourceRefs = item.source_refs;
+  const sourceRefs = source.source_refs;
   if (Array.isArray(sourceRefs)) sourceRefs.forEach((ref) => refs.add(text(ref)));
   return [...refs].filter(Boolean);
+}
+
+function relationReadingCards(rows: RelationRow[]): string[] {
+  const counts = countBy(rows, (row) => row.direction || "adjacent");
+  const predicates = countBy(rows, (row) => predicateId(row));
+  const predicateText = [...predicates.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 8)
+    .map(([predicate, count]) => `${humanKind(predicate)}: ${count}`)
+    .join("\n");
+  const summary = [
+    `outgoing: ${counts.get("outgoing") || 0}`,
+    `incoming: ${counts.get("incoming") || 0}`,
+    `internal: ${counts.get("internal") || 0}`,
+    `adjacent: ${counts.get("adjacent") || 0}`,
+  ].join("\n");
+  return [detailCard("Relation reading", summary), predicateText ? detailCard("Predicates nearby", predicateText) : ""].filter(Boolean);
+}
+
+function relationRowsSection(title: string, rows: RelationRow[]): string {
+  return `
+    <div class="section-title">${escapeHtml(title)}</div>
+    <div class="relation-table">
+      ${rows
+        .slice(0, 80)
+        .map((row, index) => {
+          const refs = collectRefs(row);
+          const layers = itemLayers(row);
+          const meta = [
+            humanKind(predicateId(row)),
+            layers.length ? layers.slice(0, 3).join(", ") : "",
+            refs.length ? `${refs.length} refs` : "",
+            row.member_edge_ids?.length ? `${row.member_edge_ids.length} member edges` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return `
+            <button class="relation-row" data-selected-relation="${index}" type="button">
+              <span class="relation-direction ${row.direction || "adjacent"}">${escapeHtml(row.direction || "adjacent")}</span>
+              <span class="relation-route">${escapeHtml(short(`${row.from_label || endpointLabel(row.from_id)} -> ${row.to_label || endpointLabel(row.to_id)}`, 104))}</span>
+              <span class="relation-meta">${escapeHtml(short(meta, 128))}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function relationRowsForSelection(item: AnyItem): RelationRow[] {
+  const source = unwrapItem(item);
+  if (!isPhilosophyView(state.currentView)) return [];
+  const edges = (state.currentView.edges || []).filter(relationAllowed);
+  const byEdgeId = new Map(edges.map((edge) => [edge.edge_id, edge]));
+  if (source.from_id && source.to_id) {
+    const memberRows = stringList(source.member_edge_ids)
+      .map((edgeId) => byEdgeId.get(edgeId))
+      .filter((edge): edge is GraphEdge => Boolean(edge))
+      .map((edge) => relationRowFromEdge(edge, "adjacent"));
+    if (memberRows.length) return memberRows;
+    return [relationRowFromEdge(source as GraphEdge, "adjacent")];
+  }
+
+  const selectedIds = new Set<string>();
+  if (source.node_id) selectedIds.add(text(source.node_id));
+  if (source.cluster_id) selectedIds.add(text(source.cluster_id));
+  stringList(source.member_node_ids).forEach((nodeId) => selectedIds.add(nodeId));
+  if (selectedIds.size === 0) return [];
+
+  return edges
+    .filter((edge) => selectedIds.has(edge.from_id) || selectedIds.has(edge.to_id))
+    .map((edge) => {
+      const fromSelected = selectedIds.has(edge.from_id);
+      const toSelected = selectedIds.has(edge.to_id);
+      const direction: RelationDirection = fromSelected && toSelected ? "internal" : fromSelected ? "outgoing" : toSelected ? "incoming" : "adjacent";
+      return relationRowFromEdge(edge, direction);
+    })
+    .sort((left, right) => {
+      const order: Record<RelationDirection, number> = { outgoing: 0, incoming: 1, internal: 2, adjacent: 3 };
+      return order[left.direction || "adjacent"] - order[right.direction || "adjacent"] || predicateId(left).localeCompare(predicateId(right));
+    })
+    .slice(0, 160);
+}
+
+function relationRowFromEdge(edge: GraphEdge, direction: RelationDirection): RelationRow {
+  return {
+    ...edge,
+    direction,
+    from_label: text(edge.from_label || endpointLabel(edge.from_id)),
+    to_label: text(edge.to_label || endpointLabel(edge.to_id)),
+    source_refs: collectRefs(edge),
+  };
 }
 
 function showNodeTooltip(nodeId: string): void {
@@ -1088,6 +1268,7 @@ function selectItem(item: AnyItem): void {
   }
   renderGraph();
   renderInspector();
+  scrollInspectorTop();
 }
 
 function renderAll(): void {
@@ -1161,6 +1342,7 @@ async function search(): Promise<void> {
   state.selected = { title: query ? `Search: ${query}` : "Search", results: state.results.length };
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 async function showReviewPacket(): Promise<void> {
@@ -1169,6 +1351,7 @@ async function showReviewPacket(): Promise<void> {
   state.selected = { title: `Review packet: ${state.currentViewId}`, ...payload.packet };
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 async function showUnresolved(): Promise<void> {
@@ -1178,6 +1361,7 @@ async function showUnresolved(): Promise<void> {
   state.selected = { title: `Unresolved: ${state.currentViewId}`, unresolved: state.results.length };
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 async function showSnapshot(): Promise<void> {
@@ -1185,6 +1369,7 @@ async function showSnapshot(): Promise<void> {
   state.selected = await fetchJson<AnyItem>("/api/philosophy/snapshot");
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 async function showAudit(): Promise<void> {
@@ -1192,6 +1377,7 @@ async function showAudit(): Promise<void> {
   state.selected = await fetchJson<AnyItem>("/api/philosophy/audit");
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 async function syncProjection(): Promise<void> {
@@ -1199,6 +1385,7 @@ async function syncProjection(): Promise<void> {
   state.selected = await fetchJson<AnyItem>(url, { method: "POST" });
   state.selectedGraphId = null;
   renderInspector();
+  scrollInspectorTop();
 }
 
 renderShell();

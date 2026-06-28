@@ -477,6 +477,69 @@ input:focus {
   border-left: 3px solid rgba(36, 120, 101, 0.62);
 }
 
+.relation-table {
+  display: grid;
+  gap: 6px;
+}
+
+.relation-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 3px 8px;
+  width: 100%;
+  border-radius: 8px;
+  padding: 8px 9px;
+  text-align: left;
+}
+
+.relation-direction {
+  grid-row: span 2;
+  align-self: start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 3px 6px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 10px;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.relation-direction.outgoing {
+  border-color: rgba(36, 120, 101, 0.5);
+  color: var(--accent);
+}
+
+.relation-direction.incoming {
+  border-color: rgba(66, 111, 163, 0.48);
+  color: var(--blue);
+}
+
+.relation-direction.internal {
+  border-color: rgba(177, 116, 47, 0.5);
+  color: var(--gold);
+}
+
+.relation-route,
+.relation-meta {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.relation-route {
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.relation-meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 pre {
   max-height: 280px;
   margin: 0;
