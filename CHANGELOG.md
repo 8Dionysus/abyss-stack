@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now exposes a read-only transport preflight route
+  and CLI command, so agents can distinguish stale/missing Codex MCP transport
+  from broken `.aoa` indexes when direct tool calls return `Transport closed`.
 - `aoa-session-memory-mcp` now auto-reloads its `core.py` implementation for
   existing tools and reports already-running stale Codex MCP transports in the
   service validator, so freshness/provider packet fixes do not silently depend

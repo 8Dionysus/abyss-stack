@@ -53,6 +53,7 @@ Resources:
 Tools:
 
 - `aoa_session_memory_status(include_live)`
+- `aoa_session_transport_preflight()`; diagnoses whether the current Codex process has a live `aoa_session_memory` MCP child, whether the process predates current config/source, and what the next action is when `mcp__aoa_session_memory` calls return `Transport closed`.
 - `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters. MCP returns compact hits, `mcp_route_plan`, and a provider freshness summary by default; follow `full_search_route` for the full archive CLI packet. `date_from`/`date_to` filter indexed search document/session dates; hook receipt timestamp checks should follow the returned `hook_receipts_route`.
 - `aoa_session_literal_query_plan(query="", kind="auto", filters)`; plans the cheapest reliable route before broad literal raw-text search. It prefers `entity_usage_chain` for typed operational anchors, entity registry/inventory for broad class queries such as skills/MCP/hooks/tools, rehydrate plus session-scoped search for exact session ids, structured filters for exact route reads, scoped full-text shards when available, and monolith fallback only as a bounded recall safety net. The packet exposes `classifications`, `cost_profile`, `fallback_plan`, and `next_expansion_command` so agents can see why the route was selected and where to expand next.
 - `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
@@ -110,6 +111,19 @@ checks that the portable SQLite search surface, route index, atlas, and latest
 diagnostic pointers are available, but it does not run global search freshness.
 Use `aoa_session_freshness_check(...)` or an explicit `.aoa search-provider-status`
 operator command when freshness itself is the question.
+
+When a direct Codex tool call fails with `Transport closed`, first run the CLI
+fallback:
+
+```bash
+PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli transport-preflight
+```
+
+If it reports `direct_tool_transport_status=restart_required`, the configured
+stdio server can still be validated with
+`python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py`,
+but direct `mcp__aoa_session_memory` calls need a fresh Codex/MCP process
+before they are proof.
 
 Entity inventory packets include a compact `provider` summary from
 `search-provider-status --provider portable_sqlite`, so agents can see whether

@@ -7,6 +7,7 @@ import re
 import shlex
 import sqlite3
 import subprocess
+import tomllib
 import time
 import datetime as dt
 from collections import Counter
@@ -55,6 +56,38 @@ def _process_start_epoch(pid: int, *, proc_root: Path = Path("/proc"), boot_epoc
     except (OSError, ValueError, IndexError):
         return None
     return boot_epoch + (start_ticks / float(ticks))
+
+
+def _proc_cmdline(pid: int, *, proc_root: Path = Path("/proc")) -> list[str]:
+    try:
+        data = (proc_root / str(pid) / "cmdline").read_bytes()
+    except OSError:
+        return []
+    return [part.decode("utf-8", errors="replace") for part in data.split(b"\0") if part]
+
+
+def _proc_ppid(pid: int, *, proc_root: Path = Path("/proc")) -> int | None:
+    try:
+        for line in (proc_root / str(pid) / "status").read_text(encoding="utf-8").splitlines():
+            if line.startswith("PPid:"):
+                return int(line.split()[1])
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def _proc_cwd(pid: int, *, proc_root: Path = Path("/proc")) -> str:
+    try:
+        return (proc_root / str(pid) / "cwd").resolve().as_posix()
+    except OSError:
+        return ""
+
+
+def _codex_config_path() -> Path:
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        return Path(codex_home).expanduser().resolve() / "config.toml"
+    return Path.home() / ".codex" / "config.toml"
 
 
 MCP_CORE_SOURCE_PATH = Path(__file__).resolve()
@@ -2443,6 +2476,7 @@ class AoASessionMemoryMCPState:
             "route_model": "anchor/query/intent -> route candidates -> evidence refs -> freshness/readiness -> next action",
             "tools": [
                 "aoa_session_memory_status",
+                "aoa_session_transport_preflight",
                 "aoa_session_search",
                 "aoa_session_agent_responses",
                 "aoa_session_agent_closeouts",
@@ -2551,6 +2585,165 @@ class AoASessionMemoryMCPState:
                 "MCP core implementation can auto-reload for existing tools; restart the Codex MCP "
                 "process when the tool list, schemas, import path, or server wrapper changes."
             ),
+        }
+
+    def session_mcp_transport_preflight(self, proc_root: Path = Path("/proc")) -> dict[str, Any]:
+        package_root = MCP_CORE_SOURCE_PATH.parents[2]
+        watched_sources = [
+            MCP_CORE_SOURCE_PATH,
+            MCP_SERVER_SOURCE_PATH,
+            package_root / "scripts" / "aoa_session_memory_mcp_server.py",
+        ]
+        source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+        config_path = _codex_config_path()
+        config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
+        configured_server: dict[str, Any] = {"configured": False, "config_path": config_path.as_posix()}
+        if config_path.exists():
+            try:
+                config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+                server = (config.get("mcp_servers") or {}).get("aoa_session_memory") or {}
+                configured_server.update(
+                    {
+                        "configured": bool(server),
+                        "command": server.get("command"),
+                        "args": server.get("args") if isinstance(server.get("args"), list) else [],
+                        "cwd": server.get("cwd"),
+                    }
+                )
+            except (OSError, tomllib.TOMLDecodeError) as exc:
+                configured_server.update({"configured": False, "diagnostics": [f"config_read_error:{exc}"]})
+
+        if not proc_root.is_dir():
+            return {
+                "schema": "aoa_session_memory_mcp_transport_preflight_v1",
+                "ok": bool(configured_server.get("configured")),
+                "mutates": False,
+                "configured_server": configured_server,
+                "runtime": self.runtime_identity(),
+                "codex_session": {"available": False, "reason": "procfs_unavailable"},
+                "running_mcp_processes": {"available": False, "reason": "procfs_unavailable"},
+                "direct_tool_transport_status": "unknown",
+                "next_action": "Run configured stdio smoke or restart Codex before treating mcp__aoa_session_memory calls as proof.",
+                "authority_boundary": self.authority_boundary(),
+            }
+
+        boot_epoch = _linux_boot_epoch(proc_root)
+        ancestor_pids: set[int] = set()
+        parent = os.getpid()
+        while parent:
+            ancestor_pids.add(parent)
+            next_parent = _proc_ppid(parent, proc_root=proc_root)
+            if not next_parent or next_parent == parent:
+                break
+            parent = next_parent
+
+        mcp_children_by_parent: dict[int, list[int]] = {}
+        mcp_processes: list[dict[str, Any]] = []
+        codex_processes: list[dict[str, Any]] = []
+        for entry in proc_root.iterdir():
+            if not entry.name.isdigit():
+                continue
+            pid = int(entry.name)
+            cmdline = _proc_cmdline(pid, proc_root=proc_root)
+            if not cmdline:
+                continue
+            joined = " ".join(cmdline)
+            started_at_epoch = _process_start_epoch(pid, proc_root=proc_root, boot_epoch=boot_epoch)
+            if "aoa-session-memory-mcp-server.py" in joined or "aoa_session_memory_mcp_server.py" in joined:
+                ppid = _proc_ppid(pid, proc_root=proc_root)
+                if ppid is not None:
+                    mcp_children_by_parent.setdefault(ppid, []).append(pid)
+                mcp_processes.append(
+                    {
+                        "pid": pid,
+                        "ppid": ppid,
+                        "cwd": _proc_cwd(pid, proc_root=proc_root),
+                        "cmdline": cmdline,
+                        "started_at_epoch": started_at_epoch,
+                        "started_before_current_source": bool(
+                            started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime
+                        ),
+                    }
+                )
+                continue
+            if "codex" not in joined or "resume" not in joined:
+                continue
+            codex_processes.append(
+                {
+                    "pid": pid,
+                    "ppid": _proc_ppid(pid, proc_root=proc_root),
+                    "cwd": _proc_cwd(pid, proc_root=proc_root),
+                    "cmdline": cmdline,
+                    "started_at_epoch": started_at_epoch,
+                    "is_current_process_ancestor": pid in ancestor_pids,
+                    "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
+                    "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+                }
+            )
+
+        for process in codex_processes:
+            child_pids = sorted(mcp_children_by_parent.get(process["pid"], []))
+            process["aoa_session_memory_child_pids"] = child_pids
+            process["has_aoa_session_memory_child"] = bool(child_pids)
+
+        current_codex = [process for process in codex_processes if process["is_current_process_ancestor"]]
+        current_predates_config = any(process["started_before_config"] for process in current_codex)
+        current_predates_source = any(process["started_before_current_source"] for process in current_codex)
+        current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
+        configured = bool(configured_server.get("configured"))
+        live_transport_restart_advisory = bool(
+            current_codex
+            and configured
+            and (current_predates_config or current_predates_source or not current_has_mcp_child)
+        )
+        stale_mcp_process_count = sum(1 for process in mcp_processes if process["started_before_current_source"])
+        if live_transport_restart_advisory:
+            direct_status = "restart_required"
+            next_action = (
+                "Restart the Codex/MCP process before using mcp__aoa_session_memory; "
+                "configured stdio may still be used as a source health proof."
+            )
+        elif current_codex and current_has_mcp_child:
+            direct_status = "attached"
+            next_action = "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
+        elif not current_codex:
+            direct_status = "not_in_codex_process"
+            next_action = "Use this as a CLI preflight; run configured stdio smoke for server proof or call MCP from a fresh Codex session."
+        else:
+            direct_status = "not_configured_or_not_spawned"
+            next_action = "Check Codex MCP config and restart Codex before using direct mcp__aoa_session_memory calls."
+
+        return {
+            "schema": "aoa_session_memory_mcp_transport_preflight_v1",
+            "ok": configured and direct_status != "restart_required",
+            "mutates": False,
+            "configured_server": configured_server,
+            "runtime": self.runtime_identity(),
+            "source_mtime_epoch": source_mtime or None,
+            "config_mtime_epoch": config_mtime or None,
+            "direct_tool_transport_status": direct_status,
+            "live_transport_restart_advisory": live_transport_restart_advisory,
+            "codex_session": {
+                "available": True,
+                "current_codex_process_count": len(current_codex),
+                "current_session_predates_config": current_predates_config,
+                "current_session_predates_current_source": current_predates_source,
+                "current_session_has_aoa_session_memory_child": current_has_mcp_child,
+                "current_codex_processes": current_codex[:6],
+                "processes": codex_processes[:12],
+                "omitted_process_count": max(0, len(codex_processes) - 12),
+            },
+            "running_mcp_processes": {
+                "available": True,
+                "process_count": len(mcp_processes),
+                "stale_process_count": stale_mcp_process_count,
+                "restart_advisory": bool(stale_mcp_process_count),
+                "processes": mcp_processes[:12],
+                "omitted_process_count": max(0, len(mcp_processes) - 12),
+            },
+            "configured_stdio_check_route": "python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+            "next_action": next_action,
+            "authority_boundary": self.authority_boundary(),
         }
 
     def _archive_command(
