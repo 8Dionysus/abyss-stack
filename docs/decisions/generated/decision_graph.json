@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 74,
-  "edge_count": 1590,
+  "decision_count": 75,
+  "edge_count": 1629,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 628,
-    "DATED": 74,
-    "GUARDED_BY": 189,
-    "HAS_STATUS": 74,
-    "HAS_SURFACE_CLASS": 179,
-    "IN_STACK_LANE": 145,
-    "NEXT_DECISION": 73,
-    "OWNED_BY_SURFACE": 78,
-    "OWNS_DECISION": 74,
+    "CITES_SOURCE_SURFACE": 651,
+    "DATED": 75,
+    "GUARDED_BY": 193,
+    "HAS_STATUS": 75,
+    "HAS_SURFACE_CLASS": 182,
+    "IN_STACK_LANE": 148,
+    "NEXT_DECISION": 74,
+    "OWNED_BY_SURFACE": 79,
+    "OWNS_DECISION": 75,
     "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 75
+    "UNDER_MECHANIC_PARENT": 76
   },
   "edges": [
     {
@@ -7583,6 +7583,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0074",
+      "target": "decision:ABYSS-STACK-D-0075",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0074",
       "target": "owner_surface:mcp/services/aoa-discord-connector-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
@@ -7593,6 +7598,191 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0074",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:aoa-kag%3Adocs/decisions/AOA-KAG-D-0012-direct-repo-provider-completion.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:aoa-kag%3Agenerated/local_kag_provider_map.min.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:aoa-kag%3Akag/LOCAL_SUBTREE_PROTOCOL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:aoa-kag%3Amanifests/local_kag_readiness.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:docs/testing/test_inventory.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:docs/validation/script_inventory.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:docs/validation/validation_lanes.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:docs/validation/validator_inventory.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/DESIGN.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/docs/BOUNDARIES.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/docs/THREAT_MODEL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:scripts/validate_nested_agents.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "source_surface:scripts/validators/source_structure.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "date:2026-06-28",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "guard_family:MCP%20port%20confinement",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "guard_family:provider%20freshness",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "guard_family:read-only%20access%20plane",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "guard_family:source-return%20route",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "surface_class:KAG%20provider%20map",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "surface_class:generated/read-model",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "stack_lane:agent%20surface",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "stack_lane:validation%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "owner_surface:mcp/services/aoa-kag-mcp/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
       "target": "mechanic_parent:federation-seams",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -7965,21 +8155,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0074",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0075",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 664,
+  "node_count": 685,
   "node_type_counts": {
-    "date": 17,
-    "decision": 74,
-    "guard_family": 71,
+    "date": 18,
+    "decision": 75,
+    "guard_family": 73,
     "mechanic_parent": 10,
-    "owner_surface": 36,
+    "owner_surface": 37,
     "repo": 1,
-    "source_surface": 376,
-    "stack_lane": 23,
+    "source_surface": 390,
+    "stack_lane": 24,
     "status": 2,
-    "surface_class": 54
+    "surface_class": 55
   },
   "nodes": [
     {
@@ -8065,6 +8260,11 @@
     {
       "id": "date:2026-06-26",
       "label": "2026-06-26",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-06-28",
+      "label": "2026-06-28",
       "type": "date"
     },
     {
@@ -8808,6 +9008,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-06-28",
+      "id": "decision:ABYSS-STACK-D-0075",
+      "label": "ABYSS-STACK-D-0075",
+      "path": "docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md",
+      "posture": "accepted KAG access-plane rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0075 AoA KAG MCP Access Plane",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -8993,6 +9203,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:provider%20freshness",
+      "label": "provider freshness",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:public-safe%20config",
       "label": "public-safe config",
       "type": "guard_family"
@@ -9115,6 +9330,11 @@
     {
       "id": "guard_family:source%20topology",
       "label": "source topology",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:source-return%20route",
+      "label": "source-return route",
       "type": "guard_family"
     },
     {
@@ -9250,6 +9470,11 @@
     {
       "id": "owner_surface:mcp/services/aoa-evals-mcp/",
       "label": "mcp/services/aoa-evals-mcp/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mcp/services/aoa-kag-mcp/",
+      "label": "mcp/services/aoa-kag-mcp/",
       "type": "owner_surface"
     },
     {
@@ -9566,6 +9791,26 @@
     {
       "id": "source_surface:aoa-evals%3Adocs/architecture/AOA_EVALS_MCP_CONTRACT.md",
       "label": "aoa-evals:docs/architecture/AOA_EVALS_MCP_CONTRACT.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Adocs/decisions/AOA-KAG-D-0012-direct-repo-provider-completion.md",
+      "label": "aoa-kag:docs/decisions/AOA-KAG-D-0012-direct-repo-provider-completion.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Agenerated/local_kag_provider_map.min.json",
+      "label": "aoa-kag:generated/local_kag_provider_map.min.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Akag/LOCAL_SUBTREE_PROTOCOL.md",
+      "label": "aoa-kag:kag/LOCAL_SUBTREE_PROTOCOL.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Amanifests/local_kag_readiness.json",
+      "label": "aoa-kag:manifests/local_kag_readiness.json",
       "type": "source_surface"
     },
     {
@@ -10271,6 +10516,56 @@
     {
       "id": "source_surface:mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
       "label": "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/AGENTS.md",
+      "label": "mcp/services/aoa-kag-mcp/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/DESIGN.md",
+      "label": "mcp/services/aoa-kag-mcp/DESIGN.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/README.md",
+      "label": "mcp/services/aoa-kag-mcp/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/docs/BOUNDARIES.md",
+      "label": "mcp/services/aoa-kag-mcp/docs/BOUNDARIES.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/docs/THREAT_MODEL.md",
+      "label": "mcp/services/aoa-kag-mcp/docs/THREAT_MODEL.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
+      "label": "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py",
+      "label": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py",
+      "label": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py",
+      "label": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py",
+      "label": "mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py",
       "type": "source_surface"
     },
     {
@@ -11394,6 +11689,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:validation%20lane",
+      "label": "validation lane",
+      "type": "stack_lane"
+    },
+    {
       "id": "status:accepted",
       "label": "accepted",
       "type": "status"
@@ -11402,6 +11702,11 @@
       "id": "status:superseded",
       "label": "superseded",
       "type": "status"
+    },
+    {
+      "id": "surface_class:KAG%20provider%20map",
+      "label": "KAG provider map",
+      "type": "surface_class"
     },
     {
       "id": "surface_class:MCP%20access%20plane",

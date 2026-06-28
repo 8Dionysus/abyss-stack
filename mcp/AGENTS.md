@@ -39,6 +39,11 @@ For bounded proof work, `mcp/services/aoa-evals-mcp/` exposes `aoa-evals`
 catalog, bundle, comparison, runtime-candidate, and report-skeleton routes
 while keeping proof authority in `aoa-evals`.
 
+For KAG provider-map access, `mcp/services/aoa-kag-mcp/` exposes `aoa-kag`
+provider status, source-return routes, freshness handles, bounded registry
+slices, and provider records while keeping KAG schema, generated maps,
+validation, and repo-local `kag/` truth in `aoa-kag` and the source repos.
+
 For host-machine context work, `mcp/services/abyss-machine-mcp/` exposes
 `abyss-machine` bridge, evidence, resource, memory, typing, nervous, heartbeat,
 and change-ledger read models while keeping host authority in `abyss-machine`.
@@ -91,6 +96,13 @@ For `aoa-evals-mcp` changes, run:
 ```bash
 python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
 python -m pytest mcp/services/aoa-evals-mcp/tests -q
+```
+
+For `aoa-kag-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
+python -m pytest mcp/services/aoa-kag-mcp/tests -q
 ```
 
 For `abyss-machine-mcp` changes, run:

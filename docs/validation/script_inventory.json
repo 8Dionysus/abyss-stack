@@ -214,6 +214,8 @@
         "mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py",
         "mcp/services/aoa-evals-mcp/scripts/release_check.py",
         "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+        "mcp/services/aoa-kag-mcp/scripts/aoa_kag_mcp_server.py",
+        "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
         "mcp/services/aoa-memo-mcp/scripts/aoa_memo_mcp_server.py",
         "mcp/services/aoa-memo-mcp/scripts/release_check.py",
         "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
