@@ -576,6 +576,36 @@ def _stdio_route_count_summary(
         "live_scenario_warn_count": live_scenario.get("quality", {}).get("warn_count")
         if isinstance(live_scenario.get("quality"), dict)
         else None,
+        "live_scenario_entity_registry_active_count": (
+            live_scenario.get("scenarios", [{}])[0].get("active_lookup_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
+        "live_scenario_entity_registry_observed_count": (
+            live_scenario.get("scenarios", [{}])[0].get("observed_lookup_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
+        "live_scenario_entity_registry_unknown_count": (
+            live_scenario.get("scenarios", [{}])[0].get("unknown_lookup_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
+        "live_scenario_entity_registry_stale_count": (
+            live_scenario.get("scenarios", [{}])[0].get("stale_lookup_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
+        "live_scenario_entity_registry_removed_count": (
+            live_scenario.get("scenarios", [{}])[0].get("removed_lookup_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
+        "live_scenario_entity_registry_transition_probe_count": (
+            live_scenario.get("scenarios", [{}])[0].get("transition_probe_count")
+            if isinstance(live_scenario.get("scenarios"), list) and live_scenario.get("scenarios")
+            else None
+        ),
         "live_scenario_corpus_case_count": live_scenario_corpus.get("case_count"),
         "live_scenario_corpus_actionable_gap_count": live_scenario_corpus.get("actionable_gap_count"),
         "maintenance_recommendation": maintenance_status.get("recommendation"),
@@ -716,10 +746,10 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 "aoa_session_live_scenario_audit",
                 {
                     "seed": "validator-stdio-smoke",
-                    "profiles": ["literal_planner"],
-                    "sample_size": 1,
+                    "profiles": ["entity_registry_lookup"],
+                    "sample_size": 5,
                     "recent_days": 7,
-                    "limit": 1,
+                    "limit": 5,
                 },
                 timeout_seconds=90,
             )
@@ -817,6 +847,21 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP live scenario audit returned invalid payload: {live_scenario.get('diagnostics')}")
     if live_scenario.get("quality", {}).get("scenario_count") != 1:
         raise SystemExit(f"stdio MCP live scenario audit did not run the requested bounded profile: {live_scenario}")
+    live_scenario_scenarios = live_scenario.get("scenarios") if isinstance(live_scenario.get("scenarios"), list) else []
+    live_scenario_registry = live_scenario_scenarios[0] if live_scenario_scenarios and isinstance(live_scenario_scenarios[0], dict) else {}
+    if live_scenario_registry.get("profile") != "entity_registry_lookup":
+        raise SystemExit(f"stdio MCP live scenario audit did not run entity_registry_lookup: {live_scenario}")
+    for key in (
+        "active_lookup_count",
+        "observed_lookup_count",
+        "unknown_lookup_count",
+        "stale_lookup_count",
+        "removed_lookup_count",
+    ):
+        if live_scenario_registry.get(key, 0) <= 0:
+            raise SystemExit(f"stdio MCP entity-registry live scenario missing {key}: {live_scenario_registry}")
+    if live_scenario_registry.get("transition_probe_count", 0) < 2:
+        raise SystemExit(f"stdio MCP entity-registry live scenario did not prove stale/removed transition probes: {live_scenario_registry}")
     if live_scenario_corpus.get("artifact_type") != "session_memory_live_scenario_regression_check":
         raise SystemExit(f"stdio MCP live scenario corpus returned invalid payload: {live_scenario_corpus.get('diagnostics')}")
     if live_scenario_corpus.get("case_count") != 1:
@@ -1278,6 +1323,24 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "stdio_live_scenario_count": stdio_smoke["live_scenario_count"],
                 "stdio_live_scenario_warn_count": stdio_smoke["live_scenario_warn_count"],
+                "stdio_live_scenario_entity_registry_active_count": stdio_smoke[
+                    "live_scenario_entity_registry_active_count"
+                ],
+                "stdio_live_scenario_entity_registry_observed_count": stdio_smoke[
+                    "live_scenario_entity_registry_observed_count"
+                ],
+                "stdio_live_scenario_entity_registry_unknown_count": stdio_smoke[
+                    "live_scenario_entity_registry_unknown_count"
+                ],
+                "stdio_live_scenario_entity_registry_stale_count": stdio_smoke[
+                    "live_scenario_entity_registry_stale_count"
+                ],
+                "stdio_live_scenario_entity_registry_removed_count": stdio_smoke[
+                    "live_scenario_entity_registry_removed_count"
+                ],
+                "stdio_live_scenario_entity_registry_transition_probe_count": stdio_smoke[
+                    "live_scenario_entity_registry_transition_probe_count"
+                ],
                 "stdio_live_scenario_corpus_case_count": stdio_smoke["live_scenario_corpus_case_count"],
                 "stdio_live_scenario_corpus_actionable_gap_count": stdio_smoke[
                     "live_scenario_corpus_actionable_gap_count"
