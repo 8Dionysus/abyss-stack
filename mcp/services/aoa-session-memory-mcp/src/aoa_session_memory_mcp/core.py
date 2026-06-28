@@ -203,6 +203,7 @@ SUPPORTED_LIVE_SCENARIO_PROFILES = [
     "literal_planner",
     "graph_neighborhood",
     "graph_bridge",
+    "route_rollup_query",
 ]
 SEARCH_FILTER_ALIASES = {
     "layer": "route_layer",
