@@ -526,6 +526,7 @@ class ToSCorpusMCPState:
             "node_id": node_id,
             "node": node,
             "related_edges": related_edges,
+            "source_refs": _source_refs([node] + related_edges),
             "authority_note": "Node source_ref stays authoritative in Tree-of-Sophia; MCP exposes an access packet only.",
         }
 
@@ -595,6 +596,7 @@ class ToSCorpusMCPState:
             "edges": selected_edges[:limit],
             "depth": max(depth, 1),
             "layers": sorted(layer_filter),
+            "source_refs": _source_refs([node_packet["node"]] + neighbors + selected_edges[:limit]),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
         }
 

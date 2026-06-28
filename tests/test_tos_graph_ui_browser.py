@@ -104,12 +104,15 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.locator(".predicate-toggle").first.wait_for(timeout=10_000)
             page.locator(".relation-card").first.wait_for(timeout=10_000)
             page.locator(".relation-card").first.click()
+            page.locator(".detail-title", has_text="Relation route").wait_for(timeout=10_000)
             page.locator(".detail-title", has_text="From").wait_for(timeout=10_000)
             page.locator(".detail-title", has_text="To").wait_for(timeout=10_000)
+            page.locator(".relation-row").first.wait_for(timeout=10_000)
             first_result_title = page.locator(".result-card .result-title").first.inner_text(timeout=10_000)
             graph_caption = page.locator("#graph-caption").inner_text(timeout=10_000)
             relation_card_count = page.locator(".result-card .result-subtitle").filter(has_text="relations").count()
             predicate_toggle_count = page.locator(".predicate-toggle").count()
+            selected_relation_count = page.locator(".relation-row").count()
             node_count = page.locator("#graph canvas").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
@@ -126,4 +129,5 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
     assert "links" in graph_caption
     assert relation_card_count > 0
     assert predicate_toggle_count > 0
+    assert selected_relation_count > 0
     assert screenshot.stat().st_size > 20_000

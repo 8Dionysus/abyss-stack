@@ -366,8 +366,10 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     assert layers["layer_counts"][0]["cluster_count"] == 1
     assert clusters["cluster_count"] == 1
     assert node["related_edges"][0]["predicate_id"] == "has-dossier"
+    assert node["source_refs"]
     assert edge["edge"]["to_id"] == "dossier:A01"
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+    assert neighborhood["source_refs"]
     assert review["packet"]["packet_id"] == "review-packet:chronology"
     assert snapshot["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
     assert audit["audit"]["review_readiness"]["status"] == "ready_for_first_graph_review"
