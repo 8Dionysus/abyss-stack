@@ -1043,7 +1043,7 @@ LIVE_SCENARIO_AUDIT = {
     "mutates": False,
     "truth_status": "bounded_live_scenario_audit_not_reviewed_truth",
     "seed": "fixture-live",
-    "profiles": ["literal_planner"],
+    "profiles": ["entity_registry_lookup"],
     "parameters": {"sample_size": 2, "recent_days": 90, "limit": 2},
     "quality": {
         "scenario_count": 1,
@@ -1052,15 +1052,25 @@ LIVE_SCENARIO_AUDIT = {
         "failed_count": 0,
         "actionable_gap_count": 0,
         "raw_or_segment_ref_scenario_count": 0,
+        "first_useful_packet_ms": 150,
     },
     "scenarios": [
         {
-            "profile": "literal_planner",
+            "profile": "entity_registry_lookup",
             "status": "passed",
             "sample_count": 5,
             "failed_count": 0,
-            "primary_route_counts": {"session_rehydrate": 1},
-            "shape_counts": {"session_id": 1},
+            "status_counts": {"active": 1, "observed": 1, "unknown": 1, "stale": 1, "removed": 1},
+            "active_lookup_count": 1,
+            "observed_lookup_count": 1,
+            "unknown_lookup_count": 1,
+            "stale_lookup_count": 1,
+            "removed_lookup_count": 1,
+            "retired_lookup_count": 2,
+            "source_ref_count": 4,
+            "registered_lookup_count": 4,
+            "unregistered_lookup_count": 1,
+            "transition_probe_count": 2,
         }
     ],
     "actionable_gaps": [],
@@ -2749,7 +2759,20 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"kind": "agent_event", "outcome_event_count": 2},
         {"node_count": 3, "edge_count": 2},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_chain"}},
-        {"quality": {"scenario_count": 1, "warn_count": 1}},
+        {
+            "quality": {"scenario_count": 1, "warn_count": 0},
+            "scenarios": [
+                {
+                    "profile": "entity_registry_lookup",
+                    "active_lookup_count": 1,
+                    "observed_lookup_count": 1,
+                    "unknown_lookup_count": 1,
+                    "stale_lookup_count": 1,
+                    "removed_lookup_count": 1,
+                    "transition_probe_count": 2,
+                }
+            ],
+        },
         {"case_count": 1, "actionable_gap_count": 0},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
@@ -2785,7 +2808,13 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["graph_neighborhood_node_count"] == 3
     assert summary["graph_neighborhood_edge_count"] == 2
     assert summary["live_scenario_count"] == 1
-    assert summary["live_scenario_warn_count"] == 1
+    assert summary["live_scenario_warn_count"] == 0
+    assert summary["live_scenario_entity_registry_active_count"] == 1
+    assert summary["live_scenario_entity_registry_observed_count"] == 1
+    assert summary["live_scenario_entity_registry_unknown_count"] == 1
+    assert summary["live_scenario_entity_registry_stale_count"] == 1
+    assert summary["live_scenario_entity_registry_removed_count"] == 1
+    assert summary["live_scenario_entity_registry_transition_probe_count"] == 2
     assert summary["live_scenario_corpus_case_count"] == 1
     assert summary["live_scenario_corpus_actionable_gap_count"] == 0
     assert summary["agent_event_usage_outcome_count"] == 2
@@ -3052,11 +3081,13 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     literal_description = tools["aoa_session_literal_query_plan"].description or ""
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
+    live_scenario_description = tools["aoa_session_live_scenario_audit"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
     assert "one compact registry, usage, consequence" in dossier_description
     assert "usage-to-consequence chains" in usage_chain_description
+    assert "entity registry lookup status probes" in live_scenario_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
     assert "compact bridge packet" in bridge_description
@@ -3937,6 +3968,7 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
     audit = state.session_live_scenario_audit(
         seed="fixture-live",
         profiles=[
+            "entity_registry_lookup",
             "entity_dossier",
             "entity_usage",
             "hook_failure",
@@ -3956,12 +3988,16 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
     assert audit["truth_status"] == "bounded_live_scenario_audit_not_reviewed_truth"
     assert audit["mcp_route"]["canonical_route"] == "scripts/aoa_session_memory.py live-scenario-audit"
     assert audit["mcp_route"]["source_of_truth"] == ".aoa"
+    assert "entity_registry_lookup" in audit["mcp_route"]["supported_profiles"]
+    assert "stale/removed" in audit["mcp_route"]["entity_registry_lookup_contract"]
     assert audit["parameters"]["limit"] == 2
     assert audit["parameters"]["recent_days"] == 90
     assert audit["quality"]["scenario_count"] == 1
     assert audit["quality"]["failed_count"] == 0
     assert audit["quality"]["actionable_gap_count"] == 0
-    assert audit["scenarios"][0]["primary_route_counts"]["session_rehydrate"] == 1
+    assert audit["scenarios"][0]["profile"] == "entity_registry_lookup"
+    assert audit["scenarios"][0]["status_counts"]["removed"] == 1
+    assert audit["scenarios"][0]["transition_probe_count"] == 2
 
     assert [command for command, _args in runner.calls] == ["live-scenario-audit"]
     command, args = runner.calls[0]
@@ -3970,7 +4006,8 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
     assert args[args.index("--sample-size") + 1] == "2"
     assert args[args.index("--recent-days") + 1] == "90"
     assert args[args.index("--limit") + 1] == "2"
-    assert args.count("--profile") == 8
+    assert args.count("--profile") == 9
+    assert "entity_registry_lookup" in args
     assert runner.timeouts[-1] == ("live-scenario-audit", 90.0)
 
 

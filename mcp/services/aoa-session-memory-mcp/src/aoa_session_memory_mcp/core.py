@@ -192,6 +192,17 @@ ALLOWED_RETRIEVAL_RECIPES = {
     "repeated-errors",
 }
 ENTITY_USAGE_RETRIEVAL_RECIPES = {"entity-usage", "entity_usage", "entity-usage-chain", "entity_usage_chain", "entity-usage-audit", "entity_usage_audit"}
+SUPPORTED_LIVE_SCENARIO_PROFILES = [
+    "entity_registry_lookup",
+    "entity_dossier",
+    "entity_usage",
+    "hook_failure",
+    "goal_lifecycle",
+    "agent_closeout",
+    "literal_planner",
+    "graph_neighborhood",
+    "graph_bridge",
+]
 SEARCH_FILTER_ALIASES = {
     "layer": "route_layer",
 }
@@ -4707,6 +4718,11 @@ class AoASessionMemoryMCPState:
             {
                 "canonical_route": "scripts/aoa_session_memory.py live-scenario-audit",
                 "source_of_truth": ".aoa",
+                "supported_profiles": SUPPORTED_LIVE_SCENARIO_PROFILES,
+                "entity_registry_lookup_contract": (
+                    "Checks active, observed, unknown, stale, and removed entity lookup status routing; "
+                    "stale/removed probes are temporary previous-snapshot transitions and do not mutate the live archive."
+                ),
                 "next_route": "Use aoa_session_live_scenario_corpus_check when the result should be treated as a regression gate.",
             },
         )
