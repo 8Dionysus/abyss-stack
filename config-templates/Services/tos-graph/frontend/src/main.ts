@@ -5,6 +5,7 @@ import "./styles.css";
 
 type Mode = "philosophy" | "corpus";
 type GraphMode = "clusters" | "nodes";
+type DensityMode = "overview" | "focused" | "dense";
 
 type BootPayload = {
   service: string;
@@ -77,12 +78,17 @@ type AppState = {
   graphMode: GraphMode;
   currentViewId: string;
   activeLayers: Set<string>;
+  activePredicates: Set<string>;
+  densityMode: DensityMode;
+  minRelationCount: number;
   status: Record<string, AnyItem>;
   philosophyViews: ViewCard[];
   corpusViews: ViewCard[];
   currentView: PhilosophyViewPayload | CorpusViewPayload | null;
   selected: AnyItem | null;
+  selectedGraphId: string | null;
   results: AnyItem[];
+  relationItems: AnyItem[];
   expandedCluster: Cluster | null;
   searchQuery: string;
 };
@@ -110,12 +116,17 @@ const state: AppState = {
   graphMode: "clusters",
   currentViewId: "",
   activeLayers: new Set(),
+  activePredicates: new Set(),
+  densityMode: "overview",
+  minRelationCount: 1,
   status: {},
   philosophyViews: [],
   corpusViews: [],
   currentView: null,
   selected: null,
+  selectedGraphId: null,
   results: [],
+  relationItems: [],
   expandedCluster: null,
   searchQuery: "",
 };
@@ -205,7 +216,7 @@ function displaySubtitle(item: AnyItem): string {
 
 function compactGraphLabel(item: AnyItem): string {
   const kind = text(item.cluster_kind || item.node_type || item.predicate_id);
-  if (kind === "corpus") return "Corpus";
+  if (kind === "corpus") return short(displayTitle(item), 28);
   if (kind === "canon-candidate-status") return displayTitle(item);
   if (kind === "concept-problem") return short(displayTitle(item), 18);
   if (kind) return short(humanKind(kind), 18);
@@ -235,6 +246,55 @@ function layerAllowed(item: AnyItem): boolean {
   const layers = itemLayers(item);
   if (state.activeLayers.size === 0 || layers.length === 0) return true;
   return layers.some((layer) => state.activeLayers.has(layer));
+}
+
+function predicateId(item: AnyItem): string {
+  return text(item.predicate_id || item.primary_predicate || "relation");
+}
+
+function currentPredicates(): string[] {
+  if (!isPhilosophyView(state.currentView)) return [];
+  const predicates = new Set<string>();
+  (state.currentView.edges || []).forEach((edge) => {
+    if (layerAllowed(edge)) predicates.add(predicateId(edge));
+  });
+  return [...predicates].sort();
+}
+
+function predicateAllowed(item: AnyItem): boolean {
+  if (!isPhilosophyView(state.currentView) || (state.currentView.edges || []).length === 0) return true;
+  return state.activePredicates.has(predicateId(item));
+}
+
+function relationAllowed(item: AnyItem): boolean {
+  return layerAllowed(item) && predicateAllowed(item);
+}
+
+function relationLimit(): number {
+  if (state.densityMode === "dense") return 520;
+  if (state.densityMode === "focused") return 280;
+  return 150;
+}
+
+function edgeLimit(): number {
+  if (state.densityMode === "dense") return 3200;
+  if (state.densityMode === "focused") return 1800;
+  return 900;
+}
+
+function relationCountAllowed(item: AnyItem): boolean {
+  const count = Number(item.relation_count || 1);
+  return !Number.isFinite(count) || count >= state.minRelationCount;
+}
+
+function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+  items.forEach((item) => {
+    const value = key(item);
+    if (!value) return;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+  return counts;
 }
 
 function colorFor(item: AnyItem, index: number): string {
@@ -287,6 +347,8 @@ function renderShell(): void {
           <div id="view-list" class="stack"></div>
           <div class="section-title">Layers</div>
           <div id="layer-list" class="stack"></div>
+          <div class="section-title">Relations</div>
+          <div id="relation-controls" class="relation-controls"></div>
         </div>
       </aside>
       <main class="panel main-stage">
@@ -454,6 +516,83 @@ function renderLayers(): void {
   });
 }
 
+function renderRelationControls(): void {
+  const root = byId("relation-controls");
+  if (state.mode !== "philosophy" || !isPhilosophyView(state.currentView)) {
+    root.innerHTML = `<div class="muted">No relation contract for corpus view.</div>`;
+    return;
+  }
+  const layerEdges = (state.currentView.edges || []).filter(layerAllowed);
+  const activeEdges = layerEdges.filter(predicateAllowed);
+  const predicateCounts = countBy(layerEdges, predicateId);
+  const predicates = [...predicateCounts.entries()].sort((left, right) => right[1] - left[1]);
+  root.innerHTML = `
+    <div class="relation-summary">
+      <strong>${activeEdges.length}</strong>
+      <span>of ${layerEdges.length} relations</span>
+    </div>
+    <div class="density-row">
+      ${(["overview", "focused", "dense"] as DensityMode[])
+        .map(
+          (mode) => `
+            <button class="density-button ${state.densityMode === mode ? "active" : ""}" data-density="${mode}" type="button">
+              ${mode}
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+    <div class="threshold-row">
+      <button id="relation-min-dec" type="button">-</button>
+      <span>min ${state.minRelationCount}</span>
+      <button id="relation-min-inc" type="button">+</button>
+      <button id="predicate-reset" type="button">All</button>
+    </div>
+    <div class="predicate-list">
+      ${predicates
+        .map(
+          ([predicate, count]) => `
+            <label class="predicate-toggle ${state.activePredicates.has(predicate) ? "active" : ""}">
+              <input data-predicate="${escapeHtml(predicate)}" type="checkbox" ${
+                state.activePredicates.has(predicate) ? "checked" : ""
+              } />
+              <span>${escapeHtml(humanKind(predicate))}</span>
+              <small>${count}</small>
+            </label>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+
+  root.querySelectorAll<HTMLButtonElement>("[data-density]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.densityMode = (button.dataset.density || "overview") as DensityMode;
+      renderAll();
+    });
+  });
+  root.querySelectorAll<HTMLInputElement>("[data-predicate]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const predicate = input.dataset.predicate || "";
+      if (input.checked) state.activePredicates.add(predicate);
+      else state.activePredicates.delete(predicate);
+      renderAll();
+    });
+  });
+  root.querySelector<HTMLButtonElement>("#relation-min-dec")?.addEventListener("click", () => {
+    state.minRelationCount = Math.max(1, state.minRelationCount - 1);
+    renderAll();
+  });
+  root.querySelector<HTMLButtonElement>("#relation-min-inc")?.addEventListener("click", () => {
+    state.minRelationCount = Math.min(50, state.minRelationCount + 1);
+    renderAll();
+  });
+  root.querySelector<HTMLButtonElement>("#predicate-reset")?.addEventListener("click", () => {
+    state.activePredicates = new Set(currentPredicates());
+    renderAll();
+  });
+}
+
 function renderInspector(): void {
   const title = state.selected ? displayTitle(state.selected) : state.currentView?.view?.title || state.currentViewId || "Selection";
   byId("inspector-title").textContent = title;
@@ -463,6 +602,7 @@ function renderInspector(): void {
 
   const cards: string[] = [];
   if (state.selected) {
+    cards.push(...relationDetailCards(state.selected));
     const refs = collectRefs(state.selected);
     if (refs.length) {
       cards.push(detailCard("Source refs", refs.slice(0, 8).join("\n")));
@@ -482,19 +622,59 @@ function renderInspector(): void {
       ),
     );
   }
+  if (state.relationItems.length) {
+    cards.push(`<div class="section-title">Relations</div>`);
+    cards.push(
+      ...state.relationItems.slice(0, 48).map(
+        (item, index) => `
+          <button class="result-card relation-card" data-relation="${index}" type="button">
+            <span class="result-title">${escapeHtml(short(displayTitle(item), 86))}</span>
+            <span class="result-subtitle">${escapeHtml(short(displaySubtitle(item), 102))}</span>
+          </button>
+        `,
+      ),
+    );
+  }
   byId("detail-list").innerHTML = cards.join("") || detailCard("No detail", "Use search or click the graph.");
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-result]").forEach((button) => {
     button.addEventListener("click", () => selectItem(state.results[Number(button.dataset.result)]));
   });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-relation]").forEach((button) => {
+    button.addEventListener("click", () => selectItem(state.relationItems[Number(button.dataset.relation)]));
+  });
 }
 
 function detailCard(title: string, body: string, pre = false): string {
+  const safeTitle = escapeHtml(title);
+  const safeBody = escapeHtml(body);
   return `
     <div class="detail-card">
-      <span class="detail-title">${title}</span>
-      ${pre ? `<pre>${body}</pre>` : `<span class="detail-body">${body}</span>`}
+      <span class="detail-title">${safeTitle}</span>
+      ${pre ? `<pre>${safeBody}</pre>` : `<span class="detail-body">${safeBody}</span>`}
     </div>
   `;
+}
+
+function relationDetailCards(item: AnyItem): string[] {
+  if (!item.relation_count) return [];
+  const predicates = item.predicates && typeof item.predicates === "object" ? (item.predicates as Record<string, unknown>) : {};
+  const predicateText = Object.entries(predicates)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))
+    .slice(0, 8)
+    .map(([predicate, count]) => `${humanKind(predicate)}: ${count}`)
+    .join("\n");
+  const layers = itemLayers(item).join("\n");
+  const memberEdges = stringList(item.member_edge_ids).slice(0, 12).join("\n");
+  const cards = [
+    detailCard("From", text(item.from_label || item.from_id)),
+    detailCard("To", text(item.to_label || item.to_id)),
+    detailCard("Predicate", humanKind(item.primary_predicate || item.predicate_id)),
+    detailCard("Relation count", text(item.relation_count)),
+  ];
+  if (predicateText) cards.push(detailCard("Predicate mix", predicateText));
+  if (layers) cards.push(detailCard("Graph layers", layers));
+  if (memberEdges) cards.push(detailCard("Member edges", memberEdges));
+  return cards;
 }
 
 function collectRefs(item: AnyItem): string[] {
@@ -554,12 +734,37 @@ function positionNodeTooltip(): void {
   nodeTooltip.style.top = `${top}px`;
 }
 
+function graphFocus(): { nodes: Set<string>; edges: Set<string> } | null {
+  const selected = state.selectedGraphId;
+  if (!selected) return null;
+  const nodes = new Set<string>();
+  const edges = new Set<string>();
+  if (graph.hasEdge(selected)) {
+    const [source, target] = graph.extremities(selected);
+    nodes.add(source);
+    nodes.add(target);
+    edges.add(selected);
+    return { nodes, edges };
+  }
+  if (!graph.hasNode(selected)) return null;
+  nodes.add(selected);
+  graph.forEachEdge((edge, _attributes, source, target) => {
+    if (source === selected || target === selected) {
+      nodes.add(source);
+      nodes.add(target);
+      edges.add(edge);
+    }
+  });
+  return { nodes, edges };
+}
+
 function renderGraph(): void {
   if (!graphContainer) return;
   hideNodeTooltip();
   renderer?.kill();
   graph.clear();
   lastGraphItems = new Map();
+  state.relationItems = [];
 
   if (!state.currentView) {
     setGraphEmpty(true, "No view loaded.");
@@ -576,6 +781,7 @@ function renderGraph(): void {
   }
 
   setGraphEmpty(false);
+  const focus = graphFocus();
   renderer = new Sigma(graph, graphContainer, {
     allowInvalidContainer: true,
     defaultNodeColor: palette.default,
@@ -588,6 +794,20 @@ function renderGraph(): void {
     minCameraRatio: 0.08,
     maxCameraRatio: 8,
     renderEdgeLabels: false,
+    nodeReducer: (node, data) => {
+      if (!focus) return data;
+      if (focus.nodes.has(node)) {
+        return { ...data, forceLabel: true, highlighted: true, zIndex: Number(data.zIndex || 0) + 100 };
+      }
+      return { ...data, label: "", color: "rgba(102, 115, 110, 0.18)", zIndex: 0 };
+    },
+    edgeReducer: (edge, data) => {
+      if (!focus) return data;
+      if (focus.edges.has(edge)) {
+        return { ...data, size: Number(data.size || 1) * 1.9, color: "rgba(36, 120, 101, 0.76)", zIndex: 100 };
+      }
+      return { ...data, size: 0.22, color: "rgba(102, 115, 110, 0.07)", zIndex: 0 };
+    },
     defaultDrawNodeHover: (context, data) => {
       context.beginPath();
       context.arc(data.x, data.y, data.size + 4, 0, Math.PI * 2);
@@ -601,6 +821,8 @@ function renderGraph(): void {
   });
   renderer.on("enterNode", ({ node }) => showNodeTooltip(node));
   renderer.on("leaveNode", hideNodeTooltip);
+  renderer.on("enterEdge", ({ edge }) => showNodeTooltip(edge));
+  renderer.on("leaveEdge", hideNodeTooltip);
   renderer.on("clickNode", ({ node }) => {
     const payload = lastGraphItems.get(node);
     if (payload) selectItem(payload);
@@ -626,7 +848,7 @@ function buildClusterGraph(): void {
   if (!isPhilosophyView(state.currentView)) return;
   const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, 360);
   const nodes = (state.currentView.nodes || []).filter(layerAllowed);
-  const edges = (state.currentView.edges || []).filter(layerAllowed);
+  const edges = (state.currentView.edges || []).filter(relationAllowed);
   const nodeToCluster = new Map<string, string[]>();
   clusters.forEach((cluster) => {
     stringList(cluster.member_node_ids).forEach((nodeId) => {
@@ -642,23 +864,26 @@ function buildClusterGraph(): void {
   const relationBuild = addClusterRelationEdges(edges, nodeToCluster, clusters);
   const relationPairs = relationBuild.relationPairs;
   const linked = new Set<string>();
-  nodes.slice(0, 900).forEach((node) => {
-    const ids = nodeToCluster.get(node.node_id) || [];
-    for (let i = 0; i < ids.length; i += 1) {
-      for (let j = i + 1; j < ids.length; j += 1) {
-        const key = [ids[i], ids[j]].sort().join("::");
-        if (linked.has(key)) continue;
-        linked.add(key);
-        if (relationPairs.has(key)) continue;
-        graph.addDirectedEdgeWithKey(`cluster-edge:${key}`, ids[i], ids[j], {
-          size: 0.6,
-          color: "rgba(23,32,29,0.14)",
-        });
+  if (state.densityMode !== "overview") {
+    nodes.slice(0, state.densityMode === "dense" ? 1200 : 700).forEach((node) => {
+      const ids = nodeToCluster.get(node.node_id) || [];
+      for (let i = 0; i < ids.length; i += 1) {
+        for (let j = i + 1; j < ids.length; j += 1) {
+          const key = [ids[i], ids[j]].sort().join("::");
+          if (linked.has(key)) continue;
+          linked.add(key);
+          if (relationPairs.has(key)) continue;
+          graph.addDirectedEdgeWithKey(`cluster-edge:${key}`, ids[i], ids[j], {
+            size: 0.5,
+            color: "rgba(23,32,29,0.1)",
+          });
+        }
       }
-    }
-  });
+    });
+  }
   layoutGraph();
-  state.results = [...clusters, ...relationBuild.relationItems.slice(0, 24)];
+  state.results = clusters;
+  state.relationItems = relationBuild.relationItems;
 }
 
 function addClusterRelationEdges(
@@ -713,8 +938,9 @@ function addClusterRelationEdges(
   });
 
   [...aggregates.values()]
+    .filter(relationCountAllowed)
     .sort((left, right) => right.relation_count - left.relation_count)
-    .slice(0, 420)
+    .slice(0, relationLimit())
     .forEach((aggregate, index) => {
       const predicates = Object.fromEntries(aggregate.predicates.entries());
       const primaryPredicate =
@@ -732,6 +958,8 @@ function addClusterRelationEdges(
         graph_layers: [...aggregate.graph_layers],
         source_refs: [...aggregate.source_refs],
         member_edge_ids: aggregate.member_edge_ids.slice(0, 80),
+        from_label: displayTitle(fromCluster || { label: aggregate.from_id }),
+        to_label: displayTitle(toCluster || { label: aggregate.to_id }),
         label: `${displayTitle(fromCluster || { label: aggregate.from_id })} -> ${displayTitle(toCluster || { label: aggregate.to_id })}`,
       };
       addGraphEdge(payload.edge_id as string, aggregate.from_id, aggregate.to_id, payload);
@@ -750,13 +978,14 @@ function buildNodeGraph(): void {
     .slice(0, 1200);
   const visible = new Set(nodes.map((node) => node.node_id));
   nodes.forEach((node, index) => addGraphNode(node.node_id, node, index, 7));
-  (state.currentView.edges || [])
-    .filter(layerAllowed)
+  const visibleEdges = (state.currentView.edges || [])
+    .filter(relationAllowed)
     .filter((edge) => visible.has(edge.from_id) && visible.has(edge.to_id))
-    .slice(0, 2600)
-    .forEach((edge, index) => addGraphEdge(edge.edge_id || `edge:${index}`, edge.from_id, edge.to_id, edge));
+    .slice(0, edgeLimit());
+  visibleEdges.forEach((edge, index) => addGraphEdge(edge.edge_id || `edge:${index}`, edge.from_id, edge.to_id, edge));
   layoutGraph();
-  state.results = [...nodes, ...(state.currentView.edges || []).filter(layerAllowed).slice(0, 120)];
+  state.results = nodes;
+  state.relationItems = visibleEdges.slice(0, 180);
 }
 
 function buildCorpusGraph(): void {
@@ -771,6 +1000,7 @@ function buildCorpusGraph(): void {
   });
   layoutGraph();
   state.results = items;
+  state.relationItems = [];
 }
 
 function addGraphNode(id: string, item: AnyItem, index: number, size: number): void {
@@ -795,21 +1025,55 @@ function addGraphEdge(id: string, from: string, to: string, item: AnyItem): void
   });
 }
 
+function hashNumber(value: string): number {
+  return value.split("").reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 100000, 17);
+}
+
+function laneForItem(item: AnyItem, fallback: number): number {
+  const signal = text(item.cluster_kind || item.node_type || item.primary_predicate || item.predicate_id || item.label || item.title);
+  if (signal.includes("canon") || signal.includes("candidate")) return 0;
+  if (signal.includes("source") || signal.includes("corpus")) return 1;
+  if (signal.includes("concept") || signal.includes("lineage")) return 2;
+  if (signal.includes("evidence") || signal.includes("unresolved")) return 3;
+  return fallback % 5;
+}
+
 function layoutGraph(): void {
   const count = Math.max(graph.order, 1);
-  graph.forEachNode((node, attributes) => {
-    const index = Number.parseInt(String(node).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0).toString(), 10);
-    const angle = (Math.PI * 2 * index) / count;
-    graph.setNodeAttribute(node, "x", Math.cos(angle) * (1 + count / 90) + (Number(attributes.x) || 0) * 0.02);
-    graph.setNodeAttribute(node, "y", Math.sin(angle) * (1 + count / 90) + (Number(attributes.y) || 0) * 0.02);
+  const hint = text(state.currentView?.view?.layout_hint);
+  const nodes = graph.nodes();
+  const span = 1 + count / 90;
+  nodes.forEach((node, index) => {
+    const item = lastGraphItems.get(node) || {};
+    const hash = hashNumber(node);
+    const lane = laneForItem(item, hash);
+    const jitter = ((hash % 29) - 14) / 120;
+    let x = 0;
+    let y = 0;
+    if (hint.includes("timeline") || hint.includes("lane")) {
+      x = ((index / Math.max(count - 1, 1)) * 2 - 1) * (1.4 + count / 80);
+      y = (lane - 2) * 0.72 + jitter;
+    } else if (hint.includes("directed") || hint.includes("flow") || hint.includes("corridor")) {
+      x = (lane - 2) * 1.2 + jitter;
+      y = ((index / Math.max(count - 1, 1)) * 2 - 1) * (1.2 + count / 95);
+    } else if (hint.includes("dag") || hint.includes("evidence") || hint.includes("uncertainty")) {
+      x = (lane - 2) * 1.1 + jitter;
+      y = ((hash % 97) / 48.5 - 1) * (1.4 + count / 110);
+    } else {
+      const angle = (Math.PI * 2 * (hash % Math.max(count, 2))) / Math.max(count, 2);
+      x = Math.cos(angle) * span + jitter;
+      y = Math.sin(angle) * span + jitter;
+    }
+    graph.setNodeAttribute(node, "x", x);
+    graph.setNodeAttribute(node, "y", y);
   });
   if (graph.order > 1) {
     forceAtlas2.assign(graph, {
-      iterations: graph.order > 500 ? 45 : 90,
+      iterations: graph.order > 500 ? 38 : 74,
       settings: {
         ...forceAtlas2.inferSettings(graph),
-        gravity: 0.06,
-        scalingRatio: graph.order > 500 ? 6 : 10,
+        gravity: hint.includes("timeline") ? 0.1 : 0.055,
+        scalingRatio: graph.order > 500 ? 7 : 11,
       },
     });
   }
@@ -817,10 +1081,12 @@ function layoutGraph(): void {
 
 function selectItem(item: AnyItem): void {
   state.selected = item;
+  state.selectedGraphId = text(item.node_id || item.cluster_id || item.edge_id || "") || null;
   const cluster = item as Cluster;
   if (cluster.cluster_id && cluster.member_node_ids?.length) {
     state.expandedCluster = cluster;
   }
+  renderGraph();
   renderInspector();
 }
 
@@ -829,6 +1095,7 @@ function renderAll(): void {
   renderMetrics();
   renderViews();
   renderLayers();
+  renderRelationControls();
   renderGraph();
   renderInspector();
 }
@@ -837,7 +1104,9 @@ async function loadMode(mode: Mode): Promise<void> {
   state.mode = mode;
   state.currentView = null;
   state.selected = null;
+  state.selectedGraphId = null;
   state.results = [];
+  state.relationItems = [];
   state.expandedCluster = null;
   if (mode === "philosophy") {
     state.status.philosophy = await fetchJson<AnyItem>("/api/philosophy/status");
@@ -857,18 +1126,24 @@ async function loadView(viewId: string): Promise<void> {
   if (!viewId) return;
   state.currentViewId = viewId;
   state.selected = null;
+  state.selectedGraphId = null;
   state.results = [];
+  state.relationItems = [];
   state.expandedCluster = null;
   if (state.mode === "philosophy") {
     const payload = await fetchJson<PhilosophyViewPayload>(`/api/philosophy/views/${encodeURIComponent(viewId)}`);
     state.currentView = payload;
     state.activeLayers = new Set(payload.view.graph_layers || []);
+    state.activePredicates = new Set((payload.edges || []).map(predicateId));
+    state.densityMode = "overview";
+    state.minRelationCount = 1;
     state.graphMode = "clusters";
     state.results = payload.clusters || [];
   } else {
     const payload = await fetchJson<CorpusViewPayload>(`/api/corpus/graph-views/${encodeURIComponent(viewId)}?limit=700`);
     state.currentView = payload;
     state.activeLayers = new Set();
+    state.activePredicates = new Set();
     state.graphMode = "nodes";
     state.results = payload.items || [];
   }
@@ -884,6 +1159,7 @@ async function search(): Promise<void> {
       : await fetchJson<{ results?: AnyItem[] }>(`/api/corpus/search?query=${encodeURIComponent(query)}&limit=80`);
   state.results = payload.results || [];
   state.selected = { title: query ? `Search: ${query}` : "Search", results: state.results.length };
+  state.selectedGraphId = null;
   renderInspector();
 }
 
@@ -891,6 +1167,7 @@ async function showReviewPacket(): Promise<void> {
   if (state.mode !== "philosophy") return;
   const payload = await fetchJson<{ packet: AnyItem }>(`/api/philosophy/review-packet?view_id=${encodeURIComponent(state.currentViewId)}`);
   state.selected = { title: `Review packet: ${state.currentViewId}`, ...payload.packet };
+  state.selectedGraphId = null;
   renderInspector();
 }
 
@@ -899,24 +1176,28 @@ async function showUnresolved(): Promise<void> {
   const payload = await fetchJson<{ unresolved?: AnyItem[] }>(`/api/philosophy/unresolved?view_id=${encodeURIComponent(state.currentViewId)}`);
   state.results = payload.unresolved || [];
   state.selected = { title: `Unresolved: ${state.currentViewId}`, unresolved: state.results.length };
+  state.selectedGraphId = null;
   renderInspector();
 }
 
 async function showSnapshot(): Promise<void> {
   if (state.mode !== "philosophy") return;
   state.selected = await fetchJson<AnyItem>("/api/philosophy/snapshot");
+  state.selectedGraphId = null;
   renderInspector();
 }
 
 async function showAudit(): Promise<void> {
   if (state.mode !== "philosophy") return;
   state.selected = await fetchJson<AnyItem>("/api/philosophy/audit");
+  state.selectedGraphId = null;
   renderInspector();
 }
 
 async function syncProjection(): Promise<void> {
   const url = state.mode === "philosophy" ? "/api/philosophy/project/sync" : "/api/project/sync";
   state.selected = await fetchJson<AnyItem>(url, { method: "POST" });
+  state.selectedGraphId = null;
   renderInspector();
 }
 

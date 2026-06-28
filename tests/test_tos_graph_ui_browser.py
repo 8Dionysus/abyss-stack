@@ -98,11 +98,18 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.get_by_role("button", name="Review packet").click()
             page.locator("#inspector-title", has_text="Review packet: chronology").wait_for(timeout=10_000)
             page.locator("#clusters-button").click()
+            page.get_by_role("button", name="focused").click()
             page.locator("#graph canvas").first.wait_for(timeout=10_000)
             page.locator(".result-card").first.wait_for(timeout=10_000)
+            page.locator(".predicate-toggle").first.wait_for(timeout=10_000)
+            page.locator(".relation-card").first.wait_for(timeout=10_000)
+            page.locator(".relation-card").first.click()
+            page.locator(".detail-title", has_text="From").wait_for(timeout=10_000)
+            page.locator(".detail-title", has_text="To").wait_for(timeout=10_000)
             first_result_title = page.locator(".result-card .result-title").first.inner_text(timeout=10_000)
             graph_caption = page.locator("#graph-caption").inner_text(timeout=10_000)
             relation_card_count = page.locator(".result-card .result-subtitle").filter(has_text="relations").count()
+            predicate_toggle_count = page.locator(".predicate-toggle").count()
             node_count = page.locator("#graph canvas").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
@@ -118,4 +125,5 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
     assert "Corpus Or Prepared Source Document" not in first_result_title
     assert "links" in graph_caption
     assert relation_card_count > 0
+    assert predicate_toggle_count > 0
     assert screenshot.stat().st_size > 20_000

@@ -147,7 +147,9 @@ button:hover {
 .segmented button.active,
 .mode-button.active,
 .view-card.active,
-.layer-toggle.active {
+.layer-toggle.active,
+.predicate-toggle.active,
+.density-button.active {
   border-color: rgba(36, 120, 101, 0.76);
   background: var(--accent-soft);
 }
@@ -160,7 +162,8 @@ button:hover {
 .view-card,
 .result-card,
 .detail-card,
-.layer-toggle {
+.layer-toggle,
+.predicate-toggle {
   width: 100%;
   border-radius: 8px;
   padding: 10px;
@@ -193,15 +196,101 @@ button:hover {
   line-height: 1.35;
 }
 
+.detail-body {
+  white-space: pre-line;
+}
+
 .layer-toggle {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.layer-toggle input {
+.layer-toggle input,
+.predicate-toggle input {
   width: auto;
   margin: 0;
+}
+
+.relation-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.relation-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 8px 10px;
+}
+
+.relation-summary strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.relation-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.density-row,
+.threshold-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.threshold-row {
+  grid-template-columns: 40px minmax(0, 1fr) 40px 56px;
+  align-items: center;
+}
+
+.density-button,
+.threshold-row button {
+  min-height: 32px;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.threshold-row span {
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.predicate-list {
+  display: grid;
+  gap: 6px;
+  max-height: 250px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.predicate-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+}
+
+.predicate-toggle span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.18;
+}
+
+.predicate-toggle small {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .input-row {
@@ -382,6 +471,10 @@ input:focus {
 
 .detail-card {
   background: var(--surface-soft);
+}
+
+.relation-card {
+  border-left: 3px solid rgba(36, 120, 101, 0.62);
 }
 
 pre {
