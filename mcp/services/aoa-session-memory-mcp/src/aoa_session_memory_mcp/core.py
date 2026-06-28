@@ -105,6 +105,7 @@ SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
 DEFAULT_SEARCH_MAX_SHARDS = 24
 USAGE_NEIGHBORHOOD_TIMEOUT_SECONDS = 20.0
+ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS = 30.0
 LIVE_READINESS_LIMIT: int | None = None
 LIVE_READINESS_SAMPLE_LIMIT = 0
 PROVIDER_DIRTY_SESSION_SAMPLE_LIMIT = 5
@@ -6003,6 +6004,51 @@ class AoASessionMemoryMCPState:
             mcp_access["full_status_route"] = self._archive_command_line("maintenance-status", [*args, "--full"] if not full else args)
             runtime = payload.get("runtime") if isinstance(payload.get("runtime"), dict) else {}
             mcp_access["runtime_reload_required"] = runtime.get("reload_required")
+        return payload
+
+    def session_operational_route_rollup_query(
+        self,
+        query: str = "",
+        *,
+        layer: str = "",
+        key: str = "",
+        route_signal: str = "",
+        limit: int = 12,
+        ref_limit: int = 3,
+    ) -> dict[str, Any]:
+        args: list[str] = []
+        text = str(query or "").strip()
+        if text:
+            args.append(_safe_selector(text, "query", limit=160))
+        for flag, value, field in (
+            ("--layer", layer, "layer"),
+            ("--key", key, "key"),
+            ("--route-signal", route_signal, "route_signal"),
+        ):
+            if value:
+                args.extend([flag, _safe_selector(str(value), field, limit=160)])
+        args.extend(
+            [
+                "--limit",
+                str(_coerce_limit(limit, 12, 100)),
+                "--ref-limit",
+                str(_coerce_bounded_int(ref_limit, 3, 0, 25)),
+            ]
+        )
+        payload = self._archive_command(
+            "search-operational-route-rollup-query",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, ROUTE_ROLLUP_QUERY_TIMEOUT_SECONDS),
+        )
+        payload.setdefault("mutates", False)
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        mcp_access = payload.get("mcp_access")
+        if isinstance(mcp_access, dict):
+            mcp_access["response_compacted"] = True
+            mcp_access["does_not_materialize_rollup"] = True
+            mcp_access["does_not_resample_shards"] = True
+            mcp_access["full_route"] = self._archive_command_line("search-operational-route-rollup-query", args)
         return payload
 
     def _maintenance_summary_for_status(self) -> dict[str, Any]:

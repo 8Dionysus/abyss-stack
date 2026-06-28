@@ -1135,6 +1135,50 @@ GRAPH_NEIGHBORHOOD = {
     },
 }
 
+OPERATIONAL_ROUTE_ROLLUP_QUERY = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_search_operational_route_rollup_query",
+    "ok": True,
+    "status": "matched",
+    "mutates": False,
+    "filters": {
+        "query": "exec_command",
+        "layer": "tool",
+        "key": "",
+        "route_signal": "",
+        "limit": 3,
+        "ref_limit": 2,
+    },
+    "results": [
+        {
+            "layer": "tool",
+            "key": "exec_command",
+            "route_signal": "tool:exec_command",
+            "posting_count": 8,
+            "session_count": 3,
+            "raw_refs": ["raw:line:1"],
+            "segment_refs": ["segments/000__initial-to-latest.md#event-000001"],
+            "session_ids": ["session-1"],
+        }
+    ],
+    "result_count": 1,
+    "quality": {
+        "uses_materialized_rollup": True,
+        "raw_or_segment_ref_present": True,
+        "freshness_status": "current",
+        "truncated": False,
+    },
+    "cost_profile": {
+        "uses_materialized_route_rollup": True,
+        "resamples_shards": False,
+        "opens_monolith": False,
+        "uses_fts": False,
+        "hydrates_body": False,
+        "elapsed_ms": 12,
+    },
+    "diagnostics": [],
+}
+
 GRAPH_TIMELINE = {
     "schema_version": 1,
     "artifact_type": "session_memory_graph_timeline",
@@ -1313,6 +1357,8 @@ class FakeRunner:
             payload = ROUTE_READINESS_FAST_GATE
         elif command == "maintenance-status":
             payload = MAINTENANCE_STATUS
+        elif command == "search-operational-route-rollup-query":
+            payload = OPERATIONAL_ROUTE_ROLLUP_QUERY
         elif command == "search":
             payload = SEARCH_RESULTS
         elif command == "literal-query-plan":
@@ -1906,6 +1952,35 @@ def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) ->
 
     surfaces = state.available_surfaces()
     assert "aoa-session-memory://maintenance/status" in surfaces["resources"]
+
+
+def test_operational_route_rollup_query_delegates_to_read_only_archive_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_operational_route_rollup_query(
+        "exec_command",
+        layer="tool",
+        limit=3,
+        ref_limit=2,
+    )
+
+    calls = {command: args for command, args in runner.calls}
+    args = calls["search-operational-route-rollup-query"]
+    assert args[0] == "exec_command"
+    assert args[args.index("--layer") + 1] == "tool"
+    assert args[args.index("--limit") + 1] == "3"
+    assert args[args.index("--ref-limit") + 1] == "2"
+    assert "--apply" not in args
+    assert "--max-shards" not in args
+    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-route-rollup-query"] == [30.0]
+    assert payload["artifact_type"] == "session_memory_search_operational_route_rollup_query"
+    assert payload["mutates"] is False
+    assert payload["quality"]["raw_or_segment_ref_present"] is True
+    assert payload["cost_profile"]["resamples_shards"] is False
+    assert payload["mcp_access"]["mutates"] is False
+    assert payload["mcp_access"]["does_not_materialize_rollup"] is True
+    assert payload["mcp_access"]["does_not_resample_shards"] is True
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -2776,10 +2851,10 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"case_count": 1, "actionable_gap_count": 0},
         {"recommendation": "use_graph_search"},
         {"ok": True, "projection_completeness": {"status": "current"}},
-        tool_count=33,
+        tool_count=34,
     )
 
-    assert summary["tool_count"] == 33
+    assert summary["tool_count"] == 34
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
@@ -2828,6 +2903,7 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     assert "aoa_session_literal_query_plan" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_dossier" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_usage_chain" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_operational_route_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
@@ -3061,6 +3137,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_registry" in tools
     assert "aoa_session_live_scenario_audit" in tools
     assert "aoa_session_live_scenario_corpus_check" in tools
+    assert "aoa_session_operational_route_rollup_query" in tools
     assert "aoa_session_projection_status" in tools
     assert "aoa_session_graph_neighborhood" in tools
     assert "aoa_session_graph_timeline" in tools
@@ -3072,6 +3149,8 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
+    assert tools["aoa_session_operational_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
+    assert tools["aoa_session_operational_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
     assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["limit"]["default"] == 6
@@ -3082,12 +3161,14 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
     live_scenario_description = tools["aoa_session_live_scenario_audit"].description or ""
+    route_rollup_description = tools["aoa_session_operational_route_rollup_query"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
     assert "one compact registry, usage, consequence" in dossier_description
     assert "usage-to-consequence chains" in usage_chain_description
     assert "entity registry lookup status probes" in live_scenario_description
+    assert "without maintenance" in route_rollup_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
     assert "compact bridge packet" in bridge_description
