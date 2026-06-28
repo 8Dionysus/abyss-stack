@@ -164,6 +164,14 @@
         "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-evals-mcp/tests"]
       },
       {
+        "label": "validate aoa kag mcp",
+        "command": ["python", "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py"]
+      },
+      {
+        "label": "test aoa kag mcp",
+        "command": ["python", "-m", "pytest", "-q", "mcp/services/aoa-kag-mcp/tests"]
+      },
+      {
         "label": "validate abyss machine mcp",
         "command": ["python", "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py"]
       },

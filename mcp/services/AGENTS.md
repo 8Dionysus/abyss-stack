@@ -46,6 +46,13 @@ python mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py
 python -m pytest mcp/services/aoa-evals-mcp/tests -q
 ```
 
+For `aoa-kag-mcp`, run:
+
+```bash
+python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
+python -m pytest mcp/services/aoa-kag-mcp/tests -q
+```
+
 For `abyss-machine-mcp`, run:
 
 ```bash
