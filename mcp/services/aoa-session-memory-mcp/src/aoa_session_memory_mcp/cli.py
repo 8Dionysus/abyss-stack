@@ -253,6 +253,14 @@ def main() -> None:
     maintenance_plan.add_argument("--no-timers", action="store_true")
     maintenance_plan.add_argument("--full", action="store_true")
 
+    route_rollup_query = sub.add_parser("route-rollup-query")
+    route_rollup_query.add_argument("query", nargs="?", default="")
+    route_rollup_query.add_argument("--layer", default="")
+    route_rollup_query.add_argument("--key", default="")
+    route_rollup_query.add_argument("--route-signal", default="")
+    route_rollup_query.add_argument("--limit", type=int, default=12)
+    route_rollup_query.add_argument("--ref-limit", type=int, default=3)
+
     projection_status = sub.add_parser("projection-status")
     projection_status.add_argument("--include-payload", action="store_true")
 
@@ -553,6 +561,17 @@ def main() -> None:
             _print(state.session_maintenance_status(deep=args.deep, include_timers=not args.no_timers, full=args.full))
         else:
             _print(state.maintenance_plan())
+    elif args.command == "route-rollup-query":
+        _print(
+            state.session_operational_route_rollup_query(
+                query=args.query,
+                layer=args.layer,
+                key=args.key,
+                route_signal=args.route_signal,
+                limit=args.limit,
+                ref_limit=args.ref_limit,
+            )
+        )
     elif args.command == "projection-status":
         _print(state.session_projection_status(include_payload=args.include_payload))
     elif args.command == "graph-neighborhood":
