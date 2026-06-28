@@ -42,10 +42,18 @@ neo4j_store = Neo4jProjectionStore(settings, neo4j_status)
 projector = CorpusProjector(reader, neo4j_status, neo4j_store)
 philosophy_projector = PhilosophyProjector(philosophy_reader, neo4j_status, neo4j_store)
 
+
+def _static_root() -> Path:
+    app_static = Path(__file__).resolve().parent / "static"
+    if app_static.exists():
+        return app_static
+    return Path(__file__).resolve().parents[1] / "frontend" / "dist"
+
+
 app = FastAPI(title="tos-graph", version="0.2.0")
 app.mount(
     "/static",
-    StaticFiles(directory=Path(__file__).resolve().parent / "static", check_dir=False),
+    StaticFiles(directory=_static_root(), check_dir=False),
     name="static",
 )
 
