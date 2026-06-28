@@ -4058,6 +4058,7 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
             "literal_planner",
             "graph_neighborhood",
             "graph_bridge",
+            "route_rollup_query",
         ],
         sample_size=2,
         recent_days=4000,
@@ -4087,8 +4088,9 @@ def test_live_scenario_audit_routes_to_canonical_archive_command(tmp_path: Path)
     assert args[args.index("--sample-size") + 1] == "2"
     assert args[args.index("--recent-days") + 1] == "90"
     assert args[args.index("--limit") + 1] == "2"
-    assert args.count("--profile") == 9
+    assert args.count("--profile") == 10
     assert "entity_registry_lookup" in args
+    assert "route_rollup_query" in args
     assert runner.timeouts[-1] == ("live-scenario-audit", 90.0)
 
 
