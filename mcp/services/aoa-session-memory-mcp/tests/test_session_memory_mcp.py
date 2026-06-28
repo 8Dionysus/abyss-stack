@@ -44,6 +44,27 @@ def test_validator_help_does_not_run_live_smoke() -> None:
     assert "usage:" in result.stdout
 
 
+def test_cli_transport_preflight_reports_schema() -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = (VALIDATOR_PATH.parents[1] / "src").as_posix()
+    result = subprocess.run(
+        [sys.executable, "-m", "aoa_session_memory_mcp.cli", "transport-preflight"],
+        cwd=VALIDATOR_PATH.parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "aoa_session_memory_mcp_transport_preflight_v1"
+    assert payload["mutates"] is False
+    assert "direct_tool_transport_status" in payload
+    assert "next_action" in payload
+
+
 def write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -2894,6 +2915,53 @@ def test_codex_session_advisory_reports_current_stale_transport(tmp_path: Path, 
     assert advisory["current_session_has_aoa_session_memory_child"] is False
     assert advisory["live_transport_restart_advisory"] is True
     assert advisory["current_codex_processes"][0]["pid"] == 200
+
+
+def test_transport_preflight_reports_current_codex_restart_need(tmp_path: Path, monkeypatch: Any) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "command = \"python3\"\n"
+        "args = [\".codex/bin/aoa-session-memory-mcp-server.py\"]\n"
+        "cwd = \"/srv/AbyssOS\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (2_000.0, 2_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "pytest"], 3_500.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 1_500.0)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["schema"] == "aoa_session_memory_mcp_transport_preflight_v1"
+    assert preflight["ok"] is False
+    assert preflight["configured_server"]["configured"] is True
+    assert preflight["direct_tool_transport_status"] == "restart_required"
+    assert preflight["live_transport_restart_advisory"] is True
+    assert preflight["codex_session"]["current_session_has_aoa_session_memory_child"] is False
 
 
 def test_usage_neighborhood_probe_uses_indexed_candidate_session() -> None:

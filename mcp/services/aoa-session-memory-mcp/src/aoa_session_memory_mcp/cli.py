@@ -37,6 +37,8 @@ def main() -> None:
     status = sub.add_parser("status")
     status.add_argument("--include-live", action="store_true")
 
+    sub.add_parser("transport-preflight")
+
     search = sub.add_parser("search")
     search.add_argument("query", nargs="?", default="")
     search.add_argument("--filter", action="append")
@@ -323,6 +325,8 @@ def main() -> None:
 
     if args.command == "status":
         _print(state.session_memory_status(include_live=args.include_live))
+    elif args.command == "transport-preflight":
+        _print(state.session_mcp_transport_preflight())
     elif args.command == "search":
         _print(state.session_search(args.query, filters=_parse_filter(args.filter), limit=args.limit))
     elif args.command == "literal-query-plan":

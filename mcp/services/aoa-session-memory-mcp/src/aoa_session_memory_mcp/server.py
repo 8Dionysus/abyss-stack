@@ -65,6 +65,11 @@ def build_server(
         return current_state().session_memory_status(include_live=include_live)
 
     @mcp.tool()
+    def aoa_session_transport_preflight() -> dict[str, Any]:
+        """Diagnose whether the current Codex process has a live aoa-session-memory MCP transport."""
+        return current_state().session_mcp_transport_preflight()
+
+    @mcp.tool()
     def aoa_session_search(query: str = "", filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
         """Search .aoa session evidence and return route refs plus freshness data."""
         return current_state().session_search(query=query, filters=filters, limit=limit)
