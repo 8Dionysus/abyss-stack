@@ -1415,6 +1415,17 @@ class FakeRunner:
         return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
 
 
+class SessionProviderTimeoutRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        command = argv[2]
+        args = tuple(argv[3:])
+        if command == "search-provider-status" and "--session" in args:
+            self.calls.append((command, args))
+            self.timeouts.append((command, timeout))
+            return CommandOutput(argv, 124, "", "command timed out after 60.0s", 60_000.0)
+        return super().__call__(argv, timeout)
+
+
 class StaleProviderRunner(FakeRunner):
     def __init__(self, *, dirty_session_id: str, dirty_session_label: str) -> None:
         super().__init__()
@@ -2903,7 +2914,7 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     assert "aoa_session_literal_query_plan" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_dossier" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_usage_chain" in validator.REQUIRED_STDIO_SMOKE_TOOLS
-    assert "aoa_session_operational_route_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_route_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
@@ -3137,7 +3148,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_registry" in tools
     assert "aoa_session_live_scenario_audit" in tools
     assert "aoa_session_live_scenario_corpus_check" in tools
-    assert "aoa_session_operational_route_rollup_query" in tools
+    assert "aoa_session_route_rollup_query" in tools
     assert "aoa_session_projection_status" in tools
     assert "aoa_session_graph_neighborhood" in tools
     assert "aoa_session_graph_timeline" in tools
@@ -3149,8 +3160,8 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
-    assert tools["aoa_session_operational_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
-    assert tools["aoa_session_operational_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
+    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
+    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
     assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["limit"]["default"] == 6
@@ -3161,7 +3172,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
     live_scenario_description = tools["aoa_session_live_scenario_audit"].description or ""
-    route_rollup_description = tools["aoa_session_operational_route_rollup_query"].description or ""
+    route_rollup_description = tools["aoa_session_route_rollup_query"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
@@ -3421,6 +3432,24 @@ def test_freshness_check_resolves_latest_before_provider_scope(tmp_path: Path) -
     assert freshness["checks"][0]["status"] == "present"
     assert freshness_calls[0][freshness_calls[0].index("--session") + 1] == "2026-05-26__001__session-memory-mcp"
     assert "latest" not in freshness_calls[0]
+
+
+def test_freshness_check_falls_back_to_global_provider_when_session_scope_times_out(tmp_path: Path) -> None:
+    runner = SessionProviderTimeoutRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="session-1")
+
+    freshness_calls = [args for command, args in runner.calls if command == "search-provider-status"]
+    assert len(freshness_calls) == 2
+    assert "--session" in freshness_calls[0]
+    assert "--session" not in freshness_calls[1]
+    assert freshness["ok"] is True
+    assert freshness["checks"][0]["status"] == "present"
+    assert freshness["projection_freshness"]["status"] == "current"
+    assert "provider_session_status_failed_using_global_freshness" in freshness["diagnostics"]
+    assert freshness["session_provider_fallback"]["ok"] is False
+    assert freshness["session_provider_fallback"]["mcp_access"]["archive_command"] == "search-provider-status"
 
 
 def test_freshness_check_rejects_relative_refs_that_escape_aoa_root(tmp_path: Path) -> None:
