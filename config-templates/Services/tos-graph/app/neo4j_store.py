@@ -76,10 +76,79 @@ def _list_dump(value: Any) -> str:
     return _json_dump(value if isinstance(value, list) else [])
 
 
+def _chunks(rows: list[dict[str, Any]], size: int = 100) -> list[list[dict[str, Any]]]:
+    return [rows[index : index + size] for index in range(0, len(rows), size)]
+
+
+ConstraintSpec = tuple[str, str, str]
+
+CORPUS_CONSTRAINTS: tuple[ConstraintSpec, ...] = (
+    ("tos_corpus_projection_owner", "TosCorpusProjection", "owner_repo"),
+    ("tos_corpus_branch_projection_id", "TosCorpusBranchProjection", "projection_id"),
+    ("tos_corpus_manifest_projection_id", "TosCorpusManifestProjection", "projection_id"),
+    ("tos_corpus_node_projection_id", "TosCorpusNodeProjection", "projection_id"),
+    ("tos_corpus_relation_pack_projection_id", "TosCorpusRelationPackProjection", "projection_id"),
+    ("tos_corpus_relation_edge_projection_id", "TosCorpusRelationEdgeProjection", "projection_id"),
+    ("tos_corpus_resource_projection_id", "TosCorpusResourceProjection", "projection_id"),
+    ("tos_corpus_graph_view_projection_id", "TosCorpusGraphViewProjection", "projection_id"),
+)
+
+PHILOSOPHY_CONSTRAINTS: tuple[ConstraintSpec, ...] = (
+    ("tos_philosophy_projection_owner", "TosPhilosophyProjection", "owner_repo"),
+    ("tos_philosophy_view_projection_id", "TosPhilosophyViewProjection", "projection_id"),
+    ("tos_philosophy_node_projection_id", "TosPhilosophyNodeProjection", "projection_id"),
+    ("tos_philosophy_edge_projection_id", "TosPhilosophyEdgeProjection", "projection_id"),
+    ("tos_philosophy_source_ref_projection_id", "TosPhilosophySourceRefProjection", "projection_id"),
+    ("tos_philosophy_layer_projection_id", "TosPhilosophyLayerProjection", "projection_id"),
+    ("tos_philosophy_cluster_projection_id", "TosPhilosophyClusterProjection", "projection_id"),
+    ("tos_philosophy_review_packet_projection_id", "TosPhilosophyReviewPacketProjection", "projection_id"),
+)
+
+PHILOSOPHY_RELATION_TYPES = [
+    "PROJECTS_VIEW",
+    "PROJECTS_NODE",
+    "PROJECTS_EDGE",
+    "PROJECTS_LAYER",
+    "PROJECTS_CLUSTER",
+    "PROJECTS_REVIEW_PACKET",
+    "PROJECTS_SOURCE_REF",
+    "IN_VIEW",
+    "IN_LAYER",
+    "HAS_SOURCE_REF",
+    "CLUSTERS_NODE",
+    "CLUSTERS_EDGE",
+    "HAS_REVIEW_PACKET",
+    "REVIEWS_VIEW",
+    "FROM_NODE",
+    "TO_NODE",
+    "TOS_PHILOSOPHY_RELATION",
+]
+
+
 class Neo4jProjectionStore:
     def __init__(self, settings: TosGraphSettings, status: Neo4jStoreStatus) -> None:
         self.settings = settings
         self.status = status
+
+    @staticmethod
+    def _ensure_constraints(tx: Any, constraints: tuple[ConstraintSpec, ...]) -> int:
+        for name, label, property_name in constraints:
+            tx.run(
+                f"""
+                CREATE CONSTRAINT {name} IF NOT EXISTS
+                FOR (node:{label})
+                REQUIRE node.{property_name} IS UNIQUE
+                """
+            ).consume()
+        return len(constraints)
+
+    @classmethod
+    def _ensure_corpus_constraints(cls, tx: Any) -> int:
+        return cls._ensure_constraints(tx, CORPUS_CONSTRAINTS)
+
+    @classmethod
+    def _ensure_philosophy_constraints(cls, tx: Any) -> int:
+        return cls._ensure_constraints(tx, PHILOSOPHY_CONSTRAINTS)
 
     @staticmethod
     def _corpus_rows(corpus: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -133,21 +202,18 @@ class Neo4jProjectionStore:
         )
         try:
             with driver.session(database=self.settings.neo4j_database) as session:
-                deleted_counts = session.execute_write(self._delete_corpus_projection)
-                session.execute_write(self._merge_corpus_projection, corpus_props)
-                for label, rel_type, rows in (
-                    ("TosCorpusBranchProjection", "PROJECTS_BRANCH", branch_rows),
-                    ("TosCorpusManifestProjection", "PROJECTS_MANIFEST", manifest_rows),
-                    ("TosCorpusNodeProjection", "PROJECTS_NODE", node_rows),
-                    ("TosCorpusRelationPackProjection", "PROJECTS_RELATION_PACK", pack_rows),
-                    ("TosCorpusRelationEdgeProjection", "PROJECTS_RELATION_EDGE", edge_rows),
-                    ("TosCorpusResourceProjection", "PROJECTS_RESOURCE", resource_rows),
-                    ("TosCorpusGraphViewProjection", "PROJECTS_GRAPH_VIEW", view_rows),
-                ):
-                    if rows:
-                        session.execute_write(self._merge_corpus_rows, label, rel_type, rows)
-                if edge_rows and node_rows:
-                    session.execute_write(self._link_corpus_relation_edges, edge_rows)
+                constraint_count = session.execute_write(self._ensure_corpus_constraints)
+                deleted_counts = session.execute_write(
+                    self._replace_corpus_projection,
+                    corpus_props,
+                    branch_rows,
+                    manifest_rows,
+                    node_rows,
+                    pack_rows,
+                    edge_rows,
+                    resource_rows,
+                    view_rows,
+                )
         except Exception as exc:  # pragma: no cover - runtime integration path
             raise Neo4jStoreError(f"neo4j corpus sync failed: {exc}") from exc
         finally:
@@ -164,6 +230,7 @@ class Neo4jProjectionStore:
             "note": f"whole-corpus projection synced into neo4j database '{self.settings.neo4j_database}' while Tree of Sophia remained canonical",
             "deleted_node_count": deleted_counts["deleted_node_count"],
             "deleted_edge_count": deleted_counts["deleted_edge_count"],
+            "constraint_count": constraint_count,
         }
 
     @staticmethod
@@ -244,12 +311,14 @@ class Neo4jProjectionStore:
 
         counts = projection.get("counts", {})
         projected_at = datetime.now(UTC).isoformat()
+        refresh_id = f"tos-philosophy:{projected_at}"
         projection_props = {
             "owner_repo": projection.get("owner_repo"),
             "schema_version": projection.get("schema_version"),
             "surface_kind": projection.get("surface_kind"),
             "schema_ref": projection.get("schema_ref"),
             "projected_at": projected_at,
+            "refresh_id": refresh_id,
             "counts_json": _json_dump(counts),
             "source_refs_json": _json_dump(projection.get("source_refs", {})),
             "snapshot_review_json": _json_dump(projection.get("snapshot_review", {})),
@@ -269,7 +338,7 @@ class Neo4jProjectionStore:
         )
         try:
             with driver.session(database=self.settings.neo4j_database) as session:
-                deleted_counts = session.execute_write(self._delete_philosophy_projection)
+                constraint_count = session.execute_write(self._ensure_philosophy_constraints)
                 session.execute_write(self._merge_philosophy_projection, projection_props)
                 for label, rel_type, rows in (
                     ("TosPhilosophyViewProjection", "PROJECTS_VIEW", view_rows),
@@ -280,31 +349,44 @@ class Neo4jProjectionStore:
                     ("TosPhilosophyReviewPacketProjection", "PROJECTS_REVIEW_PACKET", review_packet_rows),
                     ("TosPhilosophySourceRefProjection", "PROJECTS_SOURCE_REF", source_rows),
                 ):
-                    if rows:
-                        session.execute_write(self._merge_philosophy_rows, label, rel_type, rows)
-                session.execute_write(self._link_philosophy_view_memberships, node_rows, edge_rows)
+                    for chunk in _chunks(rows):
+                        session.execute_write(self._merge_philosophy_rows, label, rel_type, chunk, refresh_id)
+                for chunk in _chunks(node_rows):
+                    session.execute_write(self._link_philosophy_view_nodes, chunk, refresh_id)
+                for chunk in _chunks(edge_rows):
+                    session.execute_write(self._link_philosophy_view_edges, chunk, refresh_id)
                 for label, rows in (
                     ("TosPhilosophyViewProjection", view_rows),
                     ("TosPhilosophyNodeProjection", node_rows),
                     ("TosPhilosophyEdgeProjection", edge_rows),
                     ("TosPhilosophyClusterProjection", cluster_rows),
                 ):
-                    if rows:
-                        session.execute_write(self._link_philosophy_layer_memberships, label, rows)
-                        session.execute_write(self._link_philosophy_source_refs, label, rows)
-                if review_packet_rows:
-                    session.execute_write(self._link_philosophy_review_packets, review_packet_rows)
+                    for chunk in _chunks(rows):
+                        session.execute_write(self._link_philosophy_layer_memberships, label, chunk, refresh_id)
+                        session.execute_write(self._link_philosophy_source_refs, label, chunk, refresh_id)
+                for chunk in _chunks(review_packet_rows):
+                    session.execute_write(self._link_philosophy_review_packets, chunk, refresh_id)
                     session.execute_write(
                         self._link_philosophy_source_refs,
                         "TosPhilosophyReviewPacketProjection",
-                        review_packet_rows,
+                        chunk,
+                        refresh_id,
                     )
-                if layer_rows:
-                    session.execute_write(self._link_philosophy_source_refs, "TosPhilosophyLayerProjection", layer_rows)
-                if cluster_rows:
-                    session.execute_write(self._link_philosophy_cluster_members, cluster_rows)
-                if edge_rows:
-                    session.execute_write(self._link_philosophy_edges, edge_rows)
+                for chunk in _chunks(layer_rows):
+                    session.execute_write(
+                        self._link_philosophy_source_refs,
+                        "TosPhilosophyLayerProjection",
+                        chunk,
+                        refresh_id,
+                    )
+                for chunk in _chunks(cluster_rows):
+                    session.execute_write(self._link_philosophy_cluster_members, chunk, refresh_id)
+                for chunk in _chunks(edge_rows):
+                    session.execute_write(self._link_philosophy_edges, chunk, refresh_id)
+                deleted_counts = session.execute_write(
+                    self._delete_stale_philosophy_projection,
+                    refresh_id,
+                )
         except Exception as exc:  # pragma: no cover - runtime integration path
             raise Neo4jStoreError(f"neo4j philosophy sync failed: {exc}") from exc
         finally:
@@ -321,7 +403,37 @@ class Neo4jProjectionStore:
             "note": f"philosophy projection synced into neo4j database '{self.settings.neo4j_database}' while Tree of Sophia remained canonical",
             "deleted_node_count": deleted_counts["deleted_node_count"],
             "deleted_edge_count": deleted_counts["deleted_edge_count"],
+            "constraint_count": constraint_count,
         }
+
+    @staticmethod
+    def _replace_corpus_projection(
+        tx: Any,
+        corpus_props: dict[str, Any],
+        branch_rows: list[dict[str, Any]],
+        manifest_rows: list[dict[str, Any]],
+        node_rows: list[dict[str, Any]],
+        pack_rows: list[dict[str, Any]],
+        edge_rows: list[dict[str, Any]],
+        resource_rows: list[dict[str, Any]],
+        view_rows: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        deleted_counts = Neo4jProjectionStore._delete_corpus_projection(tx)
+        Neo4jProjectionStore._merge_corpus_projection(tx, corpus_props)
+        for label, rel_type, rows in (
+            ("TosCorpusBranchProjection", "PROJECTS_BRANCH", branch_rows),
+            ("TosCorpusManifestProjection", "PROJECTS_MANIFEST", manifest_rows),
+            ("TosCorpusNodeProjection", "PROJECTS_NODE", node_rows),
+            ("TosCorpusRelationPackProjection", "PROJECTS_RELATION_PACK", pack_rows),
+            ("TosCorpusRelationEdgeProjection", "PROJECTS_RELATION_EDGE", edge_rows),
+            ("TosCorpusResourceProjection", "PROJECTS_RESOURCE", resource_rows),
+            ("TosCorpusGraphViewProjection", "PROJECTS_GRAPH_VIEW", view_rows),
+        ):
+            if rows:
+                Neo4jProjectionStore._merge_corpus_rows(tx, label, rel_type, rows)
+        if edge_rows and node_rows:
+            Neo4jProjectionStore._link_corpus_relation_edges(tx, edge_rows)
+        return deleted_counts
 
     @staticmethod
     def _delete_corpus_projection(tx: Any) -> dict[str, int]:
@@ -407,38 +519,34 @@ class Neo4jProjectionStore:
         ).consume()
 
     @staticmethod
-    def _delete_philosophy_projection(tx: Any) -> dict[str, int]:
+    def _delete_stale_philosophy_projection(tx: Any, refresh_id: str) -> dict[str, int]:
         record = tx.run(
             """
+            MATCH ()-[rel]-()
+            WHERE type(rel) IN $relation_types
+              AND coalesce(rel.refresh_id, '') <> $refresh_id
+            WITH collect(DISTINCT rel) AS rels
+            FOREACH (rel IN rels | DELETE rel)
+            WITH size(rels) AS deleted_edge_count
             MATCH (node)
-            WHERE node:TosPhilosophyProjection
-               OR node:TosPhilosophyViewProjection
-               OR node:TosPhilosophyNodeProjection
-               OR node:TosPhilosophyEdgeProjection
-               OR node:TosPhilosophySourceRefProjection
-               OR node:TosPhilosophyLayerProjection
-               OR node:TosPhilosophyClusterProjection
-               OR node:TosPhilosophyReviewPacketProjection
-            WITH collect(node) AS nodes
-            OPTIONAL MATCH (a)-[rel]-(b)
-            WHERE a IN nodes OR b IN nodes
-            RETURN size(nodes) AS deleted_node_count, count(DISTINCT rel) AS deleted_edge_count
-            """
+            WHERE (
+                node:TosPhilosophyProjection
+                OR node:TosPhilosophyViewProjection
+                OR node:TosPhilosophyNodeProjection
+                OR node:TosPhilosophyEdgeProjection
+                OR node:TosPhilosophySourceRefProjection
+                OR node:TosPhilosophyLayerProjection
+                OR node:TosPhilosophyClusterProjection
+                OR node:TosPhilosophyReviewPacketProjection
+            )
+              AND coalesce(node.refresh_id, '') <> $refresh_id
+            WITH deleted_edge_count, collect(node) AS nodes
+            FOREACH (node IN nodes | DETACH DELETE node)
+            RETURN size(nodes) AS deleted_node_count, deleted_edge_count AS deleted_edge_count
+            """,
+            refresh_id=refresh_id,
+            relation_types=PHILOSOPHY_RELATION_TYPES,
         ).single()
-        tx.run(
-            """
-            MATCH (node)
-            WHERE node:TosPhilosophyProjection
-               OR node:TosPhilosophyViewProjection
-               OR node:TosPhilosophyNodeProjection
-               OR node:TosPhilosophyEdgeProjection
-               OR node:TosPhilosophySourceRefProjection
-               OR node:TosPhilosophyLayerProjection
-               OR node:TosPhilosophyClusterProjection
-               OR node:TosPhilosophyReviewPacketProjection
-            DETACH DELETE node
-            """
-        ).consume()
         return {
             "deleted_node_count": int(record["deleted_node_count"]) if record else 0,
             "deleted_edge_count": int(record["deleted_edge_count"]) if record else 0,
@@ -456,21 +564,29 @@ class Neo4jProjectionStore:
         ).consume()
 
     @staticmethod
-    def _merge_philosophy_rows(tx: Any, label: str, rel_type: str, rows: list[dict[str, Any]]) -> None:
+    def _merge_philosophy_rows(
+        tx: Any,
+        label: str,
+        rel_type: str,
+        rows: list[dict[str, Any]],
+        refresh_id: str,
+    ) -> None:
         query = f"""
         UNWIND $rows AS row
         MATCH (root:TosPhilosophyProjection {{owner_repo: 'Tree-of-Sophia'}})
         MERGE (projection:{label} {{projection_id: row.id}})
         SET projection += row.props
-        MERGE (root)-[:{rel_type}]->(projection)
+        SET projection.refresh_id = $refresh_id
+        MERGE (root)-[rel:{rel_type}]->(projection)
+        SET rel.refresh_id = $refresh_id
         """
-        tx.run(query, rows=rows).consume()
+        tx.run(query, rows=rows, refresh_id=refresh_id).consume()
 
     @staticmethod
-    def _link_philosophy_view_memberships(
+    def _link_philosophy_view_nodes(
         tx: Any,
         node_rows: list[dict[str, Any]],
-        edge_rows: list[dict[str, Any]],
+        refresh_id: str,
     ) -> None:
         tx.run(
             """
@@ -478,36 +594,60 @@ class Neo4jProjectionStore:
             UNWIND row.view_ids AS view_id
             MATCH (view:TosPhilosophyViewProjection {projection_id: view_id})
             MATCH (node:TosPhilosophyNodeProjection {projection_id: row.id})
-            MERGE (view)-[:PROJECTS_NODE]->(node)
-            MERGE (node)-[:IN_VIEW]->(view)
+            MERGE (view)-[projects:PROJECTS_NODE]->(node)
+            SET projects.refresh_id = $refresh_id
+            MERGE (node)-[in_view:IN_VIEW]->(view)
+            SET in_view.refresh_id = $refresh_id
             """,
             node_rows=node_rows,
+            refresh_id=refresh_id,
         ).consume()
+
+    @staticmethod
+    def _link_philosophy_view_edges(
+        tx: Any,
+        edge_rows: list[dict[str, Any]],
+        refresh_id: str,
+    ) -> None:
         tx.run(
             """
             UNWIND $edge_rows AS row
             UNWIND row.view_ids AS view_id
             MATCH (view:TosPhilosophyViewProjection {projection_id: view_id})
             MATCH (edge:TosPhilosophyEdgeProjection {projection_id: row.id})
-            MERGE (view)-[:PROJECTS_EDGE]->(edge)
-            MERGE (edge)-[:IN_VIEW]->(view)
+            MERGE (view)-[projects:PROJECTS_EDGE]->(edge)
+            SET projects.refresh_id = $refresh_id
+            MERGE (edge)-[in_view:IN_VIEW]->(view)
+            SET in_view.refresh_id = $refresh_id
             """,
             edge_rows=edge_rows,
+            refresh_id=refresh_id,
         ).consume()
 
     @staticmethod
-    def _link_philosophy_layer_memberships(tx: Any, label: str, rows: list[dict[str, Any]]) -> None:
+    def _link_philosophy_layer_memberships(
+        tx: Any,
+        label: str,
+        rows: list[dict[str, Any]],
+        refresh_id: str,
+    ) -> None:
         query = f"""
         UNWIND $rows AS row
         UNWIND row.graph_layers AS layer_id
         MATCH (projection:{label} {{projection_id: row.id}})
         MATCH (layer:TosPhilosophyLayerProjection {{projection_id: layer_id}})
-        MERGE (projection)-[:IN_LAYER]->(layer)
+        MERGE (projection)-[rel:IN_LAYER]->(layer)
+        SET rel.refresh_id = $refresh_id
         """
-        tx.run(query, rows=rows).consume()
+        tx.run(query, rows=rows, refresh_id=refresh_id).consume()
 
     @staticmethod
-    def _link_philosophy_source_refs(tx: Any, label: str, rows: list[dict[str, Any]]) -> None:
+    def _link_philosophy_source_refs(
+        tx: Any,
+        label: str,
+        rows: list[dict[str, Any]],
+        refresh_id: str,
+    ) -> None:
         query = f"""
         UNWIND $rows AS row
         WITH row, CASE
@@ -519,21 +659,25 @@ class Neo4jProjectionStore:
         MATCH (projection:{label} {{projection_id: row.id}})
         MERGE (source:TosPhilosophySourceRefProjection {{projection_id: source_ref}})
         SET source.source_ref = source_ref
-        MERGE (projection)-[:HAS_SOURCE_REF]->(source)
+        SET source.refresh_id = $refresh_id
+        MERGE (projection)-[rel:HAS_SOURCE_REF]->(source)
+        SET rel.refresh_id = $refresh_id
         """
-        tx.run(query, rows=rows).consume()
+        tx.run(query, rows=rows, refresh_id=refresh_id).consume()
 
     @staticmethod
-    def _link_philosophy_cluster_members(tx: Any, cluster_rows: list[dict[str, Any]]) -> None:
+    def _link_philosophy_cluster_members(tx: Any, cluster_rows: list[dict[str, Any]], refresh_id: str) -> None:
         tx.run(
             """
             UNWIND $cluster_rows AS row
             MATCH (cluster:TosPhilosophyClusterProjection {projection_id: row.id})
             UNWIND row.member_node_ids AS node_id
             MATCH (node:TosPhilosophyNodeProjection {projection_id: node_id})
-            MERGE (cluster)-[:CLUSTERS_NODE]->(node)
+            MERGE (cluster)-[rel:CLUSTERS_NODE]->(node)
+            SET rel.refresh_id = $refresh_id
             """,
             cluster_rows=cluster_rows,
+            refresh_id=refresh_id,
         ).consume()
         tx.run(
             """
@@ -541,9 +685,11 @@ class Neo4jProjectionStore:
             MATCH (cluster:TosPhilosophyClusterProjection {projection_id: row.id})
             UNWIND row.member_edge_ids AS edge_id
             MATCH (edge:TosPhilosophyEdgeProjection {projection_id: edge_id})
-            MERGE (cluster)-[:CLUSTERS_EDGE]->(edge)
+            MERGE (cluster)-[rel:CLUSTERS_EDGE]->(edge)
+            SET rel.refresh_id = $refresh_id
             """,
             cluster_rows=cluster_rows,
+            refresh_id=refresh_id,
         ).consume()
         tx.run(
             """
@@ -551,27 +697,37 @@ class Neo4jProjectionStore:
             MATCH (cluster:TosPhilosophyClusterProjection {projection_id: row.id})
             UNWIND row.view_ids AS view_id
             MATCH (view:TosPhilosophyViewProjection {projection_id: view_id})
-            MERGE (view)-[:PROJECTS_CLUSTER]->(cluster)
-            MERGE (cluster)-[:IN_VIEW]->(view)
+            MERGE (view)-[projects:PROJECTS_CLUSTER]->(cluster)
+            SET projects.refresh_id = $refresh_id
+            MERGE (cluster)-[in_view:IN_VIEW]->(view)
+            SET in_view.refresh_id = $refresh_id
             """,
             cluster_rows=cluster_rows,
+            refresh_id=refresh_id,
         ).consume()
 
     @staticmethod
-    def _link_philosophy_review_packets(tx: Any, review_packet_rows: list[dict[str, Any]]) -> None:
+    def _link_philosophy_review_packets(
+        tx: Any,
+        review_packet_rows: list[dict[str, Any]],
+        refresh_id: str,
+    ) -> None:
         tx.run(
             """
             UNWIND $review_packet_rows AS row
             MATCH (packet:TosPhilosophyReviewPacketProjection {projection_id: row.id})
             MATCH (view:TosPhilosophyViewProjection {projection_id: row.view_id})
-            MERGE (view)-[:HAS_REVIEW_PACKET]->(packet)
-            MERGE (packet)-[:REVIEWS_VIEW]->(view)
+            MERGE (view)-[has_packet:HAS_REVIEW_PACKET]->(packet)
+            SET has_packet.refresh_id = $refresh_id
+            MERGE (packet)-[reviews:REVIEWS_VIEW]->(view)
+            SET reviews.refresh_id = $refresh_id
             """,
             review_packet_rows=review_packet_rows,
+            refresh_id=refresh_id,
         ).consume()
 
     @staticmethod
-    def _link_philosophy_edges(tx: Any, edge_rows: list[dict[str, Any]]) -> None:
+    def _link_philosophy_edges(tx: Any, edge_rows: list[dict[str, Any]], refresh_id: str) -> None:
         tx.run(
             """
             UNWIND $edge_rows AS edge
@@ -579,16 +735,20 @@ class Neo4jProjectionStore:
             OPTIONAL MATCH (source:TosPhilosophyNodeProjection {projection_id: edge.from_id})
             OPTIONAL MATCH (target:TosPhilosophyNodeProjection {projection_id: edge.to_id})
             FOREACH (_ IN CASE WHEN source IS NULL THEN [] ELSE [1] END |
-              MERGE (projection)-[:FROM_NODE]->(source)
+              MERGE (projection)-[from_rel:FROM_NODE]->(source)
+              SET from_rel.refresh_id = $refresh_id
             )
             FOREACH (_ IN CASE WHEN target IS NULL THEN [] ELSE [1] END |
-              MERGE (projection)-[:TO_NODE]->(target)
+              MERGE (projection)-[to_rel:TO_NODE]->(target)
+              SET to_rel.refresh_id = $refresh_id
             )
             FOREACH (_ IN CASE WHEN source IS NULL OR target IS NULL THEN [] ELSE [1] END |
               MERGE (source)-[rel:TOS_PHILOSOPHY_RELATION {edge_id: edge.id}]->(target)
               SET rel.predicate_id = edge.predicate_id,
-                  rel.source_ref = edge.source_ref
+                  rel.source_ref = edge.source_ref,
+                  rel.refresh_id = $refresh_id
             )
             """,
             edge_rows=edge_rows,
+            refresh_id=refresh_id,
         ).consume()

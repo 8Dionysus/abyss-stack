@@ -10,3 +10,13 @@ abyss-stack owns the local runtime graph projection service shape, including
 the short `tos-up` localhost review workbench command, the read-only
 scale-export API for external large-graph viewers, and the bundled Cosmos/Sigma
 runtime graph lenses with layout families derived from ToS view contracts.
+
+Current runtime contract:
+
+- `/api/philosophy/contracts` exposes the light downstream contract packet
+- `/api/philosophy/views/{view_id}` serves source-owned view subgraphs with
+  `subgraph_contract` metadata
+- `/api/philosophy/project/sync` refreshes the Neo4j projection when credentials
+  are ready and reports scale-export row counts
+- Neo4j, Cosmos, Sigma, and MCP access remain projection surfaces; ToS remains
+  the source authority for meaning, source refs, graph layers, and canon status

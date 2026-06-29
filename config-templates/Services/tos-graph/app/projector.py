@@ -47,7 +47,7 @@ class PhilosophyProjector:
         self.neo4j_status = neo4j_status
         self.neo4j_store = neo4j_store
 
-    def _preview_sync(self, projection: dict[str, Any]) -> dict[str, Any]:
+    def _preview_sync(self, projection: dict[str, Any], scale_export_row_counts: dict[str, int]) -> dict[str, Any]:
         counts = projection.get("counts", {})
         return {
             "surface": "ToS/derived-exports/philosophy_graph_projection.min.json",
@@ -60,11 +60,16 @@ class PhilosophyProjector:
             "note": self.neo4j_status.note,
             "deleted_node_count": None,
             "deleted_edge_count": None,
+            "constraint_count": None,
+            "scale_export_row_counts": scale_export_row_counts,
         }
 
     def sync_philosophy(self) -> dict[str, Any]:
         projection = self.reader.load_projection()
+        scale_export = self.reader.scale_export_bundle()
         if not self.neo4j_status.ready:
-            return self._preview_sync(projection)
+            return self._preview_sync(projection, scale_export["row_counts"])
 
-        return self.neo4j_store.sync_philosophy_projection(projection)
+        result = self.neo4j_store.sync_philosophy_projection(projection)
+        result["scale_export_row_counts"] = scale_export["row_counts"]
+        return result

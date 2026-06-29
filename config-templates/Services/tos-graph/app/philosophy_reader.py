@@ -108,6 +108,10 @@ def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
     return bool(set(str(layer) for layer in item_layers) & layers)
 
 
+def _unique_values(items: list[dict[str, Any]], key: str) -> list[str]:
+    return sorted({str(item[key]) for item in items if isinstance(item.get(key), str) and item.get(key)})
+
+
 class ToSPhilosophyProjectionReader:
     def __init__(self, settings: TosGraphSettings) -> None:
         self.settings = settings
@@ -236,17 +240,105 @@ class ToSPhilosophyProjectionReader:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy graph view: {view_id}")
         nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
         edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
+        clusters = self._clusters_for_payload(payload, view_id=view_id, limit=40)
         return {
             "schema": "tos_graph_philosophy_view_v1",
             "view": view,
+            "subgraph_contract": self._view_subgraph_contract(payload, view, nodes, edges, clusters),
             "nodes": nodes,
             "edges": edges,
-            "clusters": self._clusters_for_payload(payload, view_id=view_id, limit=40),
+            "clusters": clusters,
             "review_packet": self.review_packet(view_id),
             "node_count": len(nodes),
             "edge_count": len(edges),
             "source_refs": sorted(set(view.get("source_refs", []) + _source_refs(nodes + edges))),
             "counts": payload.get("counts", {}),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    @staticmethod
+    def _view_subgraph_contract(
+        payload: dict[str, Any],
+        view: dict[str, Any],
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+        clusters: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        source_refs = payload.get("source_refs", {}) if isinstance(payload.get("source_refs"), dict) else {}
+        node_ids = {str(node.get("node_id")) for node in nodes if isinstance(node.get("node_id"), str)}
+        edge_endpoint_ids = {
+            str(endpoint)
+            for edge in edges
+            for endpoint in (edge.get("from_id"), edge.get("to_id"))
+            if isinstance(endpoint, str) and endpoint
+        }
+        dangling_endpoint_ids = sorted(edge_endpoint_ids - node_ids)
+        return {
+            "schema": "tos_graph_philosophy_subgraph_contract_v1",
+            "view_id": view.get("view_id"),
+            "route_card": view.get("route_card"),
+            "layout_hint": view.get("layout_hint"),
+            "graph_layers": _string_list(view.get("graph_layers")),
+            "node_kinds": _unique_values(nodes, "node_type"),
+            "edge_predicates": _unique_values(edges, "predicate_id"),
+            "cluster_kinds": _unique_values(clusters, "cluster_kind"),
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "cluster_count": len(clusters),
+            "source_ref_count": len(_source_refs(nodes + edges + clusters)),
+            "dangling_endpoint_ids": dangling_endpoint_ids,
+            "source_view_contract_ref": source_refs.get("source_view_contract_ref"),
+            "runtime_contract": (
+                "View responses are source-owned subgraphs selected by Tree-of-Sophia; "
+                "tos-graph may filter, render, and import them as projection data only."
+            ),
+        }
+
+    def contracts(self) -> dict[str, Any]:
+        payload = self.load_projection()
+        views = [view for view in payload.get("views", []) if isinstance(view, dict)]
+        nodes = [node for node in payload.get("nodes", []) if isinstance(node, dict)]
+        edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict)]
+        clusters = [cluster for cluster in payload.get("clusters", []) if isinstance(cluster, dict)]
+        review_packets = [packet for packet in payload.get("review_packets", []) if isinstance(packet, dict)]
+        source_refs = payload.get("source_refs", {}) if isinstance(payload.get("source_refs"), dict) else {}
+        review_packet_fields = sorted({key for packet in review_packets for key in packet.keys()})
+        view_contracts = []
+        for view in views:
+            view_nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
+            view_edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
+            view_clusters = self._clusters_for_payload(payload, view_id=str(view.get("view_id") or ""), limit=1_000_000)
+            view_contracts.append(self._view_subgraph_contract(payload, view, view_nodes, view_edges, view_clusters))
+        return {
+            "schema": "tos_graph_philosophy_contracts_v1",
+            "source_contract_refs": {
+                key: value for key, value in source_refs.items() if isinstance(value, str) and value
+            },
+            "runtime_contract": {
+                "runtime_owner": "abyss-stack",
+                "source_owner": "Tree-of-Sophia",
+                "projection_surfaces": [
+                    "api/philosophy/views",
+                    "api/philosophy/views/{view_id}",
+                    "api/philosophy/scale-export",
+                    "api/philosophy/project/sync",
+                ],
+                "contract_limits": [
+                    "does not promote candidate rows into canon",
+                    "does not make Neo4j or UI state source authority",
+                    "does not write back to Tree-of-Sophia",
+                ],
+                "expected_refresh": "rebuild Tree-of-Sophia derived exports, then refresh tos-graph projection",
+            },
+            "views": view_contracts,
+            "node_kinds": _unique_values(nodes, "node_type"),
+            "edge_predicates": _unique_values(edges, "predicate_id"),
+            "graph_layers": _unique_values(
+                [layer for layer in payload.get("graph_layers", []) if isinstance(layer, dict)],
+                "layer_id",
+            ),
+            "cluster_kinds": _unique_values(clusters, "cluster_kind"),
+            "review_packet_fields": review_packet_fields,
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
         }
 
@@ -315,6 +407,19 @@ class ToSPhilosophyProjectionReader:
                 "Tree-of-Sophia owns graph meaning and source_refs; tos-graph only streams "
                 "viewer-ready tables for large graph tools."
             ),
+        }
+
+    def scale_export_bundle(self, view_id: str | None = None, layers: set[str] | None = None) -> dict[str, Any]:
+        layer_filter = layers or set()
+        tables = {
+            table_name: self.scale_export_table(table_name, view_id=view_id, layers=layer_filter)
+            for table_name in SCALE_EXPORT_COLUMNS
+        }
+        return {
+            "schema": "tos_graph_philosophy_scale_export_bundle_v1",
+            "manifest": self.scale_export_manifest(view_id=view_id, layers=layer_filter),
+            "tables": tables,
+            "row_counts": {table_name: len(rows) for table_name, rows in tables.items()},
         }
 
     def scale_export_table(

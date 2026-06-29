@@ -89,6 +89,7 @@ class PhilosophyViewsResponse(BaseModel):
 class PhilosophyViewResponse(BaseModel):
     schema: str
     view: dict[str, Any]
+    subgraph_contract: dict[str, Any] = {}
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
     clusters: list[dict[str, Any]] = []
@@ -105,6 +106,19 @@ class PhilosophyLayersResponse(BaseModel):
     graph_layers: list[dict[str, Any]]
     layer_counts: list[dict[str, Any]]
     visibility_model: dict[str, Any]
+    runtime_projection_boundary: dict[str, Any]
+
+
+class PhilosophyContractsResponse(BaseModel):
+    schema: str
+    source_contract_refs: dict[str, str]
+    runtime_contract: dict[str, Any]
+    views: list[dict[str, Any]]
+    node_kinds: list[str]
+    edge_predicates: list[str]
+    graph_layers: list[str]
+    cluster_kinds: list[str]
+    review_packet_fields: list[str]
     runtime_projection_boundary: dict[str, Any]
 
 
@@ -180,3 +194,5 @@ class ProjectSyncResponse(BaseModel):
     note: str
     deleted_node_count: int | None = None
     deleted_edge_count: int | None = None
+    constraint_count: int | None = None
+    scale_export_row_counts: dict[str, int] = {}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import sys
+from copy import deepcopy
 from io import StringIO
 from pathlib import Path
 
@@ -318,6 +319,139 @@ def write_philosophy_projection(root: Path) -> Path:
     return projection_path
 
 
+def write_multiview_philosophy_projection(root: Path) -> Path:
+    projection_path = write_philosophy_projection(root)
+    payload = json.loads(projection_path.read_text(encoding="utf-8"))
+    transmission_node = {
+        "node_id": "transmission:A01",
+        "label": "A01 transmission channel",
+        "node_type": "transmission-node",
+        "graph_layers": ["transmission-relation"],
+        "view_ids": ["transmission"],
+        "source_ref": "ToS/philosophy/atlas/dossiers/transmission-backlog.jsonl",
+        "properties": {"channel": "school archive"},
+    }
+    transmission_edge = {
+        "edge_id": "edge:dossier:A01:transmits:A01",
+        "from_id": "dossier:A01",
+        "to_id": "transmission:A01",
+        "predicate_id": "transmits_to",
+        "graph_layers": ["transmission-relation"],
+        "view_ids": ["transmission"],
+        "source_ref": "ToS/philosophy/graph-workbench/proposed-relations/table-i-prepared-dossiers.jsonl",
+        "properties": {},
+    }
+    transmission_cluster = {
+        "cluster_id": "cluster:transmission:test",
+        "cluster_kind": "transmission",
+        "label": "Transmission: school archive",
+        "member_node_ids": ["dossier:A01", "transmission:A01"],
+        "member_edge_ids": ["edge:dossier:A01:transmits:A01"],
+        "view_ids": ["transmission"],
+        "graph_layers": ["transmission-relation"],
+        "source_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+        "source_refs": [
+            "ToS/philosophy/atlas/dossiers/transmission-backlog.jsonl",
+            "ToS/philosophy/graph-workbench/proposed-relations/table-i-prepared-dossiers.jsonl",
+        ],
+        "properties": {"review_use": "group by transmission route"},
+    }
+    transmission_packet = deepcopy(payload["review_packets"][0])
+    transmission_packet.update(
+        {
+            "packet_id": "review-packet:transmission",
+            "view_id": "transmission",
+            "review_intent": "Review transmission routes without canonizing influence.",
+            "recommended_human_review_route": "ToS/philosophy/graph-workbench/views/transmission.graph.md",
+        }
+    )
+    transmission_packet["counts"] = {
+        **transmission_packet["counts"],
+        "nodes": 2,
+        "edges": 1,
+        "clusters": 1,
+    }
+    transmission_packet["layer_counts"] = [
+        {
+            "layer_id": "transmission-relation",
+            "node_count": 2,
+            "edge_count": 1,
+            "cluster_count": 1,
+            "source_ref_count": 2,
+        }
+    ]
+    transmission_view = {
+        "view_id": "transmission",
+        "title": "Transmission",
+        "source_ref": "ToS/philosophy/graph-workbench/views/transmission.graph.md",
+        "route_card": "ToS/philosophy/graph-workbench/views/AGENTS.md",
+        "order": 20,
+        "layout_hint": "directed-corridors",
+        "graph_layers": ["transmission-relation"],
+        "filters_applied": {"relation_kinds": ["transmits_to"]},
+        "future_branch_filters": {},
+        "review_intent": "Review transmission routes without canonizing influence.",
+        "source_posture": "Transmission rows route back to source refs.",
+        "evidence_posture": "Surface route pressure before synthesis.",
+        "collapse_rule": {"default_cluster_kinds": ["transmission"], "expand_to": ["rows", "source_refs"]},
+        "ordering_hints": ["route"],
+        "agent_packet_hint": "Bring transmission cluster and source refs.",
+        "nodes": [payload["nodes"][1], transmission_node],
+        "edges": [transmission_edge],
+        "source_refs": [
+            "ToS/philosophy/atlas/dossiers/transmission-backlog.jsonl",
+            "ToS/philosophy/graph-workbench/proposed-relations/table-i-prepared-dossiers.jsonl",
+        ],
+        "diagnostics": [],
+    }
+    payload["views"].append(transmission_view)
+    payload["nodes"].append(transmission_node)
+    payload["edges"].append(transmission_edge)
+    payload["clusters"].append(transmission_cluster)
+    payload["review_packets"].append(transmission_packet)
+    payload["graph_layers"].append(
+        {
+            "layer_id": "transmission-relation",
+            "use": "transmission route relation",
+            "source_ref": "ToS/philosophy/trunk/graph-layers/README.md",
+        }
+    )
+    payload["layer_counts"].append(
+        {
+            "layer_id": "transmission-relation",
+            "node_count": 2,
+            "edge_count": 1,
+            "view_count": 1,
+            "cluster_count": 1,
+            "source_ref_count": 2,
+        }
+    )
+    payload["counts"].update(
+        {
+            "views": 2,
+            "graph_layers": 2,
+            "nodes": 3,
+            "edges": 2,
+            "source_refs": 5,
+            "clusters": 2,
+            "review_packets": 2,
+        }
+    )
+    payload["visibility_model"]["layer_ids"].append("transmission-relation")
+    payload["snapshot_review"]["current_snapshot"]["view_fingerprints"].append(
+        {
+            "view_id": "transmission",
+            "fingerprint": "d" * 64,
+            "node_count": 2,
+            "edge_count": 1,
+            "cluster_count": 1,
+            "source_ref_count": 2,
+        }
+    )
+    projection_path.write_text(json.dumps(payload), encoding="utf-8")
+    return projection_path
+
+
 def write_post_planting_audit(root: Path) -> Path:
     audit_path = root / "ToS" / "philosophy" / "graph-workbench" / "review-packets" / "table-i-post-planting-audit.json"
     audit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -497,6 +631,36 @@ def test_philosophy_reader_exposes_scale_export_tables(tmp_path: Path) -> None:
     assert parsed_edges[0]["target"] == "dossier:A01"
 
 
+def test_philosophy_reader_exposes_distinct_view_subgraph_contracts(tmp_path: Path) -> None:
+    write_multiview_philosophy_projection(tmp_path)
+    reader = ToSPhilosophyProjectionReader(settings_for(tmp_path))
+
+    chronology = reader.view("chronology")
+    transmission = reader.view("transmission")
+    contracts = reader.contracts()
+    chronology_export = reader.scale_export_bundle(view_id="chronology")
+    transmission_export = reader.scale_export_bundle(view_id="transmission")
+
+    chronology_nodes = {node["node_id"] for node in chronology["nodes"]}
+    transmission_nodes = {node["node_id"] for node in transmission["nodes"]}
+    chronology_edges = {edge["edge_id"] for edge in chronology["edges"]}
+    transmission_edges = {edge["edge_id"] for edge in transmission["edges"]}
+
+    assert chronology_nodes != transmission_nodes
+    assert chronology_edges != transmission_edges
+    assert chronology["subgraph_contract"]["graph_layers"] == ["historical-relation"]
+    assert transmission["subgraph_contract"]["graph_layers"] == ["transmission-relation"]
+    assert transmission["subgraph_contract"]["edge_predicates"] == ["transmits_to"]
+    assert chronology_export["row_counts"]["nodes"] == 2
+    assert transmission_export["row_counts"]["nodes"] == 2
+    assert chronology_export["tables"]["edges"][0]["predicate"] == "has-dossier"
+    assert transmission_export["tables"]["edges"][0]["predicate"] == "transmits_to"
+    assert contracts["schema"] == "tos_graph_philosophy_contracts_v1"
+    assert {view["view_id"] for view in contracts["views"]} == {"chronology", "transmission"}
+    assert "source_view_contract_ref" in contracts["source_contract_refs"]
+    assert contracts["runtime_contract"]["source_owner"] == "Tree-of-Sophia"
+
+
 def test_philosophy_projection_preview_uses_projection_counts(tmp_path: Path) -> None:
     write_philosophy_projection(tmp_path)
     settings = settings_for(tmp_path)
@@ -520,6 +684,8 @@ def test_philosophy_projection_preview_uses_projection_counts(tmp_path: Path) ->
     assert result["edge_count"] == 1
     assert result["resource_count"] == 3
     assert result["branch_count"] == 1
+    assert result["constraint_count"] is None
+    assert result["scale_export_row_counts"]["nodes"] == 2
 
 
 def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: Path) -> None:
@@ -542,6 +708,73 @@ def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: 
     assert review_packet_rows[0]["view_id"] == "chronology"
     assert any(row["id"].endswith("view-contracts.json") for row in source_rows)
     assert any(row["id"].endswith("cluster-contracts.json") for row in source_rows)
+
+
+class RecordingResult:
+    def __init__(self, record: dict[str, int] | None = None) -> None:
+        self.record = record
+
+    def single(self) -> dict[str, int] | None:
+        return self.record
+
+    def consume(self) -> None:
+        return None
+
+
+class RecordingTx:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+        self.params: list[dict[str, object]] = []
+
+    def run(self, query: str, **params: object) -> RecordingResult:
+        self.queries.append(" ".join(query.split()))
+        self.params.append(params)
+        if "deleted_node_count" in query:
+            return RecordingResult({"deleted_node_count": 8, "deleted_edge_count": 13})
+        return RecordingResult()
+
+
+def test_philosophy_neo4j_refresh_uses_constraints_refresh_ids_and_stale_cleanup(tmp_path: Path) -> None:
+    projection_path = write_philosophy_projection(tmp_path)
+    projection = json.loads(projection_path.read_text(encoding="utf-8"))
+    node_rows = Neo4jProjectionStore._philosophy_rows(projection, "nodes", "node_id")
+    edge_rows = Neo4jProjectionStore._philosophy_rows(projection, "edges", "edge_id")
+    cluster_rows = Neo4jProjectionStore._philosophy_rows(projection, "clusters", "cluster_id")
+
+    refresh_id = "tos-philosophy:test-refresh"
+    constraint_tx = RecordingTx()
+    data_tx = RecordingTx()
+    cleanup_tx = RecordingTx()
+    constraint_count = Neo4jProjectionStore._ensure_philosophy_constraints(constraint_tx)
+    Neo4jProjectionStore._merge_philosophy_rows(
+        data_tx,
+        "TosPhilosophyNodeProjection",
+        "PROJECTS_NODE",
+        node_rows,
+        refresh_id,
+    )
+    Neo4jProjectionStore._link_philosophy_view_nodes(data_tx, node_rows, refresh_id)
+    Neo4jProjectionStore._link_philosophy_layer_memberships(
+        data_tx,
+        "TosPhilosophyNodeProjection",
+        node_rows,
+        refresh_id,
+    )
+    Neo4jProjectionStore._link_philosophy_source_refs(data_tx, "TosPhilosophyNodeProjection", node_rows, refresh_id)
+    Neo4jProjectionStore._link_philosophy_cluster_members(data_tx, cluster_rows, refresh_id)
+    Neo4jProjectionStore._link_philosophy_edges(data_tx, edge_rows, refresh_id)
+    deleted_counts = Neo4jProjectionStore._delete_stale_philosophy_projection(cleanup_tx, refresh_id)
+
+    assert constraint_count == 8
+    assert all("CREATE CONSTRAINT" in query and "IF NOT EXISTS" in query for query in constraint_tx.queries)
+    assert any("TosPhilosophyNodeProjection" in query for query in constraint_tx.queries)
+    assert deleted_counts == {"deleted_node_count": 8, "deleted_edge_count": 13}
+    assert any("MERGE (projection:TosPhilosophyNodeProjection" in query for query in data_tx.queries)
+    assert any("SET projection.refresh_id = $refresh_id" in query for query in data_tx.queries)
+    assert any("MERGE (cluster)-[rel:CLUSTERS_NODE]->(node)" in query for query in data_tx.queries)
+    assert any("MERGE (source)-[rel:TOS_PHILOSOPHY_RELATION" in query for query in data_tx.queries)
+    assert cleanup_tx.queries[0].startswith("MATCH ()-[rel]-() WHERE type(rel) IN $relation_types")
+    assert cleanup_tx.params[0]["refresh_id"] == refresh_id
 
 
 def test_settings_treats_unreadable_stack_env_as_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

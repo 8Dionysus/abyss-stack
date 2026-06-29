@@ -107,7 +107,9 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.locator("#graph canvas").first.wait_for(timeout=10_000)
             page.locator("#renderer-cosmos").click()
             page.locator("#renderer-chip", has_text="cosmos").wait_for(timeout=10_000)
+            page.locator("[data-export-link='contracts']").wait_for(timeout=10_000)
             page.locator("[data-export-link='manifest']").wait_for(timeout=10_000)
+            contracts_href = page.locator("[data-export-link='contracts']").get_attribute("href", timeout=10_000)
             nodes_csv_href = page.locator("[data-export-link='nodes-csv']").get_attribute("href", timeout=10_000)
             page.get_by_role("button", name="Review packet").click()
             page.locator("#inspector-title", has_text="Review packet: chronology").wait_for(timeout=10_000)
@@ -144,6 +146,7 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
 
     assert node_count > 0
     assert source_ref_count > 0
+    assert contracts_href == "/api/philosophy/contracts"
     assert nodes_csv_href is not None
     assert "/api/philosophy/scale-export/nodes.csv" in nodes_csv_href
     assert "view_id=chronology" in nodes_csv_href

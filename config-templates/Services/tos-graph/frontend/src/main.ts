@@ -814,6 +814,7 @@ function renderScaleExportControls(): void {
       <span>${escapeHtml(layers.length ? layers.join(", ") : "all layers")}</span>
     </div>
     <div class="export-actions">
+      <a class="export-link" data-export-link="contracts" href="/api/philosophy/contracts" target="_blank" rel="noreferrer">Contracts</a>
       <a class="export-link" data-export-link="manifest" href="${escapeHtml(scaleExportPath())}" target="_blank" rel="noreferrer">Manifest</a>
       <button data-copy-export="manifest" type="button">Copy URL</button>
     </div>
