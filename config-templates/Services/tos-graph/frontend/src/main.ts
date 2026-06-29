@@ -2,6 +2,7 @@ import type { Graph as CosmosGraph, GraphConfig } from "@cosmos.gl/graph";
 import Graphology from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import Sigma from "sigma";
+import { localizedContentPayload, localizedContentText } from "./content-i18n";
 import "./styles.css";
 
 type Mode = "philosophy" | "corpus";
@@ -660,12 +661,13 @@ function displayTitle(item: AnyItem): string {
   if (concept) return concept[1].trim();
   const corpus = raw.match(/^Corpus Or Prepared Source Document:\s*(.+)$/i);
   const title = corpus ? corpus[1].trim() : raw;
-  return (
+  return localizedContentText(
     title
       .replace(/^ToS Deep Research[_\s:—-]*/i, "")
       .replace(/\.docx$/i, "")
       .replace(/\s+/g, " ")
-      .trim() || raw
+      .trim() || raw,
+    state.language,
   );
 }
 
@@ -674,7 +676,7 @@ function displaySubtitle(item: AnyItem): string {
     return `${humanKind(item.primary_predicate || item.predicate_id || "relation")} · ${text(item.relation_count)} ${t("relation.relations")}`;
   }
   const kind = humanKind(item.cluster_kind || item.node_type || item.predicate_id);
-  const subtitle = itemSubtitle(item);
+  const subtitle = localizedContentText(itemSubtitle(item), state.language);
   const pieces = [kind, subtitle === kind || subtitle.replaceAll("-", " ") === kind ? "" : humanKind(subtitle)].filter(Boolean);
   return [...new Set(pieces)].join(" · ");
 }
@@ -689,7 +691,9 @@ function compactGraphLabel(item: AnyItem): string {
 }
 
 function relationRouteText(item: AnyItem): string {
-  return `${text(item.from_label || endpointLabel(item.from_id))} -> ${humanKind(item.primary_predicate || item.predicate_id || "relation")} -> ${text(item.to_label || endpointLabel(item.to_id))}`;
+  const from = localizedContentText(text(item.from_label || endpointLabel(item.from_id)), state.language);
+  const to = localizedContentText(text(item.to_label || endpointLabel(item.to_id)), state.language);
+  return `${from} -> ${humanKind(item.primary_predicate || item.predicate_id || "relation")} -> ${to}`;
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -1275,7 +1279,7 @@ function renderInspector(): void {
     if (refs.length) {
       cards.push(detailCard(t("detail.sourceRefs"), refs.slice(0, 8).join("\n")));
     }
-    cards.push(detailCard(t("detail.payload"), JSON.stringify(state.selected, null, 2), true));
+    cards.push(detailCard(t("detail.payload"), JSON.stringify(localizedContentPayload(state.selected, state.language), null, 2), true));
   }
   if (state.results.length) {
     cards.push(`<div class="section-title">${t("detail.results")}</div>`);
@@ -1386,10 +1390,12 @@ function relationDetailCards(item: AnyItem): string[] {
     .join("\n");
   const layers = itemLayers(item).join("\n");
   const memberEdges = stringList(item.member_edge_ids).slice(0, 12).join("\n");
+  const from = localizedContentText(text(source.from_label || endpointLabel(source.from_id)), state.language);
+  const to = localizedContentText(text(source.to_label || endpointLabel(source.to_id)), state.language);
   const cards = [
-    detailCard(t("detail.relationRoute"), `${text(source.from_label || endpointLabel(source.from_id))}\n-> ${humanKind(source.primary_predicate || source.predicate_id)}\n-> ${text(source.to_label || endpointLabel(source.to_id))}`),
-    detailCard(t("detail.from"), text(source.from_label || endpointLabel(source.from_id))),
-    detailCard(t("detail.to"), text(source.to_label || endpointLabel(source.to_id))),
+    detailCard(t("detail.relationRoute"), `${from}\n-> ${humanKind(source.primary_predicate || source.predicate_id)}\n-> ${to}`),
+    detailCard(t("detail.from"), from),
+    detailCard(t("detail.to"), to),
     detailCard(t("detail.predicate"), humanKind(source.primary_predicate || source.predicate_id)),
   ];
   if (source.relation_count) cards.push(detailCard(t("detail.relationCount"), text(source.relation_count)));
