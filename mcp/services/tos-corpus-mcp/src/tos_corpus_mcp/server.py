@@ -92,6 +92,16 @@ def build_server(
         return current_state().philosophy_layers()
 
     @mcp.tool()
+    def tos_philosophy_graph_contracts() -> dict[str, Any]:
+        """Return the bounded MCP access contract for ToS philosophy graph packets."""
+        return current_state().philosophy_contracts()
+
+    @mcp.tool()
+    def tos_philosophy_graph_scale_manifest(view_id: str | None = None, layers: list[str] | None = None) -> dict[str, Any]:
+        """Return compact row counts and packet routes for ToS philosophy scale projection access."""
+        return current_state().philosophy_scale_manifest(view_id=view_id, layers=layers)
+
+    @mcp.tool()
     def tos_philosophy_graph_view(view_id: str) -> dict[str, Any]:
         """Return one ToS philosophy graph view packet with projected nodes, edges, and source refs."""
         return current_state().philosophy_view(view_id=view_id)
@@ -120,10 +130,34 @@ def build_server(
         node_id: str,
         depth: int = 1,
         layers: list[str] | None = None,
+        predicates: list[str] | None = None,
         limit: int = 80,
     ) -> dict[str, Any]:
         """Return the projected neighborhood around one ToS philosophy node."""
-        return current_state().philosophy_neighborhood(node_id=node_id, depth=depth, layers=layers, limit=limit)
+        return current_state().philosophy_neighborhood(
+            node_id=node_id,
+            depth=depth,
+            layers=layers,
+            predicates=predicates,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def tos_philosophy_graph_path(
+        from_id: str,
+        to_id: str,
+        layers: list[str] | None = None,
+        predicates: list[str] | None = None,
+        max_depth: int = 6,
+    ) -> dict[str, Any]:
+        """Return a bounded path packet between two projected ToS philosophy nodes."""
+        return current_state().philosophy_path_between(
+            from_id=from_id,
+            to_id=to_id,
+            layers=layers,
+            predicates=predicates,
+            max_depth=max_depth,
+        )
 
     @mcp.tool()
     def tos_philosophy_graph_review_packet(view_id: str = "chronology") -> dict[str, Any]:
@@ -192,6 +226,14 @@ def build_server(
     @mcp.resource("tos-philosophy://layers")
     def philosophy_layers_resource() -> str:
         return current_state().render_resource("tos-philosophy://layers")
+
+    @mcp.resource("tos-philosophy://contracts")
+    def philosophy_contracts_resource() -> str:
+        return current_state().render_resource("tos-philosophy://contracts")
+
+    @mcp.resource("tos-philosophy://scale-manifest")
+    def philosophy_scale_manifest_resource() -> str:
+        return current_state().render_resource("tos-philosophy://scale-manifest")
 
     @mcp.resource("tos-philosophy://snapshot")
     def philosophy_snapshot_resource() -> str:

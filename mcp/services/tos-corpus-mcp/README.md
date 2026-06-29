@@ -15,9 +15,9 @@ It returns:
 - graph-view packets
 - resource and node search
 - relation-pack packets
-- philosophy graph status, views, layers, nodes, edges, neighborhoods, review
-  packets, snapshot fingerprints, post-planting audit packets, and compact
-  packets
+- philosophy graph status, contracts, views, layers, scale manifests, nodes,
+  edges, neighborhoods, paths, review packets, snapshot fingerprints,
+  post-planting audit packets, and compact packets
 
 ## Boundary
 

@@ -24,6 +24,9 @@ from .models import (
     PhilosophyAuditResponse,
     PhilosophyContractsResponse,
     PhilosophyPacketResponse,
+    PhilosophyQueryNeighborhoodResponse,
+    PhilosophyQueryPathResponse,
+    PhilosophyQueryViewResponse,
     PhilosophyReviewPacketResponse,
     PhilosophySearchResponse,
     PhilosophySnapshotResponse,
@@ -33,7 +36,7 @@ from .models import (
     PhilosophyViewsResponse,
     ProjectSyncResponse,
 )
-from .neo4j_store import Neo4jProjectionStore, describe_neo4j_store
+from .neo4j_store import Neo4jProjectionStore, Neo4jStoreError, describe_neo4j_store
 from .philosophy_reader import SCALE_EXPORT_COLUMNS, ToSPhilosophyProjectionReader, ToSPhilosophyReaderError
 from .projector import CorpusProjector, PhilosophyProjector
 from .ui import render_index
@@ -77,6 +80,12 @@ def _layer_set(raw_layers: str | None) -> set[str]:
     return {layer.strip() for layer in raw_layers.split(",") if layer.strip()}
 
 
+def _predicate_set(raw_predicates: str | None) -> set[str]:
+    if not raw_predicates:
+        return set()
+    return {predicate.strip() for predicate in raw_predicates.split(",") if predicate.strip()}
+
+
 def _csv_stream(table_name: str, rows: list[dict[str, Any]]) -> Iterator[str]:
     fieldnames = SCALE_EXPORT_COLUMNS[table_name]
     buffer = StringIO()
@@ -95,6 +104,19 @@ def _csv_stream(table_name: str, rows: list[dict[str, Any]]) -> Iterator[str]:
 def _jsonl_stream(rows: list[dict[str, Any]]) -> Iterator[str]:
     for row in rows:
         yield json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+
+
+def _query_backend(raw_backend: str) -> str:
+    backend = raw_backend.strip().lower()
+    if backend not in {"auto", "neo4j", "json"}:
+        raise HTTPException(status_code=400, detail="backend must be auto, neo4j, or json")
+    return backend
+
+
+def _fallback_reason(exc: Exception | None = None) -> str:
+    if exc is not None:
+        return str(exc)
+    return neo4j_status.note
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -292,9 +314,21 @@ def philosophy_edge(edge_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/philosophy/neighborhood/{node_id:path}")
-def philosophy_neighborhood(node_id: str, depth: int = 1, layers: str | None = None, limit: int = 120) -> dict[str, Any]:
+def philosophy_neighborhood(
+    node_id: str,
+    depth: int = 1,
+    layers: str | None = None,
+    predicates: str | None = None,
+    limit: int = 120,
+) -> dict[str, Any]:
     try:
-        return philosophy_reader.neighborhood(node_id, depth=depth, layers=_layer_set(layers), limit=limit)
+        return philosophy_reader.neighborhood(
+            node_id,
+            depth=depth,
+            layers=_layer_set(layers),
+            predicates=_predicate_set(predicates),
+            limit=limit,
+        )
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 
@@ -304,10 +338,155 @@ def philosophy_paths(
     from_id: str = Query(alias="from"),
     to_id: str = Query(alias="to"),
     layers: str | None = None,
+    predicates: str | None = None,
     max_depth: int = 6,
 ) -> dict[str, Any]:
     try:
-        return philosophy_reader.path_between(from_id, to_id, layers=_layer_set(layers), max_depth=max_depth)
+        return philosophy_reader.path_between(
+            from_id,
+            to_id,
+            layers=_layer_set(layers),
+            predicates=_predicate_set(predicates),
+            max_depth=max_depth,
+        )
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/query/views/{view_id}", response_model=PhilosophyQueryViewResponse)
+def philosophy_query_view(
+    view_id: str,
+    layers: str | None = None,
+    predicates: str | None = None,
+    limit: int = 240,
+    backend: str = "auto",
+) -> PhilosophyQueryViewResponse:
+    layer_filter = _layer_set(layers)
+    predicate_filter = _predicate_set(predicates)
+    backend_choice = _query_backend(backend)
+    if backend_choice in {"auto", "neo4j"} and neo4j_status.ready:
+        try:
+            return PhilosophyQueryViewResponse(
+                **neo4j_store.query_philosophy_view_subgraph(
+                    view_id,
+                    layers=layer_filter,
+                    predicates=predicate_filter,
+                    limit=limit,
+                )
+            )
+        except Neo4jStoreError as exc:
+            if backend_choice == "neo4j":
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            fallback = _fallback_reason(exc)
+        else:
+            fallback = None
+    else:
+        fallback = _fallback_reason()
+    try:
+        return PhilosophyQueryViewResponse(
+            **philosophy_reader.query_view(
+                view_id,
+                layers=layer_filter,
+                predicates=predicate_filter,
+                limit=limit,
+                query_backend="json-fallback" if backend_choice == "auto" else "json",
+                fallback_reason=fallback if backend_choice == "auto" else None,
+            )
+        )
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/query/neighborhood/{node_id:path}", response_model=PhilosophyQueryNeighborhoodResponse)
+def philosophy_query_neighborhood(
+    node_id: str,
+    depth: int = 1,
+    layers: str | None = None,
+    predicates: str | None = None,
+    limit: int = 160,
+    backend: str = "auto",
+) -> PhilosophyQueryNeighborhoodResponse:
+    layer_filter = _layer_set(layers)
+    predicate_filter = _predicate_set(predicates)
+    backend_choice = _query_backend(backend)
+    if backend_choice in {"auto", "neo4j"} and neo4j_status.ready:
+        try:
+            return PhilosophyQueryNeighborhoodResponse(
+                **neo4j_store.query_philosophy_neighborhood(
+                    node_id,
+                    depth=depth,
+                    layers=layer_filter,
+                    predicates=predicate_filter,
+                    limit=limit,
+                )
+            )
+        except Neo4jStoreError as exc:
+            if backend_choice == "neo4j":
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            fallback = _fallback_reason(exc)
+        else:
+            fallback = None
+    else:
+        fallback = _fallback_reason()
+    try:
+        return PhilosophyQueryNeighborhoodResponse(
+            **philosophy_reader.neighborhood(
+                node_id,
+                depth=depth,
+                layers=layer_filter,
+                predicates=predicate_filter,
+                limit=limit,
+                query_backend="json-fallback" if backend_choice == "auto" else "json",
+                fallback_reason=fallback if backend_choice == "auto" else None,
+            )
+        )
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/query/paths", response_model=PhilosophyQueryPathResponse)
+def philosophy_query_paths(
+    from_id: str = Query(alias="from"),
+    to_id: str = Query(alias="to"),
+    layers: str | None = None,
+    predicates: str | None = None,
+    max_depth: int = 6,
+    backend: str = "auto",
+) -> PhilosophyQueryPathResponse:
+    layer_filter = _layer_set(layers)
+    predicate_filter = _predicate_set(predicates)
+    backend_choice = _query_backend(backend)
+    if backend_choice in {"auto", "neo4j"} and neo4j_status.ready:
+        try:
+            return PhilosophyQueryPathResponse(
+                **neo4j_store.query_philosophy_path(
+                    from_id,
+                    to_id,
+                    layers=layer_filter,
+                    predicates=predicate_filter,
+                    max_depth=max_depth,
+                )
+            )
+        except Neo4jStoreError as exc:
+            if backend_choice == "neo4j":
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            fallback = _fallback_reason(exc)
+        else:
+            fallback = None
+    else:
+        fallback = _fallback_reason()
+    try:
+        return PhilosophyQueryPathResponse(
+            **philosophy_reader.path_between(
+                from_id,
+                to_id,
+                layers=layer_filter,
+                predicates=predicate_filter,
+                max_depth=max_depth,
+                query_backend="json-fallback" if backend_choice == "auto" else "json",
+                fallback_reason=fallback if backend_choice == "auto" else None,
+            )
+        )
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 

@@ -76,6 +76,47 @@ def _list_dump(value: Any) -> str:
     return _json_dump(value if isinstance(value, list) else [])
 
 
+def _json_load(value: Any) -> Any:
+    if not isinstance(value, str) or not value:
+        return {}
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _string_list(value: Any) -> list[str]:
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def _source_refs(items: list[dict[str, Any]]) -> list[str]:
+    refs = {
+        str(item.get("source_ref"))
+        for item in items
+        if isinstance(item.get("source_ref"), str) and item.get("source_ref")
+    }
+    for item in items:
+        if isinstance(item.get("source_refs"), list):
+            refs.update(str(ref) for ref in item["source_refs"] if isinstance(ref, str) and ref)
+    return sorted(refs)
+
+
+def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
+    if not layers:
+        return True
+    item_layers = item.get("graph_layers")
+    if not isinstance(item_layers, list):
+        return False
+    return bool(set(str(layer) for layer in item_layers) & layers)
+
+
+def _predicate_allowed(item: dict[str, Any], predicates: set[str]) -> bool:
+    if not predicates:
+        return True
+    predicate = item.get("predicate_id")
+    return isinstance(predicate, str) and predicate in predicates
+
+
 def _chunks(rows: list[dict[str, Any]], size: int = 100) -> list[list[dict[str, Any]]]:
     return [rows[index : index + size] for index in range(0, len(rows), size)]
 
@@ -129,6 +170,403 @@ class Neo4jProjectionStore:
     def __init__(self, settings: TosGraphSettings, status: Neo4jStoreStatus) -> None:
         self.settings = settings
         self.status = status
+
+    def _execute_philosophy_read(self, query_fn: Any, *args: Any) -> Any:
+        if not self.status.ready or not self.settings.neo4j_password:
+            raise Neo4jStoreError(self.status.note)
+
+        from neo4j import GraphDatabase
+
+        driver = GraphDatabase.driver(
+            self.settings.neo4j_uri,
+            auth=(self.settings.neo4j_user, self.settings.neo4j_password),
+        )
+        try:
+            with driver.session(database=self.settings.neo4j_database) as session:
+                return session.execute_read(query_fn, *args)
+        except Exception as exc:  # pragma: no cover - runtime integration path
+            raise Neo4jStoreError(f"neo4j philosophy query failed: {exc}") from exc
+        finally:
+            driver.close()
+
+    @staticmethod
+    def _record_value(record: Any, key: str) -> Any:
+        if record is None:
+            return None
+        if hasattr(record, "get"):
+            return record.get(key)
+        return record[key]
+
+    @classmethod
+    def _payload_from_record(cls, record: Any, key: str = "payload_json") -> dict[str, Any]:
+        payload = _json_load(cls._record_value(record, key))
+        return payload if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _payloads_from_result(cls, result: Any, key: str = "payload_json") -> list[dict[str, Any]]:
+        rows = result.data() if hasattr(result, "data") else []
+        payloads: list[dict[str, Any]] = []
+        for row in rows:
+            payload = _json_load(row.get(key))
+            if isinstance(payload, dict):
+                payloads.append(payload)
+        return payloads
+
+    @classmethod
+    def _runtime_boundary_from_tx(cls, tx: Any) -> dict[str, Any]:
+        record = tx.run(
+            """
+            MATCH (projection:TosPhilosophyProjection {owner_repo: 'Tree-of-Sophia'})
+            RETURN projection.runtime_projection_boundary_json AS boundary_json
+            LIMIT 1
+            """
+        ).single()
+        boundary = _json_load(cls._record_value(record, "boundary_json"))
+        return boundary if isinstance(boundary, dict) else {}
+
+    @staticmethod
+    def _bounded_depth(depth: int, *, default: int, maximum: int) -> int:
+        try:
+            value = int(depth)
+        except (TypeError, ValueError):
+            return default
+        return max(1, min(maximum, value))
+
+    @staticmethod
+    def _bounded_limit(limit: int, *, default: int = 240, maximum: int = 2000) -> int:
+        try:
+            value = int(limit)
+        except (TypeError, ValueError):
+            return default
+        return max(1, min(maximum, value))
+
+    @staticmethod
+    def _query_contract(
+        *,
+        query_kind: str,
+        layers: set[str],
+        predicates: set[str],
+        limit: int,
+    ) -> dict[str, Any]:
+        return {
+            "schema": "tos_graph_philosophy_query_contract_v1",
+            "query_kind": query_kind,
+            "backend": "neo4j",
+            "layers": sorted(layers),
+            "predicates": sorted(predicates),
+            "limit": limit,
+            "guarantees": [
+                "bounded read-only packet",
+                "Neo4j is projection cache only",
+                "Tree-of-Sophia remains source authority",
+            ],
+        }
+
+    @staticmethod
+    def _filter_query_surfaces(
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+        clusters: list[dict[str, Any]],
+        *,
+        layers: set[str],
+        predicates: set[str],
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        filtered_edges = [
+            edge
+            for edge in edges
+            if _layer_allowed(edge, layers) and _predicate_allowed(edge, predicates)
+        ][:limit]
+        endpoint_ids = {
+            endpoint
+            for edge in filtered_edges
+            for endpoint in (edge.get("from_id"), edge.get("to_id"))
+            if isinstance(endpoint, str)
+        }
+        filtered_nodes = [
+            node
+            for node in nodes
+            if _layer_allowed(node, layers) and (not endpoint_ids or node.get("node_id") in endpoint_ids)
+        ][:limit]
+        if not filtered_nodes and not predicates:
+            filtered_nodes = [node for node in nodes if _layer_allowed(node, layers)][:limit]
+        node_ids = {str(node.get("node_id")) for node in filtered_nodes if isinstance(node.get("node_id"), str)}
+        filtered_clusters = [
+            cluster
+            for cluster in clusters
+            if _layer_allowed(cluster, layers)
+            and (
+                not node_ids
+                or bool(set(_string_list(cluster.get("member_node_ids"))) & node_ids)
+            )
+        ][:limit]
+        return filtered_nodes, filtered_edges, filtered_clusters
+
+    def query_philosophy_view_subgraph(
+        self,
+        view_id: str,
+        *,
+        layers: set[str] | None = None,
+        predicates: set[str] | None = None,
+        limit: int = 240,
+    ) -> dict[str, Any]:
+        limit = self._bounded_limit(limit)
+        layer_filter = layers or set()
+        predicate_filter = predicates or set()
+        packet = self._execute_philosophy_read(self._query_philosophy_view_subgraph_tx, view_id, limit)
+        if not packet["view"]:
+            raise Neo4jStoreError(f"unknown ToS philosophy graph view in neo4j projection: {view_id}")
+        nodes, edges, clusters = self._filter_query_surfaces(
+            packet["nodes"],
+            packet["edges"],
+            packet["clusters"],
+            layers=layer_filter,
+            predicates=predicate_filter,
+            limit=limit,
+        )
+        return {
+            "schema": "tos_graph_philosophy_query_view_v1",
+            "query_backend": "neo4j",
+            "fallback_reason": None,
+            "view_id": view_id,
+            "view": packet["view"],
+            "query_contract": self._query_contract(
+                query_kind="view-subgraph",
+                layers=layer_filter,
+                predicates=predicate_filter,
+                limit=limit,
+            ),
+            "nodes": nodes,
+            "edges": edges,
+            "clusters": clusters,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "cluster_count": len(clusters),
+            "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "limit": limit,
+            "source_refs": _source_refs(nodes + edges + clusters),
+            "runtime_projection_boundary": packet["runtime_projection_boundary"],
+            "authority_note": "Tree-of-Sophia owns graph meaning; Neo4j serves a bounded abyss-stack projection packet.",
+        }
+
+    @classmethod
+    def _query_philosophy_view_subgraph_tx(cls, tx: Any, view_id: str, limit: int) -> dict[str, Any]:
+        view = cls._payload_from_record(
+            tx.run(
+                """
+                MATCH (view:TosPhilosophyViewProjection {projection_id: $view_id})
+                RETURN view.payload_json AS payload_json
+                LIMIT 1
+                """,
+                view_id=view_id,
+            ).single()
+        )
+        query_limit = max(limit * 3, limit)
+        nodes = cls._payloads_from_result(
+            tx.run(
+                """
+                MATCH (:TosPhilosophyViewProjection {projection_id: $view_id})-[:PROJECTS_NODE]->(node:TosPhilosophyNodeProjection)
+                RETURN node.payload_json AS payload_json
+                LIMIT $limit
+                """,
+                view_id=view_id,
+                limit=query_limit,
+            )
+        )
+        edges = cls._payloads_from_result(
+            tx.run(
+                """
+                MATCH (:TosPhilosophyViewProjection {projection_id: $view_id})-[:PROJECTS_EDGE]->(edge:TosPhilosophyEdgeProjection)
+                RETURN edge.payload_json AS payload_json
+                LIMIT $limit
+                """,
+                view_id=view_id,
+                limit=query_limit,
+            )
+        )
+        clusters = cls._payloads_from_result(
+            tx.run(
+                """
+                MATCH (:TosPhilosophyViewProjection {projection_id: $view_id})-[:PROJECTS_CLUSTER]->(cluster:TosPhilosophyClusterProjection)
+                RETURN cluster.payload_json AS payload_json
+                LIMIT $limit
+                """,
+                view_id=view_id,
+                limit=query_limit,
+            )
+        )
+        return {
+            "view": {key: value for key, value in view.items() if key not in {"nodes", "edges"}},
+            "nodes": nodes,
+            "edges": edges,
+            "clusters": clusters,
+            "runtime_projection_boundary": cls._runtime_boundary_from_tx(tx),
+        }
+
+    def query_philosophy_neighborhood(
+        self,
+        node_id: str,
+        *,
+        depth: int = 1,
+        layers: set[str] | None = None,
+        predicates: set[str] | None = None,
+        limit: int = 160,
+    ) -> dict[str, Any]:
+        limit = self._bounded_limit(limit)
+        depth = self._bounded_depth(depth, default=1, maximum=4)
+        layer_filter = layers or set()
+        predicate_filter = predicates or set()
+        packet = self._execute_philosophy_read(self._query_philosophy_neighborhood_tx, node_id, depth, limit)
+        if not packet["node"]:
+            raise Neo4jStoreError(f"unknown ToS philosophy node in neo4j projection: {node_id}")
+        nodes, edges, _clusters = self._filter_query_surfaces(
+            packet["nodes"],
+            packet["edges"],
+            [],
+            layers=layer_filter,
+            predicates=predicate_filter,
+            limit=limit,
+        )
+        neighbors = [node for node in nodes if node.get("node_id") != node_id]
+        return {
+            "schema": "tos_graph_philosophy_neighborhood_v1",
+            "query_backend": "neo4j",
+            "fallback_reason": None,
+            "node_id": node_id,
+            "node": packet["node"],
+            "neighbors": neighbors,
+            "edges": edges,
+            "depth": depth,
+            "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "limit": limit,
+            "source_refs": _source_refs([packet["node"]] + neighbors + edges),
+            "runtime_projection_boundary": packet["runtime_projection_boundary"],
+            "authority_note": "Tree-of-Sophia owns graph meaning; Neo4j serves a bounded abyss-stack neighborhood packet.",
+        }
+
+    @classmethod
+    def _query_philosophy_neighborhood_tx(cls, tx: Any, node_id: str, depth: int, limit: int) -> dict[str, Any]:
+        node = cls._payload_from_record(
+            tx.run(
+                """
+                MATCH (node:TosPhilosophyNodeProjection {projection_id: $node_id})
+                RETURN node.payload_json AS payload_json
+                LIMIT 1
+                """,
+                node_id=node_id,
+            ).single()
+        )
+        query = f"""
+            MATCH (center:TosPhilosophyNodeProjection {{projection_id: $node_id}})
+            OPTIONAL MATCH path=(center)-[:TOS_PHILOSOPHY_RELATION*1..{depth}]-(neighbor:TosPhilosophyNodeProjection)
+            WITH collect(DISTINCT center.projection_id) + collect(DISTINCT neighbor.projection_id) AS node_ids
+            UNWIND node_ids AS projection_id
+            WITH DISTINCT projection_id WHERE projection_id IS NOT NULL
+            MATCH (node:TosPhilosophyNodeProjection {{projection_id: projection_id}})
+            RETURN node.payload_json AS payload_json
+            LIMIT $limit
+        """
+        nodes = cls._payloads_from_result(tx.run(query, node_id=node_id, limit=limit))
+        node_ids = sorted({str(item.get("node_id")) for item in nodes if isinstance(item.get("node_id"), str)})
+        edges = cls._payloads_from_result(
+            tx.run(
+                """
+                MATCH (edge:TosPhilosophyEdgeProjection)-[:FROM_NODE|TO_NODE]->(node:TosPhilosophyNodeProjection)
+                WHERE node.projection_id IN $node_ids
+                WITH edge, collect(DISTINCT node.projection_id) AS endpoint_ids
+                WHERE size(endpoint_ids) = 2
+                RETURN edge.payload_json AS payload_json
+                LIMIT $limit
+                """,
+                node_ids=node_ids,
+                limit=limit,
+            )
+        )
+        return {
+            "node": node,
+            "nodes": nodes,
+            "edges": edges,
+            "runtime_projection_boundary": cls._runtime_boundary_from_tx(tx),
+        }
+
+    def query_philosophy_path(
+        self,
+        from_id: str,
+        to_id: str,
+        *,
+        layers: set[str] | None = None,
+        predicates: set[str] | None = None,
+        max_depth: int = 6,
+    ) -> dict[str, Any]:
+        max_depth = self._bounded_depth(max_depth, default=6, maximum=8)
+        layer_filter = layers or set()
+        predicate_filter = predicates or set()
+        packet = self._execute_philosophy_read(self._query_philosophy_path_tx, from_id, to_id, max_depth)
+        nodes, edges, _clusters = self._filter_query_surfaces(
+            packet["nodes"],
+            packet["edges"],
+            [],
+            layers=layer_filter,
+            predicates=predicate_filter,
+            limit=2000,
+        )
+        found = bool(nodes) and (not predicate_filter or bool(edges))
+        return {
+            "schema": "tos_graph_philosophy_path_v1",
+            "query_backend": "neo4j",
+            "fallback_reason": None,
+            "from_id": from_id,
+            "to_id": to_id,
+            "found": found,
+            "nodes": nodes if found else [],
+            "edges": edges if found else [],
+            "max_depth": max_depth,
+            "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "source_refs": _source_refs((nodes if found else []) + (edges if found else [])),
+            "runtime_projection_boundary": packet["runtime_projection_boundary"],
+            "authority_note": "Tree-of-Sophia owns graph meaning; Neo4j serves a bounded abyss-stack path packet.",
+        }
+
+    @classmethod
+    def _query_philosophy_path_tx(cls, tx: Any, from_id: str, to_id: str, max_depth: int) -> dict[str, Any]:
+        record = tx.run(
+            f"""
+            MATCH (source:TosPhilosophyNodeProjection {{projection_id: $from_id}})
+            MATCH (target:TosPhilosophyNodeProjection {{projection_id: $to_id}})
+            OPTIONAL MATCH path=shortestPath((source)-[:TOS_PHILOSOPHY_RELATION*..{max_depth}]-(target))
+            RETURN
+              CASE WHEN path IS NULL THEN [] ELSE [node IN nodes(path) | node.payload_json] END AS node_payload_jsons,
+              CASE WHEN path IS NULL THEN [] ELSE [rel IN relationships(path) | rel.edge_id] END AS edge_ids
+            LIMIT 1
+            """,
+            from_id=from_id,
+            to_id=to_id,
+        ).single()
+        node_payloads = cls._record_value(record, "node_payload_jsons") or []
+        nodes = []
+        for raw in node_payloads:
+            payload = _json_load(raw)
+            if isinstance(payload, dict):
+                nodes.append(payload)
+        edge_ids = [str(edge_id) for edge_id in (cls._record_value(record, "edge_ids") or []) if edge_id]
+        edges = cls._payloads_from_result(
+            tx.run(
+                """
+                UNWIND $edge_ids AS edge_id
+                MATCH (edge:TosPhilosophyEdgeProjection {projection_id: edge_id})
+                RETURN edge.payload_json AS payload_json
+                """,
+                edge_ids=edge_ids,
+            )
+        )
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "runtime_projection_boundary": cls._runtime_boundary_from_tx(tx),
+        }
 
     @staticmethod
     def _ensure_constraints(tx: Any, constraints: tuple[ConstraintSpec, ...]) -> int:

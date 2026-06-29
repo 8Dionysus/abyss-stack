@@ -89,15 +89,20 @@ type CorpusViewPayload = {
 };
 
 type NeighborhoodPayload = {
+  query_backend?: string;
+  fallback_reason?: string | null;
   node?: GraphNode;
   neighbors?: GraphNode[];
   edges?: GraphEdge[];
   depth?: number;
   layers?: string[];
+  predicates?: string[];
   source_refs?: string[];
 };
 
 type PathPayload = {
+  query_backend?: string;
+  fallback_reason?: string | null;
   from_id?: string;
   to_id?: string;
   found?: boolean;
@@ -105,6 +110,7 @@ type PathPayload = {
   edges?: GraphEdge[];
   max_depth?: number;
   layers?: string[];
+  predicates?: string[];
   source_refs?: string[];
 };
 
@@ -543,6 +549,7 @@ function renderShell(): void {
             <button id="clusters-button" type="button">Clusters</button>
             <button id="nodes-button" type="button">Nodes</button>
             <button id="fit-button" type="button">Fit</button>
+            <button id="focus-clear-button" type="button">Full view</button>
             <button id="review-button" type="button">Review packet</button>
             <button id="unresolved-button" type="button">Unresolved</button>
           </div>
@@ -596,6 +603,7 @@ function bindShellEvents(): void {
     renderAll();
   });
   byId("fit-button").addEventListener("click", () => fitActiveGraph());
+  byId("focus-clear-button").addEventListener("click", clearFocus);
   byId("review-button").addEventListener("click", () => void showReviewPacket());
   byId("unresolved-button").addEventListener("click", () => void showUnresolved());
   byId("snapshot-button").addEventListener("click", () => void showSnapshot());
@@ -638,6 +646,9 @@ function renderChips(): void {
   setActive("renderer-sigma", state.rendererMode === "sigma");
   setActive("clusters-button", state.graphMode === "clusters");
   setActive("nodes-button", state.graphMode === "nodes");
+  const focusButton = byId("focus-clear-button") as HTMLButtonElement;
+  focusButton.disabled = !state.neighborhood && !state.pathPacket && !state.expandedCluster;
+  focusButton.classList.toggle("active", Boolean(state.neighborhood || state.pathPacket || state.expandedCluster));
 }
 
 function renderMetrics(): void {
@@ -1181,6 +1192,14 @@ function graphFocus(): { nodes: Set<string>; edges: Set<string> } | null {
     const pathEdges = new Set(stringList(state.pathPacket.edges?.map((edge) => edge.edge_id)));
     if (pathNodes.size || pathEdges.size) return { nodes: pathNodes, edges: pathEdges };
   }
+  if (state.neighborhood?.node) {
+    const nodes = new Set<string>([
+      state.neighborhood.node.node_id,
+      ...stringList(state.neighborhood.neighbors?.map((node) => node.node_id)),
+    ]);
+    const edges = new Set<string>(stringList(state.neighborhood.edges?.map((edge) => edge.edge_id)));
+    if (nodes.size || edges.size) return { nodes, edges };
+  }
   if (!selected) return null;
   const nodes = new Set<string>();
   const edges = new Set<string>();
@@ -1680,14 +1699,17 @@ function addClusterRelationEdges(
 
 function buildNodeGraph(): void {
   if (!isPhilosophyView(state.currentView)) return;
+  const focusPacket = focusedNodePacket();
   const expandedIds = new Set(state.expandedCluster?.member_node_ids || []);
-  const nodes = (state.currentView.nodes || [])
+  const sourceNodes = focusPacket?.nodes || state.currentView.nodes || [];
+  const sourceEdges = focusPacket?.edges || state.currentView.edges || [];
+  const nodes = sourceNodes
     .filter(layerAllowed)
-    .filter((node) => expandedIds.size === 0 || expandedIds.has(node.node_id))
+    .filter((node) => focusPacket || expandedIds.size === 0 || expandedIds.has(node.node_id))
     .slice(0, nodeLimit());
   const visible = new Set(nodes.map((node) => node.node_id));
   nodes.forEach((node, index) => addGraphNode(node.node_id, node, index, 7));
-  const visibleEdges = (state.currentView.edges || [])
+  const visibleEdges = sourceEdges
     .filter(relationAllowed)
     .filter((edge) => visible.has(edge.from_id) && visible.has(edge.to_id))
     .slice(0, edgeLimit());
@@ -1695,6 +1717,22 @@ function buildNodeGraph(): void {
   layoutGraph();
   state.results = nodes;
   state.relationItems = visibleEdges.slice(0, 180);
+}
+
+function focusedNodePacket(): { nodes: GraphNode[]; edges: GraphEdge[] } | null {
+  if (state.pathPacket?.found && state.pathPacket.nodes?.length) {
+    return {
+      nodes: state.pathPacket.nodes || [],
+      edges: state.pathPacket.edges || [],
+    };
+  }
+  if (state.neighborhood?.node) {
+    return {
+      nodes: [state.neighborhood.node, ...(state.neighborhood.neighbors || [])],
+      edges: state.neighborhood.edges || [],
+    };
+  }
+  return null;
 }
 
 function buildCorpusGraph(): void {
@@ -1922,6 +1960,7 @@ function selectItem(item: AnyItem): void {
   if (cluster.cluster_id && cluster.member_node_ids?.length) {
     state.expandedCluster = cluster;
   }
+  renderChips();
   renderGraph();
   renderInspector();
   scrollInspectorTop();
@@ -1946,7 +1985,16 @@ function neighborhoodCards(nodeId: string): string[] {
   const cards = [
     detailCard(
       "Neighborhood",
-      `${neighbors.length} neighbors\n${edges.length} relations\n${state.neighborhood.layers?.length ? state.neighborhood.layers.join(", ") : "all active layers"}`,
+      [
+        `${neighbors.length} neighbors`,
+        `${edges.length} relations`,
+        state.neighborhood.layers?.length ? state.neighborhood.layers.join(", ") : "all active layers",
+        state.neighborhood.predicates?.length ? state.neighborhood.predicates.map(humanKind).join(", ") : "all active predicates",
+        state.neighborhood.query_backend ? `backend: ${state.neighborhood.query_backend}` : "",
+        state.neighborhood.fallback_reason ? `fallback: ${state.neighborhood.fallback_reason}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     ),
   ];
   if (neighbors.length) {
@@ -1980,8 +2028,24 @@ function pathCards(nodeId: string): string[] {
     detailCard(
       "Path",
       state.pathPacket.found
-        ? `${nodes.length} nodes\n${edges.length} relations\nmax depth ${state.pathPacket.max_depth || 6}`
-        : `No route found\nmax depth ${state.pathPacket.max_depth || 6}`,
+        ? [
+            `${nodes.length} nodes`,
+            `${edges.length} relations`,
+            `max depth ${state.pathPacket.max_depth || 6}`,
+            state.pathPacket.predicates?.length ? state.pathPacket.predicates.map(humanKind).join(", ") : "all active predicates",
+            state.pathPacket.query_backend ? `backend: ${state.pathPacket.query_backend}` : "",
+            state.pathPacket.fallback_reason ? `fallback: ${state.pathPacket.fallback_reason}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : [
+            "No route found",
+            `max depth ${state.pathPacket.max_depth || 6}`,
+            state.pathPacket.query_backend ? `backend: ${state.pathPacket.query_backend}` : "",
+            state.pathPacket.fallback_reason ? `fallback: ${state.pathPacket.fallback_reason}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
     ),
   );
   if (nodes.length) {
@@ -2008,6 +2072,11 @@ function activeLayerParam(): string {
   return layers ? `&layers=${encodeURIComponent(layers)}` : "";
 }
 
+function activePredicateParam(): string {
+  const predicates = [...state.activePredicates].filter(Boolean).join(",");
+  return predicates ? `&predicates=${encodeURIComponent(predicates)}` : "";
+}
+
 async function showNeighborhood(nodeId: string): Promise<void> {
   if (!nodeId) return;
   const selected = state.selected;
@@ -2017,10 +2086,11 @@ async function showNeighborhood(nodeId: string): Promise<void> {
   state.expandedCluster = null;
   state.selectedGraphId = nodeId;
   state.neighborhood = await fetchJson<NeighborhoodPayload>(
-    `/api/philosophy/neighborhood/${encodeURIComponent(nodeId)}?depth=1&limit=160${activeLayerParam()}`,
+    `/api/philosophy/query/neighborhood/${encodeURIComponent(nodeId)}?depth=1&limit=160${activeLayerParam()}${activePredicateParam()}`,
   );
   state.selected = selected;
   state.selectedGraphId = nodeId;
+  renderChips();
   renderGraph();
   ignoreGraphClicksUntil = Date.now() + 1500;
   ignoreInspectorSelectionsUntil = Date.now() + 1500;
@@ -2043,15 +2113,24 @@ async function showPathTo(nodeId: string): Promise<void> {
   state.graphMode = "nodes";
   state.expandedCluster = null;
   state.pathPacket = await fetchJson<PathPayload>(
-    `/api/philosophy/paths?from=${encodeURIComponent(state.pathStartNodeId)}&to=${encodeURIComponent(nodeId)}&max_depth=6${activeLayerParam()}`,
+    `/api/philosophy/query/paths?from=${encodeURIComponent(state.pathStartNodeId)}&to=${encodeURIComponent(nodeId)}&max_depth=6${activeLayerParam()}${activePredicateParam()}`,
   );
   state.selected = selected;
   state.selectedGraphId = nodeId;
+  renderChips();
   renderGraph();
   ignoreGraphClicksUntil = Date.now() + 1500;
   ignoreInspectorSelectionsUntil = Date.now() + 1500;
   renderInspector();
   scrollInspectorTop();
+}
+
+function clearFocus(): void {
+  state.neighborhood = null;
+  state.pathPacket = null;
+  state.expandedCluster = null;
+  state.graphMode = state.mode === "philosophy" ? "clusters" : "nodes";
+  renderAll();
 }
 
 function renderAll(): void {

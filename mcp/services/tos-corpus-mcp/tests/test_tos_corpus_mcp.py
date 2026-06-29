@@ -343,12 +343,24 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
 
     status = state.philosophy_status()
     views = state.philosophy_views()
+    contracts = state.philosophy_contracts()
     view = state.philosophy_view("chronology")
     layers = state.philosophy_layers()
+    manifest = state.philosophy_scale_manifest(view_id="chronology", layers=["historical-relation"])
     clusters = state.philosophy_clusters(view_id="chronology")
     node = state.philosophy_node("atlas-row:A01")
     edge = state.philosophy_edge("edge:row:A01:has-dossier:A01")
-    neighborhood = state.philosophy_neighborhood("atlas-row:A01", layers=["historical-relation"])
+    neighborhood = state.philosophy_neighborhood(
+        "atlas-row:A01",
+        layers=["historical-relation"],
+        predicates=["has-dossier"],
+    )
+    path = state.philosophy_path_between(
+        "atlas-row:A01",
+        "dossier:A01",
+        layers=["historical-relation"],
+        predicates=["has-dossier"],
+    )
     review = state.philosophy_review_packet("chronology")
     snapshot = state.philosophy_snapshot()
     audit = state.philosophy_audit()
@@ -361,15 +373,22 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     assert status["visibility_model"]["default_payload_mode"] == "cluster-first"
     assert views["views"][0]["layout_hint"] == "timeline-lanes"
     assert views["views"][0]["cluster_count"] == 1
+    assert contracts["runtime_contract"]["source_owner"] == "Tree-of-Sophia"
+    assert contracts["views"][0]["edge_predicates"] == ["has-dossier"]
     assert view["edge_count"] == 1
     assert view["clusters"][0]["cluster_kind"] == "region"
     assert layers["layer_counts"][0]["cluster_count"] == 1
+    assert manifest["tables"]["nodes"]["row_count"] == 2
+    assert manifest["tables"]["cluster-edge-memberships"]["row_count"] == 1
     assert clusters["cluster_count"] == 1
     assert node["related_edges"][0]["predicate_id"] == "has-dossier"
     assert node["source_refs"]
     assert edge["edge"]["to_id"] == "dossier:A01"
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+    assert neighborhood["predicates"] == ["has-dossier"]
     assert neighborhood["source_refs"]
+    assert path["found"] is True
+    assert [item["node_id"] for item in path["nodes"]] == ["atlas-row:A01", "dossier:A01"]
     assert review["packet"]["packet_id"] == "review-packet:chronology"
     assert snapshot["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
     assert audit["audit"]["review_readiness"]["status"] == "ready_for_first_graph_review"
@@ -380,6 +399,8 @@ def test_philosophy_graph_packets_and_resources(tmp_path: Path) -> None:
     assert json.loads(state.render_resource("tos-philosophy://status"))["counts"]["edges"] == 1
     assert state.read_resource("tos-philosophy://view/chronology")["node_count"] == 2
     assert state.read_resource("tos-philosophy://layers")["layer_counts"][0]["cluster_count"] == 1
+    assert state.read_resource("tos-philosophy://contracts")["views"][0]["view_id"] == "chronology"
+    assert state.read_resource("tos-philosophy://scale-manifest")["tables"]["edges"]["row_count"] == 1
     assert state.read_resource("tos-philosophy://snapshot")["snapshot_review"]["diff_route"]["mode"] == "fingerprint-ready"
     assert state.read_resource("tos-philosophy://audit")["audit_exists"] is True
     assert state.read_resource("tos-philosophy://edge/edge:row:A01:has-dossier:A01")["edge"]["from_id"] == "atlas-row:A01"
