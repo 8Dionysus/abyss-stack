@@ -2607,7 +2607,12 @@ class AoASessionMemoryMCPState:
             MCP_SERVER_SOURCE_PATH,
             package_root / "scripts" / "aoa_session_memory_mcp_server.py",
         ]
+        transport_restart_sources = [
+            MCP_SERVER_SOURCE_PATH,
+            package_root / "scripts" / "aoa_session_memory_mcp_server.py",
+        ]
         source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+        transport_source_mtime = max((path.stat().st_mtime for path in transport_restart_sources if path.exists()), default=0.0)
         config_path = _codex_config_path()
         config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
         configured_server: dict[str, Any] = {"configured": False, "config_path": config_path.as_posix()}
@@ -2641,6 +2646,8 @@ class AoASessionMemoryMCPState:
             }
 
         boot_epoch = _linux_boot_epoch(proc_root)
+        runtime = self.runtime_identity()
+        runtime_reload_required = bool(runtime.get("reload_required"))
         ancestor_pids: set[int] = set()
         parent = os.getpid()
         while parent:
@@ -2674,7 +2681,9 @@ class AoASessionMemoryMCPState:
                         "cmdline": cmdline,
                         "started_at_epoch": started_at_epoch,
                         "started_before_current_source": bool(
-                            started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime
+                            started_at_epoch is not None
+                            and transport_source_mtime
+                            and started_at_epoch < transport_source_mtime
                         ),
                     }
                 )
@@ -2690,7 +2699,14 @@ class AoASessionMemoryMCPState:
                     "started_at_epoch": started_at_epoch,
                     "is_current_process_ancestor": pid in ancestor_pids,
                     "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
-                    "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+                    "started_before_current_source": bool(
+                        runtime_reload_required
+                        or (
+                            started_at_epoch is not None
+                            and transport_source_mtime
+                            and started_at_epoch < transport_source_mtime
+                        )
+                    ),
                 }
             )
 
@@ -2704,10 +2720,17 @@ class AoASessionMemoryMCPState:
         current_predates_source = any(process["started_before_current_source"] for process in current_codex)
         current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
         configured = bool(configured_server.get("configured"))
+        config_mtime_advisory = bool(
+            current_codex
+            and configured
+            and current_predates_config
+            and current_has_mcp_child
+            and not current_predates_source
+        )
         live_transport_restart_advisory = bool(
             current_codex
             and configured
-            and (current_predates_config or current_predates_source or not current_has_mcp_child)
+            and (current_predates_source or not current_has_mcp_child)
         )
         stale_mcp_process_count = sum(1 for process in mcp_processes if process["started_before_current_source"])
         if live_transport_restart_advisory:
@@ -2718,7 +2741,12 @@ class AoASessionMemoryMCPState:
             )
         elif current_codex and current_has_mcp_child:
             direct_status = "attached"
-            next_action = "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
+            next_action = (
+                "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter. "
+                "Restart only before treating newer Codex config-plane changes as loaded."
+                if config_mtime_advisory
+                else "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
+            )
         elif not current_codex:
             direct_status = "not_in_codex_process"
             next_action = "Use this as a CLI preflight; run configured stdio smoke for server proof or call MCP from a fresh Codex session."
@@ -2731,11 +2759,19 @@ class AoASessionMemoryMCPState:
             "ok": configured and direct_status != "restart_required",
             "mutates": False,
             "configured_server": configured_server,
-            "runtime": self.runtime_identity(),
+            "runtime": runtime,
             "source_mtime_epoch": source_mtime or None,
+            "transport_source_mtime_epoch": transport_source_mtime or None,
             "config_mtime_epoch": config_mtime or None,
             "direct_tool_transport_status": direct_status,
             "live_transport_restart_advisory": live_transport_restart_advisory,
+            "config_mtime_advisory": config_mtime_advisory,
+            "config_reload_boundary": (
+                "Config mtime is newer than the Codex process, but a current aoa-session-memory MCP child is attached "
+                "and source is current. Direct tools are usable; restart only before claiming config-plane freshness."
+                if config_mtime_advisory
+                else ""
+            ),
             "codex_session": {
                 "available": True,
                 "current_codex_process_count": len(current_codex),

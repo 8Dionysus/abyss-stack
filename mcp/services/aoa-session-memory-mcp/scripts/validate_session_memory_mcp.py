@@ -191,7 +191,12 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
         REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
         REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
     ]
+    transport_restart_sources = [
+        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
+        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
+    ]
     source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    transport_source_mtime = max((path.stat().st_mtime for path in transport_restart_sources if path.exists()), default=0.0)
     config_path = _codex_config_path()
     config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
     boot_epoch = _linux_boot_epoch(proc_root)
@@ -233,7 +238,11 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
                 "started_at_epoch": started_at_epoch,
                 "is_current_validator_ancestor": pid in ancestor_pids,
                 "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
-                "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+                "started_before_current_source": bool(
+                    started_at_epoch is not None
+                    and transport_source_mtime
+                    and started_at_epoch < transport_source_mtime
+                ),
             }
         )
 
@@ -247,10 +256,17 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
     current_predates_source = any(process["started_before_current_source"] for process in current_codex)
     current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
     configured = config_path.exists()
+    config_mtime_advisory = bool(
+        current_codex
+        and configured
+        and current_predates_config
+        and current_has_mcp_child
+        and not current_predates_source
+    )
     live_transport_advisory = bool(
         current_codex
         and configured
-        and (current_predates_config or current_predates_source or not current_has_mcp_child)
+        and (current_predates_source or not current_has_mcp_child)
     )
 
     return {
@@ -258,18 +274,25 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
         "config_path": config_path.as_posix(),
         "config_mtime_epoch": config_mtime or None,
         "source_mtime_epoch": source_mtime or None,
+        "transport_source_mtime_epoch": transport_source_mtime or None,
         "current_codex_process_count": len(current_codex),
         "current_session_predates_config": current_predates_config,
         "current_session_predates_current_source": current_predates_source,
         "current_session_has_aoa_session_memory_child": current_has_mcp_child,
+        "config_mtime_advisory": config_mtime_advisory,
         "live_transport_restart_advisory": live_transport_advisory,
         "advisory": (
-            "This Codex session started before the current aoa-session-memory MCP config/source "
+            "This Codex session started before the current aoa-session-memory MCP source "
             "or has no direct aoa-session-memory MCP child. Fresh configured stdio can prove the "
             "server, but direct in-session MCP calls need a Codex/MCP restart before they are "
             "freshness proof."
             if live_transport_advisory
-            else "Current Codex session is not older than the watched aoa-session-memory MCP config/source and has a direct MCP child when configured."
+            else (
+                "Current Codex session has a direct aoa-session-memory MCP child and source is current. "
+                "Config mtime is newer than the process; restart only before treating config-plane changes as loaded."
+                if config_mtime_advisory
+                else "Current Codex session is not older than the watched aoa-session-memory MCP source and has a direct MCP child when configured."
+            )
         ),
         "current_codex_processes": current_codex[:6],
         "processes": codex_processes[:12],
@@ -286,7 +309,12 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
         REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
         REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
     ]
+    transport_restart_sources = [
+        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
+        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
+    ]
     source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    transport_source_mtime = max((path.stat().st_mtime for path in transport_restart_sources if path.exists()), default=0.0)
     boot_epoch = _linux_boot_epoch(proc_root)
     processes: list[dict] = []
     for entry in proc_root.iterdir():
@@ -304,7 +332,7 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
         except OSError:
             cwd = ""
         started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
-        stale = bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime)
+        stale = bool(started_at_epoch is not None and transport_source_mtime and started_at_epoch < transport_source_mtime)
         processes.append(
             {
                 "pid": int(entry.name),
@@ -319,15 +347,16 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
     return {
         "available": True,
         "source_mtime_epoch": source_mtime or None,
+        "transport_source_mtime_epoch": transport_source_mtime or None,
         "process_count": len(processes),
         "stale_process_count": stale_count,
         "restart_advisory": stale_count > 0,
         "advisory": (
-            "Some already-running Codex MCP transports started before the current source. "
+            "Some already-running Codex MCP transports started before the current transport source. "
             "Configured stdio smoke proves a fresh server, but those transports need a Codex/MCP restart "
             "before their live output is freshness proof."
             if stale_count
-            else "No already-running aoa-session-memory MCP process is older than the watched source files."
+            else "No already-running aoa-session-memory MCP process is older than the watched transport source files."
         ),
         "processes": processes[:12],
         "omitted_process_count": max(0, len(processes) - 12),
