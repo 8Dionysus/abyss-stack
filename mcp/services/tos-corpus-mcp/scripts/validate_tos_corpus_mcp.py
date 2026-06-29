@@ -334,6 +334,23 @@ def main() -> None:
         philosophy_layers = state.philosophy_layers()
         if int(philosophy_layers["layer_counts"][0].get("cluster_count") or 0) == 0:
             raise SystemExit("ToS philosophy graph layers returned no clusters")
+        philosophy_contracts = state.philosophy_contracts()
+        if not philosophy_contracts["views"]:
+            raise SystemExit("ToS philosophy graph contracts returned no view contracts")
+        philosophy_scale_manifest = state.philosophy_scale_manifest(view_id="chronology")
+        if int(philosophy_scale_manifest["tables"]["nodes"].get("row_count") or 0) == 0:
+            raise SystemExit("ToS philosophy scale manifest returned no nodes")
+        philosophy_view = state.philosophy_view("chronology")
+        first_edge = next((edge for edge in philosophy_view["edges"] if edge.get("from_id") and edge.get("to_id")), None)
+        if first_edge is None:
+            raise SystemExit("ToS philosophy chronology view returned no path-checkable edge")
+        philosophy_path = state.philosophy_path_between(
+            str(first_edge["from_id"]),
+            str(first_edge["to_id"]),
+            layers=[str(layer) for layer in first_edge.get("graph_layers", [])],
+        )
+        if not philosophy_path["found"]:
+            raise SystemExit("ToS philosophy path packet did not find the sampled chronology edge route")
         philosophy_review = state.philosophy_review_packet("chronology")
         if not philosophy_review["packet"].get("cluster_summaries"):
             raise SystemExit("ToS philosophy graph review packet returned no cluster summaries")

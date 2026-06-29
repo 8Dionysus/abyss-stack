@@ -183,6 +183,61 @@ class PhilosophyPacketResponse(BaseModel):
     authority_note: str
 
 
+class PhilosophyQueryViewResponse(BaseModel):
+    schema: str
+    query_backend: str
+    fallback_reason: str | None = None
+    view_id: str
+    view: dict[str, Any]
+    query_contract: dict[str, Any]
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    clusters: list[dict[str, Any]] = []
+    node_count: int
+    edge_count: int
+    cluster_count: int
+    layers: list[str]
+    predicates: list[str]
+    limit: int
+    source_refs: list[str]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
+class PhilosophyQueryNeighborhoodResponse(BaseModel):
+    schema: str
+    query_backend: str
+    fallback_reason: str | None = None
+    node_id: str
+    node: dict[str, Any]
+    neighbors: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    depth: int
+    layers: list[str]
+    predicates: list[str]
+    limit: int
+    source_refs: list[str]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
+class PhilosophyQueryPathResponse(BaseModel):
+    schema: str
+    query_backend: str
+    fallback_reason: str | None = None
+    from_id: str
+    to_id: str
+    found: bool
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    max_depth: int
+    layers: list[str]
+    predicates: list[str]
+    source_refs: list[str]
+    runtime_projection_boundary: dict[str, Any]
+    authority_note: str
+
+
 class ProjectSyncResponse(BaseModel):
     surface: str
     status: str

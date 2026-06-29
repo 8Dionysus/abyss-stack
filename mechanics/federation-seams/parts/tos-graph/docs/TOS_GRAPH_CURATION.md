@@ -46,8 +46,13 @@ The active runtime route is:
 - use `cosmos.gl` as the scale-oriented GPU renderer and keep Sigma as the
   curation/neighborhood renderer fallback
 - expose the lightweight runtime graph contract packet at `/api/philosophy/contracts`
+- expose bounded runtime query packets at `/api/philosophy/query/views/{view_id}`,
+  `/api/philosophy/query/neighborhood/{node_id}`, and
+  `/api/philosophy/query/paths`
 - stream philosophy projection scale-export tables for external large-graph
   viewers and analytics tools
+- expose bounded MCP packets through `tos-corpus-mcp` for contracts, view lists,
+  node lookup, neighborhood, path, scale manifest, and lens review packets
 - expose `tos-up` as the short operator command for the same workbench route; `aoa-tos-graph` remains the explicit stack command
 - project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
@@ -67,6 +72,27 @@ projection and reports:
 
 The packet is intentionally small. It does not replace the source-owned ToS
 contracts; it makes the `abyss-stack` projection boundary readable.
+
+## Runtime query route
+
+The query API is the read path for large-graph review:
+
+- `/api/philosophy/query/views/{view_id}` returns a bounded subgraph packet for
+  one ToS-owned view
+- `/api/philosophy/query/neighborhood/{node_id}` returns a bounded focus packet
+  around one projected node
+- `/api/philosophy/query/paths` returns a bounded path packet between two
+  projected nodes
+
+Each route accepts layer filters and predicate filters. The default backend is
+`auto`: use Neo4j when the projection cache is ready; fall back to the ToS
+derived export JSON when Neo4j is unavailable or the read fails. Response
+packets report `query_backend`, `fallback_reason`, active filters, source refs,
+and runtime boundary notes so UI and agents can tell projection cache reads from
+export fallback reads.
+
+Neo4j remains a cache. Corrections, source refs, relation kinds, view meaning,
+and canon status route back to Tree of Sophia and its derived export rebuild.
 
 ## View subgraph route
 
@@ -117,6 +143,20 @@ It does not add ToS meaning, does not choose canon, and does not write back.
 Corrections still route to `Tree-of-Sophia`, then ToS derived exports are
 rebuilt and streamed again.
 
+## MCP packet route
+
+`mcp/services/tos-corpus-mcp/` is the agent-facing access plane for the same
+source-owned exports. It exposes bounded tools and resources for:
+
+- corpus status, summary, resources, graph views, nodes, and relation packs
+- philosophy status, contracts, view list, graph layers, scale manifest, view
+  packets, nodes, edges, neighborhoods, paths, review packets, snapshots,
+  audits, unresolved surfaces, and compact lens packets
+
+MCP packets are deliberately smaller than the whole tree. They are retrieval
+and review aids for agents, not a replacement for ToS source files, ToS
+derived-export builders, or ToS validators.
+
 `POST /api/philosophy/project/sync` uses the same projection and reports the
 current scale-export row counts in its response. When Neo4j credentials are
 ready, the refresh creates projection constraints if needed, then performs
@@ -135,8 +175,8 @@ The future source seeding path remains source-owned:
 - proposed relations map to transmission, evidence, historical, conceptual,
   candidate, and canonical relation layers
 - Tree of Sophia rebuilds `philosophy_graph_projection.min.json`
-- `tos-graph` refreshes scale exports, UI views, MCP/API packets, and Neo4j
-  projection from the rebuilt derived export
+- `tos-graph` refreshes scale exports, UI views, query API packets, MCP packets,
+  and Neo4j projection from the rebuilt derived export
 
 This keeps large future planting compatible with the Tree source authority while
 letting `abyss-stack` serve runtime graph access.

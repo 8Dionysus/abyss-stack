@@ -557,6 +557,12 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     view = reader.view("chronology")
     node = reader.node("atlas-row:A01")
     neighborhood = reader.neighborhood("atlas-row:A01", depth=1, layers={"historical-relation"})
+    filtered_neighborhood = reader.neighborhood(
+        "atlas-row:A01",
+        depth=1,
+        layers={"historical-relation"},
+        predicates={"missing-predicate"},
+    )
     layers = reader.layers()
     clusters = reader.clusters(view_id="chronology")
     review_packet = reader.review_packet("chronology")
@@ -565,6 +571,19 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     edge = reader.edge("edge:row:A01:has-dossier:A01")
     unresolved = reader.unresolved()
     path = reader.path_between("atlas-row:A01", "dossier:A01", layers={"historical-relation"})
+    filtered_path = reader.path_between(
+        "atlas-row:A01",
+        "dossier:A01",
+        layers={"historical-relation"},
+        predicates={"missing-predicate"},
+    )
+    query_view = reader.query_view(
+        "chronology",
+        layers={"historical-relation"},
+        predicates={"has-dossier"},
+        query_backend="json-fallback",
+        fallback_reason="neo4j unavailable in test",
+    )
 
     assert status["projection_exists"] is True
     assert status["counts"]["nodes"] == 2
@@ -576,6 +595,8 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     assert view["clusters"][0]["cluster_kind"] == "region"
     assert node["node"]["source_ref"].endswith("rows.jsonl")
     assert neighborhood["neighbors"][0]["node_id"] == "dossier:A01"
+    assert neighborhood["query_backend"] == "json"
+    assert filtered_neighborhood["neighbors"] == []
     assert layers["layer_counts"][0]["cluster_count"] == 1
     assert clusters["cluster_count"] == 1
     assert review_packet["packet"]["packet_id"] == "review-packet:chronology"
@@ -586,6 +607,12 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     assert unresolved["unresolved_count"] == 0
     assert path["found"] is True
     assert [item["node_id"] for item in path["nodes"]] == ["atlas-row:A01", "dossier:A01"]
+    assert path["query_backend"] == "json"
+    assert filtered_path["found"] is False
+    assert query_view["query_backend"] == "json-fallback"
+    assert query_view["fallback_reason"] == "neo4j unavailable in test"
+    assert query_view["query_contract"]["query_kind"] == "view-subgraph"
+    assert query_view["edge_count"] == 1
 
 
 def test_philosophy_reader_exposes_scale_export_tables(tmp_path: Path) -> None:
@@ -711,11 +738,15 @@ def test_philosophy_neo4j_rows_keep_payload_json_and_membership_shape(tmp_path: 
 
 
 class RecordingResult:
-    def __init__(self, record: dict[str, int] | None = None) -> None:
+    def __init__(self, record: dict[str, object] | None = None, rows: list[dict[str, object]] | None = None) -> None:
         self.record = record
+        self.rows = rows or []
 
-    def single(self) -> dict[str, int] | None:
+    def single(self) -> dict[str, object] | None:
         return self.record
+
+    def data(self) -> list[dict[str, object]]:
+        return self.rows
 
     def consume(self) -> None:
         return None
@@ -775,6 +806,51 @@ def test_philosophy_neo4j_refresh_uses_constraints_refresh_ids_and_stale_cleanup
     assert any("MERGE (source)-[rel:TOS_PHILOSOPHY_RELATION" in query for query in data_tx.queries)
     assert cleanup_tx.queries[0].startswith("MATCH ()-[rel]-() WHERE type(rel) IN $relation_types")
     assert cleanup_tx.params[0]["refresh_id"] == refresh_id
+
+
+def test_philosophy_neo4j_view_query_tx_returns_projection_packet(tmp_path: Path) -> None:
+    projection_path = write_philosophy_projection(tmp_path)
+    projection = json.loads(projection_path.read_text(encoding="utf-8"))
+    view = projection["views"][0]
+    node = projection["nodes"][0]
+    edge = projection["edges"][0]
+    cluster = projection["clusters"][0]
+    boundary = projection["runtime_projection_boundary"]
+
+    class QueryTx(RecordingTx):
+        def run(self, query: str, **params: object) -> RecordingResult:
+            self.queries.append(" ".join(query.split()))
+            self.params.append(params)
+            compact_query = self.queries[-1]
+            if "RETURN view.payload_json AS payload_json" in compact_query:
+                return RecordingResult({"payload_json": json.dumps(view)})
+            if "RETURN node.payload_json AS payload_json" in compact_query:
+                return RecordingResult(rows=[{"payload_json": json.dumps(node)}])
+            if "RETURN edge.payload_json AS payload_json" in compact_query:
+                return RecordingResult(rows=[{"payload_json": json.dumps(edge)}])
+            if "RETURN cluster.payload_json AS payload_json" in compact_query:
+                return RecordingResult(rows=[{"payload_json": json.dumps(cluster)}])
+            if "runtime_projection_boundary_json" in compact_query:
+                return RecordingResult({"boundary_json": json.dumps(boundary)})
+            return RecordingResult()
+
+    tx = QueryTx()
+    packet = Neo4jProjectionStore._query_philosophy_view_subgraph_tx(tx, "chronology", 50)
+    nodes, edges, clusters = Neo4jProjectionStore._filter_query_surfaces(
+        packet["nodes"],
+        packet["edges"],
+        packet["clusters"],
+        layers={"historical-relation"},
+        predicates={"has-dossier"},
+        limit=50,
+    )
+
+    assert packet["view"]["view_id"] == "chronology"
+    assert nodes[0]["node_id"] == "atlas-row:A01"
+    assert edges[0]["predicate_id"] == "has-dossier"
+    assert clusters[0]["cluster_id"] == "cluster:region:test"
+    assert packet["runtime_projection_boundary"]["runtime_owner"] == "abyss-stack"
+    assert any("TosPhilosophyViewProjection" in query for query in tx.queries)
 
 
 def test_settings_treats_unreadable_stack_env_as_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

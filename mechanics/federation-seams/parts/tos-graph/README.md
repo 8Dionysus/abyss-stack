@@ -16,7 +16,16 @@ Current runtime contract:
 - `/api/philosophy/contracts` exposes the light downstream contract packet
 - `/api/philosophy/views/{view_id}` serves source-owned view subgraphs with
   `subgraph_contract` metadata
+- `/api/philosophy/query/views/{view_id}` serves bounded runtime query packets
+  from Neo4j when ready, with JSON export fallback when Neo4j is unavailable
+- `/api/philosophy/query/neighborhood/{node_id}` serves bounded focus packets
+  for one node with layer and predicate filters
+- `/api/philosophy/query/paths` serves bounded path packets between projected
+  nodes with layer and predicate filters
 - `/api/philosophy/project/sync` refreshes the Neo4j projection when credentials
   are ready and reports scale-export row counts
-- Neo4j, Cosmos, Sigma, and MCP access remain projection surfaces; ToS remains
-  the source authority for meaning, source refs, graph layers, and canon status
+- `tos-corpus-mcp` exposes contracts, view, node, neighborhood, path, scale
+  manifest, and compact lens packets for agents
+- Neo4j, Cosmos, Sigma, and MCP access remain projection/access surfaces; ToS
+  remains the source authority for meaning, source refs, graph layers, and canon
+  status

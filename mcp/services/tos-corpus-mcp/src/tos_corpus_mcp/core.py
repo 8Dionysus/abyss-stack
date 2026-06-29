@@ -42,6 +42,10 @@ def _source_refs(items: list[dict[str, Any]]) -> list[str]:
     return sorted(refs)
 
 
+def _string_list(value: Any) -> list[str]:
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
 def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
     if not layers:
         return True
@@ -49,6 +53,17 @@ def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
     if not isinstance(item_layers, list):
         return False
     return bool(set(str(layer) for layer in item_layers) & layers)
+
+
+def _predicate_allowed(item: dict[str, Any], predicates: set[str]) -> bool:
+    if not predicates:
+        return True
+    predicate = item.get("predicate_id")
+    return isinstance(predicate, str) and predicate in predicates
+
+
+def _unique_values(items: list[dict[str, Any]], key: str) -> list[str]:
+    return sorted({str(item[key]) for item in items if isinstance(item.get(key), str) and item.get(key)})
 
 
 @dataclass(slots=True)
@@ -371,6 +386,75 @@ class ToSCorpusMCPState:
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
         }
 
+    @staticmethod
+    def _philosophy_view_contract(
+        payload: dict[str, Any],
+        view: dict[str, Any],
+        clusters: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
+        edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
+        source_refs = payload.get("source_refs", {}) if isinstance(payload.get("source_refs"), dict) else {}
+        return {
+            "schema": "tos_philosophy_mcp_view_contract_v1",
+            "view_id": view.get("view_id"),
+            "route_card": view.get("route_card"),
+            "layout_hint": view.get("layout_hint"),
+            "graph_layers": [str(layer) for layer in view.get("graph_layers", []) if layer],
+            "node_kinds": _unique_values(nodes, "node_type"),
+            "edge_predicates": _unique_values(edges, "predicate_id"),
+            "cluster_kinds": _unique_values(clusters, "cluster_kind"),
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "cluster_count": len(clusters),
+            "source_view_contract_ref": source_refs.get("source_view_contract_ref"),
+        }
+
+    def philosophy_contracts(self) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        views = [view for view in payload.get("views", []) if isinstance(view, dict)]
+        nodes = [node for node in payload.get("nodes", []) if isinstance(node, dict)]
+        edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict)]
+        clusters = [cluster for cluster in payload.get("clusters", []) if isinstance(cluster, dict)]
+        source_refs = payload.get("source_refs", {}) if isinstance(payload.get("source_refs"), dict) else {}
+        return {
+            "schema": "tos_philosophy_mcp_contracts_v1",
+            "source_contract_refs": {
+                key: value for key, value in source_refs.items() if isinstance(value, str) and value
+            },
+            "runtime_contract": {
+                "runtime_owner": "abyss-stack",
+                "source_owner": "Tree-of-Sophia",
+                "packet_shape": "bounded MCP resources and tools over ToS derived exports",
+                "limits": [
+                    "no writeback",
+                    "no canon promotion",
+                    "MCP packets are access aids, not source authority",
+                ],
+            },
+            "views": [
+                self._philosophy_view_contract(
+                    payload,
+                    view,
+                    self._philosophy_clusters_for_payload(
+                        payload,
+                        view_id=str(view.get("view_id") or ""),
+                        limit=1_000_000,
+                    ),
+                )
+                for view in views
+            ],
+            "node_kinds": _unique_values(nodes, "node_type"),
+            "edge_predicates": _unique_values(edges, "predicate_id"),
+            "graph_layers": _unique_values(
+                [layer for layer in payload.get("graph_layers", []) if isinstance(layer, dict)],
+                "layer_id",
+            ),
+            "cluster_kinds": _unique_values(clusters, "cluster_kind"),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns graph meaning; MCP exposes the access-plane contract only.",
+        }
+
     def philosophy_view(self, view_id: str) -> dict[str, Any]:
         payload = self.philosophy_projection()
         view = next(
@@ -444,6 +528,50 @@ class ToSCorpusMCPState:
             "counts": payload.get("counts", {}),
             "source_refs": _source_refs(clusters),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def philosophy_scale_manifest(self, view_id: str | None = None, layers: list[str] | None = None) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        layer_filter = set(layers or [])
+        if view_id:
+            view = next(
+                (item for item in payload.get("views", []) if isinstance(item, dict) and item.get("view_id") == view_id),
+                None,
+            )
+            if view is None:
+                raise KeyError(f"unknown ToS philosophy graph view: {view_id}")
+            nodes = [node for node in view.get("nodes", []) if isinstance(node, dict) and _layer_allowed(node, layer_filter)]
+            edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layer_filter)]
+            clusters = self._philosophy_clusters_for_payload(payload, view_id=view_id, limit=1_000_000)
+            clusters = [cluster for cluster in clusters if _layer_allowed(cluster, layer_filter)]
+        else:
+            nodes = [node for node in payload.get("nodes", []) if isinstance(node, dict) and _layer_allowed(node, layer_filter)]
+            edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layer_filter)]
+            clusters = [
+                cluster
+                for cluster in payload.get("clusters", [])
+                if isinstance(cluster, dict) and _layer_allowed(cluster, layer_filter)
+            ]
+        return {
+            "schema": "tos_philosophy_mcp_scale_manifest_v1",
+            "view_id": view_id,
+            "layers": sorted(layer_filter),
+            "tables": {
+                "nodes": {"row_count": len(nodes), "packet_route": "tos_philosophy_graph_view"},
+                "edges": {"row_count": len(edges), "packet_route": "tos_philosophy_graph_view"},
+                "clusters": {"row_count": len(clusters), "packet_route": "tos_philosophy_graph_clusters"},
+                "cluster-node-memberships": {
+                    "row_count": sum(len(_string_list(cluster.get("member_node_ids"))) for cluster in clusters),
+                    "packet_route": "tos_philosophy_graph_clusters",
+                },
+                "cluster-edge-memberships": {
+                    "row_count": sum(len(_string_list(cluster.get("member_edge_ids"))) for cluster in clusters),
+                    "packet_route": "tos_philosophy_graph_clusters",
+                },
+            },
+            "source_projection_ref": self.philosophy_graph_projection_path.as_posix(),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Scale manifests are MCP navigation packets; ToS derived exports remain authoritative.",
         }
 
     def philosophy_review_packet(self, view_id: str = "chronology") -> dict[str, Any]:
@@ -558,12 +686,20 @@ class ToSCorpusMCPState:
         node_id: str,
         depth: int = 1,
         layers: list[str] | None = None,
+        predicates: list[str] | None = None,
         limit: int = 80,
     ) -> dict[str, Any]:
         node_packet = self.philosophy_node(node_id)
         payload = self.philosophy_projection()
         layer_filter = set(layers or [])
-        all_edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layer_filter)]
+        predicate_filter = set(predicates or [])
+        all_edges = [
+            edge
+            for edge in payload.get("edges", [])
+            if isinstance(edge, dict)
+            and _layer_allowed(edge, layer_filter)
+            and _predicate_allowed(edge, predicate_filter)
+        ]
         selected_ids = {node_id}
         frontier = {node_id}
         selected_edges: list[dict[str, Any]] = []
@@ -596,8 +732,77 @@ class ToSCorpusMCPState:
             "edges": selected_edges[:limit],
             "depth": max(depth, 1),
             "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "limit": max(limit, 0),
             "source_refs": _source_refs([node_packet["node"]] + neighbors + selected_edges[:limit]),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def philosophy_path_between(
+        self,
+        from_id: str,
+        to_id: str,
+        layers: list[str] | None = None,
+        predicates: list[str] | None = None,
+        max_depth: int = 6,
+    ) -> dict[str, Any]:
+        payload = self.philosophy_projection()
+        nodes_by_id = {
+            str(node.get("node_id")): node
+            for node in payload.get("nodes", [])
+            if isinstance(node, dict) and isinstance(node.get("node_id"), str)
+        }
+        if from_id not in nodes_by_id:
+            raise KeyError(f"unknown ToS philosophy node: {from_id}")
+        if to_id not in nodes_by_id:
+            raise KeyError(f"unknown ToS philosophy node: {to_id}")
+        layer_filter = set(layers or [])
+        predicate_filter = set(predicates or [])
+        adjacency: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        for edge in payload.get("edges", []):
+            if (
+                not isinstance(edge, dict)
+                or not _layer_allowed(edge, layer_filter)
+                or not _predicate_allowed(edge, predicate_filter)
+            ):
+                continue
+            left = str(edge.get("from_id") or "")
+            right = str(edge.get("to_id") or "")
+            adjacency.setdefault(left, []).append((right, edge))
+            adjacency.setdefault(right, []).append((left, edge))
+
+        queue: list[tuple[str, list[str], list[dict[str, Any]]]] = [(from_id, [from_id], [])]
+        seen = {from_id}
+        found_nodes: list[str] = []
+        found_edges: list[dict[str, Any]] = []
+        depth_limit = max(1, min(8, int(max_depth)))
+        while queue:
+            current, path_nodes, path_edges = queue.pop(0)
+            if current == to_id:
+                found_nodes = path_nodes
+                found_edges = path_edges
+                break
+            if len(path_edges) >= depth_limit:
+                continue
+            for neighbor, edge in adjacency.get(current, []):
+                if neighbor in seen:
+                    continue
+                seen.add(neighbor)
+                queue.append((neighbor, [*path_nodes, neighbor], [*path_edges, edge]))
+        path_nodes_payload = [nodes_by_id[node_id] for node_id in found_nodes]
+        return {
+            "schema": "tos_philosophy_mcp_path_v1",
+            "from_id": from_id,
+            "to_id": to_id,
+            "found": bool(found_nodes),
+            "nodes": path_nodes_payload,
+            "edges": found_edges,
+            "max_depth": depth_limit,
+            "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "source_refs": _source_refs(path_nodes_payload + found_edges),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns graph meaning; MCP serves a bounded path packet.",
         }
 
     def philosophy_search(self, query: str, limit: int = 20) -> dict[str, Any]:
@@ -679,6 +884,10 @@ class ToSCorpusMCPState:
             return self.philosophy_views()
         if uri == "tos-philosophy://layers":
             return self.philosophy_layers()
+        if uri == "tos-philosophy://contracts":
+            return self.philosophy_contracts()
+        if uri == "tos-philosophy://scale-manifest":
+            return self.philosophy_scale_manifest()
         if uri == "tos-philosophy://snapshot":
             return self.philosophy_snapshot()
         if uri == "tos-philosophy://audit":

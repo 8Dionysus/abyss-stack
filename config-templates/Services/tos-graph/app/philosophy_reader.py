@@ -108,6 +108,13 @@ def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
     return bool(set(str(layer) for layer in item_layers) & layers)
 
 
+def _predicate_allowed(item: dict[str, Any], predicates: set[str]) -> bool:
+    if not predicates:
+        return True
+    predicate = item.get("predicate_id")
+    return isinstance(predicate, str) and predicate in predicates
+
+
 def _unique_values(items: list[dict[str, Any]], key: str) -> list[str]:
     return sorted({str(item[key]) for item in items if isinstance(item.get(key), str) and item.get(key)})
 
@@ -340,6 +347,130 @@ class ToSPhilosophyProjectionReader:
             "cluster_kinds": _unique_values(clusters, "cluster_kind"),
             "review_packet_fields": review_packet_fields,
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    @staticmethod
+    def _query_contract(
+        *,
+        query_kind: str,
+        layers: set[str],
+        predicates: set[str],
+        limit: int,
+        backend: str,
+    ) -> dict[str, Any]:
+        return {
+            "schema": "tos_graph_philosophy_query_contract_v1",
+            "query_kind": query_kind,
+            "backend": backend,
+            "layers": sorted(layers),
+            "predicates": sorted(predicates),
+            "limit": max(limit, 0),
+            "guarantees": [
+                "bounded read-only packet",
+                "Tree-of-Sophia remains source authority",
+                "Neo4j and JSON readers are projection surfaces",
+            ],
+        }
+
+    @staticmethod
+    def _filter_query_surfaces(
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+        clusters: list[dict[str, Any]],
+        *,
+        layers: set[str],
+        predicates: set[str],
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        filtered_edges = [
+            edge
+            for edge in edges
+            if _layer_allowed(edge, layers) and _predicate_allowed(edge, predicates)
+        ][: max(limit, 0)]
+        endpoint_ids = {
+            endpoint
+            for edge in filtered_edges
+            for endpoint in (edge.get("from_id"), edge.get("to_id"))
+            if isinstance(endpoint, str)
+        }
+        filtered_nodes = [
+            node
+            for node in nodes
+            if _layer_allowed(node, layers) and (not endpoint_ids or node.get("node_id") in endpoint_ids)
+        ][: max(limit, 0)]
+        if not filtered_nodes and not predicates:
+            filtered_nodes = [node for node in nodes if _layer_allowed(node, layers)][: max(limit, 0)]
+        node_ids = {str(node.get("node_id")) for node in filtered_nodes if isinstance(node.get("node_id"), str)}
+        filtered_clusters = [
+            cluster
+            for cluster in clusters
+            if _layer_allowed(cluster, layers)
+            and (
+                not node_ids
+                or bool(set(_string_list(cluster.get("member_node_ids"))) & node_ids)
+            )
+        ][: max(limit, 0)]
+        return filtered_nodes, filtered_edges, filtered_clusters
+
+    def query_view(
+        self,
+        view_id: str,
+        *,
+        layers: set[str] | None = None,
+        predicates: set[str] | None = None,
+        limit: int = 240,
+        query_backend: str = "json",
+        fallback_reason: str | None = None,
+    ) -> dict[str, Any]:
+        payload = self.load_projection()
+        view = next(
+            (item for item in payload.get("views", []) if isinstance(item, dict) and item.get("view_id") == view_id),
+            None,
+        )
+        if view is None:
+            raise ToSPhilosophyReaderError(f"unknown ToS philosophy graph view: {view_id}")
+        layer_filter = layers or set()
+        predicate_filter = predicates or set()
+        nodes = [node for node in view.get("nodes", []) if isinstance(node, dict)]
+        edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict)]
+        clusters = self._clusters_for_payload(payload, view_id=view_id, limit=1_000_000)
+        nodes, edges, clusters = self._filter_query_surfaces(
+            nodes,
+            edges,
+            clusters,
+            layers=layer_filter,
+            predicates=predicate_filter,
+            limit=limit,
+        )
+        return {
+            "schema": "tos_graph_philosophy_query_view_v1",
+            "query_backend": query_backend,
+            "fallback_reason": fallback_reason,
+            "view_id": view_id,
+            "view": {
+                key: value
+                for key, value in view.items()
+                if key not in {"nodes", "edges"}
+            },
+            "query_contract": self._query_contract(
+                query_kind="view-subgraph",
+                layers=layer_filter,
+                predicates=predicate_filter,
+                limit=limit,
+                backend=query_backend,
+            ),
+            "nodes": nodes,
+            "edges": edges,
+            "clusters": clusters,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "cluster_count": len(clusters),
+            "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "limit": max(limit, 0),
+            "source_refs": _source_refs(nodes + edges + clusters),
+            "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns graph meaning; this query packet is an abyss-stack runtime projection.",
         }
 
     @staticmethod
@@ -672,11 +803,27 @@ class ToSPhilosophyProjectionReader:
             "authority_note": "Tree-of-Sophia owns the edge source_ref; tos-graph only serves this projection packet.",
         }
 
-    def neighborhood(self, node_id: str, depth: int = 1, layers: set[str] | None = None, limit: int = 120) -> dict[str, Any]:
+    def neighborhood(
+        self,
+        node_id: str,
+        depth: int = 1,
+        layers: set[str] | None = None,
+        limit: int = 120,
+        predicates: set[str] | None = None,
+        query_backend: str = "json",
+        fallback_reason: str | None = None,
+    ) -> dict[str, Any]:
         node_packet = self.node(node_id)
         payload = self.load_projection()
         layer_filter = layers or set()
-        all_edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layer_filter)]
+        predicate_filter = predicates or set()
+        all_edges = [
+            edge
+            for edge in payload.get("edges", [])
+            if isinstance(edge, dict)
+            and _layer_allowed(edge, layer_filter)
+            and _predicate_allowed(edge, predicate_filter)
+        ]
         selected_ids = {node_id}
         frontier = {node_id}
         selected_edges: list[dict[str, Any]] = []
@@ -705,13 +852,19 @@ class ToSPhilosophyProjectionReader:
         ][:limit]
         return {
             "schema": "tos_graph_philosophy_neighborhood_v1",
+            "query_backend": query_backend,
+            "fallback_reason": fallback_reason,
+            "node_id": node_id,
             "node": node_packet["node"],
             "neighbors": neighbors,
             "edges": selected_edges,
             "depth": max(depth, 1),
             "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
+            "limit": max(limit, 0),
             "source_refs": _source_refs([node_packet["node"]] + neighbors + selected_edges),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns graph meaning; this neighborhood is an abyss-stack runtime projection packet.",
         }
 
     def path_between(
@@ -720,7 +873,10 @@ class ToSPhilosophyProjectionReader:
         to_id: str,
         *,
         layers: set[str] | None = None,
+        predicates: set[str] | None = None,
         max_depth: int = 6,
+        query_backend: str = "json",
+        fallback_reason: str | None = None,
     ) -> dict[str, Any]:
         payload = self.load_projection()
         nodes_by_id = {
@@ -733,9 +889,14 @@ class ToSPhilosophyProjectionReader:
         if to_id not in nodes_by_id:
             raise ToSPhilosophyReaderError(f"unknown ToS philosophy node: {to_id}")
         layer_filter = layers or set()
+        predicate_filter = predicates or set()
         adjacency: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         for edge in payload.get("edges", []):
-            if not isinstance(edge, dict) or not _layer_allowed(edge, layer_filter):
+            if (
+                not isinstance(edge, dict)
+                or not _layer_allowed(edge, layer_filter)
+                or not _predicate_allowed(edge, predicate_filter)
+            ):
                 continue
             left = str(edge.get("from_id") or "")
             right = str(edge.get("to_id") or "")
@@ -763,15 +924,19 @@ class ToSPhilosophyProjectionReader:
         path_nodes_payload = [nodes_by_id[node_id] for node_id in found_nodes]
         return {
             "schema": "tos_graph_philosophy_path_v1",
+            "query_backend": query_backend,
+            "fallback_reason": fallback_reason,
             "from_id": from_id,
             "to_id": to_id,
             "found": bool(found_nodes),
             "layers": sorted(layer_filter),
+            "predicates": sorted(predicate_filter),
             "max_depth": max_depth,
             "nodes": path_nodes_payload,
             "edges": found_edges,
             "source_refs": _source_refs(path_nodes_payload + found_edges),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+            "authority_note": "Tree-of-Sophia owns graph meaning; this path is an abyss-stack runtime projection packet.",
         }
 
     def search(self, query: str, limit: int = 40) -> dict[str, Any]:
