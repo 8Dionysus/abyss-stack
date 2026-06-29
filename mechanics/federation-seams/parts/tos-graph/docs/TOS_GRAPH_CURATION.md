@@ -45,11 +45,43 @@ The active runtime route is:
 - render the graph workbench through bundled WebGL frontends rather than an inline diagnostic SVG
 - use `cosmos.gl` as the scale-oriented GPU renderer and keep Sigma as the
   curation/neighborhood renderer fallback
+- expose the lightweight runtime graph contract packet at `/api/philosophy/contracts`
 - stream philosophy projection scale-export tables for external large-graph
   viewers and analytics tools
 - expose `tos-up` as the short operator command for the same workbench route; `aoa-tos-graph` remains the explicit stack command
 - project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
+
+## Graph contract route
+
+`/api/philosophy/contracts` is the runtime contract packet for agents, UI
+review, and downstream tools. It derives from the source-owned philosophy
+projection and reports:
+
+- source contract refs published by Tree of Sophia
+- available view subgraphs and their route cards
+- node kinds, edge predicates, graph layers, and cluster kinds present in the
+  current projection
+- review packet fields currently served
+- runtime limits: no canon promotion, no writeback, no Neo4j/UI source authority
+
+The packet is intentionally small. It does not replace the source-owned ToS
+contracts; it makes the `abyss-stack` projection boundary readable.
+
+## View subgraph route
+
+`/api/philosophy/views/{view_id}` returns a source-owned subgraph, not a global
+graph plus cosmetic layout. Each view packet includes a `subgraph_contract`
+derived from the selected ToS view:
+
+- selected graph layers
+- node kinds and edge predicates present in that view
+- cluster kinds used for collapse
+- source view contract ref
+- dangling endpoint diagnostics, if present
+
+The frontend still chooses runtime coordinates through layout families, but the
+node and edge sets come from the ToS materialized projection.
 
 ## Scale export route
 
@@ -84,6 +116,30 @@ viewers, notebooks, offline layout experiments, and Neo4j import experiments.
 It does not add ToS meaning, does not choose canon, and does not write back.
 Corrections still route to `Tree-of-Sophia`, then ToS derived exports are
 rebuilt and streamed again.
+
+`POST /api/philosophy/project/sync` uses the same projection and reports the
+current scale-export row counts in its response. When Neo4j credentials are
+ready, the refresh creates projection constraints if needed, then performs
+chunked idempotent `MERGE` passes with a fresh `refresh_id`. Stale projection
+cleanup runs only after the refresh passes complete, so a mid-refresh failure
+does not start by deleting the previous graph.
+
+## Future ToS seeding route
+
+The future source seeding path remains source-owned:
+
+- master-table rows map to source document, corpus unit, historical event, and
+  candidate/canon status surfaces
+- prepared dossiers map to source witness, work/text, person/author,
+  school/tradition, concept/problem, and evidence relation pressure
+- proposed relations map to transmission, evidence, historical, conceptual,
+  candidate, and canonical relation layers
+- Tree of Sophia rebuilds `philosophy_graph_projection.min.json`
+- `tos-graph` refreshes scale exports, UI views, MCP/API packets, and Neo4j
+  projection from the rebuilt derived export
+
+This keeps large future planting compatible with the Tree source authority while
+letting `abyss-stack` serve runtime graph access.
 
 ## Renderer route
 

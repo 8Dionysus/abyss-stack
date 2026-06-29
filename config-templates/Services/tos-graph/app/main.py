@@ -22,6 +22,7 @@ from .models import (
     PhilosophyClustersResponse,
     PhilosophyLayersResponse,
     PhilosophyAuditResponse,
+    PhilosophyContractsResponse,
     PhilosophyPacketResponse,
     PhilosophyReviewPacketResponse,
     PhilosophySearchResponse,
@@ -186,6 +187,14 @@ def philosophy_views() -> PhilosophyViewsResponse:
 def philosophy_layers() -> PhilosophyLayersResponse:
     try:
         return PhilosophyLayersResponse(**philosophy_reader.layers())
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/contracts", response_model=PhilosophyContractsResponse)
+def philosophy_contracts() -> PhilosophyContractsResponse:
+    try:
+        return PhilosophyContractsResponse(**philosophy_reader.contracts())
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
 
