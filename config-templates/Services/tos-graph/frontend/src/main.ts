@@ -9,6 +9,7 @@ type GraphMode = "clusters" | "nodes";
 type DensityMode = "overview" | "focused" | "dense";
 type RendererMode = "cosmos" | "sigma";
 type LayoutFamily = "timeline" | "flow" | "evidence" | "semantic" | "infrastructure" | "organic";
+type Language = "en" | "ru";
 
 type BootPayload = {
   service: string;
@@ -117,6 +118,7 @@ type PathPayload = {
 type ScaleExportTable = "nodes" | "edges" | "clusters" | "cluster-node-memberships" | "cluster-edge-memberships";
 
 type AppState = {
+  language: Language;
   mode: Mode;
   graphMode: GraphMode;
   rendererMode: RendererMode;
@@ -158,15 +160,363 @@ const palette = {
   line: "rgba(23,32,29,0.22)",
 };
 
-const scaleExportTables: { table: ScaleExportTable; title: string }[] = [
-  { table: "nodes", title: "Nodes" },
-  { table: "edges", title: "Edges" },
-  { table: "clusters", title: "Clusters" },
-  { table: "cluster-node-memberships", title: "Cluster nodes" },
-  { table: "cluster-edge-memberships", title: "Cluster edges" },
+const scaleExportTables: { table: ScaleExportTable; titleKey: string }[] = [
+  { table: "nodes", titleKey: "export.nodes" },
+  { table: "edges", titleKey: "export.edges" },
+  { table: "clusters", titleKey: "export.clusters" },
+  { table: "cluster-node-memberships", titleKey: "export.clusterNodes" },
+  { table: "cluster-edge-memberships", titleKey: "export.clusterEdges" },
 ];
 
+const uiText: Record<Language, Record<string, string>> = {
+  en: {
+    "brand.title": "Tree of Sophia Graph",
+    "brand.note": "Runtime workbench for ToS-owned projection exports.",
+    "language.label": "Language",
+    "mode.philosophy": "Philosophy",
+    "mode.corpus": "Corpus",
+    "search.placeholder": "Search nodes, clusters, refs",
+    "button.search": "Search",
+    "button.sync": "Sync",
+    "section.views": "Views",
+    "section.layers": "Layers",
+    "section.relations": "Relations",
+    "section.scaleExport": "Scale Export",
+    "chip.mode": "Mode",
+    "chip.view": "View",
+    "chip.renderer": "Renderer",
+    "chip.neo4j": "Neo4j",
+    "chip.projection": "Projection",
+    "button.clusters": "Clusters",
+    "button.nodes": "Nodes",
+    "button.fit": "Fit",
+    "button.fullView": "Full view",
+    "button.reviewPacket": "Review packet",
+    "button.unresolved": "Unresolved",
+    "button.snapshot": "Snapshot",
+    "button.audit": "Audit",
+    "button.copy": "Copy",
+    "button.copyUrl": "Copy URL",
+    "button.contracts": "Contracts",
+    "button.manifest": "Manifest",
+    "empty.graph": "No graph payload for this view.",
+    "empty.noView": "No view loaded.",
+    "empty.filters": "No graph payload for current filters.",
+    "inspector.selection": "Selection",
+    "inspector.nothing": "Nothing selected.",
+    "inspector.help": "Select a graph node, cluster, result, review packet, snapshot, or audit entry.",
+    "muted.noLayerCorpus": "No layer contract for corpus view.",
+    "muted.noLayers": "No layers for this view.",
+    "muted.noRelationCorpus": "No relation contract for corpus view.",
+    "muted.scaleCorpus": "Scale export follows the ToS philosophy projection.",
+    "relation.of": "of",
+    "relation.relations": "relations",
+    "relation.min": "min",
+    "relation.all": "All",
+    "relation.refs": "refs",
+    "relation.memberEdges": "member edges",
+    "export.allLayers": "all layers",
+    "export.nodes": "Nodes",
+    "export.edges": "Edges",
+    "export.clusters": "Clusters",
+    "export.clusterNodes": "Cluster nodes",
+    "export.clusterEdges": "Cluster edges",
+    "detail.results": "Results",
+    "detail.relations": "Relations",
+    "detail.noDetail": "No detail",
+    "detail.noDetailBody": "Use search or click the graph.",
+    "detail.sourceRefs": "Source refs",
+    "detail.payload": "Payload",
+    "detail.relationRoute": "Relation route",
+    "detail.from": "From",
+    "detail.to": "To",
+    "detail.predicate": "Predicate",
+    "detail.relationCount": "Relation count",
+    "detail.predicateMix": "Predicate mix",
+    "detail.graphLayers": "Graph layers",
+    "detail.memberEdges": "Member edges",
+    "detail.relationReading": "Relation reading",
+    "detail.predicatesNearby": "Predicates nearby",
+    "detail.selectedRelations": "Selected relations",
+    "detail.neighborhood": "Neighborhood",
+    "detail.members": "members",
+    "detail.neighbors": "Neighbors",
+    "detail.neighborCount": "neighbors",
+    "detail.neighborhoodRelations": "Neighborhood relations",
+    "detail.pathStart": "Path start",
+    "detail.path": "Path",
+    "detail.pathNodes": "Path nodes",
+    "detail.pathRelations": "Path relations",
+    "detail.noRoute": "No route found",
+    "detail.maxDepth": "max depth",
+    "detail.allActiveLayers": "all active layers",
+    "detail.allActivePredicates": "all active predicates",
+    "detail.backend": "backend",
+    "detail.fallback": "fallback",
+    "route.neighborhood": "Neighborhood",
+    "route.pathStartSet": "Path start set",
+    "route.useAsPathStart": "Use as path start",
+    "route.pathFrom": "Path from",
+    "state.loading": "loading",
+    "state.none": "none",
+    "caption.view": "View",
+    "caption.nodes": "nodes",
+    "caption.links": "links",
+    "selection.scaleExportUrl": "Scale export URL",
+    "selection.search": "Search",
+    "selection.reviewPacket": "Review packet",
+    "selection.unresolved": "Unresolved",
+    "load.failed": "Load failed",
+  },
+  ru: {
+    "brand.title": "Граф Древа Софии",
+    "brand.note": "Рабочая runtime-панель для проекций, которыми владеет ToS.",
+    "language.label": "Язык",
+    "mode.philosophy": "Философия",
+    "mode.corpus": "Корпус",
+    "search.placeholder": "Поиск узлов, кластеров, ссылок",
+    "button.search": "Поиск",
+    "button.sync": "Синхронизировать",
+    "section.views": "Виды",
+    "section.layers": "Слои",
+    "section.relations": "Связи",
+    "section.scaleExport": "Масштабный экспорт",
+    "chip.mode": "Режим",
+    "chip.view": "Вид",
+    "chip.renderer": "Рендерер",
+    "chip.neo4j": "Neo4j",
+    "chip.projection": "Проекция",
+    "button.clusters": "Кластеры",
+    "button.nodes": "Узлы",
+    "button.fit": "Вписать",
+    "button.fullView": "Полный вид",
+    "button.reviewPacket": "Пакет ревью",
+    "button.unresolved": "Нерешенное",
+    "button.snapshot": "Снимок",
+    "button.audit": "Аудит",
+    "button.copy": "Копировать",
+    "button.copyUrl": "Копировать URL",
+    "button.contracts": "Контракты",
+    "button.manifest": "Манифест",
+    "empty.graph": "Для этого вида нет графового пакета.",
+    "empty.noView": "Вид не загружен.",
+    "empty.filters": "Для текущих фильтров нет графового пакета.",
+    "inspector.selection": "Выбор",
+    "inspector.nothing": "Ничего не выбрано.",
+    "inspector.help": "Выберите узел, кластер, результат, пакет ревью, снимок или запись аудита.",
+    "muted.noLayerCorpus": "У корпусного вида нет контракта слоев.",
+    "muted.noLayers": "У этого вида нет слоев.",
+    "muted.noRelationCorpus": "У корпусного вида нет контракта связей.",
+    "muted.scaleCorpus": "Масштабный экспорт следует философской проекции ToS.",
+    "relation.of": "из",
+    "relation.relations": "связей",
+    "relation.min": "мин.",
+    "relation.all": "Все",
+    "relation.refs": "ссылок",
+    "relation.memberEdges": "вложенных связей",
+    "export.allLayers": "все слои",
+    "export.nodes": "Узлы",
+    "export.edges": "Связи",
+    "export.clusters": "Кластеры",
+    "export.clusterNodes": "Узлы кластеров",
+    "export.clusterEdges": "Связи кластеров",
+    "detail.results": "Результаты",
+    "detail.relations": "Связи",
+    "detail.noDetail": "Нет деталей",
+    "detail.noDetailBody": "Используйте поиск или кликните по графу.",
+    "detail.sourceRefs": "Ссылки на источник",
+    "detail.payload": "Пакет",
+    "detail.relationRoute": "Маршрут связи",
+    "detail.from": "От",
+    "detail.to": "К",
+    "detail.predicate": "Предикат",
+    "detail.relationCount": "Число связей",
+    "detail.predicateMix": "Состав предикатов",
+    "detail.graphLayers": "Слои графа",
+    "detail.memberEdges": "Вложенные связи",
+    "detail.relationReading": "Чтение связей",
+    "detail.predicatesNearby": "Ближайшие предикаты",
+    "detail.selectedRelations": "Выбранные связи",
+    "detail.neighborhood": "Окрестность",
+    "detail.members": "участников",
+    "detail.neighbors": "Соседи",
+    "detail.neighborCount": "соседей",
+    "detail.neighborhoodRelations": "Связи окрестности",
+    "detail.pathStart": "Начало пути",
+    "detail.path": "Путь",
+    "detail.pathNodes": "Узлы пути",
+    "detail.pathRelations": "Связи пути",
+    "detail.noRoute": "Маршрут не найден",
+    "detail.maxDepth": "макс. глубина",
+    "detail.allActiveLayers": "все активные слои",
+    "detail.allActivePredicates": "все активные предикаты",
+    "detail.backend": "движок",
+    "detail.fallback": "запасной путь",
+    "route.neighborhood": "Окрестность",
+    "route.pathStartSet": "Начало пути задано",
+    "route.useAsPathStart": "Сделать началом пути",
+    "route.pathFrom": "Путь от",
+    "state.loading": "загрузка",
+    "state.none": "нет",
+    "caption.view": "Вид",
+    "caption.nodes": "узлов",
+    "caption.links": "связей",
+    "selection.scaleExportUrl": "URL масштабного экспорта",
+    "selection.search": "Поиск",
+    "selection.reviewPacket": "Пакет ревью",
+    "selection.unresolved": "Нерешенное",
+    "load.failed": "Загрузка не удалась",
+  },
+};
+
+const tokenText: Record<Language, Record<string, string>> = {
+  en: {},
+  ru: {
+    adjacent: "Смежные",
+    "authority-layers": "слои авторитетности",
+    belongs_to_genre: "принадлежит жанру",
+    branches: "ветви",
+    candidate: "кандидат",
+    "candidate-endpoint": "кандидатная точка",
+    "candidate-node": "кандидатный узел",
+    "candidate-relation": "кандидатные связи",
+    "canon-candidate-status": "статус канона/кандидата",
+    "canon-promotion": "продвижение в канон",
+    canonized_by: "канонизирован через",
+    "canonical-relation": "канонические связи",
+    clusters: "кластеры",
+    commented_by: "комментируется через",
+    concept: "понятие",
+    "concept-problem": "понятие или проблема",
+    "conceptual-relation": "понятийные связи",
+    contains: "содержит",
+    contains_row: "содержит строку",
+    contains_view: "содержит вид",
+    contested_by: "оспаривается через",
+    dense: "плотно",
+    deferred: "отложено",
+    develops_concept: "развивает понятие",
+    "diff-snapshot": "снимок различий",
+    edges: "связи",
+    "evidence-relation": "свидетельские связи",
+    "evidence-status": "статус свидетельств",
+    flow: "поток",
+    fragments_preserved_by: "фрагменты сохранены через",
+    focused: "фокус",
+    "graph-view": "графовый вид",
+    graph_layers: "слои графа",
+    "graph-layers": "слои графа",
+    has_node_type_pressure: "давление типа узла",
+    has_prepared_dossier: "имеет подготовленное досье",
+    has_relation_pressure: "давление типа связи",
+    "historical-relation": "исторические связи",
+    incoming: "Входящие",
+    influences: "влияет",
+    institutionalized_in: "институционализировано в",
+    internal: "Внутренние",
+    manifests: "манифесты",
+    "master-table": "мастер-таблица",
+    "master-table-row": "строка мастер-таблицы",
+    "node-neighborhood": "окрестность узла",
+    nodes: "узлы",
+    organic: "органика",
+    outgoing: "Исходящие",
+    overview: "обзор",
+    polemicizes_with: "полемизирует с",
+    prepared_dossier: "подготовленное досье",
+    "prepared-dossier": "подготовленное досье",
+    "promotion-flow": "поток продвижения",
+    preserved_in: "сохранено в",
+    preserves_in: "сохраняет в",
+    "provenance-dag": "DAG происхождения",
+    preview: "предпросмотр",
+    ready: "готово",
+    receives_from: "получает от",
+    region: "регион",
+    relation: "связь",
+    relation_edges: "ребра связей",
+    "relation-edges": "ребра связей",
+    relation_packs: "пакеты связей",
+    "relation-packs": "пакеты связей",
+    resources: "ресурсы",
+    review_packets: "пакеты ревью",
+    "review-packets": "пакеты ревью",
+    "route-graph": "граф маршрутов",
+    "school-institution": "школа/институт",
+    semantic: "семантика",
+    "source-relation": "источниковые связи",
+    "source-witness": "источник-свидетель",
+    survives_as: "выживает как",
+    timeline: "хронология",
+    transforms_concept: "преобразует понятие",
+    translated_into: "переведено в",
+    "transmission-relation": "связи передачи",
+    transmits_to: "передает к",
+    uncertain_relation: "неуверенная связь",
+    uses_language: "использует язык",
+    uses_script: "использует письмо",
+    views: "виды",
+    "view-section": "раздел вида",
+    work: "работа",
+  },
+};
+
+const viewTitleText: Record<Language, Record<string, string>> = {
+  en: {},
+  ru: {
+    chronology: "Хронологический граф",
+    transmission: "Граф передачи",
+    "source-evidence": "Граф источниковых свидетельств",
+    "concept-lineage": "Граф родословия понятий",
+    "institution-media": "Граф институтов и медиа",
+    "script-decipherment": "Граф письменностей и дешифровки",
+    "imperial-multilingualism": "Граф имперского многоязычия",
+    "ritual-law": "Граф ритуала и закона",
+    "epigraphic-network": "Эпиграфическая сеть",
+    "lost-corpus": "Граф утраченных корпусов",
+    "canon-promotion": "Граф продвижения в канон",
+    "corpus-topology": "Топология корпуса",
+    "authority-layers": "Слои авторитетности",
+    "route-graph": "Граф маршрутов",
+    "node-neighborhood": "Окрестность узла",
+    "provenance-dag": "DAG происхождения",
+    "promotion-flow": "Поток продвижения",
+    "diff-snapshot": "Снимок различий",
+  },
+};
+
+const viewSubtitleText: Record<Language, Record<string, string>> = {
+  en: {},
+  ru: {
+    chronology: "хронологические линии",
+    transmission: "направленные коридоры",
+    "source-evidence": "DAG свидетельств",
+    "concept-lineage": "семантическая родословная",
+    "institution-media": "карта инфраструктуры",
+    "script-decipherment": "маршрут неопределенности",
+    "imperial-multilingualism": "карта параллельных версий",
+    "ritual-law": "инфраструктура закона и ритуала",
+    "epigraphic-network": "распределенное публичное письмо",
+    "lost-corpus": "маршрут отсутствия и свидетельств",
+    "canon-promotion": "поток продвижения",
+    "corpus-topology": "ветвящееся дерево дома ToS",
+    "authority-layers": "переключение видимости по слоям корпуса",
+    "route-graph": "маршруты пакетов связей",
+    "node-neighborhood": "ограниченное расширение вокруг узла",
+    "provenance-dag": "давление источников к кандидату, канону и экспорту",
+    "promotion-flow": "проверка кандидатного материала к канону",
+    "diff-snapshot": "сравнение снимков корпусного индекса",
+  },
+};
+
+function initialLanguage(): Language {
+  const stored = window.localStorage.getItem("tos-graph-language");
+  if (stored === "ru" || stored === "en") return stored;
+  return navigator.language.toLowerCase().startsWith("ru") ? "ru" : "en";
+}
+
 const state: AppState = {
+  language: initialLanguage(),
   mode: "philosophy",
   graphMode: "clusters",
   rendererMode: "cosmos",
@@ -193,6 +543,7 @@ const state: AppState = {
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("missing #app");
 const appRoot = app;
+document.documentElement.lang = state.language;
 
 let graph = new Graphology({ multi: true, type: "directed" });
 let renderer: Sigma | null = null;
@@ -211,6 +562,28 @@ const lastPointer = { x: 0, y: 0 };
 
 function text(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
+}
+
+function t(key: string): string {
+  return uiText[state.language][key] || uiText.en[key] || key;
+}
+
+function tokenLabel(value: unknown): string {
+  const original = text(value).trim();
+  if (!original) return "";
+  const lower = original.toLowerCase();
+  const normalized = lower.replaceAll("_", "-");
+  return tokenText[state.language][normalized] || tokenText[state.language][lower] || tokenText.en[normalized] || tokenText.en[lower] || original.replaceAll("_", " ").replaceAll("-", " ");
+}
+
+function viewDisplayTitle(view?: ViewCard | null): string {
+  if (!view) return state.currentViewId || t("caption.view");
+  return viewTitleText[state.language][view.view_id] || view.title || view.view_id;
+}
+
+function viewDisplaySubtitle(view?: ViewCard | null): string {
+  if (!view) return "";
+  return viewSubtitleText[state.language][view.view_id] || view.layout_hint || view.purpose || view.entry_surface || "";
 }
 
 function short(value: unknown, length = 58): string {
@@ -273,22 +646,23 @@ function itemSubtitle(item: AnyItem): string {
 }
 
 function humanKind(value: unknown): string {
-  return text(value).replaceAll("_", " ").replaceAll("-", " ").trim();
+  return tokenLabel(value);
 }
 
 function displayTitle(item: AnyItem): string {
   const source = unwrapItem(item);
   if (source.from_id && source.to_id) return relationRouteText(source);
+  if (source.view_id) return viewDisplayTitle(source as ViewCard);
   const raw = itemTitle(item).trim();
   const canon = raw.match(/^Canon Or Candidate Status:\s*(.+)$/i);
-  if (canon) return `Status ${canon[1].trim()}`;
+  if (canon) return `${state.language === "ru" ? "Статус" : "Status"} ${canon[1].trim()}`;
   const concept = raw.match(/^Concept Or Problem:\s*(.+)$/i);
   if (concept) return concept[1].trim();
   const corpus = raw.match(/^Corpus Or Prepared Source Document:\s*(.+)$/i);
   const title = corpus ? corpus[1].trim() : raw;
   return (
     title
-      .replace(/^ToS Deep Research[_ ]*/i, "")
+      .replace(/^ToS Deep Research[_\s:—-]*/i, "")
       .replace(/\.docx$/i, "")
       .replace(/\s+/g, " ")
       .trim() || raw
@@ -297,7 +671,7 @@ function displayTitle(item: AnyItem): string {
 
 function displaySubtitle(item: AnyItem): string {
   if (item.relation_count) {
-    return `${humanKind(item.primary_predicate || item.predicate_id || "relation")} · ${text(item.relation_count)} relations`;
+    return `${humanKind(item.primary_predicate || item.predicate_id || "relation")} · ${text(item.relation_count)} ${t("relation.relations")}`;
   }
   const kind = humanKind(item.cluster_kind || item.node_type || item.predicate_id);
   const subtitle = itemSubtitle(item);
@@ -508,67 +882,75 @@ function renderShell(): void {
     <div class="app-shell">
       <aside class="panel left-rail">
         <div class="rail-head">
-          <h1 class="brand-title">Tree of Sophia Graph</h1>
-          <p class="brand-note">Runtime workbench for ToS-owned projection exports.</p>
+          <div class="rail-head-row">
+            <div>
+              <h1 class="brand-title">${t("brand.title")}</h1>
+              <p class="brand-note">${t("brand.note")}</p>
+            </div>
+            <div class="language-toggle" aria-label="${t("language.label")}">
+              <button id="language-en" type="button">EN</button>
+              <button id="language-ru" type="button">RU</button>
+            </div>
+          </div>
         </div>
         <div class="segmented">
-          <button id="mode-philosophy" class="mode-button" type="button">Philosophy</button>
-          <button id="mode-corpus" class="mode-button" type="button">Corpus</button>
+          <button id="mode-philosophy" class="mode-button" type="button">${t("mode.philosophy")}</button>
+          <button id="mode-corpus" class="mode-button" type="button">${t("mode.corpus")}</button>
         </div>
         <div class="rail-scroll">
           <div class="input-row">
-            <input id="search" type="search" placeholder="Search nodes, clusters, refs" />
+            <input id="search" type="search" placeholder="${t("search.placeholder")}" />
             <div class="inline-actions">
-              <button id="search-button" type="button">Search</button>
-              <button id="sync-button" type="button">Sync</button>
+              <button id="search-button" type="button">${t("button.search")}</button>
+              <button id="sync-button" type="button">${t("button.sync")}</button>
             </div>
           </div>
-          <div class="section-title">Views</div>
+          <div class="section-title">${t("section.views")}</div>
           <div id="view-list" class="stack"></div>
-          <div class="section-title">Layers</div>
+          <div class="section-title">${t("section.layers")}</div>
           <div id="layer-list" class="stack"></div>
-          <div class="section-title">Relations</div>
+          <div class="section-title">${t("section.relations")}</div>
           <div id="relation-controls" class="relation-controls"></div>
-          <div class="section-title">Scale Export</div>
+          <div class="section-title">${t("section.scaleExport")}</div>
           <div id="scale-export-controls" class="scale-export-controls"></div>
         </div>
       </aside>
       <main class="panel main-stage">
         <div class="toolbar">
           <div class="chip-row">
-            <span class="chip">Mode <strong id="mode-chip"></strong></span>
-            <span class="chip">View <strong id="view-chip"></strong></span>
-            <span class="chip">Renderer <strong id="renderer-chip"></strong></span>
-            <span class="chip">Neo4j <strong id="neo4j-chip"></strong></span>
-            <span class="chip">Projection <strong id="projection-chip"></strong></span>
+            <span class="chip">${t("chip.mode")} <strong id="mode-chip"></strong></span>
+            <span class="chip">${t("chip.view")} <strong id="view-chip"></strong></span>
+            <span class="chip">${t("chip.renderer")} <strong id="renderer-chip"></strong></span>
+            <span class="chip">${t("chip.neo4j")} <strong id="neo4j-chip"></strong></span>
+            <span class="chip">${t("chip.projection")} <strong id="projection-chip"></strong></span>
           </div>
           <div id="metrics" class="metric-row"></div>
           <div class="inline-actions">
             <button id="renderer-cosmos" class="renderer-button" type="button">Cosmos</button>
             <button id="renderer-sigma" class="renderer-button" type="button">Sigma</button>
-            <button id="clusters-button" type="button">Clusters</button>
-            <button id="nodes-button" type="button">Nodes</button>
-            <button id="fit-button" type="button">Fit</button>
-            <button id="focus-clear-button" type="button">Full view</button>
-            <button id="review-button" type="button">Review packet</button>
-            <button id="unresolved-button" type="button">Unresolved</button>
+            <button id="clusters-button" type="button">${t("button.clusters")}</button>
+            <button id="nodes-button" type="button">${t("button.nodes")}</button>
+            <button id="fit-button" type="button">${t("button.fit")}</button>
+            <button id="focus-clear-button" type="button">${t("button.fullView")}</button>
+            <button id="review-button" type="button">${t("button.reviewPacket")}</button>
+            <button id="unresolved-button" type="button">${t("button.unresolved")}</button>
           </div>
         </div>
         <div class="graph-wrap">
           <div id="graph"></div>
-          <div id="graph-empty" class="graph-empty" hidden>No graph payload for this view.</div>
+          <div id="graph-empty" class="graph-empty" hidden>${t("empty.graph")}</div>
           <div id="graph-caption" class="graph-caption"></div>
           <div id="node-tooltip" class="node-tooltip" hidden></div>
         </div>
       </main>
       <aside class="panel right-rail">
         <div class="inspector-head">
-          <h2 id="inspector-title" class="inspector-title">Selection</h2>
-          <div id="inspector-meta" class="muted">Nothing selected.</div>
+          <h2 id="inspector-title" class="inspector-title">${t("inspector.selection")}</h2>
+          <div id="inspector-meta" class="muted">${t("inspector.nothing")}</div>
         </div>
         <div class="segmented">
-          <button id="snapshot-button" type="button">Snapshot</button>
-          <button id="audit-button" type="button">Audit</button>
+          <button id="snapshot-button" type="button">${t("button.snapshot")}</button>
+          <button id="audit-button" type="button">${t("button.audit")}</button>
         </div>
         <div class="inspector-scroll">
           <div id="detail-list" class="detail-grid"></div>
@@ -583,6 +965,8 @@ function renderShell(): void {
 }
 
 function bindShellEvents(): void {
+  byId("language-en").addEventListener("click", () => setLanguage("en"));
+  byId("language-ru").addEventListener("click", () => setLanguage("ru"));
   byId("mode-philosophy").addEventListener("click", () => void loadMode("philosophy"));
   byId("mode-corpus").addEventListener("click", () => void loadMode("corpus"));
   byId("clusters-button").addEventListener("click", () => {
@@ -633,13 +1017,24 @@ function setActive(id: string, active: boolean): void {
   byId(id).classList.toggle("active", active);
 }
 
+function setLanguage(language: Language): void {
+  if (state.language === language) return;
+  state.language = language;
+  window.localStorage.setItem("tos-graph-language", language);
+  document.documentElement.lang = language;
+  renderShell();
+  renderAll();
+}
+
 function renderChips(): void {
-  byId("mode-chip").textContent = state.mode;
-  byId("view-chip").textContent = state.currentViewId || "none";
+  setActive("language-en", state.language === "en");
+  setActive("language-ru", state.language === "ru");
+  byId("mode-chip").textContent = t(`mode.${state.mode}`);
+  byId("view-chip").textContent = state.currentViewId || t("state.none");
   byId("renderer-chip").textContent = state.rendererMode;
-  byId("neo4j-chip").textContent = boot.neo4j.ready ? "ready" : boot.neo4j.configured ? "preview" : "deferred";
+  byId("neo4j-chip").textContent = boot.neo4j.ready ? humanKind("ready") : boot.neo4j.configured ? humanKind("preview") : humanKind("deferred");
   const status = state.mode === "philosophy" ? state.status.philosophy : state.status.corpus;
-  byId("projection-chip").textContent = text(status?.projection_exists ?? status?.index_exists ?? "loading");
+  byId("projection-chip").textContent = text(status?.projection_exists ?? status?.index_exists ?? t("state.loading"));
   setActive("mode-philosophy", state.mode === "philosophy");
   setActive("mode-corpus", state.mode === "corpus");
   setActive("renderer-cosmos", state.rendererMode === "cosmos");
@@ -663,7 +1058,7 @@ function renderMetrics(): void {
       (key) => `
         <div class="metric">
           <strong>${text(counts[key] ?? 0)}</strong>
-          <span>${key.replaceAll("_", " ")}</span>
+          <span>${humanKind(key)}</span>
         </div>
       `,
     )
@@ -676,8 +1071,8 @@ function renderViews(): void {
     .map(
       (view) => `
         <button class="view-card ${view.view_id === state.currentViewId ? "active" : ""}" data-view="${view.view_id}" type="button">
-          <span class="view-title">${short(view.title || view.view_id, 72)}</span>
-          <span class="view-subtitle">${short(view.layout_hint || view.purpose || view.entry_surface || "", 92)}</span>
+          <span class="view-title">${short(viewDisplayTitle(view), 72)}</span>
+          <span class="view-subtitle">${short(viewDisplaySubtitle(view), 92)}</span>
         </button>
       `,
     )
@@ -689,12 +1084,12 @@ function renderViews(): void {
 
 function renderLayers(): void {
   if (state.mode !== "philosophy" || !isPhilosophyView(state.currentView)) {
-    byId("layer-list").innerHTML = `<div class="muted">No layer contract for corpus view.</div>`;
+    byId("layer-list").innerHTML = `<div class="muted">${t("muted.noLayerCorpus")}</div>`;
     return;
   }
   const layers = state.currentView.view.graph_layers || [];
   if (layers.length === 0) {
-    byId("layer-list").innerHTML = `<div class="muted">No layers for this view.</div>`;
+    byId("layer-list").innerHTML = `<div class="muted">${t("muted.noLayers")}</div>`;
     return;
   }
   byId("layer-list").innerHTML = layers
@@ -702,7 +1097,7 @@ function renderLayers(): void {
       (layer) => `
         <label class="layer-toggle ${state.activeLayers.has(layer) ? "active" : ""}">
           <input data-layer="${layer}" type="checkbox" ${state.activeLayers.has(layer) ? "checked" : ""} />
-          <span>${layer}</span>
+          <span>${escapeHtml(humanKind(layer))}</span>
         </label>
       `,
     )
@@ -720,7 +1115,7 @@ function renderLayers(): void {
 function renderRelationControls(): void {
   const root = byId("relation-controls");
   if (state.mode !== "philosophy" || !isPhilosophyView(state.currentView)) {
-    root.innerHTML = `<div class="muted">No relation contract for corpus view.</div>`;
+    root.innerHTML = `<div class="muted">${t("muted.noRelationCorpus")}</div>`;
     return;
   }
   const layerEdges = (state.currentView.edges || []).filter(layerAllowed);
@@ -730,14 +1125,14 @@ function renderRelationControls(): void {
   root.innerHTML = `
     <div class="relation-summary">
       <strong>${activeEdges.length}</strong>
-      <span>of ${layerEdges.length} relations</span>
+      <span>${t("relation.of")} ${layerEdges.length} ${t("relation.relations")}</span>
     </div>
     <div class="density-row">
       ${(["overview", "focused", "dense"] as DensityMode[])
         .map(
           (mode) => `
             <button class="density-button ${state.densityMode === mode ? "active" : ""}" data-density="${mode}" type="button">
-              ${mode}
+              ${humanKind(mode)}
             </button>
           `,
         )
@@ -745,9 +1140,9 @@ function renderRelationControls(): void {
     </div>
     <div class="threshold-row">
       <button id="relation-min-dec" type="button">-</button>
-      <span>min ${state.minRelationCount}</span>
+      <span>${t("relation.min")} ${state.minRelationCount}</span>
       <button id="relation-min-inc" type="button">+</button>
-      <button id="predicate-reset" type="button">All</button>
+      <button id="predicate-reset" type="button">${t("relation.all")}</button>
     </div>
     <div class="predicate-list">
       ${predicates
@@ -815,29 +1210,29 @@ function scaleExportAbsoluteUrl(table?: ScaleExportTable, format?: "csv" | "json
 function renderScaleExportControls(): void {
   const root = byId("scale-export-controls");
   if (state.mode !== "philosophy" || !isPhilosophyView(state.currentView)) {
-    root.innerHTML = `<div class="muted">Scale export follows the ToS philosophy projection.</div>`;
+    root.innerHTML = `<div class="muted">${t("muted.scaleCorpus")}</div>`;
     return;
   }
   const layers = [...state.activeLayers].filter(Boolean);
   root.innerHTML = `
     <div class="export-summary">
       <strong>${escapeHtml(state.currentViewId || "view")}</strong>
-      <span>${escapeHtml(layers.length ? layers.join(", ") : "all layers")}</span>
+      <span>${escapeHtml(layers.length ? layers.map(humanKind).join(", ") : t("export.allLayers"))}</span>
     </div>
     <div class="export-actions">
-      <a class="export-link" data-export-link="contracts" href="/api/philosophy/contracts" target="_blank" rel="noreferrer">Contracts</a>
-      <a class="export-link" data-export-link="manifest" href="${escapeHtml(scaleExportPath())}" target="_blank" rel="noreferrer">Manifest</a>
-      <button data-copy-export="manifest" type="button">Copy URL</button>
+      <a class="export-link" data-export-link="contracts" href="/api/philosophy/contracts" target="_blank" rel="noreferrer">${t("button.contracts")}</a>
+      <a class="export-link" data-export-link="manifest" href="${escapeHtml(scaleExportPath())}" target="_blank" rel="noreferrer">${t("button.manifest")}</a>
+      <button data-copy-export="manifest" type="button">${t("button.copyUrl")}</button>
     </div>
     <div class="export-table-list">
       ${scaleExportTables
         .map(
-          ({ table, title }) => `
+          ({ table, titleKey }) => `
             <div class="export-row">
-              <span>${escapeHtml(title)}</span>
+              <span>${escapeHtml(t(titleKey))}</span>
               <a class="export-link" data-export-link="${table}-csv" href="${escapeHtml(scaleExportPath(table, "csv"))}" target="_blank" rel="noreferrer">CSV</a>
               <a class="export-link" data-export-link="${table}-jsonl" href="${escapeHtml(scaleExportPath(table, "jsonl"))}" target="_blank" rel="noreferrer">JSONL</a>
-              <button data-copy-export="${table}" type="button">Copy</button>
+              <button data-copy-export="${table}" type="button">${t("button.copy")}</button>
             </div>
           `,
         )
@@ -854,11 +1249,11 @@ function renderScaleExportControls(): void {
 }
 
 function renderInspector(): void {
-  const title = state.selected ? displayTitle(state.selected) : state.currentView?.view?.title || state.currentViewId || "Selection";
+  const title = state.selected ? displayTitle(state.selected) : viewDisplayTitle(state.currentView?.view) || state.currentViewId || t("inspector.selection");
   byId("inspector-title").textContent = title;
   byId("inspector-meta").textContent = state.selected
     ? displaySubtitle(state.selected)
-    : "Select a graph node, cluster, result, review packet, snapshot, or audit entry.";
+    : t("inspector.help");
 
   const cards: string[] = [];
   const selectedRelationRows = state.selected ? relationRowsForSelection(state.selected) : [];
@@ -870,7 +1265,7 @@ function renderInspector(): void {
     cards.push(...relationDetailCards(state.selected));
     if (selectedRelationRows.length) {
       cards.push(...relationReadingCards(selectedRelationRows));
-      cards.push(relationRowsSection("Selected relations", selectedRelationRows));
+      cards.push(relationRowsSection(t("detail.selectedRelations"), selectedRelationRows));
     }
     if (selectedNodeId) {
       cards.push(...neighborhoodCards(selectedNodeId));
@@ -878,12 +1273,12 @@ function renderInspector(): void {
     }
     const refs = collectRefs(state.selected);
     if (refs.length) {
-      cards.push(detailCard("Source refs", refs.slice(0, 8).join("\n")));
+      cards.push(detailCard(t("detail.sourceRefs"), refs.slice(0, 8).join("\n")));
     }
-    cards.push(detailCard("Payload", JSON.stringify(state.selected, null, 2), true));
+    cards.push(detailCard(t("detail.payload"), JSON.stringify(state.selected, null, 2), true));
   }
   if (state.results.length) {
-    cards.push(`<div class="section-title">Results</div>`);
+    cards.push(`<div class="section-title">${t("detail.results")}</div>`);
     cards.push(
       ...state.results.slice(0, 48).map(
         (item, index) => `
@@ -896,7 +1291,7 @@ function renderInspector(): void {
     );
   }
   if (state.relationItems.length) {
-    cards.push(`<div class="section-title">Relations</div>`);
+    cards.push(`<div class="section-title">${t("detail.relations")}</div>`);
     cards.push(
       ...state.relationItems.slice(0, 48).map(
         (item, index) => `
@@ -908,7 +1303,7 @@ function renderInspector(): void {
       ),
     );
   }
-  byId("detail-list").innerHTML = cards.join("") || detailCard("No detail", "Use search or click the graph.");
+  byId("detail-list").innerHTML = cards.join("") || detailCard(t("detail.noDetail"), t("detail.noDetailBody"));
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-result]").forEach((button) => {
     button.addEventListener("click", () => {
       if (inspectorSelectionAllowed()) selectItem(state.results[Number(button.dataset.result)]);
@@ -992,15 +1387,15 @@ function relationDetailCards(item: AnyItem): string[] {
   const layers = itemLayers(item).join("\n");
   const memberEdges = stringList(item.member_edge_ids).slice(0, 12).join("\n");
   const cards = [
-    detailCard("Relation route", `${text(source.from_label || endpointLabel(source.from_id))}\n-> ${humanKind(source.primary_predicate || source.predicate_id)}\n-> ${text(source.to_label || endpointLabel(source.to_id))}`),
-    detailCard("From", text(source.from_label || endpointLabel(source.from_id))),
-    detailCard("To", text(source.to_label || endpointLabel(source.to_id))),
-    detailCard("Predicate", humanKind(source.primary_predicate || source.predicate_id)),
+    detailCard(t("detail.relationRoute"), `${text(source.from_label || endpointLabel(source.from_id))}\n-> ${humanKind(source.primary_predicate || source.predicate_id)}\n-> ${text(source.to_label || endpointLabel(source.to_id))}`),
+    detailCard(t("detail.from"), text(source.from_label || endpointLabel(source.from_id))),
+    detailCard(t("detail.to"), text(source.to_label || endpointLabel(source.to_id))),
+    detailCard(t("detail.predicate"), humanKind(source.primary_predicate || source.predicate_id)),
   ];
-  if (source.relation_count) cards.push(detailCard("Relation count", text(source.relation_count)));
-  if (predicateText) cards.push(detailCard("Predicate mix", predicateText));
-  if (layers) cards.push(detailCard("Graph layers", layers));
-  if (memberEdges) cards.push(detailCard("Member edges", memberEdges));
+  if (source.relation_count) cards.push(detailCard(t("detail.relationCount"), text(source.relation_count)));
+  if (predicateText) cards.push(detailCard(t("detail.predicateMix"), predicateText));
+  if (layers) cards.push(detailCard(t("detail.graphLayers"), layers.split("\n").map(humanKind).join("\n")));
+  if (memberEdges) cards.push(detailCard(t("detail.memberEdges"), memberEdges));
   return cards;
 }
 
@@ -1029,12 +1424,12 @@ function relationReadingCards(rows: RelationRow[]): string[] {
     .map(([predicate, count]) => `${humanKind(predicate)}: ${count}`)
     .join("\n");
   const summary = [
-    `outgoing: ${counts.get("outgoing") || 0}`,
-    `incoming: ${counts.get("incoming") || 0}`,
-    `internal: ${counts.get("internal") || 0}`,
-    `adjacent: ${counts.get("adjacent") || 0}`,
+    `${humanKind("outgoing")}: ${counts.get("outgoing") || 0}`,
+    `${humanKind("incoming")}: ${counts.get("incoming") || 0}`,
+    `${humanKind("internal")}: ${counts.get("internal") || 0}`,
+    `${humanKind("adjacent")}: ${counts.get("adjacent") || 0}`,
   ].join("\n");
-  return [detailCard("Relation reading", summary), predicateText ? detailCard("Predicates nearby", predicateText) : ""].filter(Boolean);
+  return [detailCard(t("detail.relationReading"), summary), predicateText ? detailCard(t("detail.predicatesNearby"), predicateText) : ""].filter(Boolean);
 }
 
 function relationRowsSection(title: string, rows: RelationRow[], source: "selected" | "neighborhood" | "path" = "selected"): string {
@@ -1055,14 +1450,14 @@ function relationRowsSection(title: string, rows: RelationRow[], source: "select
           const meta = [
             humanKind(predicateId(row)),
             layers.length ? layers.slice(0, 3).join(", ") : "",
-            refs.length ? `${refs.length} refs` : "",
-            row.member_edge_ids?.length ? `${row.member_edge_ids.length} member edges` : "",
+            refs.length ? `${refs.length} ${t("relation.refs")}` : "",
+            row.member_edge_ids?.length ? `${row.member_edge_ids.length} ${t("relation.memberEdges")}` : "",
           ]
             .filter(Boolean)
             .join(" · ");
           return `
             <button class="relation-row" ${actionAttr}="${index}" type="button">
-              <span class="relation-direction ${row.direction || "adjacent"}">${escapeHtml(row.direction || "adjacent")}</span>
+              <span class="relation-direction ${row.direction || "adjacent"}">${escapeHtml(humanKind(row.direction || "adjacent"))}</span>
               <span class="relation-route">${escapeHtml(short(relationRouteText(row), 116))}</span>
               <span class="relation-meta">${escapeHtml(short(meta, 128))}</span>
             </button>
@@ -1078,10 +1473,10 @@ function relationRowsSection(title: string, rows: RelationRow[], source: "select
 
 function relationRowsByDirection(rows: RelationRow[]): { title: string; rows: { row: RelationRow; index: number }[] }[] {
   const labels: Record<RelationDirection, string> = {
-    outgoing: "Outgoing",
-    incoming: "Incoming",
-    internal: "Internal",
-    adjacent: "Adjacent",
+    outgoing: humanKind("outgoing"),
+    incoming: humanKind("incoming"),
+    internal: humanKind("internal"),
+    adjacent: humanKind("adjacent"),
   };
   const order: RelationDirection[] = ["outgoing", "incoming", "internal", "adjacent"];
   const indexed = rows.slice(0, 100).map((row, index) => ({ row, index }));
@@ -1145,7 +1540,7 @@ function showNodeTooltip(nodeId: string): void {
   const refs = collectRefs(item).slice(0, 3);
   const layers = itemLayers(item).slice(0, 4);
   const memberIds = item.member_node_ids;
-  const members = Array.isArray(memberIds) ? `${memberIds.length} members` : "";
+  const members = Array.isArray(memberIds) ? `${memberIds.length} ${t("detail.members")}` : "";
   const meta = [displaySubtitle(item), members].filter(Boolean).join(" · ");
   nodeTooltip.innerHTML = `
     <div class="node-tooltip-title">${escapeHtml(displayTitle(item))}</div>
@@ -1231,7 +1626,7 @@ function renderGraph(): void {
   state.relationItems = [];
 
   if (!state.currentView) {
-    setGraphEmpty(true, "No view loaded.");
+    setGraphEmpty(true, t("empty.noView"));
     return;
   }
 
@@ -1240,7 +1635,7 @@ function renderGraph(): void {
   else buildNodeGraph();
 
   if (graph.order === 0) {
-    setGraphEmpty(true, "No graph payload for current filters.");
+    setGraphEmpty(true, t("empty.filters"));
     return;
   }
 
@@ -1564,12 +1959,15 @@ function writeRgba(target: Float32Array, index: number, rgba: [number, number, n
 function setGraphEmpty(empty: boolean, message = ""): void {
   const emptyNode = byId("graph-empty");
   emptyNode.hidden = !empty;
-  emptyNode.textContent = message || "No graph payload.";
+  emptyNode.textContent = message || t("empty.graph");
   const caption = byId("graph-caption");
   const view = state.currentView?.view;
-  const graphSummary = graph.order > 0 ? ` · ${graph.order} nodes · ${graph.size} links` : "";
-  const layoutSummary = state.mode === "philosophy" ? `${view?.layout_hint || view?.purpose || boot.projection_mode} · ${layoutFamily()}` : view?.layout_hint || view?.purpose || boot.projection_mode;
-  caption.textContent = `${view?.title || state.currentViewId || "View"} · ${layoutSummary}${graphSummary}`;
+  const graphSummary = graph.order > 0 ? ` · ${graph.order} ${t("caption.nodes")} · ${graph.size} ${t("caption.links")}` : "";
+  const layoutSummary =
+    state.mode === "philosophy"
+      ? `${viewDisplaySubtitle(view) || boot.projection_mode} · ${humanKind(layoutFamily())}`
+      : viewDisplaySubtitle(view) || boot.projection_mode;
+  caption.textContent = `${viewDisplayTitle(view) || state.currentViewId || t("caption.view")} · ${layoutSummary}${graphSummary}`;
 }
 
 function buildClusterGraph(): void {
@@ -1971,9 +2369,9 @@ function nodeRouteActions(nodeId: string): string {
   const canPathTo = Boolean(state.pathStartNodeId && state.pathStartNodeId !== nodeId);
   return `
     <div class="route-actions">
-      <button id="neighborhood-button" type="button">Neighborhood</button>
-      <button id="path-start-button" type="button">${state.pathStartNodeId === nodeId ? "Path start set" : "Use as path start"}</button>
-      ${canPathTo ? `<button id="path-to-button" type="button">Path from ${escapeHtml(short(pathStartLabel, 24))}</button>` : ""}
+      <button id="neighborhood-button" type="button">${t("route.neighborhood")}</button>
+      <button id="path-start-button" type="button">${state.pathStartNodeId === nodeId ? t("route.pathStartSet") : t("route.useAsPathStart")}</button>
+      ${canPathTo ? `<button id="path-to-button" type="button">${t("route.pathFrom")} ${escapeHtml(short(pathStartLabel, 24))}</button>` : ""}
     </div>
   `;
 }
@@ -1984,21 +2382,21 @@ function neighborhoodCards(nodeId: string): string[] {
   const edges = state.neighborhood.edges || [];
   const cards = [
     detailCard(
-      "Neighborhood",
+      t("detail.neighborhood"),
       [
-        `${neighbors.length} neighbors`,
-        `${edges.length} relations`,
-        state.neighborhood.layers?.length ? state.neighborhood.layers.join(", ") : "all active layers",
-        state.neighborhood.predicates?.length ? state.neighborhood.predicates.map(humanKind).join(", ") : "all active predicates",
-        state.neighborhood.query_backend ? `backend: ${state.neighborhood.query_backend}` : "",
-        state.neighborhood.fallback_reason ? `fallback: ${state.neighborhood.fallback_reason}` : "",
+        `${neighbors.length} ${t("detail.neighborCount")}`,
+        `${edges.length} ${t("relation.relations")}`,
+        state.neighborhood.layers?.length ? state.neighborhood.layers.map(humanKind).join(", ") : t("detail.allActiveLayers"),
+        state.neighborhood.predicates?.length ? state.neighborhood.predicates.map(humanKind).join(", ") : t("detail.allActivePredicates"),
+        state.neighborhood.query_backend ? `${t("detail.backend")}: ${state.neighborhood.query_backend}` : "",
+        state.neighborhood.fallback_reason ? `${t("detail.fallback")}: ${state.neighborhood.fallback_reason}` : "",
       ]
         .filter(Boolean)
         .join("\n"),
     ),
   ];
   if (neighbors.length) {
-    cards.push(`<div class="section-title">Neighbors</div>`);
+    cards.push(`<div class="section-title">${t("detail.neighbors")}</div>`);
     cards.push(
       ...neighbors.slice(0, 24).map(
         (item, index) => `
@@ -2011,7 +2409,7 @@ function neighborhoodCards(nodeId: string): string[] {
     );
   }
   if (edges.length) {
-    cards.push(relationRowsSection("Neighborhood relations", edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "neighborhood"));
+    cards.push(relationRowsSection(t("detail.neighborhoodRelations"), edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "neighborhood"));
   }
   return cards;
 }
@@ -2019,37 +2417,37 @@ function neighborhoodCards(nodeId: string): string[] {
 function pathCards(nodeId: string): string[] {
   const cards: string[] = [];
   if (state.pathStartNodeId) {
-    cards.push(detailCard("Path start", endpointLabel(state.pathStartNodeId) || state.pathStartNodeId));
+    cards.push(detailCard(t("detail.pathStart"), endpointLabel(state.pathStartNodeId) || state.pathStartNodeId));
   }
   if (!state.pathPacket || (state.pathPacket.from_id !== nodeId && state.pathPacket.to_id !== nodeId)) return cards;
   const nodes = state.pathPacket.nodes || [];
   const edges = state.pathPacket.edges || [];
   cards.push(
     detailCard(
-      "Path",
+      t("detail.path"),
       state.pathPacket.found
         ? [
-            `${nodes.length} nodes`,
-            `${edges.length} relations`,
-            `max depth ${state.pathPacket.max_depth || 6}`,
-            state.pathPacket.predicates?.length ? state.pathPacket.predicates.map(humanKind).join(", ") : "all active predicates",
-            state.pathPacket.query_backend ? `backend: ${state.pathPacket.query_backend}` : "",
-            state.pathPacket.fallback_reason ? `fallback: ${state.pathPacket.fallback_reason}` : "",
+            `${nodes.length} ${t("caption.nodes")}`,
+            `${edges.length} ${t("relation.relations")}`,
+            `${t("detail.maxDepth")} ${state.pathPacket.max_depth || 6}`,
+            state.pathPacket.predicates?.length ? state.pathPacket.predicates.map(humanKind).join(", ") : t("detail.allActivePredicates"),
+            state.pathPacket.query_backend ? `${t("detail.backend")}: ${state.pathPacket.query_backend}` : "",
+            state.pathPacket.fallback_reason ? `${t("detail.fallback")}: ${state.pathPacket.fallback_reason}` : "",
           ]
             .filter(Boolean)
             .join("\n")
         : [
-            "No route found",
-            `max depth ${state.pathPacket.max_depth || 6}`,
-            state.pathPacket.query_backend ? `backend: ${state.pathPacket.query_backend}` : "",
-            state.pathPacket.fallback_reason ? `fallback: ${state.pathPacket.fallback_reason}` : "",
+            t("detail.noRoute"),
+            `${t("detail.maxDepth")} ${state.pathPacket.max_depth || 6}`,
+            state.pathPacket.query_backend ? `${t("detail.backend")}: ${state.pathPacket.query_backend}` : "",
+            state.pathPacket.fallback_reason ? `${t("detail.fallback")}: ${state.pathPacket.fallback_reason}` : "",
           ]
             .filter(Boolean)
             .join("\n"),
     ),
   );
   if (nodes.length) {
-    cards.push(`<div class="section-title">Path nodes</div>`);
+    cards.push(`<div class="section-title">${t("detail.pathNodes")}</div>`);
     cards.push(
       ...nodes.map(
         (item, index) => `
@@ -2062,7 +2460,7 @@ function pathCards(nodeId: string): string[] {
     );
   }
   if (edges.length) {
-    cards.push(relationRowsSection("Path relations", edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "path"));
+    cards.push(relationRowsSection(t("detail.pathRelations"), edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "path"));
   }
   return cards;
 }
@@ -2148,9 +2546,9 @@ async function copyScaleExportUrl(table?: ScaleExportTable, format?: "csv" | "js
   const url = scaleExportAbsoluteUrl(table, format);
   try {
     await navigator.clipboard.writeText(url);
-    state.selected = { title: "Scale export URL", url };
+    state.selected = { title: t("selection.scaleExportUrl"), url };
   } catch (error) {
-    state.selected = { title: "Scale export URL", url, copy_error: text(error) };
+    state.selected = { title: t("selection.scaleExportUrl"), url, copy_error: text(error) };
   }
   state.selectedGraphId = null;
   renderInspector();
@@ -2221,7 +2619,7 @@ async function search(): Promise<void> {
       ? await fetchJson<{ results?: AnyItem[] }>(`/api/philosophy/search?query=${encodeURIComponent(query)}&limit=80`)
       : await fetchJson<{ results?: AnyItem[] }>(`/api/corpus/search?query=${encodeURIComponent(query)}&limit=80`);
   state.results = payload.results || [];
-  state.selected = { title: query ? `Search: ${query}` : "Search", results: state.results.length };
+  state.selected = { title: query ? `${t("selection.search")}: ${query}` : t("selection.search"), results: state.results.length };
   state.selectedGraphId = null;
   renderInspector();
   scrollInspectorTop();
@@ -2230,7 +2628,7 @@ async function search(): Promise<void> {
 async function showReviewPacket(): Promise<void> {
   if (state.mode !== "philosophy") return;
   const payload = await fetchJson<{ packet: AnyItem }>(`/api/philosophy/review-packet?view_id=${encodeURIComponent(state.currentViewId)}`);
-  state.selected = { title: `Review packet: ${state.currentViewId}`, ...payload.packet };
+  state.selected = { title: `${t("selection.reviewPacket")}: ${state.currentViewId}`, ...payload.packet };
   state.selectedGraphId = null;
   renderInspector();
   scrollInspectorTop();
@@ -2240,7 +2638,7 @@ async function showUnresolved(): Promise<void> {
   if (state.mode !== "philosophy") return;
   const payload = await fetchJson<{ unresolved?: AnyItem[] }>(`/api/philosophy/unresolved?view_id=${encodeURIComponent(state.currentViewId)}`);
   state.results = payload.unresolved || [];
-  state.selected = { title: `Unresolved: ${state.currentViewId}`, unresolved: state.results.length };
+  state.selected = { title: `${t("selection.unresolved")}: ${state.currentViewId}`, unresolved: state.results.length };
   state.selectedGraphId = null;
   renderInspector();
   scrollInspectorTop();
@@ -2272,6 +2670,6 @@ async function syncProjection(): Promise<void> {
 
 renderShell();
 void loadMode("philosophy").catch((error: unknown) => {
-  byId("inspector-title").textContent = "Load failed";
+  byId("inspector-title").textContent = t("load.failed");
   byId("inspector-meta").innerHTML = `<span class="danger">${text(error)}</span>`;
 });

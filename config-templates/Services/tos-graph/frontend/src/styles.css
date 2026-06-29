@@ -99,6 +99,17 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
+.rail-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rail-head-row > div:first-child {
+  min-width: 0;
+}
+
 .rail-scroll,
 .inspector-scroll {
   overflow: auto;
@@ -134,11 +145,17 @@ a {
 .segmented,
 .inline-actions,
 .chip-row,
+.language-toggle,
 .metric-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.language-toggle {
+  flex: 0 0 auto;
+  gap: 4px;
 }
 
 .segmented {
@@ -148,10 +165,18 @@ a {
 
 .segmented button,
 .inline-actions button,
-.mode-button {
+.mode-button,
+.language-toggle button {
   border-radius: 7px;
   padding: 8px 10px;
   min-height: 36px;
+}
+
+.language-toggle button {
+  min-height: 30px;
+  padding: 5px 7px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .segmented button.active,
@@ -160,7 +185,8 @@ a {
 .view-card.active,
 .layer-toggle.active,
 .predicate-toggle.active,
-.density-button.active {
+.density-button.active,
+.language-toggle button.active {
   border-color: rgba(36, 120, 101, 0.76);
   background: var(--accent-soft);
 }
