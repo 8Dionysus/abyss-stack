@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import csv
+import json
 from pathlib import Path
+from io import StringIO
+from collections.abc import Iterator
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
@@ -29,7 +33,7 @@ from .models import (
     ProjectSyncResponse,
 )
 from .neo4j_store import Neo4jProjectionStore, describe_neo4j_store
-from .philosophy_reader import ToSPhilosophyProjectionReader, ToSPhilosophyReaderError
+from .philosophy_reader import SCALE_EXPORT_COLUMNS, ToSPhilosophyProjectionReader, ToSPhilosophyReaderError
 from .projector import CorpusProjector, PhilosophyProjector
 from .ui import render_index
 
@@ -70,6 +74,26 @@ def _layer_set(raw_layers: str | None) -> set[str]:
     if not raw_layers:
         return set()
     return {layer.strip() for layer in raw_layers.split(",") if layer.strip()}
+
+
+def _csv_stream(table_name: str, rows: list[dict[str, Any]]) -> Iterator[str]:
+    fieldnames = SCALE_EXPORT_COLUMNS[table_name]
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    yield buffer.getvalue()
+    buffer.seek(0)
+    buffer.truncate(0)
+    for row in rows:
+        writer.writerow(row)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+
+
+def _jsonl_stream(rows: list[dict[str, Any]]) -> Iterator[str]:
+    for row in rows:
+        yield json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -277,6 +301,41 @@ def philosophy_paths(
         return philosophy_reader.path_between(from_id, to_id, layers=_layer_set(layers), max_depth=max_depth)
     except ToSPhilosophyReaderError as exc:
         raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/scale-export/manifest")
+def philosophy_scale_export_manifest(view_id: str | None = None, layers: str | None = None) -> dict[str, Any]:
+    try:
+        return philosophy_reader.scale_export_manifest(view_id=view_id, layers=_layer_set(layers))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+
+
+@app.get("/api/philosophy/scale-export/{table_name}.{file_format}")
+def philosophy_scale_export_table(
+    table_name: str,
+    file_format: str,
+    view_id: str | None = None,
+    layers: str | None = None,
+) -> StreamingResponse:
+    if file_format not in {"csv", "jsonl"}:
+        raise HTTPException(status_code=400, detail="file_format must be csv or jsonl")
+    try:
+        rows = philosophy_reader.scale_export_table(table_name, view_id=view_id, layers=_layer_set(layers))
+    except ToSPhilosophyReaderError as exc:
+        raise _handle_philosophy_reader_error(exc) from exc
+    filename = f"tos-philosophy-{table_name}.{file_format}"
+    if file_format == "csv":
+        return StreamingResponse(
+            _csv_stream(table_name, rows),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    return StreamingResponse(
+        _jsonl_stream(rows),
+        media_type="application/x-ndjson; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/project/sync", response_model=ProjectSyncResponse)

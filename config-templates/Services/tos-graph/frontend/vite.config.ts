@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: "/static/",
   build: {
+    chunkSizeWarningLimit: 900,
     manifest: false,
     outDir: "dist",
     emptyOutDir: true,

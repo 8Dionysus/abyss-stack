@@ -7,4 +7,6 @@ and `compose/modules/52-tos-graph.yml`.
 Tree of Sophia owns authored meaning, the checked whole-corpus index, and the
 materialized philosophy graph projection.
 abyss-stack owns the local runtime graph projection service shape, including
-the short `tos-up` localhost review workbench command.
+the short `tos-up` localhost review workbench command, the read-only
+scale-export API for external large-graph viewers, and the bundled Cosmos/Sigma
+runtime graph lenses with layout families derived from ToS view contracts.
