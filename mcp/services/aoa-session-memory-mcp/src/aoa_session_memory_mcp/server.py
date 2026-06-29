@@ -493,7 +493,7 @@ def build_server(
         return current_state().maintenance_plan()
 
     @mcp.tool()
-    def aoa_session_operational_route_rollup_query(
+    def aoa_session_route_rollup_query(
         query: str = "",
         layer: str = "",
         key: str = "",

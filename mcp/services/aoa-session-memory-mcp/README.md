@@ -83,7 +83,7 @@ Tools:
 - `aoa_session_latest_diagnostics(kind, limit, include_payload)`
 - `aoa_session_maintenance_status(deep, include_timers, full)`; returns the canonical read-only `.aoa maintenance-status` packet with `agent_route`, exact next command, search/graph posture, timer snapshot, and MCP stop line.
 - `aoa_session_maintenance_plan()`; compatibility entry that returns the same maintenance-status route without timers.
-- `aoa_session_operational_route_rollup_query(query, layer, key, route_signal, limit, ref_limit)`; reads the materialized `.aoa` operational route-rollup projection without running maintenance, resampling shards, opening the monolith, using FTS, or hydrating raw body text. Use it when maintenance status says `use_operational_route_rollup_projection`; materialization remains an operator route outside MCP.
+- `aoa_session_route_rollup_query(query, layer, key, route_signal, limit, ref_limit)`; reads the materialized `.aoa` operational route-rollup projection without running maintenance, resampling shards, opening the monolith, using FTS, or hydrating raw body text. Use it when maintenance status says `use_operational_route_rollup_projection`; materialization remains an operator route outside MCP.
 - `aoa_session_projection_status(include_payload)`; reads the latest `projection-catchup` diagnostic and returns its `projection_completeness` block plus current maintenance summary. It does not run `projection-catchup`; that writer route stays outside MCP.
 - `aoa_session_graph_neighborhood(anchor, kind, depth, limit, edge_limit)`; returns compact graph packets by default. Raise `edge_limit` only when a deeper relation walk is explicitly needed.
 - `aoa_session_graph_timeline(anchor, kind, limit)`

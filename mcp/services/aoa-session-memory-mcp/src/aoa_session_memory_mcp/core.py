@@ -5103,6 +5103,23 @@ class AoASessionMemoryMCPState:
             provider_args,
             timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
         )
+        diagnostics = []
+        session_provider_fallback: dict[str, Any] | None = None
+        if provider_session and not provider_full.get("ok"):
+            global_provider_args = ["--provider", "portable_sqlite"]
+            global_provider = self._archive_command(
+                "search-provider-status",
+                global_provider_args,
+                timeout_seconds=max(self.timeout_seconds, STATUS_TIMEOUT_SECONDS),
+            )
+            if global_provider.get("ok"):
+                session_provider_fallback = _compact_provider_status_for_mcp(
+                    provider_full,
+                    full_freshness_route=self._archive_command_line("search-provider-status", provider_args),
+                )
+                provider_full = global_provider
+                provider_args = global_provider_args
+                diagnostics.append("provider_session_status_failed_using_global_freshness")
         checks = [self._check_ref(ref, session_dir=session_dir) for ref in refs[:100]]
         projection_freshness = self._target_projection_freshness(
             provider_full,
@@ -5115,7 +5132,6 @@ class AoASessionMemoryMCPState:
             for check in checks
         )
         provider_allows_ref_check = bool(provider_full.get("ok")) or projection_freshness.get("status") == "current_with_global_stale"
-        diagnostics = []
         if projection_freshness.get("status") == "current_with_global_stale":
             diagnostics.append("provider_global_stale_target_session_current")
         elif projection_freshness.get("status") == "current_with_global_deferred_live_updates":
@@ -5135,6 +5151,7 @@ class AoASessionMemoryMCPState:
             "session": session or None,
             "checks": checks,
             "diagnostics": diagnostics,
+            "session_provider_fallback": session_provider_fallback,
             "authority_boundary": self.authority_boundary(),
         }
 
