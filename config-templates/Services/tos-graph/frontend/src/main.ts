@@ -1,4 +1,5 @@
-import Graph from "graphology";
+import type { Graph as CosmosGraph, GraphConfig } from "@cosmos.gl/graph";
+import Graphology from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import Sigma from "sigma";
 import "./styles.css";
@@ -6,6 +7,8 @@ import "./styles.css";
 type Mode = "philosophy" | "corpus";
 type GraphMode = "clusters" | "nodes";
 type DensityMode = "overview" | "focused" | "dense";
+type RendererMode = "cosmos" | "sigma";
+type LayoutFamily = "timeline" | "flow" | "evidence" | "semantic" | "infrastructure" | "organic";
 
 type BootPayload = {
   service: string;
@@ -85,9 +88,32 @@ type CorpusViewPayload = {
   items?: AnyItem[];
 };
 
+type NeighborhoodPayload = {
+  node?: GraphNode;
+  neighbors?: GraphNode[];
+  edges?: GraphEdge[];
+  depth?: number;
+  layers?: string[];
+  source_refs?: string[];
+};
+
+type PathPayload = {
+  from_id?: string;
+  to_id?: string;
+  found?: boolean;
+  nodes?: GraphNode[];
+  edges?: GraphEdge[];
+  max_depth?: number;
+  layers?: string[];
+  source_refs?: string[];
+};
+
+type ScaleExportTable = "nodes" | "edges" | "clusters" | "cluster-node-memberships" | "cluster-edge-memberships";
+
 type AppState = {
   mode: Mode;
   graphMode: GraphMode;
+  rendererMode: RendererMode;
   currentViewId: string;
   activeLayers: Set<string>;
   activePredicates: Set<string>;
@@ -103,6 +129,9 @@ type AppState = {
   relationItems: AnyItem[];
   expandedCluster: Cluster | null;
   searchQuery: string;
+  neighborhood: NeighborhoodPayload | null;
+  pathStartNodeId: string | null;
+  pathPacket: PathPayload | null;
 };
 
 declare global {
@@ -123,9 +152,18 @@ const palette = {
   line: "rgba(23,32,29,0.22)",
 };
 
+const scaleExportTables: { table: ScaleExportTable; title: string }[] = [
+  { table: "nodes", title: "Nodes" },
+  { table: "edges", title: "Edges" },
+  { table: "clusters", title: "Clusters" },
+  { table: "cluster-node-memberships", title: "Cluster nodes" },
+  { table: "cluster-edge-memberships", title: "Cluster edges" },
+];
+
 const state: AppState = {
   mode: "philosophy",
   graphMode: "clusters",
+  rendererMode: "cosmos",
   currentViewId: "",
   activeLayers: new Set(),
   activePredicates: new Set(),
@@ -141,18 +179,28 @@ const state: AppState = {
   relationItems: [],
   expandedCluster: null,
   searchQuery: "",
+  neighborhood: null,
+  pathStartNodeId: null,
+  pathPacket: null,
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("missing #app");
 const appRoot = app;
 
-let graph = new Graph({ multi: true, type: "directed" });
+let graph = new Graphology({ multi: true, type: "directed" });
 let renderer: Sigma | null = null;
+let cosmosRenderer: CosmosGraph | null = null;
+let cosmosModulePromise: Promise<typeof import("@cosmos.gl/graph")> | null = null;
 let graphContainer: HTMLDivElement | null = null;
 let nodeTooltip: HTMLDivElement | null = null;
 let lastGraphItems = new Map<string, AnyItem>();
+let cosmosPointItems: AnyItem[] = [];
+let cosmosLinkItems: AnyItem[] = [];
 let hoveredNodeId: string | null = null;
+let ignoreGraphClicksUntil = 0;
+let ignoreInspectorSelectionsUntil = 0;
+let graphRenderVersion = 0;
 const lastPointer = { x: 0, y: 0 };
 
 function text(value: unknown): string {
@@ -196,6 +244,9 @@ function itemId(item: AnyItem): string {
 
 function itemTitle(item: AnyItem): string {
   const source = unwrapItem(item);
+  if (source.from_id && source.to_id) {
+    return relationRouteText(source);
+  }
   return text(source.label || source.title || source.name || source.view_id || itemId(source));
 }
 
@@ -220,6 +271,8 @@ function humanKind(value: unknown): string {
 }
 
 function displayTitle(item: AnyItem): string {
+  const source = unwrapItem(item);
+  if (source.from_id && source.to_id) return relationRouteText(source);
   const raw = itemTitle(item).trim();
   const canon = raw.match(/^Canon Or Candidate Status:\s*(.+)$/i);
   if (canon) return `Status ${canon[1].trim()}`;
@@ -255,6 +308,10 @@ function compactGraphLabel(item: AnyItem): string {
   return short(displayTitle(item), 18);
 }
 
+function relationRouteText(item: AnyItem): string {
+  return `${text(item.from_label || endpointLabel(item.from_id))} -> ${humanKind(item.primary_predicate || item.predicate_id || "relation")} -> ${text(item.to_label || endpointLabel(item.to_id))}`;
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) throw new Error(await response.text());
@@ -268,6 +325,17 @@ function isPhilosophyView(payload: PhilosophyViewPayload | CorpusViewPayload | n
 function itemLayers(item: AnyItem): string[] {
   const layers = item.graph_layers;
   return Array.isArray(layers) ? layers.map(text) : [];
+}
+
+function itemProperties(item: AnyItem): AnyItem {
+  const source = unwrapItem(item);
+  return source.properties && typeof source.properties === "object" && !Array.isArray(source.properties)
+    ? (source.properties as AnyItem)
+    : {};
+}
+
+function propertyText(item: AnyItem, key: string): string {
+  return text(itemProperties(item)[key]);
 }
 
 function stringList(value: unknown): string[] {
@@ -344,20 +412,53 @@ function relationAllowed(item: AnyItem): boolean {
 }
 
 function relationLimit(): number {
+  if (state.rendererMode === "cosmos") {
+    if (state.densityMode === "dense") return 12000;
+    if (state.densityMode === "focused") return 6000;
+    return 2200;
+  }
   if (state.densityMode === "dense") return 520;
   if (state.densityMode === "focused") return 280;
   return 150;
 }
 
 function edgeLimit(): number {
+  if (state.rendererMode === "cosmos") {
+    if (state.densityMode === "dense") return 60000;
+    if (state.densityMode === "focused") return 30000;
+    return 12000;
+  }
   if (state.densityMode === "dense") return 3200;
   if (state.densityMode === "focused") return 1800;
   return 900;
 }
 
+function nodeLimit(): number {
+  if (state.rendererMode === "cosmos") {
+    if (state.densityMode === "dense") return 50000;
+    if (state.densityMode === "focused") return 22000;
+    return 9000;
+  }
+  return 1200;
+}
+
+function clusterLimit(): number {
+  if (state.rendererMode === "cosmos") return 8000;
+  return 360;
+}
+
+function corpusItemLimit(): number {
+  if (state.rendererMode === "cosmos") return 12000;
+  return 700;
+}
+
 function relationCountAllowed(item: AnyItem): boolean {
   const count = Number(item.relation_count || 1);
   return !Number.isFinite(count) || count >= state.minRelationCount;
+}
+
+function inspectorSelectionAllowed(): boolean {
+  return Date.now() >= ignoreInspectorSelectionsUntil;
 }
 
 function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
@@ -383,11 +484,11 @@ function edgeColorFor(item: AnyItem): string {
   const predicate = text(item.predicate_id || item.primary_predicate || "");
   const layers = itemLayers(item).join(" ");
   const signal = `${predicate} ${layers}`;
-  if (signal.includes("source") || signal.includes("prepared") || signal.includes("contains")) return "rgba(66,111,163,0.55)";
-  if (signal.includes("canon") || signal.includes("candidate")) return "rgba(177,116,47,0.56)";
-  if (signal.includes("evidence") || signal.includes("unresolved")) return "rgba(163,72,63,0.52)";
-  if (signal.includes("concept") || signal.includes("lineage")) return "rgba(118,95,162,0.54)";
-  return palette.line;
+  if (signal.includes("source") || signal.includes("prepared") || signal.includes("contains")) return "rgba(66,111,163,0.72)";
+  if (signal.includes("canon") || signal.includes("candidate")) return "rgba(177,116,47,0.74)";
+  if (signal.includes("evidence") || signal.includes("unresolved")) return "rgba(163,72,63,0.7)";
+  if (signal.includes("concept") || signal.includes("lineage")) return "rgba(118,95,162,0.72)";
+  return "rgba(36,120,101,0.5)";
 }
 
 function relationWeight(item: AnyItem): number {
@@ -422,6 +523,8 @@ function renderShell(): void {
           <div id="layer-list" class="stack"></div>
           <div class="section-title">Relations</div>
           <div id="relation-controls" class="relation-controls"></div>
+          <div class="section-title">Scale Export</div>
+          <div id="scale-export-controls" class="scale-export-controls"></div>
         </div>
       </aside>
       <main class="panel main-stage">
@@ -429,11 +532,14 @@ function renderShell(): void {
           <div class="chip-row">
             <span class="chip">Mode <strong id="mode-chip"></strong></span>
             <span class="chip">View <strong id="view-chip"></strong></span>
+            <span class="chip">Renderer <strong id="renderer-chip"></strong></span>
             <span class="chip">Neo4j <strong id="neo4j-chip"></strong></span>
             <span class="chip">Projection <strong id="projection-chip"></strong></span>
           </div>
           <div id="metrics" class="metric-row"></div>
           <div class="inline-actions">
+            <button id="renderer-cosmos" class="renderer-button" type="button">Cosmos</button>
+            <button id="renderer-sigma" class="renderer-button" type="button">Sigma</button>
             <button id="clusters-button" type="button">Clusters</button>
             <button id="nodes-button" type="button">Nodes</button>
             <button id="fit-button" type="button">Fit</button>
@@ -481,7 +587,15 @@ function bindShellEvents(): void {
     state.graphMode = "nodes";
     renderAll();
   });
-  byId("fit-button").addEventListener("click", () => renderer?.getCamera().animatedReset({ duration: 260 }));
+  byId("renderer-cosmos").addEventListener("click", () => {
+    state.rendererMode = "cosmos";
+    renderAll();
+  });
+  byId("renderer-sigma").addEventListener("click", () => {
+    state.rendererMode = "sigma";
+    renderAll();
+  });
+  byId("fit-button").addEventListener("click", () => fitActiveGraph());
   byId("review-button").addEventListener("click", () => void showReviewPacket());
   byId("unresolved-button").addEventListener("click", () => void showUnresolved());
   byId("snapshot-button").addEventListener("click", () => void showSnapshot());
@@ -514,11 +628,14 @@ function setActive(id: string, active: boolean): void {
 function renderChips(): void {
   byId("mode-chip").textContent = state.mode;
   byId("view-chip").textContent = state.currentViewId || "none";
+  byId("renderer-chip").textContent = state.rendererMode;
   byId("neo4j-chip").textContent = boot.neo4j.ready ? "ready" : boot.neo4j.configured ? "preview" : "deferred";
   const status = state.mode === "philosophy" ? state.status.philosophy : state.status.corpus;
   byId("projection-chip").textContent = text(status?.projection_exists ?? status?.index_exists ?? "loading");
   setActive("mode-philosophy", state.mode === "philosophy");
   setActive("mode-corpus", state.mode === "corpus");
+  setActive("renderer-cosmos", state.rendererMode === "cosmos");
+  setActive("renderer-sigma", state.rendererMode === "sigma");
   setActive("clusters-button", state.graphMode === "clusters");
   setActive("nodes-button", state.graphMode === "nodes");
 }
@@ -666,6 +783,64 @@ function renderRelationControls(): void {
   });
 }
 
+function scaleExportQuery(): string {
+  const params = new URLSearchParams();
+  if (state.currentViewId) params.set("view_id", state.currentViewId);
+  const layers = [...state.activeLayers].filter(Boolean);
+  if (layers.length) params.set("layers", layers.join(","));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function scaleExportPath(table?: ScaleExportTable, format?: "csv" | "jsonl"): string {
+  const suffix = table && format ? `/${table}.${format}` : "/manifest";
+  return `/api/philosophy/scale-export${suffix}${scaleExportQuery()}`;
+}
+
+function scaleExportAbsoluteUrl(table?: ScaleExportTable, format?: "csv" | "jsonl"): string {
+  return new URL(scaleExportPath(table, format), window.location.origin).toString();
+}
+
+function renderScaleExportControls(): void {
+  const root = byId("scale-export-controls");
+  if (state.mode !== "philosophy" || !isPhilosophyView(state.currentView)) {
+    root.innerHTML = `<div class="muted">Scale export follows the ToS philosophy projection.</div>`;
+    return;
+  }
+  const layers = [...state.activeLayers].filter(Boolean);
+  root.innerHTML = `
+    <div class="export-summary">
+      <strong>${escapeHtml(state.currentViewId || "view")}</strong>
+      <span>${escapeHtml(layers.length ? layers.join(", ") : "all layers")}</span>
+    </div>
+    <div class="export-actions">
+      <a class="export-link" data-export-link="manifest" href="${escapeHtml(scaleExportPath())}" target="_blank" rel="noreferrer">Manifest</a>
+      <button data-copy-export="manifest" type="button">Copy URL</button>
+    </div>
+    <div class="export-table-list">
+      ${scaleExportTables
+        .map(
+          ({ table, title }) => `
+            <div class="export-row">
+              <span>${escapeHtml(title)}</span>
+              <a class="export-link" data-export-link="${table}-csv" href="${escapeHtml(scaleExportPath(table, "csv"))}" target="_blank" rel="noreferrer">CSV</a>
+              <a class="export-link" data-export-link="${table}-jsonl" href="${escapeHtml(scaleExportPath(table, "jsonl"))}" target="_blank" rel="noreferrer">JSONL</a>
+              <button data-copy-export="${table}" type="button">Copy</button>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+  root.querySelectorAll<HTMLButtonElement>("[data-copy-export]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const table = button.dataset.copyExport || "";
+      if (table === "manifest") void copyScaleExportUrl();
+      else void copyScaleExportUrl(table as ScaleExportTable, "jsonl");
+    });
+  });
+}
+
 function renderInspector(): void {
   const title = state.selected ? displayTitle(state.selected) : state.currentView?.view?.title || state.currentViewId || "Selection";
   byId("inspector-title").textContent = title;
@@ -675,11 +850,19 @@ function renderInspector(): void {
 
   const cards: string[] = [];
   const selectedRelationRows = state.selected ? relationRowsForSelection(state.selected) : [];
+  const selectedNodeId = state.selected ? selectedNodeIdFor(state.selected) : "";
   if (state.selected) {
+    if (selectedNodeId) {
+      cards.push(nodeRouteActions(selectedNodeId));
+    }
     cards.push(...relationDetailCards(state.selected));
     if (selectedRelationRows.length) {
       cards.push(...relationReadingCards(selectedRelationRows));
       cards.push(relationRowsSection("Selected relations", selectedRelationRows));
+    }
+    if (selectedNodeId) {
+      cards.push(...neighborhoodCards(selectedNodeId));
+      cards.push(...pathCards(selectedNodeId));
     }
     const refs = collectRefs(state.selected);
     if (refs.length) {
@@ -715,13 +898,58 @@ function renderInspector(): void {
   }
   byId("detail-list").innerHTML = cards.join("") || detailCard("No detail", "Use search or click the graph.");
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-result]").forEach((button) => {
-    button.addEventListener("click", () => selectItem(state.results[Number(button.dataset.result)]));
+    button.addEventListener("click", () => {
+      if (inspectorSelectionAllowed()) selectItem(state.results[Number(button.dataset.result)]);
+    });
   });
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-relation]").forEach((button) => {
-    button.addEventListener("click", () => selectItem(state.relationItems[Number(button.dataset.relation)]));
+    button.addEventListener("click", () => {
+      if (inspectorSelectionAllowed()) selectItem(state.relationItems[Number(button.dataset.relation)]);
+    });
   });
   byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-selected-relation]").forEach((button) => {
-    button.addEventListener("click", () => selectItem(selectedRelationRows[Number(button.dataset.selectedRelation)]));
+    button.addEventListener("click", () => {
+      if (inspectorSelectionAllowed()) selectItem(selectedRelationRows[Number(button.dataset.selectedRelation)]);
+    });
+  });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-neighbor]").forEach((button) => {
+    const item = state.neighborhood?.neighbors?.[Number(button.dataset.neighbor)];
+    button.addEventListener("click", () => {
+      if (item && inspectorSelectionAllowed()) selectItem(item);
+    });
+  });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-path-node]").forEach((button) => {
+    const item = state.pathPacket?.nodes?.[Number(button.dataset.pathNode)];
+    button.addEventListener("click", () => {
+      if (item && inspectorSelectionAllowed()) selectItem(item);
+    });
+  });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-path-edge]").forEach((button) => {
+    const item = state.pathPacket?.edges?.[Number(button.dataset.pathEdge)];
+    button.addEventListener("click", () => {
+      if (item && inspectorSelectionAllowed()) selectItem(item);
+    });
+  });
+  byId("detail-list").querySelectorAll<HTMLButtonElement>("[data-neighborhood-edge]").forEach((button) => {
+    const item = state.neighborhood?.edges?.[Number(button.dataset.neighborhoodEdge)];
+    button.addEventListener("click", () => {
+      if (item && inspectorSelectionAllowed()) selectItem(item);
+    });
+  });
+  document.getElementById("neighborhood-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void showNeighborhood(selectedNodeId);
+  });
+  document.getElementById("path-start-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setPathStart(selectedNodeId);
+  });
+  document.getElementById("path-to-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void showPathTo(selectedNodeId);
   });
 }
 
@@ -764,6 +992,11 @@ function relationDetailCards(item: AnyItem): string[] {
   return cards;
 }
 
+function selectedNodeIdFor(item: AnyItem): string {
+  const source = unwrapItem(item);
+  return text(source.node_id);
+}
+
 function collectRefs(item: AnyItem): string[] {
   const source = unwrapItem(item);
   const refs = new Set<string>();
@@ -792,13 +1025,19 @@ function relationReadingCards(rows: RelationRow[]): string[] {
   return [detailCard("Relation reading", summary), predicateText ? detailCard("Predicates nearby", predicateText) : ""].filter(Boolean);
 }
 
-function relationRowsSection(title: string, rows: RelationRow[]): string {
+function relationRowsSection(title: string, rows: RelationRow[], source: "selected" | "neighborhood" | "path" = "selected"): string {
+  const grouped = relationRowsByDirection(rows);
+  const actionAttr =
+    source === "neighborhood" ? "data-neighborhood-edge" : source === "path" ? "data-path-edge" : "data-selected-relation";
   return `
     <div class="section-title">${escapeHtml(title)}</div>
     <div class="relation-table">
-      ${rows
-        .slice(0, 80)
-        .map((row, index) => {
+      ${grouped
+        .map(
+          (group) => `
+            <div class="relation-group-label">${escapeHtml(group.title)}</div>
+            ${group.rows
+              .map(({ row, index }) => {
           const refs = collectRefs(row);
           const layers = itemLayers(row);
           const meta = [
@@ -810,16 +1049,36 @@ function relationRowsSection(title: string, rows: RelationRow[]): string {
             .filter(Boolean)
             .join(" · ");
           return `
-            <button class="relation-row" data-selected-relation="${index}" type="button">
+            <button class="relation-row" ${actionAttr}="${index}" type="button">
               <span class="relation-direction ${row.direction || "adjacent"}">${escapeHtml(row.direction || "adjacent")}</span>
-              <span class="relation-route">${escapeHtml(short(`${row.from_label || endpointLabel(row.from_id)} -> ${row.to_label || endpointLabel(row.to_id)}`, 104))}</span>
+              <span class="relation-route">${escapeHtml(short(relationRouteText(row), 116))}</span>
               <span class="relation-meta">${escapeHtml(short(meta, 128))}</span>
             </button>
           `;
         })
         .join("")}
+          `,
+        )
+        .join("")}
     </div>
   `;
+}
+
+function relationRowsByDirection(rows: RelationRow[]): { title: string; rows: { row: RelationRow; index: number }[] }[] {
+  const labels: Record<RelationDirection, string> = {
+    outgoing: "Outgoing",
+    incoming: "Incoming",
+    internal: "Internal",
+    adjacent: "Adjacent",
+  };
+  const order: RelationDirection[] = ["outgoing", "incoming", "internal", "adjacent"];
+  const indexed = rows.slice(0, 100).map((row, index) => ({ row, index }));
+  return order
+    .map((direction) => ({
+      title: labels[direction],
+      rows: indexed.filter((item) => (item.row.direction || "adjacent") === direction),
+    }))
+    .filter((group) => group.rows.length > 0);
 }
 
 function relationRowsForSelection(item: AnyItem): RelationRow[] {
@@ -916,6 +1175,11 @@ function positionNodeTooltip(): void {
 
 function graphFocus(): { nodes: Set<string>; edges: Set<string> } | null {
   const selected = state.selectedGraphId;
+  if (state.pathPacket?.found) {
+    const pathNodes = new Set(stringList(state.pathPacket.nodes?.map((node) => node.node_id)));
+    const pathEdges = new Set(stringList(state.pathPacket.edges?.map((edge) => edge.edge_id)));
+    if (pathNodes.size || pathEdges.size) return { nodes: pathNodes, edges: pathEdges };
+  }
   if (!selected) return null;
   const nodes = new Set<string>();
   const edges = new Set<string>();
@@ -941,7 +1205,7 @@ function graphFocus(): { nodes: Set<string>; edges: Set<string> } | null {
 function renderGraph(): void {
   if (!graphContainer) return;
   hideNodeTooltip();
-  renderer?.kill();
+  destroyGraphRenderers();
   graph.clear();
   lastGraphItems = new Map();
   state.relationItems = [];
@@ -961,6 +1225,37 @@ function renderGraph(): void {
   }
 
   setGraphEmpty(false);
+  const renderVersion = graphRenderVersion;
+  if (state.rendererMode === "cosmos") void renderCosmosGraph(renderVersion);
+  else renderSigmaGraph();
+}
+
+function destroyGraphRenderers(): void {
+  graphRenderVersion += 1;
+  renderer?.kill();
+  renderer = null;
+  cosmosRenderer?.destroy();
+  cosmosRenderer = null;
+  cosmosPointItems = [];
+  cosmosLinkItems = [];
+  if (graphContainer) graphContainer.innerHTML = "";
+}
+
+function fitActiveGraph(): void {
+  if (state.rendererMode === "cosmos") {
+    cosmosRenderer?.fitView(260, 0.18, false);
+    return;
+  }
+  renderer?.getCamera().animatedReset({ duration: 260 });
+}
+
+function loadCosmosModule(): Promise<typeof import("@cosmos.gl/graph")> {
+  cosmosModulePromise ||= import("@cosmos.gl/graph");
+  return cosmosModulePromise;
+}
+
+function renderSigmaGraph(): void {
+  if (!graphContainer) return;
   const focus = graphFocus();
   renderer = new Sigma(graph, graphContainer, {
     allowInvalidContainer: true,
@@ -979,14 +1274,14 @@ function renderGraph(): void {
       if (focus.nodes.has(node)) {
         return { ...data, forceLabel: true, highlighted: true, zIndex: Number(data.zIndex || 0) + 100 };
       }
-      return { ...data, label: "", color: "rgba(102, 115, 110, 0.18)", zIndex: 0 };
+      return { ...data, label: "", color: "rgba(102, 115, 110, 0.3)", zIndex: 0 };
     },
     edgeReducer: (edge, data) => {
       if (!focus) return data;
       if (focus.edges.has(edge)) {
-        return { ...data, size: Number(data.size || 1) * 1.9, color: "rgba(36, 120, 101, 0.76)", zIndex: 100 };
+        return { ...data, size: Number(data.size || 1) * 2.5, color: "rgba(23, 32, 29, 0.82)", zIndex: 100 };
       }
-      return { ...data, size: 0.22, color: "rgba(102, 115, 110, 0.07)", zIndex: 0 };
+      return { ...data, size: 0.3, color: "rgba(102, 115, 110, 0.16)", zIndex: 0 };
     },
     defaultDrawNodeHover: (context, data) => {
       context.beginPath();
@@ -1004,14 +1299,246 @@ function renderGraph(): void {
   renderer.on("enterEdge", ({ edge }) => showNodeTooltip(edge));
   renderer.on("leaveEdge", hideNodeTooltip);
   renderer.on("clickNode", ({ node }) => {
+    if (Date.now() < ignoreGraphClicksUntil) return;
     const payload = lastGraphItems.get(node);
     if (payload) selectItem(payload);
   });
   renderer.on("clickEdge", ({ edge }) => {
+    if (Date.now() < ignoreGraphClicksUntil) return;
     const payload = lastGraphItems.get(edge);
     if (payload) selectItem(payload);
   });
   renderer.getCamera().animatedReset({ duration: 220 });
+}
+
+type CosmosPayload = {
+  nodeIds: string[];
+  edgeIds: string[];
+  pointPositions: Float32Array;
+  pointColors: Float32Array;
+  pointSizes: Float32Array;
+  links: Float32Array;
+  linkColors: Float32Array;
+  linkWidths: Float32Array;
+  linkArrows: boolean[];
+  focusedPointIndex?: number;
+  focusedLinkIndex?: number;
+  highlightedPointIndices?: number[];
+  highlightedLinkIndices?: number[];
+  outlinedPointIndices?: number[];
+};
+
+async function renderCosmosGraph(renderVersion: number): Promise<void> {
+  if (!graphContainer) return;
+  const payload = cosmosPayloadFromGraph();
+  const { Graph: CosmosGraphClass } = await loadCosmosModule();
+  if (renderVersion !== graphRenderVersion || state.rendererMode !== "cosmos" || !graphContainer) return;
+  const family = layoutFamily();
+  const simulationEnabled = cosmosSimulationEnabled(family);
+  const config: GraphConfig = {
+    backgroundColor: [1, 1, 1, 0],
+    spaceSize: 4096,
+    randomSeed: 41,
+    rescalePositions: true,
+    fitViewOnInit: true,
+    fitViewDelay: 140,
+    fitViewDuration: 260,
+    fitViewPadding: family === "timeline" || family === "flow" ? 0.06 : 0.1,
+    pointDefaultColor: palette.blue,
+    pointDefaultSize: 5,
+    pointSizeScale: state.graphMode === "clusters" ? 0.86 : 1.22,
+    pointGreyoutOpacity: 0.32,
+    renderHoveredPointRing: true,
+    hoveredPointRingColor: [1, 1, 1, 0.96],
+    focusedPointRingColor: [0.09, 0.13, 0.12, 0.9],
+    outlinedPointRingColor: [0.09, 0.13, 0.12, 0.72],
+    focusedPointIndex: payload.focusedPointIndex,
+    highlightedPointIndices: payload.highlightedPointIndices,
+    outlinedPointIndices: payload.outlinedPointIndices,
+    renderLinks: payload.links.length > 0,
+    linkDefaultColor: [0.09, 0.13, 0.12, 0.22],
+    linkOpacity: linkOpacityForLayout(family),
+    linkGreyoutOpacity: 0.08,
+    linkDefaultWidth: 0.7,
+    linkWidthScale: linkWidthScaleForLayout(family),
+    linkVisibilityDistanceRange: [8000, 12000],
+    linkVisibilityMinTransparency: state.densityMode === "dense" ? 0.32 : 0.86,
+    scaleLinksOnZoom: true,
+    linkBlending: state.densityMode !== "dense",
+    curvedLinks: family === "semantic" || family === "infrastructure",
+    linkDefaultArrows: family === "flow" || family === "evidence",
+    focusedLinkIndex: payload.focusedLinkIndex,
+    highlightedLinkIndices: payload.highlightedLinkIndices,
+    hoveredLinkWidthIncrease: 2,
+    focusedLinkWidthIncrease: 3,
+    enableDrag: true,
+    enableSimulation: simulationEnabled,
+    simulationGravity: family === "organic" ? 0.12 : 0.04,
+    simulationCenter: simulationEnabled ? 0.05 : 0,
+    simulationRepulsion: simulationEnabled ? (state.densityMode === "dense" ? 0.36 : 0.62) : 0,
+    simulationLinkSpring: simulationEnabled ? 0.58 : 0,
+    simulationLinkDistance: state.graphMode === "clusters" ? 26 : 18,
+    simulationFriction: 0.84,
+    transitionDuration: 420,
+    hoveredPointCursor: "pointer",
+    hoveredLinkCursor: "pointer",
+    onPointClick: (index, _pointPosition, _event) => {
+      if (Date.now() < ignoreGraphClicksUntil) return;
+      const item = cosmosPointItems[index];
+      if (item) selectItem(item);
+    },
+    onLinkClick: (index, _event) => {
+      if (Date.now() < ignoreGraphClicksUntil) return;
+      const item = cosmosLinkItems[index];
+      if (item) selectItem(item);
+    },
+    onMouseMove: (_index, _pointPosition, event) => {
+      lastPointer.x = event.clientX;
+      lastPointer.y = event.clientY;
+      if (hoveredNodeId) positionNodeTooltip();
+    },
+    onPointMouseOver: (index, _pointPosition, event) => {
+      if (event && "clientX" in event) {
+        lastPointer.x = event.clientX;
+        lastPointer.y = event.clientY;
+      }
+      const nodeId = payload.nodeIds[index];
+      if (nodeId) showNodeTooltip(nodeId);
+    },
+    onPointMouseOut: (_event) => hideNodeTooltip(),
+    onLinkMouseOver: (index) => {
+      const edgeId = payload.edgeIds[index];
+      if (edgeId) showNodeTooltip(edgeId);
+    },
+    onLinkMouseOut: (_event) => hideNodeTooltip(),
+  };
+  cosmosRenderer = new CosmosGraphClass(graphContainer, config);
+  cosmosPointItems = payload.nodeIds.map((nodeId) => lastGraphItems.get(nodeId) || { node_id: nodeId, label: nodeId });
+  cosmosLinkItems = payload.edgeIds.map((edgeId) => lastGraphItems.get(edgeId) || { edge_id: edgeId, label: edgeId });
+  cosmosRenderer.setPointPositions(payload.pointPositions);
+  cosmosRenderer.setPointColors(payload.pointColors);
+  cosmosRenderer.setPointSizes(payload.pointSizes);
+  cosmosRenderer.setLinks(payload.links);
+  cosmosRenderer.setLinkColors(payload.linkColors);
+  cosmosRenderer.setLinkWidths(payload.linkWidths);
+  cosmosRenderer.setLinkArrows(payload.linkArrows);
+  cosmosRenderer.render(simulationEnabled ? undefined : 0);
+}
+
+function cosmosSimulationEnabled(family: LayoutFamily): boolean {
+  if (state.graphMode === "nodes" && state.densityMode !== "overview") return true;
+  return family === "semantic" || family === "organic";
+}
+
+function linkOpacityForLayout(family: LayoutFamily): number {
+  if (state.densityMode === "dense") return 0.28;
+  if (family === "timeline" || family === "flow") return 0.42;
+  if (family === "evidence") return 0.5;
+  return 0.62;
+}
+
+function linkWidthScaleForLayout(family: LayoutFamily): number {
+  if (state.densityMode === "dense") return 0.72;
+  if (family === "timeline" || family === "flow") return 0.82;
+  if (family === "evidence") return 0.94;
+  return 1.22;
+}
+
+function cosmosPayloadFromGraph(): CosmosPayload {
+  const family = layoutFamily();
+  const nodeIds = graph.nodes();
+  const nodeIndex = new Map(nodeIds.map((nodeId, index) => [nodeId, index]));
+  const pointPositions = new Float32Array(nodeIds.length * 2);
+  const pointColors = new Float32Array(nodeIds.length * 4);
+  const pointSizes = new Float32Array(nodeIds.length);
+  nodeIds.forEach((nodeId, index) => {
+    const x = numberAttr(graph.getNodeAttribute(nodeId, "x"));
+    const y = numberAttr(graph.getNodeAttribute(nodeId, "y"));
+    pointPositions[index * 2] = x;
+    pointPositions[index * 2 + 1] = y;
+    writeRgba(pointColors, index, colorToRgba(text(graph.getNodeAttribute(nodeId, "color") || palette.default)));
+    const sizeMultiplier = state.graphMode === "clusters" ? 0.94 : 1.42;
+    const maxSize = state.graphMode === "clusters" ? 28 : 38;
+    pointSizes[index] = Math.max(4.5, Math.min(maxSize, numberAttr(graph.getNodeAttribute(nodeId, "size"), 7) * sizeMultiplier));
+  });
+
+  const edgeIds: string[] = [];
+  const links: number[] = [];
+  const linkColors: number[] = [];
+  const linkWidths: number[] = [];
+  const linkArrows: boolean[] = [];
+  graph.edges().forEach((edgeId) => {
+    const [source, target] = graph.extremities(edgeId);
+    const sourceIndex = nodeIndex.get(source);
+    const targetIndex = nodeIndex.get(target);
+    if (sourceIndex === undefined || targetIndex === undefined) return;
+    edgeIds.push(edgeId);
+    links.push(sourceIndex, targetIndex);
+    linkColors.push(...colorToRgba(text(graph.getEdgeAttribute(edgeId, "color") || palette.line)));
+    const minWidth = state.densityMode === "dense" ? 0.9 : family === "timeline" || family === "flow" ? 1.15 : 1.6;
+    linkWidths.push(Math.max(minWidth, Math.min(9, numberAttr(graph.getEdgeAttribute(edgeId, "size"), 1))));
+    linkArrows.push(state.mode === "philosophy" && state.densityMode !== "dense");
+  });
+
+  const focus = graphFocus();
+  const focusPointIndices = focus
+    ? nodeIds.map((nodeId, index) => (focus.nodes.has(nodeId) ? index : -1)).filter((index) => index >= 0)
+    : undefined;
+  const focusLinkIndices = focus
+    ? edgeIds.map((edgeId, index) => (focus.edges.has(edgeId) ? index : -1)).filter((index) => index >= 0)
+    : undefined;
+  const hardHighlight = Boolean(state.pathPacket?.found);
+  const focusedPointIndex =
+    state.selectedGraphId && nodeIndex.has(state.selectedGraphId) ? nodeIndex.get(state.selectedGraphId) : undefined;
+  const focusedLinkIndex = state.selectedGraphId ? edgeIds.indexOf(state.selectedGraphId) : -1;
+  return {
+    nodeIds,
+    edgeIds,
+    pointPositions,
+    pointColors,
+    pointSizes,
+    links: new Float32Array(links),
+    linkColors: new Float32Array(linkColors),
+    linkWidths: new Float32Array(linkWidths),
+    linkArrows,
+    focusedPointIndex,
+    focusedLinkIndex: focusedLinkIndex >= 0 ? focusedLinkIndex : undefined,
+    highlightedPointIndices: hardHighlight ? focusPointIndices : undefined,
+    highlightedLinkIndices: hardHighlight ? focusLinkIndices : undefined,
+    outlinedPointIndices: focusPointIndices,
+  };
+}
+
+function numberAttr(value: unknown, fallback = 0): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function colorToRgba(value: string): [number, number, number, number] {
+  const color = value.trim();
+  if (color.startsWith("#")) {
+    const hex = color.slice(1);
+    if (hex.length === 6) {
+      const red = parseInt(hex.slice(0, 2), 16) / 255;
+      const green = parseInt(hex.slice(2, 4), 16) / 255;
+      const blue = parseInt(hex.slice(4, 6), 16) / 255;
+      return [red, green, blue, 1];
+    }
+  }
+  const rgba = color.match(/rgba?\\(([^)]+)\\)/i);
+  if (rgba) {
+    const parts = rgba[1].split(",").map((part) => Number(part.trim()));
+    const [red = 36, green = 120, blue = 101, alpha = 1] = parts;
+    return [red / 255, green / 255, blue / 255, alpha > 1 ? alpha / 255 : alpha];
+  }
+  return [0.14, 0.47, 0.4, 1];
+}
+
+function writeRgba(target: Float32Array, index: number, rgba: [number, number, number, number]): void {
+  target[index * 4] = rgba[0];
+  target[index * 4 + 1] = rgba[1];
+  target[index * 4 + 2] = rgba[2];
+  target[index * 4 + 3] = rgba[3];
 }
 
 function setGraphEmpty(empty: boolean, message = ""): void {
@@ -1021,12 +1548,13 @@ function setGraphEmpty(empty: boolean, message = ""): void {
   const caption = byId("graph-caption");
   const view = state.currentView?.view;
   const graphSummary = graph.order > 0 ? ` · ${graph.order} nodes · ${graph.size} links` : "";
-  caption.textContent = `${view?.title || state.currentViewId || "View"} · ${view?.layout_hint || view?.purpose || boot.projection_mode}${graphSummary}`;
+  const layoutSummary = state.mode === "philosophy" ? `${view?.layout_hint || view?.purpose || boot.projection_mode} · ${layoutFamily()}` : view?.layout_hint || view?.purpose || boot.projection_mode;
+  caption.textContent = `${view?.title || state.currentViewId || "View"} · ${layoutSummary}${graphSummary}`;
 }
 
 function buildClusterGraph(): void {
   if (!isPhilosophyView(state.currentView)) return;
-  const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, 360);
+  const clusters = (state.currentView.clusters || []).filter(layerAllowed).slice(0, clusterLimit());
   const nodes = (state.currentView.nodes || []).filter(layerAllowed);
   const edges = (state.currentView.edges || []).filter(relationAllowed);
   const nodeToCluster = new Map<string, string[]>();
@@ -1155,7 +1683,7 @@ function buildNodeGraph(): void {
   const nodes = (state.currentView.nodes || [])
     .filter(layerAllowed)
     .filter((node) => expandedIds.size === 0 || expandedIds.has(node.node_id))
-    .slice(0, 1200);
+    .slice(0, nodeLimit());
   const visible = new Set(nodes.map((node) => node.node_id));
   nodes.forEach((node, index) => addGraphNode(node.node_id, node, index, 7));
   const visibleEdges = (state.currentView.edges || [])
@@ -1170,7 +1698,7 @@ function buildNodeGraph(): void {
 
 function buildCorpusGraph(): void {
   const payload = state.currentView as CorpusViewPayload;
-  const items = (payload.items || []).slice(0, 700);
+  const items = (payload.items || []).slice(0, corpusItemLimit());
   const rootId = `view:${state.currentViewId}`;
   addGraphNode(rootId, payload.view, 0, 16);
   items.forEach((item, index) => {
@@ -1202,11 +1730,68 @@ function addGraphEdge(id: string, from: string, to: string, item: AnyItem): void
   graph.addDirectedEdgeWithKey(id, from, to, {
     size: relationWeight(item),
     color: edgeColorFor(item),
+    label: humanKind(predicateId(item)),
   });
 }
 
 function hashNumber(value: string): number {
   return value.split("").reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 100000, 17);
+}
+
+function layoutFamily(): LayoutFamily {
+  const viewId = state.currentViewId;
+  const hint = text(state.currentView?.view?.layout_hint).toLowerCase();
+  if (viewId === "chronology" || hint.includes("timeline") || hint.includes("lane")) return "timeline";
+  if (viewId === "transmission" || viewId === "canon-promotion" || hint.includes("directed") || hint.includes("flow") || hint.includes("corridor") || hint.includes("promotion")) return "flow";
+  if (
+    viewId === "source-evidence" ||
+    viewId === "script-decipherment" ||
+    viewId === "lost-corpus" ||
+    hint.includes("dag") ||
+    hint.includes("evidence") ||
+    hint.includes("uncertainty") ||
+    hint.includes("absence")
+  ) {
+    return "evidence";
+  }
+  if (viewId === "concept-lineage" || hint.includes("semantic") || hint.includes("lineage")) return "semantic";
+  if (
+    viewId === "institution-media" ||
+    viewId === "imperial-multilingualism" ||
+    viewId === "ritual-law" ||
+    viewId === "epigraphic-network" ||
+    hint.includes("infrastructure") ||
+    hint.includes("parallel") ||
+    hint.includes("ritual") ||
+    hint.includes("law") ||
+    hint.includes("distributed")
+  ) {
+    return "infrastructure";
+  }
+  return "organic";
+}
+
+function dossierOrdinal(item: AnyItem, fallback: number): number {
+  const source = unwrapItem(item);
+  const raw = [
+    propertyText(source, "dossier_id"),
+    propertyText(source, "atlas_row_id"),
+    propertyText(source, "candidate_id"),
+    propertyText(source, "original_node_id"),
+    text(source.node_id || source.cluster_id || source.edge_id || source.label),
+  ].join(" ");
+  const tableThree = raw.match(/T3[-_ ]?(\d+)/i);
+  if (tableThree) return 3000 + Number(tableThree[1]);
+  const tableTwo = raw.match(/T2[-_ ]?(\d+)/i);
+  if (tableTwo) return 2000 + Number(tableTwo[1]);
+  const dossier = raw.match(/\bA(\d{1,3})\b/i);
+  if (dossier) return Number(dossier[1]);
+  return fallback;
+}
+
+function normalized(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value) || max <= min) return 0;
+  return ((value - min) / (max - min)) * 2 - 1;
 }
 
 function laneForItem(item: AnyItem, fallback: number): number {
@@ -1218,27 +1803,92 @@ function laneForItem(item: AnyItem, fallback: number): number {
   return fallback % 5;
 }
 
+function flowLaneForItem(item: AnyItem, fallback: number): number {
+  const signal = `${text(item.cluster_kind || item.node_type || item.primary_predicate || item.predicate_id || item.label || item.title)} ${itemLayers(item).join(" ")}`.toLowerCase();
+  if (signal.includes("source") || signal.includes("witness") || signal.includes("evidence")) return 0;
+  if (signal.includes("corpus") || signal.includes("dossier") || signal.includes("prepared")) return 1;
+  if (signal.includes("candidate") || signal.includes("concept")) return 2;
+  if (signal.includes("transmission") || signal.includes("preserved") || signal.includes("survives") || signal.includes("medium")) return 3;
+  if (signal.includes("canon") || signal.includes("status") || signal.includes("promotion")) return 4;
+  return fallback % 5;
+}
+
+function evidenceLaneForItem(item: AnyItem, fallback: number): number {
+  const signal = `${text(item.cluster_kind || item.node_type || item.primary_predicate || item.predicate_id || item.label || item.title)} ${propertyText(item, "original_node_type")} ${itemLayers(item).join(" ")}`.toLowerCase();
+  if (signal.includes("source") || signal.includes("document") || signal.includes("witness")) return 0;
+  if (signal.includes("preservation") || signal.includes("survives") || signal.includes("preserved")) return 1;
+  if (signal.includes("evidence") || signal.includes("dossier") || signal.includes("corpus")) return 2;
+  if (signal.includes("contested") || signal.includes("controversy") || signal.includes("uncertainty")) return 3;
+  if (signal.includes("lost") || signal.includes("absence") || signal.includes("fragment")) return 4;
+  return fallback % 5;
+}
+
+function semanticLaneForItem(item: AnyItem, fallback: number): number {
+  const signal = `${text(item.cluster_kind || item.node_type || item.primary_predicate || item.predicate_id || item.label || item.title)} ${propertyText(item, "original_node_type")} ${itemLayers(item).join(" ")}`.toLowerCase();
+  if (signal.includes("concept") || signal.includes("problem")) return 0;
+  if (signal.includes("method") || signal.includes("genre")) return 1;
+  if (signal.includes("candidate")) return 2;
+  if (signal.includes("canon") || signal.includes("canonical")) return 3;
+  if (signal.includes("source") || signal.includes("evidence")) return 4;
+  return fallback % 5;
+}
+
+function branchRegionLane(item: AnyItem, fallback: number): number {
+  const branch = propertyText(item, "branch_path").toLowerCase();
+  if (branch.includes("west-asia")) return 0;
+  if (branch.includes("north-africa")) return 1;
+  if (branch.includes("east-asia")) return 2;
+  if (branch.includes("south-asia")) return 3;
+  if (branch.includes("southeast-asia")) return 4;
+  if (branch.includes("mediterranean")) return 5;
+  return fallback % 6;
+}
+
+function layoutForceIterations(family: LayoutFamily): number {
+  if (state.rendererMode === "cosmos" && family !== "organic" && family !== "semantic") return 0;
+  if (family === "timeline" || family === "flow" || family === "evidence") return graph.order > 500 ? 10 : 18;
+  if (family === "semantic") return graph.order > 500 ? 24 : 42;
+  return graph.order > 500 ? 34 : 68;
+}
+
 function layoutGraph(): void {
   const count = Math.max(graph.order, 1);
-  const hint = text(state.currentView?.view?.layout_hint);
+  const family = layoutFamily();
   const nodes = graph.nodes();
+  const ordinals = nodes.map((node, index) => dossierOrdinal(lastGraphItems.get(node) || {}, index));
+  const minOrdinal = Math.min(...ordinals);
+  const maxOrdinal = Math.max(...ordinals);
   const span = 1 + count / 90;
   nodes.forEach((node, index) => {
     const item = lastGraphItems.get(node) || {};
     const hash = hashNumber(node);
     const lane = laneForItem(item, hash);
+    const orderX = normalized(ordinals[index], minOrdinal, maxOrdinal);
     const jitter = ((hash % 29) - 14) / 120;
     let x = 0;
     let y = 0;
-    if (hint.includes("timeline") || hint.includes("lane")) {
-      x = ((index / Math.max(count - 1, 1)) * 2 - 1) * (1.4 + count / 80);
-      y = (lane - 2) * 0.72 + jitter;
-    } else if (hint.includes("directed") || hint.includes("flow") || hint.includes("corridor")) {
-      x = (lane - 2) * 1.2 + jitter;
-      y = ((index / Math.max(count - 1, 1)) * 2 - 1) * (1.2 + count / 95);
-    } else if (hint.includes("dag") || hint.includes("evidence") || hint.includes("uncertainty")) {
-      x = (lane - 2) * 1.1 + jitter;
-      y = ((hash % 97) / 48.5 - 1) * (1.4 + count / 110);
+    if (family === "timeline") {
+      x = orderX * (2.7 + count / 75);
+      y = (lane - 2) * 0.58 + jitter;
+    } else if (family === "flow") {
+      const flowLane = flowLaneForItem(item, hash);
+      x = (flowLane - 2) * 1.08 + jitter;
+      y = orderX * (2.2 + count / 92) + ((hash % 17) - 8) / 180;
+    } else if (family === "evidence") {
+      const evidenceLane = evidenceLaneForItem(item, hash);
+      x = (evidenceLane - 2) * 1.0 + jitter;
+      y = orderX * (2.3 + count / 105) + ((hash % 23) - 11) / 180;
+    } else if (family === "semantic") {
+      const semanticLane = semanticLaneForItem(item, hash);
+      const radius = 0.45 + semanticLane * 0.42 + count / 520;
+      const angle = Math.PI * 2 * ((hash % 997) / 997);
+      x = Math.cos(angle) * radius + orderX * 0.12;
+      y = Math.sin(angle) * radius + (semanticLane - 2) * 0.08;
+    } else if (family === "infrastructure") {
+      const regionLane = branchRegionLane(item, hash);
+      const mediaLane = evidenceLaneForItem(item, hash);
+      x = (regionLane - 2.5) * 0.82 + jitter;
+      y = (mediaLane - 2) * 0.66 + orderX * 0.72 + ((hash % 19) - 9) / 160;
     } else {
       const angle = (Math.PI * 2 * (hash % Math.max(count, 2))) / Math.max(count, 2);
       x = Math.cos(angle) * span + jitter;
@@ -1247,13 +1897,14 @@ function layoutGraph(): void {
     graph.setNodeAttribute(node, "x", x);
     graph.setNodeAttribute(node, "y", y);
   });
-  if (graph.order > 1) {
+  const iterations = layoutForceIterations(family);
+  if (graph.order > 1 && iterations > 0) {
     forceAtlas2.assign(graph, {
-      iterations: graph.order > 500 ? 38 : 74,
+      iterations,
       settings: {
         ...forceAtlas2.inferSettings(graph),
-        gravity: hint.includes("timeline") ? 0.1 : 0.055,
-        scalingRatio: graph.order > 500 ? 7 : 11,
+        gravity: family === "timeline" ? 0.16 : family === "flow" || family === "evidence" ? 0.12 : 0.055,
+        scalingRatio: graph.order > 500 ? 7 : family === "semantic" ? 8 : 11,
       },
     });
   }
@@ -1262,11 +1913,142 @@ function layoutGraph(): void {
 function selectItem(item: AnyItem): void {
   state.selected = item;
   state.selectedGraphId = text(item.node_id || item.cluster_id || item.edge_id || "") || null;
+  const nodeId = selectedNodeIdFor(item);
+  if (!nodeId || state.neighborhood?.node?.node_id !== nodeId) state.neighborhood = null;
+  const pathNodeIds = new Set(stringList(state.pathPacket?.nodes?.map((node) => node.node_id)));
+  if (!nodeId || (state.pathPacket && !pathNodeIds.has(nodeId))) state.pathPacket = null;
   const cluster = item as Cluster;
   if (cluster.cluster_id && cluster.member_node_ids?.length) {
     state.expandedCluster = cluster;
   }
   renderGraph();
+  renderInspector();
+  scrollInspectorTop();
+}
+
+function nodeRouteActions(nodeId: string): string {
+  const pathStartLabel = state.pathStartNodeId ? endpointLabel(state.pathStartNodeId) || state.pathStartNodeId : "";
+  const canPathTo = Boolean(state.pathStartNodeId && state.pathStartNodeId !== nodeId);
+  return `
+    <div class="route-actions">
+      <button id="neighborhood-button" type="button">Neighborhood</button>
+      <button id="path-start-button" type="button">${state.pathStartNodeId === nodeId ? "Path start set" : "Use as path start"}</button>
+      ${canPathTo ? `<button id="path-to-button" type="button">Path from ${escapeHtml(short(pathStartLabel, 24))}</button>` : ""}
+    </div>
+  `;
+}
+
+function neighborhoodCards(nodeId: string): string[] {
+  if (!state.neighborhood || state.neighborhood.node?.node_id !== nodeId) return [];
+  const neighbors = state.neighborhood.neighbors || [];
+  const edges = state.neighborhood.edges || [];
+  const cards = [
+    detailCard(
+      "Neighborhood",
+      `${neighbors.length} neighbors\n${edges.length} relations\n${state.neighborhood.layers?.length ? state.neighborhood.layers.join(", ") : "all active layers"}`,
+    ),
+  ];
+  if (neighbors.length) {
+    cards.push(`<div class="section-title">Neighbors</div>`);
+    cards.push(
+      ...neighbors.slice(0, 24).map(
+        (item, index) => `
+          <button class="result-card" data-neighbor="${index}" type="button">
+            <span class="result-title">${escapeHtml(short(displayTitle(item), 82))}</span>
+            <span class="result-subtitle">${escapeHtml(short(displaySubtitle(item), 98))}</span>
+          </button>
+        `,
+      ),
+    );
+  }
+  if (edges.length) {
+    cards.push(relationRowsSection("Neighborhood relations", edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "neighborhood"));
+  }
+  return cards;
+}
+
+function pathCards(nodeId: string): string[] {
+  const cards: string[] = [];
+  if (state.pathStartNodeId) {
+    cards.push(detailCard("Path start", endpointLabel(state.pathStartNodeId) || state.pathStartNodeId));
+  }
+  if (!state.pathPacket || (state.pathPacket.from_id !== nodeId && state.pathPacket.to_id !== nodeId)) return cards;
+  const nodes = state.pathPacket.nodes || [];
+  const edges = state.pathPacket.edges || [];
+  cards.push(
+    detailCard(
+      "Path",
+      state.pathPacket.found
+        ? `${nodes.length} nodes\n${edges.length} relations\nmax depth ${state.pathPacket.max_depth || 6}`
+        : `No route found\nmax depth ${state.pathPacket.max_depth || 6}`,
+    ),
+  );
+  if (nodes.length) {
+    cards.push(`<div class="section-title">Path nodes</div>`);
+    cards.push(
+      ...nodes.map(
+        (item, index) => `
+          <button class="result-card" data-path-node="${index}" type="button">
+            <span class="result-title">${escapeHtml(short(displayTitle(item), 82))}</span>
+            <span class="result-subtitle">${escapeHtml(short(displaySubtitle(item), 98))}</span>
+          </button>
+        `,
+      ),
+    );
+  }
+  if (edges.length) {
+    cards.push(relationRowsSection("Path relations", edges.map((edge) => relationRowFromEdge(edge, "adjacent")), "path"));
+  }
+  return cards;
+}
+
+function activeLayerParam(): string {
+  const layers = [...state.activeLayers].filter(Boolean).join(",");
+  return layers ? `&layers=${encodeURIComponent(layers)}` : "";
+}
+
+async function showNeighborhood(nodeId: string): Promise<void> {
+  if (!nodeId) return;
+  const selected = state.selected;
+  ignoreGraphClicksUntil = Date.now() + 1500;
+  ignoreInspectorSelectionsUntil = Date.now() + 1500;
+  state.graphMode = "nodes";
+  state.expandedCluster = null;
+  state.selectedGraphId = nodeId;
+  state.neighborhood = await fetchJson<NeighborhoodPayload>(
+    `/api/philosophy/neighborhood/${encodeURIComponent(nodeId)}?depth=1&limit=160${activeLayerParam()}`,
+  );
+  state.selected = selected;
+  state.selectedGraphId = nodeId;
+  renderGraph();
+  ignoreGraphClicksUntil = Date.now() + 1500;
+  ignoreInspectorSelectionsUntil = Date.now() + 1500;
+  renderInspector();
+  scrollInspectorTop();
+}
+
+function setPathStart(nodeId: string): void {
+  if (!nodeId) return;
+  state.pathStartNodeId = nodeId;
+  state.pathPacket = null;
+  renderInspector();
+}
+
+async function showPathTo(nodeId: string): Promise<void> {
+  if (!nodeId || !state.pathStartNodeId || state.pathStartNodeId === nodeId) return;
+  const selected = state.selected;
+  ignoreGraphClicksUntil = Date.now() + 1500;
+  ignoreInspectorSelectionsUntil = Date.now() + 1500;
+  state.graphMode = "nodes";
+  state.expandedCluster = null;
+  state.pathPacket = await fetchJson<PathPayload>(
+    `/api/philosophy/paths?from=${encodeURIComponent(state.pathStartNodeId)}&to=${encodeURIComponent(nodeId)}&max_depth=6${activeLayerParam()}`,
+  );
+  state.selected = selected;
+  state.selectedGraphId = nodeId;
+  renderGraph();
+  ignoreGraphClicksUntil = Date.now() + 1500;
+  ignoreInspectorSelectionsUntil = Date.now() + 1500;
   renderInspector();
   scrollInspectorTop();
 }
@@ -1277,8 +2059,22 @@ function renderAll(): void {
   renderViews();
   renderLayers();
   renderRelationControls();
+  renderScaleExportControls();
   renderGraph();
   renderInspector();
+}
+
+async function copyScaleExportUrl(table?: ScaleExportTable, format?: "csv" | "jsonl"): Promise<void> {
+  const url = scaleExportAbsoluteUrl(table, format);
+  try {
+    await navigator.clipboard.writeText(url);
+    state.selected = { title: "Scale export URL", url };
+  } catch (error) {
+    state.selected = { title: "Scale export URL", url, copy_error: text(error) };
+  }
+  state.selectedGraphId = null;
+  renderInspector();
+  scrollInspectorTop();
 }
 
 async function loadMode(mode: Mode): Promise<void> {
@@ -1289,6 +2085,9 @@ async function loadMode(mode: Mode): Promise<void> {
   state.results = [];
   state.relationItems = [];
   state.expandedCluster = null;
+  state.neighborhood = null;
+  state.pathStartNodeId = null;
+  state.pathPacket = null;
   if (mode === "philosophy") {
     state.status.philosophy = await fetchJson<AnyItem>("/api/philosophy/status");
     const views = await fetchJson<{ views: ViewCard[] }>("/api/philosophy/views");
@@ -1311,6 +2110,9 @@ async function loadView(viewId: string): Promise<void> {
   state.results = [];
   state.relationItems = [];
   state.expandedCluster = null;
+  state.neighborhood = null;
+  state.pathStartNodeId = null;
+  state.pathPacket = null;
   if (state.mode === "philosophy") {
     const payload = await fetchJson<PhilosophyViewPayload>(`/api/philosophy/views/${encodeURIComponent(viewId)}`);
     state.currentView = payload;

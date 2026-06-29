@@ -7,6 +7,62 @@ from typing import Any
 from .config import TosGraphSettings
 
 
+SCALE_EXPORT_COLUMNS = {
+    "nodes": [
+        "id",
+        "label",
+        "kind",
+        "view_ids",
+        "graph_layers",
+        "source_ref",
+        "source_refs",
+        "properties",
+    ],
+    "edges": [
+        "id",
+        "source",
+        "target",
+        "predicate",
+        "label",
+        "view_ids",
+        "graph_layers",
+        "source_ref",
+        "source_refs",
+        "properties",
+    ],
+    "clusters": [
+        "id",
+        "label",
+        "kind",
+        "member_count",
+        "edge_count",
+        "view_ids",
+        "graph_layers",
+        "source_ref",
+        "source_refs",
+        "properties",
+    ],
+    "cluster-node-memberships": [
+        "cluster_id",
+        "node_id",
+        "cluster_kind",
+        "cluster_label",
+        "view_ids",
+        "graph_layers",
+        "source_ref",
+    ],
+    "cluster-edge-memberships": [
+        "cluster_id",
+        "edge_id",
+        "cluster_kind",
+        "cluster_label",
+        "view_ids",
+        "graph_layers",
+        "source_ref",
+    ],
+}
+
+
 class ToSPhilosophyReaderError(RuntimeError):
     """Raised when the ToS philosophy graph projection cannot be read honestly."""
 
@@ -31,6 +87,16 @@ def _source_refs(items: list[dict[str, Any]]) -> list[str]:
         if isinstance(item.get("source_refs"), list):
             refs.update(str(ref) for ref in item["source_refs"] if isinstance(ref, str) and ref)
     return sorted(refs)
+
+
+def _json_cell(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _string_list(value: Any) -> list[str]:
+    return [str(item) for item in value] if isinstance(value, list) else []
 
 
 def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
@@ -226,6 +292,153 @@ class ToSPhilosophyProjectionReader:
             "counts": payload.get("counts", {}),
             "source_refs": _source_refs(clusters),
             "runtime_projection_boundary": payload.get("runtime_projection_boundary", {}),
+        }
+
+    def scale_export_manifest(self, view_id: str | None = None, layers: set[str] | None = None) -> dict[str, Any]:
+        layer_filter = layers or set()
+        tables = {
+            table_name: {
+                "columns": SCALE_EXPORT_COLUMNS[table_name],
+                "row_count": len(self.scale_export_table(table_name, view_id=view_id, layers=layer_filter)),
+                "formats": ["csv", "jsonl"],
+            }
+            for table_name in SCALE_EXPORT_COLUMNS
+        }
+        return {
+            "schema": "tos_graph_philosophy_scale_export_manifest_v1",
+            "view_id": view_id,
+            "layers": sorted(layer_filter),
+            "tables": tables,
+            "source_projection_ref": self.projection_path.as_posix(),
+            "runtime_projection_boundary": self.status().get("runtime_projection_boundary", {}),
+            "authority_note": (
+                "Tree-of-Sophia owns graph meaning and source_refs; tos-graph only streams "
+                "viewer-ready tables for large graph tools."
+            ),
+        }
+
+    def scale_export_table(
+        self,
+        table_name: str,
+        *,
+        view_id: str | None = None,
+        layers: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        if table_name not in SCALE_EXPORT_COLUMNS:
+            raise ToSPhilosophyReaderError(f"unknown ToS philosophy scale export table: {table_name}")
+        payload = self.load_projection()
+        layer_filter = layers or set()
+        nodes, edges, clusters = self._scale_export_surfaces(payload, view_id=view_id, layers=layer_filter)
+        if table_name == "nodes":
+            return [self._scale_node_row(node) for node in nodes]
+        if table_name == "edges":
+            return [self._scale_edge_row(edge) for edge in edges]
+        if table_name == "clusters":
+            return [self._scale_cluster_row(cluster) for cluster in clusters]
+        if table_name == "cluster-node-memberships":
+            return [
+                self._scale_cluster_membership_row(cluster, node_id=node_id)
+                for cluster in clusters
+                for node_id in _string_list(cluster.get("member_node_ids"))
+            ]
+        if table_name == "cluster-edge-memberships":
+            return [
+                self._scale_cluster_membership_row(cluster, edge_id=edge_id)
+                for cluster in clusters
+                for edge_id in _string_list(cluster.get("member_edge_ids"))
+            ]
+        raise ToSPhilosophyReaderError(f"unknown ToS philosophy scale export table: {table_name}")
+
+    def _scale_export_surfaces(
+        self,
+        payload: dict[str, Any],
+        *,
+        view_id: str | None,
+        layers: set[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        if view_id:
+            view = next(
+                (item for item in payload.get("views", []) if isinstance(item, dict) and item.get("view_id") == view_id),
+                None,
+            )
+            if view is None:
+                raise ToSPhilosophyReaderError(f"unknown ToS philosophy graph view: {view_id}")
+            nodes = [node for node in view.get("nodes", []) if isinstance(node, dict) and _layer_allowed(node, layers)]
+            edges = [edge for edge in view.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layers)]
+            clusters = self._clusters_for_payload(payload, view_id=view_id, limit=1_000_000)
+            clusters = [cluster for cluster in clusters if _layer_allowed(cluster, layers)]
+            return nodes, edges, clusters
+        nodes = [node for node in payload.get("nodes", []) if isinstance(node, dict) and _layer_allowed(node, layers)]
+        edges = [edge for edge in payload.get("edges", []) if isinstance(edge, dict) and _layer_allowed(edge, layers)]
+        clusters = [cluster for cluster in payload.get("clusters", []) if isinstance(cluster, dict) and _layer_allowed(cluster, layers)]
+        return nodes, edges, clusters
+
+    @staticmethod
+    def _pipe_cell(value: Any) -> str:
+        return "|".join(_string_list(value))
+
+    @classmethod
+    def _scale_node_row(cls, node: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": str(node.get("node_id") or ""),
+            "label": str(node.get("label") or node.get("node_id") or ""),
+            "kind": str(node.get("node_type") or ""),
+            "view_ids": cls._pipe_cell(node.get("view_ids")),
+            "graph_layers": cls._pipe_cell(node.get("graph_layers")),
+            "source_ref": str(node.get("source_ref") or ""),
+            "source_refs": _json_cell(node.get("source_refs") or _source_refs([node])),
+            "properties": _json_cell(node.get("properties")),
+        }
+
+    @classmethod
+    def _scale_edge_row(cls, edge: dict[str, Any]) -> dict[str, Any]:
+        predicate = str(edge.get("predicate_id") or "")
+        return {
+            "id": str(edge.get("edge_id") or ""),
+            "source": str(edge.get("from_id") or ""),
+            "target": str(edge.get("to_id") or ""),
+            "predicate": predicate,
+            "label": predicate.replace("_", " ").replace("-", " "),
+            "view_ids": cls._pipe_cell(edge.get("view_ids")),
+            "graph_layers": cls._pipe_cell(edge.get("graph_layers")),
+            "source_ref": str(edge.get("source_ref") or ""),
+            "source_refs": _json_cell(edge.get("source_refs") or _source_refs([edge])),
+            "properties": _json_cell(edge.get("properties")),
+        }
+
+    @classmethod
+    def _scale_cluster_row(cls, cluster: dict[str, Any]) -> dict[str, Any]:
+        properties = cluster.get("properties") if isinstance(cluster.get("properties"), dict) else {}
+        return {
+            "id": str(cluster.get("cluster_id") or ""),
+            "label": str(cluster.get("label") or cluster.get("cluster_id") or ""),
+            "kind": str(cluster.get("cluster_kind") or ""),
+            "member_count": str(properties.get("member_count") or len(_string_list(cluster.get("member_node_ids")))),
+            "edge_count": str(properties.get("edge_count") or len(_string_list(cluster.get("member_edge_ids")))),
+            "view_ids": cls._pipe_cell(cluster.get("view_ids")),
+            "graph_layers": cls._pipe_cell(cluster.get("graph_layers")),
+            "source_ref": str(cluster.get("source_ref") or ""),
+            "source_refs": _json_cell(cluster.get("source_refs") or _source_refs([cluster])),
+            "properties": _json_cell(properties),
+        }
+
+    @classmethod
+    def _scale_cluster_membership_row(
+        cls,
+        cluster: dict[str, Any],
+        *,
+        node_id: str | None = None,
+        edge_id: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "cluster_id": str(cluster.get("cluster_id") or ""),
+            "node_id": node_id or "",
+            "edge_id": edge_id or "",
+            "cluster_kind": str(cluster.get("cluster_kind") or ""),
+            "cluster_label": str(cluster.get("label") or ""),
+            "view_ids": cls._pipe_cell(cluster.get("view_ids")),
+            "graph_layers": cls._pipe_cell(cluster.get("graph_layers")),
+            "source_ref": str(cluster.get("source_ref") or ""),
         }
 
     def review_packet(self, view_id: str) -> dict[str, Any]:

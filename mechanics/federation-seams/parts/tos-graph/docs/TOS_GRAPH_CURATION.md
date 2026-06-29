@@ -42,10 +42,77 @@ The active runtime route is:
 - read `ToS/derived-exports/tos_corpus_index.min.json`
 - read `ToS/derived-exports/philosophy_graph_projection.min.json`
 - expose switchable corpus and philosophy graph views through a localhost-only helper UI and API
-- render the graph workbench through a bundled WebGL frontend rather than an inline diagnostic SVG
+- render the graph workbench through bundled WebGL frontends rather than an inline diagnostic SVG
+- use `cosmos.gl` as the scale-oriented GPU renderer and keep Sigma as the
+  curation/neighborhood renderer fallback
+- stream philosophy projection scale-export tables for external large-graph
+  viewers and analytics tools
 - expose `tos-up` as the short operator command for the same workbench route; `aoa-tos-graph` remains the explicit stack command
 - project the whole corpus index and philosophy graph projection into Neo4j when credentials are ready
 - keep write mode absent by default
+
+## Scale export route
+
+The review workbench is intentionally not the final UI for the full future
+Tree. It is the local operator lens for source-owned projection exports.
+
+Large graph viewers should consume stable tables rather than scrape the UI or
+treat Neo4j as source truth. `tos-graph` exposes these read-only tables:
+
+- `/api/philosophy/scale-export/manifest`
+- `/api/philosophy/scale-export/nodes.csv`
+- `/api/philosophy/scale-export/nodes.jsonl`
+- `/api/philosophy/scale-export/edges.csv`
+- `/api/philosophy/scale-export/edges.jsonl`
+- `/api/philosophy/scale-export/clusters.csv`
+- `/api/philosophy/scale-export/clusters.jsonl`
+- `/api/philosophy/scale-export/cluster-node-memberships.csv`
+- `/api/philosophy/scale-export/cluster-node-memberships.jsonl`
+- `/api/philosophy/scale-export/cluster-edge-memberships.csv`
+- `/api/philosophy/scale-export/cluster-edge-memberships.jsonl`
+
+Each endpoint accepts optional `view_id` and comma-separated `layers` query
+parameters. The table spine is:
+
+- nodes: `id`, `label`, `kind`, `view_ids`, `graph_layers`, source refs, properties
+- edges: `id`, `source`, `target`, `predicate`, source refs, properties
+- clusters: cluster identity and counts
+- memberships: cluster-to-node and cluster-to-edge joins
+
+This is the compatibility plane for scale tools such as GPU/WebGL graph
+viewers, notebooks, offline layout experiments, and Neo4j import experiments.
+It does not add ToS meaning, does not choose canon, and does not write back.
+Corrections still route to `Tree-of-Sophia`, then ToS derived exports are
+rebuilt and streamed again.
+
+## Renderer route
+
+`tos-graph` uses one filtered graph build path and two renderers:
+
+- `cosmos.gl` consumes typed-array projections for larger graph layers and
+  should be the first route for scale inspection
+- Sigma consumes the same built graph for compact curation, neighborhood
+  reading, and fallback behavior
+
+Both renderers are runtime lenses. Neither owns graph meaning, source authority,
+canonical status, or writeback.
+
+## Layout route
+
+The frontend reads ToS-owned `view_id` and `layout_hint` fields, then maps them
+to runtime layout families:
+
+- `timeline`: chronology and lane views
+- `flow`: transmission corridors and canon-promotion flow
+- `evidence`: source evidence, uncertainty, absence, and lost-corpus routes
+- `semantic`: concept-lineage views
+- `infrastructure`: institution, media, epigraphic, ritual-law, and parallel
+  version views
+- `organic`: fallback for views without a stronger shape
+
+These families only choose coordinates, link styling, and whether the Cosmos
+simulation may move the rendered points. They do not change ToS graph data and
+must not be treated as canonical topology.
 
 ## Dry-run-first landing order
 

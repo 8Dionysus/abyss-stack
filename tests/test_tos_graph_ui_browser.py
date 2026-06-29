@@ -95,6 +95,20 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.goto(tos_graph_server, wait_until="networkidle")
             page.get_by_text("Tree of Sophia Graph").wait_for(timeout=10_000)
             page.locator("#inspector-title", has_text="Chronology Graph View").wait_for(timeout=10_000)
+            page.locator("#renderer-chip", has_text="cosmos").wait_for(timeout=10_000)
+            page.locator("#graph canvas").first.wait_for(timeout=10_000)
+            page.locator("#graph-caption", has_text="timeline").wait_for(timeout=10_000)
+            page.locator("[data-view='transmission']").click()
+            page.locator("#graph-caption", has_text="flow").wait_for(timeout=10_000)
+            page.locator("[data-view='chronology']").click()
+            page.locator("#graph-caption", has_text="timeline").wait_for(timeout=10_000)
+            page.locator("#renderer-sigma").click()
+            page.locator("#renderer-chip", has_text="sigma").wait_for(timeout=10_000)
+            page.locator("#graph canvas").first.wait_for(timeout=10_000)
+            page.locator("#renderer-cosmos").click()
+            page.locator("#renderer-chip", has_text="cosmos").wait_for(timeout=10_000)
+            page.locator("[data-export-link='manifest']").wait_for(timeout=10_000)
+            nodes_csv_href = page.locator("[data-export-link='nodes-csv']").get_attribute("href", timeout=10_000)
             page.get_by_role("button", name="Review packet").click()
             page.locator("#inspector-title", has_text="Review packet: chronology").wait_for(timeout=10_000)
             page.locator("#clusters-button").click()
@@ -108,11 +122,16 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
             page.locator(".detail-title", has_text="From").wait_for(timeout=10_000)
             page.locator(".detail-title", has_text="To").wait_for(timeout=10_000)
             page.locator(".relation-row").first.wait_for(timeout=10_000)
+            relation_card_count = page.locator(".result-card .result-subtitle").filter(has_text="relations").count()
+            page.locator("#nodes-button").click()
+            page.locator(".result-card").first.click()
+            page.get_by_role("button", name="Neighborhood").click()
+            page.locator(".detail-title", has_text="Neighborhood").wait_for(timeout=10_000)
             first_result_title = page.locator(".result-card .result-title").first.inner_text(timeout=10_000)
             graph_caption = page.locator("#graph-caption").inner_text(timeout=10_000)
-            relation_card_count = page.locator(".result-card .result-subtitle").filter(has_text="relations").count()
             predicate_toggle_count = page.locator(".predicate-toggle").count()
             selected_relation_count = page.locator(".relation-row").count()
+            route_action_count = page.locator(".route-actions button").count()
             node_count = page.locator("#graph canvas").count()
             source_ref_count = page.get_by_text("source_ref").count()
             page.screenshot(path=str(screenshot))
@@ -125,9 +144,13 @@ def test_tos_graph_philosophy_ui_renders_canvas_and_source_refs(tos_graph_server
 
     assert node_count > 0
     assert source_ref_count > 0
+    assert nodes_csv_href is not None
+    assert "/api/philosophy/scale-export/nodes.csv" in nodes_csv_href
+    assert "view_id=chronology" in nodes_csv_href
     assert "Corpus Or Prepared Source Document" not in first_result_title
     assert "links" in graph_caption
     assert relation_card_count > 0
     assert predicate_toggle_count > 0
     assert selected_relation_count > 0
+    assert route_action_count >= 2
     assert screenshot.stat().st_size > 20_000

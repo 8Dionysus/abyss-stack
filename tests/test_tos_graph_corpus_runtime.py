@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 import json
 import sys
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -450,6 +452,49 @@ def test_philosophy_reader_exposes_views_nodes_and_neighborhood(tmp_path: Path) 
     assert unresolved["unresolved_count"] == 0
     assert path["found"] is True
     assert [item["node_id"] for item in path["nodes"]] == ["atlas-row:A01", "dossier:A01"]
+
+
+def test_philosophy_reader_exposes_scale_export_tables(tmp_path: Path) -> None:
+    write_philosophy_projection(tmp_path)
+    reader = ToSPhilosophyProjectionReader(settings_for(tmp_path))
+
+    manifest = reader.scale_export_manifest(view_id="chronology", layers={"historical-relation"})
+    nodes = reader.scale_export_table("nodes", view_id="chronology", layers={"historical-relation"})
+    edges = reader.scale_export_table("edges", view_id="chronology", layers={"historical-relation"})
+    clusters = reader.scale_export_table("clusters", view_id="chronology", layers={"historical-relation"})
+    cluster_nodes = reader.scale_export_table(
+        "cluster-node-memberships",
+        view_id="chronology",
+        layers={"historical-relation"},
+    )
+    cluster_edges = reader.scale_export_table(
+        "cluster-edge-memberships",
+        view_id="chronology",
+        layers={"historical-relation"},
+    )
+
+    assert manifest["schema"] == "tos_graph_philosophy_scale_export_manifest_v1"
+    assert manifest["tables"]["nodes"]["row_count"] == 2
+    assert manifest["tables"]["edges"]["formats"] == ["csv", "jsonl"]
+    assert nodes[0]["id"] == "atlas-row:A01"
+    assert nodes[0]["graph_layers"] == "historical-relation"
+    assert json.loads(nodes[0]["source_refs"]) == ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"]
+    assert edges[0]["source"] == "atlas-row:A01"
+    assert edges[0]["target"] == "dossier:A01"
+    assert edges[0]["predicate"] == "has-dossier"
+    assert clusters[0]["id"] == "cluster:region:test"
+    assert clusters[0]["member_count"] == "2"
+    assert cluster_nodes[0]["cluster_id"] == "cluster:region:test"
+    assert cluster_nodes[0]["node_id"] == "atlas-row:A01"
+    assert cluster_edges[0]["edge_id"] == "edge:row:A01:has-dossier:A01"
+
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=manifest["tables"]["edges"]["columns"], extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(edges)
+    parsed_edges = list(csv.DictReader(StringIO(output.getvalue())))
+    assert parsed_edges[0]["source"] == "atlas-row:A01"
+    assert parsed_edges[0]["target"] == "dossier:A01"
 
 
 def test_philosophy_projection_preview_uses_projection_counts(tmp_path: Path) -> None:

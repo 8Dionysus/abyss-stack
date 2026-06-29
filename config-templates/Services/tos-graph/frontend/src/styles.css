@@ -52,6 +52,11 @@ button:hover {
   border-color: var(--line-strong);
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 328px minmax(520px, 1fr) 392px;
@@ -146,6 +151,7 @@ button:hover {
 
 .segmented button.active,
 .mode-button.active,
+.renderer-button.active,
 .view-card.active,
 .layer-toggle.active,
 .predicate-toggle.active,
@@ -291,6 +297,90 @@ button:hover {
 .predicate-toggle small {
   color: var(--muted);
   font-size: 11px;
+}
+
+.scale-export-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.export-summary {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 8px 10px;
+}
+
+.export-summary strong,
+.export-summary span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.export-summary strong {
+  font-size: 13px;
+}
+
+.export-summary span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.export-actions,
+.export-row {
+  display: grid;
+  gap: 6px;
+  align-items: center;
+}
+
+.export-actions {
+  grid-template-columns: minmax(0, 1fr) 82px;
+}
+
+.export-table-list {
+  display: grid;
+  gap: 6px;
+}
+
+.export-row {
+  grid-template-columns: minmax(0, 1fr) 46px 58px 50px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 6px;
+}
+
+.export-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.15;
+}
+
+.export-link,
+.export-actions button,
+.export-row button {
+  display: inline-grid;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  padding: 5px 7px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.export-link:hover,
+.export-actions button:hover,
+.export-row button:hover {
+  border-color: rgba(36, 120, 101, 0.7);
 }
 
 .input-row {
@@ -473,6 +563,28 @@ input:focus {
   background: var(--surface-soft);
 }
 
+.route-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 2px;
+}
+
+.route-actions button {
+  min-height: 34px;
+  border-radius: 7px;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.route-actions button:first-child {
+  border-color: rgba(36, 120, 101, 0.7);
+  background: var(--accent-soft);
+}
+
 .relation-card {
   border-left: 3px solid rgba(36, 120, 101, 0.62);
 }
@@ -482,9 +594,18 @@ input:focus {
   gap: 6px;
 }
 
+.relation-group-label {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .relation-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   gap: 3px 8px;
   width: 100%;
   border-radius: 8px;
