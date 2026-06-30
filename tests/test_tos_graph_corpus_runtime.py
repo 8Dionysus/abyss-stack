@@ -111,9 +111,37 @@ def write_index(root: Path) -> Path:
 def write_philosophy_projection(root: Path) -> Path:
     projection_path = root / "ToS" / "derived-exports" / "philosophy_graph_projection.min.json"
     projection_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def multilingual_label(original: str | None, ru: str, en: str, source_ref: str) -> dict[str, object]:
+        return {
+            "schema_version": "tos_multilingual_label_v1",
+            "label": {
+                "original": original,
+                "ru": ru,
+                "en": en,
+            },
+            "language": {
+                "original_language": None,
+                "original_script": None,
+                "transliteration": None,
+            },
+            "translation_status": {
+                "original": "source" if original else "pending",
+                "ru": "reviewed",
+                "en": "reviewed",
+            },
+            "source_ref": source_ref,
+        }
+
     node_a = {
         "node_id": "atlas-row:A01",
         "label": "A01",
+        "multilingual": multilingual_label(
+            None,
+            "A01 — Протоклинопись и учётные онтологии",
+            "A01 — Proto-Cuneiform and Accounting Ontologies",
+            "ToS/philosophy/atlas/master-tables/table-i/rows.jsonl",
+        ),
         "node_type": "atlas-row",
         "graph_layers": ["historical-relation"],
         "view_ids": ["chronology"],
@@ -123,6 +151,12 @@ def write_philosophy_projection(root: Path) -> Path:
     node_b = {
         "node_id": "dossier:A01",
         "label": "A01 dossier",
+        "multilingual": multilingual_label(
+            None,
+            "Досье A01",
+            "A01 dossier",
+            "ToS/philosophy/dossiers/A01.md",
+        ),
         "node_type": "dossier",
         "graph_layers": ["historical-relation"],
         "view_ids": ["chronology"],
@@ -143,6 +177,12 @@ def write_philosophy_projection(root: Path) -> Path:
         "cluster_id": "cluster:region:test",
         "cluster_kind": "region",
         "label": "Region: West Asia",
+        "multilingual": multilingual_label(
+            None,
+            "Регион: Западная Азия",
+            "Region: West Asia",
+            "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
+        ),
         "member_key": "properties.source_section",
         "member_value": "West Asia",
         "member_node_ids": ["atlas-row:A01", "dossier:A01"],
@@ -214,6 +254,14 @@ def write_philosophy_projection(root: Path) -> Path:
             "lens_review_contract_ref": "ToS/philosophy/graph-workbench/views/lens-review-contracts.json",
             "cluster_contract_ref": "ToS/philosophy/graph-workbench/clusters/cluster-contracts.json",
             "review_packet_contract_ref": "ToS/philosophy/graph-workbench/review-packets/review-packet-contract.json",
+        },
+        "content_language_contract": {
+            "schema_version": "tos_multilingual_content_contract_v1",
+            "source_ref": "ToS/philosophy/atlas/multilingual/content-labels.json",
+            "display_languages": ["original", "ru", "en"],
+            "required_translation_languages": ["ru", "en"],
+            "original_language_rule": "preserve attested original titles or mark pending",
+            "downstream_consumer_rule": "abyss-stack reads generated multilingual fields",
         },
         "runtime_projection_boundary": {
             "runtime_owner": "abyss-stack",
@@ -636,14 +684,20 @@ def test_philosophy_reader_exposes_scale_export_tables(tmp_path: Path) -> None:
 
     assert manifest["schema"] == "tos_graph_philosophy_scale_export_manifest_v1"
     assert manifest["tables"]["nodes"]["row_count"] == 2
+    assert "label_ru" in manifest["tables"]["nodes"]["columns"]
+    assert "label_en" in manifest["tables"]["clusters"]["columns"]
     assert manifest["tables"]["edges"]["formats"] == ["csv", "jsonl"]
     assert nodes[0]["id"] == "atlas-row:A01"
+    assert nodes[0]["label_ru"] == "A01 — Протоклинопись и учётные онтологии"
+    assert nodes[0]["label_en"] == "A01 — Proto-Cuneiform and Accounting Ontologies"
     assert nodes[0]["graph_layers"] == "historical-relation"
     assert json.loads(nodes[0]["source_refs"]) == ["ToS/philosophy/atlas/master-tables/table-i/rows.jsonl"]
     assert edges[0]["source"] == "atlas-row:A01"
     assert edges[0]["target"] == "dossier:A01"
     assert edges[0]["predicate"] == "has-dossier"
     assert clusters[0]["id"] == "cluster:region:test"
+    assert clusters[0]["label_ru"] == "Регион: Западная Азия"
+    assert clusters[0]["label_en"] == "Region: West Asia"
     assert clusters[0]["member_count"] == "2"
     assert cluster_nodes[0]["cluster_id"] == "cluster:region:test"
     assert cluster_nodes[0]["node_id"] == "atlas-row:A01"

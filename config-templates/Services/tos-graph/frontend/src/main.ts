@@ -27,6 +27,14 @@ type BootPayload = {
 
 type AnyItem = Record<string, unknown>;
 
+type MultilingualLabel = {
+  label?: {
+    original?: string | null;
+    ru?: string | null;
+    en?: string | null;
+  };
+};
+
 type ViewCard = {
   view_id: string;
   title?: string;
@@ -597,6 +605,17 @@ function unwrapItem(item: AnyItem): AnyItem {
   return nested && typeof nested === "object" && !Array.isArray(nested) ? (nested as AnyItem) : item;
 }
 
+function sourceOwnedDisplayLabel(item: AnyItem): string {
+  const source = unwrapItem(item);
+  const multilingual = source.multilingual;
+  if (!multilingual || typeof multilingual !== "object" || Array.isArray(multilingual)) return "";
+  const labels = (multilingual as MultilingualLabel).label;
+  if (!labels || typeof labels !== "object") return "";
+  const preferred = state.language === "ru" ? labels.ru : labels.en;
+  const fallback = labels.original || labels.ru || labels.en;
+  return text(preferred || fallback).trim();
+}
+
 function escapeHtml(value: unknown): string {
   return text(value)
     .replace(/&/g, "&amp;")
@@ -654,12 +673,12 @@ function displayTitle(item: AnyItem): string {
   const source = unwrapItem(item);
   if (source.from_id && source.to_id) return relationRouteText(source);
   if (source.view_id) return viewDisplayTitle(source as ViewCard);
-  const raw = itemTitle(item).trim();
-  const canon = raw.match(/^Canon Or Candidate Status:\s*(.+)$/i);
+  const raw = (sourceOwnedDisplayLabel(item) || itemTitle(item)).trim();
+  const canon = raw.match(/^(?:Canon Or Candidate Status|Статус канона или кандидата):\s*(.+)$/i);
   if (canon) return `${state.language === "ru" ? "Статус" : "Status"} ${canon[1].trim()}`;
-  const concept = raw.match(/^Concept Or Problem:\s*(.+)$/i);
+  const concept = raw.match(/^(?:Concept Or Problem|Концепт или проблема):\s*(.+)$/i);
   if (concept) return concept[1].trim();
-  const corpus = raw.match(/^Corpus Or Prepared Source Document:\s*(.+)$/i);
+  const corpus = raw.match(/^(?:Corpus Or Prepared Source Document|Корпус или подготовленный исходный документ):\s*(.+)$/i);
   const title = corpus ? corpus[1].trim() : raw;
   return localizedContentText(
     title
