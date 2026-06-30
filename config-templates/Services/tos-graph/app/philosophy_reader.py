@@ -11,6 +11,9 @@ SCALE_EXPORT_COLUMNS = {
     "nodes": [
         "id",
         "label",
+        "label_original",
+        "label_ru",
+        "label_en",
         "kind",
         "view_ids",
         "graph_layers",
@@ -33,6 +36,9 @@ SCALE_EXPORT_COLUMNS = {
     "clusters": [
         "id",
         "label",
+        "label_original",
+        "label_ru",
+        "label_en",
         "kind",
         "member_count",
         "edge_count",
@@ -97,6 +103,19 @@ def _json_cell(value: Any) -> str:
 
 def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def _multilingual_label(item: dict[str, Any], language: str) -> str:
+    multilingual = item.get("multilingual")
+    if not isinstance(multilingual, dict):
+        return "" if language == "original" else str(item.get("label") or "")
+    labels = multilingual.get("label")
+    if not isinstance(labels, dict):
+        return "" if language == "original" else str(item.get("label") or "")
+    value = labels.get(language)
+    if value is None:
+        return ""
+    return str(value)
 
 
 def _layer_allowed(item: dict[str, Any], layers: set[str]) -> bool:
@@ -618,6 +637,9 @@ class ToSPhilosophyProjectionReader:
         return {
             "id": str(node.get("node_id") or ""),
             "label": str(node.get("label") or node.get("node_id") or ""),
+            "label_original": _multilingual_label(node, "original"),
+            "label_ru": _multilingual_label(node, "ru"),
+            "label_en": _multilingual_label(node, "en"),
             "kind": str(node.get("node_type") or ""),
             "view_ids": cls._pipe_cell(node.get("view_ids")),
             "graph_layers": cls._pipe_cell(node.get("graph_layers")),
@@ -648,6 +670,9 @@ class ToSPhilosophyProjectionReader:
         return {
             "id": str(cluster.get("cluster_id") or ""),
             "label": str(cluster.get("label") or cluster.get("cluster_id") or ""),
+            "label_original": _multilingual_label(cluster, "original"),
+            "label_ru": _multilingual_label(cluster, "ru"),
+            "label_en": _multilingual_label(cluster, "en"),
             "kind": str(cluster.get("cluster_kind") or ""),
             "member_count": str(properties.get("member_count") or len(_string_list(cluster.get("member_node_ids")))),
             "edge_count": str(properties.get("edge_count") or len(_string_list(cluster.get("member_edge_ids")))),
