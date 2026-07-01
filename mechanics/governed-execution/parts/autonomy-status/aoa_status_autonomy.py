@@ -59,6 +59,12 @@ FEDERATION_LAYERS = [
     "aoa-kag",
     "tos-source",
 ]
+PODMAN_INSPECT_MISSING_MARKERS = (
+    "no such object",
+    "no such container",
+    "no container with name or id",
+    "does not exist",
+)
 
 
 def is_source_checkout(path: Path) -> bool:
@@ -125,15 +131,24 @@ def run_command(
         }
 
 
+def inspect_result_is_missing(result: dict[str, Any]) -> bool:
+    output = f"{result.get('stdout', '')}\n{result.get('stderr', '')}".lower()
+    return any(marker in output for marker in PODMAN_INSPECT_MISSING_MARKERS)
+
+
 def container_state(name: str) -> str:
     result = run_command(
         ["podman", "inspect", "--format", "{{.State.Status}}", name],
         timeout_s=15.0,
     )
     if result["exit_code"] != 0:
-        return "missing"
+        if inspect_result_is_missing(result):
+            return "missing"
+        return "inspect_error"
     status = str(result["stdout"]).strip()
-    return status or "unknown"
+    if not status:
+        return "unknown"
+    return status
 
 
 def container_env_flag(name: str, env_name: str) -> bool:
