@@ -278,6 +278,45 @@ def parse_overlays(value: str) -> list[str]:
     return [item.strip() for item in items if item.strip()]
 
 
+def public_safe_overlay_spec(value: str) -> str | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    path = Path(text).expanduser()
+    if path.is_absolute():
+        try:
+            resolved = path.resolve(strict=False)
+        except OSError:
+            resolved = path
+        for root in (SCRIPT_ROOT, DEFAULT_CONFIGS_ROOT):
+            try:
+                relative = resolved.relative_to(root.resolve(strict=False))
+            except ValueError:
+                continue
+            break
+        else:
+            return None
+    else:
+        relative = path
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        return None
+    if not relative.parts or relative.parts[0] != "compose":
+        return None
+    return relative.as_posix()
+
+
+def public_safe_overlay_specs(values: list[str]) -> list[str]:
+    sanitized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        spec = public_safe_overlay_spec(value)
+        if spec is None or spec in seen:
+            continue
+        seen.add(spec)
+        sanitized.append(spec)
+    return sanitized
+
+
 def package_record(name: str) -> dict[str, Any]:
     returncode, output, _ = run_command(
         "rpm",
@@ -447,6 +486,8 @@ def main() -> int:
     preferred_preset = "intel-full" if drm_nodes["dev_dri_present"] else "agent-full"
     preferred_profiles = load_profile_names(preferred_preset)
     current_overlays = parse_overlays(os.environ.get("AOA_EXTRA_COMPOSE_FILES", ""))
+    if args.mode == "public":
+        current_overlays = public_safe_overlay_specs(current_overlays)
     requires_llamacpp_runtime_fallback = (
         preferred_preset == "intel-full" and "avx512f" not in cpu_flags
     )
@@ -529,6 +570,8 @@ def main() -> int:
                 if value is not None and str(value).strip()
             ]
     recommended_overlays = merge_unique_strings(safety_overlays, recommended_overlays)
+    if args.mode == "public":
+        recommended_overlays = public_safe_overlay_specs(recommended_overlays)
 
     host_facts_ref = args.host_facts_ref
     if host_facts_ref is None:
