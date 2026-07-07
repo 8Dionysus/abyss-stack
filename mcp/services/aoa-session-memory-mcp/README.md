@@ -89,7 +89,7 @@ Tools:
 - `aoa_session_graph_timeline(anchor, kind, limit)`
 - `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
 - `aoa_session_graph_bridge(source, target, kind, source_kind, target_kind, max_depth, limit)`; first compact route for "how are these two operational anchors connected?", wrapping bounded path, source/target timeline samples, refs, freshness, and next expansion.
-- `aoa_session_graph_cooccurrence(anchor, kind, limit)`
+- `aoa_session_graph_cooccurrence(anchor, kind, limit)`; bounded first route for dense operational anchors such as common tools, MCP services, hooks, or skills. It aggregates nearby route-signal cooccurrences with evidence refs without running maintenance or hydrating raw transcript bodies.
 - `aoa_session_graphrag_packet(query, anchor, mode, limit, include_semantic_context, rerank_local)`
 - `aoa_session_explain_graph_packet(intent, anchor, query, limit)`
 - `aoa_session_graph_eval(limit, include_semantic_context, rerank_local)`

@@ -49,6 +49,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_projection_status",
     "aoa_session_graph_neighborhood",
     "aoa_session_graph_bridge",
+    "aoa_session_graph_cooccurrence",
 }
 
 ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
@@ -494,6 +495,14 @@ def _payload_count(payload: dict, key: str) -> int:
     return value if isinstance(value, int) else 0
 
 
+def _payload_count_or_list_len(payload: dict, key: str, list_key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, int):
+        return value
+    items = payload.get(list_key)
+    return len(items) if isinstance(items, list) else 0
+
+
 def _has_first_raw_or_segment_ref(ref: dict) -> bool:
     return bool(
         isinstance(ref, dict)
@@ -620,6 +629,7 @@ def _stdio_route_count_summary(
     usage_alias: dict,
     agent_event_usage: dict,
     graph_neighborhood: dict,
+    graph_cooccurrence: dict,
     retrieve_usage: dict,
     live_scenario: dict,
     live_scenario_corpus: dict,
@@ -694,6 +704,12 @@ def _stdio_route_count_summary(
         "agent_event_usage_outcome_count": _payload_count(agent_event_usage, "outcome_event_count"),
         "graph_neighborhood_node_count": _payload_count(graph_neighborhood, "node_count"),
         "graph_neighborhood_edge_count": _payload_count(graph_neighborhood, "edge_count"),
+        "graph_cooccurrence_count": _payload_count_or_list_len(
+            graph_cooccurrence, "cooccurrence_count", "cooccurrences"
+        ),
+        "graph_cooccurrence_ref_count": _payload_count_or_list_len(
+            graph_cooccurrence, "evidence_ref_count", "evidence_refs"
+        ),
         "retrieve_usage_served_by": retrieve_usage.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_usage.get("retrieval_redirect"), dict)
         else None,
@@ -864,6 +880,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 6, "edge_limit": 6},
                 timeout_seconds=90,
             )
+            graph_cooccurrence = await call_json(
+                "aoa_session_graph_cooccurrence",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 6},
+                timeout_seconds=90,
+            )
             retrieve_usage = await call_json(
                 "aoa_session_retrieve",
                 {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
@@ -969,6 +990,12 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP agent_event usage route failed: {agent_event_usage.get('diagnostics')}")
     if graph_neighborhood.get("artifact_type") != "session_memory_graph_neighborhood" or graph_neighborhood.get("ok") is not True:
         raise SystemExit(f"stdio MCP graph neighborhood returned invalid payload: {graph_neighborhood.get('diagnostics')}")
+    if graph_cooccurrence.get("artifact_type") != "session_memory_graph_cooccurrence" or graph_cooccurrence.get("ok") is not True:
+        raise SystemExit(f"stdio MCP graph cooccurrence returned invalid payload: {graph_cooccurrence.get('diagnostics')}")
+    cooccurrences = graph_cooccurrence.get("cooccurrences") if isinstance(graph_cooccurrence.get("cooccurrences"), list) else []
+    evidence_refs = graph_cooccurrence.get("evidence_refs") if isinstance(graph_cooccurrence.get("evidence_refs"), list) else []
+    if not cooccurrences or not evidence_refs:
+        raise SystemExit(f"stdio MCP graph cooccurrence returned no cooccurrences or refs: {graph_cooccurrence}")
     if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_chain":
         raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if live_scenario.get("artifact_type") != "session_memory_live_scenario_audit":
@@ -1022,6 +1049,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         usage_alias,
         agent_event_usage,
         graph_neighborhood,
+        graph_cooccurrence,
         retrieve_usage,
         live_scenario,
         live_scenario_corpus,
@@ -1442,6 +1470,8 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_agent_event_usage_outcome_count": stdio_smoke["agent_event_usage_outcome_count"],
                 "stdio_graph_neighborhood_node_count": stdio_smoke["graph_neighborhood_node_count"],
                 "stdio_graph_neighborhood_edge_count": stdio_smoke["graph_neighborhood_edge_count"],
+                "stdio_graph_cooccurrence_count": stdio_smoke["graph_cooccurrence_count"],
+                "stdio_graph_cooccurrence_ref_count": stdio_smoke["graph_cooccurrence_ref_count"],
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "stdio_live_scenario_count": stdio_smoke["live_scenario_count"],
                 "stdio_live_scenario_warn_count": stdio_smoke["live_scenario_warn_count"],
