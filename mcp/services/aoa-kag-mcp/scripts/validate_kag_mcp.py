@@ -42,6 +42,29 @@ def main() -> None:
         raise SystemExit("aoa-kag provider map returned no providers")
     if state.provider_lookup("aoa-kag")["status"] != "provider_ready":
         raise SystemExit("aoa-kag provider lookup did not return provider_ready")
+    provider_status = state.provider_status()
+    source_index_repo = None
+    for provider in provider_status["providers"]:
+        repo_local_index = provider.get("repo_local_index")
+        if not isinstance(repo_local_index, dict):
+            continue
+        if (
+            repo_local_index.get("status") == "passed"
+            and repo_local_index.get("source_index_ref")
+        ):
+            source_index_repo = str(provider["repo"])
+            break
+    if not source_index_repo:
+        raise SystemExit("aoa-kag provider map returned no passed repo-local source index")
+    repo_local_index = state.repo_local_index(source_index_repo)
+    if repo_local_index["repo_local_index"].get("status") != "passed":
+        raise SystemExit(f"{source_index_repo} repo-local index is not passed")
+    source_index = state.source_index_status(source_index_repo)
+    if not source_index["source_index_exists"]:
+        raise SystemExit(f"{source_index_repo} source index resource is missing")
+    common_surface_profile = state.common_surface_profile(source_index_repo)
+    if common_surface_profile["common_surface_profile"].get("source") != "source_surface_index":
+        raise SystemExit(f"{source_index_repo} common surface profile is not sourced from source_surface_index")
     if not state.freshness_check()["ok"]:
         raise SystemExit("aoa-kag provider freshness handles are missing receipts")
     generation = state.generation_route_lookup("aoa-kag")
@@ -59,12 +82,15 @@ def main() -> None:
     resource = state.read_resource("aoa-kag://registry/provider-map")
     if resource.get("schema_version") != "aoa-local-kag-provider-map-v1":
         raise SystemExit("aoa-kag provider-map resource has unexpected schema")
+    profile_resource = state.read_resource(f"aoa-kag://providers/{source_index_repo}/common-surface-profile")
+    if profile_resource["common_surface_profile"].get("source") != "source_surface_index":
+        raise SystemExit(f"{source_index_repo} common-surface-profile resource is not readable")
     if state.read_resource("aoa-kag://providers/aoa-kag/generation")["status"] != "available":
         raise SystemExit("aoa-kag generation resource has unexpected status")
-    if not state.read_resource("aoa-kag://providers/aoa-kag/source-index")["repo_local_index"]:
-        raise SystemExit("aoa-kag source-index resource returned no index")
-    if not state.read_resource("aoa-kag://providers/aoa-kag/repo-local-index")["repo_local_index"]:
-        raise SystemExit("aoa-kag repo-local-index resource returned no index")
+    if not state.read_resource(f"aoa-kag://providers/{source_index_repo}/source-index")["repo_local_index"]:
+        raise SystemExit(f"{source_index_repo} source-index resource returned no index")
+    if not state.read_resource(f"aoa-kag://providers/{source_index_repo}/repo-local-index")["repo_local_index"]:
+        raise SystemExit(f"{source_index_repo} repo-local-index resource returned no index")
     if not state.read_resource("aoa-kag://coverage/repo-local-source-indexes")["owners"]:
         raise SystemExit("aoa-kag coverage resource returned no owners")
     server = build_server()

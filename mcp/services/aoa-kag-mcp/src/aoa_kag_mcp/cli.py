@@ -37,11 +37,18 @@ def main() -> None:
     source_return.add_argument("--local-id")
     source_return.add_argument("--path")
 
-    generation = sub.add_parser("generation-route")
-    generation.add_argument("repo")
+    repo_local_index = sub.add_parser("repo-local-index")
+    repo_local_index.add_argument("repo")
 
     source_index = sub.add_parser("source-index")
     source_index.add_argument("repo")
+    source_index.add_argument("--include-payload", action="store_true")
+
+    common_surface_profile = sub.add_parser("common-surface-profile")
+    common_surface_profile.add_argument("repo")
+
+    generation = sub.add_parser("generation-route")
+    generation.add_argument("repo")
 
     coverage = sub.add_parser("coverage-status")
     coverage.add_argument("--repo")
@@ -81,10 +88,14 @@ def main() -> None:
         _print(state.freshness_check(repo=args.repo))
     elif args.command == "source-return":
         _print(state.source_return_lookup(repo=args.repo, local_id=args.local_id, path=args.path))
+    elif args.command == "repo-local-index":
+        _print(state.repo_local_index(repo=args.repo))
+    elif args.command == "source-index":
+        _print(state.source_index_lookup(repo=args.repo, include_payload=args.include_payload))
+    elif args.command == "common-surface-profile":
+        _print(state.common_surface_profile(repo=args.repo))
     elif args.command == "generation-route":
         _print(state.generation_route_lookup(repo=args.repo))
-    elif args.command == "source-index":
-        _print(state.source_index_lookup(repo=args.repo))
     elif args.command == "coverage-status":
         _print(state.repo_local_coverage_status(repo=args.repo, status=args.status))
     elif args.command == "registry-slice":

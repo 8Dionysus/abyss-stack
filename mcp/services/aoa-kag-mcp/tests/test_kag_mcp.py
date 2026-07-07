@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.server import build_server
 
@@ -20,6 +22,39 @@ def seed_provider(
     source_index_ref: str = "kag/indexes/source_surface_index.json",
 ) -> dict[str, object]:
     kag = root / "kag"
+    source_index_payload = {
+        "schema_version": "aoa-repo-local-kag-index-v1",
+        "repo": {"name": repo, "root": ".", "git_ref": "fixture"},
+        "index_identity": {
+            "local_id": "index:repo-local:source-surfaces",
+            "artifact_kind": "source_surface_index",
+            "content_digest": "fixture",
+            "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json",
+        },
+        "coverage_summary": {"record_count": 1, "unknown_count": 0},
+        "classification_summary": {
+            "artifact_kind": {"document": 1},
+            "primary_kind": {"document": 1},
+            "surface_state": {"authored_source": 1},
+            "document_role": {"readme": 1},
+            "mechanics_role": {"none": 1},
+            "command_role": {"none": 1},
+        },
+        "records": [],
+    }
+    common_surface_profile = {
+        "source": "source_surface_index",
+        "counts": source_index_payload["classification_summary"],
+        "quality": {
+            "unknown_count": 0,
+            "has_kag_home": True,
+            "has_record_classes": True,
+            "has_source_index": True,
+            "has_owner_commands": False,
+            "has_generated_readmodels": False,
+            "has_validation_route": True,
+        },
+    }
     write_json(
         kag / "manifest.json",
         {
@@ -39,6 +74,7 @@ def seed_provider(
             "owner_return_route": {"path": "README.md", "route_kind": "source"},
         },
     )
+    write_json(kag / "indexes" / "source_surface_index.json", source_index_payload)
     write_json(
         kag / "receipts" / "validation_receipt.json",
         {
@@ -60,7 +96,7 @@ def seed_provider(
         write_json(
             root / source_index_ref,
             {
-                "schema_version": "aoa_repo_local_source_surface_index_v1",
+                "schema_version": "aoa-repo-local-kag-index-v1",
                 "repo": repo,
                 "index_identity": {"local_id": "index:repo-local:source-surfaces"},
                 "coverage_summary": {"record_count": 1, "document_count": 1},
@@ -124,6 +160,7 @@ def seed_provider(
             "source_index_ref": source_index_ref,
             "index_files": index_files,
             "coverage": {"documents": 1, "commands": 0, "validators": 1},
+            "common_surface_profile": common_surface_profile,
             "coverage_report_ref": "generated/repo_local_kag_coverage.min.json",
             "coverage_owner_key": repo,
         },
@@ -141,20 +178,27 @@ def seed_workspace(root: Path) -> AoAKagMCPState:
     )
     repo_a_provider = seed_provider(repo_a, "repo-a", local_id="repo-a-source-home")
     providers = [aoa_kag_provider, repo_a_provider]
+    repo_local_indexes = {
+        str(provider["repo"]): provider["repo_local_index"]
+        for provider in providers
+    }
+    common_surface_profiles = {
+        repo: packet["common_surface_profile"]
+        for repo, packet in repo_local_indexes.items()
+    }
     write_json(
         aoa_kag / "generated" / "local_kag_provider_map.min.json",
         {
             "schema_version": "aoa-local-kag-provider-map-v1",
             "providers": providers,
+            "provider_repo_local_indexes": repo_local_indexes,
+            "provider_common_surface_profiles": common_surface_profiles,
             "remaining_routes": [],
             "os_surfaces": [],
             "provider_status_counts": {"provider_ready": 2},
             "mcp_handoff": {"service_route": "mcp/services/aoa-kag-mcp"},
             "provider_generation_profiles": {
                 str(provider["repo"]): provider["generation_profile"] for provider in providers
-            },
-            "provider_repo_local_indexes": {
-                str(provider["repo"]): provider["repo_local_index"] for provider in providers
             },
         },
     )
@@ -191,6 +235,7 @@ def seed_workspace(root: Path) -> AoAKagMCPState:
                     "index_status": provider["repo_local_index"]["status"],
                     "index_files": provider["repo_local_index"]["index_files"],
                     "coverage": provider["repo_local_index"]["coverage"],
+                    "common_surface_profile": provider["repo_local_index"]["common_surface_profile"],
                 }
                 for provider in providers
             ],
@@ -217,6 +262,8 @@ def test_provider_lookup_preserves_owner_return_route(tmp_path: Path) -> None:
     assert packet["schema"] == "aoa_kag_provider_lookup_v1"
     assert packet["status"] == "provider_ready"
     assert packet["provider"]["owner_return_routes"][0]["path"] == "README.md"
+    assert packet["repo_local_index"]["status"] == "passed"
+    assert packet["common_surface_profile"]["source"] == "source_surface_index"
     assert packet["provider_root"] == (tmp_path / "connectors" / "repo-a").resolve().as_posix()
 
 
@@ -266,6 +313,20 @@ def test_source_index_lookup_summarizes_repo_local_index(tmp_path: Path) -> None
     assert owner_specific["index_files"] == ["kag/indexes/source_inventory.json"]
 
 
+def test_source_index_lookup_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+    provider_map = state.provider_map()
+    provider_map["provider_repo_local_indexes"]["repo-a"]["source_index_ref"] = "../outside.json"
+    for provider in provider_map["providers"]:
+        if provider["repo"] == "repo-a":
+            provider["repo_local_index"]["source_index_ref"] = "../outside.json"
+            break
+    write_json(state.provider_map_path, provider_map)
+
+    with pytest.raises(ValueError, match="escapes provider root"):
+        state.source_index_lookup("repo-a", include_payload=True)
+
+
 def test_repo_local_coverage_status_filters_rows(tmp_path: Path) -> None:
     state = seed_workspace(tmp_path)
 
@@ -307,6 +368,7 @@ def test_resources_return_provider_map_manifest_records_and_readiness(tmp_path: 
     generation = state.read_resource("aoa-kag://providers/repo-a/generation")
     source_index = state.read_resource("aoa-kag://providers/repo-a/source-index")
     repo_local_index = state.read_resource("aoa-kag://providers/repo-a/repo-local-index")
+    common_surface_profile = state.read_resource("aoa-kag://providers/repo-a/common-surface-profile")
     coverage = state.read_resource("aoa-kag://coverage/repo-local-source-indexes")
 
     assert provider_map["schema_version"] == "aoa-local-kag-provider-map-v1"
@@ -314,9 +376,22 @@ def test_resources_return_provider_map_manifest_records_and_readiness(tmp_path: 
     assert manifest["repo"] == "repo-a"
     assert records["count"] == 1
     assert generation["status"] == "available"
-    assert source_index["source_index_exists"] is True
     assert repo_local_index["repo_local_index"]["status"] == "passed"
+    assert source_index["source_index_exists"] is True
+    assert source_index["source_index"]["schema_version"] == "aoa-repo-local-kag-index-v1"
+    assert common_surface_profile["common_surface_profile"]["source"] == "source_surface_index"
     assert coverage["coverage_summary"]["owner_count"] == 2
+
+
+def test_source_index_and_common_profile_tools_read_provider_map(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+
+    source_index = state.source_index_status("repo-a")
+    profile = state.common_surface_profile("repo-a")
+
+    assert source_index["status"] == "passed"
+    assert source_index["source_index_ref"] == "kag/indexes/source_surface_index.json"
+    assert profile["common_surface_profile"]["quality"]["has_source_index"] is True
 
 
 def test_validation_status_checks_provider_homes(tmp_path: Path) -> None:
