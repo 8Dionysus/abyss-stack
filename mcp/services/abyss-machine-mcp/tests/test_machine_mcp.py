@@ -247,16 +247,150 @@ PAYLOADS: dict[tuple[str, ...], dict[str, Any]] = {
         "ok": True,
         "summary": {"status": "ok", "fails": 0, "warnings": 0, "checks": 9},
     },
+    ("artifacts", "requirements", "--artifact-class", "public_source_seed", "--json"): {
+        "schema": "abyss_machine_artifact_requirements_v1",
+        "ok": True,
+        "summary": {"artifact_classes": 1},
+        "rows": [{"artifact_class": "public_source_seed", "controls": {"required": ["abi_signature"]}}],
+    },
+    (
+        "artifacts",
+        "producer-profiles",
+        "--require-command-resolution",
+        "--artifact-class",
+        "public_source_seed",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifact_producer_profiles_v1",
+        "ok": True,
+        "summary": {"profiles": 1, "command_resolution_checked": True},
+        "rows": [{"owner_repo": "abyss-machine", "artifact_classes": ["public_source_seed"]}],
+    },
+    ("artifacts", "affected", "--artifact-class", "public_source_seed", "--json"): {
+        "schema": "abyss_machine_artifacts_affected_v1",
+        "ok": True,
+        "summary": {"artifact_classes": 1, "affected": 0},
+        "rows": [{"artifact_class": "public_source_seed", "freshness": "fresh"}],
+    },
+    (
+        "artifacts",
+        "affected",
+        "--artifact-class",
+        "public_source_seed",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifacts_affected_v1",
+        "ok": True,
+        "summary": {"artifact_classes": 1, "affected": 0},
+        "changed_source_repo": "abyss-machine",
+        "changed_source_ref": "source-refresh:main-abc123+dirty-deadbeef",
+        "rows": [{"artifact_class": "public_source_seed", "freshness": "fresh"}],
+    },
+    ("artifacts", "trust-coverage", "--json"): {
+        "schema": "abyss_machine_artifacts_trust_coverage_v1",
+        "ok": True,
+        "summary": {"artifact_classes": 21, "fully_covered": 20, "deferred_with_real_blocker": 1},
+    },
+    (
+        "artifacts",
+        "trust-coverage",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifacts_trust_coverage_v1",
+        "ok": True,
+        "source_context": {
+            "requested_source_repo": "abyss-machine",
+            "requested_source_ref": "source-refresh:main-abc123+dirty-deadbeef",
+        },
+        "summary": {"artifact_classes": 21, "fully_covered": 20, "deferred_with_real_blocker": 1},
+    },
+    (
+        "artifacts",
+        "trust-coverage",
+        "--source-root",
+        "/tmp/abyss/abyss-machine",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifacts_trust_coverage_v1",
+        "ok": True,
+        "source_context": {
+            "public_seed_root": "/tmp/abyss/abyss-machine",
+            "requested_source_repo": "abyss-machine",
+            "requested_source_ref": "source-refresh:main-abc123+dirty-deadbeef",
+        },
+        "summary": {"artifact_classes": 21, "fully_covered": 20, "deferred_with_real_blocker": 1},
+    },
+    (
+        "artifacts",
+        "trust-gate",
+        "--artifact-class",
+        "public_media_export",
+        "--consumer-intent",
+        "release_consumer",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifact_trust_gate_v1",
+        "ok": True,
+        "artifact_class": "public_media_export",
+        "consumer_intent": "release_consumer",
+        "verdict": "warn",
+        "summary": {"verdict": "warn", "reasons": 1},
+        "reasons": ["C2PA credential onboarding is pre-organization"],
+    },
+    (
+        "artifacts",
+        "registry-latest",
+        "--artifact-class",
+        "public_source_seed",
+        "--consumer-intent",
+        "agent",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifact_registry_latest_v1",
+        "ok": True,
+        "artifact_class": "public_source_seed",
+        "latest": {"record_id": "sha256:test"},
+    },
+    (
+        "artifacts",
+        "scenarios",
+        "--registry-dir",
+        "/var/lib/abyss-machine/artifacts/bundle-registry",
+        "--json",
+    ): {
+        "schema": "abyss_machine_artifact_scenarios_v1",
+        "ok": True,
+        "summary": {"scenarios": 8},
+    },
+    ("artifacts", "validate", "--json"): {
+        "schema": "abyss_machine_artifacts_validate_v1",
+        "ok": True,
+        "summary": {"status": "warn", "fails": 0, "warnings": 2},
+    },
 }
 
 
 class FakeRunner:
     def __init__(self) -> None:
         self.calls: list[tuple[str, ...]] = []
+        self.timeouts: list[tuple[tuple[str, ...], float]] = []
 
     def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
         key = tuple(argv[1:])
         self.calls.append(key)
+        self.timeouts.append((key, timeout))
         payload = PAYLOADS.get(key)
         if payload is None:
             return CommandOutput(argv=argv, returncode=2, stdout="{}", stderr=f"unexpected command: {key}", elapsed_ms=1.0)
@@ -273,6 +407,77 @@ class NonJsonRunner(FakeRunner):
                 returncode=0,
                 stdout="warning: changed output shape\nnot-json",
                 stderr="",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
+class MemoryPressureWatchRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        self.calls.append(key)
+        if key == ("memory", "pressure", "--json"):
+            return CommandOutput(
+                argv=argv,
+                returncode=1,
+                stdout=json.dumps({
+                    "schema": "abyss_machine_memory_pressure_v1",
+                    "ok": False,
+                    "summary": {"class": "watch", "swap_used_percent": 12.0},
+                    "reasons": ["swap_used_percent=12.0>watch"],
+                }),
+                stderr="",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
+class ArtifactManualReviewRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        self.calls.append(key)
+        self.timeouts.append((key, timeout))
+        if key == ("artifacts", "trust-coverage", "--json"):
+            return CommandOutput(
+                argv=argv,
+                returncode=1,
+                stdout=json.dumps({
+                    "schema": "abyss_machine_artifacts_trust_coverage_v1",
+                    "ok": False,
+                    "summary": {
+                        "artifact_classes": 21,
+                        "fully_covered": 18,
+                        "deferred_with_real_blocker": 3,
+                    },
+                }),
+                stderr="",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
+class CoverageSourceContextUnsupportedRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        self.calls.append(key)
+        self.timeouts.append((key, timeout))
+        if key == (
+            "artifacts",
+            "trust-coverage",
+            "--source-repo",
+            "abyss-machine",
+            "--source-ref",
+            "source-refresh:main-abc123+dirty-deadbeef",
+            "--json",
+        ):
+            return CommandOutput(
+                argv=argv,
+                returncode=2,
+                stdout="",
+                stderr=(
+                    "abyss-machine: error: unrecognized arguments: --source-repo abyss-machine "
+                    "--source-ref source-refresh:main-abc123+dirty-deadbeef"
+                ),
                 elapsed_ms=1.0,
             )
         return super().__call__(argv, timeout)
@@ -306,6 +511,9 @@ def test_surface_allowlist_rejects_arbitrary_command() -> None:
 
     with pytest.raises(ValueError):
         state.surface("shell")
+
+    with pytest.raises(ValueError):
+        state.surface("artifacts")
 
 
 def test_route_is_preflight_only_and_uses_allowlisted_surfaces() -> None:
@@ -343,6 +551,30 @@ def test_surface_fails_closed_when_json_payload_is_unparsable() -> None:
     assert result["payload_summary"] is None
 
 
+def test_memory_pressure_watch_is_a_readable_surface_not_transport_failure() -> None:
+    state = state_with_fake(MemoryPressureWatchRunner())
+
+    result = state.surface("memory-pressure")
+
+    assert result["returncode"] == 1
+    assert result["payload_parse_ok"] is True
+    assert result["payload_ok"] is False
+    assert result["ok"] is True
+    assert result["payload_summary"]["class"] == "watch"
+
+
+def test_artifact_trust_manual_review_remains_readable_typed_surface() -> None:
+    state = state_with_fake(ArtifactManualReviewRunner())
+
+    result = state.surface("artifact-trust-coverage")
+
+    assert result["returncode"] == 1
+    assert result["payload_parse_ok"] is True
+    assert result["payload_ok"] is False
+    assert result["ok"] is True
+    assert result["payload_summary"]["deferred_with_real_blocker"] == 3
+
+
 def test_maps_tool_queries_axis_as_route_signals() -> None:
     runner = FakeRunner()
     state = state_with_fake(runner)
@@ -372,6 +604,186 @@ def test_maps_resource_and_surfaces_are_allowlisted() -> None:
     resource = state.read_resource("abyss-machine://maps/by-eval-packet")
     assert resource["axis"] == "by-eval-packet"
     assert resource["result_count"] == 1
+
+
+def test_artifact_trust_surfaces_are_allowlisted_and_typed() -> None:
+    runner = FakeRunner()
+    state = state_with_fake(runner)
+
+    requirements = state.surface("artifact-trust-requirements", artifact_class="public_source_seed")
+    assert requirements["payload_schema"] == "abyss_machine_artifact_requirements_v1"
+    assert requirements["mutates"] is False
+    assert requirements["truth_level"] == "artifact_trust_requirements_read_model"
+
+    profiles = state.surface("artifact-trust-producer-profiles", artifact_class="public_source_seed")
+    assert profiles["payload_summary"]["command_resolution_checked"] is True
+
+    affected = state.surface("artifact-trust-affected", artifact_class="public_source_seed")
+    assert affected["payload_summary"]["affected"] == 0
+
+    affected_with_source_ref = state.surface(
+        "artifact-trust-affected",
+        artifact_class="public_source_seed",
+        source_repo="abyss-machine",
+        source_ref="source-refresh:main-abc123+dirty-deadbeef",
+    )
+    assert affected_with_source_ref["payload_summary"]["affected"] == 0
+
+    coverage = state.surface("artifact-trust-coverage")
+    assert coverage["payload_summary"]["deferred_with_real_blocker"] == 1
+    coverage_with_source_ref = state.surface(
+        "artifact-trust-coverage",
+        source_repo="abyss-machine",
+        source_ref="source-refresh:main-abc123+dirty-deadbeef",
+    )
+    assert coverage_with_source_ref["payload_summary"]["deferred_with_real_blocker"] == 1
+    coverage_with_source_root = state.surface(
+        "artifact-trust-coverage",
+        source_root="/tmp/abyss/abyss-machine",
+        source_repo="abyss-machine",
+        source_ref="source-refresh:main-abc123+dirty-deadbeef",
+    )
+    assert coverage_with_source_root["payload_summary"]["deferred_with_real_blocker"] == 1
+
+    gate = state.surface(
+        "artifact-trust-gate",
+        artifact_class="public_media_export",
+        consumer_intent="release_consumer",
+    )
+    assert gate["payload_schema"] == "abyss_machine_artifact_trust_gate_v1"
+    assert gate["payload_summary"]["verdict"] == "warn"
+
+    latest = state.surface("artifact-trust-registry-latest", artifact_class="public_source_seed")
+    assert latest["payload_schema"] == "abyss_machine_artifact_registry_latest_v1"
+
+    scenarios = state.surface("artifact-trust-scenarios")
+    assert scenarios["payload_summary"]["scenarios"] == 8
+
+    validate = state.surface("artifact-trust-validate")
+    assert validate["payload_summary"]["fails"] == 0
+    assert validate["timeout_seconds"] == 60.0
+
+    assert (
+        "artifacts",
+        "producer-profiles",
+        "--require-command-resolution",
+        "--artifact-class",
+        "public_source_seed",
+        "--json",
+    ) in runner.calls
+    assert (
+        "artifacts",
+        "trust-gate",
+        "--artifact-class",
+        "public_media_export",
+        "--consumer-intent",
+        "release_consumer",
+        "--json",
+    ) in runner.calls
+    assert (
+        (
+            "artifacts",
+            "trust-gate",
+            "--artifact-class",
+            "public_media_export",
+            "--consumer-intent",
+            "release_consumer",
+            "--json",
+        ),
+        45.0,
+    ) in runner.timeouts
+    assert (
+        "artifacts",
+        "scenarios",
+        "--registry-dir",
+        "/var/lib/abyss-machine/artifacts/bundle-registry",
+        "--json",
+    ) in runner.calls
+    assert (
+        "artifacts",
+        "affected",
+        "--artifact-class",
+        "public_source_seed",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ) in runner.calls
+    assert (
+        "artifacts",
+        "trust-coverage",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ) in runner.calls
+    assert (
+        "artifacts",
+        "trust-coverage",
+        "--source-root",
+        "/tmp/abyss/abyss-machine",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ) in runner.calls
+    assert (
+        (
+            "artifacts",
+            "validate",
+            "--json",
+        ),
+        60.0,
+    ) in runner.timeouts
+
+
+def test_artifact_trust_coverage_source_context_falls_back_for_old_cli() -> None:
+    runner = CoverageSourceContextUnsupportedRunner()
+    state = state_with_fake(runner)
+
+    coverage = state.surface(
+        "artifact-trust-coverage",
+        source_repo="abyss-machine",
+        source_ref="source-refresh:main-abc123+dirty-deadbeef",
+    )
+
+    assert coverage["ok"] is True
+    assert coverage["payload_summary"]["deferred_with_real_blocker"] == 1
+    assert coverage["warnings"] == ["artifact_trust_coverage_source_context_unsupported_by_cli"]
+    assert coverage["source_context_request"]["status"] == "fallback_without_source_context"
+    assert coverage["command"] == ["abyss-machine", "artifacts", "trust-coverage", "--json"]
+    assert coverage["requested_command"] == [
+        "abyss-machine",
+        "artifacts",
+        "trust-coverage",
+        "--source-repo",
+        "abyss-machine",
+        "--source-ref",
+        "source-refresh:main-abc123+dirty-deadbeef",
+        "--json",
+    ]
+
+
+def test_artifact_trust_surfaces_reject_unsafe_or_incomplete_parameters() -> None:
+    state = state_with_fake()
+
+    with pytest.raises(ValueError):
+        state.surface("artifact-trust-gate")
+
+    with pytest.raises(ValueError):
+        state.surface("artifact-trust-registry-latest")
+
+    with pytest.raises(ValueError):
+        state.surface("artifact-trust-requirements", artifact_class="../private")
+
+    with pytest.raises(ValueError):
+        state.surface("artifact-trust-affected", source_ref="source-refresh:main;rm -rf /")
+
+    with pytest.raises(ValueError):
+        state.surface("artifact-trust-coverage", source_root="/etc")
 
 
 def test_context_packet_wraps_host_owned_packet() -> None:

@@ -107,6 +107,30 @@ summaries, deterministic answer trace, and local trace eval. MCP transports the
 compact result; it does not become proof authority, reviewed memory, KAG truth,
 operator authorization, or a repository mutation route.
 
+For artifact trust orientation, agents use read-only artifact surfaces:
+
+```text
+abyss_machine_surface(name="artifact-trust-requirements", artifact_class="CLASS")
+abyss_machine_surface(name="artifact-trust-producer-profiles", artifact_class="CLASS")
+abyss_machine_surface(name="artifact-trust-affected", artifact_class="CLASS")
+abyss_machine_surface(name="artifact-trust-affected", artifact_class="CLASS", source_repo="OWNER", source_ref="source-refresh:REF")
+abyss_machine_surface(name="artifact-trust-coverage", source_root="/path/to/abyss-machine", source_repo="OWNER", source_ref="source-refresh:REF")
+abyss_machine_surface(name="artifact-trust-gate", artifact_class="CLASS", consumer_intent="agent")
+```
+
+Those surfaces wrap bounded `abyss-machine artifacts ... --json` read models.
+They let agents inspect requirements, owner-local producer routes, drift,
+coverage, latest registry selection, scenarios, validation, and trust-gate
+verdicts without creating another trust MCP. Build, sign, verify, promote,
+registry repair, and release work stay outside MCP on the owner CLI route.
+Explicit `source_repo` and `source_ref` are available for affected and coverage
+read models, and coverage can also receive a bounded `source_root` pointing at
+an abyss-machine source root. Together they make source freshness checks
+independent of the MCP process working directory. When the
+installed owner CLI is older and rejects coverage source-context flags, the MCP
+falls back to plain coverage and returns an explicit unsupported-by-CLI warning
+instead of silently pretending the source context was checked.
+
 ## Command Policy
 
 The service has a fixed allowlist of `abyss-machine ... --json` read-model
@@ -146,6 +170,14 @@ Allowed surfaces are read-only or preflight-only:
 - `changes-status`
 - `changes-index`
 - `stack-bridge-validate`
+- `artifact-trust-requirements`
+- `artifact-trust-producer-profiles`
+- `artifact-trust-affected`
+- `artifact-trust-coverage`
+- `artifact-trust-gate`
+- `artifact-trust-registry-latest`
+- `artifact-trust-scenarios`
+- `artifact-trust-validate`
 
 Privileged commands, source mutation, repair, service restart, process
 mutation, cleanup, capture deletion, and arbitrary shell execution are outside

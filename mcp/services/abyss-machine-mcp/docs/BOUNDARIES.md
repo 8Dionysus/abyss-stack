@@ -19,6 +19,12 @@ authority boundaries.
 The fast brief reads `stack-bridge`, which is an owner-routed bridge contract
 and evidence map. Targeted surfaces read one live command at a time.
 
+Artifact trust surfaces are targeted read models over `abyss-machine artifacts`
+commands. They may expose requirements, producer profiles, affected/drift
+posture, coverage, trust-gate verdicts, registry latest selection, scenarios,
+and validator status. They may not build sidecars, sign, verify, promote,
+repair registry state, write evidence, or decide proof verdicts.
+
 Generated latest files, bridge refs, machine atlas map entries, context
 packets, and machine RAG traces are evidence. They help agents route work, but
 they are weaker than source contracts under `/etc/abyss-machine` and operator
@@ -33,5 +39,7 @@ intent.
   or game roots.
 - No private raw capture reads by default.
 - No memory landing, proof verdict, or evidence acceptance.
+- No artifact signing, sidecar building, evidence promotion, registry writes,
+  or trust-root mutation.
 - No KAG publication or delivery into AoA organs.
 - No non-stdio exposure without a later decision.

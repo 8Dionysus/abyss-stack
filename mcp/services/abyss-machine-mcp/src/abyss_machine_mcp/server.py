@@ -49,6 +49,11 @@ def build_server(
         reader_profile: str = "agent",
         limit: int = 20,
         evidence_limit: int = 12,
+        artifact_class: str = "",
+        consumer_intent: str = "agent",
+        source_repo: str = "",
+        source_ref: str = "",
+        source_root: str = "",
     ) -> dict[str, Any]:
         """Read one allowlisted abyss-machine surface as compact typed JSON."""
         return current_state().surface(
@@ -62,6 +67,11 @@ def build_server(
             reader_profile=reader_profile,
             limit=limit,
             evidence_limit=evidence_limit,
+            artifact_class=artifact_class,
+            consumer_intent=consumer_intent,
+            source_repo=source_repo,
+            source_ref=source_ref,
+            source_root=source_root,
         )
 
     @mcp.tool()
@@ -214,6 +224,18 @@ def build_server(
             f"Use abyss_machine_rag_trace(query={query!r}, axis='by-rag-run', reader_profile='retrieval-context'). "
             "Treat the result as a generated evidence trace with local trace eval. It is not proof, reviewed memory, "
             "KAG truth, action approval, or delivery into an AoA organ."
+        )
+
+    @mcp.prompt(name="artifact-trust-read")
+    def artifact_trust_read(artifact_class: str) -> str:
+        """Prompt route for read-only artifact trust orientation."""
+        return (
+            "Use abyss_machine_surface(name='artifact-trust-requirements', "
+            f"artifact_class={artifact_class!r}), then read artifact-trust-producer-profiles, "
+            "artifact-trust-affected, and artifact-trust-gate for the same class. "
+            "When checking a dirty or explicit source ref, pass source_root to artifact-trust-coverage. "
+            "Treat MCP output as read-only evidence from abyss-machine; build, sign, promote, "
+            "or repair only through the owning CLI and owner repository route."
         )
 
     @mcp.prompt(name="host-incident-triage")
