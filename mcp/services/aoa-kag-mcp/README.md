@@ -10,10 +10,11 @@ access plane.
 | owner | `abyss-stack` MCP service package |
 | source authority | `aoa-kag` schema, readiness, generated provider map, and repo-local `kag/` homes |
 | primary input | `aoa-kag/generated/local_kag_provider_map.min.json` |
-| resources | provider map, readiness matrix, provider manifests, provider records |
-| tools | provider lookup, status, freshness, source-return lookup, registry slice, composition slice, validation status |
-| prompts | bounded provider query, source-return summary, cross-repo relation preview, runtime handoff brief |
+| resources | provider map, readiness matrix, provider manifests, provider records, generation profiles, source-index handles, repo-local coverage |
+| tools | provider lookup, status, generation route lookup, source-index lookup, coverage status, freshness, source-return lookup, registry slice, composition slice, validation status |
+| prompts | bounded provider query, source-return summary, repo source-surface brief, cross-repo relation preview, runtime handoff brief |
 
-The service reads compact provider records and source-return handles. It does
-not build embeddings, write graph state, mutate provider homes, run validators
-as hidden side effects, or replace source-owner docs.
+The service reads compact provider records, generation routes, source-index
+handles, coverage rows, and source-return handles. Graph databases, vector
+stores, embedding caches, provider-home mutation, validator execution, and
+source-owner meaning stay with their owning layers.

@@ -36,18 +36,37 @@ def main() -> None:
         raise SystemExit("aoa-kag provider map is missing")
     if not status["readiness_exists"]:
         raise SystemExit("aoa-kag readiness matrix is missing")
+    if not status["coverage_exists"]:
+        raise SystemExit("aoa-kag repo-local coverage report is missing")
     if int(status["provider_count"]) < 1:
         raise SystemExit("aoa-kag provider map returned no providers")
     if state.provider_lookup("aoa-kag")["status"] != "provider_ready":
         raise SystemExit("aoa-kag provider lookup did not return provider_ready")
     if not state.freshness_check()["ok"]:
         raise SystemExit("aoa-kag provider freshness handles are missing receipts")
+    generation = state.generation_route_lookup("aoa-kag")
+    if generation["status"] != "available" or not generation["builder_routes"]:
+        raise SystemExit("aoa-kag generation route lookup returned no builder routes")
+    source_index = state.source_index_lookup("aoa-kag")
+    if not source_index["repo_local_index"]:
+        raise SystemExit("aoa-kag source-index lookup returned no repo-local index")
+    coverage = state.repo_local_coverage_status()
+    if int(coverage["count"]) < 1:
+        raise SystemExit("aoa-kag repo-local coverage returned no owner rows")
     registry = state.registry_slice(limit=3)
     if not registry["items"]:
         raise SystemExit("aoa-kag registry slice returned no items")
     resource = state.read_resource("aoa-kag://registry/provider-map")
     if resource.get("schema_version") != "aoa-local-kag-provider-map-v1":
         raise SystemExit("aoa-kag provider-map resource has unexpected schema")
+    if state.read_resource("aoa-kag://providers/aoa-kag/generation")["status"] != "available":
+        raise SystemExit("aoa-kag generation resource has unexpected status")
+    if not state.read_resource("aoa-kag://providers/aoa-kag/source-index")["repo_local_index"]:
+        raise SystemExit("aoa-kag source-index resource returned no index")
+    if not state.read_resource("aoa-kag://providers/aoa-kag/repo-local-index")["repo_local_index"]:
+        raise SystemExit("aoa-kag repo-local-index resource returned no index")
+    if not state.read_resource("aoa-kag://coverage/repo-local-source-indexes")["owners"]:
+        raise SystemExit("aoa-kag coverage resource returned no owners")
     server = build_server()
     if server is None:
         raise SystemExit("MCP server did not build")
