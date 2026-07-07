@@ -255,11 +255,22 @@ def main() -> None:
 
     route_rollup_query = sub.add_parser("route-rollup-query")
     route_rollup_query.add_argument("query", nargs="?", default="")
-    route_rollup_query.add_argument("--layer", default="")
+    route_rollup_query.add_argument("--layer", default="tool")
     route_rollup_query.add_argument("--key", default="")
     route_rollup_query.add_argument("--route-signal", default="")
     route_rollup_query.add_argument("--limit", type=int, default=12)
     route_rollup_query.add_argument("--ref-limit", type=int, default=3)
+
+    direct_event_rollup_query = sub.add_parser("direct-event-rollup-query")
+    direct_event_rollup_query.add_argument("query", nargs="?", default="")
+    direct_event_rollup_query.add_argument("--usage-role", default="result")
+    direct_event_rollup_query.add_argument("--event-type", default="")
+    direct_event_rollup_query.add_argument("--session-act", default="")
+    direct_event_rollup_query.add_argument("--layer", default="")
+    direct_event_rollup_query.add_argument("--key", default="")
+    direct_event_rollup_query.add_argument("--route-signal", default="")
+    direct_event_rollup_query.add_argument("--limit", type=int, default=12)
+    direct_event_rollup_query.add_argument("--ref-limit", type=int, default=3)
 
     projection_status = sub.add_parser("projection-status")
     projection_status.add_argument("--include-payload", action="store_true")
@@ -565,6 +576,20 @@ def main() -> None:
         _print(
             state.session_operational_route_rollup_query(
                 query=args.query,
+                layer=args.layer,
+                key=args.key,
+                route_signal=args.route_signal,
+                limit=args.limit,
+                ref_limit=args.ref_limit,
+            )
+        )
+    elif args.command == "direct-event-rollup-query":
+        _print(
+            state.session_operational_direct_event_rollup_query(
+                query=args.query,
+                usage_role=args.usage_role,
+                event_type=args.event_type,
+                session_act=args.session_act,
                 layer=args.layer,
                 key=args.key,
                 route_signal=args.route_signal,

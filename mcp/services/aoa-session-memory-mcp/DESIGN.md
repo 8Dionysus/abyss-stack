@@ -44,6 +44,7 @@ aoa_session_route(axis, key)
 aoa_session_graph_neighborhood(anchor, edge_limit=...)
 aoa_session_graph_bridge(source, target, source_kind="mcp", target_kind="tool")
 aoa_session_route_rollup_query(query, layer="tool")
+aoa_session_direct_event_rollup_query(usage_role="result")
 ```
 
 The anchor may be a skill, MCP, hook, tool, path, repo, command, config,

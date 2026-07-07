@@ -111,12 +111,14 @@ PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli hook-receipts --event-name UserPromptSubmit --only-errors --limit 5
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli projection-status
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli route-rollup-query exec_command --layer tool --limit 3
+PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli direct-event-rollup-query --usage-role result --limit 3
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli route by-mcp aoa-session-memory-mcp
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli brief latest
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli evidence-packet --intent "debug aoa-session-memory-mcp" --anchor aoa-session-memory-mcp
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli freshness-check raw:line:1 --session latest
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-neighborhood aoa-session-memory-mcp --kind mcp --limit 20
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-bridge aoa-session-memory-mcp exec_command --source-kind mcp --target-kind tool --limit 4
+PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-cooccurrence aoa-session-memory-mcp --kind mcp_service --limit 6
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graphrag-packet aoa-session-memory-mcp --anchor aoa-session-memory-mcp --limit 5
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli graph-quality-audit --limit 4
 ```

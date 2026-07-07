@@ -67,6 +67,26 @@ def main() -> None:
     rag_validate = state.surface("rag-validate")
     if not rag_validate["ok"]:
         raise SystemExit(f"machine RAG validator surface failed: {rag_validate}")
+    artifact_coverage = state.surface("artifact-trust-coverage", include_payload=False)
+    if not artifact_coverage["ok"]:
+        raise SystemExit(f"artifact trust coverage surface failed: {artifact_coverage}")
+    artifact_gate = state.surface(
+        "artifact-trust-gate",
+        artifact_class="public_source_seed",
+        consumer_intent="agent",
+        include_payload=False,
+    )
+    if not artifact_gate["ok"]:
+        raise SystemExit(f"artifact trust gate surface failed: {artifact_gate}")
+    artifact_validate = state.surface("artifact-trust-validate", include_payload=False)
+    if not artifact_validate["ok"]:
+        raise SystemExit(f"artifact trust validator surface failed: {artifact_validate}")
+    try:
+        state.surface("artifacts")
+    except ValueError:
+        artifact_reject_ok = True
+    else:
+        raise SystemExit("generic artifacts surface must remain disallowed")
     route = state.machine_route("validate abyss-machine MCP route posture", work_class="heavy", kind="ai")
     if route["mutates"]:
         raise SystemExit("route tool must remain non-mutating")
@@ -93,6 +113,10 @@ def main() -> None:
                 "rag_trace_ok": rag["ok"],
                 "rag_trace_schema": rag.get("trace_schema"),
                 "rag_eval_ok": rag.get("eval", {}).get("ok"),
+                "artifact_trust_coverage_ok": artifact_coverage["ok"],
+                "artifact_trust_gate_ok": artifact_gate["ok"],
+                "artifact_trust_validate_ok": artifact_validate["ok"],
+                "artifact_trust_generic_surface_rejected": artifact_reject_ok,
                 "route_posture": route["route_posture"],
             },
             indent=2,

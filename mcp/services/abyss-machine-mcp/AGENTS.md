@@ -85,6 +85,7 @@ PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli ma
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli context-packet --axis by-eval-packet --reader-profile proof-context --limit 4
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli rag-trace --query "machine RAG trace loop" --limit 4 --evidence-limit 6
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface memory-pressure
+PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli surface artifact-trust-gate --artifact-class public_source_seed --consumer-intent agent
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli route --intent "start bounded local AI work" --class heavy --kind ai
 PYTHONPATH=mcp/services/abyss-machine-mcp/src python -m abyss_machine_mcp.cli read-resource abyss-machine://brief
 ```

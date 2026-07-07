@@ -14,9 +14,24 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_ABYSS_MACHINE_BIN = "abyss-machine"
+DEFAULT_ARTIFACT_BUNDLE_REGISTRY = "/var/lib/abyss-machine/artifacts/bundle-registry"
 DEFAULT_TIMEOUT_SECONDS = 12.0
+SURFACE_TIMEOUT_SECONDS = {
+    # Aggregating read models can legitimately scan large local state while
+    # still remaining non-mutating and bounded.
+    "typing-status": 45.0,
+    "artifact-trust-requirements": 45.0,
+    "artifact-trust-producer-profiles": 45.0,
+    "artifact-trust-affected": 45.0,
+    "artifact-trust-coverage": 45.0,
+    "artifact-trust-gate": 45.0,
+    "artifact-trust-registry-latest": 45.0,
+    "artifact-trust-scenarios": 45.0,
+    "artifact-trust-validate": 60.0,
+}
 
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+SOURCE_REF_RE = re.compile(r"^[A-Za-z0-9_./:+-]{1,240}$")
 
 STOP_LINES = [
     "Do not execute arbitrary shell commands.",
@@ -229,6 +244,46 @@ SURFACE_META: dict[str, dict[str, str]] = {
         "truth_level": "bridge_validation",
         "description": "stack bridge validator result",
     },
+    "artifact-trust-requirements": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_requirements_read_model",
+        "description": "artifact class required controls, owner route, and consumer loop commands",
+    },
+    "artifact-trust-producer-profiles": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_producer_profile_read_model",
+        "description": "owner-local producer profiles with command-resolution checks",
+    },
+    "artifact-trust-affected": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_drift_read_model",
+        "description": "artifact trust drift, freshness, stale ABI, and sibling lag posture",
+    },
+    "artifact-trust-coverage": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_coverage_read_model",
+        "description": "durable registry coverage and OS-internal artifact trust readiness",
+    },
+    "artifact-trust-gate": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_consumer_gate",
+        "description": "consumer allow, warn, or deny verdict for one artifact class",
+    },
+    "artifact-trust-registry-latest": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_registry_latest",
+        "description": "latest durable registry record selected through consumer gate rules",
+    },
+    "artifact-trust-scenarios": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_scenario_read_model",
+        "description": "representative OS Abyss artifact trust E2E scenarios",
+    },
+    "artifact-trust-validate": {
+        "owner": "abyss-machine",
+        "truth_level": "artifact_trust_validation",
+        "description": "artifact trust subsystem validator result",
+    },
 }
 
 
@@ -287,6 +342,40 @@ def _safe_token(value: str, label: str) -> str:
     if not TOKEN_RE.fullmatch(value):
         raise ValueError(f"{label} must be a short token, got: {value!r}")
     return value
+
+
+def _safe_source_ref(value: str, label: str) -> str:
+    if not SOURCE_REF_RE.fullmatch(value):
+        raise ValueError(f"{label} must be a bounded source ref token, got: {value!r}")
+    return value
+
+
+def _path_is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _safe_source_root(value: str, *, workspace_root: Path) -> str:
+    if not value:
+        return ""
+    raw = Path(value).expanduser()
+    if not raw.is_absolute():
+        raise ValueError("source_root must be an absolute abyss-machine source root")
+    resolved = raw.resolve(strict=False)
+    if resolved.name != "abyss-machine":
+        raise ValueError("source_root must point at an abyss-machine source root")
+    allowed_prefixes = [
+        workspace_root.resolve(strict=False),
+        workspace_root.parent.resolve(strict=False),
+        (Path.home() / "src").resolve(strict=False),
+        Path("/usr/local/share").resolve(strict=False),
+    ]
+    if not any(resolved == prefix or _path_is_relative_to(resolved, prefix) for prefix in allowed_prefixes):
+        raise ValueError("source_root is outside the bounded abyss-machine source-root allowlist")
+    return resolved.as_posix()
 
 
 def _safe_query(value: str) -> str:
@@ -387,14 +476,27 @@ def _summary(payload: Any) -> Any:
     )
 
 
-def _payload_ok(payload: Any, returncode: int) -> bool:
-    if returncode != 0:
+def _surface_read_ok(surface: str, payload: Any, returncode: int) -> bool:
+    if not isinstance(payload, dict):
         return False
-    if payload is None:
+    if returncode == 0 and payload.get("ok") is not False:
+        return True
+    schema = str(payload.get("schema") or "")
+    if surface.startswith("artifact-trust-"):
+        return schema.startswith("abyss_machine_artifact")
+    if surface == "memory-pressure":
+        return schema == "abyss_machine_memory_pressure_v1"
+    return False
+
+
+def _coverage_source_context_unsupported(run: dict[str, Any]) -> bool:
+    if run.get("surface") != "artifact-trust-coverage":
         return False
-    if isinstance(payload, dict) and payload.get("ok") is False:
+    stderr = str(run.get("stderr") or "")
+    if "unrecognized arguments" not in stderr:
         return False
-    return True
+    argv = [str(item) for item in run.get("argv", [])]
+    return "--source-root" in argv or "--source-repo" in argv or "--source-ref" in argv
 
 
 def _collect_paths(value: Any, *, limit: int = 16) -> list[str]:
@@ -536,6 +638,11 @@ class AbyssMachineMCPState:
         reader_profile: str = "agent",
         limit: int = 20,
         evidence_limit: int = 12,
+        artifact_class: str = "",
+        consumer_intent: str = "agent",
+        source_repo: str = "",
+        source_ref: str = "",
+        source_root: str = "",
     ) -> list[str]:
         if name == "stack-bridge":
             return ["stack-bridge", "--json"]
@@ -647,21 +754,89 @@ class AbyssMachineMCPState:
             return ["changes", "index", "--json"]
         if name == "stack-bridge-validate":
             return ["stack-bridge", "validate", "--json"]
+        if name == "artifact-trust-requirements":
+            args = ["artifacts", "requirements"]
+            if artifact_class:
+                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
+            args.append("--json")
+            return args
+        if name == "artifact-trust-producer-profiles":
+            args = ["artifacts", "producer-profiles", "--require-command-resolution"]
+            if artifact_class:
+                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
+            args.append("--json")
+            return args
+        if name == "artifact-trust-affected":
+            args = ["artifacts", "affected"]
+            if artifact_class:
+                args.extend(["--artifact-class", _safe_token(artifact_class, "artifact_class")])
+            if source_repo:
+                args.extend(["--source-repo", _safe_token(source_repo, "source_repo")])
+            if source_ref:
+                args.extend(["--source-ref", _safe_source_ref(source_ref, "source_ref")])
+            args.append("--json")
+            return args
+        if name == "artifact-trust-coverage":
+            args = ["artifacts", "trust-coverage"]
+            if source_root:
+                args.extend(["--source-root", _safe_source_root(source_root, workspace_root=self.workspace_root)])
+            if source_repo:
+                args.extend(["--source-repo", _safe_token(source_repo, "source_repo")])
+            if source_ref:
+                args.extend(["--source-ref", _safe_source_ref(source_ref, "source_ref")])
+            args.append("--json")
+            return args
+        if name == "artifact-trust-gate":
+            if not artifact_class:
+                raise ValueError("artifact_class is required for artifact-trust-gate")
+            return [
+                "artifacts",
+                "trust-gate",
+                "--artifact-class",
+                _safe_token(artifact_class, "artifact_class"),
+                "--consumer-intent",
+                _safe_token(consumer_intent, "consumer_intent"),
+                "--json",
+            ]
+        if name == "artifact-trust-registry-latest":
+            if not artifact_class:
+                raise ValueError("artifact_class is required for artifact-trust-registry-latest")
+            return [
+                "artifacts",
+                "registry-latest",
+                "--artifact-class",
+                _safe_token(artifact_class, "artifact_class"),
+                "--consumer-intent",
+                _safe_token(consumer_intent, "consumer_intent"),
+                "--json",
+            ]
+        if name == "artifact-trust-scenarios":
+            return [
+                "artifacts",
+                "scenarios",
+                "--registry-dir",
+                DEFAULT_ARTIFACT_BUNDLE_REGISTRY,
+                "--json",
+            ]
+        if name == "artifact-trust-validate":
+            return ["artifacts", "validate", "--json"]
         raise ValueError(f"unknown or disallowed abyss-machine surface: {name}")
 
     def _run_json(self, surface: str, args: list[str], timeout: float | None = None) -> dict[str, Any]:
         argv = [self.abyss_machine_bin, *args]
-        output = self.command_runner(argv, float(timeout or self.timeout_seconds))
+        effective_timeout = float(timeout or SURFACE_TIMEOUT_SECONDS.get(surface, self.timeout_seconds))
+        output = self.command_runner(argv, effective_timeout)
         payload = _read_json(output.stdout)
         return {
             "surface": surface,
             "argv": argv,
+            "timeout_seconds": effective_timeout,
             "returncode": output.returncode,
             "stderr": output.stderr.strip(),
             "elapsed_ms": output.elapsed_ms,
             "payload": payload,
             "payload_parse_ok": payload is not None,
-            "ok": _payload_ok(payload, output.returncode),
+            "ok": _surface_read_ok(surface, payload, output.returncode),
         }
 
     def _public_command_result(self, run: dict[str, Any], *, include_payload: bool = False) -> dict[str, Any]:
@@ -678,8 +853,10 @@ class AbyssMachineMCPState:
             "command": run["argv"],
             "ok": run["ok"],
             "returncode": run["returncode"],
+            "timeout_seconds": run["timeout_seconds"],
             "elapsed_ms": run["elapsed_ms"],
             "payload_parse_ok": run["payload_parse_ok"],
+            "payload_ok": payload.get("ok") if isinstance(payload, dict) else None,
             "payload_schema": payload.get("schema") if isinstance(payload, dict) else None,
             "payload_generated_at": payload.get("generated_at") if isinstance(payload, dict) else None,
             "payload_summary": _summary(payload),
@@ -704,6 +881,11 @@ class AbyssMachineMCPState:
         reader_profile: str = "agent",
         limit: int = 20,
         evidence_limit: int = 12,
+        artifact_class: str = "",
+        consumer_intent: str = "agent",
+        source_repo: str = "",
+        source_ref: str = "",
+        source_root: str = "",
         include_payload: bool = True,
         timeout: float | None = None,
     ) -> dict[str, Any]:
@@ -720,8 +902,31 @@ class AbyssMachineMCPState:
             reader_profile=reader_profile,
             limit=limit,
             evidence_limit=evidence_limit,
+            artifact_class=artifact_class,
+            consumer_intent=consumer_intent,
+            source_repo=source_repo,
+            source_ref=source_ref,
+            source_root=source_root,
         )
         run = self._run_json(name, args, timeout=timeout)
+        if name == "artifact-trust-coverage" and (source_root or source_repo or source_ref) and _coverage_source_context_unsupported(run):
+            fallback_args = self._surface_args(name)
+            fallback_run = self._run_json(name, fallback_args, timeout=timeout)
+            result = self._public_command_result(fallback_run, include_payload=include_payload)
+            result["warnings"] = [
+                *([str(item) for item in result.get("warnings", [])] if isinstance(result.get("warnings"), list) else []),
+                "artifact_trust_coverage_source_context_unsupported_by_cli",
+            ]
+            result["source_context_request"] = {
+                "requested_source_root": source_root or None,
+                "requested_source_repo": source_repo or None,
+                "requested_source_ref": source_ref or None,
+                "status": "fallback_without_source_context",
+                "reason": "installed abyss-machine trust-coverage does not yet support --source-root/--source-repo/--source-ref",
+            }
+            result["requested_command"] = run["argv"]
+            result["requested_stderr"] = run["stderr"] or None
+            return result
         return self._public_command_result(run, include_payload=include_payload)
 
     def _stack_bridge_payload(self) -> tuple[dict[str, Any], dict[str, Any]]:

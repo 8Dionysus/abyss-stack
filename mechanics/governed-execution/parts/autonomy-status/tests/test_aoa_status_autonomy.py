@@ -264,3 +264,38 @@ class AutonomyCollectorTests(unittest.TestCase):
         self.assertEqual(payload["checks"]["federation_layers"]["status"], "not_enabled")
         self.assertEqual(payload["degradation_reasons"], [])
         self.assertTrue(payload["truth_status"]["control_plane"]["live_available"])
+
+    def test_route_api_requirement_treats_missing_route_api_container_as_optional(self) -> None:
+        with patch.object(
+            self.module,
+            "run_command",
+            return_value={
+                "command": ["podman", "inspect"],
+                "cwd": None,
+                "exit_code": 125,
+                "stdout": "",
+                "stderr": 'Error: no such object: "route-api"',
+            },
+        ):
+            requirement = self.module.route_api_requirement()
+
+        self.assertFalse(requirement["required"])
+        self.assertEqual(requirement["route_api_container_state"], "missing")
+
+    def test_route_api_requirement_keeps_inspect_errors_actionable(self) -> None:
+        with patch.object(
+            self.module,
+            "run_command",
+            return_value={
+                "command": ["podman", "inspect"],
+                "cwd": None,
+                "exit_code": 125,
+                "stdout": "",
+                "stderr": "Error: cannot connect to Podman socket",
+            },
+        ):
+            requirement = self.module.route_api_requirement()
+
+        self.assertTrue(requirement["required"])
+        self.assertEqual(requirement["route_api_container_state"], "inspect_error")
+        self.assertEqual(requirement["reason"], "route-api container state is inspect_error")

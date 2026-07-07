@@ -4,6 +4,7 @@
 
 - Provider map and readiness matrix.
 - Repo-local `kag/` records.
+- Generation profiles, source-index handles, and repo-local coverage rows.
 - Source-return route handles.
 - Local filesystem roots named by the provider map.
 

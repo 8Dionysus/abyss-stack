@@ -53,3 +53,33 @@ def test_load_profile_names_falls_back_to_deployed_configs_when_source_preset_is
     module.DEFAULT_CONFIGS_ROOT = deployed_configs
 
     assert module.load_profile_names("agent-full") == ["agentic", "tools", "observability"]
+
+
+def test_public_overlay_specs_drop_private_paths_and_normalize_repo_paths(tmp_path) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    configs_root = tmp_path / "runtime" / "Configs"
+    source_root.mkdir(parents=True)
+    configs_root.mkdir(parents=True)
+
+    module.SCRIPT_ROOT = source_root
+    module.DEFAULT_CONFIGS_ROOT = configs_root
+
+    specs = module.public_safe_overlay_specs(
+        [
+            str(source_root / "compose" / "tuning" / "source.yml"),
+            str(configs_root / "compose" / "tuning" / "runtime.yml"),
+            "compose/tuning/relative.yml",
+            str(tmp_path / "private" / "runtime.yml"),
+            "../outside.yml",
+            "~/private.yml",
+            "Secrets/runtime.yml",
+            "compose/tuning/relative.yml",
+        ]
+    )
+
+    assert specs == [
+        "compose/tuning/source.yml",
+        "compose/tuning/runtime.yml",
+        "compose/tuning/relative.yml",
+    ]

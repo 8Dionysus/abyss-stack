@@ -33,6 +33,11 @@ def main() -> None:
     surface.add_argument("--reader-profile", default="agent")
     surface.add_argument("--limit", type=int, default=20)
     surface.add_argument("--evidence-limit", type=int, default=12)
+    surface.add_argument("--artifact-class", default="")
+    surface.add_argument("--consumer-intent", default="agent")
+    surface.add_argument("--source-repo", default="")
+    surface.add_argument("--source-ref", default="")
+    surface.add_argument("--source-root", default="")
 
     evidence = sub.add_parser("evidence-map")
     evidence.add_argument("--layer")
@@ -93,6 +98,11 @@ def main() -> None:
                 reader_profile=args.reader_profile,
                 limit=args.limit,
                 evidence_limit=args.evidence_limit,
+                artifact_class=args.artifact_class,
+                consumer_intent=args.consumer_intent,
+                source_repo=args.source_repo,
+                source_ref=args.source_ref,
+                source_root=args.source_root,
             )
         )
     elif args.command == "evidence-map":

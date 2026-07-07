@@ -10,6 +10,7 @@
 | prompt flood from bridge archives | responses compact nested payloads and expose evidence refs separately |
 | stale generated state is overclaimed | timestamps, schemas, truth levels, and validation routes remain visible |
 | private capture leakage | no raw private capture tools; recall remains evidence, not instruction |
+| artifact trust read access becomes signing or promotion authority | artifact surfaces expose only allowlisted read models; signing, sidecar build, evidence promotion, registry writes, and trust-root changes stay outside MCP |
 | stack absorbs host ownership | docs and responses route host truth back to `abyss-machine` |
 | broad exposure widens attack surface | service is stdio-only until a later decision |
 

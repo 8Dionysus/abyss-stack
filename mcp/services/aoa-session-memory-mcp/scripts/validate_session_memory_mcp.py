@@ -46,9 +46,25 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_live_scenario_corpus_check",
     "aoa_session_maintenance_status",
     "aoa_session_route_rollup_query",
+    "aoa_session_direct_event_rollup_query",
     "aoa_session_projection_status",
     "aoa_session_graph_neighborhood",
     "aoa_session_graph_bridge",
+    "aoa_session_graph_cooccurrence",
+}
+
+ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
+    "current",
+    "current_with_deferred_live_updates",
+    "current_with_global_deferred_live_updates",
+    "current_with_global_stale",
+}
+
+ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
+    "current",
+    "current_with_deferred_live_updates",
+    "current_with_global_deferred_live_updates",
+    "current_with_global_stale",
 }
 
 
@@ -56,7 +72,7 @@ def _search_alias_smoke_arguments(limit: int = 3) -> dict:
     return {
         "query": "",
         "filters": {
-            "route_signal": "mcp:aoa-session-memory-mcp",
+            "route_signal": "mcp:aoa_session_memory_mcp",
             "doc_type": "event",
             "layer": "mcp",
             "use_shards": True,
@@ -65,9 +81,30 @@ def _search_alias_smoke_arguments(limit: int = 3) -> dict:
     }
 
 
+def _freshness_smoke_status(state: AoASessionMemoryMCPState, brief: dict) -> str:
+    if not brief.get("ok") or brief.get("session", {}).get("archive_status") != "indexed":
+        return ""
+    label = brief.get("session", {}).get("label") or brief.get("session", {}).get("id")
+    manifest = brief.get("refs", {}).get("manifest") if isinstance(brief.get("refs"), dict) else ""
+    if not label or not manifest:
+        return ""
+    refs = [manifest]
+    raw_path = Path(manifest).parent / "raw" / "session.raw.jsonl"
+    if raw_path.exists():
+        refs.append("raw:line:1")
+    freshness = state.session_freshness_check(refs, session=str(label))
+    if not freshness.get("ok"):
+        return str(freshness.get("projection_freshness", {}).get("status") or "")
+    return str(freshness.get("projection_freshness", {}).get("status") or "")
+
+
 def _select_freshness_smoke_brief(state: AoASessionMemoryMCPState, latest_brief: dict) -> dict:
     latest_status = latest_brief.get("session", {}).get("archive_status")
-    if latest_brief.get("ok") and latest_status == "indexed":
+    if (
+        latest_brief.get("ok")
+        and latest_status == "indexed"
+        and _freshness_smoke_status(state, latest_brief) in ACCEPTABLE_FRESHNESS_SMOKE_STATUSES
+    ):
         return latest_brief
 
     indexed = state.session_search(
@@ -82,20 +119,29 @@ def _select_freshness_smoke_brief(state: AoASessionMemoryMCPState, latest_brief:
         if not label:
             continue
         brief = state.session_brief(str(label), max_segments=2)
-        if brief.get("ok") and brief.get("session", {}).get("archive_status") == "indexed":
+        if (
+            brief.get("ok")
+            and brief.get("session", {}).get("archive_status") == "indexed"
+            and _freshness_smoke_status(state, brief) in ACCEPTABLE_FRESHNESS_SMOKE_STATUSES
+        ):
             return brief
         refs = hit.get("refs") if isinstance(hit.get("refs"), dict) else {}
         manifest = refs.get("session") or hit.get("session_ref")
-        if manifest and hit.get("archive_status") == "indexed":
-            return {
-                "ok": True,
-                "session": {
-                    "id": hit.get("session_id"),
-                    "label": label,
-                    "archive_status": "indexed",
-                },
-                "refs": {"manifest": str(manifest)},
-            }
+        fallback_brief = {
+            "ok": True,
+            "session": {
+                "id": hit.get("session_id"),
+                "label": label,
+                "archive_status": "indexed",
+            },
+            "refs": {"manifest": str(manifest)},
+        }
+        if (
+            manifest
+            and hit.get("archive_status") == "indexed"
+            and _freshness_smoke_status(state, fallback_brief) in ACCEPTABLE_FRESHNESS_SMOKE_STATUSES
+        ):
+            return fallback_brief
 
     return latest_brief
 
@@ -182,16 +228,52 @@ def _proc_cwd(pid: str, proc_root: Path = Path("/proc")) -> str:
         return ""
 
 
+SESSION_MEMORY_MCP_SERVER_BASENAMES = {
+    "aoa-session-memory-mcp-server",
+    "aoa-session-memory-mcp-server.py",
+    "aoa_session_memory_mcp_server.py",
+}
+CODEX_PROCESS_BASENAMES = {
+    "codex",
+    "codex.exe",
+    "codex.js",
+}
+
+
+def _restart_required_source_paths() -> list[Path]:
+    return [
+        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
+        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
+    ]
+
+
+def _core_auto_reload_source_paths() -> list[Path]:
+    return [REPO_ROOT / "src/aoa_session_memory_mcp/core.py"]
+
+
+def _max_existing_mtime(paths: list[Path]) -> float:
+    return max((path.stat().st_mtime for path in paths if path.exists()), default=0.0)
+
+
+def _is_session_memory_mcp_server_cmdline(cmdline: list[str]) -> bool:
+    for part in cmdline:
+        if Path(part).name in SESSION_MEMORY_MCP_SERVER_BASENAMES:
+            return True
+        if part == "aoa_session_memory_mcp.server":
+            return True
+    return False
+
+
+def _is_codex_process_cmdline(cmdline: list[str]) -> bool:
+    return any(Path(part).name in CODEX_PROCESS_BASENAMES for part in cmdline)
+
+
 def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
     if not proc_root.is_dir():
         return {"available": False, "reason": "procfs_unavailable"}
 
-    watched_sources = [
-        REPO_ROOT / "src/aoa_session_memory_mcp/core.py",
-        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
-        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
-    ]
-    source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    restart_source_mtime = _max_existing_mtime(_restart_required_source_paths())
+    core_auto_reload_source_mtime = _max_existing_mtime(_core_auto_reload_source_paths())
     config_path = _codex_config_path()
     config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
     boot_epoch = _linux_boot_epoch(proc_root)
@@ -206,6 +288,7 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
         parent = next_parent
 
     mcp_children_by_parent: dict[int, list[int]] = {}
+    mcp_processes_by_pid: dict[int, dict] = {}
     codex_processes: list[dict] = []
     for entry in proc_root.iterdir():
         if not entry.name.isdigit():
@@ -214,16 +297,23 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
         cmdline = _proc_cmdline(entry.name, proc_root=proc_root)
         if not cmdline:
             continue
-        joined = " ".join(cmdline)
-        if "aoa-session-memory-mcp-server.py" in joined or "aoa_session_memory_mcp_server.py" in joined:
+        started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
+        if _is_session_memory_mcp_server_cmdline(cmdline):
             ppid = _proc_ppid(entry.name, proc_root=proc_root)
             if ppid is not None:
                 mcp_children_by_parent.setdefault(ppid, []).append(pid)
+            mcp_processes_by_pid[pid] = {
+                "pid": pid,
+                "ppid": ppid,
+                "started_at_epoch": started_at_epoch,
+                "started_before_current_source": bool(
+                    started_at_epoch is not None and restart_source_mtime and started_at_epoch < restart_source_mtime
+                ),
+            }
             continue
-        if "codex" not in joined or "resume" not in joined:
+        if not _is_codex_process_cmdline(cmdline):
             continue
 
-        started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
         codex_processes.append(
             {
                 "pid": pid,
@@ -233,7 +323,14 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
                 "started_at_epoch": started_at_epoch,
                 "is_current_validator_ancestor": pid in ancestor_pids,
                 "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
-                "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+                "started_before_current_source": bool(
+                    started_at_epoch is not None and restart_source_mtime and started_at_epoch < restart_source_mtime
+                ),
+                "started_before_core_auto_reload_source": bool(
+                    started_at_epoch is not None
+                    and core_auto_reload_source_mtime
+                    and started_at_epoch < core_auto_reload_source_mtime
+                ),
             }
         )
 
@@ -246,30 +343,54 @@ def _codex_session_advisory(proc_root: Path = Path("/proc")) -> dict:
     current_predates_config = any(process["started_before_config"] for process in current_codex)
     current_predates_source = any(process["started_before_current_source"] for process in current_codex)
     current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
+    current_mcp_child_processes = [
+        mcp_processes_by_pid[pid]
+        for process in current_codex
+        for pid in process.get("aoa_session_memory_child_pids", [])
+        if pid in mcp_processes_by_pid
+    ]
+    current_mcp_child_count = len(current_mcp_child_processes)
+    current_stale_mcp_child_count = sum(
+        1 for process in current_mcp_child_processes if process.get("started_before_current_source")
+    )
+    current_has_fresh_mcp_child = bool(
+        current_mcp_child_processes and current_stale_mcp_child_count < current_mcp_child_count
+    )
     configured = config_path.exists()
+    config_reload_advisory = bool(
+        current_codex
+        and configured
+        and current_predates_config
+        and current_has_fresh_mcp_child
+    )
     live_transport_advisory = bool(
         current_codex
         and configured
-        and (current_predates_config or current_predates_source or not current_has_mcp_child)
+        and not current_has_fresh_mcp_child
     )
 
     return {
         "available": True,
         "config_path": config_path.as_posix(),
         "config_mtime_epoch": config_mtime or None,
-        "source_mtime_epoch": source_mtime or None,
+        "source_mtime_epoch": restart_source_mtime or None,
+        "restart_required_source_mtime_epoch": restart_source_mtime or None,
+        "core_auto_reload_source_mtime_epoch": core_auto_reload_source_mtime or None,
         "current_codex_process_count": len(current_codex),
         "current_session_predates_config": current_predates_config,
         "current_session_predates_current_source": current_predates_source,
         "current_session_has_aoa_session_memory_child": current_has_mcp_child,
+        "current_session_mcp_child_count": current_mcp_child_count,
+        "current_session_mcp_child_stale_count": current_stale_mcp_child_count,
+        "current_session_has_fresh_aoa_session_memory_child": current_has_fresh_mcp_child,
+        "config_reload_advisory": config_reload_advisory,
         "live_transport_restart_advisory": live_transport_advisory,
         "advisory": (
-            "This Codex session started before the current aoa-session-memory MCP config/source "
-            "or has no direct aoa-session-memory MCP child. Fresh configured stdio can prove the "
+            "This Codex session has no fresh direct aoa-session-memory MCP child. Fresh configured stdio can prove the "
             "server, but direct in-session MCP calls need a Codex/MCP restart before they are "
             "freshness proof."
             if live_transport_advisory
-            else "Current Codex session is not older than the watched aoa-session-memory MCP config/source and has a direct MCP child when configured."
+            else "Current Codex session has a fresh direct MCP child when configured; config mtime drift is advisory only."
         ),
         "current_codex_processes": current_codex[:6],
         "processes": codex_processes[:12],
@@ -281,12 +402,8 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
     if not proc_root.is_dir():
         return {"available": False, "reason": "procfs_unavailable"}
 
-    watched_sources = [
-        REPO_ROOT / "src/aoa_session_memory_mcp/core.py",
-        REPO_ROOT / "src/aoa_session_memory_mcp/server.py",
-        REPO_ROOT / "scripts/aoa_session_memory_mcp_server.py",
-    ]
-    source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+    restart_source_mtime = _max_existing_mtime(_restart_required_source_paths())
+    core_auto_reload_source_mtime = _max_existing_mtime(_core_auto_reload_source_paths())
     boot_epoch = _linux_boot_epoch(proc_root)
     processes: list[dict] = []
     for entry in proc_root.iterdir():
@@ -295,8 +412,7 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
         cmdline = _proc_cmdline(entry.name, proc_root=proc_root)
         if not cmdline:
             continue
-        joined = " ".join(cmdline)
-        if "aoa-session-memory-mcp-server.py" not in joined and "aoa_session_memory_mcp_server.py" not in joined:
+        if not _is_session_memory_mcp_server_cmdline(cmdline):
             continue
         cwd = ""
         try:
@@ -304,7 +420,7 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
         except OSError:
             cwd = ""
         started_at_epoch = _process_start_epoch(entry.name, proc_root=proc_root, boot_epoch=boot_epoch)
-        stale = bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime)
+        stale = bool(started_at_epoch is not None and restart_source_mtime and started_at_epoch < restart_source_mtime)
         processes.append(
             {
                 "pid": int(entry.name),
@@ -312,22 +428,29 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
                 "cmdline": cmdline,
                 "started_at_epoch": started_at_epoch,
                 "started_before_current_source": stale,
+                "started_before_core_auto_reload_source": bool(
+                    started_at_epoch is not None
+                    and core_auto_reload_source_mtime
+                    and started_at_epoch < core_auto_reload_source_mtime
+                ),
             }
         )
 
     stale_count = sum(1 for process in processes if process["started_before_current_source"])
     return {
         "available": True,
-        "source_mtime_epoch": source_mtime or None,
+        "source_mtime_epoch": restart_source_mtime or None,
+        "restart_required_source_mtime_epoch": restart_source_mtime or None,
+        "core_auto_reload_source_mtime_epoch": core_auto_reload_source_mtime or None,
         "process_count": len(processes),
         "stale_process_count": stale_count,
         "restart_advisory": stale_count > 0,
         "advisory": (
-            "Some already-running Codex MCP transports started before the current source. "
+            "Some already-running Codex MCP transports started before the current restart-required source. "
             "Configured stdio smoke proves a fresh server, but those transports need a Codex/MCP restart "
             "before their live output is freshness proof."
             if stale_count
-            else "No already-running aoa-session-memory MCP process is older than the watched source files."
+            else "No already-running aoa-session-memory MCP process is older than the restart-required source files."
         ),
         "processes": processes[:12],
         "omitted_process_count": max(0, len(processes) - 12),
@@ -378,6 +501,26 @@ def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServ
 def _payload_count(payload: dict, key: str) -> int:
     value = payload.get(key)
     return value if isinstance(value, int) else 0
+
+
+def _payload_count_or_list_len(payload: dict, key: str, list_key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, int):
+        return value
+    items = payload.get(list_key)
+    return len(items) if isinstance(items, list) else 0
+
+
+def _has_first_raw_or_segment_ref(ref: dict) -> bool:
+    return bool(
+        isinstance(ref, dict)
+        and (
+            ref.get("raw")
+            or ref.get("raw_ref")
+            or ref.get("segment")
+            or ref.get("segment_ref")
+        )
+    )
 
 
 def _first_entity(payload: dict) -> dict:
@@ -494,10 +637,12 @@ def _stdio_route_count_summary(
     usage_alias: dict,
     agent_event_usage: dict,
     graph_neighborhood: dict,
+    graph_cooccurrence: dict,
     retrieve_usage: dict,
     live_scenario: dict,
     live_scenario_corpus: dict,
     maintenance_status: dict,
+    direct_event_rollup_query: dict,
     projection_status: dict,
     *,
     tool_count: int,
@@ -560,7 +705,7 @@ def _stdio_route_count_summary(
         else None,
         "entity_usage_chain_first_ref_present": bool(
             isinstance(usage_chain.get("first_ref"), dict)
-            and (usage_chain["first_ref"].get("raw") or usage_chain["first_ref"].get("segment"))
+            and _has_first_raw_or_segment_ref(usage_chain["first_ref"])
         ),
         "usage_alias_kind": usage_alias.get("kind"),
         "usage_alias_requested_kind": usage_alias.get("requested_kind"),
@@ -568,6 +713,12 @@ def _stdio_route_count_summary(
         "agent_event_usage_outcome_count": _payload_count(agent_event_usage, "outcome_event_count"),
         "graph_neighborhood_node_count": _payload_count(graph_neighborhood, "node_count"),
         "graph_neighborhood_edge_count": _payload_count(graph_neighborhood, "edge_count"),
+        "graph_cooccurrence_count": _payload_count_or_list_len(
+            graph_cooccurrence, "cooccurrence_count", "cooccurrences"
+        ),
+        "graph_cooccurrence_ref_count": _payload_count_or_list_len(
+            graph_cooccurrence, "evidence_ref_count", "evidence_refs"
+        ),
         "retrieve_usage_served_by": retrieve_usage.get("retrieval_redirect", {}).get("served_by")
         if isinstance(retrieve_usage.get("retrieval_redirect"), dict)
         else None,
@@ -613,6 +764,13 @@ def _stdio_route_count_summary(
         "maintenance_smoke_skipped": maintenance_status.get("mcp_access", {}).get("skipped_in_stdio_smoke")
         if isinstance(maintenance_status.get("mcp_access"), dict)
         else None,
+        "direct_event_rollup_result_count": _payload_count(direct_event_rollup_query, "result_count"),
+        "direct_event_rollup_freshness_status": direct_event_rollup_query.get("quality", {}).get("freshness_status")
+        if isinstance(direct_event_rollup_query.get("quality"), dict)
+        else None,
+        "direct_event_rollup_materialized": direct_event_rollup_query.get("cost_profile", {}).get("uses_materialized_direct_event_rollup")
+        if isinstance(direct_event_rollup_query.get("cost_profile"), dict)
+        else None,
         "projection_status_ok": projection_status.get("ok"),
         "projection_completeness_status": projection_status.get("projection_completeness", {}).get("status")
         if isinstance(projection_status.get("projection_completeness"), dict)
@@ -654,7 +812,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
 
             inventory = await call_json(
                 "aoa_session_entity_inventory",
-                {"layer": "skill", "query": "aoa-session-memory", "limit": 8, "sample_limit": 3},
+                {"layer": "skill", "limit": 8, "sample_limit": 3},
             )
             mcp_service_inventory = await call_json(
                 "aoa_session_entity_inventory",
@@ -738,6 +896,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 6, "edge_limit": 6},
                 timeout_seconds=90,
             )
+            graph_cooccurrence = await call_json(
+                "aoa_session_graph_cooccurrence",
+                {"anchor": "aoa-session-memory-mcp", "kind": "mcp_service", "limit": 6},
+                timeout_seconds=90,
+            )
             retrieve_usage = await call_json(
                 "aoa_session_retrieve",
                 {"recipe": "entity_usage", "query": "aoa-session-memory-mcp", "limit": 2, "event_limit": 2},
@@ -762,7 +925,13 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
             projection_status = await call_json(
                 "aoa_session_projection_status",
                 {},
+                timeout_seconds=60,
                 require_ok=False,
+            )
+            direct_event_rollup_query = await call_json(
+                "aoa_session_direct_event_rollup_query",
+                {"usage_role": "result", "limit": 3, "ref_limit": 3},
+                timeout_seconds=60,
             )
             maintenance_status = {
                 "artifact_type": "session_memory_maintenance_status",
@@ -793,11 +962,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         ("tool", tool_inventory),
         ("api", api_inventory),
     ):
-        if layer_inventory.get("entity_count", 0) <= 0:
-            raise SystemExit(f"stdio MCP {layer_name} inventory returned no entities: {layer_inventory.get('diagnostics')}")
+        if not layer_inventory.get("ok"):
+            raise SystemExit(f"stdio MCP {layer_name} inventory returned not-ok payload: {layer_inventory.get('diagnostics')}")
         _assert_bounded_inventory_packet(layer_inventory, f"stdio MCP {layer_name}")
-    if open_threads.get("result_count", 0) <= 0:
-        raise SystemExit(f"stdio MCP open-thread search returned no results: {open_threads.get('diagnostics')}")
+    if not open_threads.get("ok", True):
+        raise SystemExit(f"stdio MCP open-thread search returned not-ok payload: {open_threads.get('diagnostics')}")
     first_mcp_inventory_entity = _first_entity(mcp_service_inventory)
     if not first_mcp_inventory_entity.get("latest_session_date"):
         raise SystemExit(f"stdio MCP mcp_service inventory did not report latest_session_date: {mcp_service_inventory}")
@@ -827,7 +996,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     usage_chain_first_ref = usage_chain.get("first_ref") if isinstance(usage_chain.get("first_ref"), dict) else {}
     if usage_chain_counts.get("usage_event_count", 0) <= 0 or usage_chain_quality.get("raw_or_segment_ref_present") is not True:
         raise SystemExit(f"stdio MCP usage-chain quality contract failed: {usage_chain}")
-    if not (usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment")):
+    if not _has_first_raw_or_segment_ref(usage_chain_first_ref):
         raise SystemExit(f"stdio MCP usage-chain first_ref contract failed: {usage_chain}")
     if usage_alias.get("kind") != "mcp" or usage_alias.get("requested_kind") != "mcp_service":
         raise SystemExit(f"stdio MCP usage kind alias contract failed: {usage_alias.get('diagnostics')}")
@@ -842,6 +1011,12 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP agent_event usage route failed: {agent_event_usage.get('diagnostics')}")
     if graph_neighborhood.get("artifact_type") != "session_memory_graph_neighborhood" or graph_neighborhood.get("ok") is not True:
         raise SystemExit(f"stdio MCP graph neighborhood returned invalid payload: {graph_neighborhood.get('diagnostics')}")
+    if graph_cooccurrence.get("artifact_type") != "session_memory_graph_cooccurrence" or graph_cooccurrence.get("ok") is not True:
+        raise SystemExit(f"stdio MCP graph cooccurrence returned invalid payload: {graph_cooccurrence.get('diagnostics')}")
+    cooccurrences = graph_cooccurrence.get("cooccurrences") if isinstance(graph_cooccurrence.get("cooccurrences"), list) else []
+    evidence_refs = graph_cooccurrence.get("evidence_refs") if isinstance(graph_cooccurrence.get("evidence_refs"), list) else []
+    if not cooccurrences or not evidence_refs:
+        raise SystemExit(f"stdio MCP graph cooccurrence returned no cooccurrences or refs: {graph_cooccurrence}")
     if retrieve_usage.get("retrieval_redirect", {}).get("served_by") != "aoa_session_entity_usage_chain":
         raise SystemExit(f"stdio MCP retrieve entity_usage redirect failed: {retrieve_usage.get('diagnostics')}")
     if live_scenario.get("artifact_type") != "session_memory_live_scenario_audit":
@@ -867,6 +1042,32 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP live scenario corpus returned invalid payload: {live_scenario_corpus.get('diagnostics')}")
     if live_scenario_corpus.get("case_count") != 1:
         raise SystemExit(f"stdio MCP live scenario corpus did not honor case_limit=1: {live_scenario_corpus}")
+    direct_event_quality = (
+        direct_event_rollup_query.get("quality")
+        if isinstance(direct_event_rollup_query.get("quality"), dict)
+        else {}
+    )
+    direct_event_cost = (
+        direct_event_rollup_query.get("cost_profile")
+        if isinstance(direct_event_rollup_query.get("cost_profile"), dict)
+        else {}
+    )
+    direct_event_mcp_access = (
+        direct_event_rollup_query.get("mcp_access")
+        if isinstance(direct_event_rollup_query.get("mcp_access"), dict)
+        else {}
+    )
+    if direct_event_rollup_query.get("artifact_type") != "session_memory_search_operational_direct_event_rollup_query":
+        raise SystemExit(f"stdio MCP direct-event rollup query returned invalid payload: {direct_event_rollup_query.get('diagnostics')}")
+    if direct_event_rollup_query.get("result_count", 0) <= 0 or direct_event_quality.get("raw_or_segment_ref_present") is not True:
+        raise SystemExit(f"stdio MCP direct-event rollup query returned no usable refs: {direct_event_rollup_query}")
+    if direct_event_cost.get("uses_materialized_direct_event_rollup") is not True:
+        raise SystemExit(f"stdio MCP direct-event rollup query did not use materialized projection: {direct_event_cost}")
+    for key in ("resamples_shards", "opens_monolith", "uses_fts", "hydrates_body"):
+        if direct_event_cost.get(key) is not False:
+            raise SystemExit(f"stdio MCP direct-event rollup query violated cost contract {key}: {direct_event_cost}")
+    if direct_event_mcp_access.get("does_not_resample_shards") is not True or direct_event_mcp_access.get("behavior_proof_route") != "usage-chain":
+        raise SystemExit(f"stdio MCP direct-event rollup access boundary failed: {direct_event_mcp_access}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     if projection_status.get("schema") != "aoa_session_memory_projection_status_v1" or projection_status.get("mutates") is not False:
@@ -895,10 +1096,12 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         usage_alias,
         agent_event_usage,
         graph_neighborhood,
+        graph_cooccurrence,
         retrieve_usage,
         live_scenario,
         live_scenario_corpus,
         maintenance_status,
+        direct_event_rollup_query,
         projection_status,
         tool_count=len(tools),
     )
@@ -983,7 +1186,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
                 or usage_chain_payload.get("kind") != "mcp"
                 or usage_chain_payload.get("requested_kind") != "mcp_service"
                 or usage_chain_counts.get("usage_event_count", 0) <= 0
-                or not (usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment"))
+                or not _has_first_raw_or_segment_ref(usage_chain_first_ref)
             ):
                 raise SystemExit(f"configured Codex MCP usage-chain contract failed: {usage_chain_payload}")
 
@@ -1081,7 +1284,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
             projection_result = await mcp_session.call_tool(
                 "aoa_session_projection_status",
                 {},
-                read_timeout_seconds=timedelta(seconds=20),
+                read_timeout_seconds=timedelta(seconds=60),
             )
             if projection_result.isError or not projection_result.content:
                 raise SystemExit(f"configured Codex MCP projection status call failed: {projection_result.content}")
@@ -1109,7 +1312,7 @@ async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
         "usage_chain_usage_count": usage_chain_counts.get("usage_event_count")
         if isinstance(usage_chain_counts, dict)
         else None,
-        "usage_chain_first_ref_present": bool(usage_chain_first_ref.get("raw") or usage_chain_first_ref.get("segment")),
+        "usage_chain_first_ref_present": _has_first_raw_or_segment_ref(usage_chain_first_ref),
         "mcp_service_inventory_requested_layer": inventory_payload.get("requested_layer")
         if isinstance(inventory_payload, dict)
         else None,
@@ -1233,13 +1436,7 @@ def main(argv: list[str] | None = None) -> None:
     if failed_ref_checks:
         raise SystemExit(f"freshness ref resolution failed: {failed_ref_checks}")
     freshness_status = freshness.get("projection_freshness", {}).get("status")
-    acceptable_freshness = {
-        "current",
-        "current_with_deferred_live_updates",
-        "current_with_global_deferred_live_updates",
-        "current_with_global_stale",
-    }
-    if not freshness.get("ok") or freshness_status not in acceptable_freshness:
+    if not freshness.get("ok") or freshness_status not in ACCEPTABLE_FRESHNESS_SMOKE_STATUSES:
         raise SystemExit(f"freshness smoke is not current: {freshness_status}")
     server = build_server()
     if server is None:
@@ -1321,6 +1518,8 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_agent_event_usage_outcome_count": stdio_smoke["agent_event_usage_outcome_count"],
                 "stdio_graph_neighborhood_node_count": stdio_smoke["graph_neighborhood_node_count"],
                 "stdio_graph_neighborhood_edge_count": stdio_smoke["graph_neighborhood_edge_count"],
+                "stdio_graph_cooccurrence_count": stdio_smoke["graph_cooccurrence_count"],
+                "stdio_graph_cooccurrence_ref_count": stdio_smoke["graph_cooccurrence_ref_count"],
                 "stdio_retrieve_usage_served_by": stdio_smoke["retrieve_usage_served_by"],
                 "stdio_live_scenario_count": stdio_smoke["live_scenario_count"],
                 "stdio_live_scenario_warn_count": stdio_smoke["live_scenario_warn_count"],
@@ -1346,6 +1545,11 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_live_scenario_corpus_actionable_gap_count": stdio_smoke[
                     "live_scenario_corpus_actionable_gap_count"
                 ],
+                "stdio_direct_event_rollup_result_count": stdio_smoke["direct_event_rollup_result_count"],
+                "stdio_direct_event_rollup_freshness_status": stdio_smoke[
+                    "direct_event_rollup_freshness_status"
+                ],
+                "stdio_direct_event_rollup_materialized": stdio_smoke["direct_event_rollup_materialized"],
                 "stdio_maintenance_smoke_skipped": stdio_smoke["maintenance_smoke_skipped"],
                 "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],

@@ -11,8 +11,9 @@ nearer card narrows the lane.
 map and repo-local `kag/` provider packets.
 
 It helps agents inspect provider status, source-return routes, freshness
-handles, registry slices, and bounded provider records without turning the MCP
-service into KAG source authority.
+handles, generation routes, source-index handles, repo-local coverage,
+registry slices, and bounded provider records without turning the MCP service
+into KAG source authority.
 
 ## Read before editing
 
