@@ -3019,6 +3019,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"kind": "mcp", "requested_kind": "mcp_service"},
         {"kind": "agent_event", "outcome_event_count": 2},
         {"node_count": 3, "edge_count": 2},
+        {"cooccurrence_count": 4, "evidence_ref_count": 8},
         {"retrieval_redirect": {"served_by": "aoa_session_entity_usage_chain"}},
         {
             "quality": {"scenario_count": 1, "warn_count": 0},
@@ -3069,6 +3070,8 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["agent_event_usage_kind"] == "agent_event"
     assert summary["graph_neighborhood_node_count"] == 3
     assert summary["graph_neighborhood_edge_count"] == 2
+    assert summary["graph_cooccurrence_count"] == 4
+    assert summary["graph_cooccurrence_ref_count"] == 8
     assert summary["live_scenario_count"] == 1
     assert summary["live_scenario_warn_count"] == 0
     assert summary["live_scenario_entity_registry_active_count"] == 1
@@ -3092,6 +3095,8 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     assert "aoa_session_entity_usage_chain" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_route_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_graph_bridge" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_graph_cooccurrence" in validator.REQUIRED_STDIO_SMOKE_TOOLS
 
 
 def test_validator_search_alias_smoke_is_route_only() -> None:
