@@ -495,7 +495,7 @@ def build_server(
     @mcp.tool()
     def aoa_session_route_rollup_query(
         query: str = "",
-        layer: str = "",
+        layer: str = "tool",
         key: str = "",
         route_signal: str = "",
         limit: int = 12,

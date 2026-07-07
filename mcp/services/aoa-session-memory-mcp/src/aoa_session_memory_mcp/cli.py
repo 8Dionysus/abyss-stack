@@ -255,7 +255,7 @@ def main() -> None:
 
     route_rollup_query = sub.add_parser("route-rollup-query")
     route_rollup_query.add_argument("query", nargs="?", default="")
-    route_rollup_query.add_argument("--layer", default="")
+    route_rollup_query.add_argument("--layer", default="tool")
     route_rollup_query.add_argument("--key", default="")
     route_rollup_query.add_argument("--route-signal", default="")
     route_rollup_query.add_argument("--limit", type=int, default=12)

@@ -8,6 +8,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -1235,6 +1236,17 @@ GRAPH_BRIDGE = {
         "evidence_ref_count": 1,
         "raw_or_segment_ref_present": True,
     },
+    "freshness": {
+        "status": "graph_store_stale",
+        "warning": "graph store has stale hot-gate state; verify through raw refs",
+        "dirty_sessions": [{"session_id": "session-1", "raw": "heavy"}],
+        "dirty_session_ids": ["session-1"],
+        "maintenance_recommendation": {
+            "route": "budgeted_graph_maintenance",
+            "command": "python3 scripts/aoa_session_memory.py graph-maintenance all --apply --batch-limit 25",
+            "internal_plan": ["heavy"] * 20,
+        },
+    },
     "next_command": "python3 scripts/aoa_session_memory.py graph-bridge aoa-session-memory-mcp exec_command --kind auto --source-kind mcp --target-kind tool --limit 4 --max-depth 4",
     "next_expansion_command": "python3 scripts/aoa_session_memory.py graph-bridge aoa-session-memory-mcp exec_command --kind auto --source-kind mcp --target-kind tool --limit 8 --max-depth 5",
     "next_expansion": [{"id": "shortest_path", "command": "python3 scripts/aoa_session_memory.py graph-shortest-path aoa-session-memory-mcp exec_command --kind auto --max-depth 5"}],
@@ -1426,6 +1438,33 @@ class SessionProviderTimeoutRunner(FakeRunner):
         return super().__call__(argv, timeout)
 
 
+class SessionProviderSelectorErrorRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        command = argv[2]
+        args = tuple(argv[3:])
+        if command == "search-provider-status" and "--session" in args:
+            self.calls.append((command, args))
+            self.timeouts.append((command, timeout))
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "search_provider_status",
+                "provider_schema_version": 1,
+                "ok": False,
+                "default_provider": "portable_sqlite",
+                "selected_provider": "portable_sqlite",
+                "providers": {
+                    "portable_sqlite": {
+                        "ok": False,
+                        "status": "invalid_session",
+                        "diagnostics": ["unknown session selector: bogus"],
+                    }
+                },
+                "diagnostics": ["portable_sqlite:invalid_session"],
+            }
+            return CommandOutput(argv, 1, json.dumps(payload), "", 1.0)
+        return super().__call__(argv, timeout)
+
+
 class StaleProviderRunner(FakeRunner):
     def __init__(self, *, dirty_session_id: str, dirty_session_label: str) -> None:
         super().__init__()
@@ -1574,7 +1613,7 @@ def test_latest_session_resolution_uses_registry_updated_at(tmp_path: Path) -> N
     assert brief["session"]["session_id"] == "session-1"
 
 
-def test_latest_session_resolution_prefers_live_transcript_activity(tmp_path: Path) -> None:
+def test_latest_session_resolution_prefers_registry_recency_over_stale_raw_mtime(tmp_path: Path) -> None:
     aoa = seed_archive(tmp_path)
     registry_path = aoa / "session-registry.json"
     active_dir = aoa / "sessions/2026-06-04__003__active-long-session"
@@ -1655,7 +1694,7 @@ def test_latest_session_resolution_prefers_live_transcript_activity(tmp_path: Pa
     brief = state.session_brief("latest", max_segments=1)
 
     assert brief["ok"] is True
-    assert brief["session"]["session_id"] == "active-long-session"
+    assert brief["session"]["session_id"] == "raw-unavailable-latest"
 
 
 def test_latest_session_resolution_falls_back_to_registry_date_sequence(tmp_path: Path) -> None:
@@ -1853,6 +1892,7 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     )
     status = state.session_memory_status()
     plan = state.maintenance_plan()
+    graph_resource = state.read_resource("aoa-session-memory://graph/status")
 
     assert status["graph"]["status"] == "sqlite_live_store_present"
     assert status["graph"]["sidecar_status"] == "not_exported"
@@ -1865,6 +1905,9 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert status["graph"]["freshness"]["dirty_count"] == 7
     assert status["graph"]["freshness"]["missing_count"] == 2
     assert "graph_sidecar_not_exported" in status["graph"]["diagnostics"]
+    assert graph_resource["decision_source"] == "maintenance_status"
+    assert graph_resource["needs_graph_maintenance"] is False
+    assert graph_resource["needs_index_maintenance"] is False
     assert plan["artifact_type"] == "session_memory_maintenance_status"
     assert plan["compatibility_tool"] == "aoa_session_maintenance_plan"
     assert plan["preferred_tool"] == "aoa_session_maintenance_status"
@@ -1875,6 +1918,52 @@ def test_status_distinguishes_sqlite_graph_store_from_missing_sidecar(tmp_path: 
     assert plan["operations"]["search_shards"]["raw_text_fallback_dependency"]["route_blocked_shard_count"] == 3
     assert plan["operations"]["why_maintenance_long"][0]["phase"] == "session_bulk_index"
     assert "--no-timers" in [arg for command, args in state.command_runner.calls if command == "maintenance-status" for arg in args]
+
+
+def test_graph_summary_uses_non_ok_maintenance_packet_for_decisions(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    sqlite_path = aoa / "graph/graph.sqlite3"
+    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    sqlite_path.write_bytes(b"SQLite live store placeholder")
+    write_json(
+        aoa / "diagnostics/20260526T000001Z__graph-freshness-gates.json",
+        {
+            "artifact_type": "session_memory_graph_freshness_gates",
+            "ok": True,
+            "needs_index_maintenance": False,
+            "needs_graph_maintenance": False,
+            "graph_store": {"status": "current"},
+        },
+    )
+
+    class NonOkMaintenanceRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            if argv[2] != "maintenance-status":
+                return super().__call__(argv, timeout)
+            self.calls.append((argv[2], tuple(argv[3:])))
+            self.timeouts.append((argv[2], timeout))
+            payload = {
+                **MAINTENANCE_STATUS,
+                "ok": False,
+                "graph": {"status": "dirty", "dirty_count": 3, "missing_count": 1, "blocked_count": 0},
+                "route": {"status": "dirty", "needs_index_maintenance": True, "needs_graph_maintenance": True},
+            }
+            return CommandOutput(argv, 0, json.dumps(payload, ensure_ascii=False), "", 1.0)
+
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=NonOkMaintenanceRunner(),
+        timeout_seconds=2,
+    )
+
+    status = state.session_memory_status()
+
+    assert status["graph"]["decision_source"] == "maintenance_status"
+    assert status["graph"]["maintenance_status"] == "dirty"
+    assert status["graph"]["needs_graph_maintenance"] is True
+    assert status["graph"]["needs_index_maintenance"] is True
 
 
 def test_projection_status_reads_latest_completeness_without_running_catchup(tmp_path: Path) -> None:
@@ -1897,6 +1986,46 @@ def test_projection_status_reads_latest_completeness_without_running_catchup(tmp
 
     resource = state.read_resource("aoa-session-memory://projection/status")
     assert resource["projection_completeness"]["surfaces"]["search_index"]["status"] == "current"
+
+
+def test_projection_status_treats_stale_completeness_as_not_ok(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    write_json(
+        aoa / "diagnostics/20260526T000200Z__projection-catchup-catchup.json",
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_projection_catchup",
+            "ok": True,
+            "projection_completeness": {
+                "schema_version": 1,
+                "artifact_type": "session_memory_projection_completeness",
+                "status": "stale",
+                "actionable_surface_ids": ["search_index"],
+                "deferred_surface_ids": [],
+                "surfaces": {
+                    "search_index": {"status": "stale", "needs_maintenance": True},
+                    "entity_registry": {"status": "current", "needs_maintenance": False},
+                },
+            },
+        },
+    )
+    runner = FakeRunner()
+    state = AoASessionMemoryMCPState.discover(
+        workspace_root=tmp_path,
+        aoa_root=aoa,
+        script_path=aoa / "scripts/aoa_session_memory.py",
+        command_runner=runner,
+        timeout_seconds=2,
+    )
+
+    status = state.session_projection_status()
+
+    assert status["ok"] is False
+    assert status["source"] == "stale_projection_catchup_diagnostic"
+    assert status["next_operator_route"]["id"] == "run_projection_catchup_outside_mcp"
+    assert status["next_operator_route"]["reason"] == "projection_completeness_stale"
+    assert "projection_completeness_stale" in status["diagnostics"]
+    assert not any(call[0] == "projection-catchup" for call in runner.calls)
 
 
 def test_projection_status_flags_legacy_completeness_diagnostic(tmp_path: Path) -> None:
@@ -1971,7 +2100,6 @@ def test_operational_route_rollup_query_delegates_to_read_only_archive_route(tmp
 
     payload = state.session_operational_route_rollup_query(
         "exec_command",
-        layer="tool",
         limit=3,
         ref_limit=2,
     )
@@ -1992,6 +2120,17 @@ def test_operational_route_rollup_query_delegates_to_read_only_archive_route(tmp
     assert payload["mcp_access"]["mutates"] is False
     assert payload["mcp_access"]["does_not_materialize_rollup"] is True
     assert payload["mcp_access"]["does_not_resample_shards"] is True
+
+
+def test_operational_route_rollup_query_allows_explicit_all_layer_query(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    state.session_operational_route_rollup_query("exec_command", layer="")
+
+    calls = {command: args for command, args in runner.calls}
+    args = calls["search-operational-route-rollup-query"]
+    assert "--layer" not in args
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -2346,7 +2485,7 @@ def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Pat
         filters={
             "session": "session-1",
             "doc_type": "event",
-            "agent_event": "assistant_final_closeout",
+            "agent_event": "open_thread",
             "task_episode_id": "task-0001",
             "route_signal": "mcp:aoa_session_memory_mcp",
             "event_type": "TOOL_CALL",
@@ -2362,7 +2501,7 @@ def test_agent_event_search_with_ordinary_filters_uses_full_search(tmp_path: Pat
     args = search_calls[0][1]
     assert "--use-shards" not in args
     assert "--max-shards" not in args
-    assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--agent-event") + 1] == "assistant_open_thread"
     assert args[args.index("--task-episode-id") + 1] == "task-0001"
     assert args[args.index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
     assert args[args.index("--event-type") + 1] == "TOOL_CALL"
@@ -2491,6 +2630,29 @@ def test_goal_lifecycle_search_with_agent_filters_uses_full_search(tmp_path: Pat
     args = search_calls[0][1]
     assert args[args.index("--doc-type") + 1] == "goal_lifecycle"
     assert args[args.index("--agent-event") + 1] == "assistant_final_closeout"
+    assert args[args.index("--task-episode-id") + 1] == "task-0001"
+
+
+def test_goal_lifecycle_search_with_episode_alias_uses_full_search(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    search = state.session_search(
+        "",
+        filters={
+            "session": "session-1",
+            "doc_type": "goal_lifecycle",
+            "episode": "task-0001",
+        },
+        limit=3,
+    )
+
+    assert search["artifact_type"] == "search_results"
+    assert not any(call[0] == "goal-lifecycles" for call in runner.calls)
+    search_calls = [call for call in runner.calls if call[0] == "search"]
+    assert len(search_calls) == 1
+    args = search_calls[0][1]
+    assert args[args.index("--doc-type") + 1] == "goal_lifecycle"
     assert args[args.index("--task-episode-id") + 1] == "task-0001"
 
 
@@ -2629,6 +2791,7 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
         filters={"session": "session-1", "doc_type": "event", "agent_event": "open_thread"},
         limit=3,
     )
+    reasoning = state.session_agent_reasoning_windows(session="session-1", limit=1)
     neighborhood = state.session_answer_neighborhood(session="session-1", limit=1)
 
     assert responses["source"] == "portable_sqlite_agent_event_fast_path"
@@ -2673,8 +2836,15 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     assert open_thread_search["requested_agent_events"] == ["open_thread"]
     assert open_thread_search["result_count"] == 1
     assert open_thread_search["results"][0]["agent_event"] == "assistant_open_thread"
+    assert reasoning["source"] == "portable_sqlite_agent_event_window_fast_path"
+    assert reasoning["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
+    assert reasoning["cost_profile"]["lightweight_route"] is True
+    assert reasoning["quality"]["ordered_by"] == "sqlite_rowid_desc_agent_event_fast_path"
     assert neighborhood["source"] == "portable_sqlite_agent_event_window_fast_path"
     assert neighborhood["window_count"] == 1
+    assert neighborhood["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
+    assert neighborhood["cost_profile"]["lightweight_route"] is True
+    assert neighborhood["quality"]["ordered_by"] == "sqlite_rowid_desc_agent_event_fast_path"
     assert not any(call[0] in {"agent-responses", "answer-neighborhood"} for call in runner.calls)
 
 
@@ -2794,6 +2964,8 @@ def test_goal_lifecycle_route_wraps_archive_cli_and_compacts_payload(tmp_path: P
     assert len(lifecycles["results"][0]["sample_events"]) == 2
     assert lifecycles["results"][0]["sample_events"][0]["objective"].endswith("...")
     assert lifecycles["results"][0]["sample_events"][0]["objective_omitted"] is True
+    assert lifecycles["results"][0]["sample_events"][0]["refs"]["raw_ref"] == "raw:line:2"
+    assert lifecycles["results"][0]["sample_events"][1]["refs"]["raw_ref"] == "raw:line:3"
     assert lifecycles["results"][0]["omitted_sample_event_count"] == 3
     assert lifecycles["mcp_payload_policy"]["response_compacted"] is True
     assert lifecycles["mcp_payload_policy"]["sample_events_per_lifecycle"] == 2
@@ -2840,7 +3012,10 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         {"ok": True, "entity_count": 1},
         {"primary_route": {"route_id": "entity_usage_chain"}, "cost_profile": {"structured_first": True}},
         {"quality": {"usage_event_count": 2, "graph_node_count": 3, "raw_or_segment_ref_present": True}},
-        {"counts": {"usage_event_count": 2, "chain_with_result_or_consequence_count": 2}},
+        {
+            "counts": {"usage_event_count": 2, "chain_with_result_or_consequence_count": 2},
+            "first_ref": {"raw_ref": "raw:line:7"},
+        },
         {"kind": "mcp", "requested_kind": "mcp_service"},
         {"kind": "agent_event", "outcome_event_count": 2},
         {"node_count": 3, "edge_count": 2},
@@ -2888,6 +3063,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["entity_dossier_raw_or_segment_ref_present"] is True
     assert summary["entity_usage_chain_usage_count"] == 2
     assert summary["entity_usage_chain_success_count"] == 2
+    assert summary["entity_usage_chain_first_ref_present"] is True
     assert summary["usage_alias_kind"] == "mcp"
     assert summary["usage_alias_requested_kind"] == "mcp_service"
     assert summary["agent_event_usage_kind"] == "agent_event"
@@ -2925,10 +3101,68 @@ def test_validator_search_alias_smoke_is_route_only() -> None:
 
     assert arguments["query"] == ""
     assert arguments["limit"] == 2
-    assert arguments["filters"]["route_signal"] == "mcp:aoa-session-memory-mcp"
+    assert arguments["filters"]["route_signal"] == "mcp:aoa_session_memory_mcp"
     assert arguments["filters"]["doc_type"] == "event"
     assert arguments["filters"]["layer"] == "mcp"
     assert arguments["filters"]["use_shards"] is True
+
+
+def test_validator_freshness_smoke_selector_skips_stale_latest_for_stable_candidate() -> None:
+    validator = load_validator_module()
+
+    class SmokeState:
+        def session_freshness_check(self, refs: list[str], session: str = "") -> dict:
+            statuses = {
+                "latest-stale": "stale",
+                "stable-indexed": "current",
+            }
+            return {
+                "ok": True,
+                "projection_freshness": {"status": statuses.get(session, "stale")},
+                "checks": [{"status": "present", "ref": ref} for ref in refs],
+            }
+
+        def session_search(self, query: str, *, filters: dict, limit: int) -> dict:
+            assert query == ""
+            assert filters == {"doc_type": "session", "archive_status": "indexed"}
+            assert limit == 5
+            return {
+                "results": [
+                    {
+                        "session_id": "stable-id",
+                        "session_label": "stable-indexed",
+                        "archive_status": "indexed",
+                        "refs": {"session": "/tmp/stable/session.manifest.json"},
+                    }
+                ]
+            }
+
+        def session_brief(self, session: str, max_segments: int) -> dict:
+            assert session == "stable-indexed"
+            assert max_segments == 2
+            return {
+                "ok": True,
+                "session": {"label": "stable-indexed", "archive_status": "indexed"},
+                "refs": {"manifest": "/tmp/stable/session.manifest.json"},
+            }
+
+    latest = {
+        "ok": True,
+        "session": {"label": "latest-stale", "archive_status": "indexed"},
+        "refs": {"manifest": "/tmp/latest/session.manifest.json"},
+    }
+
+    selected = validator._select_freshness_smoke_brief(SmokeState(), latest)
+
+    assert selected["session"]["label"] == "stable-indexed"
+
+
+def test_validator_usage_chain_first_ref_accepts_alias_keys() -> None:
+    validator = load_validator_module()
+
+    assert validator._has_first_raw_or_segment_ref({"raw_ref": "raw:line:7"}) is True
+    assert validator._has_first_raw_or_segment_ref({"segment_ref": "000.md#event-000007"}) is True
+    assert validator._has_first_raw_or_segment_ref({"session": "session.manifest.json"}) is False
 
 
 def test_running_mcp_process_advisory_reports_stale_transports(tmp_path: Path, monkeypatch: Any) -> None:
@@ -2970,6 +3204,43 @@ def test_running_mcp_process_advisory_reports_stale_transports(tmp_path: Path, m
     assert advisory["restart_advisory"] is True
     stale = [item for item in advisory["processes"] if item["started_before_current_source"]]
     assert stale[0]["pid"] == 101
+
+
+def test_running_mcp_process_advisory_does_not_restart_for_core_only_change(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    mtimes = {
+        "src/aoa_session_memory_mcp/core.py": 3_000.0,
+        "src/aoa_session_memory_mcp/server.py": 1_000.0,
+        "scripts/aoa_session_memory_mcp_server.py": 1_000.0,
+    }
+    for relative, mtime in mtimes.items():
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    process_dir = proc / "101"
+    process_dir.mkdir()
+    process_dir.joinpath("cmdline").write_bytes(b"python3\0.codex/bin/aoa-session-memory-mcp-server.py\0")
+    start_ticks = int((2_000.0 - 1000.0) * float(ticks))
+    fields = ["101", "(python3)", "S", *(["0"] * 18), str(start_ticks)]
+    process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    advisory = validator._running_mcp_process_advisory(proc)
+
+    assert advisory["stale_process_count"] == 0
+    assert advisory["restart_advisory"] is False
+    assert advisory["processes"][0]["started_before_current_source"] is False
+    assert advisory["processes"][0]["started_before_core_auto_reload_source"] is True
 
 
 def test_running_mcp_process_advisory_handles_missing_procfs(tmp_path: Path) -> None:
@@ -3033,6 +3304,165 @@ def test_codex_session_advisory_reports_current_stale_transport(tmp_path: Path, 
     assert advisory["current_codex_processes"][0]["pid"] == 200
 
 
+def test_codex_session_advisory_treats_config_mtime_as_advisory_when_child_is_fresh(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    for relative in (
+        "src/aoa_session_memory_mcp/core.py",
+        "src/aoa_session_memory_mcp/server.py",
+        "scripts/aoa_session_memory_mcp_server.py",
+    ):
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (1_000.0, 1_000.0))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\ncommand = \"aoa-session-memory-mcp-server\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (2_000.0, 2_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "validate_session_memory_mcp.py"], 2_100.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 1_500.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], 1_600.0)
+
+    advisory = validator._codex_session_advisory(proc)
+
+    assert advisory["current_session_predates_config"] is True
+    assert advisory["current_session_has_aoa_session_memory_child"] is True
+    assert advisory["current_session_has_fresh_aoa_session_memory_child"] is True
+    assert advisory["current_session_mcp_child_stale_count"] == 0
+    assert advisory["config_reload_advisory"] is True
+    assert advisory["live_transport_restart_advisory"] is False
+
+
+def test_codex_session_advisory_recognizes_installed_server_entrypoint(tmp_path: Path, monkeypatch: Any) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    source_epoch = time.time() + 1000.0
+    for relative in (
+        "src/aoa_session_memory_mcp/core.py",
+        "src/aoa_session_memory_mcp/server.py",
+        "scripts/aoa_session_memory_mcp_server.py",
+    ):
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (source_epoch, source_epoch))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text("[mcp_servers.aoa_session_memory]\ncommand = \"aoa-session-memory-mcp-server\"\n", encoding="utf-8")
+    os.utime(config_path, (source_epoch + 5.0, source_epoch + 5.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "validate_session_memory_mcp.py"], source_epoch + 100.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "app-server"], source_epoch + 110.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], source_epoch + 120.0)
+
+    advisory = validator._codex_session_advisory(proc)
+
+    assert advisory["current_session_has_aoa_session_memory_child"] is True
+    assert advisory["live_transport_restart_advisory"] is False
+    assert advisory["current_codex_processes"][0]["aoa_session_memory_child_pids"] == [301]
+
+
+def test_codex_session_advisory_does_not_restart_for_core_only_change(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    validator = load_validator_module()
+    repo_root = tmp_path / "aoa-session-memory-mcp"
+    mtimes = {
+        "src/aoa_session_memory_mcp/core.py": 3_000.0,
+        "src/aoa_session_memory_mcp/server.py": 1_000.0,
+        "scripts/aoa_session_memory_mcp_server.py": 1_000.0,
+    }
+    for relative, mtime in mtimes.items():
+        path = repo_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+    monkeypatch.setattr(validator, "REPO_ROOT", repo_root)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\ncommand = \"aoa-session-memory-mcp-server\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (1_000.0, 1_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "validate_session_memory_mcp.py"], 2_000.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 2_000.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], 2_000.0)
+
+    advisory = validator._codex_session_advisory(proc)
+
+    assert advisory["current_session_predates_current_source"] is False
+    assert advisory["current_session_has_aoa_session_memory_child"] is True
+    assert advisory["live_transport_restart_advisory"] is False
+    assert advisory["current_codex_processes"][0]["started_before_core_auto_reload_source"] is True
+
+
 def test_transport_preflight_reports_current_codex_restart_need(tmp_path: Path, monkeypatch: Any) -> None:
     codex_home = tmp_path / "codex-home"
     codex_home.mkdir()
@@ -3078,6 +3508,177 @@ def test_transport_preflight_reports_current_codex_restart_need(tmp_path: Path, 
     assert preflight["direct_tool_transport_status"] == "restart_required"
     assert preflight["live_transport_restart_advisory"] is True
     assert preflight["codex_session"]["current_session_has_aoa_session_memory_child"] is False
+
+
+def test_transport_preflight_treats_config_mtime_as_advisory_when_child_is_fresh(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    package_root = tmp_path / "aoa-session-memory-mcp"
+    core_path = package_root / "src" / "aoa_session_memory_mcp" / "core.py"
+    server_path = package_root / "src" / "aoa_session_memory_mcp" / "server.py"
+    wrapper_path = package_root / "scripts" / "aoa_session_memory_mcp_server.py"
+    for path in (core_path, server_path, wrapper_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (1_000.0, 1_000.0))
+    monkeypatch.setattr(module, "MCP_CORE_SOURCE_PATH", core_path)
+    monkeypatch.setattr(module, "MCP_SERVER_SOURCE_PATH", server_path)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "command = \"aoa-session-memory-mcp-server\"\n"
+        "cwd = \"/srv/AbyssOS\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (2_000.0, 2_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "pytest"], 2_100.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 1_500.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], 1_600.0)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["ok"] is True
+    assert preflight["direct_tool_transport_status"] == "attached"
+    assert preflight["live_transport_restart_advisory"] is False
+    assert preflight["codex_session"]["current_session_predates_config"] is True
+    assert preflight["codex_session"]["current_session_has_fresh_aoa_session_memory_child"] is True
+    assert preflight["codex_session"]["current_session_mcp_child_stale_count"] == 0
+    assert preflight["codex_session"]["config_reload_advisory"] is True
+
+
+def test_transport_preflight_recognizes_installed_server_entrypoint(tmp_path: Path, monkeypatch: Any) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    source_epoch = time.time() + 1000.0
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "command = \"aoa-session-memory-mcp-server\"\n"
+        "cwd = \"/srv/AbyssOS\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (source_epoch + 5.0, source_epoch + 5.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "pytest"], source_epoch + 100.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], source_epoch + 110.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], source_epoch + 120.0)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["ok"] is True
+    assert preflight["direct_tool_transport_status"] == "attached"
+    assert preflight["live_transport_restart_advisory"] is False
+    assert preflight["codex_session"]["current_session_has_aoa_session_memory_child"] is True
+    assert preflight["codex_session"]["current_codex_processes"][0]["aoa_session_memory_child_pids"] == [301]
+    assert preflight["running_mcp_processes"]["process_count"] == 1
+
+
+def test_transport_preflight_does_not_restart_for_core_only_change(tmp_path: Path, monkeypatch: Any) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    package_root = tmp_path / "aoa-session-memory-mcp"
+    core_path = package_root / "src" / "aoa_session_memory_mcp" / "core.py"
+    server_path = package_root / "src" / "aoa_session_memory_mcp" / "server.py"
+    wrapper_path = package_root / "scripts" / "aoa_session_memory_mcp_server.py"
+    for path, mtime in ((core_path, 3_000.0), (server_path, 1_000.0), (wrapper_path, 1_000.0)):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+    monkeypatch.setattr(module, "MCP_CORE_SOURCE_PATH", core_path)
+    monkeypatch.setattr(module, "MCP_SERVER_SOURCE_PATH", server_path)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "command = \"aoa-session-memory-mcp-server\"\n"
+        "cwd = \"/srv/AbyssOS\"\n",
+        encoding="utf-8",
+    )
+    os.utime(config_path, (1_000.0, 1_000.0))
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    current_pid = str(os.getpid())
+
+    def write_process(pid: str, ppid: str, cmdline: list[str], start_epoch: float) -> None:
+        process_dir = proc / pid
+        process_dir.mkdir()
+        process_dir.joinpath("cmdline").write_bytes(b"\0".join(part.encode("utf-8") for part in cmdline) + b"\0")
+        process_dir.joinpath("status").write_text(f"Name:\tfixture\nPPid:\t{ppid}\n", encoding="utf-8")
+        start_ticks = int((start_epoch - 1000.0) * float(ticks))
+        fields = [pid, "(fixture)", "S", *(["0"] * 18), str(start_ticks)]
+        process_dir.joinpath("stat").write_text(" ".join(fields), encoding="utf-8")
+
+    write_process(current_pid, "200", ["python", "pytest"], 2_000.0)
+    write_process("200", "1", ["/home/dionysus/.local/bin/codex", "resume"], 2_000.0)
+    write_process("301", "200", ["/home/dionysus/.local/bin/aoa-session-memory-mcp-server"], 2_000.0)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["ok"] is True
+    assert preflight["direct_tool_transport_status"] == "attached"
+    assert preflight["live_transport_restart_advisory"] is False
+    assert preflight["codex_session"]["current_session_predates_current_source"] is False
+    assert preflight["codex_session"]["current_codex_processes"][0]["started_before_core_auto_reload_source"] is True
+    assert preflight["running_mcp_processes"]["restart_advisory"] is False
+    assert preflight["running_mcp_processes"]["processes"][0]["started_before_core_auto_reload_source"] is True
 
 
 def test_usage_neighborhood_probe_uses_indexed_candidate_session() -> None:
@@ -3160,6 +3761,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
+    assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["layer"]["default"] == "tool"
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
@@ -3383,6 +3985,22 @@ def test_entity_registry_reads_generated_snapshot_without_archive_command(tmp_pa
     assert resource["entries"][0]["kind"] == "skill"
 
 
+def test_entity_registry_preserves_generated_snapshot_failure_status(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    registry_path = state.aoa_root / "maps/entity-registry.json"
+    snapshot = json.loads(registry_path.read_text(encoding="utf-8"))
+    snapshot["ok"] = False
+    snapshot["diagnostics"] = ["generated_entity_registry_stale"]
+    registry_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    registry = state.session_entity_registry(kind="skill", lookup="aoa-decision", limit=5)
+
+    assert registry["ok"] is False
+    assert registry["diagnostics"] == ["generated_entity_registry_stale"]
+    assert registry["entries"][0]["canonical_key"] == "aoa_decision"
+
+
 def test_entity_inventory_resolves_relative_atlas_detail_json(tmp_path: Path) -> None:
     aoa = seed_archive(tmp_path)
     index_path = aoa / "maps/by-skill/index.json"
@@ -3450,6 +4068,23 @@ def test_freshness_check_falls_back_to_global_provider_when_session_scope_times_
     assert "provider_session_status_failed_using_global_freshness" in freshness["diagnostics"]
     assert freshness["session_provider_fallback"]["ok"] is False
     assert freshness["session_provider_fallback"]["mcp_access"]["archive_command"] == "search-provider-status"
+
+
+def test_freshness_check_keeps_session_provider_selector_failures_authoritative(tmp_path: Path) -> None:
+    runner = SessionProviderSelectorErrorRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    freshness = state.session_freshness_check(["raw:line:1"], session="bogus")
+
+    freshness_calls = [args for command, args in runner.calls if command == "search-provider-status"]
+    assert len(freshness_calls) == 1
+    assert "--session" in freshness_calls[0]
+    assert freshness["ok"] is False
+    assert freshness["checks"][0]["status"] == "needs_session_context"
+    assert freshness["provider"]["ok"] is False
+    assert freshness["provider"]["providers"]["portable_sqlite"]["status"] == "invalid_session"
+    assert freshness["session_provider_fallback"] is None
+    assert "provider_session_status_failed_authoritative" in freshness["diagnostics"]
 
 
 def test_freshness_check_rejects_relative_refs_that_escape_aoa_root(tmp_path: Path) -> None:
@@ -3700,6 +4335,41 @@ def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
     assert "graph-neighborhood" in commands
 
 
+def test_entity_dossier_keeps_usage_neighborhood_fallback_expansion_command(tmp_path: Path) -> None:
+    class TimeoutUsageNeighborhoodRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            if command == "entity-usage-neighborhood":
+                self.calls.append((command, tuple(argv[3:])))
+                self.timeouts.append((command, timeout))
+                payload = {
+                    "schema_version": 1,
+                    "artifact_type": "session_memory_entity_usage_neighborhood",
+                    "ok": False,
+                    "diagnostics": ["fixture timeout"],
+                    "mcp_access": {"archive_command": "entity-usage-neighborhood"},
+                }
+                return CommandOutput(argv, 124, json.dumps(payload), "command timed out", timeout * 1000)
+            return super().__call__(argv, timeout)
+
+    runner = TimeoutUsageNeighborhoodRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    dossier = state.session_entity_dossier(
+        "aoa-session-memory-mcp",
+        kind="mcp",
+        usage_limit=2,
+        neighborhood_limit=1,
+        graph_limit=6,
+        graph_edge_limit=6,
+    )
+
+    expansion = next(item for item in dossier["next_expansion"] if item["id"] == "usage_neighborhood")
+    assert "entity-usage-neighborhood" in expansion["command"]
+    assert dossier["neighborhood"]["next_expansion_command"] == expansion["command"]
+    assert dossier["neighborhood"]["fallback_reason"] == "archive_route_unavailable"
+
+
 def test_entity_usage_neighborhood_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
@@ -3759,6 +4429,22 @@ def test_entity_usage_neighborhood_light_probe_uses_search_fast_path(tmp_path: P
     assert search_calls
     assert search_calls[0][1][search_calls[0][1].index("--route-signal") + 1] == "mcp:aoa_session_memory_mcp"
     assert "--use-shards" not in search_calls[0][1]
+
+
+def test_usage_route_signal_candidates_strip_registry_anchor_prefix(tmp_path: Path) -> None:
+    state = state_with_fixture(tmp_path)
+
+    mcp_candidates = state._usage_route_signal_candidates(
+        kind="mcp_service",
+        anchor="mcp_service:aoa_decisions_mcp",
+    )
+    tool_candidates = state._usage_route_signal_candidates(
+        kind="mcp_tool",
+        anchor="mcp_tool:session_search",
+    )
+
+    assert "mcp:aoa_decisions_mcp" in mcp_candidates
+    assert "tool:session_search" in tool_candidates
 
 
 def test_entity_usage_neighborhood_falls_back_to_search_when_archive_route_times_out(tmp_path: Path) -> None:
@@ -4415,6 +5101,13 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
     assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
+    deeper = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=4, edge_limit=2)
+
+    assert deeper.get("source") != "mcp_sqlite_graph_fast_path"
+    graph_calls = [call for call in runner.calls if call[0] == "graph-neighborhood"]
+    assert graph_calls
+    assert graph_calls[-1][1][graph_calls[-1][1].index("--depth") + 1] == "2"
+
 
 def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path: Path) -> None:
     runner = FakeRunner()
@@ -4460,6 +5153,10 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     assert bridge["normalized_entities"]["source"]["kind"] == "mcp"
     assert bridge["normalized_entities"]["target"]["kind"] == "tool"
     assert bridge["quality"]["raw_or_segment_ref_present"] is True
+    assert bridge["freshness"]["status"] == "graph_store_stale"
+    assert "dirty_sessions" not in bridge["freshness"]
+    assert "dirty_session_ids" not in bridge["freshness"]
+    assert "internal_plan" not in bridge["freshness"]["maintenance_recommendation"]
     assert bridge["mcp_payload_policy"]["response_compacted"] is True
     assert "graph-bridge" in bridge["mcp_access"]["full_graph_route"]
     assert cooccurrence["cooccurrences"][0]["node"]["type"] == "tool"

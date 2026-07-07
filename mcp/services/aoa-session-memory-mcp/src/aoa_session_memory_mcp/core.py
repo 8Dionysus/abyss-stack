@@ -83,6 +83,22 @@ def _proc_cwd(pid: int, *, proc_root: Path = Path("/proc")) -> str:
         return ""
 
 
+SESSION_MEMORY_MCP_SERVER_BASENAMES = {
+    "aoa-session-memory-mcp-server",
+    "aoa-session-memory-mcp-server.py",
+    "aoa_session_memory_mcp_server.py",
+}
+
+
+def _is_session_memory_mcp_server_cmdline(cmdline: list[str]) -> bool:
+    for part in cmdline:
+        if Path(part).name in SESSION_MEMORY_MCP_SERVER_BASENAMES:
+            return True
+        if part == "aoa_session_memory_mcp.server":
+            return True
+    return False
+
+
 def _codex_config_path() -> Path:
     codex_home = os.environ.get("CODEX_HOME")
     if codex_home:
@@ -179,7 +195,7 @@ TRACE_KIND_ALIASES = {
 ALLOWED_DOC_TYPES = {"all", "session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
 ALLOWED_SEARCH_DOC_TYPES = {"session", "segment", "event", "incident", "task_episode", "goal_lifecycle", "entity_registry"}
 DEFAULT_GRAPH_QUALITY_ANCHORS = [
-    "mcp:aoa-session-memory-mcp",
+    "mcp:aoa_session_memory_mcp",
     "skill:aoa-memo-writeback",
     "tool:apply_patch",
 ]
@@ -209,6 +225,7 @@ SEARCH_FILTER_ALIASES = {
     "layer": "route_layer",
 }
 SEARCH_CONTROL_FILTERS = {"use_shards", "max_shards"}
+REQUESTED_AGENT_EVENT_FILTER = "_requested_agent_event"
 SEARCH_FILTER_FLAGS = {
     "session": "--session",
     "doc_type": "--doc-type",
@@ -554,6 +571,21 @@ def _normalize_search_filters(filters: dict[str, Any]) -> tuple[dict[str, Any], 
                 f"ignored filter alias {alias!r}={alias_value!r}; using {canonical!r}={canonical_value!r}"
             )
         normalized.pop(alias, None)
+    agent_event_value = normalized.get("agent_event")
+    if agent_event_value not in (None, ""):
+        normalized_events, requested_events = _normalize_agent_event_classes(
+            _split_filter_values(agent_event_value)
+        )
+        if normalized_events:
+            normalized["agent_event"] = ",".join(normalized_events)
+            if requested_events != normalized_events:
+                normalized[REQUESTED_AGENT_EVENT_FILTER] = ",".join(requested_events)
+                diagnostics.append(
+                    "normalized agent_event aliases: "
+                    + ",".join(requested_events)
+                    + " -> "
+                    + ",".join(normalized_events)
+                )
     return normalized, diagnostics
 
 
@@ -933,8 +965,11 @@ def _compact_goal_event(event: dict[str, Any]) -> dict[str, Any]:
         )
         if event.get(key) not in (None, "", [], {})
     }
+    refs = _compact_episode_ref(event)
     if isinstance(event.get("refs"), dict):
-        compact["refs"] = _compact_episode_ref(event["refs"])
+        refs = {**refs, **_compact_episode_ref(event["refs"])}
+    if refs:
+        compact["refs"] = refs
     if "objective" in compact:
         preview, chars, omitted = _bounded_text(
             compact.get("objective"),
@@ -1571,6 +1606,8 @@ def _compact_graph_bridge_payload(payload: dict[str, Any], *, full_route: str) -
     ):
         if payload.get(key) not in (None, "", [], {}):
             compact[key] = payload.get(key)
+    if isinstance(payload.get("freshness"), dict):
+        compact["freshness"] = _compact_graph_freshness(payload.get("freshness"))
     if isinstance(payload.get("normalized_entities"), dict):
         compact["normalized_entities"] = payload["normalized_entities"]
 
@@ -2189,7 +2226,13 @@ def _compact_dossier_neighborhood(payload: dict[str, Any]) -> dict[str, Any]:
         if payload.get(key) not in (None, "", [], {})
     }
     mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
-    for key in ("full_evidence_route", "response_compacted", "fallback_reason", "selected_route_signal"):
+    for key in (
+        "full_evidence_route",
+        "next_expansion_command",
+        "response_compacted",
+        "fallback_reason",
+        "selected_route_signal",
+    ):
         if mcp_access.get(key) not in (None, "", [], {}):
             compact[key] = mcp_access.get(key)
     return _without_omitted_field_counts(compact)
@@ -2415,6 +2458,40 @@ def _compact_provider_status_for_mcp(
     return compact
 
 
+def _session_provider_status_allows_global_fallback(provider: dict[str, Any]) -> bool:
+    mcp_access = provider.get("mcp_access")
+    if isinstance(mcp_access, dict):
+        if mcp_access.get("returncode") == 124:
+            return True
+        stderr = str(mcp_access.get("stderr") or "").lower()
+        if "timed out" in stderr or "timeout" in stderr or "unavailable" in stderr:
+            return True
+
+    values: list[str] = []
+    for key in ("status", "reason"):
+        value = provider.get(key)
+        if isinstance(value, str):
+            values.append(value)
+    diagnostics = provider.get("diagnostics")
+    if isinstance(diagnostics, list):
+        values.extend(str(item) for item in diagnostics if isinstance(item, (str, int, float)))
+    providers = provider.get("providers")
+    if isinstance(providers, dict):
+        for item in providers.values():
+            if not isinstance(item, dict):
+                continue
+            for key in ("status", "reason"):
+                value = item.get(key)
+                if isinstance(value, str):
+                    values.append(value)
+            provider_diagnostics = item.get("diagnostics")
+            if isinstance(provider_diagnostics, list):
+                values.extend(str(entry) for entry in provider_diagnostics if isinstance(entry, (str, int, float)))
+
+    haystack = " ".join(values).lower()
+    return "timed out" in haystack or "timeout" in haystack or "unavailable" in haystack
+
+
 @dataclass(slots=True)
 class AoASessionMemoryMCPState:
     workspace_root: Path
@@ -2602,12 +2679,12 @@ class AoASessionMemoryMCPState:
 
     def session_mcp_transport_preflight(self, proc_root: Path = Path("/proc")) -> dict[str, Any]:
         package_root = MCP_CORE_SOURCE_PATH.parents[2]
-        watched_sources = [
-            MCP_CORE_SOURCE_PATH,
+        restart_required_sources = [
             MCP_SERVER_SOURCE_PATH,
             package_root / "scripts" / "aoa_session_memory_mcp_server.py",
         ]
-        source_mtime = max((path.stat().st_mtime for path in watched_sources if path.exists()), default=0.0)
+        restart_source_mtime = max((path.stat().st_mtime for path in restart_required_sources if path.exists()), default=0.0)
+        core_auto_reload_source_mtime = _source_mtime_epoch(MCP_CORE_SOURCE_PATH) or 0.0
         config_path = _codex_config_path()
         config_mtime = config_path.stat().st_mtime if config_path.exists() else 0.0
         configured_server: dict[str, Any] = {"configured": False, "config_path": config_path.as_posix()}
@@ -2660,9 +2737,8 @@ class AoASessionMemoryMCPState:
             cmdline = _proc_cmdline(pid, proc_root=proc_root)
             if not cmdline:
                 continue
-            joined = " ".join(cmdline)
             started_at_epoch = _process_start_epoch(pid, proc_root=proc_root, boot_epoch=boot_epoch)
-            if "aoa-session-memory-mcp-server.py" in joined or "aoa_session_memory_mcp_server.py" in joined:
+            if _is_session_memory_mcp_server_cmdline(cmdline):
                 ppid = _proc_ppid(pid, proc_root=proc_root)
                 if ppid is not None:
                     mcp_children_by_parent.setdefault(ppid, []).append(pid)
@@ -2674,11 +2750,19 @@ class AoASessionMemoryMCPState:
                         "cmdline": cmdline,
                         "started_at_epoch": started_at_epoch,
                         "started_before_current_source": bool(
-                            started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime
+                            started_at_epoch is not None
+                            and restart_source_mtime
+                            and started_at_epoch < restart_source_mtime
+                        ),
+                        "started_before_core_auto_reload_source": bool(
+                            started_at_epoch is not None
+                            and core_auto_reload_source_mtime
+                            and started_at_epoch < core_auto_reload_source_mtime
                         ),
                     }
                 )
                 continue
+            joined = " ".join(cmdline)
             if "codex" not in joined or "resume" not in joined:
                 continue
             codex_processes.append(
@@ -2690,7 +2774,14 @@ class AoASessionMemoryMCPState:
                     "started_at_epoch": started_at_epoch,
                     "is_current_process_ancestor": pid in ancestor_pids,
                     "started_before_config": bool(started_at_epoch is not None and config_mtime and started_at_epoch < config_mtime),
-                    "started_before_current_source": bool(started_at_epoch is not None and source_mtime and started_at_epoch < source_mtime),
+                    "started_before_current_source": bool(
+                        started_at_epoch is not None and restart_source_mtime and started_at_epoch < restart_source_mtime
+                    ),
+                    "started_before_core_auto_reload_source": bool(
+                        started_at_epoch is not None
+                        and core_auto_reload_source_mtime
+                        and started_at_epoch < core_auto_reload_source_mtime
+                    ),
                 }
             )
 
@@ -2703,11 +2794,31 @@ class AoASessionMemoryMCPState:
         current_predates_config = any(process["started_before_config"] for process in current_codex)
         current_predates_source = any(process["started_before_current_source"] for process in current_codex)
         current_has_mcp_child = any(process["has_aoa_session_memory_child"] for process in current_codex)
+        mcp_process_by_pid = {process["pid"]: process for process in mcp_processes}
+        current_mcp_child_processes = [
+            mcp_process_by_pid[pid]
+            for process in current_codex
+            for pid in process.get("aoa_session_memory_child_pids", [])
+            if pid in mcp_process_by_pid
+        ]
+        current_mcp_child_count = len(current_mcp_child_processes)
+        current_stale_mcp_child_count = sum(
+            1 for process in current_mcp_child_processes if process.get("started_before_current_source")
+        )
+        current_has_fresh_mcp_child = bool(
+            current_mcp_child_processes and current_stale_mcp_child_count < current_mcp_child_count
+        )
         configured = bool(configured_server.get("configured"))
+        config_reload_advisory = bool(
+            current_codex
+            and configured
+            and current_predates_config
+            and current_has_fresh_mcp_child
+        )
         live_transport_restart_advisory = bool(
             current_codex
             and configured
-            and (current_predates_config or current_predates_source or not current_has_mcp_child)
+            and not current_has_fresh_mcp_child
         )
         stale_mcp_process_count = sum(1 for process in mcp_processes if process["started_before_current_source"])
         if live_transport_restart_advisory:
@@ -2716,9 +2827,15 @@ class AoASessionMemoryMCPState:
                 "Restart the Codex/MCP process before using mcp__aoa_session_memory; "
                 "configured stdio may still be used as a source health proof."
             )
-        elif current_codex and current_has_mcp_child:
+        elif configured and current_codex and current_has_fresh_mcp_child:
             direct_status = "attached"
-            next_action = "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
+            if config_reload_advisory:
+                next_action = (
+                    "Use mcp__aoa_session_memory tools; restart only if this task depends on newly changed "
+                    "Codex MCP config rather than the attached live server."
+                )
+            else:
+                next_action = "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
         elif not current_codex:
             direct_status = "not_in_codex_process"
             next_action = "Use this as a CLI preflight; run configured stdio smoke for server proof or call MCP from a fresh Codex session."
@@ -2732,7 +2849,9 @@ class AoASessionMemoryMCPState:
             "mutates": False,
             "configured_server": configured_server,
             "runtime": self.runtime_identity(),
-            "source_mtime_epoch": source_mtime or None,
+            "source_mtime_epoch": restart_source_mtime or None,
+            "restart_required_source_mtime_epoch": restart_source_mtime or None,
+            "core_auto_reload_source_mtime_epoch": core_auto_reload_source_mtime or None,
             "config_mtime_epoch": config_mtime or None,
             "direct_tool_transport_status": direct_status,
             "live_transport_restart_advisory": live_transport_restart_advisory,
@@ -2742,6 +2861,10 @@ class AoASessionMemoryMCPState:
                 "current_session_predates_config": current_predates_config,
                 "current_session_predates_current_source": current_predates_source,
                 "current_session_has_aoa_session_memory_child": current_has_mcp_child,
+                "current_session_mcp_child_count": current_mcp_child_count,
+                "current_session_mcp_child_stale_count": current_stale_mcp_child_count,
+                "current_session_has_fresh_aoa_session_memory_child": current_has_fresh_mcp_child,
+                "config_reload_advisory": config_reload_advisory,
                 "current_codex_processes": current_codex[:6],
                 "processes": codex_processes[:12],
                 "omitted_process_count": max(0, len(codex_processes) - 12),
@@ -3018,7 +3141,11 @@ class AoASessionMemoryMCPState:
             for key, value in filters.items()
             if key in SEARCH_FILTER_FLAGS and value not in (None, "")
         }
-        supported_extra = {"provider", "explain"} | SEARCH_CONTROL_FILTERS | AGENT_ROUTE_SEARCH_FILTERS
+        supported_extra = (
+            {"provider", "explain", REQUESTED_AGENT_EVENT_FILTER}
+            | SEARCH_CONTROL_FILTERS
+            | AGENT_ROUTE_SEARCH_FILTERS
+        )
         for key in sorted(set(filters) - set(SEARCH_FILTER_FLAGS) - supported_extra):
             diagnostics.append(f"ignored unsupported filter {key!r}")
         if text:
@@ -3091,6 +3218,7 @@ class AoASessionMemoryMCPState:
             "date_to",
             "max_shards",
             "query_timeout_ms",
+            REQUESTED_AGENT_EVENT_FILTER,
         }
         for key in sorted(set(filters) - supported_filters):
             diagnostics.append(f"ignored unsupported filter {key!r}")
@@ -3192,6 +3320,7 @@ class AoASessionMemoryMCPState:
         if (
             doc_type == "goal_lifecycle"
             and not query
+            and not episode
             and "agent_event" not in active_filters
             and "task_episode_id" not in active_filters
         ):
@@ -3216,7 +3345,9 @@ class AoASessionMemoryMCPState:
         payload = self.session_agent_responses(
             query=query,
             session=session,
-            agent_events=_split_filter_values(active_filters.get("agent_event")),
+            agent_events=_split_filter_values(
+                filters.get(REQUESTED_AGENT_EVENT_FILTER) or active_filters.get("agent_event")
+            ),
             episode=episode,
             closeout_final=_as_bool(filters.get("closeout_final"), default=False),
             verification_state=str(filters.get("verification_state") or "any"),
@@ -3831,6 +3962,9 @@ class AoASessionMemoryMCPState:
             "windows": windows,
             "parameters": {"before": before, "after": after},
             "provider": source_payload.get("provider"),
+            "cost_profile": source_payload.get("cost_profile"),
+            "search_projection": source_payload.get("search_projection"),
+            "quality": source_payload.get("quality"),
             "diagnostics": [
                 "served by MCP SQLite agent-event window fast path",
                 "fast path returns center refs only; use next_expansion_command for raw before/after windows",
@@ -4365,7 +4499,8 @@ class AoASessionMemoryMCPState:
             {
                 "id": "usage_neighborhood",
                 "tool": "aoa_session_entity_usage_neighborhood",
-                "command": neighborhood_mcp_access.get("full_evidence_route"),
+                "command": neighborhood_mcp_access.get("full_evidence_route")
+                or neighborhood_mcp_access.get("next_expansion_command"),
                 "use_when": "before/after event windows or local consequence chains need inspection",
             },
             {
@@ -4615,8 +4750,11 @@ class AoASessionMemoryMCPState:
             candidates.append(anchor_text)
             prefix, _, value = anchor_text.partition(":")
             normalized_value = _route_key(value)
+            normalized_prefix_kind = _normalize_trace_kind(prefix)
             if prefix and normalized_value:
                 candidates.append(f"{_route_key(prefix)}:{normalized_value}")
+            if normalized_prefix_kind and normalized_prefix_kind != "auto" and normalized_value:
+                candidates.append(f"{normalized_prefix_kind}:{normalized_value}")
         if normalized_kind and normalized_kind != "auto" and normalized_anchor:
             candidates.append(f"{normalized_kind}:{normalized_anchor}")
             candidates.append(f"{normalized_kind}:{anchor_text}")
@@ -5105,7 +5243,11 @@ class AoASessionMemoryMCPState:
         )
         diagnostics = []
         session_provider_fallback: dict[str, Any] | None = None
-        if provider_session and not provider_full.get("ok"):
+        if (
+            provider_session
+            and not provider_full.get("ok")
+            and _session_provider_status_allows_global_fallback(provider_full)
+        ):
             global_provider_args = ["--provider", "portable_sqlite"]
             global_provider = self._archive_command(
                 "search-provider-status",
@@ -5120,6 +5262,8 @@ class AoASessionMemoryMCPState:
                 provider_full = global_provider
                 provider_args = global_provider_args
                 diagnostics.append("provider_session_status_failed_using_global_freshness")
+        elif provider_session and not provider_full.get("ok"):
+            diagnostics.append("provider_session_status_failed_authoritative")
         checks = [self._check_ref(ref, session_dir=session_dir) for ref in refs[:100]]
         projection_freshness = self._target_projection_freshness(
             provider_full,
@@ -5560,7 +5704,7 @@ class AoASessionMemoryMCPState:
             "artifact_type": "entity_registry_snapshot",
             "generated_at": snapshot.get("generated_at"),
             "generated_at_epoch": snapshot.get("generated_at_epoch"),
-            "ok": True,
+            "ok": bool(snapshot.get("ok", True)),
             "mutates": False,
             "aoa_root": self.aoa_root.as_posix(),
             "registry_path": path.as_posix(),
@@ -6028,7 +6172,7 @@ class AoASessionMemoryMCPState:
         self,
         query: str = "",
         *,
-        layer: str = "",
+        layer: str = "tool",
         key: str = "",
         route_signal: str = "",
         limit: int = 12,
@@ -6241,17 +6385,33 @@ class AoASessionMemoryMCPState:
         completeness = latest_payload.get("projection_completeness")
         if not isinstance(completeness, dict):
             completeness = latest_payload.get("completeness_check") if isinstance(latest_payload.get("completeness_check"), dict) else {}
-        completeness_current = (
+        completeness_has_current_schema = (
             isinstance(completeness, dict)
             and completeness.get("artifact_type") == "session_memory_projection_completeness"
             and isinstance(completeness.get("surfaces"), dict)
+        )
+        completeness_current = (
+            completeness_has_current_schema
+            and completeness.get("status") == "current"
+            and not completeness.get("actionable_surface_ids")
+            and not completeness.get("deferred_surface_ids")
+            and all(
+                isinstance(surface, dict)
+                and surface.get("status") == "current"
+                and surface.get("needs_maintenance") is not True
+                for surface in completeness.get("surfaces", {}).values()
+            )
         )
         next_route = latest_payload.get("next_route") if isinstance(latest_payload.get("next_route"), dict) else {}
         maintenance = self._maintenance_summary_for_status()
         refresh_route = {
             "id": "run_projection_catchup_outside_mcp",
             "status": "needed",
-            "reason": "projection_completeness_missing_or_legacy",
+            "reason": (
+                "projection_completeness_stale"
+                if completeness_has_current_schema
+                else "projection_completeness_missing_or_legacy"
+            ),
             "command": self._archive_argv("projection-catchup", ["all", "--write-report"]),
         }
         payload = {
@@ -6261,7 +6421,11 @@ class AoASessionMemoryMCPState:
             "source": (
                 "latest_projection_catchup_diagnostic"
                 if completeness_current
-                else ("legacy_projection_catchup_diagnostic" if completeness else "missing_projection_catchup_diagnostic")
+                else (
+                    "stale_projection_catchup_diagnostic"
+                    if completeness_has_current_schema
+                    else ("legacy_projection_catchup_diagnostic" if completeness else "missing_projection_catchup_diagnostic")
+                )
             ),
             "projection_completeness": completeness,
             "latest_projection_catchup": {
@@ -6272,7 +6436,7 @@ class AoASessionMemoryMCPState:
             },
             "current_maintenance": maintenance,
             "next_operator_route": next_route if completeness_current and next_route else refresh_route,
-            "diagnostics": [] if completeness_current else ["projection_completeness_missing_or_legacy"],
+            "diagnostics": [] if completeness_current else [refresh_route["reason"]],
             "mcp_access": {
                 "mutates": False,
                 "archive_command": None,
@@ -6435,6 +6599,8 @@ class AoASessionMemoryMCPState:
         edge_limit: int,
         full_route: str,
     ) -> dict[str, Any] | None:
+        if depth > 1:
+            return None
         db_path = self.aoa_root / "graph" / "graph.sqlite3"
         if not db_path.is_file():
             return None
@@ -6766,7 +6932,7 @@ class AoASessionMemoryMCPState:
             return self.session_trace("/".join(parts), limit=12, per_route_limit=5)
         if netloc == "graph" and parts:
             if parts[0] == "status":
-                return self._graph_summary()
+                return self._graph_summary(self.session_maintenance_status(include_timers=False))
             if parts[0] == "neighborhood" and len(parts) >= 2:
                 return self.graph_neighborhood("/".join(parts[1:]), limit=40)
             if parts[0] == "timeline" and len(parts) >= 2:
@@ -6795,7 +6961,7 @@ class AoASessionMemoryMCPState:
         maintenance = maintenance if isinstance(maintenance, dict) else {}
         maintenance_graph = maintenance.get("graph") if isinstance(maintenance.get("graph"), dict) else {}
         maintenance_route = maintenance.get("route") if isinstance(maintenance.get("route"), dict) else {}
-        has_maintenance_verdict = bool(maintenance.get("ok")) and bool(maintenance_graph or maintenance_route)
+        has_maintenance_verdict = bool(maintenance_graph or maintenance_route)
         decision_source = "maintenance_status" if has_maintenance_verdict else "cached_graph_freshness_diagnostic"
         needs_graph_maintenance = (
             maintenance_route.get("needs_graph_maintenance")
@@ -6990,9 +7156,9 @@ class AoASessionMemoryMCPState:
                 continue
         return newest
 
-    def _session_recency_key(self, item: dict[str, Any]) -> tuple[float, str, int, str]:
+    def _session_recency_key(self, item: dict[str, Any]) -> tuple[str, int, str, float]:
         date, sequence, label = self._session_sort_key(item)
-        return (self._session_activity_mtime(item), str(item.get("updated_at") or date), sequence, label)
+        return (str(item.get("updated_at") or date), sequence, label, self._session_activity_mtime(item))
 
     def _session_path_from_registry(self, item: dict[str, Any]) -> Path | None:
         display = item.get("display") if isinstance(item.get("display"), dict) else {}
