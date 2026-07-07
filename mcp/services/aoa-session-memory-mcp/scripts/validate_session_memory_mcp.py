@@ -46,10 +46,18 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_live_scenario_corpus_check",
     "aoa_session_maintenance_status",
     "aoa_session_route_rollup_query",
+    "aoa_session_direct_event_rollup_query",
     "aoa_session_projection_status",
     "aoa_session_graph_neighborhood",
     "aoa_session_graph_bridge",
     "aoa_session_graph_cooccurrence",
+}
+
+ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
+    "current",
+    "current_with_deferred_live_updates",
+    "current_with_global_deferred_live_updates",
+    "current_with_global_stale",
 }
 
 ACCEPTABLE_FRESHNESS_SMOKE_STATUSES = {
@@ -634,6 +642,7 @@ def _stdio_route_count_summary(
     live_scenario: dict,
     live_scenario_corpus: dict,
     maintenance_status: dict,
+    direct_event_rollup_query: dict,
     projection_status: dict,
     *,
     tool_count: int,
@@ -754,6 +763,13 @@ def _stdio_route_count_summary(
         "maintenance_recommendation": maintenance_status.get("recommendation"),
         "maintenance_smoke_skipped": maintenance_status.get("mcp_access", {}).get("skipped_in_stdio_smoke")
         if isinstance(maintenance_status.get("mcp_access"), dict)
+        else None,
+        "direct_event_rollup_result_count": _payload_count(direct_event_rollup_query, "result_count"),
+        "direct_event_rollup_freshness_status": direct_event_rollup_query.get("quality", {}).get("freshness_status")
+        if isinstance(direct_event_rollup_query.get("quality"), dict)
+        else None,
+        "direct_event_rollup_materialized": direct_event_rollup_query.get("cost_profile", {}).get("uses_materialized_direct_event_rollup")
+        if isinstance(direct_event_rollup_query.get("cost_profile"), dict)
         else None,
         "projection_status_ok": projection_status.get("ok"),
         "projection_completeness_status": projection_status.get("projection_completeness", {}).get("status")
@@ -912,6 +928,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 timeout_seconds=60,
                 require_ok=False,
             )
+            direct_event_rollup_query = await call_json(
+                "aoa_session_direct_event_rollup_query",
+                {"usage_role": "result", "limit": 3, "ref_limit": 3},
+                timeout_seconds=60,
+            )
             maintenance_status = {
                 "artifact_type": "session_memory_maintenance_status",
                 "mutates": False,
@@ -1021,6 +1042,32 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP live scenario corpus returned invalid payload: {live_scenario_corpus.get('diagnostics')}")
     if live_scenario_corpus.get("case_count") != 1:
         raise SystemExit(f"stdio MCP live scenario corpus did not honor case_limit=1: {live_scenario_corpus}")
+    direct_event_quality = (
+        direct_event_rollup_query.get("quality")
+        if isinstance(direct_event_rollup_query.get("quality"), dict)
+        else {}
+    )
+    direct_event_cost = (
+        direct_event_rollup_query.get("cost_profile")
+        if isinstance(direct_event_rollup_query.get("cost_profile"), dict)
+        else {}
+    )
+    direct_event_mcp_access = (
+        direct_event_rollup_query.get("mcp_access")
+        if isinstance(direct_event_rollup_query.get("mcp_access"), dict)
+        else {}
+    )
+    if direct_event_rollup_query.get("artifact_type") != "session_memory_search_operational_direct_event_rollup_query":
+        raise SystemExit(f"stdio MCP direct-event rollup query returned invalid payload: {direct_event_rollup_query.get('diagnostics')}")
+    if direct_event_rollup_query.get("result_count", 0) <= 0 or direct_event_quality.get("raw_or_segment_ref_present") is not True:
+        raise SystemExit(f"stdio MCP direct-event rollup query returned no usable refs: {direct_event_rollup_query}")
+    if direct_event_cost.get("uses_materialized_direct_event_rollup") is not True:
+        raise SystemExit(f"stdio MCP direct-event rollup query did not use materialized projection: {direct_event_cost}")
+    for key in ("resamples_shards", "opens_monolith", "uses_fts", "hydrates_body"):
+        if direct_event_cost.get(key) is not False:
+            raise SystemExit(f"stdio MCP direct-event rollup query violated cost contract {key}: {direct_event_cost}")
+    if direct_event_mcp_access.get("does_not_resample_shards") is not True or direct_event_mcp_access.get("behavior_proof_route") != "usage-chain":
+        raise SystemExit(f"stdio MCP direct-event rollup access boundary failed: {direct_event_mcp_access}")
     if maintenance_status.get("artifact_type") != "session_memory_maintenance_status" or maintenance_status.get("mutates") is not False:
         raise SystemExit(f"stdio MCP maintenance status returned invalid payload: {maintenance_status.get('diagnostics')}")
     if projection_status.get("schema") != "aoa_session_memory_projection_status_v1" or projection_status.get("mutates") is not False:
@@ -1054,6 +1101,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         live_scenario,
         live_scenario_corpus,
         maintenance_status,
+        direct_event_rollup_query,
         projection_status,
         tool_count=len(tools),
     )
@@ -1497,6 +1545,11 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_live_scenario_corpus_actionable_gap_count": stdio_smoke[
                     "live_scenario_corpus_actionable_gap_count"
                 ],
+                "stdio_direct_event_rollup_result_count": stdio_smoke["direct_event_rollup_result_count"],
+                "stdio_direct_event_rollup_freshness_status": stdio_smoke[
+                    "direct_event_rollup_freshness_status"
+                ],
+                "stdio_direct_event_rollup_materialized": stdio_smoke["direct_event_rollup_materialized"],
                 "stdio_maintenance_smoke_skipped": stdio_smoke["maintenance_smoke_skipped"],
                 "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],

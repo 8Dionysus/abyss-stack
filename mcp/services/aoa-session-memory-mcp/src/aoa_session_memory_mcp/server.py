@@ -512,6 +512,31 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_direct_event_rollup_query(
+        query: str = "",
+        usage_role: str = "result",
+        event_type: str = "",
+        session_act: str = "",
+        layer: str = "",
+        key: str = "",
+        route_signal: str = "",
+        limit: int = 12,
+        ref_limit: int = 3,
+    ) -> dict[str, Any]:
+        """Read the materialized direct operational-event rollup without shard resampling, FTS, monolith reads, or body hydration."""
+        return current_state().session_operational_direct_event_rollup_query(
+            query=query,
+            usage_role=usage_role,
+            event_type=event_type,
+            session_act=session_act,
+            layer=layer,
+            key=key,
+            route_signal=route_signal,
+            limit=limit,
+            ref_limit=ref_limit,
+        )
+
+    @mcp.tool()
     def aoa_session_projection_status(include_payload: bool = False) -> dict[str, Any]:
         """Read the latest projection-catchup completeness diagnostic without running maintenance."""
         return current_state().session_projection_status(include_payload=include_payload)
