@@ -108,8 +108,59 @@ class AoAKagMCPState:
     def _os_surfaces(self) -> list[dict[str, Any]]:
         return [item for item in self.provider_map().get("os_surfaces", []) if isinstance(item, dict)]
 
+    def _provider_repo_local_indexes(self) -> dict[str, dict[str, Any]]:
+        value = self.provider_map().get("provider_repo_local_indexes")
+        if not isinstance(value, dict):
+            return {}
+        return {str(repo): packet for repo, packet in value.items() if isinstance(packet, dict)}
+
+    def _provider_common_surface_profiles(self) -> dict[str, dict[str, Any]]:
+        value = self.provider_map().get("provider_common_surface_profiles")
+        if not isinstance(value, dict):
+            return {}
+        return {str(repo): packet for repo, packet in value.items() if isinstance(packet, dict)}
+
+    def _readiness_os_surfaces(self) -> list[dict[str, Any]]:
+        if not self.readiness_exists():
+            return []
+        return [item for item in self.readiness().get("os_surfaces", []) if isinstance(item, dict)]
+
+    def _provider_root_from_readiness(self, repo: str) -> Path | None:
+        for surface in self._readiness_os_surfaces():
+            owner_return = surface.get("owner_return_route")
+            owner_repo = owner_return.get("repo") if isinstance(owner_return, dict) else None
+            surface_id = str(surface.get("surface_id") or "")
+            owner_provider_match = owner_repo == repo and surface.get("provider_status") == "provider_ready"
+            surface_match = surface_id == repo or surface_id.endswith(f"/{repo}")
+            if not owner_provider_match and not surface_match:
+                continue
+            root = str(surface.get("root") or "")
+            if not root:
+                continue
+            path = Path(root).expanduser()
+            if not path.is_absolute():
+                path = self.workspace_root / path
+            return path.resolve()
+        return None
+
     def _provider(self, repo: str) -> dict[str, Any] | None:
         return next((item for item in self._providers() if item.get("repo") == repo), None)
+
+    def _repo_local_index(self, repo: str) -> dict[str, Any] | None:
+        packet = self._provider_repo_local_indexes().get(repo)
+        if packet is not None:
+            return packet
+        provider = self._provider(repo)
+        value = provider.get("repo_local_index") if isinstance(provider, dict) else None
+        return value if isinstance(value, dict) else None
+
+    def _common_surface_profile(self, repo: str) -> dict[str, Any] | None:
+        packet = self._provider_common_surface_profiles().get(repo)
+        if packet is not None:
+            return packet
+        repo_local_index = self._repo_local_index(repo)
+        value = repo_local_index.get("common_surface_profile") if isinstance(repo_local_index, dict) else None
+        return value if isinstance(value, dict) else None
 
     def _remaining_route(self, repo: str) -> dict[str, Any] | None:
         return next((item for item in self._remaining_routes() if item.get("repo") == repo), None)
@@ -117,13 +168,17 @@ class AoAKagMCPState:
     def _provider_root(self, repo: str) -> Path:
         if repo == "aoa-kag":
             return self.aoa_kag_root
+        readiness_root = self._provider_root_from_readiness(repo)
+        if readiness_root is not None:
+            return readiness_root
         return self.workspace_root / repo
 
     def status(self) -> dict[str, Any]:
         payload = self.provider_map() if self.provider_map_exists() else {}
         providers = payload.get("providers", []) if isinstance(payload.get("providers"), list) else []
         remaining = payload.get("remaining_routes", []) if isinstance(payload.get("remaining_routes"), list) else []
-        os_surfaces = payload.get("os_surfaces", []) if isinstance(payload.get("os_surfaces"), list) else []
+        provider_map_os_surfaces = payload.get("os_surfaces", []) if isinstance(payload.get("os_surfaces"), list) else []
+        os_surfaces = self._readiness_os_surfaces() or provider_map_os_surfaces
         return {
             "schema": "aoa_kag_mcp_status_v1",
             "provider_map_exists": self.provider_map_exists(),
@@ -149,6 +204,8 @@ class AoAKagMCPState:
                 "kind": "provider",
                 "status": provider.get("provider_status", "provider_ready"),
                 "provider": provider,
+                "repo_local_index": self._repo_local_index(repo),
+                "common_surface_profile": self._common_surface_profile(repo),
                 "provider_root": self._provider_root(repo).as_posix(),
                 "authority_note": "Provider records route back to the repo-local kag/ home and source-return surfaces.",
             }
@@ -181,6 +238,8 @@ class AoAKagMCPState:
                     "repo": item.get("repo"),
                     "provider_status": item.get("provider_status", "provider_ready"),
                     "record_counts": item.get("record_counts", {}),
+                    "repo_local_index": self._repo_local_index(str(item.get("repo"))),
+                    "common_surface_profile": self._common_surface_profile(str(item.get("repo"))),
                     "owner_return_routes": item.get("owner_return_routes", []),
                     "mcp_access_shape": item.get("mcp_access_shape", []),
                 }
@@ -227,11 +286,56 @@ class AoAKagMCPState:
         return {
             "schema": "aoa_kag_freshness_check_v1",
             "repo": repo,
-            "ok": not missing_handles,
+            "ok": not missing_handles and not missing_receipts,
             "missing": missing_handles,
             "missing_receipts": missing_receipts,
             "freshness": rows,
             "authority_boundary": "Freshness handles point to provider receipts and owner validators; MCP reports local receipt materialization without running validators as a hidden side effect.",
+        }
+
+    def repo_local_index(self, repo: str) -> dict[str, Any]:
+        packet = self._repo_local_index(repo)
+        if packet is None:
+            raise KeyError(f"unknown KAG provider repo-local index: {repo}")
+        return {
+            "schema": "aoa_kag_repo_local_index_resource_v1",
+            "repo": repo,
+            "repo_local_index": packet,
+            "authority_note": "Repo-local index status is read from the aoa-kag generated provider map.",
+        }
+
+    def common_surface_profile(self, repo: str) -> dict[str, Any]:
+        profile = self._common_surface_profile(repo)
+        if profile is None:
+            raise KeyError(f"unknown KAG provider common surface profile: {repo}")
+        return {
+            "schema": "aoa_kag_common_surface_profile_resource_v1",
+            "repo": repo,
+            "common_surface_profile": profile,
+            "authority_note": "Common surface profiles summarize source-surface classes; source meaning remains with provider owners.",
+        }
+
+    def source_index_status(self, repo: str, *, include_payload: bool = False) -> dict[str, Any]:
+        packet = self._repo_local_index(repo)
+        if packet is None:
+            raise KeyError(f"unknown KAG provider source index: {repo}")
+        source_index_ref = str(packet.get("source_index_ref") or "")
+        root = self._provider_root(repo)
+        source_index_path = root / source_index_ref if source_index_ref else None
+        source_index_exists = bool(source_index_path and source_index_path.is_file())
+        payload: dict[str, Any] | None = None
+        if include_payload and source_index_path is not None and source_index_path.is_file():
+            payload = _read_json(source_index_path)
+        return {
+            "schema": "aoa_kag_source_index_status_v1",
+            "repo": repo,
+            "status": packet.get("status"),
+            "source_index_ref": source_index_ref,
+            "source_index_exists": source_index_exists,
+            "index_files": packet.get("index_files", []),
+            "coverage_owner_key": packet.get("coverage_owner_key"),
+            "source_index": payload,
+            "authority_note": "Dereference source_index_ref only when present; owner-specific providers expose index_files instead.",
         }
 
     def source_return_lookup(
@@ -367,6 +471,12 @@ class AoAKagMCPState:
             if provider is None:
                 raise KeyError(f"unknown KAG provider: {repo}")
             return _read_json(self._provider_root(repo) / "kag" / "manifest.json")
+        if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "repo-local-index":
+            return self.repo_local_index(parts[0])
+        if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "common-surface-profile":
+            return self.common_surface_profile(parts[0])
+        if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "source-index":
+            return self.source_index_status(parts[0], include_payload=True)
         if parsed.netloc == "providers" and len(parts) == 3 and parts[1] == "records":
             repo = parts[0]
             record_class = parts[2]

@@ -36,6 +36,16 @@ def main() -> None:
     source_return.add_argument("--local-id")
     source_return.add_argument("--path")
 
+    repo_local_index = sub.add_parser("repo-local-index")
+    repo_local_index.add_argument("repo")
+
+    source_index = sub.add_parser("source-index")
+    source_index.add_argument("repo")
+    source_index.add_argument("--include-payload", action="store_true")
+
+    common_surface_profile = sub.add_parser("common-surface-profile")
+    common_surface_profile.add_argument("repo")
+
     registry = sub.add_parser("registry-slice")
     registry.add_argument("--status")
     registry.add_argument("--repo")
@@ -69,6 +79,12 @@ def main() -> None:
         _print(state.freshness_check(repo=args.repo))
     elif args.command == "source-return":
         _print(state.source_return_lookup(repo=args.repo, local_id=args.local_id, path=args.path))
+    elif args.command == "repo-local-index":
+        _print(state.repo_local_index(repo=args.repo))
+    elif args.command == "source-index":
+        _print(state.source_index_status(repo=args.repo, include_payload=args.include_payload))
+    elif args.command == "common-surface-profile":
+        _print(state.common_surface_profile(repo=args.repo))
     elif args.command == "registry-slice":
         _print(state.registry_slice(status=args.status, repo=args.repo, limit=args.limit))
     elif args.command == "composition-slice":

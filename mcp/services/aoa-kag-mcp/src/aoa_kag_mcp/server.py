@@ -57,6 +57,16 @@ def build_server(
         return current_state().source_return_lookup(repo=repo, local_id=local_id, path=path)
 
     @mcp.tool()
+    def aoa_kag_source_index_status(repo: str, include_payload: bool = False) -> dict[str, Any]:
+        """Return repo-local source-index status for one provider."""
+        return current_state().source_index_status(repo=repo, include_payload=include_payload)
+
+    @mcp.tool()
+    def aoa_kag_common_surface_profile(repo: str) -> dict[str, Any]:
+        """Return the common source-surface profile for one provider."""
+        return current_state().common_surface_profile(repo=repo)
+
+    @mcp.tool()
     def aoa_kag_registry_slice(
         status: str | None = None,
         repo: str | None = None,
@@ -91,6 +101,30 @@ def build_server(
     def provider_records_resource(repo: str, record_class: str) -> str:
         return json.dumps(
             current_state().read_resource(f"aoa-kag://providers/{repo}/records/{record_class}"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/repo-local-index")
+    def provider_repo_local_index_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/repo-local-index"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/source-index")
+    def provider_source_index_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/source-index"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/common-surface-profile")
+    def provider_common_surface_profile_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/common-surface-profile"),
             ensure_ascii=False,
             indent=2,
         )
