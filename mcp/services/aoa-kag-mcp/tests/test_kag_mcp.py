@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from aoa_kag_mcp.core import AoAKagMCPState
 from aoa_kag_mcp.server import build_server
 
@@ -309,6 +311,20 @@ def test_source_index_lookup_summarizes_repo_local_index(tmp_path: Path) -> None
     assert owner_specific["status"] == "owner-specific"
     assert owner_specific["source_index_ref"] == ""
     assert owner_specific["index_files"] == ["kag/indexes/source_inventory.json"]
+
+
+def test_source_index_lookup_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+    provider_map = state.provider_map()
+    provider_map["provider_repo_local_indexes"]["repo-a"]["source_index_ref"] = "../outside.json"
+    for provider in provider_map["providers"]:
+        if provider["repo"] == "repo-a":
+            provider["repo_local_index"]["source_index_ref"] = "../outside.json"
+            break
+    write_json(state.provider_map_path, provider_map)
+
+    with pytest.raises(ValueError, match="escapes provider root"):
+        state.source_index_lookup("repo-a", include_payload=True)
 
 
 def test_repo_local_coverage_status_filters_rows(tmp_path: Path) -> None:

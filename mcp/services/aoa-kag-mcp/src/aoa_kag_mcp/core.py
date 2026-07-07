@@ -39,6 +39,18 @@ def _contains(value: Any, needle: str) -> bool:
     return False
 
 
+def _provider_child_path(root: Path, ref: str) -> Path:
+    root_resolved = root.resolve(strict=False)
+    ref_path = Path(ref).expanduser()
+    candidate = ref_path if ref_path.is_absolute() else root_resolved / ref_path
+    resolved = candidate.resolve(strict=False)
+    try:
+        resolved.relative_to(root_resolved)
+    except ValueError as exc:
+        raise ValueError(f"provider path escapes provider root: {ref}") from exc
+    return resolved
+
+
 @dataclass(slots=True)
 class AoAKagMCPState:
     workspace_root: Path
@@ -406,7 +418,7 @@ class AoAKagMCPState:
             }
         source_index_ref = str(repo_index.get("source_index_ref") or "")
         provider_root = self._provider_root(repo)
-        source_index_path = provider_root / source_index_ref if source_index_ref else None
+        source_index_path = _provider_child_path(provider_root, source_index_ref) if source_index_ref else None
         source_index_exists = bool(source_index_path and source_index_path.is_file())
         source_index_summary = (
             self._source_index_summary(source_index_path)
