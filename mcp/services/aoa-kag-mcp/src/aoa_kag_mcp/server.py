@@ -16,6 +16,7 @@ def build_server(
     aoa_kag_root: str | Path | None = None,
     provider_map_path: str | Path | None = None,
     readiness_path: str | Path | None = None,
+    coverage_path: str | Path | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -30,6 +31,7 @@ def build_server(
             aoa_kag_root=aoa_kag_root,
             provider_map_path=provider_map_path,
             readiness_path=readiness_path,
+            coverage_path=coverage_path,
         )
 
     @mcp.tool()
@@ -55,6 +57,24 @@ def build_server(
     ) -> dict[str, Any]:
         """Return source-return routes for one provider or matching record."""
         return current_state().source_return_lookup(repo=repo, local_id=local_id, path=path)
+
+    @mcp.tool()
+    def aoa_kag_generation_route_lookup(repo: str) -> dict[str, Any]:
+        """Return source-owned generation route metadata for one provider."""
+        return current_state().generation_route_lookup(repo=repo)
+
+    @mcp.tool()
+    def aoa_kag_source_index_lookup(repo: str) -> dict[str, Any]:
+        """Return compact repo-local source-index metadata for one provider."""
+        return current_state().source_index_lookup(repo=repo)
+
+    @mcp.tool()
+    def aoa_kag_repo_local_coverage_status(
+        repo: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        """Return repo-local KAG source-index coverage rows."""
+        return current_state().repo_local_coverage_status(repo=repo, status=status)
 
     @mcp.tool()
     def aoa_kag_registry_slice(
@@ -95,6 +115,38 @@ def build_server(
             indent=2,
         )
 
+    @mcp.resource("aoa-kag://providers/{repo}/generation")
+    def provider_generation_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/generation"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/source-index")
+    def provider_source_index_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/source-index"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/repo-local-index")
+    def provider_repo_local_index_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/repo-local-index"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://coverage/repo-local-source-indexes")
+    def repo_local_source_indexes_resource() -> str:
+        return json.dumps(
+            current_state().read_resource("aoa-kag://coverage/repo-local-source-indexes"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
     @mcp.prompt(name="bounded-provider-query")
     def bounded_provider_query(repo: str, question: str) -> str:
         """Prompt route for querying one provider without crossing source ownership."""
@@ -108,6 +160,15 @@ def build_server(
         """Prompt route for summarizing owner-return paths."""
         return (
             f"Use aoa_kag_source_return_lookup(repo={repo!r}) and inspect the owner_return_routes before changing meaning."
+        )
+
+    @mcp.prompt(name="repo-source-surface-brief")
+    def repo_source_surface_brief(repo: str) -> str:
+        """Prompt route for reading one repo's KAG source surfaces."""
+        return (
+            f"Use aoa_kag_generation_route_lookup(repo={repo!r}), "
+            f"aoa_kag_source_index_lookup(repo={repo!r}), and "
+            f"aoa_kag_source_return_lookup(repo={repo!r}) before summarizing repo-local source surfaces."
         )
 
     @mcp.prompt(name="cross-repo-relation-preview")

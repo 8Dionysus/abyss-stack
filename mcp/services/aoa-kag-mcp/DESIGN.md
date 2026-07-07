@@ -24,6 +24,7 @@ embedding caches, and live indexing to later runtime-owned contracts.
 ## Interface
 
 Resources expose exact packet surfaces. Tools return typed JSON packets over
-provider status, freshness, source-return routes, registry slices, and simple
-composition search. Prompts guide agents to use source-return routes before
-making meaning claims.
+provider status, generation routes, source-index handles, repo-local coverage,
+freshness, source-return routes, registry slices, and simple composition
+search. Prompts guide agents through provider records, source-return routes,
+and repo-local source surfaces before making meaning claims.
