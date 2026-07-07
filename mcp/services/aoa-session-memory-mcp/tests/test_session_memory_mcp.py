@@ -1180,6 +1180,59 @@ OPERATIONAL_ROUTE_ROLLUP_QUERY = {
     "diagnostics": [],
 }
 
+OPERATIONAL_DIRECT_EVENT_ROLLUP_QUERY = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_search_operational_direct_event_rollup_query",
+    "ok": True,
+    "status": "matched",
+    "mutates": False,
+    "filters": {
+        "query": "",
+        "usage_role": "result",
+        "event_type": "",
+        "session_act": "",
+        "layer": "",
+        "key": "",
+        "route_signal": "",
+        "limit": 3,
+        "ref_limit": 3,
+    },
+    "results": [
+        {
+            "usage_role": "result",
+            "event_type": "COMMAND_OUTPUT",
+            "session_act": "command_result",
+            "posting_count": 8,
+            "session_count": 3,
+            "raw_refs": ["raw:line:1"],
+            "segment_refs": ["segments/000__initial-to-latest.md#event-000001"],
+            "session_ids": ["session-1"],
+        }
+    ],
+    "result_count": 1,
+    "totals": {
+        "matched_group_count": 1,
+        "source_direct_event_count": 20,
+        "source_direct_event_term_count": 4,
+    },
+    "quality": {
+        "uses_materialized_direct_event_rollup": True,
+        "raw_or_segment_ref_present": True,
+        "freshness_status": "current",
+        "needs_refresh": False,
+        "usage_chain_required_for_behavior_proof": True,
+    },
+    "cost_profile": {
+        "uses_materialized_direct_event_rollup": True,
+        "resamples_shards": False,
+        "opens_monolith": False,
+        "uses_fts": False,
+        "hydrates_body": False,
+        "elapsed_ms": 2,
+    },
+    "diagnostics": [],
+}
+
 GRAPH_TIMELINE = {
     "schema_version": 1,
     "artifact_type": "session_memory_graph_timeline",
@@ -1371,6 +1424,8 @@ class FakeRunner:
             payload = MAINTENANCE_STATUS
         elif command == "search-operational-route-rollup-query":
             payload = OPERATIONAL_ROUTE_ROLLUP_QUERY
+        elif command == "search-operational-direct-event-rollup-query":
+            payload = OPERATIONAL_DIRECT_EVENT_ROLLUP_QUERY
         elif command == "search":
             payload = SEARCH_RESULTS
         elif command == "literal-query-plan":
@@ -2131,6 +2186,39 @@ def test_operational_route_rollup_query_allows_explicit_all_layer_query(tmp_path
     calls = {command: args for command, args in runner.calls}
     args = calls["search-operational-route-rollup-query"]
     assert "--layer" not in args
+
+
+def test_operational_direct_event_rollup_query_delegates_to_read_only_archive_route(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_operational_direct_event_rollup_query(
+        usage_role="result",
+        event_type="COMMAND_OUTPUT",
+        session_act="command_result",
+        limit=3,
+        ref_limit=2,
+    )
+
+    calls = {command: args for command, args in runner.calls}
+    args = calls["search-operational-direct-event-rollup-query"]
+    assert args[args.index("--usage-role") + 1] == "result"
+    assert args[args.index("--event-type") + 1] == "COMMAND_OUTPUT"
+    assert args[args.index("--session-act") + 1] == "command_result"
+    assert args[args.index("--limit") + 1] == "3"
+    assert args[args.index("--ref-limit") + 1] == "2"
+    assert "--apply" not in args
+    assert "--max-shards" not in args
+    assert [timeout for command, timeout in runner.timeouts if command == "search-operational-direct-event-rollup-query"] == [30.0]
+    assert payload["artifact_type"] == "session_memory_search_operational_direct_event_rollup_query"
+    assert payload["mutates"] is False
+    assert payload["quality"]["raw_or_segment_ref_present"] is True
+    assert payload["cost_profile"]["uses_materialized_direct_event_rollup"] is True
+    assert payload["cost_profile"]["resamples_shards"] is False
+    assert payload["mcp_access"]["mutates"] is False
+    assert payload["mcp_access"]["does_not_materialize_rollup"] is True
+    assert payload["mcp_access"]["does_not_resample_shards"] is True
+    assert payload["mcp_access"]["behavior_proof_route"] == "usage-chain"
 
 
 def test_trace_and_search_use_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -3037,11 +3125,16 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
         },
         {"case_count": 1, "actionable_gap_count": 0},
         {"recommendation": "use_graph_search"},
+        {
+            "result_count": 1,
+            "quality": {"freshness_status": "current"},
+            "cost_profile": {"uses_materialized_direct_event_rollup": True},
+        },
         {"ok": True, "projection_completeness": {"status": "current"}},
-        tool_count=34,
+        tool_count=35,
     )
 
-    assert summary["tool_count"] == 34
+    assert summary["tool_count"] == 35
     assert summary["inventory_entity_count"] == 1
     assert summary["mcp_service_inventory_layer"] == "mcp"
     assert summary["mcp_service_inventory_requested_layer"] == "mcp_service"
@@ -3082,6 +3175,9 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["live_scenario_entity_registry_transition_probe_count"] == 2
     assert summary["live_scenario_corpus_case_count"] == 1
     assert summary["live_scenario_corpus_actionable_gap_count"] == 0
+    assert summary["direct_event_rollup_result_count"] == 1
+    assert summary["direct_event_rollup_freshness_status"] == "current"
+    assert summary["direct_event_rollup_materialized"] is True
     assert summary["agent_event_usage_outcome_count"] == 2
     assert summary["retrieve_usage_served_by"] == "aoa_session_entity_usage_chain"
     assert summary["maintenance_recommendation"] == "use_graph_search"
@@ -3094,6 +3190,7 @@ def test_validator_requires_literal_and_graph_mcp_tools() -> None:
     assert "aoa_session_entity_dossier" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_entity_usage_chain" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_route_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
+    assert "aoa_session_direct_event_rollup_query" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_neighborhood" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_bridge" in validator.REQUIRED_STDIO_SMOKE_TOOLS
     assert "aoa_session_graph_cooccurrence" in validator.REQUIRED_STDIO_SMOKE_TOOLS
@@ -3755,6 +3852,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_live_scenario_audit" in tools
     assert "aoa_session_live_scenario_corpus_check" in tools
     assert "aoa_session_route_rollup_query" in tools
+    assert "aoa_session_direct_event_rollup_query" in tools
     assert "aoa_session_projection_status" in tools
     assert "aoa_session_graph_neighborhood" in tools
     assert "aoa_session_graph_timeline" in tools
@@ -3769,6 +3867,9 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["layer"]["default"] == "tool"
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
+    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["usage_role"]["default"] == "result"
+    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
+    assert tools["aoa_session_direct_event_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
     assert tools["aoa_session_projection_status"].inputSchema["properties"]["include_payload"]["default"] is False
     assert tools["aoa_session_graph_neighborhood"].inputSchema["properties"]["edge_limit"]["default"] is None
     assert tools["aoa_session_entity_usage_chain"].inputSchema["properties"]["limit"]["default"] == 6
@@ -3780,6 +3881,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
     live_scenario_description = tools["aoa_session_live_scenario_audit"].description or ""
     route_rollup_description = tools["aoa_session_route_rollup_query"].description or ""
+    direct_event_rollup_description = tools["aoa_session_direct_event_rollup_query"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
     bridge_description = tools["aoa_session_graph_bridge"].description or ""
     assert "literal skill/MCP/hook/tool/API/path/query" in literal_description
@@ -3787,6 +3889,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "usage-to-consequence chains" in usage_chain_description
     assert "entity registry lookup status probes" in live_scenario_description
     assert "without maintenance" in route_rollup_description
+    assert "without shard resampling" in direct_event_rollup_description
     assert "graph route neighborhood" in graph_description
     assert "skill, MCP, hook, tool" in graph_description
     assert "compact bridge packet" in bridge_description
