@@ -60,6 +60,7 @@ Prompts:
 - `nervous-recall`
 - `machine-atlas`
 - `machine-rag-trace`
+- `artifact-trust-read`
 - `host-incident-triage`
 
 Every response carries an authority boundary and keeps source refs visible.
@@ -67,6 +68,30 @@ Every response carries an authority boundary and keeps source refs visible.
 entry map first; use `abyss_machine_evidence_map(limit=N)` to expand refs when
 the task needs deeper proof. Outputs are compacted by default so agents do not
 flood the prompt with whole bridge archives.
+
+Artifact trust surfaces are available through the same
+`abyss_machine_surface` tool, not through a separate MCP server:
+
+- `artifact-trust-requirements`
+- `artifact-trust-producer-profiles`
+- `artifact-trust-affected`
+- `artifact-trust-coverage`
+- `artifact-trust-gate`
+- `artifact-trust-registry-latest`
+- `artifact-trust-scenarios`
+- `artifact-trust-validate`
+
+These surfaces wrap allowlisted read-only `abyss-machine artifacts ... --json`
+commands. They do not build sidecars, sign, promote evidence, write the
+registry, repair state, or approve consumption beyond the returned
+`abyss-machine` read model. `artifact-trust-affected` and
+`artifact-trust-coverage` accepts optional `source_root`, `source_repo`, and
+`source_ref` parameters so agents can inspect explicit dirty source-ref
+freshness against a bounded abyss-machine source root instead of relying on the
+MCP process working directory. If
+the installed `abyss-machine` CLI does not yet support source-context flags for
+coverage, the MCP falls back to plain coverage and returns an explicit
+`artifact_trust_coverage_source_context_unsupported_by_cli` warning.
 
 ## Agent Route
 
