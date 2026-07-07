@@ -43,15 +43,17 @@ def main() -> None:
     if state.provider_lookup("aoa-kag")["status"] != "provider_ready":
         raise SystemExit("aoa-kag provider lookup did not return provider_ready")
     provider_status = state.provider_status()
-    source_index_repo = next(
-        (
-            str(provider["repo"])
-            for provider in provider_status["providers"]
-            if provider.get("repo_local_index", {}).get("status") == "passed"
-            and provider.get("repo_local_index", {}).get("source_index_ref")
-        ),
-        None,
-    )
+    source_index_repo = None
+    for provider in provider_status["providers"]:
+        repo_local_index = provider.get("repo_local_index")
+        if not isinstance(repo_local_index, dict):
+            continue
+        if (
+            repo_local_index.get("status") == "passed"
+            and repo_local_index.get("source_index_ref")
+        ):
+            source_index_repo = str(provider["repo"])
+            break
     if not source_index_repo:
         raise SystemExit("aoa-kag provider map returned no passed repo-local source index")
     repo_local_index = state.repo_local_index(source_index_repo)
