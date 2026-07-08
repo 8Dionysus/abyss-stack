@@ -372,6 +372,11 @@ def build_server(
         )
 
     @mcp.tool()
+    def aoa_session_live_scenario_corpus_inventory(full: bool = False) -> dict[str, Any]:
+        """List reviewed live-scenario corpus cases without running them."""
+        return current_state().session_live_scenario_corpus_inventory(full=full)
+
+    @mcp.tool()
     def aoa_session_route(
         axis: str,
         key: str = "",

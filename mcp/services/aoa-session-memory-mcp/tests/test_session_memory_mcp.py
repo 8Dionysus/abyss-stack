@@ -1395,6 +1395,27 @@ LIVE_SCENARIO_CORPUS_CHECK = {
     "diagnostics": [],
 }
 
+LIVE_SCENARIO_CORPUS_INVENTORY = {
+    "schema_version": 1,
+    "artifact_type": "session_memory_live_scenario_regression_corpus_inventory",
+    "ok": True,
+    "mutates": False,
+    "truth_status": "source_corpus_inventory_not_live_route_proof",
+    "corpus_path": "/srv/AbyssOS/.aoa/config/live-scenario-regression-corpus.json",
+    "case_count": 3,
+    "profile_counts": {"literal_planner": 1, "maintenance_status": 1, "route_rollup_query": 1},
+    "cases": [
+        {
+            "index": 1,
+            "id": "literal_planner_route_contract",
+            "profiles": ["literal_planner"],
+            "exact_check_command": "python3 scripts/aoa_session_memory.py live-scenario-corpus check --case-limit 1 --write-report",
+        }
+    ],
+    "diagnostics": [],
+    "next_route": "Run live-scenario-corpus check for regression proof; this inventory is route coverage only.",
+}
+
 GRAPH_EXPLAIN = {
     "schema_version": 1,
     "artifact_type": "session_memory_graph_explain_packet",
@@ -1476,7 +1497,7 @@ class FakeRunner:
         elif command == "graph-quality-audit":
             payload = GRAPH_QUALITY_AUDIT
         elif command == "live-scenario-corpus":
-            payload = LIVE_SCENARIO_CORPUS_CHECK
+            payload = LIVE_SCENARIO_CORPUS_INVENTORY if args[:1] == ("list",) else LIVE_SCENARIO_CORPUS_CHECK
         else:
             return CommandOutput(argv, 2, "{}", f"unexpected command {command}", 1.0)
         return CommandOutput(argv, 0, json.dumps(payload), "", 1.0)
@@ -3124,6 +3145,7 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
             ],
         },
         {"case_count": 1, "actionable_gap_count": 0},
+        {"case_count": 3, "truth_status": "source_corpus_inventory_not_live_route_proof"},
         {"recommendation": "use_graph_search"},
         {
             "result_count": 1,
@@ -3175,6 +3197,8 @@ def test_stdio_route_count_summary_allows_empty_route_results() -> None:
     assert summary["live_scenario_entity_registry_transition_probe_count"] == 2
     assert summary["live_scenario_corpus_case_count"] == 1
     assert summary["live_scenario_corpus_actionable_gap_count"] == 0
+    assert summary["live_scenario_corpus_inventory_case_count"] == 3
+    assert summary["live_scenario_corpus_inventory_truth_status"] == "source_corpus_inventory_not_live_route_proof"
     assert summary["direct_event_rollup_result_count"] == 1
     assert summary["direct_event_rollup_freshness_status"] == "current"
     assert summary["direct_event_rollup_materialized"] is True
@@ -3851,6 +3875,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "aoa_session_entity_registry" in tools
     assert "aoa_session_live_scenario_audit" in tools
     assert "aoa_session_live_scenario_corpus_check" in tools
+    assert "aoa_session_live_scenario_corpus_inventory" in tools
     assert "aoa_session_route_rollup_query" in tools
     assert "aoa_session_direct_event_rollup_query" in tools
     assert "aoa_session_projection_status" in tools
@@ -3864,6 +3889,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert tools["aoa_session_entity_registry"].inputSchema["properties"]["kind"]["default"] == "all"
     assert tools["aoa_session_live_scenario_audit"].inputSchema["properties"]["sample_size"]["default"] == 4
     assert tools["aoa_session_live_scenario_corpus_check"].inputSchema["properties"]["case_limit"]["default"] == 0
+    assert tools["aoa_session_live_scenario_corpus_inventory"].inputSchema["properties"]["full"]["default"] is False
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["layer"]["default"] == "tool"
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["limit"]["default"] == 12
     assert tools["aoa_session_route_rollup_query"].inputSchema["properties"]["ref_limit"]["default"] == 3
@@ -3880,6 +3906,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     dossier_description = tools["aoa_session_entity_dossier"].description or ""
     usage_chain_description = tools["aoa_session_entity_usage_chain"].description or ""
     live_scenario_description = tools["aoa_session_live_scenario_audit"].description or ""
+    corpus_inventory_description = tools["aoa_session_live_scenario_corpus_inventory"].description or ""
     route_rollup_description = tools["aoa_session_route_rollup_query"].description or ""
     direct_event_rollup_description = tools["aoa_session_direct_event_rollup_query"].description or ""
     graph_description = tools["aoa_session_graph_neighborhood"].description or ""
@@ -3888,6 +3915,7 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "one compact registry, usage, consequence" in dossier_description
     assert "usage-to-consequence chains" in usage_chain_description
     assert "entity registry lookup status probes" in live_scenario_description
+    assert "without running them" in corpus_inventory_description
     assert "without maintenance" in route_rollup_description
     assert "without shard resampling" in direct_event_rollup_description
     assert "graph route neighborhood" in graph_description
@@ -4932,6 +4960,25 @@ def test_live_scenario_corpus_check_routes_to_archive_corpus(tmp_path: Path) -> 
     assert command == "live-scenario-corpus"
     assert args[0] == "check"
     assert args[args.index("--case-limit") + 1] == "1"
+    assert "--full" in args
+    assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
+
+
+def test_live_scenario_corpus_inventory_routes_to_archive_list(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+
+    payload = state.session_live_scenario_corpus_inventory(full=True)
+
+    assert payload["artifact_type"] == "session_memory_live_scenario_regression_corpus_inventory"
+    assert payload["ok"] is True
+    assert payload["case_count"] == 3
+    assert payload["truth_status"] == "source_corpus_inventory_not_live_route_proof"
+    assert payload["mcp_route"]["canonical_route"] == "scripts/aoa_session_memory.py live-scenario-corpus list"
+    assert payload["mcp_route"]["does_not_run_cases"] is True
+    command, args = runner.calls[-1]
+    assert command == "live-scenario-corpus"
+    assert args[0] == "list"
     assert "--full" in args
     assert runner.timeouts[-1] == ("live-scenario-corpus", 90.0)
 

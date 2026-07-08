@@ -4898,6 +4898,31 @@ class AoASessionMemoryMCPState:
         )
         return payload
 
+    def session_live_scenario_corpus_inventory(
+        self,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        args = ["list"]
+        if full:
+            args.append("--full")
+        payload = self._archive_command(
+            "live-scenario-corpus",
+            args,
+            allow_nonzero_json=True,
+            timeout_seconds=max(self.timeout_seconds, EVIDENCE_PACKET_TIMEOUT_SECONDS),
+        )
+        payload.setdefault("authority_boundary", self.authority_boundary())
+        payload.setdefault(
+            "mcp_route",
+            {
+                "canonical_corpus": "config/live-scenario-regression-corpus.json",
+                "canonical_route": "scripts/aoa_session_memory.py live-scenario-corpus list",
+                "does_not_run_cases": True,
+                "next_route": "Use aoa_session_live_scenario_corpus_check for live regression proof.",
+            },
+        )
+        return payload
+
     def session_retrieve(
         self,
         recipe: str = "continue-session",
