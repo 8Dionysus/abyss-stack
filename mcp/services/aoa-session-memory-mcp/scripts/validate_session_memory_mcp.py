@@ -44,6 +44,7 @@ REQUIRED_STDIO_SMOKE_TOOLS = {
     "aoa_session_retrieve",
     "aoa_session_live_scenario_audit",
     "aoa_session_live_scenario_corpus_check",
+    "aoa_session_live_scenario_corpus_inventory",
     "aoa_session_maintenance_status",
     "aoa_session_route_rollup_query",
     "aoa_session_direct_event_rollup_query",
@@ -641,6 +642,7 @@ def _stdio_route_count_summary(
     retrieve_usage: dict,
     live_scenario: dict,
     live_scenario_corpus: dict,
+    live_scenario_corpus_inventory: dict,
     maintenance_status: dict,
     direct_event_rollup_query: dict,
     projection_status: dict,
@@ -760,6 +762,8 @@ def _stdio_route_count_summary(
         ),
         "live_scenario_corpus_case_count": live_scenario_corpus.get("case_count"),
         "live_scenario_corpus_actionable_gap_count": live_scenario_corpus.get("actionable_gap_count"),
+        "live_scenario_corpus_inventory_case_count": live_scenario_corpus_inventory.get("case_count"),
+        "live_scenario_corpus_inventory_truth_status": live_scenario_corpus_inventory.get("truth_status"),
         "maintenance_recommendation": maintenance_status.get("recommendation"),
         "maintenance_smoke_skipped": maintenance_status.get("mcp_access", {}).get("skipped_in_stdio_smoke")
         if isinstance(maintenance_status.get("mcp_access"), dict)
@@ -922,6 +926,11 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
                 {"case_limit": 1},
                 timeout_seconds=90,
             )
+            live_scenario_corpus_inventory = await call_json(
+                "aoa_session_live_scenario_corpus_inventory",
+                {},
+                timeout_seconds=90,
+            )
             projection_status = await call_json(
                 "aoa_session_projection_status",
                 {},
@@ -1042,6 +1051,24 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP live scenario corpus returned invalid payload: {live_scenario_corpus.get('diagnostics')}")
     if live_scenario_corpus.get("case_count") != 1:
         raise SystemExit(f"stdio MCP live scenario corpus did not honor case_limit=1: {live_scenario_corpus}")
+    if (
+        live_scenario_corpus_inventory.get("artifact_type")
+        != "session_memory_live_scenario_regression_corpus_inventory"
+    ):
+        raise SystemExit(
+            "stdio MCP live scenario corpus inventory returned invalid payload: "
+            f"{live_scenario_corpus_inventory.get('diagnostics')}"
+        )
+    if live_scenario_corpus_inventory.get("case_count", 0) <= 0:
+        raise SystemExit(f"stdio MCP live scenario corpus inventory returned no cases: {live_scenario_corpus_inventory}")
+    if (
+        live_scenario_corpus_inventory.get("truth_status")
+        != "source_corpus_inventory_not_live_route_proof"
+    ):
+        raise SystemExit(
+            "stdio MCP live scenario corpus inventory blurred truth status: "
+            f"{live_scenario_corpus_inventory.get('truth_status')}"
+        )
     direct_event_quality = (
         direct_event_rollup_query.get("quality")
         if isinstance(direct_event_rollup_query.get("quality"), dict)
@@ -1100,6 +1127,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         retrieve_usage,
         live_scenario,
         live_scenario_corpus,
+        live_scenario_corpus_inventory,
         maintenance_status,
         direct_event_rollup_query,
         projection_status,
@@ -1544,6 +1572,12 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_live_scenario_corpus_case_count": stdio_smoke["live_scenario_corpus_case_count"],
                 "stdio_live_scenario_corpus_actionable_gap_count": stdio_smoke[
                     "live_scenario_corpus_actionable_gap_count"
+                ],
+                "stdio_live_scenario_corpus_inventory_case_count": stdio_smoke[
+                    "live_scenario_corpus_inventory_case_count"
+                ],
+                "stdio_live_scenario_corpus_inventory_truth_status": stdio_smoke[
+                    "live_scenario_corpus_inventory_truth_status"
                 ],
                 "stdio_direct_event_rollup_result_count": stdio_smoke["direct_event_rollup_result_count"],
                 "stdio_direct_event_rollup_freshness_status": stdio_smoke[

@@ -184,6 +184,8 @@ def main() -> None:
     live_scenario_corpus = sub.add_parser("live-scenario-corpus-check")
     live_scenario_corpus.add_argument("--case-limit", type=int, default=0)
     live_scenario_corpus.add_argument("--full", action="store_true")
+    live_scenario_corpus_inventory = sub.add_parser("live-scenario-corpus-list")
+    live_scenario_corpus_inventory.add_argument("--full", action="store_true")
 
     route = sub.add_parser("route")
     route.add_argument("axis")
@@ -515,6 +517,8 @@ def main() -> None:
                 full=args.full,
             )
         )
+    elif args.command == "live-scenario-corpus-list":
+        _print(state.session_live_scenario_corpus_inventory(full=args.full))
     elif args.command == "brief":
         _print(state.session_brief(args.session, max_segments=args.max_segments))
     elif args.command == "retrieve":
