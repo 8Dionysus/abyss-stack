@@ -2592,6 +2592,7 @@ class AoASessionMemoryMCPState:
                 "aoa_session_entity_registry",
                 "aoa_session_hook_receipts",
                 "aoa_session_live_scenario_corpus_check",
+                "aoa_session_live_scenario_corpus_inventory",
                 "aoa_session_latest_diagnostics",
                 "aoa_session_maintenance_status",
                 "aoa_session_maintenance_plan",
