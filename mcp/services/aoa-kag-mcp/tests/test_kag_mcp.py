@@ -313,6 +313,28 @@ def test_source_index_lookup_summarizes_repo_local_index(tmp_path: Path) -> None
     assert owner_specific["index_files"] == ["kag/indexes/source_inventory.json"]
 
 
+def test_source_index_lookup_ignores_runtime_consumer_surface_with_matching_id(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+    runtime_consumer_root = tmp_path / "runtime-consumer" / "repo-a"
+    runtime_consumer_root.mkdir(parents=True)
+    readiness = state.readiness()
+    readiness["os_surfaces"].insert(
+        0,
+        {
+            "surface_id": "connectors/repo-a",
+            "root": runtime_consumer_root.as_posix(),
+            "provider_status": "runtime_consumer",
+            "owner_return_route": {"repo": "repo-a", "surface": ".codex/AGENTS.md", "route_kind": "runtime"},
+        },
+    )
+    write_json(state.readiness_path, readiness)
+
+    packet = state.source_index_lookup("repo-a")
+
+    assert packet["provider_root"] == (tmp_path / "connectors" / "repo-a").resolve().as_posix()
+    assert packet["source_index_exists"] is True
+
+
 def test_source_index_lookup_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
     state = seed_workspace(tmp_path)
     provider_map = state.provider_map()

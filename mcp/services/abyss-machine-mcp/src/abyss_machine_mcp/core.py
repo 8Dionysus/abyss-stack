@@ -479,9 +479,11 @@ def _summary(payload: Any) -> Any:
 def _surface_read_ok(surface: str, payload: Any, returncode: int) -> bool:
     if not isinstance(payload, dict):
         return False
+    schema = str(payload.get("schema") or "")
+    if surface == "artifact-trust-validate":
+        return returncode == 0 and schema == "abyss_machine_artifacts_validate_v1" and payload.get("ok") is True
     if returncode == 0 and payload.get("ok") is not False:
         return True
-    schema = str(payload.get("schema") or "")
     if surface.startswith("artifact-trust-"):
         return schema.startswith("abyss_machine_artifact")
     if surface == "memory-pressure":
