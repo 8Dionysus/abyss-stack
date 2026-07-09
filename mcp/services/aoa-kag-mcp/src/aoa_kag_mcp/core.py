@@ -172,8 +172,9 @@ class AoAKagMCPState:
             owner_return = surface.get("owner_return_route")
             owner_repo = owner_return.get("repo") if isinstance(owner_return, dict) else None
             surface_id = str(surface.get("surface_id") or "")
-            owner_provider_match = owner_repo == repo and surface.get("provider_status") == "provider_ready"
-            surface_match = surface_id == repo or surface_id.endswith(f"/{repo}")
+            provider_ready = surface.get("provider_status") == "provider_ready"
+            owner_provider_match = provider_ready and owner_repo == repo
+            surface_match = provider_ready and (surface_id == repo or surface_id.endswith(f"/{repo}"))
             if not owner_provider_match and not surface_match:
                 continue
             root = Path(str(surface.get("root"))).expanduser()

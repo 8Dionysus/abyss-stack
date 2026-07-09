@@ -456,6 +456,26 @@ class ArtifactManualReviewRunner(FakeRunner):
         return super().__call__(argv, timeout)
 
 
+class ArtifactValidateFailureRunner(FakeRunner):
+    def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+        key = tuple(argv[1:])
+        self.calls.append(key)
+        self.timeouts.append((key, timeout))
+        if key == ("artifacts", "validate", "--json"):
+            return CommandOutput(
+                argv=argv,
+                returncode=1,
+                stdout=json.dumps({
+                    "schema": "abyss_machine_artifacts_validate_v1",
+                    "ok": False,
+                    "summary": {"status": "fail", "fails": 1, "warnings": 0},
+                }),
+                stderr="artifact trust validation failed",
+                elapsed_ms=1.0,
+            )
+        return super().__call__(argv, timeout)
+
+
 class CoverageSourceContextUnsupportedRunner(FakeRunner):
     def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
         key = tuple(argv[1:])
@@ -573,6 +593,18 @@ def test_artifact_trust_manual_review_remains_readable_typed_surface() -> None:
     assert result["payload_ok"] is False
     assert result["ok"] is True
     assert result["payload_summary"]["deferred_with_real_blocker"] == 3
+
+
+def test_artifact_trust_validate_failure_fails_surface() -> None:
+    state = state_with_fake(ArtifactValidateFailureRunner())
+
+    result = state.surface("artifact-trust-validate")
+
+    assert result["returncode"] == 1
+    assert result["payload_parse_ok"] is True
+    assert result["payload_ok"] is False
+    assert result["ok"] is False
+    assert result["payload_summary"]["fails"] == 1
 
 
 def test_maps_tool_queries_axis_as_route_signals() -> None:

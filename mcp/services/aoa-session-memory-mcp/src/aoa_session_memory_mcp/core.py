@@ -34,6 +34,11 @@ def _source_mtime_epoch(*paths: Path) -> float | None:
     return max(mtimes) if mtimes else None
 
 
+def _core_auto_reload_enabled() -> bool:
+    value = os.environ.get("AOA_SESSION_MEMORY_MCP_AUTO_RELOAD", "1").strip().casefold()
+    return value not in {"0", "false", "no", "off"}
+
+
 def _linux_boot_epoch(proc_root: Path = Path("/proc")) -> float | None:
     try:
         for line in (proc_root / "stat").read_text(encoding="utf-8").splitlines():
@@ -2681,10 +2686,13 @@ class AoASessionMemoryMCPState:
 
     def session_mcp_transport_preflight(self, proc_root: Path = Path("/proc")) -> dict[str, Any]:
         package_root = MCP_CORE_SOURCE_PATH.parents[2]
+        core_auto_reload_enabled = _core_auto_reload_enabled()
         restart_required_sources = [
             MCP_SERVER_SOURCE_PATH,
             package_root / "scripts" / "aoa_session_memory_mcp_server.py",
         ]
+        if not core_auto_reload_enabled:
+            restart_required_sources.append(MCP_CORE_SOURCE_PATH)
         restart_source_mtime = max((path.stat().st_mtime for path in restart_required_sources if path.exists()), default=0.0)
         core_auto_reload_source_mtime = _source_mtime_epoch(MCP_CORE_SOURCE_PATH) or 0.0
         config_path = _codex_config_path()
@@ -2853,6 +2861,7 @@ class AoASessionMemoryMCPState:
             "runtime": self.runtime_identity(),
             "source_mtime_epoch": restart_source_mtime or None,
             "restart_required_source_mtime_epoch": restart_source_mtime or None,
+            "core_auto_reload_enabled": core_auto_reload_enabled,
             "core_auto_reload_source_mtime_epoch": core_auto_reload_source_mtime or None,
             "config_mtime_epoch": config_mtime or None,
             "direct_tool_transport_status": direct_status,
