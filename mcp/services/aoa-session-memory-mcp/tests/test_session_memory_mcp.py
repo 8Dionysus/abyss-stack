@@ -2167,6 +2167,7 @@ def test_maintenance_status_delegates_to_archive_status_route(tmp_path: Path) ->
     assert any(item["reason"] == "sqlite_index_build" for item in resource["operations"]["why_maintenance_long"])
 
     surfaces = state.available_surfaces()
+    assert "aoa_session_live_scenario_corpus_inventory" in surfaces["tools"]
     assert "aoa-session-memory://maintenance/status" in surfaces["resources"]
 
 
