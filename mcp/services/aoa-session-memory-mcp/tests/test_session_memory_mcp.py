@@ -1082,6 +1082,39 @@ SKILL_EVIDENCE_SUMMARY = {
     ),
 }
 
+STRUCTURED_SKILL_EVIDENCE_SUMMARY = {
+    **SKILL_EVIDENCE_SUMMARY,
+    "state_counts": {"selected": 1},
+    "association_state_counts": {"selected": 1},
+    "input_event_count": 1,
+    "unique_evidence_event_count": 1,
+    "unique_evidence_fact_count": 1,
+    "duplicate_evidence_association_count": 0,
+    "structured_skill_selection_event_count": 1,
+    "task_episode_link_event_count": 1,
+    "task_episode_ref_count": 1,
+    "task_episode_refs": [
+        {
+            "session_id": "session-skill",
+            "session_label": "2026-07-10__001__skill-evidence",
+            "task_episode_id": "task-0001",
+        }
+    ],
+    "task_episode_refs_truncated": False,
+    "dimensions": {
+        "prompt_visible_candidate_present": False,
+        "selection_candidate_present": True,
+        "structured_skill_selection_candidate_present": True,
+        "skill_payload_loaded_candidate_present": True,
+        "skill_read_candidate_present": False,
+        "procedure_candidate_present": False,
+        "verification_candidate_present": False,
+        "completion_candidate_present": False,
+        "deflection_candidate_present": False,
+        "task_episode_link_candidate_present": True,
+    },
+}
+
 SKILL_USAGE_EVENT = {
     "doc_id": "event:session-skill:000004",
     "source": "portable_sqlite",
@@ -1143,6 +1176,44 @@ SKILL_SELECTED_OUTCOME_EVENT = {
         "raw": "raw:line:5",
         "raw_block": "raw:block:5-5",
     },
+}
+
+STRUCTURED_SKILL_ENTRYPOINT_EVENT = {
+    **SKILL_USAGE_EVENT,
+    "doc_id": "event:session-skill:000009",
+    "source_doc_id": "event:session-skill:000009",
+    "distance": 0,
+    "relation": "selected_entrypoint",
+    "role": "entrypoint",
+    "event_id": "000009",
+    "event_type": "USER_INTENT",
+    "correlation_id": "",
+    "family": "communication",
+    "phase": "request",
+    "actor": "user",
+    "action": "select_skill",
+    "outcome": "observed",
+    "conversation_act": "structured_skill_selection",
+    "session_act": "skill_explicit_selection",
+    "task_episode_id": "task-0001",
+    "skill_evidence_state": "selected",
+    "usage_actions": ["selected", "loaded"],
+    "primary_usage_action": "selected",
+    "matched_routes": ["skill:aoa_eval_select"],
+    "route_signals": ["skill:aoa_eval_select"],
+    "title": "Structured skill selection: aoa-eval-select",
+    "snippet": (
+        "Embedded skill payload mentions validate, configured, failed, repaired, and used; "
+        "those procedure words are not behavioral evidence."
+    ),
+    "refs": {
+        "session": "sessions/skill/session.json",
+        "segment": "segments/000.md#event-000009",
+        "segment_index": "segments/000.index.json",
+        "raw": "raw:line:9",
+        "raw_block": "raw:block:9-9",
+    },
+    "content": "PRIVATE EMBEDDED SKILL BODY MUST NOT CROSS MCP",
 }
 
 SKILL_FALSE_CORRELATION_EVENTS = [
@@ -5302,6 +5373,203 @@ def test_skill_evidence_contract_survives_bounded_mcp_compaction(tmp_path: Path)
         assert "raw_transcript" not in encoded
 
 
+def test_structured_skill_evidence_survives_audit_chain_and_dossier_compaction() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    old_producer_evidence = core_module._compact_skill_evidence(SKILL_EVIDENCE_SUMMARY)
+    assert old_producer_evidence == SKILL_EVIDENCE_SUMMARY
+    assert "structured_skill_selection_event_count" not in old_producer_evidence
+    assert "task_episode_refs" not in old_producer_evidence
+
+    audit = core_module._compact_entity_usage_audit_payload(
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_audit",
+            "ok": True,
+            "mutates": False,
+            "truth_status": "session_memory_entity_usage_routes_to_evidence_not_reviewed_truth",
+            "anchor": "aoa-eval-select",
+            "kind": "skill",
+            "event_count": 1,
+            "entrypoint_event_count": 1,
+            "entrypoint_events": [STRUCTURED_SKILL_ENTRYPOINT_EVENT],
+            "skill_evidence": STRUCTURED_SKILL_EVIDENCE_SUMMARY,
+        },
+        full_route="python3 scripts/aoa_session_memory.py entity-usage-audit aoa-eval-select --kind skill --full",
+    )
+    chain = core_module._compact_entity_usage_chain_payload(
+        {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_chain",
+            "ok": True,
+            "mutates": False,
+            "truth_status": "session_memory_usage_chain_routes_to_evidence_not_reviewed_truth",
+            "anchor": "aoa-eval-select",
+            "kind": "skill",
+            "counts": {"entrypoint_event_count": 1, "usage_event_count": 0},
+            "skill_evidence": STRUCTURED_SKILL_EVIDENCE_SUMMARY,
+            "usage_action_counts": {"loaded": 1, "selected": 1},
+            "primary_usage_action_counts": {"selected": 1},
+            "usage_action_samples": {
+                "loaded": [STRUCTURED_SKILL_ENTRYPOINT_EVENT],
+                "selected": [STRUCTURED_SKILL_ENTRYPOINT_EVENT],
+            },
+            "usage_chain": {
+                "entrypoint_events": [STRUCTURED_SKILL_ENTRYPOINT_EVENT],
+                "chains": [],
+            },
+        },
+        full_route="python3 scripts/aoa_session_memory.py usage-chain aoa-eval-select --kind skill --full",
+    )
+    dossier_usage = core_module._compact_dossier_usage(audit)
+
+    for packet in (audit, chain, dossier_usage):
+        evidence = packet["skill_evidence"]
+        assert evidence["structured_skill_selection_event_count"] == 1
+        assert evidence["task_episode_link_event_count"] == 1
+        assert evidence["task_episode_ref_count"] == 1
+        assert evidence["task_episode_refs"] == [
+            {
+                "session_id": "session-skill",
+                "session_label": "2026-07-10__001__skill-evidence",
+                "task_episode_id": "task-0001",
+            }
+        ]
+        assert evidence["task_episode_refs_truncated"] is False
+        assert evidence["dimensions"]["structured_skill_selection_candidate_present"] is True
+        assert evidence["dimensions"]["skill_payload_loaded_candidate_present"] is True
+        assert evidence["dimensions"]["task_episode_link_candidate_present"] is True
+        assert evidence["dimensions"]["skill_read_candidate_present"] is False
+        assert evidence["behavioral_candidate_present"] is False
+        assert evidence["invocation_claim_allowed"] is False
+
+    audit_event = audit["entrypoint_events"][0]
+    chain_event = chain["usage_chain"]["entrypoint_events"][0]
+    for event in (audit_event, chain_event):
+        assert event["session_act"] == "skill_explicit_selection"
+        assert event["task_episode_id"] == "task-0001"
+        assert event["skill_evidence_state"] == "selected"
+        assert event["usage_actions"] == ["selected", "loaded"]
+        assert event["primary_usage_action"] == "selected"
+        assert event["refs"] == {
+            "session": "sessions/skill/session.json",
+            "segment": "segments/000.md#event-000009",
+            "segment_index": "segments/000.index.json",
+            "raw": "raw:line:9",
+            "raw_block": "raw:block:9-9",
+        }
+        assert not {
+            "validated",
+            "used",
+            "configured",
+            "failed",
+            "repaired",
+        }.intersection(event["usage_actions"])
+
+    assert chain["usage_action_counts"] == {"selected": 1, "loaded": 1}
+    assert chain["primary_usage_action_counts"] == {"selected": 1}
+    encoded = json.dumps({"audit": audit, "chain": chain, "dossier": dossier_usage})
+    assert "PRIVATE EMBEDDED SKILL BODY MUST NOT CROSS MCP" not in encoded
+
+
+def test_skill_evidence_task_episode_refs_keep_session_identity() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    evidence = {
+        "schema_version": "skill_usage_evidence_v1",
+        "candidate_only": True,
+        "task_episode_link_event_count": 2,
+        "task_episode_ref_count": 2,
+        "task_episode_refs": [
+            {"session_id": "session-a", "task_episode_id": "task-0001"},
+            {"session_id": "session-b", "task_episode_id": "task-0001"},
+        ],
+        "task_episode_refs_truncated": False,
+        "dimensions": {"task_episode_link_candidate_present": True},
+        "invocation_claim_allowed": False,
+    }
+
+    compact = core_module._compact_skill_evidence(evidence)
+
+    assert compact["task_episode_link_event_count"] == 2
+    assert compact["task_episode_ref_count"] == 2
+    assert compact["task_episode_refs"] == [
+        {"session_id": "session-a", "task_episode_id": "task-0001"},
+        {"session_id": "session-b", "task_episode_id": "task-0001"},
+    ]
+    assert compact["task_episode_refs_truncated"] is False
+    assert compact["dimensions"]["task_episode_link_candidate_present"] is True
+    assert compact["invocation_claim_allowed"] is False
+
+
+def test_skill_evidence_task_episode_refs_remain_bounded_with_omission_counts() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    refs = [
+        {"session_id": f"session-{index:02d}", "task_episode_id": "task-0001"}
+        for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT + 3)
+    ]
+    compact = core_module._compact_skill_evidence(
+        {
+            "schema_version": "skill_usage_evidence_v1",
+            "candidate_only": True,
+            "task_episode_link_event_count": len(refs),
+            "task_episode_ref_count": 0,
+            "task_episode_refs": refs,
+            "task_episode_refs_truncated": False,
+            "invocation_claim_allowed": False,
+        }
+    )
+
+    assert compact["task_episode_link_event_count"] == 15
+    assert compact["task_episode_ref_count"] == 15
+    assert len(compact["task_episode_refs"]) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert compact["task_episode_refs"][0] == {
+        "session_id": "session-00",
+        "task_episode_id": "task-0001",
+    }
+    assert compact["task_episode_refs"][1] == {
+        "session_id": "session-01",
+        "task_episode_id": "task-0001",
+    }
+    assert compact["omitted_task_episode_ref_count"] == 3
+    assert compact["task_episode_refs_truncated"] is True
+    assert compact["invocation_claim_allowed"] is False
+
+
+def test_skill_evidence_task_episode_refs_validate_before_bounding() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    refs = [
+        {"task_episode_id": f"invalid-{index:02d}"}
+        for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT)
+    ] + [
+        {"session_id": f"later-session-{index}", "task_episode_id": "task-0001"}
+        for index in range(3)
+    ]
+
+    compact = core_module._compact_skill_evidence(
+        {
+            "schema_version": "skill_usage_evidence_v1",
+            "candidate_only": True,
+            "task_episode_link_event_count": len(refs),
+            "task_episode_ref_count": len(refs),
+            "task_episode_refs": refs,
+            "task_episode_refs_truncated": False,
+            "invocation_claim_allowed": False,
+        }
+    )
+
+    assert compact["task_episode_ref_count"] == 15
+    assert compact["task_episode_refs"] == [
+        {"session_id": "later-session-0", "task_episode_id": "task-0001"},
+        {"session_id": "later-session-1", "task_episode_id": "task-0001"},
+        {"session_id": "later-session-2", "task_episode_id": "task-0001"},
+    ]
+    assert compact["omitted_task_episode_ref_count"] == 12
+    assert compact["task_episode_refs_truncated"] is True
+
+
 def test_usage_action_count_compactor_is_bounded() -> None:
     from aoa_session_memory_mcp import core as core_module
 
@@ -5310,7 +5578,7 @@ def test_usage_action_count_compactor_is_bounded() -> None:
     )
 
     assert len(compact) == core_module.ENTITY_USAGE_ACTION_LIMIT
-    assert list(compact) == [f"action_{index}" for index in range(12)]
+    assert list(compact) == sorted(f"action_{index}" for index in range(15))[:12]
     assert omitted == 3
 
 
@@ -5335,12 +5603,97 @@ def test_usage_action_sample_compactor_bounds_action_buckets() -> None:
     )
 
     assert len(compact) == core_module.ENTITY_USAGE_ACTION_LIMIT
-    assert list(compact) == [
-        f"action_{index}" for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT)
-    ]
+    assert list(compact) == sorted(
+        f"action_{index}" for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT + 3)
+    )[:core_module.ENTITY_USAGE_ACTION_LIMIT]
     assert len(omitted_samples) == core_module.ENTITY_USAGE_ACTION_LIMIT
     assert set(omitted_samples.values()) == {1}
     assert omitted_buckets == 3
+
+
+def test_usage_action_sample_compactor_reports_bounded_key_collisions() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    common_prefix = "x" * 80
+    first_key = common_prefix + "-a"
+    second_key = common_prefix + "-b"
+    bounded_key = core_module._bounded_string(first_key, 80)
+
+    compact, omitted_samples, omitted_buckets = core_module._compact_usage_action_samples(
+        {
+            second_key: [{"event_id": "second", "refs": {"raw": "raw:line:2"}}],
+            "selected": [{"event_id": "selected", "refs": {"raw": "raw:line:3"}}],
+            first_key: [{"event_id": "first", "refs": {"raw": "raw:line:1"}}],
+            "context": [{"event_id": "context", "refs": {"raw": "raw:line:4"}}],
+        }
+    )
+
+    assert bounded_key is not None
+    assert list(compact) == ["selected", bounded_key, "context"]
+    assert compact[bounded_key][0]["event_id"] == "first"
+    assert omitted_samples == {}
+    assert omitted_buckets == 1
+
+
+def test_usage_action_compactors_prioritize_semantics_before_weak_buckets() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    actions = [
+        "context",
+        "cooccurrence",
+        "mentioned",
+        "prompt_visible",
+        "skill_read",
+        "selected",
+        "loaded",
+        "procedure_observed",
+        "verified",
+        "completed",
+        "called",
+        "used",
+        "validated",
+        "repaired",
+        "failed",
+    ]
+    expected = [
+        "selected",
+        "loaded",
+        "completed",
+        "verified",
+        "procedure_observed",
+        "failed",
+        "repaired",
+        "validated",
+        "called",
+        "used",
+        "skill_read",
+        "prompt_visible",
+    ]
+
+    compact_counts, omitted_count = core_module._compact_usage_action_counts(
+        {action: index + 1 for index, action in enumerate(actions)}
+    )
+    compact_samples, omitted_samples, omitted_buckets = core_module._compact_usage_action_samples(
+        {
+            action: [
+                {"event_id": f"{action}-0", "refs": {"raw": f"raw:{action}:0"}},
+                {"event_id": f"{action}-1"},
+                {"event_id": f"{action}-2"},
+                {"event_id": f"{action}-3"},
+            ]
+            for action in actions
+        }
+    )
+
+    assert core_module.ENTITY_USAGE_ACTION_LIMIT == 12
+    assert list(compact_counts) == expected
+    assert list(compact_samples) == expected
+    assert omitted_count == 3
+    assert omitted_buckets == 3
+    assert set(omitted_samples) == set(expected)
+    assert set(omitted_samples.values()) == {1}
+    assert "context" not in compact_counts
+    assert "cooccurrence" not in compact_counts
 
 
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:

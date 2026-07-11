@@ -127,6 +127,23 @@ boundary visible, bounds event/action samples, and does not copy arbitrary raw
 transcript body fields into the response. `full=true` remains the explicit
 archive expansion route when the compact samples are insufficient.
 
+For a producer-classified Codex structured skill input, MCP preserves the
+`skill_explicit_selection` entrypoint, `selected` plus `loaded` action pair,
+structured-selection dimensions, bounded composite task-episode refs, and
+raw/segment/session refs. Here `loaded` means only that the full skill payload
+was embedded in the structured input envelope. It does not mean the model read
+the skill through a file-read event, followed its procedure, completed the
+task, or produced an effective outcome. Composite task-episode refs retain
+session identity so equal local episode ids from different sessions do not
+collapse; the link remains candidate evidence and does not permit an invocation
+claim.
+
+When the producer returns more action buckets than the compact packet can
+carry, MCP applies a deterministic semantic priority. Selection/load and
+behaviorally meaningful actions are retained before weak mention,
+cooccurrence, or context buckets; omission counts remain explicit. This is a
+transport ordering rule, not MCP-side reclassification or proof.
+
 `aoa_session_memory_status()` uses a fast search read-model presence probe. It
 checks that the portable SQLite search surface, route index, atlas, and latest
 diagnostic pointers are available, but it does not run global search freshness.

@@ -85,6 +85,17 @@ than becoming accepted consequences. This transport contract does not let MCP
 decide whether a skill was effective, invoked, verified, or complete, and it
 does not widen compact packets to arbitrary raw transcript body fields.
 
+Structured Codex skill input is transported as an explicit selection
+candidate. Its `loaded` action means the skill payload was embedded in the
+structured input envelope; it is distinct from `skill_read`, procedure
+observation, completion, and effectiveness. Bounded task-episode links use
+composite session-plus-episode refs so repeated local episode ids cannot merge
+across sessions. They remain candidate-only correlation metadata. When action
+buckets exceed the packet limit, a deterministic semantic priority keeps
+selection/load and stronger behavioral signals ahead of weak context or
+cooccurrence buckets while preserving omission counts; MCP still does not
+reclassify producer evidence or compute a verdict.
+
 Agent-event and lightweight usage-neighborhood routes have MCP-local fast
 paths over the portable SQLite projection. They are deliberately bounded:
 session-scoped answer/closeout/progress/reasoning packets can return zero
