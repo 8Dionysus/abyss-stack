@@ -64,6 +64,12 @@ The allowlists keep the bridge light and reviewable. Future agents can see which
 units are source-managed, while operators still decide when to install, enable,
 or restart them on a real machine.
 
+For sibling-service adapters, reproducibility means preserving the deployed
+invocation route and scheduling trigger, not freezing sibling-internal input
+selection in this repository. When the sibling command owns a stable default
+registry or inventory, the unit should delegate to it so the owner can evolve
+its admitted sources without a second authority forming here.
+
 ## Consequences
 
 - Config sync now projects `systemd/` as a source-managed runtime surface.
@@ -74,6 +80,9 @@ or restart them on a real machine.
   enabling or restarting them.
 - Unit files may consume host-owned commands such as `abyss-machine`, but those
   commands remain outside this repository's implementation authority.
+- Unit files that invoke sibling-owned commands keep only the public command
+  boundary here; sibling-internal registry, inventory, and source-selection
+  defaults remain with the sibling owner.
 - Per-machine overrides, runtime-selection drop-ins, enablement state, and live
   service status remain host-local.
 

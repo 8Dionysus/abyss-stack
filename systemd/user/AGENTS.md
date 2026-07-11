@@ -19,6 +19,10 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 - Host-service adapters may call host-owned commands such as `abyss-machine`.
   Keep those commands as consumed dependencies; do not copy host-layer logic or
   private state into this repository.
+- Sibling-service adapters own scheduling and the deployed invocation route,
+  not the sibling's internal input selection. Prefer the sibling command's
+  public defaults over pinning its private registry, inventory, or config paths
+  in a unit skeleton.
 
 ## Unit rules
 - Preserve the rootless Fedora-first posture. Do not convert these into privileged or system-wide service assumptions casually.
@@ -31,6 +35,9 @@ This directory stores rootless `systemd --user` unit skeletons for the deployed 
 - If the unit name, install path, or install behavior changes, update `scripts/aoa-install-systemd`, `systemd/user/managed-units.txt`, and `systemd/user/README.md`.
 - If lifecycle semantics change, update `docs/operations/LIFECYCLE.md` and `docs/install/DEPLOYMENT.md`.
 - Keep the deployed-path assumption explicit. The unit should continue to run from the deployed runtime tree, not from a working checkout.
+- When a unit watches sibling-owned inputs or passes sibling CLI options,
+  reconcile it with the current sibling contract and add a deterministic source
+  test for the exact adapter boundary.
 
 ## Install routes
 

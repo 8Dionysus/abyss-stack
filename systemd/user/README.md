@@ -64,6 +64,12 @@ The current allowlist covers the local working surface:
 - `ydotoold.service` for dictation paste support
 - AoA closeout and stats path units that watch owner-local receipt surfaces
 
+The `aoa-stats-live-refresh` pair owns only the runtime trigger and the deployed
+command route. Its path unit mirrors the receipt surfaces currently admitted by
+`aoa-stats`; its service invokes the deployed refresh command without an
+explicit registry argument, leaving canonical registry selection with the
+sibling owner.
+
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.
 
