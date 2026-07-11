@@ -32,7 +32,7 @@ runtime-candidate contracts. It gives agents one repeatable route to ask:
 | `aoa-evals` runtime-candidate readers | candidate evidence and artifact hook templates |
 | `aoa-evals` readiness dashboard | Eval Forge front-door refs, commands, candidate queue routes, and non-proof stop lines |
 | `abyss-stack/Logs/eval-exports` | private runtime candidate exports produced by governed execution |
-| sibling repo `evals/` ports | repo-local eval pressure, suite notes, report notes, and intake drafts |
+| sibling repo `evals/` ports | repo-local eval pressure, suite notes, execution sidecars, report notes, and intake drafts |
 | `aoa-evals-mcp` | live MCP access plane over those surfaces, with narrow local-port write gates |
 
 ## MCP Surface
@@ -102,6 +102,14 @@ The service does not run evals, compute verdicts, publish receipts, promote
 bundles, ingest or accept evidence, approve proposals, create central bundles,
 or mutate `aoa-evals`.
 
+Local suite execution sidecars are inspect-only through MCP. A `ready` suite
+means only that the current `aoa-evals` owner builder found a fresh reviewed
+source contract. MCP forces execution, proof, promotion, runtime
+reproducibility, and sidecar-write authority off; it never invokes
+`runner.argv`. The repo owner or `aoa-eval-apply` must JIT-revalidate the
+sidecar and tracked hashes, capture the environment, and write an execution
+receipt before any separate owner-local run.
+
 `aoa_evals_forge_access_packet` and `aoa-evals://forge-access` expose the
 current Eval Forge front door as access-plane data: selected `aoa-evals` root
 and freshness state, readiness summary, active local-port routes, candidate
@@ -117,10 +125,14 @@ owner, and returns `inventory_status`, `pressure_counts`,
 `validation_issues`, `central_eval_name_matches`, and `route_recommendation`.
 Those recommendations are advisory routing evidence; direct repo inspection and
 central `aoa-evals` review still own any mutation or proof adoption.
-The inventory shape is locked to
-`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v1.json`;
-MCP reports the loaded contract metadata and treats missing contract data as a
-degraded fallback, not as a new source of truth.
+The current inventory shape is locked to
+`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v2.json` and
+is produced through the selected `aoa-evals` source checkout. MCP accepts the
+historical v1 contract for compatibility, but v1, unknown, invalid-authority,
+or degraded fallback input always maps suite execution to `absent`; suite-note
+counts never imply runnable posture. MCP reports producer/compatibility
+metadata and treats a missing or failed owner builder as a degraded read path,
+not as a new source of truth.
 
 In the shared AoA Codex plane this service is registered as `aoa_evals` through
 `8Dionysus:config/codex_plane/runtime_manifest.v1.json`. The workspace launcher

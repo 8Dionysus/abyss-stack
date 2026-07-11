@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- `aoa-evals-mcp` now consumes the `aoa-evals` local-port inventory v2 read
+  model, exposing source-contract-ready, stale, invalid, or absent local suite
+  execution posture without running suite commands or widening the local-port
+  write allowlist; v1 and unknown inputs fail closed to `absent`.
 - `aoa-kag-mcp` now exposes each provider's source, entity, artifact, and event
   index family plus optional owner-native domain index catalogs through bounded
   read-only tools, resources, and CLI routes.

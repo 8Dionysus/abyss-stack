@@ -17,6 +17,8 @@
 | local inventory causes unsafe repo mutation | inventory is read-only routing evidence; write tools remain gated and port-scoped |
 | path traversal or unintended overwrite through local-port writes | repo IDs must resolve under the workspace, explicit file slugs reject path syntax, and existing files require `replace_existing=true` |
 | workspace scan leaks runtime-heavy/private state | local-port discovery scans Git roots with ignored worktree, model, log, service, and bundle paths |
+| legacy or injected inventory claims a runnable suite | only valid v2 owner inventory may carry suite posture; v1, unknown, and invalid-authority input maps to `absent`, while conflicting paths, owners, authority flags, or runner grammar map to `invalid` |
+| a readable suite command becomes executable MCP authority | MCP marks execution and sidecar writes forbidden, never invokes `runner.argv`, and keeps `evals/suites/*.suite.json` outside all write globs |
 
 ## Trust Boundary
 

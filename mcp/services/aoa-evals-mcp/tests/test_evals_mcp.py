@@ -152,6 +152,220 @@ def local_port_inventory_contract() -> dict[str, object]:
     }
 
 
+def local_port_inventory_contract_v2() -> dict[str, object]:
+    contract = local_port_inventory_contract()
+    proof_boundary = "central proof adoption, verdicts, scoring, regression, and proof doctrine stay in aoa-evals"
+
+    def route(route_key: str, route_name: str, subskill: str, action: str) -> dict[str, str]:
+        return {
+            "route_key": route_key,
+            "route": route_name,
+            "subskill": subskill,
+            "action": action,
+            "proof_boundary": proof_boundary,
+        }
+
+    contract.update(
+        {
+            "schema_version": "aoa_local_eval_port_inventory_contract_v2",
+            "inventory_schema_version": "os_abyss_local_eval_port_inventory_v2",
+            "execution_boundary": (
+                "Inventory and MCP consumers inspect suite execution contracts but never invoke "
+                "runner.argv. Ready means source-contract-ready only."
+            ),
+            "compatibility": {
+                "previous_contract_ref": "docs/architecture/local_eval_port_inventory.contract.v1.json",
+                "current_contract_ref": "docs/architecture/local_eval_port_inventory.contract.v2.json",
+                "accepted_contract_schema_versions": [
+                    "aoa_local_eval_port_inventory_contract_v1",
+                    "aoa_local_eval_port_inventory_contract_v2",
+                ],
+                "accepted_inventory_schema_versions": [
+                    "os_abyss_local_eval_port_inventory_v1",
+                    "os_abyss_local_eval_port_inventory_v2",
+                ],
+                "v1_fallback_suite_execution_state": "absent",
+            },
+            "suite_execution_states": ["absent", "invalid", "stale", "ready"],
+            "suite_execution_aggregate_priority": ["invalid", "stale", "ready", "absent"],
+            "summary_keys": [
+                *contract["summary_keys"],
+                "suite_execution_absent",
+                "suite_execution_invalid",
+                "suite_execution_stale",
+                "suite_execution_ready",
+            ],
+            "pressure_count_keys": [
+                "intake_packets",
+                "suite_notes",
+                "suite_execution_contracts",
+                "report_notes",
+                "local_bundles",
+                "active_total",
+            ],
+            "source_of_truth": {
+                **contract["source_of_truth"],
+                "local_suite_execution_schema": (
+                    "mechanics/proof-object/parts/eval-authoring/schemas/"
+                    "local-eval-suite-execution.schema.json"
+                ),
+                "inventory_contract": "docs/architecture/local_eval_port_inventory.contract.v2.json",
+            },
+        }
+    )
+    contract["route_recommendations"] = [
+        *[
+            item
+            for item in contract["route_recommendations"]
+            if item["route_key"] != "active_suite_apply_or_regression_check"
+        ],
+        route(
+            "active_suite_note_review_or_execution_contract_design",
+            "aoa-eval-design",
+            "aoa-eval-design",
+            "Treat a suite note as design pressure until a reviewed sidecar is ready.",
+        ),
+        route(
+            "active_suite_contract_invalid_repair",
+            "repair-local-suite-execution-contract",
+            "aoa-eval-apply",
+            "Repair the local suite execution contract before owner-local invocation.",
+        ),
+        route(
+            "active_suite_contract_stale_review",
+            "refresh-local-suite-execution-contract",
+            "aoa-eval-apply",
+            "Review changed tracked sources before owner-local invocation.",
+        ),
+        route(
+            "active_suite_apply_or_regression_check",
+            "aoa-eval-apply",
+            "aoa-eval-apply",
+            "Route source-contract-ready metadata to owner/apply for JIT revalidation only.",
+        ),
+    ]
+    return contract
+
+
+def ready_suite_execution(*, owner_repo: str = "aoa-skills") -> dict[str, object]:
+    runner = {
+        "kind": "python_pytest",
+        "argv": ["python", "-B", "-m", "pytest", "-q", "tests/guardrail.py"],
+        "cwd": ".",
+    }
+    suite = {
+        "path": "evals/suites/guardrail.suite.json",
+        "suite_id": "guardrail",
+        "state": "ready",
+        "entrypoint_ref": "tests/guardrail.py",
+        "entrypoint_arg": "tests/guardrail.py",
+        "runner": runner,
+        "timeout_seconds": 120,
+        "success_exit_codes": [0],
+        "stale_sources": [],
+        "issues": [],
+        "auto_run_allowed": False,
+        "proof_authority": False,
+        "promotion_allowed": False,
+        "readiness_scope": "source-contract-ready",
+        "runtime_reproducibility_proven": False,
+        "jit_revalidation_required": True,
+        "environment_capture_required": True,
+        "execution_receipt_required": True,
+        "authority_boundary": (
+            "owner-local execution support only; no verdict, scoring, regression, proof "
+            "doctrine, proof acceptance, or promotion authority"
+        ),
+    }
+    return {
+        "schema_version": "local_eval_suite_execution_inventory_v1",
+        "state": "ready",
+        "canonical_owner_repo": owner_repo,
+        "owner_identity_sources": ["git_common_dir", "git_origin"],
+        "state_vocabulary": ["absent", "invalid", "stale", "ready"],
+        "aggregate_priority": ["invalid", "stale", "ready", "absent"],
+        "suite_count": 1,
+        "invalid_count": 0,
+        "stale_count": 0,
+        "ready_count": 1,
+        "suites": [suite],
+        "issues": [],
+        "auto_run_allowed": False,
+        "inventory_executed_runner": False,
+        "proof_authority": False,
+        "promotion_allowed": False,
+        "readiness_scope": "source-contract-ready",
+        "runtime_reproducibility_proven": False,
+        "jit_revalidation_required": True,
+        "environment_capture_required": True,
+        "execution_receipt_required": True,
+    }
+
+
+def owner_inventory_payload(
+    repo_root: Path,
+    suite_execution: dict[str, object],
+    *,
+    schema_version: str = "os_abyss_local_eval_port_inventory_v2",
+    proof_owner_repo: str = "aoa-evals",
+) -> dict[str, object]:
+    return {
+        "contract_schema_version": "aoa_local_eval_port_inventory_contract_v2",
+        "schema_version": schema_version,
+        "layer": "aoa-evals-local-port-inventory",
+        "workspace_root": repo_root.parent.as_posix(),
+        "proof_owner_repo": proof_owner_repo,
+        "authority_boundary": (
+            "Repo-local eval ports carry intake, suites, reports, and pressure evidence only. "
+            "Central verdict, scoring, regression, proof doctrine, and central bundle adoption remain in aoa-evals."
+        ),
+        "summary": {},
+        "excluded_repos": [],
+        "repos": [
+            {
+                "repo": repo_root.name,
+                "canonical_owner_repo": "aoa-skills",
+                "owner_identity_sources": ["git_common_dir", "git_origin"],
+                "repo_path": repo_root.name,
+                "repo_id": repo_root.name,
+                "root": repo_root.as_posix(),
+                "port_path": "evals/PORT.yaml",
+                "inventory_status": "active",
+                "validator_ok": True,
+                "blocked_by_suite_execution": False,
+                "declared_status": "active",
+                "pressure_counts": {
+                    "intake_packets": 0,
+                    "suite_notes": 1,
+                    "suite_execution_contracts": 1,
+                    "report_notes": 0,
+                    "local_bundles": 0,
+                    "active_total": 2,
+                },
+                "owner_boundary": {
+                    "schema_version": "local_eval_port_v1",
+                    "owner_repo": "aoa-skills",
+                    "proof_owner_repo": "aoa-evals",
+                    "default_intake_schema": "eval_need_v1",
+                    "local_role": "repo-local eval pressure, fixtures, suites, and reports",
+                    "central_boundary": "no verdict, scoring, regression, or proof doctrine authority",
+                    "central_proof_boundary_ok": True,
+                },
+                "suite_execution": suite_execution,
+                "central_eval_name_matches": [],
+                "validation_issues": [],
+                "route_recommendation": {
+                    "route_key": "active_suite_apply_or_regression_check",
+                    "route": "aoa-eval-apply",
+                    "subskill": "aoa-eval-apply",
+                    "action": "owner/apply after JIT revalidation",
+                    "proof_boundary": "ready is not central proof",
+                },
+            }
+        ],
+    }
+
+
 def seed_local_eval_port(root: Path, repo: str = "aoa-memo", *, status: str = "skeleton") -> Path:
     repo_root = root / repo
     (repo_root / ".git").mkdir(parents=True, exist_ok=True)
@@ -487,6 +701,14 @@ def seed_evals(root: Path) -> None:
                 },
             ],
         },
+    )
+
+
+def seed_evals_v2(root: Path) -> None:
+    seed_evals(root)
+    write_json(
+        root / "aoa-evals/docs/architecture/local_eval_port_inventory.contract.v2.json",
+        local_port_inventory_contract_v2(),
     )
 
 
@@ -1166,6 +1388,229 @@ def test_runtime_candidate_exports_report_shape_invalid_private_candidates(tmp_p
     assert detail["candidate_payload_included"] is False
     assert detail["validation"]["valid"] is False
     assert "candidate_payload" not in detail
+
+
+def test_local_ports_v2_exposes_ready_suite_as_inspect_only_without_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals_v2(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, repo="aoa-skills", status="active")
+    write_text(
+        repo_root / "evals/suites/guardrail.suite.md",
+        """---
+schema_version: local_eval_suite_note_v1
+owner_repo: aoa-skills
+status: reviewed
+authority_boundary: no verdict, scoring, regression, or proof doctrine authority
+---
+
+# Guardrail
+""",
+    )
+    marker = repo_root / "executed.marker"
+    write_text(
+        repo_root / "tests/guardrail.py",
+        "from pathlib import Path\nPath('executed.marker').write_text('ran')\n",
+    )
+    execution = ready_suite_execution()
+    payload = owner_inventory_payload(repo_root, execution)
+    monkeypatch.setattr(
+        AoAEvalsMCPState,
+        "_owner_local_port_inventory_payload",
+        lambda self: (payload, None, "fixture:aoa-evals-v2-builder"),
+        raising=False,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    listing = state.local_ports()
+    entry = listing["ports"][0]
+
+    assert listing["inventory_contract"]["schema_version"] == "aoa_local_eval_port_inventory_contract_v2"
+    assert listing["inventory_schema_version"] == "os_abyss_local_eval_port_inventory_v2"
+    assert listing["summary"]["suite_execution_ready"] == 1
+    assert entry["suite_execution"]["state"] == "ready"
+    assert entry["suite_execution"]["execution_allowed"] is False
+    assert entry["suite_execution"]["suite_sidecar_write_allowed"] is False
+    assert entry["suite_execution"]["owner_apply_required"] is True
+    assert entry["suite_execution"]["proof_authority"] is False
+    assert entry["suite_execution"]["promotion_allowed"] is False
+    assert entry["suite_execution"]["runtime_reproducibility_proven"] is False
+    assert entry["suite_execution"]["suites"][0]["runner"]["argv"][-1] == "tests/guardrail.py"
+    assert entry["route_recommendation"]["route_key"] == "active_suite_apply_or_regression_check"
+
+    detail = state.local_port("aoa-skills")
+    assert detail["suite_execution"]["state"] == "ready"
+    assert detail["suite_execution"]["execution_allowed"] is False
+    suites = state.read_resource("aoa-evals://local-port/aoa-skills/suites")
+    assert suites["suite_execution"]["state"] == "ready"
+    assert suites["suite_execution"]["execution_allowed"] is False
+
+    dry_write = state.write_local_report_note(
+        "aoa-skills",
+        "guardrail-observation",
+        "Guardrail observation",
+        "Inspect-only consumer compatibility observation.",
+        "# Guardrail observation\n",
+        apply=False,
+    )
+    assert "evals/suites/*.suite.json" not in dry_write["write_receipt"]["allowed_relative_globs"]
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize(
+    "source_schema",
+    ["os_abyss_local_eval_port_inventory_v1", "unknown_inventory_schema_v9"],
+)
+def test_local_ports_downgrades_v1_or_unknown_injected_ready_to_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_schema: str,
+) -> None:
+    seed_evals_v2(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, repo="aoa-skills", status="active")
+    write_text(
+        repo_root / "evals/suites/guardrail.suite.md",
+        """---
+schema_version: local_eval_suite_note_v1
+owner_repo: aoa-skills
+status: draft
+authority_boundary: no verdict, scoring, regression, or proof doctrine authority
+---
+
+# Guardrail
+""",
+    )
+    payload = owner_inventory_payload(
+        repo_root,
+        ready_suite_execution(),
+        schema_version=source_schema,
+    )
+    monkeypatch.setattr(
+        AoAEvalsMCPState,
+        "_owner_local_port_inventory_payload",
+        lambda self: (payload, None, "fixture:legacy-or-unknown-builder"),
+        raising=False,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    entry = state.local_ports()["ports"][0]
+
+    assert entry["suite_execution"]["state"] == "absent"
+    assert entry["suite_execution"]["ready_count"] == 0
+    assert entry["suite_execution"]["execution_allowed"] is False
+    assert entry["suite_execution"]["owner_apply_required"] is False
+    assert entry["route_recommendation"]["route_key"] == "active_suite_note_review_or_execution_contract_design"
+
+
+def test_local_ports_rejects_invalid_inventory_or_suite_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_evals_v2(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, repo="aoa-skills", status="active")
+    write_text(
+        repo_root / "evals/suites/guardrail.suite.md",
+        """---
+schema_version: local_eval_suite_note_v1
+owner_repo: aoa-skills
+status: reviewed
+authority_boundary: no verdict, scoring, regression, or proof doctrine authority
+---
+
+# Guardrail
+""",
+    )
+    invalid_inventory = owner_inventory_payload(
+        repo_root,
+        ready_suite_execution(),
+        proof_owner_repo="aoa-skills",
+    )
+    monkeypatch.setattr(
+        AoAEvalsMCPState,
+        "_owner_local_port_inventory_payload",
+        lambda self: (invalid_inventory, None, "fixture:invalid-authority"),
+        raising=False,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    downgraded = state.local_ports()
+    downgraded_entry = downgraded["ports"][0]
+    assert downgraded["producer_validation"]["valid"] is False
+    assert downgraded_entry["suite_execution"]["state"] == "absent"
+    assert downgraded_entry["route_recommendation"]["route_key"] != "active_suite_apply_or_regression_check"
+
+    invalid_suite = ready_suite_execution()
+    invalid_suite["proof_authority"] = True
+    invalid_payload = owner_inventory_payload(repo_root, invalid_suite)
+    monkeypatch.setattr(
+        AoAEvalsMCPState,
+        "_owner_local_port_inventory_payload",
+        lambda self: (invalid_payload, None, "fixture:invalid-suite-authority"),
+        raising=False,
+    )
+
+    blocked_entry = state.local_ports()["ports"][0]
+    assert blocked_entry["suite_execution"]["state"] == "invalid"
+    assert blocked_entry["suite_execution"]["proof_authority"] is False
+    assert blocked_entry["suite_execution"]["execution_allowed"] is False
+    assert blocked_entry["route_recommendation"]["route_key"] == "active_suite_contract_invalid_repair"
+    assert state.local_ports()["summary"]["validator_failed"] == 1
+
+
+@pytest.mark.parametrize("conflict", ["path", "owner", "plugin", "type"])
+def test_local_ports_blocks_conflicting_v2_suite_identity_paths_or_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    conflict: str,
+) -> None:
+    seed_evals_v2(tmp_path)
+    repo_root = seed_local_eval_port(tmp_path, repo="aoa-skills", status="active")
+    write_text(
+        repo_root / "evals/suites/guardrail.suite.md",
+        """---
+schema_version: local_eval_suite_note_v1
+owner_repo: aoa-skills
+status: reviewed
+authority_boundary: no verdict, scoring, regression, or proof doctrine authority
+---
+
+# Guardrail
+""",
+    )
+    execution = ready_suite_execution()
+    if conflict == "path":
+        execution["suites"][0]["path"] = "/tmp/injected.suite.json"
+        execution["suites"][0]["entrypoint_arg"] = "../outside.py"
+    elif conflict == "owner":
+        execution["canonical_owner_repo"] = "aoa-other"
+    elif conflict == "plugin":
+        execution["suites"][0]["runner"]["argv"] = [
+            "python",
+            "-m",
+            "pytest",
+            "-p",
+            "untrusted_plugin",
+            "tests/guardrail.py",
+        ]
+    else:
+        execution["suites"][0]["entrypoint_arg"] = 7
+    payload = owner_inventory_payload(repo_root, execution)
+    monkeypatch.setattr(
+        AoAEvalsMCPState,
+        "_owner_local_port_inventory_payload",
+        lambda self: (payload, None, f"fixture:conflicting-{conflict}"),
+        raising=False,
+    )
+    state = AoAEvalsMCPState.discover(workspace_root=tmp_path)
+
+    entry = state.local_ports()["ports"][0]
+
+    assert entry["suite_execution"]["state"] == "invalid"
+    assert entry["suite_execution"]["execution_allowed"] is False
+    assert entry["suite_execution"]["owner_apply_required"] is False
+    assert entry["route_recommendation"]["route_key"] == "active_suite_contract_invalid_repair"
+    assert entry["suite_execution"]["consumer_validation_issues"]
 
 
 def test_local_ports_are_first_class_resources(tmp_path: Path) -> None:

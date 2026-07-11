@@ -117,13 +117,21 @@ and a route recommendation such as `valid_skeleton_keep_dormant`,
 The recommendation is a routing hint only. It must not promote local pressure,
 accept evidence, compute a verdict, or create central bundles.
 
-The producer/consumer lock for this read-model is
-`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v1.json`.
+The current producer/consumer lock for this read-model is
+`aoa-evals:docs/architecture/local_eval_port_inventory.contract.v2.json`.
 `aoa-evals` owns the status vocabulary, summary keys, route keys, discovery
-ignore policy, and authority boundary. The MCP implementation loads that
-contract from the selected source or mirror root, reports the loaded contract
-metadata, and uses fallback constants only when older mirrors have not yet
-carried the contract.
+ignore policy, suite execution contract, and authority boundary. From a source
+checkout MCP asks the owner builder for the inventory, then applies a bounded
+fail-closed consumer projection. It does not rescan a v2 inventory into a
+stronger local truth.
+
+V2 may expose aggregate suite execution as `absent`, `invalid`, `stale`, or
+`ready`. `ready` is source-contract readiness only: MCP never invokes the
+typed `python_pytest` argv, never writes execution sidecars, and never claims a
+pinned interpreter, dependency runtime, verdict, score, regression, or proof
+acceptance. V1, unknown, invalid-authority, and degraded fallback inputs map
+suite execution to `absent`, so historical suite-note counts cannot become a
+runnable inference.
 
 ## Readiness
 
@@ -143,6 +151,8 @@ The first layer is ready when:
   runtime-heavy stack state;
 - local-port inventory route keys and summary keys match the central
   `aoa-evals` inventory contract;
+- v2 suite readiness remains inspect-only, while v1/unknown/injected-ready
+  input fails closed and the write allowlist excludes execution sidecars;
 - local-port write tools return audit receipts that keep dry-run, path
   confinement, validation, activation, side effects, and proof-forbidden fields
   visible to agents;
