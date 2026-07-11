@@ -87,7 +87,7 @@
   },
   "index_identity": {
     "artifact_kind": "source_surface_index",
-    "content_digest": "4df81d5f3d675f27e5260016e322e883054e9d6a3e72d75b2ed1bb6819b65e29",
+    "content_digest": "b4b88c1249cbf20da6020ed811402058d9d76294a51438b69ea11f06ef65783f",
     "local_id": "index:repo-local:source-surfaces",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json"
   },
@@ -4742,13 +4742,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "f5c0cf4bc2d25fa7ea9d0acf884aea61eb7adb2eb6fbea21c0813ee8afda2805",
+        "content_hash": "209e581e1337d386ac30b4b59cda85cd12824f8d7338a4f660b97e9e63f8f78c",
         "git_ref": "git-index-source-tree",
         "id": "file:changelog.md:06572a96a5",
         "mime": "text/markdown",
         "path": "CHANGELOG.md",
         "repo": "abyss-stack",
-        "size_bytes": 40822
+        "size_bytes": 41247
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -4805,217 +4805,217 @@
           {
             "anchor": "040-2026-06-07",
             "level": 2,
-            "line": 75,
+            "line": 81,
             "ref": "CHANGELOG.md#040-2026-06-07",
             "title": "[0.4.0] - 2026-06-07"
           },
           {
             "anchor": "summary",
             "level": 3,
-            "line": 77,
+            "line": 83,
             "ref": "CHANGELOG.md#summary",
             "title": "Summary"
           },
           {
             "anchor": "added-1",
             "level": 3,
-            "line": 100,
+            "line": 106,
             "ref": "CHANGELOG.md#added-1",
             "title": "Added"
           },
           {
             "anchor": "changed",
             "level": 3,
-            "line": 249,
+            "line": 255,
             "ref": "CHANGELOG.md#changed",
             "title": "Changed"
           },
           {
             "anchor": "included-in-this-release",
             "level": 3,
-            "line": 489,
+            "line": 495,
             "ref": "CHANGELOG.md#included-in-this-release",
             "title": "Included in this release"
           },
           {
             "anchor": "validation",
             "level": 3,
-            "line": 538,
+            "line": 544,
             "ref": "CHANGELOG.md#validation",
             "title": "Validation"
           },
           {
             "anchor": "notes",
             "level": 3,
-            "line": 549,
+            "line": 555,
             "ref": "CHANGELOG.md#notes",
             "title": "Notes"
           },
           {
             "anchor": "022-2026-04-23",
             "level": 2,
-            "line": 554,
+            "line": 560,
             "ref": "CHANGELOG.md#022-2026-04-23",
             "title": "[0.2.2] - 2026-04-23"
           },
           {
             "anchor": "summary-1",
             "level": 3,
-            "line": 556,
+            "line": 562,
             "ref": "CHANGELOG.md#summary-1",
             "title": "Summary"
           },
           {
             "anchor": "added-2",
             "level": 3,
-            "line": 569,
+            "line": 575,
             "ref": "CHANGELOG.md#added-2",
             "title": "Added"
           },
           {
             "anchor": "changed-1",
             "level": 3,
-            "line": 579,
+            "line": 585,
             "ref": "CHANGELOG.md#changed-1",
             "title": "Changed"
           },
           {
             "anchor": "validation-1",
             "level": 3,
-            "line": 585,
+            "line": 591,
             "ref": "CHANGELOG.md#validation-1",
             "title": "Validation"
           },
           {
             "anchor": "notes-1",
             "level": 3,
-            "line": 589,
+            "line": 595,
             "ref": "CHANGELOG.md#notes-1",
             "title": "Notes"
           },
           {
             "anchor": "021-2026-04-19",
             "level": 2,
-            "line": 594,
+            "line": 600,
             "ref": "CHANGELOG.md#021-2026-04-19",
             "title": "[0.2.1] - 2026-04-19"
           },
           {
             "anchor": "summary-2",
             "level": 3,
-            "line": 596,
+            "line": 602,
             "ref": "CHANGELOG.md#summary-2",
             "title": "Summary"
           },
           {
             "anchor": "added-3",
             "level": 3,
-            "line": 605,
+            "line": 611,
             "ref": "CHANGELOG.md#added-3",
             "title": "Added"
           },
           {
             "anchor": "changed-2",
             "level": 3,
-            "line": 610,
+            "line": 616,
             "ref": "CHANGELOG.md#changed-2",
             "title": "Changed"
           },
           {
             "anchor": "validation-2",
             "level": 3,
-            "line": 616,
+            "line": 622,
             "ref": "CHANGELOG.md#validation-2",
             "title": "Validation"
           },
           {
             "anchor": "notes-2",
             "level": 3,
-            "line": 620,
+            "line": 626,
             "ref": "CHANGELOG.md#notes-2",
             "title": "Notes"
           },
           {
             "anchor": "020-2026-04-10",
             "level": 2,
-            "line": 625,
+            "line": 631,
             "ref": "CHANGELOG.md#020-2026-04-10",
             "title": "[0.2.0] - 2026-04-10"
           },
           {
             "anchor": "summary-3",
             "level": 3,
-            "line": 627,
+            "line": 633,
             "ref": "CHANGELOG.md#summary-3",
             "title": "Summary"
           },
           {
             "anchor": "validation-3",
             "level": 3,
-            "line": 633,
+            "line": 639,
             "ref": "CHANGELOG.md#validation-3",
             "title": "Validation"
           },
           {
             "anchor": "notes-3",
             "level": 3,
-            "line": 637,
+            "line": 643,
             "ref": "CHANGELOG.md#notes-3",
             "title": "Notes"
           },
           {
             "anchor": "added-4",
             "level": 3,
-            "line": 641,
+            "line": 647,
             "ref": "CHANGELOG.md#added-4",
             "title": "Added"
           },
           {
             "anchor": "changed-3",
             "level": 3,
-            "line": 653,
+            "line": 659,
             "ref": "CHANGELOG.md#changed-3",
             "title": "Changed"
           },
           {
             "anchor": "included-in-this-release-1",
             "level": 3,
-            "line": 660,
+            "line": 666,
             "ref": "CHANGELOG.md#included-in-this-release-1",
             "title": "Included in this release"
           },
           {
             "anchor": "010-2026-04-01",
             "level": 2,
-            "line": 674,
+            "line": 680,
             "ref": "CHANGELOG.md#010-2026-04-01",
             "title": "[0.1.0] - 2026-04-01"
           },
           {
             "anchor": "summary-4",
             "level": 3,
-            "line": 680,
+            "line": 686,
             "ref": "CHANGELOG.md#summary-4",
             "title": "Summary"
           },
           {
             "anchor": "added-5",
             "level": 3,
-            "line": 686,
+            "line": 692,
             "ref": "CHANGELOG.md#added-5",
             "title": "Added"
           },
           {
             "anchor": "validation-4",
             "level": 3,
-            "line": 694,
+            "line": 700,
             "ref": "CHANGELOG.md#validation-4",
             "title": "Validation"
           },
           {
             "anchor": "notes-4",
             "level": 3,
-            "line": 700,
+            "line": 706,
             "ref": "CHANGELOG.md#notes-4",
             "title": "Notes"
           }
@@ -5027,7 +5027,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "f5c0cf4bc2d25fa7ea9d0acf884aea61eb7adb2eb6fbea21c0813ee8afda2805",
+        "digest": "209e581e1337d386ac30b4b59cda85cd12824f8d7338a4f660b97e9e63f8f78c",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -52885,13 +52885,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "4219aefae9b3f1e9a5d19a31495b0463a9ab136a6c03116dc9c12de7030eb2a6",
+        "content_hash": "dde73ebbea05c62fd17526fbccafa723c88490fa0fef4cf2ce78c7d568f79f7c",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/design.md:cefca02cc5",
         "mime": "text/markdown",
         "path": "mcp/services/aoa-session-memory-mcp/DESIGN.md",
         "repo": "abyss-stack",
-        "size_bytes": 9693
+        "size_bytes": 10411
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -52948,14 +52948,14 @@
           {
             "anchor": "source-discovery",
             "level": 2,
-            "line": 169,
+            "line": 180,
             "ref": "mcp/services/aoa-session-memory-mcp/DESIGN.md#source-discovery",
             "title": "Source Discovery"
           },
           {
             "anchor": "readiness",
             "level": 2,
-            "line": 180,
+            "line": 191,
             "ref": "mcp/services/aoa-session-memory-mcp/DESIGN.md#readiness",
             "title": "Readiness"
           }
@@ -52967,7 +52967,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "4219aefae9b3f1e9a5d19a31495b0463a9ab136a6c03116dc9c12de7030eb2a6",
+        "digest": "dde73ebbea05c62fd17526fbccafa723c88490fa0fef4cf2ce78c7d568f79f7c",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -53015,13 +53015,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "467cf3489d0c6ba4da12e0277e18480db0f3be76e3237b1cc55f8e941fbcb3fc",
+        "content_hash": "20ef71b2f045b88d0ceefec69aa32dd71f13ee6b2b3c1e513c2e0cae7f9af7c2",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/readme.md:60020ffbb3",
         "mime": "text/markdown",
         "path": "mcp/services/aoa-session-memory-mcp/README.md",
         "repo": "abyss-stack",
-        "size_bytes": 20655
+        "size_bytes": 21707
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -53078,7 +53078,7 @@
           {
             "anchor": "agent-route",
             "level": 2,
-            "line": 255,
+            "line": 272,
             "ref": "mcp/services/aoa-session-memory-mcp/README.md#agent-route",
             "title": "Agent Route"
           }
@@ -53090,7 +53090,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "467cf3489d0c6ba4da12e0277e18480db0f3be76e3237b1cc55f8e941fbcb3fc",
+        "digest": "20ef71b2f045b88d0ceefec69aa32dd71f13ee6b2b3c1e513c2e0cae7f9af7c2",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -53908,13 +53908,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
+        "content_hash": "fee12b8ddb9221ff008937bf599c6fd90e5f2deb5829a3e53b5b9c170883fab3",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
         "mime": "text/x-python",
         "path": "mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
         "repo": "abyss-stack",
-        "size_bytes": 328086
+        "size_bytes": 331471
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -53947,7 +53947,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
+        "digest": "fee12b8ddb9221ff008937bf599c6fd90e5f2deb5829a3e53b5b9c170883fab3",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -54175,13 +54175,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
+        "content_hash": "8ed2a7b103cf2fdfceebab2cbc507320e9fecbc79e550c098f949ba0b6726117",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
         "mime": "text/x-python",
         "path": "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
         "repo": "abyss-stack",
-        "size_bytes": 266607
+        "size_bytes": 280400
       },
       "mechanics_role": "none",
       "observed_form": "command",
@@ -54214,7 +54214,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
+        "digest": "8ed2a7b103cf2fdfceebab2cbc507320e9fecbc79e550c098f949ba0b6726117",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
