@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,9 +16,51 @@ from jsonschema import Draft202012Validator
 
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
-LOCAL_PORT_INVENTORY_CONTRACT = Path("docs/architecture/local_eval_port_inventory.contract.v1.json")
-LOCAL_PORT_INVENTORY_SCHEMA = "os_abyss_local_eval_port_inventory_v1"
+LOCAL_PORT_INVENTORY_CONTRACT_V2 = Path("docs/architecture/local_eval_port_inventory.contract.v2.json")
+LOCAL_PORT_INVENTORY_CONTRACT_V1 = Path("docs/architecture/local_eval_port_inventory.contract.v1.json")
+LOCAL_PORT_INVENTORY_CONTRACTS = (
+    LOCAL_PORT_INVENTORY_CONTRACT_V2,
+    LOCAL_PORT_INVENTORY_CONTRACT_V1,
+)
+LOCAL_PORT_INVENTORY_CONTRACT = LOCAL_PORT_INVENTORY_CONTRACT_V2
+LOCAL_PORT_INVENTORY_SCHEMA_V2 = "os_abyss_local_eval_port_inventory_v2"
+LOCAL_PORT_INVENTORY_SCHEMA_V1 = "os_abyss_local_eval_port_inventory_v1"
+LOCAL_PORT_INVENTORY_SCHEMA = LOCAL_PORT_INVENTORY_SCHEMA_V2
+LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2 = "aoa_local_eval_port_inventory_contract_v2"
+LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V1 = "aoa_local_eval_port_inventory_contract_v1"
+LOCAL_PORT_INVENTORY_ACCEPTED_SCHEMAS = {
+    LOCAL_PORT_INVENTORY_SCHEMA_V1,
+    LOCAL_PORT_INVENTORY_SCHEMA_V2,
+}
+LOCAL_PORT_INVENTORY_ACCEPTED_CONTRACT_SCHEMAS = {
+    LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V1,
+    LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2,
+}
 LOCAL_PORT_DISCOVERY_DEFAULT_MAX_DEPTH = 4
+LOCAL_PORT_INVENTORY_BUILDER = Path("scripts/build_local_eval_port_inventory.py")
+LOCAL_SUITE_EXECUTION_STATES = ("absent", "invalid", "stale", "ready")
+LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY = ("invalid", "stale", "ready", "absent")
+LOCAL_SUITE_EXECUTION_SCHEMA = "local_eval_suite_execution_inventory_v1"
+LOCAL_SUITE_READY_SCOPE = "source-contract-ready"
+LOCAL_SUITE_PYTEST_FLAGS = {
+    "-q",
+    "--quiet",
+    "-x",
+    "--exitfirst",
+    "--strict-markers",
+    "--strict-config",
+    "--disable-warnings",
+}
+LOCAL_SUITE_PYTEST_VALUE_FLAG_RE = re.compile(
+    r"^(?:--maxfail=[1-9][0-9]{0,2}|--tb=(?:auto|long|short|line|native|no)|"
+    r"--color=(?:yes|no|auto)|-r[a-zA-Z]+)$"
+)
+LOCAL_SUITE_SHELL_METACHARACTER_RE = re.compile(r"[;&|<>`$\r\n\x00]")
+WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+LOCAL_SUITE_AUTHORITY_BOUNDARY = (
+    "owner-local execution support only; no verdict, scoring, regression, proof doctrine, "
+    "proof acceptance, or promotion authority"
+)
 
 CATALOG_MIN = Path("generated/eval_catalog.min.json")
 CATALOG_FULL = Path("generated/eval_catalog.json")
@@ -114,7 +157,7 @@ LOCAL_PORT_SOURCE_OF_TRUTH = {
     "local_port_validator": "aoa-evals:scripts/validate_local_eval_port.py",
     "central_eval_catalog": "aoa-evals:generated/eval_catalog.min.json",
     "mcp_contract": "aoa-evals:docs/architecture/AOA_EVALS_MCP_CONTRACT.md",
-    "inventory_contract": f"aoa-evals:{LOCAL_PORT_INVENTORY_CONTRACT.as_posix()}",
+    "inventory_contract": f"aoa-evals:{LOCAL_PORT_INVENTORY_CONTRACT_V2.as_posix()}",
 }
 LOCAL_PORT_IGNORED_DIR_NAMES = {
     ".git",
@@ -166,6 +209,28 @@ LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS: dict[str, dict[str, str]] = {
         "action": "Repair the local eval-port shape and rerun the validator before applying or designing evals.",
         "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
     },
+    "active_suite_contract_invalid_repair": {
+        "route_key": "active_suite_contract_invalid_repair",
+        "route": "repair-local-suite-execution-contract",
+        "subskill": "aoa-eval-apply",
+        "action": (
+            "Repair the local suite execution sidecar, canonical owner, paths, typed runner, "
+            "or authority flags before any owner-local invocation."
+        ),
+        "proof_boundary": (
+            "inventory and MCP never execute runner.argv; central proof authority stays in aoa-evals"
+        ),
+    },
+    "active_suite_contract_stale_review": {
+        "route_key": "active_suite_contract_stale_review",
+        "route": "refresh-local-suite-execution-contract",
+        "subskill": "aoa-eval-apply",
+        "action": (
+            "Review changed tracked sources and refresh approved SHA256 values before any "
+            "owner-local invocation."
+        ),
+        "proof_boundary": "stale contracts are not runnable and hash refresh is not proof acceptance",
+    },
     "central_overlap_apply_existing_first": {
         "route_key": "central_overlap_apply_existing_first",
         "route": "aoa-eval-select",
@@ -191,8 +256,27 @@ LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS: dict[str, dict[str, str]] = {
         "route_key": "active_suite_apply_or_regression_check",
         "route": "aoa-eval-apply",
         "subskill": "aoa-eval-apply",
-        "action": "Use the local suite as a candidate deterministic check or regression surface; keep scoring and verdict authority central.",
-        "proof_boundary": LOCAL_PORT_PROOF_BOUNDARY,
+        "action": (
+            "A source-contract-ready local suite may be invoked only by the repo owner or "
+            "aoa-eval-apply after JIT revalidation, using exact argv and timeout, with "
+            "environment capture and an execution receipt."
+        ),
+        "proof_boundary": (
+            "ready does not prove pinned dependencies or reproducible runtime and remains "
+            "owner-local support, not central proof, scoring, or verdict authority"
+        ),
+    },
+    "active_suite_note_review_or_execution_contract_design": {
+        "route_key": "active_suite_note_review_or_execution_contract_design",
+        "route": "aoa-eval-design",
+        "subskill": "aoa-eval-design",
+        "action": (
+            "Treat the suite note as design pressure only; add a reviewed execution sidecar "
+            "before claiming a runnable local suite."
+        ),
+        "proof_boundary": (
+            "a .suite.md note alone is not runnable and carries no central proof authority"
+        ),
     },
     "active_intake_select_then_apply_or_design": {
         "route_key": "active_intake_select_then_apply_or_design",
@@ -694,6 +778,165 @@ def _local_port_path_is_ignored(path: Path, workspace_root: Path) -> bool:
     return any(relative == prefix or relative.startswith(f"{prefix}/") for prefix in LOCAL_PORT_IGNORED_RELATIVE_PREFIXES)
 
 
+def _safe_repo_relative_ref(value: Any, *, allow_dot: bool = False) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if allow_dot and text == ".":
+        return True
+    if (
+        not text
+        or text == "."
+        or text.startswith("/")
+        or text.endswith("/")
+        or "//" in text
+        or "\\" in text
+        or "\x00" in text
+        or len(text) > 1024
+        or any(ord(char) < 32 or ord(char) == 127 for char in text)
+        or WINDOWS_ABSOLUTE_PATH_RE.match(text)
+    ):
+        return False
+    path = Path(text)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        return False
+    return path.as_posix() == text
+
+
+def _compatibility_absent_suite_execution(
+    source_schema_version: str,
+    *,
+    canonical_owner_repo: str | None = None,
+    reason: str = "non-v2 inventories always map suite execution to absent",
+) -> dict[str, Any]:
+    return {
+        "schema_version": LOCAL_SUITE_EXECUTION_SCHEMA,
+        "state": "absent",
+        "canonical_owner_repo": canonical_owner_repo,
+        "owner_identity_sources": [],
+        "state_vocabulary": list(LOCAL_SUITE_EXECUTION_STATES),
+        "aggregate_priority": list(LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY),
+        "suite_count": 0,
+        "invalid_count": 0,
+        "stale_count": 0,
+        "ready_count": 0,
+        "suites": [],
+        "issues": [],
+        "consumer_validation_issues": [],
+        "auto_run_allowed": False,
+        "inventory_executed_runner": False,
+        "execution_allowed": False,
+        "suite_sidecar_write_allowed": False,
+        "owner_apply_required": False,
+        "proof_authority": False,
+        "promotion_allowed": False,
+        "readiness_scope": LOCAL_SUITE_READY_SCOPE,
+        "runtime_reproducibility_proven": False,
+        "jit_revalidation_required": True,
+        "execution_receipt_required": True,
+        "environment_capture_required": True,
+        "read_only": True,
+        "compatibility_downgrade": {
+            "source_inventory_schema_version": source_schema_version,
+            "rule": reason,
+        },
+    }
+
+
+def _suite_projection_issues(suite: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    path = suite.get("path")
+    if not _safe_repo_relative_ref(path) or not str(path).startswith("evals/suites/") or not str(path).endswith(
+        ".suite.json"
+    ):
+        issues.append("suite path must be a repo-relative evals/suites/*.suite.json ref")
+
+    state = str(suite.get("state") or "")
+    if state not in LOCAL_SUITE_EXECUTION_STATES:
+        issues.append("suite state is outside the local suite execution vocabulary")
+
+    for key in ("auto_run_allowed", "proof_authority", "promotion_allowed", "runtime_reproducibility_proven"):
+        if suite.get(key) is not False:
+            issues.append(f"suite {key} must stay false")
+    for key in ("jit_revalidation_required", "environment_capture_required", "execution_receipt_required"):
+        if suite.get(key) is not True:
+            issues.append(f"suite {key} must stay true")
+    if suite.get("readiness_scope") != LOCAL_SUITE_READY_SCOPE:
+        issues.append("suite readiness_scope must stay source-contract-ready")
+    if suite.get("authority_boundary") != LOCAL_SUITE_AUTHORITY_BOUNDARY:
+        issues.append("suite authority_boundary conflicts with the owner-local non-proof boundary")
+
+    if state in {"ready", "stale"}:
+        entrypoint_ref = suite.get("entrypoint_ref")
+        entrypoint_arg = suite.get("entrypoint_arg")
+        runner = suite.get("runner")
+        if not _safe_repo_relative_ref(entrypoint_ref):
+            issues.append("suite entrypoint_ref must be repo-relative and traversal-free")
+        if not _safe_repo_relative_ref(entrypoint_arg):
+            issues.append("suite entrypoint_arg must be cwd-relative and traversal-free")
+        if not isinstance(runner, dict):
+            issues.append("suite runner must be a typed mapping")
+        else:
+            argv = runner.get("argv")
+            cwd = runner.get("cwd")
+            if runner.get("kind") != "python_pytest":
+                issues.append("suite runner.kind must be python_pytest")
+            if not _safe_repo_relative_ref(cwd, allow_dot=True):
+                issues.append("suite runner.cwd must be repo-relative and traversal-free")
+            if (
+                not isinstance(argv, list)
+                or not argv
+                or len(argv) > 64
+                or not all(isinstance(arg, str) and arg and len(arg) <= 4096 for arg in argv)
+            ):
+                issues.append("suite runner.argv must be a non-empty string array")
+            else:
+                module_index = 2 if len(argv) > 1 and argv[1] == "-B" else 1
+                flags_start = module_index + 2
+                valid_prefix = len(argv) >= 4 and argv[0] in {"python", "python3"} and argv[
+                    module_index:flags_start
+                ] == ["-m", "pytest"]
+                if not valid_prefix:
+                    issues.append("suite runner.argv is not a typed python_pytest invocation")
+                if entrypoint_arg and argv[-1] != entrypoint_arg:
+                    issues.append("suite runner.argv final arg conflicts with entrypoint_arg")
+                if entrypoint_arg and argv.count(entrypoint_arg) != 1:
+                    issues.append("suite runner.argv must contain entrypoint_arg exactly once")
+                if any(LOCAL_SUITE_SHELL_METACHARACTER_RE.search(arg) for arg in argv):
+                    issues.append("suite runner.argv contains forbidden shell metacharacters")
+                index = flags_start
+                while valid_prefix and index < len(argv) - 1:
+                    flag = argv[index]
+                    if flag == "-p" and index + 1 < len(argv) - 1:
+                        if argv[index + 1] != "no:cacheprovider":
+                            issues.append(
+                                "suite runner.argv permits only the fixed plugin pair -p no:cacheprovider"
+                            )
+                        index += 2
+                        continue
+                    if flag not in LOCAL_SUITE_PYTEST_FLAGS and not LOCAL_SUITE_PYTEST_VALUE_FLAG_RE.fullmatch(flag):
+                        issues.append(f"suite runner.argv flag is outside the reviewed allowlist: {flag}")
+                    index += 1
+            if (
+                _safe_repo_relative_ref(cwd, allow_dot=True)
+                and _safe_repo_relative_ref(entrypoint_arg)
+                and _safe_repo_relative_ref(entrypoint_ref)
+            ):
+                resolved_arg = (Path(str(cwd)) / str(entrypoint_arg)).as_posix()
+                if resolved_arg != str(entrypoint_ref):
+                    issues.append("suite runner.cwd and entrypoint_arg conflict with entrypoint_ref")
+        timeout = suite.get("timeout_seconds")
+        if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 3600:
+            issues.append("suite timeout_seconds must stay between 1 and 3600")
+        success_codes = suite.get("success_exit_codes")
+        if not isinstance(success_codes, list) or not success_codes or any(
+            not isinstance(code, int) or isinstance(code, bool) or not 0 <= code <= 255
+            for code in success_codes
+        ):
+            issues.append("suite success_exit_codes must be a non-empty bounded integer list")
+    return issues
+
+
 def _validate_public_refs(refs: list[str]) -> list[str]:
     issues: list[str] = []
     for ref in refs:
@@ -919,46 +1162,129 @@ class AoAEvalsMCPState:
             if resolved in seen:
                 continue
             seen.add(resolved)
-            path = resolved / LOCAL_PORT_INVENTORY_CONTRACT
-            payload = _read_json(path)
-            if isinstance(payload, dict):
+            for contract_ref in LOCAL_PORT_INVENTORY_CONTRACTS:
+                path = resolved / contract_ref
+                payload = _read_json(path)
+                if not isinstance(payload, dict):
+                    continue
+                if payload.get("schema_version") not in LOCAL_PORT_INVENTORY_ACCEPTED_CONTRACT_SCHEMAS:
+                    continue
+                if payload.get("proof_owner_repo") != "aoa-evals":
+                    continue
                 return payload, path, "aoa-evals"
         return {}, None, "fallback"
 
     def _local_port_inventory_contract_summary(self) -> dict[str, Any]:
         contract, path, source = self._local_port_inventory_contract()
+        schema_version = str(contract.get("schema_version") or LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V1)
+        inventory_schema_version = str(
+            contract.get("inventory_schema_version") or LOCAL_PORT_INVENTORY_SCHEMA_V1
+        )
+        is_v2 = (
+            schema_version == LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2
+            and inventory_schema_version == LOCAL_PORT_INVENTORY_SCHEMA_V2
+        )
         route_keys = [
             str(route.get("route_key"))
             for route in contract.get("route_recommendations", [])
             if isinstance(route, dict) and route.get("route_key")
         ]
+        owner_route_keys = sorted(set(route_keys))
+        accepted_route_keys = sorted(
+            set(owner_route_keys) | set(LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS)
+        )
+        default_summary_keys = [
+            "repos",
+            "validator_ok",
+            "validator_failed",
+            "with_local_port",
+            "with_detected_pressure",
+            "excluded_repos",
+            "missing",
+            "stale_candidate",
+            "invalid",
+            "skeleton",
+            "active",
+        ]
+        if is_v2:
+            default_summary_keys.extend(f"suite_execution_{state}" for state in LOCAL_SUITE_EXECUTION_STATES)
+        compatibility = contract.get("compatibility")
         return {
-            "schema_version": contract.get("schema_version"),
-            "inventory_schema_version": contract.get("inventory_schema_version", LOCAL_PORT_INVENTORY_SCHEMA),
+            "schema_version": schema_version,
+            "inventory_schema_version": inventory_schema_version,
             "contract_ref": path.as_posix() if path else None,
             "contract_source": source,
-            "route_keys": route_keys or sorted(LOCAL_PORT_ROUTE_RECOMMENDATION_FALLBACKS),
+            "contract_valid": bool(contract),
+            "accepted_contract_schema_versions": sorted(
+                LOCAL_PORT_INVENTORY_ACCEPTED_CONTRACT_SCHEMAS
+            ),
+            "accepted_inventory_schema_versions": sorted(LOCAL_PORT_INVENTORY_ACCEPTED_SCHEMAS),
+            "route_keys": accepted_route_keys,
+            "owner_route_keys": owner_route_keys,
+            "compatibility_added_route_keys": sorted(set(accepted_route_keys) - set(owner_route_keys)),
             "status_vocabulary": contract.get(
                 "inventory_statuses",
                 ["missing", "stale_candidate", "invalid", "skeleton", "active"],
             ),
-            "summary_keys": contract.get(
-                "summary_keys",
-                [
-                    "repos",
-                    "validator_ok",
-                    "validator_failed",
-                    "with_local_port",
-                    "with_detected_pressure",
-                    "excluded_repos",
-                    "missing",
-                    "stale_candidate",
-                    "invalid",
-                    "skeleton",
-                    "active",
-                ],
+            "summary_keys": contract.get("summary_keys", default_summary_keys),
+            "suite_execution_states": contract.get(
+                "suite_execution_states",
+                list(LOCAL_SUITE_EXECUTION_STATES),
             ),
+            "suite_execution_aggregate_priority": contract.get(
+                "suite_execution_aggregate_priority",
+                list(LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY),
+            ),
+            "compatibility": compatibility if isinstance(compatibility, dict) else {},
+            "execution_allowed": False,
+            "suite_sidecar_write_allowed": False,
+            "proof_authority": False,
+            "promotion_allowed": False,
         }
+
+    def _owner_local_port_inventory_payload(
+        self,
+    ) -> tuple[dict[str, Any] | None, str | None, str | None]:
+        contract, contract_path, _source = self._local_port_inventory_contract()
+        if contract.get("schema_version") != LOCAL_PORT_INVENTORY_CONTRACT_SCHEMA_V2:
+            return None, None, None
+        if contract_path is None:
+            return None, "v2 inventory contract path is unavailable", None
+        owner_root = contract_path.parents[2]
+        if self.source_root is None or owner_root.resolve() != self.source_root.resolve():
+            return None, "v2 owner inventory builder is unavailable from a source checkout", None
+        builder = owner_root / LOCAL_PORT_INVENTORY_BUILDER
+        if not builder.is_file():
+            return None, f"v2 owner inventory builder is missing: {builder}", None
+        env = dict(os.environ)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        command = [
+            sys.executable,
+            "-B",
+            builder.as_posix(),
+            "--workspace-root",
+            self.workspace_root.as_posix(),
+            "--json",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                cwd=owner_root,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            return None, f"v2 owner inventory builder failed: {exc}", builder.as_posix()
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            return None, f"v2 owner inventory builder emitted invalid JSON: {exc}", builder.as_posix()
+        if not isinstance(payload, dict):
+            return None, "v2 owner inventory builder did not emit an object", builder.as_posix()
+        return payload, None, builder.as_posix()
 
     def _local_port_contract_route_recommendation(self, route_key: str) -> dict[str, str]:
         contract, _path, _source = self._local_port_inventory_contract()
@@ -971,6 +1297,372 @@ class AoAEvalsMCPState:
         if fallback is None:
             raise ValueError(f"unknown local eval-port route key: {route_key}")
         return dict(fallback)
+
+    @staticmethod
+    def _invalidate_suite_execution(
+        projection: dict[str, Any],
+        issues: list[str],
+    ) -> dict[str, Any]:
+        result = dict(projection)
+        existing = [
+            str(issue)
+            for issue in result.get("consumer_validation_issues", [])
+            if str(issue)
+        ]
+        result["consumer_validation_issues"] = _unique_strings([*existing, *issues])
+        result["state"] = "invalid"
+        result["invalid_count"] = max(int(result.get("invalid_count") or 0), 1)
+        result["ready_count"] = 0
+        result["owner_apply_required"] = False
+        result["execution_allowed"] = False
+        result["suite_sidecar_write_allowed"] = False
+        result["proof_authority"] = False
+        result["promotion_allowed"] = False
+        result["read_only"] = True
+        return result
+
+    def _normalize_suite_execution_projection(
+        self,
+        raw: Any,
+        *,
+        source_schema_version: str,
+        canonical_owner_repo: str | None,
+        producer_valid: bool,
+    ) -> dict[str, Any]:
+        if source_schema_version != LOCAL_PORT_INVENTORY_SCHEMA_V2 or not producer_valid:
+            reason = (
+                "inventory authority validation failed; suite execution maps to absent"
+                if not producer_valid
+                else "non-v2 inventories always map suite execution to absent"
+            )
+            return _compatibility_absent_suite_execution(
+                source_schema_version,
+                canonical_owner_repo=canonical_owner_repo,
+                reason=reason,
+            )
+        if not isinstance(raw, dict):
+            return self._invalidate_suite_execution(
+                _compatibility_absent_suite_execution(
+                    source_schema_version,
+                    canonical_owner_repo=canonical_owner_repo,
+                    reason="v2 inventory omitted the required suite_execution object",
+                ),
+                ["v2 inventory suite_execution must be an object"],
+            )
+
+        projection = dict(raw)
+        issues: list[str] = []
+        if raw.get("schema_version") != LOCAL_SUITE_EXECUTION_SCHEMA:
+            issues.append("suite_execution schema_version is not local_eval_suite_execution_inventory_v1")
+        raw_owner = raw.get("canonical_owner_repo")
+        if canonical_owner_repo and raw_owner != canonical_owner_repo:
+            issues.append("suite_execution canonical_owner_repo conflicts with the inventory repo owner")
+        for key in (
+            "auto_run_allowed",
+            "inventory_executed_runner",
+            "proof_authority",
+            "promotion_allowed",
+            "runtime_reproducibility_proven",
+        ):
+            if raw.get(key) is not False:
+                issues.append(f"suite_execution {key} must stay false")
+        for key in (
+            "jit_revalidation_required",
+            "environment_capture_required",
+            "execution_receipt_required",
+        ):
+            if raw.get(key) is not True:
+                issues.append(f"suite_execution {key} must stay true")
+        if raw.get("readiness_scope") != LOCAL_SUITE_READY_SCOPE:
+            issues.append("suite_execution readiness_scope must stay source-contract-ready")
+
+        raw_suites = raw.get("suites")
+        suites: list[dict[str, Any]] = []
+        if not isinstance(raw_suites, list):
+            issues.append("suite_execution suites must be a list")
+            raw_suites = []
+        for index, item in enumerate(raw_suites):
+            if not isinstance(item, dict):
+                issues.append(f"suite_execution suites[{index}] must be an object")
+                continue
+            suite = dict(item)
+            suite_issues = _suite_projection_issues(suite)
+            if suite_issues:
+                suite["state"] = "invalid"
+                suite["consumer_validation_issues"] = suite_issues
+            else:
+                suite["consumer_validation_issues"] = []
+            suite["auto_run_allowed"] = False
+            suite["execution_allowed"] = False
+            suite["suite_sidecar_write_allowed"] = False
+            suite["proof_authority"] = False
+            suite["promotion_allowed"] = False
+            suite["runtime_reproducibility_proven"] = False
+            suite["read_only"] = True
+            suites.append(suite)
+            issues.extend(f"suites[{index}]: {issue}" for issue in suite_issues)
+
+        state_counts = {
+            state: sum(1 for suite in suites if suite.get("state") == state)
+            for state in LOCAL_SUITE_EXECUTION_STATES
+        }
+        aggregate_state = "absent"
+        if suites:
+            aggregate_state = next(
+                state
+                for state in LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY
+                if state_counts[state]
+            )
+        raw_state = str(raw.get("state") or "")
+        if raw_state not in LOCAL_SUITE_EXECUTION_STATES:
+            issues.append("suite_execution state is outside the accepted vocabulary")
+        elif raw_state != aggregate_state:
+            issues.append("suite_execution state conflicts with the projected suite states")
+        if raw.get("suite_count") != len(suites):
+            issues.append("suite_execution suite_count conflicts with suites")
+        for state in ("invalid", "stale", "ready"):
+            if raw.get(f"{state}_count") != state_counts[state]:
+                issues.append(f"suite_execution {state}_count conflicts with suites")
+
+        projection.update(
+            {
+                "schema_version": LOCAL_SUITE_EXECUTION_SCHEMA,
+                "state": aggregate_state,
+                "canonical_owner_repo": canonical_owner_repo,
+                "state_vocabulary": list(LOCAL_SUITE_EXECUTION_STATES),
+                "aggregate_priority": list(LOCAL_SUITE_EXECUTION_AGGREGATE_PRIORITY),
+                "suite_count": len(suites),
+                "invalid_count": state_counts["invalid"],
+                "stale_count": state_counts["stale"],
+                "ready_count": state_counts["ready"],
+                "suites": suites,
+                "consumer_validation_issues": [],
+                "auto_run_allowed": False,
+                "inventory_executed_runner": False,
+                "execution_allowed": False,
+                "suite_sidecar_write_allowed": False,
+                "owner_apply_required": aggregate_state == "ready",
+                "proof_authority": False,
+                "promotion_allowed": False,
+                "readiness_scope": LOCAL_SUITE_READY_SCOPE,
+                "runtime_reproducibility_proven": False,
+                "jit_revalidation_required": True,
+                "environment_capture_required": True,
+                "execution_receipt_required": True,
+                "read_only": True,
+            }
+        )
+        return self._invalidate_suite_execution(projection, issues) if issues else projection
+
+    def _normalized_local_port_route(
+        self,
+        entry: dict[str, Any],
+    ) -> dict[str, str]:
+        status = str(entry.get("inventory_status") or "invalid")
+        declared_status = entry.get("declared_status")
+        counts = entry.get("pressure_counts")
+        counts = counts if isinstance(counts, dict) else {}
+        suite_execution = entry.get("suite_execution")
+        suite_execution = suite_execution if isinstance(suite_execution, dict) else {}
+        suite_state = str(suite_execution.get("state") or "absent")
+        central_matches = entry.get("central_eval_name_matches")
+        central_matches = central_matches if isinstance(central_matches, list) else []
+        if status == "missing":
+            route_key = "missing_no_pressure"
+        elif status == "stale_candidate":
+            route_key = "stale_local_eval_surface_review"
+        elif suite_state == "invalid":
+            route_key = "active_suite_contract_invalid_repair"
+        elif status == "invalid":
+            route_key = "invalid_active_repair" if declared_status == "active" else "invalid_port_repair"
+        elif central_matches:
+            route_key = "central_overlap_apply_existing_first"
+        elif status == "skeleton":
+            route_key = "valid_skeleton_keep_dormant"
+        elif int(counts.get("local_bundles") or 0):
+            route_key = "local_bundle_central_review_candidate"
+        elif suite_state == "stale":
+            route_key = "active_suite_contract_stale_review"
+        elif suite_state == "ready":
+            route_key = "active_suite_apply_or_regression_check"
+        elif int(counts.get("suite_notes") or 0):
+            route_key = "active_suite_note_review_or_execution_contract_design"
+        elif int(counts.get("intake_packets") or 0):
+            route_key = "active_intake_select_then_apply_or_design"
+        elif int(counts.get("report_notes") or 0):
+            route_key = "active_reports_only_suite_extraction_or_review"
+        else:
+            route_key = "active_without_detected_pressure"
+        return self._local_port_contract_route_recommendation(route_key)
+
+    def _normalize_local_port_inventory_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        source_schema_version = str(payload.get("schema_version") or "unknown")
+        producer_issues: list[str] = []
+        if payload.get("layer") != "aoa-evals-local-port-inventory":
+            producer_issues.append("inventory layer must be aoa-evals-local-port-inventory")
+        if payload.get("proof_owner_repo") != "aoa-evals":
+            producer_issues.append("inventory proof_owner_repo must remain aoa-evals")
+        if source_schema_version not in LOCAL_PORT_INVENTORY_ACCEPTED_SCHEMAS:
+            producer_issues.append(f"unsupported inventory schema_version: {source_schema_version}")
+        producer_valid = not producer_issues
+
+        raw_entries = payload.get("repos")
+        if not isinstance(raw_entries, list):
+            raw_entries = payload.get("ports")
+        if not isinstance(raw_entries, list):
+            producer_issues.append("inventory repos must be a list")
+            raw_entries = []
+            producer_valid = False
+
+        entries: list[dict[str, Any]] = []
+        workspace_root = self.workspace_root.resolve()
+        for index, item in enumerate(raw_entries):
+            if not isinstance(item, dict):
+                producer_issues.append(f"inventory repos[{index}] must be an object")
+                continue
+            entry = dict(item)
+            entry_issues: list[str] = []
+            raw_repo_id = entry.get("repo_id")
+            raw_repo_path = entry.get("repo_path")
+            repo_id = raw_repo_id.strip() if isinstance(raw_repo_id, str) else ""
+            repo_path = raw_repo_path.strip() if isinstance(raw_repo_path, str) else ""
+            if not _safe_repo_relative_ref(raw_repo_id):
+                entry_issues.append("repo_id must be workspace-relative and traversal-free")
+            if not _safe_repo_relative_ref(raw_repo_path, allow_dot=True):
+                entry_issues.append("repo_path must be workspace-relative and traversal-free")
+            expected_root = workspace_root if repo_path == "." else (workspace_root / repo_path)
+            raw_root = str(entry.get("root") or entry.get("repo_root") or "")
+            try:
+                root_matches = bool(raw_root) and Path(raw_root).resolve() == expected_root.resolve()
+            except (OSError, RuntimeError):
+                root_matches = False
+            if not root_matches:
+                entry_issues.append("inventory root conflicts with workspace_root and repo_path")
+            canonical_owner_repo = entry.get("canonical_owner_repo")
+            if not isinstance(canonical_owner_repo, str) or not canonical_owner_repo:
+                owner_boundary = entry.get("owner_boundary")
+                if isinstance(owner_boundary, dict) and isinstance(owner_boundary.get("owner_repo"), str):
+                    canonical_owner_repo = str(owner_boundary["owner_repo"])
+                else:
+                    canonical_owner_repo = str(entry.get("repo") or "") or None
+
+            suite_execution = self._normalize_suite_execution_projection(
+                entry.get("suite_execution"),
+                source_schema_version=source_schema_version,
+                canonical_owner_repo=canonical_owner_repo,
+                producer_valid=producer_valid,
+            )
+            if entry_issues and source_schema_version == LOCAL_PORT_INVENTORY_SCHEMA_V2 and producer_valid:
+                suite_execution = self._invalidate_suite_execution(suite_execution, entry_issues)
+
+            raw_counts = entry.get("pressure_counts")
+            raw_counts = raw_counts if isinstance(raw_counts, dict) else {}
+            counts: dict[str, int] = {}
+            for key in (
+                "intake_packets",
+                "suite_notes",
+                "suite_execution_contracts",
+                "report_notes",
+                "local_bundles",
+            ):
+                value = raw_counts.get(key)
+                counts[key] = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+            if source_schema_version != LOCAL_PORT_INVENTORY_SCHEMA_V2 or not producer_valid:
+                counts["suite_execution_contracts"] = 0
+            counts["active_total"] = sum(counts.values())
+
+            source_validation_issues = entry.get("validation_issues")
+            source_validation_issues = source_validation_issues if isinstance(source_validation_issues, list) else []
+            entry.update(
+                {
+                    "canonical_owner_repo": canonical_owner_repo,
+                    "pressure_counts": counts,
+                    "suite_execution": suite_execution,
+                    "blocked_by_suite_execution": suite_execution["state"] in {"invalid", "stale"},
+                    "consumer_inventory_issues": entry_issues,
+                    "validation_issues": source_validation_issues,
+                }
+            )
+            if not isinstance(entry.get("counts"), dict):
+                entry["counts"] = {
+                    "intake": counts["intake_packets"],
+                    "suites": counts["suite_notes"],
+                    "reports": counts["report_notes"],
+                    "bundles": counts["local_bundles"],
+                }
+            entry["validator_ok"] = bool(
+                entry.get("validator_ok")
+                and not source_validation_issues
+                and not entry_issues
+                and suite_execution["state"] not in {"invalid", "stale"}
+            )
+            if not isinstance(entry.get("validation"), dict):
+                entry["validation"] = {
+                    "valid": entry["validator_ok"],
+                    "issues": [
+                        str(issue.get("message") or issue)
+                        if isinstance(issue, dict)
+                        else str(issue)
+                        for issue in [*source_validation_issues, *entry_issues]
+                    ],
+                }
+            entry["route_recommendation"] = self._normalized_local_port_route(entry)
+            entries.append(entry)
+
+        normalized = dict(payload)
+        normalized["repos"] = entries
+        normalized["producer_validation"] = {
+            "valid": producer_valid,
+            "issues": producer_issues,
+            "source_schema_version": source_schema_version,
+        }
+        normalized["consumer_compatibility"] = {
+            "source_schema_version": source_schema_version,
+            "suite_execution_state": "v2_source_fields" if producer_valid and source_schema_version == LOCAL_PORT_INVENTORY_SCHEMA_V2 else "absent",
+            "runnable_inference_allowed": False,
+            "execution_allowed": False,
+            "suite_sidecar_write_allowed": False,
+        }
+        return normalized
+
+    def _legacy_local_port_inventory_payload(self) -> dict[str, Any]:
+        workspace_root = self.workspace_root.resolve()
+        roots = self._discover_local_repo_roots()
+        excluded_repos = [
+            {
+                "repo": root.name,
+                "repo_path": _workspace_relative(root, workspace_root),
+                "repo_id": _local_repo_id(root, workspace_root),
+                "reason": "central_proof_owner_not_repo_local_port",
+            }
+            for root in roots
+            if root.name == "aoa-evals"
+        ]
+        contract_summary = self._local_port_inventory_contract_summary()
+        source_schema = str(contract_summary["inventory_schema_version"])
+        if source_schema == LOCAL_PORT_INVENTORY_SCHEMA_V2:
+            source_schema = "aoa_evals_mcp_legacy_inventory_scan_v1"
+        entries = [self._local_port_summary(root) for root in roots if root.name != "aoa-evals"]
+        return {
+            "contract_schema_version": contract_summary["schema_version"],
+            "schema_version": source_schema,
+            "layer": "aoa-evals-local-port-inventory",
+            "workspace_root": workspace_root.as_posix(),
+            "proof_owner_repo": "aoa-evals",
+            "authority_boundary": self._local_port_authority_boundary(),
+            "excluded_repos": excluded_repos,
+            "repos": entries,
+        }
+
+    def _local_port_inventory_read_model(
+        self,
+    ) -> tuple[dict[str, Any], str | None, str | None, str]:
+        payload, error, producer_ref = self._owner_local_port_inventory_payload()
+        mode = "aoa-evals-owner-builder"
+        if payload is None:
+            payload = self._legacy_local_port_inventory_payload()
+            mode = "mcp-compatibility-scan"
+        return self._normalize_local_port_inventory_payload(payload), error, producer_ref, mode
 
     def _local_port_discovery_max_depth(self) -> int:
         contract, _path, _source = self._local_port_inventory_contract()
@@ -1376,46 +2068,68 @@ class AoAEvalsMCPState:
         return result
 
     def local_ports(self, status: str | None = None, include_skeleton: bool = True) -> dict[str, Any]:
-        workspace_root = self.workspace_root.resolve()
         inventory_contract = self._local_port_inventory_contract_summary()
         status_vocabulary = self._local_port_status_vocabulary()
-        roots = self._discover_local_repo_roots()
-        excluded_repos = [
-            {
-                "repo": root.name,
-                "repo_path": _workspace_relative(root, workspace_root),
-                "repo_id": _local_repo_id(root, workspace_root),
-                "reason": "central_proof_owner_not_repo_local_port",
-            }
-            for root in roots
-            if root.name == "aoa-evals"
-        ]
-        ports = [self._local_port_summary(root) for root in roots if root.name != "aoa-evals"]
+        inventory, producer_error, producer_ref, inventory_mode = self._local_port_inventory_read_model()
+        raw_ports = inventory.get("repos")
+        ports = [dict(port) for port in raw_ports] if isinstance(raw_ports, list) else []
         if status:
             ports = [port for port in ports if str(port.get("inventory_status") or "") == status]
         if not include_skeleton:
             ports = [port for port in ports if port.get("inventory_status") != "skeleton"]
+        raw_excluded = inventory.get("excluded_repos")
+        excluded_repos = [dict(entry) for entry in raw_excluded if isinstance(entry, dict)] if isinstance(raw_excluded, list) else []
         summary: dict[str, int] = {
             "repos": len(ports),
-            "validator_ok": sum(1 for port in ports if port["validator_ok"]),
-            "validator_failed": sum(1 for port in ports if port["validation_issues"]),
-            "with_local_port": sum(
-                1 for port in ports if port["inventory_status"] not in {"missing", "stale_candidate"}
+            "validator_ok": sum(1 for port in ports if port.get("validator_ok") is True),
+            "validator_failed": sum(
+                1
+                for port in ports
+                if port.get("validation_issues")
+                or port.get("consumer_inventory_issues")
+                or (
+                    isinstance(port.get("suite_execution"), dict)
+                    and port["suite_execution"].get("state") in {"invalid", "stale"}
+                )
             ),
-            "with_detected_pressure": sum(1 for port in ports if port["pressure_counts"]["active_total"] > 0),
+            "with_local_port": sum(
+                1 for port in ports if port.get("inventory_status") not in {"missing", "stale_candidate"}
+            ),
+            "with_detected_pressure": sum(
+                1
+                for port in ports
+                if isinstance(port.get("pressure_counts"), dict)
+                and int(port["pressure_counts"].get("active_total") or 0) > 0
+            ),
             "excluded_repos": len(excluded_repos),
         }
         for inventory_status in status_vocabulary:
-            summary[inventory_status] = sum(1 for port in ports if port["inventory_status"] == inventory_status)
+            summary[inventory_status] = sum(
+                1 for port in ports if port.get("inventory_status") == inventory_status
+            )
+        for suite_state in LOCAL_SUITE_EXECUTION_STATES:
+            summary_key = f"suite_execution_{suite_state}"
+            if summary_key in inventory_contract["summary_keys"]:
+                summary[summary_key] = sum(
+                    1
+                    for port in ports
+                    if isinstance(port.get("suite_execution"), dict)
+                    and port["suite_execution"].get("state") == suite_state
+                )
         return {
             "schema": "aoa_evals_local_ports_v1",
-            "inventory_schema_version": inventory_contract["inventory_schema_version"],
+            "inventory_schema_version": str(inventory.get("schema_version") or "unknown"),
             "layer": "aoa-evals-local-port-inventory",
             "workspace_root": self.workspace_root.as_posix(),
             "proof_owner_repo": "aoa-evals",
             "inventory_contract": inventory_contract,
+            "inventory_mode": inventory_mode,
+            "inventory_producer_ref": producer_ref,
+            "inventory_producer_error": producer_error,
+            "producer_validation": inventory.get("producer_validation", {}),
+            "consumer_compatibility": inventory.get("consumer_compatibility", {}),
             "summary": summary,
-            "excluded_repos": sorted(excluded_repos, key=lambda entry: str(entry["repo_id"])),
+            "excluded_repos": sorted(excluded_repos, key=lambda entry: str(entry.get("repo_id") or "")),
             "count": len(ports),
             "ports": ports,
             "read_only": True,
@@ -1427,7 +2141,27 @@ class AoAEvalsMCPState:
 
     def local_port(self, repo: str) -> dict[str, Any]:
         repo_root = self._resolve_local_repo_root(repo, require_port=False)
-        result = self._local_port_summary(repo_root, include_files=True)
+        repo_id = _local_repo_id(repo_root, self.workspace_root.resolve())
+        listing = self.local_ports(include_skeleton=True)
+        result = next(
+            (
+                dict(entry)
+                for entry in listing["ports"]
+                if entry.get("repo_id") == repo_id
+                or entry.get("repo_path") == repo_id
+                or ("/" not in repo and entry.get("repo") == repo)
+            ),
+            None,
+        )
+        if result is None:
+            result = self._local_port_summary(repo_root)
+        result.update(
+            {
+                "intake": self._local_intake_records(repo_root),
+                "suites": self._local_note_records(repo_root, "suites"),
+                "reports": self._local_note_records(repo_root, "reports"),
+            }
+        )
         result["schema"] = "aoa_evals_local_port_v1"
         result["read_only"] = True
         result["write_scope"] = "local intake, suite notes, and report notes only"
@@ -2951,13 +3685,19 @@ class AoAEvalsMCPState:
                     "intake": self._local_intake_records(repo_root),
                     "authority_boundary": self.authority_boundary(),
                 }
-            return {
+            result = {
                 "schema": f"aoa_evals_local_port_{resource_key}_v1",
                 "repo": repo_root.name,
                 "repo_id": _local_repo_id(repo_root, self.workspace_root.resolve()),
                 resource_key: self._local_note_records(repo_root, resource_key),
                 "authority_boundary": self.authority_boundary(),
             }
+            if resource_key == "suites":
+                result["suite_execution"] = self.local_port(repo_id).get(
+                    "suite_execution",
+                    _compatibility_absent_suite_execution("unknown"),
+                )
+            return result
         if len(parts) == 2 and parts[0] == "bundle":
             return self.inspect_bundle(parts[1])
         if len(parts) == 3 and parts[0] == "bundle" and parts[2] == "sections":

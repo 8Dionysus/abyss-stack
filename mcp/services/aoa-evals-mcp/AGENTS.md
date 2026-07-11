@@ -30,6 +30,10 @@ This stack-owned MCP surface owns:
   exports under `Logs/eval-exports/`.
 - Listing, inspection, dry-run planning, and gated local writes for sibling
   repo `evals/` ports.
+- Read-only consumption of the `aoa-evals` local-port inventory v2 suite
+  execution projection; MCP may expose `absent`, `invalid`, `stale`, or
+  source-contract-ready posture but may not execute `runner.argv` or write
+  `evals/suites/*.suite.json` sidecars.
 - Local-port writes limited to `evals/intake/*.eval_need.json`,
   `evals/suites/*.suite.md`, `evals/reports/*.report.md`, and `PORT.yaml`
   `skeleton` to `active` activation when the same write adds first pressure.
@@ -79,6 +83,8 @@ It does not own:
 - Runtime evidence templates stay candidate-only until bundle-local review.
 - Local eval-port writes stay below central `aoa-evals` proof authority and
   must dry-run before `apply=true`.
+- V1 or unknown local-port inventory input must never infer runnable posture;
+  injected suite execution fields fail closed to `absent`.
 - Keep the server stdio-only unless a later decision widens exposure.
 
 ## Run

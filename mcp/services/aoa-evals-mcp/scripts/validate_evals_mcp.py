@@ -46,7 +46,11 @@ def main() -> None:
     if local_ports["schema"] != "aoa_evals_local_ports_v1":
         raise SystemExit("local eval-port resource schema drifted")
     contract = local_ports.get("inventory_contract")
-    if not isinstance(contract, dict) or contract.get("schema_version") != "aoa_local_eval_port_inventory_contract_v1":
+    accepted_contract_schemas = {
+        "aoa_local_eval_port_inventory_contract_v1",
+        "aoa_local_eval_port_inventory_contract_v2",
+    }
+    if not isinstance(contract, dict) or contract.get("schema_version") not in accepted_contract_schemas:
         raise SystemExit("local eval-port inventory contract is unavailable or wrong schema")
     if contract.get("contract_source") != "aoa-evals":
         raise SystemExit(f"local eval-port inventory contract source drifted: {contract.get('contract_source')}")
@@ -64,6 +68,25 @@ def main() -> None:
     )
     if unknown_route_keys:
         raise SystemExit(f"local eval-port route keys drifted from inventory contract: {unknown_route_keys}")
+    for port in local_ports.get("ports", []):
+        suite_execution = port.get("suite_execution") if isinstance(port, dict) else None
+        if not isinstance(suite_execution, dict):
+            raise SystemExit("local eval-port entry omitted fail-closed suite execution posture")
+        if suite_execution.get("state") not in {"absent", "invalid", "stale", "ready"}:
+            raise SystemExit("local eval-port suite execution state drifted")
+        if any(
+            suite_execution.get(key) is not False
+            for key in (
+                "auto_run_allowed",
+                "inventory_executed_runner",
+                "execution_allowed",
+                "suite_sidecar_write_allowed",
+                "proof_authority",
+                "promotion_allowed",
+                "runtime_reproducibility_proven",
+            )
+        ):
+            raise SystemExit("local eval-port suite execution widened MCP authority")
     local_port_repo = None
     local_port_valid = None
     local_find_valid = None

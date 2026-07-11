@@ -48,6 +48,13 @@ local bundle, or replace direct inspection of the target repo before a write.
 Its machine-readable status and route vocabulary is consumed from
 `aoa-evals`, not authored by `abyss-stack`.
 
+Local suite execution posture is also read-only routing evidence. MCP may
+preserve owner-produced `absent`, `invalid`, `stale`, or source-contract-ready
+state, but it never invokes the projected argv and never upgrades readiness to
+runtime reproducibility, proof, scoring, regression, or promotion authority.
+Legacy, unknown, or invalid-authority inventory input fails closed to
+`absent`.
+
 Local-port write tools are below local repo review and below central proof
 adoption. They may prepare or apply only `evals/intake/*.eval_need.json`,
 `evals/suites/*.suite.md`, `evals/reports/*.report.md`, and first-pressure
@@ -56,6 +63,8 @@ reject workspace escape and path-like explicit slugs, and require explicit
 overwrite permission. Their responses include audit receipts for dry-run/apply
 state, target confinement, validation, activation, side effects, and forbidden
 proof/promotion/verdict/scoring/central-mutation effects.
+Execution sidecars under `evals/suites/*.suite.json` are deliberately outside
+this write allowlist.
 
 ## Stop Lines
 
@@ -67,5 +76,6 @@ proof/promotion/verdict/scoring/central-mutation effects.
 - No proposal approval or source bundle creation.
 - No worksheet acceptance or Eval Forge route promotion from MCP.
 - No arbitrary sibling path writes outside repo-local `evals/` ports.
+- No local suite execution or execution-sidecar writes.
 - No treating MCP/generated/runtime output as stronger than source bundles.
 - No moving proof authority into `abyss-stack`.
