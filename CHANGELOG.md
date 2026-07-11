@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` compact skill audit, usage-chain, neighborhood, and
+  dossier packets now preserve producer-owned candidate states, action
+  semantics, evidence refs, and separately bounded rejected foreign
+  correlations without exposing raw transcript bodies or claiming a skill
+  invocation/effectiveness verdict.
 - `aoa-session-memory-mcp` now exposes a read-only transport preflight route
   and CLI command, so agents can distinguish stale/missing Codex MCP transport
   from broken `.aoa` indexes when direct tool calls return `Transport closed`.

@@ -143,6 +143,9 @@ ENTITY_USAGE_NEIGHBORHOOD_SAMPLE_LIMIT = 2
 ENTITY_USAGE_LOCAL_EVENT_SAMPLE_LIMIT = 1
 ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
 ENTITY_USAGE_TEXT_PREVIEW_CHARS = 80
+ENTITY_USAGE_ACTION_LIMIT = 12
+ENTITY_USAGE_ACTION_SAMPLE_LIMIT = 3
+SKILL_EVIDENCE_STATE_LIST_LIMIT = 16
 ENTITY_DOSSIER_USAGE_LIMIT = 4
 ENTITY_DOSSIER_NEIGHBORHOOD_LIMIT = 2
 ENTITY_DOSSIER_GRAPH_LIMIT = 12
@@ -1215,8 +1218,10 @@ def _compact_usage_refs(refs: Any) -> dict[str, Any]:
         allowed_keys=(
             "raw",
             "raw_ref",
+            "raw_block",
             "segment",
             "segment_ref",
+            "segment_index",
             "session",
             "session_ref",
             "graph",
@@ -1259,6 +1264,110 @@ def _without_omitted_field_counts(value: Any) -> Any:
     if isinstance(value, list):
         return [_without_omitted_field_counts(item) for item in value]
     return value
+
+
+def _compact_skill_evidence(evidence: Any) -> dict[str, Any]:
+    if not isinstance(evidence, dict):
+        return {}
+    compact: dict[str, Any] = {}
+    for key in (
+        "schema_version",
+        "candidate_only",
+        "input_event_count",
+        "unique_evidence_event_count",
+        "unique_evidence_fact_count",
+        "duplicate_evidence_association_count",
+        "dispatch_candidate_present",
+        "behavioral_candidate_present",
+        "receipt_or_review_ingestion_available",
+        "invocation_claim_allowed",
+        "invocation_claim_blocker",
+        "authority_boundary",
+    ):
+        scalar = _compact_usage_scalar(evidence.get(key), limit=220)
+        if scalar not in (None, "", [], {}):
+            compact[key] = scalar
+    for key in (
+        "supported_states",
+        "automatic_candidate_states",
+        "receipt_or_review_states",
+        "rejection_edge_states",
+    ):
+        values = evidence.get(key)
+        selected = _compact_usage_list(
+            values,
+            limit=SKILL_EVIDENCE_STATE_LIST_LIMIT,
+            text_limit=80,
+        )
+        if selected:
+            compact[key] = selected
+            if isinstance(values, list) and len(values) > len(selected):
+                compact[f"omitted_{key}_count"] = len(values) - len(selected)
+    for key in (
+        "state_counts",
+        "association_state_counts",
+        "dimensions",
+        "correlation_rejections",
+    ):
+        value = _compact_usage_mapping(evidence.get(key), text_limit=120)
+        if value:
+            compact[key] = _without_omitted_field_counts(value)
+    return compact
+
+
+def _compact_usage_action_counts(value: Any) -> tuple[dict[str, Any], int]:
+    if not isinstance(value, dict):
+        return {}, 0
+    compact: dict[str, Any] = {}
+    valid_count = 0
+    for key, count in value.items():
+        action = _bounded_string(key, 80)
+        if not action or not isinstance(count, (bool, int, float)):
+            continue
+        valid_count += 1
+        if len(compact) >= ENTITY_USAGE_ACTION_LIMIT:
+            continue
+        compact[action] = count
+    return compact, max(0, valid_count - len(compact))
+
+
+def _compact_usage_action_samples(value: Any) -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
+    if not isinstance(value, dict):
+        return {}, {}
+    compact: dict[str, list[dict[str, Any]]] = {}
+    omitted: dict[str, int] = {}
+    for key, samples in value.items():
+        if not isinstance(samples, list):
+            continue
+        action = _bounded_string(key, 80)
+        if not action:
+            continue
+        selected: list[dict[str, Any]] = []
+        for sample in samples[:ENTITY_USAGE_ACTION_SAMPLE_LIMIT]:
+            if not isinstance(sample, dict):
+                continue
+            item = _compact_usage_mapping(
+                sample,
+                allowed_keys=(
+                    "role",
+                    "event_type",
+                    "session_id",
+                    "session_label",
+                    "event_id",
+                    "title",
+                ),
+            )
+            refs = _compact_usage_refs(sample.get("refs"))
+            if refs:
+                item["refs"] = refs
+            item = _without_omitted_field_counts(item)
+            if item:
+                selected.append(item)
+        if selected:
+            compact[action] = selected
+        if len(samples) > len(selected):
+            omitted[action] = len(samples) - len(selected)
+    return compact, omitted
 
 
 def _compact_graph_freshness(freshness: Any) -> dict[str, Any]:
@@ -1767,10 +1876,18 @@ def _compact_usage_event(event: Any) -> dict[str, Any]:
     compact = _compact_usage_mapping(
         event,
         allowed_keys=(
+            "doc_id",
+            "source",
+            "source_doc_id",
+            "distance",
             "event_id",
             "event_type",
             "source_type",
             "role",
+            "family",
+            "phase",
+            "actor",
+            "action",
             "conversation_act",
             "session_act",
             "agent_event",
@@ -1788,13 +1905,31 @@ def _compact_usage_event(event: Any) -> dict[str, Any]:
             "relation",
             "offset",
             "correlation_id",
+            "source_correlation_id",
+            "rejected_correlation_id",
             "status",
             "outcome",
+            "skill_evidence_state",
+            "usage_actions",
+            "primary_usage_action",
+            "route_signal_count",
+            "route_signals_truncated",
+            "matched_routes_truncated",
             "refs",
             "raw_preview",
             "document_refs",
         ),
     )
+    usage_actions = _compact_usage_list(
+        event.get("usage_actions"),
+        limit=ENTITY_USAGE_ACTION_LIMIT,
+        text_limit=80,
+    )
+    if usage_actions:
+        compact["usage_actions"] = usage_actions
+        source_usage_actions = event.get("usage_actions")
+        if isinstance(source_usage_actions, list) and len(source_usage_actions) > len(usage_actions):
+            compact["omitted_usage_action_count"] = len(source_usage_actions) - len(usage_actions)
     freshness = _compact_usage_freshness(event.get("freshness"))
     if freshness:
         compact["freshness"] = freshness
@@ -1851,6 +1986,7 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
         "generated_at",
         "ok",
         "mutates",
+        "truth_status",
         "anchor",
         "kind",
         "requested_kind",
@@ -1862,6 +1998,9 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
         "outcome_event_count",
         "context_event_count",
         "consequence_event_count",
+        "false_correlation_event_count",
+        "false_correlation_edge_count",
+        "unique_false_correlation_event_count",
         "document_ref_count",
         "quality",
         "diagnostics",
@@ -1872,18 +2011,26 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
             compact[key] = payload.get(key)
     if isinstance(payload.get("provider"), dict):
         compact["provider"] = _compact_usage_provider_status(payload["provider"])
-    usage_events = payload.get("usage_events")
-    if isinstance(usage_events, list):
-        selected = [_compact_usage_event(event) for event in usage_events[:ENTITY_USAGE_AUDIT_SAMPLE_LIMIT]]
-        compact["usage_events"] = [event for event in selected if event]
-        compact["usage_event_count"] = payload.get("usage_event_count", len(usage_events))
-        compact["omitted_usage_event_count"] = max(0, len(usage_events) - len(compact["usage_events"]))
-    consequence_events = payload.get("consequence_events")
-    if isinstance(consequence_events, list):
-        selected = [_compact_usage_event(event) for event in consequence_events[:ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT]]
-        compact["consequence_events"] = [event for event in selected if event]
-        compact["consequence_event_count"] = payload.get("consequence_event_count", len(consequence_events))
-        compact["omitted_consequence_event_count"] = max(0, len(consequence_events) - len(compact["consequence_events"]))
+    skill_evidence = _compact_skill_evidence(payload.get("skill_evidence"))
+    if skill_evidence:
+        compact["skill_evidence"] = skill_evidence
+    for key, sample_limit in (
+        ("entrypoint_events", ENTITY_USAGE_AUDIT_SAMPLE_LIMIT),
+        ("usage_events", ENTITY_USAGE_AUDIT_SAMPLE_LIMIT),
+        ("result_events", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+        ("outcome_events", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+        ("context_events", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+        ("consequence_events", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+        ("false_correlation_events", ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT),
+    ):
+        events = payload.get(key)
+        if not isinstance(events, list):
+            continue
+        selected = [_compact_usage_event(event) for event in events[:sample_limit]]
+        compact[key] = [event for event in selected if event]
+        event_count_key = f"{key[:-1]}_count"
+        compact[event_count_key] = payload.get(event_count_key, len(events))
+        compact[f"omitted_{event_count_key}"] = max(0, len(events) - len(compact[key]))
     document_refs = payload.get("document_refs")
     if isinstance(document_refs, list):
         selected_refs = [_compact_document_ref(ref) for ref in document_refs[:ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT]]
@@ -1903,6 +2050,8 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
         "response_compacted": True,
         "usage_event_sample_limit": ENTITY_USAGE_AUDIT_SAMPLE_LIMIT,
         "consequence_event_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
+        "false_correlation_event_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
+        "skill_evidence_state_list_limit": SKILL_EVIDENCE_STATE_LIST_LIMIT,
         "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
         "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
         "full_evidence_route": full_route,
@@ -1919,6 +2068,7 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
         "generated_at",
         "ok",
         "mutates",
+        "truth_status",
         "anchor",
         "kind",
         "requested_kind",
@@ -1938,6 +2088,22 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
     first_ref = _compact_first_ref(payload.get("first_ref"))
     if first_ref:
         compact["first_ref"] = first_ref
+    skill_evidence = _compact_skill_evidence(payload.get("skill_evidence"))
+    if skill_evidence:
+        compact["skill_evidence"] = skill_evidence
+    for key in ("usage_action_counts", "primary_usage_action_counts"):
+        counts, omitted_count = _compact_usage_action_counts(payload.get(key))
+        if counts:
+            compact[key] = counts
+        if omitted_count:
+            compact[f"omitted_{key.removesuffix('_counts')}_count"] = omitted_count
+    usage_action_samples, omitted_action_samples = _compact_usage_action_samples(
+        payload.get("usage_action_samples")
+    )
+    if usage_action_samples:
+        compact["usage_action_samples"] = usage_action_samples
+    if omitted_action_samples:
+        compact["omitted_usage_action_sample_counts"] = omitted_action_samples
     usage_chain = payload.get("usage_chain") if isinstance(payload.get("usage_chain"), dict) else {}
     compact_chain: dict[str, Any] = {}
     entrypoints = usage_chain.get("entrypoint_events")
@@ -1974,13 +2140,26 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
         compact_chain["chains"] = selected_chains
         compact_chain["chain_count"] = len(chains)
         compact_chain["omitted_chain_count"] = max(0, len(chains) - len(selected_chains))
-    for key in ("unmatched_consequence_events", "result_events", "outcome_events", "context_events"):
+    for key in (
+        "unmatched_consequence_events",
+        "result_events",
+        "outcome_events",
+        "false_correlation_events",
+        "context_events",
+    ):
         events = usage_chain.get(key)
         if isinstance(events, list):
             selected = [_compact_usage_event(event) for event in events[:ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT]]
             compact_chain[key] = [event for event in selected if event]
-            compact_chain[f"{key}_count"] = len(events)
-            compact_chain[f"omitted_{key}_count"] = max(0, len(events) - len(compact_chain[key]))
+            if key == "false_correlation_events":
+                compact_chain["false_correlation_event_count"] = len(events)
+                compact_chain["omitted_false_correlation_event_count"] = max(
+                    0,
+                    len(events) - len(compact_chain[key]),
+                )
+            else:
+                compact_chain[f"{key}_count"] = len(events)
+                compact_chain[f"omitted_{key}_count"] = max(0, len(events) - len(compact_chain[key]))
     if compact_chain:
         compact["usage_chain"] = _without_omitted_field_counts(compact_chain)
     for key, limit in (
@@ -2015,6 +2194,9 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
         "chain_consequence_sample_limit": ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT,
         "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
         "evidence_ref_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
+        "false_correlation_event_sample_limit": ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT,
+        "usage_action_sample_limit_per_action": ENTITY_USAGE_ACTION_SAMPLE_LIMIT,
+        "skill_evidence_state_list_limit": SKILL_EVIDENCE_STATE_LIST_LIMIT,
         "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
         "full_evidence_route": full_route,
     }
@@ -2208,6 +2390,9 @@ def _compact_dossier_usage(payload: dict[str, Any]) -> dict[str, Any]:
             "outcome_event_count",
             "context_event_count",
             "consequence_event_count",
+            "false_correlation_event_count",
+            "false_correlation_edge_count",
+            "unique_false_correlation_event_count",
             "document_ref_count",
             "quality",
             "provider",
@@ -2215,9 +2400,24 @@ def _compact_dossier_usage(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if payload.get(key) not in (None, "", [], {})
     }
-    for key in ("usage_events", "consequence_events", "document_refs"):
+    skill_evidence = _compact_skill_evidence(payload.get("skill_evidence"))
+    if skill_evidence:
+        compact["skill_evidence"] = skill_evidence
+    for key in (
+        "entrypoint_events",
+        "usage_events",
+        "result_events",
+        "outcome_events",
+        "context_events",
+        "consequence_events",
+        "false_correlation_events",
+        "document_refs",
+    ):
         if payload.get(key) not in (None, "", [], {}):
             compact[key] = payload.get(key)
+    for key in tuple(payload):
+        if key.startswith("omitted_") and key.endswith("_event_count"):
+            compact[key] = payload[key]
     mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
     for key in ("full_evidence_route", "response_compacted"):
         if mcp_access.get(key) not in (None, "", [], {}):

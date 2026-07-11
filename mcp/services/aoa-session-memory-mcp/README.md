@@ -64,7 +64,7 @@ Tools:
 - `aoa_session_goal_lifecycles(target, session, goal_id, status, event_kind, limit, order)`
 - `aoa_session_answer_neighborhood(query, session, agent_events, episode, limit, before, after)`
 - `aoa_session_trace(anchor, kind, limit, per_route_limit, session, doc_type)`; the default `doc_type` is `session` for bounded live archive probes, and callers can request `event` when exact event-level evidence is needed.
-- `aoa_session_entity_usage_chain(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session, full)`; hot first packet for how a skill/MCP/hook/tool/API/etc entity was used and what happened after it. It returns compact usage-to-consequence chains, refs, freshness, noise flags, and expansion routes while skipping GraphRAG, graph neighborhood, and raw-preview neighborhoods by default.
+- `aoa_session_entity_usage_chain(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session, full)`; hot first packet for how a skill/MCP/hook/tool/API/etc entity was used and what happened after it. It returns compact usage-to-consequence chains, refs, freshness, noise flags, and expansion routes while skipping GraphRAG, graph neighborhood, and raw-preview neighborhoods by default. For `kind="skill"`, the compact packet preserves the producer-owned candidate evidence summary, event-level state/action semantics, and separately bounded rejected foreign-correlation events.
 - `aoa_session_entity_dossier(anchor, kind, session, usage_limit, neighborhood_limit, graph_limit, graph_edge_limit)`; heavier human card for a skill/MCP/hook/tool/API/etc entity. It combines generated source identity, usage/consequence audit, before/after neighborhood, graph topology, refs, freshness/noise flags, and explicit next expansion routes without replacing raw or owner-source evidence.
 - `aoa_session_entity_usage_audit(anchor, kind, limit, per_route_limit, consequence_window, document_limit, session, full)`; returns compact samples, counts, refs, freshness, and a `full_evidence_route` by default. Set `full=true` only when the caller deliberately needs the full archive evidence packet.
 - `aoa_session_entity_usage_neighborhood(anchor, kind, limit, per_route_limit, before, after, raw_preview_chars, document_limit, session, full)`; returns bounded usage windows by default and keeps raw/segment evidence authoritative through refs plus `full_evidence_route`.
@@ -108,6 +108,24 @@ Prompts:
 
 All tools are read-only. They do not reindex, repair, distill, relabel,
 export, promote, write memory, accept evidence, or mutate `.aoa`.
+
+### Skill-evidence compact contract
+
+`.aoa` owns skill-evidence classification. The default compact MCP audit,
+usage-chain, neighborhood, and dossier packets preserve its
+`skill_usage_evidence_v1` candidate summary, complete accepted-state list and
+separate `rejection_edge_states`,
+`skill_evidence_state`, `usage_actions` / `primary_usage_action`, bounded action
+aggregates, and raw/segment/session refs. Foreign tool results with another
+correlation id remain in a separate bounded `false_correlation_events` bucket
+with `correlation_id`, `source_correlation_id`, and
+`rejected_correlation_id`; they are not folded into accepted consequences.
+
+These fields are navigation evidence, not a skill-effectiveness verdict. MCP
+keeps `candidate_only`, `invocation_claim_allowed`, and the producer authority
+boundary visible, bounds event/action samples, and does not copy arbitrary raw
+transcript body fields into the response. `full=true` remains the explicit
+archive expansion route when the compact samples are insufficient.
 
 `aoa_session_memory_status()` uses a fast search read-model presence probe. It
 checks that the portable SQLite search surface, route index, atlas, and latest
