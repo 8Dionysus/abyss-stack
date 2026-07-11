@@ -370,7 +370,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "75f8ddd1b100b062a190e6c8f0266bbdc9cc61d404fdc9768d73893e4bc0b058",
+      "content_hash": "93dbb41078302f8c2d1dae1f5ad028430a4363d58b06c1bee738131fb8064860",
       "id": "artifact:file:changelog.md:06572a96a5",
       "path": "CHANGELOG.md",
       "source_record_id": "file:changelog.md:06572a96a5",
@@ -3674,7 +3674,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "f02df90ac337ae7a9e69c30f54d25778b74071093dd17d4c8e6765f670b8af80",
+      "content_hash": "4219aefae9b3f1e9a5d19a31495b0463a9ab136a6c03116dc9c12de7030eb2a6",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/design.md:cefca02cc5",
       "path": "mcp/services/aoa-session-memory-mcp/DESIGN.md",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/design.md:cefca02cc5",
@@ -3682,7 +3682,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "75210057b48f702178288513453b7053ae43173de45b5102e010cf5eacd7e717",
+      "content_hash": "467cf3489d0c6ba4da12e0277e18480db0f3be76e3237b1cc55f8e941fbcb3fc",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/readme.md:60020ffbb3",
       "path": "mcp/services/aoa-session-memory-mcp/README.md",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/readme.md:60020ffbb3",
@@ -3690,7 +3690,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "6bc8fc15872594a974656d7ff842bad744c3dbe6ec43ecdf9316cbb85605957c",
+      "content_hash": "f2e7bc014ffe4e8526bc2d974516e25a0728d7570db6b3141851da05dfdb9f6f",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/docs/boundaries.md:b58bee19d3",
       "path": "mcp/services/aoa-session-memory-mcp/docs/BOUNDARIES.md",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/docs/boundaries.md:b58bee19d3",
@@ -3698,7 +3698,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "f93315bfee7f189e4c1696ad82f722ee1026343c4d17874fa31acbd23b5b6ce5",
+      "content_hash": "c03dcd0bc9bf86d3cbfd53d6e04e59f7c76efa4e3ffedaaf28aaaaa93411c51b",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/docs/threat_model.md:b93ac68c0c",
       "path": "mcp/services/aoa-session-memory-mcp/docs/THREAT_MODEL.md",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/docs/threat_model.md:b93ac68c0c",
@@ -3754,7 +3754,7 @@
     },
     {
       "artifact_kind": "source_code",
-      "content_hash": "be4c3a26f17ecaf5576911d69ff7c39028e06c888b102a5191c2fb7143af888b",
+      "content_hash": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
       "path": "mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
@@ -3778,7 +3778,7 @@
     },
     {
       "artifact_kind": "test",
-      "content_hash": "f80c110b3e92a131432401e9ce21721b2721a6cee9ba735a84011a1e4591a5f6",
+      "content_hash": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
       "path": "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
@@ -10235,7 +10235,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_artifact_index",
-    "content_digest": "765364feefe4d7e2eb3488597b8e2b8fae1f57491e6708b25df7931947588465",
+    "content_digest": "2f4833d1356d1cc3c23daa2cb8ed72440c4dcd77eba0443ed0ba6549bdd6892a",
     "index_kind": "artifact",
     "local_id": "index:repo-local:artifacts",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -10259,7 +10259,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v1",
   "source_index": {
-    "content_digest": "8b5043acd01c207f8e8f3bebf0304625ca0b4c631a0b6f69d3b41615057362f6",
+    "content_digest": "de2f5bc39f90f43919a47cdb026f829fcbf407e6046f7574c15f3581244c0a82",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },

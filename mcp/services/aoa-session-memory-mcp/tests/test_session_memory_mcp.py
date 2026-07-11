@@ -1019,6 +1019,160 @@ ENTITY_USAGE_NEIGHBORHOOD = {
     ],
 }
 
+SKILL_EVIDENCE_SUPPORTED_STATES = [
+    "selected",
+    "procedure_observed",
+    "verified",
+    "completed",
+    "deflected",
+    "prompt_visible",
+    "skill_read",
+    "edited",
+    "mentioned",
+    "cooccurrence",
+]
+
+SKILL_EVIDENCE_SUMMARY = {
+    "schema_version": "skill_usage_evidence_v1",
+    "candidate_only": True,
+    "supported_states": SKILL_EVIDENCE_SUPPORTED_STATES,
+    "automatic_candidate_states": [
+        "cooccurrence",
+        "edited",
+        "mentioned",
+        "selected",
+        "skill_read",
+    ],
+    "receipt_or_review_states": [
+        "completed",
+        "deflected",
+        "procedure_observed",
+        "prompt_visible",
+        "verified",
+    ],
+    "state_counts": {"selected": 1, "skill_read": 1},
+    "association_state_counts": {"selected": 1, "skill_read": 2},
+    "input_event_count": 3,
+    "unique_evidence_event_count": 2,
+    "unique_evidence_fact_count": 2,
+    "duplicate_evidence_association_count": 1,
+    "rejection_edge_states": ["false_correlation"],
+    "dimensions": {
+        "prompt_visible_candidate_present": False,
+        "selection_candidate_present": True,
+        "skill_read_candidate_present": True,
+        "procedure_candidate_present": False,
+        "verification_candidate_present": False,
+        "completion_candidate_present": False,
+        "deflection_candidate_present": False,
+    },
+    "dispatch_candidate_present": True,
+    "behavioral_candidate_present": False,
+    "correlation_rejections": {
+        "state": "false_correlation",
+        "edge_count": 6,
+        "unique_event_count": 6,
+    },
+    "receipt_or_review_ingestion_available": False,
+    "invocation_claim_allowed": False,
+    "invocation_claim_blocker": "candidate_states_require_task_episode_correlation_and_owner_review",
+    "authority_boundary": (
+        "session-memory classifies candidate skill evidence; "
+        "skill effectiveness and eval verdicts remain owner-reviewed"
+    ),
+}
+
+SKILL_USAGE_EVENT = {
+    "doc_id": "event:session-skill:000004",
+    "source": "portable_sqlite",
+    "source_doc_id": "event:session-skill:000004",
+    "distance": 0,
+    "relation": "selected_usage",
+    "role": "usage",
+    "session_id": "session-skill",
+    "session_label": "2026-07-10__001__skill-evidence",
+    "session_date": "2026-07-10",
+    "segment_id": "000__initial-to-latest",
+    "event_id": "000004",
+    "event_type": "FILE_READ",
+    "correlation_id": "skill-call",
+    "family": "file",
+    "phase": "execution",
+    "actor": "assistant",
+    "action": "inspect_workspace",
+    "outcome": "observed",
+    "skill_evidence_state": "skill_read",
+    "usage_actions": ["read"],
+    "primary_usage_action": "read",
+    "conversation_act": "assistant_action",
+    "session_act": "file_inspection",
+    "matched_routes": ["skill:aoa_tdd_slice"],
+    "route_signals": ["skill:aoa_tdd_slice"],
+    "route_signal_count": 1,
+    "route_signals_truncated": False,
+    "title": "Read aoa-tdd-slice/SKILL.md",
+    "snippet": "bounded skill read",
+    "refs": {
+        "session": "sessions/skill/session.json",
+        "segment": "segments/000.md#event-000004",
+        "segment_index": "segments/000.index.json",
+        "raw": "raw:line:4",
+        "raw_block": "raw:block:4-4",
+    },
+    "freshness": {"status": "fresh", "basis": "fixture"},
+    "content": "PRIVATE RAW TRANSCRIPT BODY MUST NOT CROSS MCP",
+}
+
+SKILL_SELECTED_OUTCOME_EVENT = {
+    **SKILL_USAGE_EVENT,
+    "doc_id": "event:session-skill:000005",
+    "source_doc_id": "event:session-skill:000004",
+    "distance": 1,
+    "relation": "consequence_candidate",
+    "role": "outcome",
+    "event_id": "000005",
+    "event_type": "ASSISTANT_MESSAGE",
+    "skill_evidence_state": "selected",
+    "usage_actions": ["selected"],
+    "primary_usage_action": "selected",
+    "title": "Using aoa-tdd-slice for the bounded change",
+    "refs": {
+        "session": "sessions/skill/session.json",
+        "segment": "segments/000.md#event-000005",
+        "segment_index": "segments/000.index.json",
+        "raw": "raw:line:5",
+        "raw_block": "raw:block:5-5",
+    },
+}
+
+SKILL_FALSE_CORRELATION_EVENTS = [
+    {
+        **SKILL_USAGE_EVENT,
+        "doc_id": f"event:session-skill:rejected-{index}",
+        "source_doc_id": "event:session-skill:000004",
+        "distance": index + 1,
+        "relation": "false_correlation",
+        "role": "context",
+        "event_id": f"rejected-{index}",
+        "event_type": "TOOL_OUTPUT",
+        "correlation_id": f"other-call-{index}",
+        "source_correlation_id": "skill-call",
+        "rejected_correlation_id": f"other-call-{index}",
+        "skill_evidence_state": "false_correlation",
+        "usage_actions": ["context"],
+        "primary_usage_action": "context",
+        "title": "Foreign parallel tool output",
+        "refs": {
+            "session": "sessions/skill/session.json",
+            "segment": f"segments/000.md#event-rejected-{index}",
+            "segment_index": "segments/000.index.json",
+            "raw": f"raw:line:{20 + index}",
+            "raw_block": f"raw:block:{20 + index}-{20 + index}",
+        },
+    }
+    for index in range(6)
+]
+
 ENTITY_USAGE_SCENARIO_AUDIT = {
     "schema_version": 1,
     "artifact_type": "session_memory_entity_usage_scenario_audit",
@@ -4925,6 +5079,268 @@ def test_entity_usage_neighborhood_compacts_heavy_archive_payload_for_mcp(tmp_pa
     assert "omitted_field_count" not in encoded
     assert len(encoded) < 4500
     assert ("neighbor evidence " * 12) not in encoded
+
+
+def test_skill_evidence_contract_survives_bounded_mcp_compaction(tmp_path: Path) -> None:
+    def audit_payload() -> dict:
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_audit",
+            "ok": True,
+            "mutates": False,
+            "truth_status": "session_memory_entity_usage_routes_to_evidence_not_reviewed_truth",
+            "anchor": "aoa-tdd-slice",
+            "kind": "skill",
+            "event_count": 9,
+            "usage_event_count": 1,
+            "outcome_event_count": 1,
+            "consequence_event_count": 1,
+            "false_correlation_event_count": 6,
+            "false_correlation_edge_count": 6,
+            "unique_false_correlation_event_count": 6,
+            "usage_events": [SKILL_USAGE_EVENT],
+            "outcome_events": [SKILL_SELECTED_OUTCOME_EVENT],
+            "consequence_events": [SKILL_SELECTED_OUTCOME_EVENT],
+            "false_correlation_events": SKILL_FALSE_CORRELATION_EVENTS,
+            "document_refs": [{"kind": "mentioned_path", "value": "skills/aoa-tdd-slice/SKILL.md"}],
+            "skill_evidence": SKILL_EVIDENCE_SUMMARY,
+            "quality": {
+                "skill_dispatch_candidate_present": True,
+                "skill_behavioral_candidate_present": False,
+                "skill_invocation_claim_allowed": False,
+                "false_correlation_event_present": True,
+            },
+            "raw_transcript": "PRIVATE RAW TRANSCRIPT BODY MUST NOT CROSS MCP",
+        }
+
+    def chain_payload() -> dict:
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_chain",
+            "ok": True,
+            "mutates": False,
+            "truth_status": "session_memory_usage_chain_routes_to_evidence_not_reviewed_truth",
+            "anchor": "aoa-tdd-slice",
+            "kind": "skill",
+            "counts": {
+                "usage_event_count": 1,
+                "outcome_event_count": 1,
+                "consequence_event_count": 1,
+                "false_correlation_event_count": 6,
+                "false_correlation_edge_count": 6,
+                "unique_false_correlation_event_count": 6,
+                "chain_count": 1,
+                "chain_with_result_or_consequence_count": 1,
+            },
+            "quality": {
+                "direct_usage_present": True,
+                "skill_dispatch_candidate_present": True,
+                "skill_behavioral_candidate_present": False,
+                "skill_invocation_claim_allowed": False,
+                "false_correlation_event_present": True,
+                "raw_or_segment_ref_present": True,
+                "skipped_graph_rag_packet": True,
+                "noise_flag_count": 1,
+            },
+            "noise_flags": ["foreign_correlated_results_rejected"],
+            "first_ref": {
+                "raw": "raw:line:4",
+                "segment": "segments/000.md#event-000004",
+                "segment_index": "segments/000.index.json",
+                "session": "sessions/skill/session.json",
+            },
+            "usage_chain": {
+                "chains": [
+                    {
+                        "usage_event": SKILL_USAGE_EVENT,
+                        "result_or_consequence_events": [SKILL_SELECTED_OUTCOME_EVENT],
+                        "result_or_consequence_count": 1,
+                        "has_result_or_consequence": True,
+                    }
+                ],
+                "outcome_events": [SKILL_SELECTED_OUTCOME_EVENT],
+                "false_correlation_events": SKILL_FALSE_CORRELATION_EVENTS,
+            },
+            "document_refs": [{"kind": "mentioned_path", "value": "skills/aoa-tdd-slice/SKILL.md"}],
+            "evidence_refs": [
+                {"kind": "raw_line", "value": "raw:line:4"},
+                {"kind": "segment_markdown", "value": "segments/000.md#event-000004"},
+            ],
+            "skill_evidence": SKILL_EVIDENCE_SUMMARY,
+            "usage_action_counts": {"read": 1, "selected": 1},
+            "primary_usage_action_counts": {"read": 1, "selected": 1},
+            "usage_action_samples": {
+                "read": [
+                    {
+                        "role": "usage",
+                        "event_type": "FILE_READ",
+                        "session_label": "2026-07-10__001__skill-evidence",
+                        "event_id": "000004",
+                        "title": "Read aoa-tdd-slice/SKILL.md",
+                        "refs": SKILL_USAGE_EVENT["refs"],
+                        "content": "PRIVATE RAW TRANSCRIPT BODY MUST NOT CROSS MCP",
+                    }
+                ],
+                "selected": [
+                    {
+                        "role": "outcome",
+                        "event_type": "ASSISTANT_MESSAGE",
+                        "session_label": "2026-07-10__001__skill-evidence",
+                        "event_id": "000005",
+                        "title": "Using aoa-tdd-slice for the bounded change",
+                        "refs": SKILL_SELECTED_OUTCOME_EVENT["refs"],
+                    }
+                ],
+            },
+            "raw_transcript": "PRIVATE RAW TRANSCRIPT BODY MUST NOT CROSS MCP",
+        }
+
+    def neighborhood_payload() -> dict:
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_entity_usage_neighborhood",
+            "ok": True,
+            "mutates": False,
+            "anchor": "aoa-tdd-slice",
+            "kind": "skill",
+            "window_count": 1,
+            "quality": {"usage_neighborhood_present": True, "consequence_present": True},
+            "neighborhoods": [
+                {
+                    "ok": True,
+                    "source_usage_event": SKILL_USAGE_EVENT,
+                    "local_events": [SKILL_FALSE_CORRELATION_EVENTS[0]],
+                    "consequence_events": [SKILL_SELECTED_OUTCOME_EVENT],
+                }
+            ],
+        }
+
+    class SkillEvidenceRunner(FakeRunner):
+        def __call__(self, argv: list[str], timeout: float) -> CommandOutput:
+            command = argv[2]
+            payloads = {
+                "entity-usage-audit": audit_payload,
+                "usage-chain": chain_payload,
+                "entity-usage-neighborhood": neighborhood_payload,
+            }
+            if command not in payloads:
+                return super().__call__(argv, timeout)
+            self.calls.append((command, tuple(argv[3:])))
+            self.timeouts.append((command, timeout))
+            return CommandOutput(argv, 0, json.dumps(payloads[command]()), "", 1.0)
+
+    state = state_with_fixture(tmp_path, SkillEvidenceRunner())
+    audit = state.session_entity_usage_audit("aoa-tdd-slice", kind="skill", limit=8)
+    chain = state.session_entity_usage_chain("aoa-tdd-slice", kind="skill", limit=8)
+    neighborhood = state.session_entity_usage_neighborhood(
+        "aoa-tdd-slice",
+        kind="skill",
+        limit=4,
+        per_route_limit=4,
+        raw_preview_chars=160,
+    )
+    dossier = state.session_entity_dossier(
+        "aoa-decision",
+        kind="skill",
+        usage_limit=2,
+        neighborhood_limit=1,
+        graph_limit=6,
+        graph_edge_limit=6,
+    )
+
+    assert audit["skill_evidence"] == SKILL_EVIDENCE_SUMMARY
+    assert audit["false_correlation_event_count"] == 6
+    assert len(audit["false_correlation_events"]) == 3
+    assert audit["omitted_false_correlation_event_count"] == 3
+    assert audit["usage_events"][0]["skill_evidence_state"] == "skill_read"
+    assert audit["outcome_events"][0]["skill_evidence_state"] == "selected"
+    audit_rejected = audit["false_correlation_events"][0]
+    assert audit_rejected["correlation_id"] == "other-call-0"
+    assert audit_rejected["source_correlation_id"] == "skill-call"
+    assert audit_rejected["rejected_correlation_id"] == "other-call-0"
+    assert audit_rejected["skill_evidence_state"] == "false_correlation"
+    assert audit_rejected["refs"]["raw"] == "raw:line:20"
+
+    assert chain["skill_evidence"] == SKILL_EVIDENCE_SUMMARY
+    assert chain["skill_evidence"]["supported_states"] == SKILL_EVIDENCE_SUPPORTED_STATES
+    assert chain["usage_action_counts"] == {"read": 1, "selected": 1}
+    assert chain["primary_usage_action_counts"] == {"read": 1, "selected": 1}
+    assert chain["usage_action_samples"]["read"][0]["refs"]["raw"] == "raw:line:4"
+    chain_usage = chain["usage_chain"]["chains"][0]["usage_event"]
+    assert chain_usage["correlation_id"] == "skill-call"
+    assert chain_usage["skill_evidence_state"] == "skill_read"
+    assert chain_usage["usage_actions"] == ["read"]
+    assert chain_usage["primary_usage_action"] == "read"
+    assert chain_usage["refs"]["segment_index"] == "segments/000.index.json"
+    assert chain["counts"]["false_correlation_event_count"] == 6
+    assert len(chain["usage_chain"]["false_correlation_events"]) == 2
+    assert chain["usage_chain"]["false_correlation_event_count"] == 6
+    assert chain["usage_chain"]["omitted_false_correlation_event_count"] == 4
+    chain_rejected = chain["usage_chain"]["false_correlation_events"][0]
+    assert chain_rejected["source_doc_id"] == "event:session-skill:000004"
+    assert chain_rejected["source_correlation_id"] == "skill-call"
+    assert chain_rejected["rejected_correlation_id"] == "other-call-0"
+    assert chain_rejected["skill_evidence_state"] == "false_correlation"
+    assert chain_rejected["usage_actions"] == ["context"]
+    assert chain_rejected["primary_usage_action"] == "context"
+
+    neighborhood_usage = neighborhood["neighborhoods"][0]["source_usage_event"]
+    neighborhood_rejected = neighborhood["neighborhoods"][0]["local_events"][0]
+    assert neighborhood_usage["skill_evidence_state"] == "skill_read"
+    assert neighborhood_usage["usage_actions"] == ["read"]
+    assert neighborhood_rejected["source_correlation_id"] == "skill-call"
+    assert neighborhood_rejected["rejected_correlation_id"] == "other-call-0"
+    assert neighborhood_rejected["skill_evidence_state"] == "false_correlation"
+
+    assert dossier["usage"]["skill_evidence"] == SKILL_EVIDENCE_SUMMARY
+    assert dossier["usage"]["false_correlation_event_count"] == 6
+    assert dossier["usage"]["false_correlation_events"][0]["refs"]["raw"] == "raw:line:20"
+
+    for payload in (audit, chain, neighborhood, dossier):
+        encoded = json.dumps(payload)
+        assert "PRIVATE RAW TRANSCRIPT BODY MUST NOT CROSS MCP" not in encoded
+        assert "raw_transcript" not in encoded
+
+
+def test_usage_action_count_compactor_is_bounded() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    compact, omitted = core_module._compact_usage_action_counts(
+        {f"action_{index}": index for index in range(15)}
+    )
+
+    assert len(compact) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert list(compact) == [f"action_{index}" for index in range(12)]
+    assert omitted == 3
+
+
+def test_usage_action_sample_compactor_bounds_action_buckets() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    compact, omitted_samples, omitted_buckets = core_module._compact_usage_action_samples(
+        {
+            f"action_{index}": [
+                {
+                    "role": "usage",
+                    "event_type": "FILE_READ",
+                    "event_id": str(index),
+                    "refs": {"raw": f"raw:line:{index}"},
+                },
+                {"event_id": f"{index}-extra"},
+                {"event_id": f"{index}-extra-2"},
+                {"event_id": f"{index}-omitted"},
+            ]
+            for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT + 3)
+        }
+    )
+
+    assert len(compact) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert list(compact) == [
+        f"action_{index}" for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT)
+    ]
+    assert len(omitted_samples) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert set(omitted_samples.values()) == {1}
+    assert omitted_buckets == 3
 
 
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:

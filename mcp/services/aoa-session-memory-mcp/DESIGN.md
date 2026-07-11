@@ -75,6 +75,16 @@ filters, scoped full-text shards, or monolith fallback. Class questions with
 use/error/consequence intent include a bounded entity-usage scenario route
 before broad raw-text recall.
 
+Skill evidence remains producer-owned. When `.aoa` returns a typed skill
+candidate summary, the MCP compact adapter preserves the complete accepted
+state vocabulary, separate rejection-edge vocabulary, candidate/claim
+boundary, event-level state and action semantics,
+correlation ids, and evidence refs. Results rejected because they belong to a
+different tool correlation stay in a separate bounded rejection bucket rather
+than becoming accepted consequences. This transport contract does not let MCP
+decide whether a skill was effective, invoked, verified, or complete, and it
+does not widen compact packets to arbitrary raw transcript body fields.
+
 Agent-event and lightweight usage-neighborhood routes have MCP-local fast
 paths over the portable SQLite projection. They are deliberately bounded:
 session-scoped answer/closeout/progress/reasoning packets can return zero
@@ -180,6 +190,9 @@ The first layer is ready when:
   `truncated`, and omitted counts so agents can expand deliberately;
 - session briefs are compact and avoid bulk raw transcript output;
 - retrieval and evidence packets preserve raw/segment/session refs;
+- compact skill packets preserve producer-owned candidate states, action
+  semantics, accepted-versus-rejected correlations, and claim limits without
+  carrying raw transcript bodies or computing a verdict;
 - freshness checks do not claim more than they can prove;
 - prompts route agents through evidence before writeback or promotion;
 - validation proves the service did not become a writer, maintainer, reindexer,

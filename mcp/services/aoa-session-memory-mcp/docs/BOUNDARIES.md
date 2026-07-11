@@ -17,7 +17,10 @@ generated JSON surfaces under the configured `.aoa` root.
 
 It returns compact JSON objects with route candidates, session refs, segment
 refs, raw refs, route signals, freshness status, diagnostics summaries, and
-explicit authority boundaries.
+explicit authority boundaries. Typed skill packets may also carry
+producer-owned candidate states, action summaries, and accepted-versus-rejected
+correlation discriminators; MCP transports those fields but does not promote
+them into invocation, effectiveness, or proof verdicts.
 
 Route hits are candidate evidence. Search results, atlas entries, diagnostics,
 and MCP responses are not reviewed truth.

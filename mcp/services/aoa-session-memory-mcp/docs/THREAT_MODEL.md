@@ -10,6 +10,8 @@
 | MCP mutates the archive | only allowlisted read commands are wrapped; no write flags are exposed |
 | raw private transcript content leaks | compact refs and snippets are returned; bulk raw is not exposed by default |
 | writeback evidence is laundered into memory | evidence packets are candidate-only and point to `aoa-memo` review |
+| skill-file reads, edits, or mentions are laundered into behavioral invocation | compact packets preserve producer candidate states and `invocation_claim_allowed` instead of flattening all activity into usage |
+| a parallel tool result is attached to the wrong skill event | source, observed, and rejected correlation ids remain visible and foreign results stay in a separate bounded rejection bucket |
 | broad exposure widens attack surface | service is stdio-only until a later decision |
 | arbitrary file read through route resources | resources resolve fixed URI shapes and `.aoa` map/session roots only |
 
