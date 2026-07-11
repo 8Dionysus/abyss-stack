@@ -15,6 +15,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now preserves producer-classified structured skill
+  selection/load candidates and session-qualified task-episode refs across
+  compact audit, usage-chain, and dossier packets, while keeping `loaded`
+  distinct from skill reads, procedure execution, completion, and
+  effectiveness; bounded action summaries retain stronger semantic buckets
+  before weak mention, cooccurrence, or context buckets.
 - `aoa-session-memory-mcp` compact skill audit, usage-chain, neighborhood, and
   dossier packets now preserve producer-owned candidate states, action
   semantics, evidence refs, and separately bounded rejected foreign

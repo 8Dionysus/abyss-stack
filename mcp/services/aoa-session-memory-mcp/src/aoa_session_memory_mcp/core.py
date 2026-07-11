@@ -145,6 +145,30 @@ ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT = 2
 ENTITY_USAGE_TEXT_PREVIEW_CHARS = 80
 ENTITY_USAGE_ACTION_LIMIT = 12
 ENTITY_USAGE_ACTION_SAMPLE_LIMIT = 3
+ENTITY_USAGE_ACTION_SEMANTIC_PRIORITY = (
+    "selected",
+    "loaded",
+    "completed",
+    "verified",
+    "procedure_observed",
+    "deflected",
+    "failed",
+    "repaired",
+    "validated",
+    "edited",
+    "called",
+    "used",
+    "observed",
+    "configured",
+    "read",
+)
+ENTITY_USAGE_WEAK_ACTION_PRIORITY = (
+    "skill_read",
+    "prompt_visible",
+    "mentioned",
+    "cooccurrence",
+    "context",
+)
 SKILL_EVIDENCE_STATE_LIST_LIMIT = 16
 ENTITY_DOSSIER_USAGE_LIMIT = 4
 ENTITY_DOSSIER_NEIGHBORHOOD_LIMIT = 2
@@ -1277,6 +1301,9 @@ def _compact_skill_evidence(evidence: Any) -> dict[str, Any]:
         "unique_evidence_event_count",
         "unique_evidence_fact_count",
         "duplicate_evidence_association_count",
+        "structured_skill_selection_event_count",
+        "task_episode_link_event_count",
+        "task_episode_ref_count",
         "dispatch_candidate_present",
         "behavioral_candidate_present",
         "receipt_or_review_ingestion_available",
@@ -1312,23 +1339,74 @@ def _compact_skill_evidence(evidence: Any) -> dict[str, Any]:
         value = _compact_usage_mapping(evidence.get(key), text_limit=120)
         if value:
             compact[key] = _without_omitted_field_counts(value)
+    task_episode_refs = evidence.get("task_episode_refs")
+    if isinstance(task_episode_refs, list):
+        valid_task_episode_refs: list[dict[str, Any]] = []
+        for ref in task_episode_refs:
+            item = _compact_usage_mapping(
+                ref,
+                allowed_keys=("session_id", "session_label", "task_episode_id"),
+                text_limit=120,
+            )
+            item = _without_omitted_field_counts(item)
+            if item.get("task_episode_id") and (item.get("session_id") or item.get("session_label")):
+                valid_task_episode_refs.append(item)
+        selected_task_episode_refs = valid_task_episode_refs[:ENTITY_USAGE_ACTION_LIMIT]
+        if selected_task_episode_refs:
+            compact["task_episode_refs"] = selected_task_episode_refs
+        source_ref_count = evidence.get("task_episode_ref_count")
+        nonnegative_source_ref_count = (
+            max(0, int(source_ref_count))
+            if isinstance(source_ref_count, int) and not isinstance(source_ref_count, bool)
+            else 0
+        )
+        total_ref_count = max(nonnegative_source_ref_count, len(task_episode_refs))
+        compact["task_episode_ref_count"] = total_ref_count
+        omitted_ref_count = max(0, total_ref_count - len(selected_task_episode_refs))
+        if omitted_ref_count:
+            compact["omitted_task_episode_ref_count"] = omitted_ref_count
+        compact["task_episode_refs_truncated"] = bool(
+            evidence.get("task_episode_refs_truncated")
+        ) or omitted_ref_count > 0
+    elif isinstance(evidence.get("task_episode_refs_truncated"), bool):
+        compact["task_episode_refs_truncated"] = evidence["task_episode_refs_truncated"]
     return compact
+
+
+def _usage_action_semantic_sort_key(action: str) -> tuple[int, int, str]:
+    try:
+        return (0, ENTITY_USAGE_ACTION_SEMANTIC_PRIORITY.index(action), action)
+    except ValueError:
+        pass
+    try:
+        return (2, ENTITY_USAGE_WEAK_ACTION_PRIORITY.index(action), action)
+    except ValueError:
+        return (1, 0, action)
 
 
 def _compact_usage_action_counts(value: Any) -> tuple[dict[str, Any], int]:
     if not isinstance(value, dict):
         return {}, 0
     compact: dict[str, Any] = {}
-    valid_count = 0
+    valid_items: list[tuple[str, str, Any]] = []
     for key, count in value.items():
         action = _bounded_string(key, 80)
         if not action or not isinstance(count, (bool, int, float)):
             continue
-        valid_count += 1
-        if len(compact) >= ENTITY_USAGE_ACTION_LIMIT:
+        valid_items.append((action, str(key), count))
+    unique_items: list[tuple[str, Any]] = []
+    seen_actions: set[str] = set()
+    for action, _raw_key, count in sorted(
+        valid_items,
+        key=lambda item: (*_usage_action_semantic_sort_key(item[0]), item[1]),
+    ):
+        if action in seen_actions:
             continue
+        seen_actions.add(action)
+        unique_items.append((action, count))
+    for action, count in unique_items[:ENTITY_USAGE_ACTION_LIMIT]:
         compact[action] = count
-    return compact, max(0, valid_count - len(compact))
+    return compact, max(0, len(valid_items) - len(compact))
 
 
 def _compact_usage_action_samples(
@@ -1338,18 +1416,26 @@ def _compact_usage_action_samples(
         return {}, {}, 0
     compact: dict[str, list[dict[str, Any]]] = {}
     omitted: dict[str, int] = {}
-    valid_bucket_count = 0
-    retained_bucket_count = 0
+    valid_items: list[tuple[str, str, list[Any]]] = []
     for key, samples in value.items():
         if not isinstance(samples, list):
             continue
         action = _bounded_string(key, 80)
         if not action:
             continue
-        valid_bucket_count += 1
-        if retained_bucket_count >= ENTITY_USAGE_ACTION_LIMIT:
+        valid_items.append((action, str(key), samples))
+    unique_items: list[tuple[str, list[Any]]] = []
+    seen_actions: set[str] = set()
+    for action, _raw_key, samples in sorted(
+        valid_items,
+        key=lambda item: (*_usage_action_semantic_sort_key(item[0]), item[1]),
+    ):
+        if action in seen_actions:
             continue
-        retained_bucket_count += 1
+        seen_actions.add(action)
+        unique_items.append((action, samples))
+    retained_items = unique_items[:ENTITY_USAGE_ACTION_LIMIT]
+    for action, samples in retained_items:
         selected: list[dict[str, Any]] = []
         for sample in samples[:ENTITY_USAGE_ACTION_SAMPLE_LIMIT]:
             if not isinstance(sample, dict):
@@ -1375,7 +1461,7 @@ def _compact_usage_action_samples(
             compact[action] = selected
         if len(samples) > len(selected):
             omitted[action] = len(samples) - len(selected)
-    return compact, omitted, max(0, valid_bucket_count - retained_bucket_count)
+    return compact, omitted, max(0, len(valid_items) - len(retained_items))
 
 
 def _compact_graph_freshness(freshness: Any) -> dict[str, Any]:
