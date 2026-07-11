@@ -5314,6 +5314,35 @@ def test_usage_action_count_compactor_is_bounded() -> None:
     assert omitted == 3
 
 
+def test_usage_action_sample_compactor_bounds_action_buckets() -> None:
+    from aoa_session_memory_mcp import core as core_module
+
+    compact, omitted_samples, omitted_buckets = core_module._compact_usage_action_samples(
+        {
+            f"action_{index}": [
+                {
+                    "role": "usage",
+                    "event_type": "FILE_READ",
+                    "event_id": str(index),
+                    "refs": {"raw": f"raw:line:{index}"},
+                },
+                {"event_id": f"{index}-extra"},
+                {"event_id": f"{index}-extra-2"},
+                {"event_id": f"{index}-omitted"},
+            ]
+            for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT + 3)
+        }
+    )
+
+    assert len(compact) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert list(compact) == [
+        f"action_{index}" for index in range(core_module.ENTITY_USAGE_ACTION_LIMIT)
+    ]
+    assert len(omitted_samples) == core_module.ENTITY_USAGE_ACTION_LIMIT
+    assert set(omitted_samples.values()) == {1}
+    assert omitted_buckets == 3
+
+
 def test_entity_usage_scenario_audit_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)

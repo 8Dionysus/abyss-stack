@@ -1331,17 +1331,25 @@ def _compact_usage_action_counts(value: Any) -> tuple[dict[str, Any], int]:
     return compact, max(0, valid_count - len(compact))
 
 
-def _compact_usage_action_samples(value: Any) -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
+def _compact_usage_action_samples(
+    value: Any,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, int], int]:
     if not isinstance(value, dict):
-        return {}, {}
+        return {}, {}, 0
     compact: dict[str, list[dict[str, Any]]] = {}
     omitted: dict[str, int] = {}
+    valid_bucket_count = 0
+    retained_bucket_count = 0
     for key, samples in value.items():
         if not isinstance(samples, list):
             continue
         action = _bounded_string(key, 80)
         if not action:
             continue
+        valid_bucket_count += 1
+        if retained_bucket_count >= ENTITY_USAGE_ACTION_LIMIT:
+            continue
+        retained_bucket_count += 1
         selected: list[dict[str, Any]] = []
         for sample in samples[:ENTITY_USAGE_ACTION_SAMPLE_LIMIT]:
             if not isinstance(sample, dict):
@@ -1367,7 +1375,7 @@ def _compact_usage_action_samples(value: Any) -> tuple[dict[str, list[dict[str, 
             compact[action] = selected
         if len(samples) > len(selected):
             omitted[action] = len(samples) - len(selected)
-    return compact, omitted
+    return compact, omitted, max(0, valid_bucket_count - retained_bucket_count)
 
 
 def _compact_graph_freshness(freshness: Any) -> dict[str, Any]:
@@ -2097,13 +2105,17 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
             compact[key] = counts
         if omitted_count:
             compact[f"omitted_{key.removesuffix('_counts')}_count"] = omitted_count
-    usage_action_samples, omitted_action_samples = _compact_usage_action_samples(
-        payload.get("usage_action_samples")
-    )
+    (
+        usage_action_samples,
+        omitted_action_samples,
+        omitted_action_sample_buckets,
+    ) = _compact_usage_action_samples(payload.get("usage_action_samples"))
     if usage_action_samples:
         compact["usage_action_samples"] = usage_action_samples
     if omitted_action_samples:
         compact["omitted_usage_action_sample_counts"] = omitted_action_samples
+    if omitted_action_sample_buckets:
+        compact["omitted_usage_action_sample_bucket_count"] = omitted_action_sample_buckets
     usage_chain = payload.get("usage_chain") if isinstance(payload.get("usage_chain"), dict) else {}
     compact_chain: dict[str, Any] = {}
     entrypoints = usage_chain.get("entrypoint_events")
@@ -2195,6 +2207,7 @@ def _compact_entity_usage_chain_payload(payload: dict[str, Any], *, full_route: 
         "document_ref_sample_limit": ENTITY_USAGE_DOCUMENT_REF_SAMPLE_LIMIT,
         "evidence_ref_sample_limit": ENTITY_USAGE_CONSEQUENCE_SAMPLE_LIMIT,
         "false_correlation_event_sample_limit": ENTITY_USAGE_CHAIN_CONSEQUENCE_SAMPLE_LIMIT,
+        "usage_action_bucket_limit": ENTITY_USAGE_ACTION_LIMIT,
         "usage_action_sample_limit_per_action": ENTITY_USAGE_ACTION_SAMPLE_LIMIT,
         "skill_evidence_state_list_limit": SKILL_EVIDENCE_STATE_LIST_LIMIT,
         "text_preview_chars": ENTITY_USAGE_TEXT_PREVIEW_CHARS,
