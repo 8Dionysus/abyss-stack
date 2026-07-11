@@ -44,6 +44,18 @@ def main() -> None:
     source_index.add_argument("repo")
     source_index.add_argument("--include-payload", action="store_true")
 
+    repository_index_family = sub.add_parser("repository-index-family")
+    repository_index_family.add_argument("repo")
+
+    repository_index = sub.add_parser("repository-index")
+    repository_index.add_argument("repo")
+    repository_index.add_argument("index_kind", choices=("source", "entity", "artifact", "event"))
+    repository_index.add_argument("--include-payload", action="store_true")
+
+    domain_index_catalog = sub.add_parser("domain-index-catalog")
+    domain_index_catalog.add_argument("repo")
+    domain_index_catalog.add_argument("--include-payload", action="store_true")
+
     common_surface_profile = sub.add_parser("common-surface-profile")
     common_surface_profile.add_argument("repo")
 
@@ -92,6 +104,23 @@ def main() -> None:
         _print(state.repo_local_index(repo=args.repo))
     elif args.command == "source-index":
         _print(state.source_index_lookup(repo=args.repo, include_payload=args.include_payload))
+    elif args.command == "repository-index-family":
+        _print(state.repository_index_family_lookup(repo=args.repo))
+    elif args.command == "repository-index":
+        _print(
+            state.repository_index_lookup(
+                repo=args.repo,
+                index_kind=args.index_kind,
+                include_payload=args.include_payload,
+            )
+        )
+    elif args.command == "domain-index-catalog":
+        _print(
+            state.domain_index_catalog_lookup(
+                repo=args.repo,
+                include_payload=args.include_payload,
+            )
+        )
     elif args.command == "common-surface-profile":
         _print(state.common_surface_profile(repo=args.repo))
     elif args.command == "generation-route":

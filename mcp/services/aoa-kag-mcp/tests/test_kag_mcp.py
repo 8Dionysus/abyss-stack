@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -109,7 +110,52 @@ def seed_provider(
                 ],
             },
         )
-        index_files = ["kag/indexes/provider_readiness_index.json", source_index_ref]
+        repository_index_family = {
+            "source": source_index_ref,
+            "entity": "kag/indexes/repo_entity_index.json",
+            "artifact": "kag/indexes/repo_artifact_index.json",
+            "event": "kag/indexes/repo_event_index.json",
+        }
+        for index_kind in ("entity", "artifact", "event"):
+            write_json(
+                root / repository_index_family[index_kind],
+                {
+                    "schema_version": "aoa-repo-local-kag-repository-index-v1",
+                    "repo": {"name": repo, "root": ".", "git_ref": "fixture"},
+                    "index_identity": {
+                        "local_id": f"index:repo-local:{index_kind}",
+                        "index_kind": index_kind,
+                    },
+                    "source_index": {
+                        "path": source_index_ref,
+                        "content_digest": "fixture",
+                    },
+                    "summary": {"entry_count": 1},
+                    "entries": [{"local_id": f"{index_kind}:README.md"}],
+                },
+            )
+        domain_index_catalog_ref = "kag/indexes/domain_index_catalog.json"
+        write_json(
+            root / domain_index_catalog_ref,
+            {
+                "schema_version": "aoa-domain-index-catalog-v1",
+                "repo": repo,
+                "catalog_identity": {"local_id": f"catalog:{repo}:domain-indexes"},
+                "entries": [
+                    {
+                        "id": f"domain-index:{repo}:fixture",
+                        "domain": "fixture",
+                        "index_kind": "source_catalog",
+                        "path": "generated/domain-index.json",
+                    }
+                ],
+            },
+        )
+        index_files = [
+            "kag/indexes/provider_readiness_index.json",
+            *repository_index_family.values(),
+            domain_index_catalog_ref,
+        ]
         index_status = "passed"
     else:
         write_json(
@@ -122,6 +168,8 @@ def seed_provider(
         )
         index_files = ["kag/indexes/source_inventory.json"]
         index_status = "owner-specific"
+        repository_index_family = {}
+        domain_index_catalog_ref = ""
     return {
         "repo": repo,
         "provider_status": "provider_ready",
@@ -159,6 +207,8 @@ def seed_provider(
             "status": index_status,
             "source_index_ref": source_index_ref,
             "index_files": index_files,
+            "repository_index_family": repository_index_family,
+            "domain_index_catalog_ref": domain_index_catalog_ref,
             "coverage": {"documents": 1, "commands": 0, "validators": 1},
             "common_surface_profile": common_surface_profile,
             "coverage_report_ref": "generated/repo_local_kag_coverage.min.json",
@@ -349,6 +399,56 @@ def test_source_index_lookup_keeps_reads_inside_provider_root(tmp_path: Path) ->
         state.source_index_lookup("repo-a", include_payload=True)
 
 
+def test_repository_index_family_lookup_reports_all_four_indexes(tmp_path: Path) -> None:
+    packet = seed_workspace(tmp_path).repository_index_family_lookup("repo-a")
+
+    assert packet["schema"] == "aoa_kag_repository_index_family_lookup_v1"
+    assert packet["family_complete"] is True
+    assert set(packet["indexes"]) == {"source", "entity", "artifact", "event"}
+    assert all(index["exists"] for index in packet["indexes"].values())
+
+
+def test_repository_index_lookup_reads_one_typed_index(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+
+    packet = state.repository_index_lookup("repo-a", "entity", include_payload=True)
+
+    assert packet["schema"] == "aoa_kag_repository_index_lookup_v1"
+    assert packet["index_kind"] == "entity"
+    assert packet["index_exists"] is True
+    assert packet["index_summary"]["entry_count"] == 1
+    assert packet["index"]["index_identity"]["index_kind"] == "entity"
+
+
+def test_repository_index_lookup_rejects_unknown_kind_and_escaping_ref(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+
+    with pytest.raises(KeyError, match="unknown repository index kind"):
+        state.repository_index_lookup("repo-a", "vectors")
+
+    provider_map = state.provider_map()
+    provider_map["provider_repo_local_indexes"]["repo-a"]["repository_index_family"]["entity"] = "../outside.json"
+    write_json(state.provider_map_path, provider_map)
+
+    with pytest.raises(ValueError, match="escapes provider root"):
+        state.repository_index_lookup("repo-a", "entity", include_payload=True)
+
+
+def test_domain_index_catalog_lookup_handles_published_and_absent_catalogs(tmp_path: Path) -> None:
+    state = seed_workspace(tmp_path)
+
+    published = state.domain_index_catalog_lookup("repo-a", include_payload=True)
+    absent = state.domain_index_catalog_lookup("aoa-kag", include_payload=True)
+
+    assert published["schema"] == "aoa_kag_domain_index_catalog_lookup_v1"
+    assert published["status"] == "available"
+    assert published["catalog_summary"]["entry_count"] == 1
+    assert published["domain_index_catalog"]["repo"] == "repo-a"
+    assert absent["status"] == "not_published"
+    assert absent["domain_index_catalog_ref"] == ""
+    assert absent["domain_index_catalog"] is None
+
+
 def test_repo_local_coverage_status_filters_rows(tmp_path: Path) -> None:
     state = seed_workspace(tmp_path)
 
@@ -391,6 +491,9 @@ def test_resources_return_provider_map_manifest_records_and_readiness(tmp_path: 
     source_index = state.read_resource("aoa-kag://providers/repo-a/source-index")
     repo_local_index = state.read_resource("aoa-kag://providers/repo-a/repo-local-index")
     common_surface_profile = state.read_resource("aoa-kag://providers/repo-a/common-surface-profile")
+    index_family = state.read_resource("aoa-kag://providers/repo-a/repository-index-family")
+    entity_index = state.read_resource("aoa-kag://providers/repo-a/indexes/entity")
+    domain_catalog = state.read_resource("aoa-kag://providers/repo-a/domain-index-catalog")
     coverage = state.read_resource("aoa-kag://coverage/repo-local-source-indexes")
 
     assert provider_map["schema_version"] == "aoa-local-kag-provider-map-v1"
@@ -402,6 +505,9 @@ def test_resources_return_provider_map_manifest_records_and_readiness(tmp_path: 
     assert source_index["source_index_exists"] is True
     assert source_index["source_index"]["schema_version"] == "aoa-repo-local-kag-index-v1"
     assert common_surface_profile["common_surface_profile"]["source"] == "source_surface_index"
+    assert index_family["family_complete"] is True
+    assert entity_index["index"]["index_identity"]["index_kind"] == "entity"
+    assert domain_catalog["domain_index_catalog"]["repo"] == "repo-a"
     assert coverage["coverage_summary"]["owner_count"] == 2
 
 
@@ -426,3 +532,22 @@ def test_validation_status_checks_provider_homes(tmp_path: Path) -> None:
 
 def test_server_builds() -> None:
     assert build_server() is not None
+
+
+def test_server_exposes_repository_index_family_handoff() -> None:
+    server = build_server()
+    tools = {tool.name for tool in asyncio.run(server.list_tools())}
+    resource_templates = {
+        str(resource.uriTemplate) for resource in asyncio.run(server.list_resource_templates())
+    }
+
+    assert {
+        "aoa_kag_repository_index_family_lookup",
+        "aoa_kag_repository_index_lookup",
+        "aoa_kag_domain_index_catalog_lookup",
+    } <= tools
+    assert {
+        "aoa-kag://providers/{repo}/repository-index-family",
+        "aoa-kag://providers/{repo}/indexes/{index_kind}",
+        "aoa-kag://providers/{repo}/domain-index-catalog",
+    } <= resource_templates

@@ -13,6 +13,7 @@
 | KAG schema and provider validation | `aoa-kag` |
 | Authored meaning in a repo | that repo's source surfaces |
 | Direct repo provider records | that repo's `kag/` home |
+| Repository and owner-native domain indexes | that repo's `kag/indexes/` home |
 | Runtime graph/vector/cache state | runtime owner in `abyss-stack` or `.aoa` |
 | Reviewed proof, memory, routing, role, skill, technique, playbook meaning | owning AoA organ repo |
 

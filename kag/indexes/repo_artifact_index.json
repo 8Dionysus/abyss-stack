@@ -370,7 +370,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "93dbb41078302f8c2d1dae1f5ad028430a4363d58b06c1bee738131fb8064860",
+      "content_hash": "f5c0cf4bc2d25fa7ea9d0acf884aea61eb7adb2eb6fbea21c0813ee8afda2805",
       "id": "artifact:file:changelog.md:06572a96a5",
       "path": "CHANGELOG.md",
       "source_record_id": "file:changelog.md:06572a96a5",
@@ -2818,7 +2818,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "9f1fbedb778bffbd9ee67d01630f02d5f196e410df334431670984217a811d32",
+      "content_hash": "f65201bc8ef7e02dcb1bba09b12fd323f52d6adac97bc540d340bf76ae368e16",
       "id": "artifact:file:mcp/agents.md:da02323674",
       "path": "mcp/AGENTS.md",
       "source_record_id": "file:mcp/agents.md:da02323674",
@@ -2842,7 +2842,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "792ccc54291c52f534650242b14e06689942d57c3b7c86d6e3ed052efae692df",
+      "content_hash": "f45981f1c4649723e9e7601d2015663c0c9a23b1f81967e6f86603ce6b5a98ae",
       "id": "artifact:file:mcp/services/readme.md:cdc356f441",
       "path": "mcp/services/README.md",
       "source_record_id": "file:mcp/services/readme.md:cdc356f441",
@@ -3434,7 +3434,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "5c5da0fa70226dc60ab77f728208207a42e08770902f109f6f7e5da476bef7d0",
+      "content_hash": "29fc7bb42538bcd445c82eed5d87b14090a623d1f02d4e975118de47c63a6cf8",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/agents.md:6f9267f0ff",
       "path": "mcp/services/aoa-kag-mcp/AGENTS.md",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/agents.md:6f9267f0ff",
@@ -3442,7 +3442,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "9121c95139ad081a46551cb4d0ed019f84206b81b11ccadb0ca9d4b4ff696657",
+      "content_hash": "6734e961175155f16ba4e4f94e4045ad698a6e546c385e8fcec383c04a7f8bf4",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/design.md:cd7695d30c",
       "path": "mcp/services/aoa-kag-mcp/DESIGN.md",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/design.md:cd7695d30c",
@@ -3450,7 +3450,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "712db25253ba1a17250a6ec4ea150aed0dbfffbfc476c2d4497b7393a3f88747",
+      "content_hash": "e4d7ffaaad9e2ec462f6c0c0c06ccad6bd4f7a5b1dcac4bc6801a47ddc0f2016",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/readme.md:e7953abdf0",
       "path": "mcp/services/aoa-kag-mcp/README.md",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/readme.md:e7953abdf0",
@@ -3458,7 +3458,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "6b2366c8ee0bde944466dda495f2cd0d5650554d008f3b6477a94372d02953aa",
+      "content_hash": "445d885be959bcc4be44540edc65821949fecbf19427a4e8dc8b83998b4d7aa7",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/docs/boundaries.md:aa35608eee",
       "path": "mcp/services/aoa-kag-mcp/docs/BOUNDARIES.md",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/docs/boundaries.md:aa35608eee",
@@ -3466,7 +3466,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "7596c67f890352f3b147ff2e49ecc0db29f5db0a009139c56e21354ed85aa78f",
+      "content_hash": "0bc814943c1a94d32ad3990248c35d77fdef6ada0ba7a0af3f12e09121260557",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/docs/threat_model.md:2e8c678772",
       "path": "mcp/services/aoa-kag-mcp/docs/THREAT_MODEL.md",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/docs/threat_model.md:2e8c678772",
@@ -3490,7 +3490,7 @@
     },
     {
       "artifact_kind": "validator",
-      "content_hash": "5402de0eb34710b52b2ade38bc496489e2a3531d2fdfb31cb89449359db05cf0",
+      "content_hash": "e63cac4124eb6556e02e3b5739c522289880e9b50bb668e588485eedd946b8c5",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py:2334ef570a",
       "path": "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py:2334ef570a",
@@ -3506,7 +3506,7 @@
     },
     {
       "artifact_kind": "source_code",
-      "content_hash": "7bf8f1d7cc2d0bf5592a17c811fead504a24d6444a561edf6bbdd63694ff7c9c",
+      "content_hash": "ac2d9ee91d9f6b754d671d1890db33770df86f523ebd994d63d491b23f724f24",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py:a5cad42a99",
       "path": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/cli.py:a5cad42a99",
@@ -3514,7 +3514,7 @@
     },
     {
       "artifact_kind": "source_code",
-      "content_hash": "9bac344d71db45f1f749a7ec4d93615e92414a98b94b6a0ef19d19e20f5d0411",
+      "content_hash": "add1bc36bca308c49fb001934c4d940eddb176ac451743ae3e5b909657935d19",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py:9035adedf9",
       "path": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/core.py:9035adedf9",
@@ -3522,7 +3522,7 @@
     },
     {
       "artifact_kind": "source_code",
-      "content_hash": "c09e30669c1925261982c56c7967d39a65761d956bc36a3fd6e98e6ef3ea8d22",
+      "content_hash": "27a2151bc8829c1bef6e8f0fec25ec6e246cd3275ca8594bb002ffeb8b8f0fac",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py:3a19975beb",
       "path": "mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/src/aoa_kag_mcp/server.py:3a19975beb",
@@ -3538,7 +3538,7 @@
     },
     {
       "artifact_kind": "test",
-      "content_hash": "f4a8eb72df392f3d5fbd16d4c4c607a2a0e8ec6706bdf21ed4e55737df26991c",
+      "content_hash": "ecb51090f811e9445774ecf6c95661e52616e3731bf90beb78077d679e93e43b",
       "id": "artifact:file:mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py:40f4e63943",
       "path": "mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py",
       "source_record_id": "file:mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py:40f4e63943",
@@ -10235,7 +10235,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_artifact_index",
-    "content_digest": "2f4833d1356d1cc3c23daa2cb8ed72440c4dcd77eba0443ed0ba6549bdd6892a",
+    "content_digest": "2032cae405b1c0585121513825fa61dcb5dfffce8acd4e56f3d24c2768cbcf0d",
     "index_kind": "artifact",
     "local_id": "index:repo-local:artifacts",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -10259,7 +10259,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v1",
   "source_index": {
-    "content_digest": "de2f5bc39f90f43919a47cdb026f829fcbf407e6046f7574c15f3581244c0a82",
+    "content_digest": "4df81d5f3d675f27e5260016e322e883054e9d6a3e72d75b2ed1bb6819b65e29",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },

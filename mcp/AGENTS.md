@@ -40,9 +40,10 @@ catalog, bundle, comparison, runtime-candidate, and report-skeleton routes
 while keeping proof authority in `aoa-evals`.
 
 For KAG provider-map access, `mcp/services/aoa-kag-mcp/` exposes `aoa-kag`
-provider status, source-return routes, freshness handles, bounded registry
-slices, and provider records while keeping KAG schema, generated maps,
-validation, and repo-local `kag/` truth in `aoa-kag` and the source repos.
+provider status, repository index families, domain index catalogs,
+source-return routes, freshness handles, bounded registry slices, and provider
+records while keeping KAG schema, generated maps, validation, and repo-local
+`kag/` truth in `aoa-kag` and the source repos.
 
 For host-machine context work, `mcp/services/abyss-machine-mcp/` exposes
 `abyss-machine` bridge, evidence, resource, memory, typing, nervous, heartbeat,
