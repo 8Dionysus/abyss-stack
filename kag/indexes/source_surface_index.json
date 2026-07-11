@@ -87,7 +87,7 @@
   },
   "index_identity": {
     "artifact_kind": "source_surface_index",
-    "content_digest": "c863d48884d78ff806800855e67efc7a507e4e71be7f8309b89d04a13fb88465",
+    "content_digest": "de2f5bc39f90f43919a47cdb026f829fcbf407e6046f7574c15f3581244c0a82",
     "local_id": "index:repo-local:source-surfaces",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json"
   },
@@ -53901,13 +53901,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "eca4cd78b4bef40c1bb1edf6bcc1b62858cf401faebee2ad7b02b05e8ec524c9",
+        "content_hash": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
         "mime": "text/x-python",
         "path": "mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
         "repo": "abyss-stack",
-        "size_bytes": 327567
+        "size_bytes": 328086
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -53940,7 +53940,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "eca4cd78b4bef40c1bb1edf6bcc1b62858cf401faebee2ad7b02b05e8ec524c9",
+        "digest": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -54168,13 +54168,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "1158737ecdfa0503b2e23563ea675b206ca796adafdebb27bbc8d9bfbb963e84",
+        "content_hash": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
         "git_ref": "git-index-source-tree",
         "id": "file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
         "mime": "text/x-python",
         "path": "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
         "repo": "abyss-stack",
-        "size_bytes": 265525
+        "size_bytes": 266607
       },
       "mechanics_role": "none",
       "observed_form": "command",
@@ -54207,7 +54207,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "1158737ecdfa0503b2e23563ea675b206ca796adafdebb27bbc8d9bfbb963e84",
+        "digest": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
         "signature_ref": "",
         "verification_state": "digest-only"
       },

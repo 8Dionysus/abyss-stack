@@ -3754,7 +3754,7 @@
     },
     {
       "artifact_kind": "source_code",
-      "content_hash": "eca4cd78b4bef40c1bb1edf6bcc1b62858cf401faebee2ad7b02b05e8ec524c9",
+      "content_hash": "4c0262b807b0bca78a0cfa9eefb466ec14bf29d308539e0b783c2c3bded0dddc",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
       "path": "mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py:e4b2a1d254",
@@ -3778,7 +3778,7 @@
     },
     {
       "artifact_kind": "test",
-      "content_hash": "1158737ecdfa0503b2e23563ea675b206ca796adafdebb27bbc8d9bfbb963e84",
+      "content_hash": "0f585e93cd6a764a708c557c3b895fa29044160e51c0cc5333c22caba8cd7e90",
       "id": "artifact:file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
       "path": "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
       "source_record_id": "file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf",
@@ -10235,7 +10235,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_artifact_index",
-    "content_digest": "c04ba1cad9b9c43966d04a2952b408c1ec600cd5a1b22670eee6cc7cf98406b7",
+    "content_digest": "2f4833d1356d1cc3c23daa2cb8ed72440c4dcd77eba0443ed0ba6549bdd6892a",
     "index_kind": "artifact",
     "local_id": "index:repo-local:artifacts",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -10259,7 +10259,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v1",
   "source_index": {
-    "content_digest": "c863d48884d78ff806800855e67efc7a507e4e71be7f8309b89d04a13fb88465",
+    "content_digest": "de2f5bc39f90f43919a47cdb026f829fcbf407e6046f7574c15f3581244c0a82",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },
