@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence, Set
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -9,6 +10,10 @@ TextFileIterator = Callable[[], list[Path]]
 GitFileIterator = Callable[[], list[str]]
 
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".zip", ".pyc"}
+REPO_SELF_INDEX_SCHEMA_VERSIONS = {
+    "aoa-repo-local-kag-index-v2",
+    "aoa-repo-local-kag-repository-index-v2",
+}
 SOURCE_HYGIENE_VALIDATOR_PATH = Path("scripts") / "validators" / "source_hygiene.py"
 GIT_MIRROR_RUNTIME_TOP_LEVEL_DIRS = {"Secrets", "Logs", "Models"}
 GIT_MIRROR_CACHE_PARTS = {
@@ -72,6 +77,23 @@ MOVED_MECHANIC_DOC_REFS = (
 )
 
 
+def is_repo_self_index(path: Path, *, root: Path) -> bool:
+    try:
+        relative_path = path.relative_to(root)
+    except ValueError:
+        return False
+    if relative_path.parts[:2] != ("kag", "indexes") or path.suffix.lower() != ".json":
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(payload, dict)
+        and payload.get("schema_version") in REPO_SELF_INDEX_SCHEMA_VERSIONS
+    )
+
+
 def iter_text_files(root: Path, *, binary_suffixes: Set[str]) -> list[Path]:
     paths: list[Path] = []
 
@@ -81,6 +103,8 @@ def iter_text_files(root: Path, *, binary_suffixes: Set[str]) -> list[Path]:
         if ".git" in path.parts:
             continue
         if path.suffix.lower() in binary_suffixes:
+            continue
+        if is_repo_self_index(path, root=root):
             continue
 
         paths.append(path)

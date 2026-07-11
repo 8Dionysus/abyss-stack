@@ -90,6 +90,37 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
         )
         self.assertEqual(errors, [])
 
+    def test_repo_self_indexes_are_outside_authored_text_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "abyss-stack"
+            indexes = repo_root / "kag" / "indexes"
+            indexes.mkdir(parents=True)
+            source_index = indexes / "source_surface_index.json"
+            repository_index = indexes / "repo_event_index.json"
+            owner_index = indexes / "provider_readiness_index.json"
+            authored_doc = repo_root / "docs" / "ROUTE.md"
+            authored_doc.parent.mkdir(parents=True)
+            source_index.write_text(
+                '{"schema_version":"aoa-repo-local-kag-index-v2"}\n',
+                encoding="utf-8",
+            )
+            repository_index.write_text(
+                '{"schema_version":"aoa-repo-local-kag-repository-index-v2"}\n',
+                encoding="utf-8",
+            )
+            owner_index.write_text(
+                '{"schema_version":"aoa-local-kag-record-v1"}\n',
+                encoding="utf-8",
+            )
+            authored_doc.write_text("Current route\n", encoding="utf-8")
+
+            paths = self.iter_text_files(repo_root)
+
+        self.assertNotIn(source_index, paths)
+        self.assertNotIn(repository_index, paths)
+        self.assertIn(owner_index, paths)
+        self.assertIn(authored_doc, paths)
+
     def test_required_operator_scripts_have_backend_routes(self) -> None:
         self.assertEqual(
             script_surface.REQUIRED_SCRIPTS,
