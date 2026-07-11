@@ -149,6 +149,7 @@ meaning synchronized across entry surfaces.
 | Repair posture | `mechanics/runtime-repair/README.md` |
 | MCP access plane | `mcp/AGENTS.md` and the package-local card |
 | Local memory port | `memo/AGENTS.md` |
+| Repository KAG provider | `kag/AGENTS.md` |
 | Scripts | `scripts/README.md` and the owning mechanic part |
 | Repo-local agent overlays | `.agents/README.md` and the nearest `.agents/**/AGENTS.md` |
 | CI or GitHub route | `.github/GITHUB_SURFACE.md` and `.github/AGENTS.md` |

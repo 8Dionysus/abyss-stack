@@ -257,6 +257,12 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'quests/examples',
         'python scripts/validate_stack.py',
     ),
+    'kag/AGENTS.md': (
+        'repository-local KAG provider home',
+        'kag/manifest.json',
+        'runtime source home',
+        'aoa-kag',
+    ),
     'tests/AGENTS.md': (
         'runtime validation gate',
         'tests/README.md',
