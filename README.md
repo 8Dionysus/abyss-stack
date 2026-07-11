@@ -167,6 +167,7 @@ storage.
 | [env](env/README.md) | public environment examples |
 | [mcp](mcp/README.md) | stdio/local access planes for owner-layer context |
 | [memo](memo/README.md) | local runtime memory candidates, receipts, exports, and notes |
+| [kag](kag/README.md) | source-linked provider records and repository indexes |
 | [scripts](scripts/README.md) | stable operator wrappers and repository validators |
 | [systemd](systemd/README.md) | user-unit source skeletons and managed working-service adapters |
 | [tests](tests/README.md) | repository-level tests and validation routes |

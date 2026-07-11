@@ -1,0 +1,58 @@
+{
+  "schema_version": "aoa-local-kag-record-v1",
+  "repo": "abyss-stack",
+  "local_id": "index:abyss-stack:provider-records",
+  "record_class": "index",
+  "source_refs": [
+    {
+      "repo": "abyss-stack",
+      "path": "README.md",
+      "source_class": "runtime_source",
+      "role": "primary",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "mcp/README.md",
+      "source_class": "runtime_source",
+      "role": "supporting",
+      "authority": "authored_source"
+    }
+  ],
+  "source_owner": "abyss-stack",
+  "provenance_mode": "strict_source_linked",
+  "derived_method": "source-linked index over the local runtime provider records",
+  "generated_or_authored": "generated_from_source",
+  "status": "active",
+  "owner_return_route": {
+    "repo": "abyss-stack",
+    "surface": "README.md",
+    "route_kind": "runtime"
+  },
+  "freshness": {
+    "mode": "source_snapshot",
+    "state": "current",
+    "checked_ref": "README.md"
+  },
+  "builder": {
+    "route": "abyss-stack source validation",
+    "surface": "scripts/validate_stack.py"
+  },
+  "validator": {
+    "route": "python scripts/validate_stack.py",
+    "lane": "owner-local"
+  },
+  "storage_posture": {
+    "git_surface": "portable_records",
+    "payload_class": "index",
+    "runtime_route": "abyss-stack"
+  },
+  "consumer_route": "aoa-kag registry",
+  "index_kind": "inventory",
+  "indexed_record_classes": ["node", "edge"],
+  "source_record_ids": [
+    "node:abyss-stack:runtime-source-home",
+    "node:abyss-stack:mcp-access-plane",
+    "edge:abyss-stack:source-routes-to-access-plane"
+  ]
+}

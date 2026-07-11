@@ -1,0 +1,53 @@
+{
+  "schema_version": "aoa-local-kag-record-v1",
+  "repo": "abyss-stack",
+  "local_id": "node:abyss-stack:mcp-access-plane",
+  "record_class": "node",
+  "source_refs": [
+    {
+      "repo": "abyss-stack",
+      "path": "mcp/README.md",
+      "source_class": "runtime_source",
+      "role": "primary",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "mcp/services/aoa-kag-mcp/README.md",
+      "source_class": "runtime_source",
+      "role": "supporting",
+      "authority": "authored_source"
+    }
+  ],
+  "source_owner": "abyss-stack",
+  "provenance_mode": "strict_source_linked",
+  "derived_method": "source-linked local KAG node over the MCP access plane",
+  "generated_or_authored": "authored_control",
+  "status": "active",
+  "owner_return_route": {
+    "repo": "abyss-stack",
+    "surface": "mcp/README.md",
+    "route_kind": "runtime"
+  },
+  "freshness": {
+    "mode": "source_snapshot",
+    "state": "current",
+    "checked_ref": "mcp/README.md"
+  },
+  "builder": {
+    "route": "abyss-stack source validation",
+    "surface": "scripts/validate_stack.py"
+  },
+  "validator": {
+    "route": "python scripts/validate_stack.py",
+    "lane": "owner-local"
+  },
+  "storage_posture": {
+    "git_surface": "portable_records",
+    "payload_class": "node",
+    "runtime_route": "abyss-stack"
+  },
+  "consumer_route": "aoa-kag-mcp resource",
+  "node_kind": "route_surface",
+  "label": "abyss-stack MCP access plane"
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": "aoa-local-kag-manifest-v1",
+  "repo": "abyss-stack",
+  "owner_surface": "kag/AGENTS.md",
+  "source_surfaces": [
+    {
+      "repo": "abyss-stack",
+      "path": "README.md",
+      "source_class": "runtime_source",
+      "role": "primary",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "DESIGN.md",
+      "source_class": "runtime_source",
+      "role": "supporting",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "mechanics/README.md",
+      "source_class": "runtime_source",
+      "role": "supporting",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "mcp/README.md",
+      "source_class": "runtime_source",
+      "role": "consumer_route",
+      "authority": "authored_source"
+    }
+  ],
+  "record_classes": ["node", "edge", "index", "projection", "receipt"],
+  "storage_posture": {
+    "git_surface": "portable_records",
+    "payload_class": "manifest",
+    "runtime_route": "abyss-stack"
+  },
+  "validation_routes": [
+    {
+      "route": "python scripts/validate_stack.py",
+      "lane": "owner-local"
+    },
+    {
+      "route": "aoa-kag:scripts/validate_kag.py",
+      "lane": "local-kag"
+    }
+  ],
+  "consumer_routes": [
+    "aoa-kag registry",
+    "aoa-kag-mcp resource",
+    "abyss-stack runtime services"
+  ],
+  "owner_return_routes": [
+    {
+      "repo": "abyss-stack",
+      "surface": "README.md",
+      "route_kind": "runtime"
+    }
+  ]
+}

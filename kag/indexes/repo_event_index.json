@@ -1,0 +1,3155 @@
+{
+  "entries": [
+    {
+      "event_kind": "workflow_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:556b237fadfd7c60ea7a",
+      "observation_state": "declared",
+      "path": ".github/workflows/mirror-canary.yml",
+      "source_record_id": "file:.github/workflows/mirror-canary.yml:cb496c3de1"
+    },
+    {
+      "event_kind": "workflow_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:282d218d42aa29831177",
+      "observation_state": "declared",
+      "path": ".github/workflows/validate-stack.yml",
+      "source_record_id": "file:.github/workflows/validate-stack.yml:7087c9a5aa"
+    },
+    {
+      "event_kind": "release_declaration",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "040-2026-06-07",
+        "level": 2,
+        "line": 64,
+        "ref": "CHANGELOG.md#040-2026-06-07",
+        "title": "[0.4.0] - 2026-06-07"
+      },
+      "id": "event:repo:3eb29b8f1e1cc3c6b753",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "release_declaration",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "022-2026-04-23",
+        "level": 2,
+        "line": 543,
+        "ref": "CHANGELOG.md#022-2026-04-23",
+        "title": "[0.2.2] - 2026-04-23"
+      },
+      "id": "event:repo:4b2a692ed4fb1e723df1",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "release_declaration",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "020-2026-04-10",
+        "level": 2,
+        "line": 614,
+        "ref": "CHANGELOG.md#020-2026-04-10",
+        "title": "[0.2.0] - 2026-04-10"
+      },
+      "id": "event:repo:d5d901acef628d1ded98",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "release_declaration",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "010-2026-04-01",
+        "level": 2,
+        "line": 663,
+        "ref": "CHANGELOG.md#010-2026-04-01",
+        "title": "[0.1.0] - 2026-04-01"
+      },
+      "id": "event:repo:d7d753bf79cacb0d3b05",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "release_declaration",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "021-2026-04-19",
+        "level": 2,
+        "line": 583,
+        "ref": "CHANGELOG.md#021-2026-04-19",
+        "title": "[0.2.1] - 2026-04-19"
+      },
+      "id": "event:repo:dee9410c77499fec329e",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "release_lane",
+      "event_role": "declaration",
+      "heading_ref": {
+        "anchor": "unreleased",
+        "level": 2,
+        "line": 8,
+        "ref": "CHANGELOG.md#unreleased",
+        "title": "[Unreleased]"
+      },
+      "id": "event:repo:821cfb8a9a354c3cc449",
+      "observation_state": "declared",
+      "path": "CHANGELOG.md",
+      "source_record_id": "file:changelog.md:06572a96a5"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:e9f8c14ba2eed2e33588",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0001-runtime-root-under-abyssos.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0001-runtime-root-under-abyssos.md:c294dba858"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:bfbc367898df64932d5f",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0002-runtime-mechanics-topology.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0002-runtime-mechanics-topology.md:b6a2b2ea3e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:2e3b3ebeae5e68197eb3",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0003-mechanics-legacy-artifact-containment.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0003-mechanics-legacy-artifact-containment.md:85dbd9d608"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:7450db059a6c42ec743b",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0004-machine-bridge-under-machine-fit.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0004-machine-bridge-under-machine-fit.md:2b2de2124b"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1e84b3d03d590677b49c",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0005-operator-wrappers-with-part-local-backends.md:da8fb79e08"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:0a02a54eb8aa6606dd87",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0006-local-ai-trials-first-run-boundary.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0006-local-ai-trials-first-run-boundary.md:a20e700691"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:031469c1c904fa86617d",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0007-inference-pilot-compatibility-gates.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0007-inference-pilot-compatibility-gates.md:fc7a8bef91"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d28841588435af6c4c37",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0008-root-design-agent-surfaces.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0008-root-design-agent-surfaces.md:584ab8df46"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:6bb33796fd1d73de010c",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0009-root-residual-topology-cleanup.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0009-root-residual-topology-cleanup.md:1329ff67e4"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d2256660031164611932",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0010-workspace-sibling-roots-under-abyssos.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0010-workspace-sibling-roots-under-abyssos.md:27993211f9"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1d38f0b22a3e7c9012e7",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0011-legacy-heavy-runtime-package-distillation.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0011-legacy-heavy-runtime-package-distillation.md:54db9581ac"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:c881163231c1e7d01716",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0012-quest-and-compatibility-topology.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0012-quest-and-compatibility-topology.md:b27100126a"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:882395fd971e9a13da04",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0013-runtime-compatibility-boundaries.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0013-runtime-compatibility-boundaries.md:ee6cab81c5"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:6c27b8dd278f1a34bf29",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0014-residual-frontier-quest-alignment.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0014-residual-frontier-quest-alignment.md:767cea9fd8"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1a6ae872b89b86d98446",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0015-mechanics-package-card-completeness.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0015-mechanics-package-card-completeness.md:0047342cbd"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:cb27b5ebe0a5d5b9a398",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0016-live-runtime-cutover-parity.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0016-live-runtime-cutover-parity.md:1cc1b6b849"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1b259a2ad10740f27cac",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0017-direction-history-decision-surface-roles.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0017-direction-history-decision-surface-roles.md:2f622712d5"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:5b5c11c797a4a74557d7",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0018-entry-route-contract-validation-placement.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0018-entry-route-contract-validation-placement.md:caf976c29d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:666ce7f17af6119a6366",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0019-github-homepage-readme-selection.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0019-github-homepage-readme-selection.md:aa3f7a7e04"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:6d7d5adc44fab2807564",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0020-docs-district-topology.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0020-docs-district-topology.md:ebf4c15d57"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:35faba9c0692ddc02e50",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0021-source-component-pinning-posture.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0021-source-component-pinning-posture.md:1ae12460e2"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d3b2871abe32a5ccf7ae",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0022-machine-evidence-freshness-gates.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0022-machine-evidence-freshness-gates.md:e1b6ecf206"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:277e7f0e0ed744ae85f7",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0023-working-substrate-profile.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0023-working-substrate-profile.md:5a51997e9f"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:2a2f12883ec46d450b9c",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0024-fallback-gateway-profile.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0024-fallback-gateway-profile.md:a3adedbaa4"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1db300fe02d58b01ec42",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0025-composition-first-presets.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0025-composition-first-presets.md:8b9817da1d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:ca69b6a6c7a4aaed8750",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0026-workflow-automation-optional-profile.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0026-workflow-automation-optional-profile.md:901ff57f52"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:4efeca2c5b62d6fef1fd",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0027-managed-systemd-unit-sources.md:2ceff1fdcb"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:e214e22be9e8d3d9211f",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0028-intel-inference-and-rerank-service-selection.md:2898f4898a"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:30b228f2d80c6fb6174d",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0029-babelvox-tts-experimental-lane.md:cdeb8ccbcf"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:93d109e37182f43e13ec",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0030-rag-orchestration-profile.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0030-rag-orchestration-profile.md:d4048f22de"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d32e87ce90692088154d",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0031-aoa-memo-mcp-under-stack-mcp.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0031-aoa-memo-mcp-under-stack-mcp.md:689090ab9e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:71c7deff993b38e12a47",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0032-mcp-services-topology.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0032-mcp-services-topology.md:b43c61d29e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:5003cc09cb9a9c44198f",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0033-aoa-memo-mcp-port-confinement.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0033-aoa-memo-mcp-port-confinement.md:b1cd163950"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:ffe1b2599075dca41a62",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0034-aoa-memo-mcp-landing-plan-boundary.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0034-aoa-memo-mcp-landing-plan-boundary.md:7d57cc2c25"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:5d2883d88f41f62aff8b",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0035-aoa-evals-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0035-aoa-evals-mcp-access-plane.md:723ac817a0"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:ff9138f102c8e99c60ee",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0036-abyss-machine-mcp-access-plane.md:26ff5f10fa"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:9b778a97f13722985900",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0037-aoa-session-memory-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0037-aoa-session-memory-mcp-access-plane.md:f8fe7c3f10"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:3fe9a448c47df43b0a6b",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0038-canonical-decision-ids-and-indexes.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0038-canonical-decision-ids-and-indexes.md:69dc0fdecc"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:5374b61ade1acc0b18eb",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0039-validation-command-authority-and-technical-topology.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0039-validation-command-authority-and-technical-topology.md:8507d41e41"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:532602853cf29b5c85ac",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0040-script-surface-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0040-script-surface-validator-module.md:4a0ad29a4e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:6b1f3a66aad4204ce159",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0041-source-hygiene-validator-module.md:08bc2c833d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:be1e58476a4c9945994e",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0042-source-structure-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0042-source-structure-validator-module.md:fe87c9255d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:3427c1ffdc47b38c42d9",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0043-service-selection-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0043-service-selection-validator-module.md:5c5f853573"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:ec76d60fd9a406ead9a9",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0044-sync-parity-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0044-sync-parity-validator-module.md:6da22a26e3"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:f5b7f618792e35121316",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0045-questbook-surface-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0045-questbook-surface-validator-module.md:052ae4ded6"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:07346e818899d720106d",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0046-federation-surface-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0046-federation-surface-validator-module.md:ba80668245"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:3a8911d5c4f273b0780c",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0047-federation-upstream-compatibility-language-split.md:461cb45899"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:08f42a043cf64c2e02ad",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0048-federation-landing-validator-split.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0048-federation-landing-validator-split.md:390630c037"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:7afa2ca03e303172611e",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0049-federation-runtime-seams-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0049-federation-runtime-seams-validator-module.md:0e61728c0a"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:0f0fd29fb84197dd1be8",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0050-diagnostic-spine-validator-module.md:368c5d3bdb"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:57b5080c2ebd5770f71f",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0051-runtime-hygiene-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0051-runtime-hygiene-validator-module.md:992cbba9cf"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:81be9c41dac19885a540",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0052-machine-fit-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0052-machine-fit-validator-module.md:0e32fdadd2"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:b5152472d531ff5d1913",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0053-return-policy-validator-module.md:13845455cd"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d59718c521a4308c4d38",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0054-branch-policy-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0054-branch-policy-validator-module.md:425c86b70f"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:c971e6a318aa572bc3e4",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0055-root-routes-validator-module.md:bf05be4fb6"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:a517da612d9262629cea",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0056-decision-surface-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0056-decision-surface-validator-module.md:ceeeb19913"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d224b0b488a4864fbb61",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0057-mechanics-topology-validator-module.md:27f3f55b9f"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1ddfbfa3a5809e5ace69",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0058-profile-topology-validator-module.md:1bd85997bb"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:048efcc9263f352e0388",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0059-runtime-route-contracts-validator-module.md:5ec0472dd8"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:83dc303081294c2c0711",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0060-inference-pilot-compatibility-validator-module.md:5b8dc7d61d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:ef20c01aa325122a8323",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0061-active-topology-language-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0061-active-topology-language-validator-module.md:e06b0f586c"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:15398131d64180008392",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0062-agent-skill-projection-validator-module.md:b2161b6c07"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:10051451748326ba0070",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0063-root-validator-wrapper-tail-removal.md:529b117ad7"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:2433e60bcdcc2bace025",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0064-federation-effective-runtime-inputs.md:1b6b2e7b4a"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:fd0177b5037bd9a81d08",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0065-observability-logql-loki-alloy.md:f4afb79f51"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:1285de91f1bd3e8a683c",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0066-aoa-decisions-mcp-access-plane.md:4079e96936"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:e106bade277650e1e837",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0067-decision-surface-coverage-registry.md:221786448d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:39a42a669f21ee29a2e8",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0068-decision-graph-contract-and-impact-packets.md:462958ef9e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:c9445d466ad97f9f8769",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0069-tos-corpus-mcp-access-plane.md:dc704c758d"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:8c4be0befde291476c1b",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0070-observability-otlp-tempo-trace-plane.md:bdfadda129"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:46a5a9520e7fbc112d06",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0071-aoa-evals-local-port-write-side-mcp.md:dc35456284"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:083d122c6aefe5e03bf8",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0072-aoa-4pda-connector-mcp-access-plane.md:bd20cbe464"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:2de7ece058e4d0ec954a",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0073-tos-philosophy-graph-access-plane.md:fd2da5d803"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:77d79fc69d73888be6d0",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0074-telegram-discord-connector-mcp-access-planes.md:6a741b246e"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d68d7f45bf7d819fece5",
+      "observation_state": "declared",
+      "path": "docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md",
+      "source_record_id": "file:docs/decisions/abyss-stack-d-0075-aoa-kag-mcp-access-plane.md:5a239fe4db"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:8c6dc44900efb3e71283",
+      "observation_state": "declared",
+      "path": "docs/decisions/TEMPLATE.md",
+      "source_record_id": "file:docs/decisions/template.md:874770b824"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:6410c7fce9b5e5603030",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-date.md",
+      "source_record_id": "file:docs/decisions/indexes/by-date.md:7f76a83a93"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:403504f63e92caf9c530",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-guard.md",
+      "source_record_id": "file:docs/decisions/indexes/by-guard.md:8ae406686a"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:0de0bc91995ad9ed2362",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-mechanic.md",
+      "source_record_id": "file:docs/decisions/indexes/by-mechanic.md:ebd094489b"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:3526d4f152ff24b365e0",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-number.md",
+      "source_record_id": "file:docs/decisions/indexes/by-number.md:02e6940a39"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:d2528a83a8148d3cf483",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-stack-lane.md",
+      "source_record_id": "file:docs/decisions/indexes/by-stack-lane.md:f2dcc71adb"
+    },
+    {
+      "event_kind": "decision_record",
+      "event_role": "declaration",
+      "heading_ref": null,
+      "id": "event:repo:322cdf803f0aebfbf80f",
+      "observation_state": "declared",
+      "path": "docs/decisions/indexes/by-surface.md",
+      "source_record_id": "file:docs/decisions/indexes/by-surface.md:acd156903f"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:c8f69d91845f89f939d2",
+      "observation_state": "observed",
+      "path": "kag/receipts/validation_receipt.json",
+      "source_record_id": "file:kag/receipts/validation_receipt.json:8e616be0cd"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:531415dae5082f21a853",
+      "observation_state": "declared",
+      "path": "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",
+      "source_record_id": "file:mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py:0d99db9327"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0dd19a2f1e31438f9232",
+      "observation_state": "declared",
+      "path": "mcp/services/abyss-machine-mcp/scripts/release_check.py",
+      "source_record_id": "file:mcp/services/abyss-machine-mcp/scripts/release_check.py:35150f3c9f"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1153b6b338e3ce9e0286",
+      "observation_state": "declared",
+      "path": "mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py",
+      "source_record_id": "file:mcp/services/abyss-machine-mcp/scripts/validate_machine_mcp.py:6826b909c0"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b94800f8168b586ee1c0",
+      "observation_state": "declared",
+      "path": "mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py",
+      "source_record_id": "file:mcp/services/abyss-machine-mcp/tests/test_machine_mcp.py:a12d3ca9a6"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:6059ab09e12f7225e1d0",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-4pda-connector-mcp/scripts/aoa_4pda_connector_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-4pda-connector-mcp/scripts/aoa_4pda_connector_mcp_server.py:196f239da3"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c86e660423d33da50a29",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py:a03500d3d5"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7811e00aba3c5f32fa3d",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-4pda-connector-mcp/tests/test_4pda_connector_mcp.py:8835a41340"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ac6d6470664e890490da",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py:3bfeae6be1"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e92112c4dedd9ea1e0ab",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-decisions-mcp/scripts/release_check.py",
+      "source_record_id": "file:mcp/services/aoa-decisions-mcp/scripts/release_check.py:40998f5a60"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:da6b383b1c54e08bcb1d",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-decisions-mcp/scripts/validate_decisions_mcp.py:46f04a6148"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:09018c0c528968ced46c",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py:61953fe600"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d3958f686096767db334",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-discord-connector-mcp/scripts/aoa_discord_connector_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-discord-connector-mcp/scripts/aoa_discord_connector_mcp_server.py:8e7d8df6ae"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b59d98b70ff7fc8d83b6",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py:ce2a6dfe0c"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:bdecd47253ed77e1a420",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-discord-connector-mcp/tests/test_discord_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-discord-connector-mcp/tests/test_discord_connector_mcp.py:1f232d2442"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:397234aa0cf50f876d32",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-evals-mcp/scripts/aoa_evals_mcp_server.py:19222791a1"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:73bbc7732aedc33d09cd",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-evals-mcp/scripts/release_check.py",
+      "source_record_id": "file:mcp/services/aoa-evals-mcp/scripts/release_check.py:c2e512451b"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:70d4ff83f0fbb2b8c174",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-evals-mcp/scripts/validate_evals_mcp.py:6afb92305e"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:84a4f1e113ce405d935e",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-evals-mcp/tests/test_evals_mcp.py:7de69dd211"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:5e2f42f69f3bbf9a81cd",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-kag-mcp/scripts/aoa_kag_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-kag-mcp/scripts/aoa_kag_mcp_server.py:79194dad31"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:55eb7a91c2c8d71bf919",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py:2334ef570a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f4d8fde162b791a5dfee",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-kag-mcp/tests/test_kag_mcp.py:40f4e63943"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c6e00fb4dfe2de6cda8a",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-memo-mcp/scripts/release_check.py",
+      "source_record_id": "file:mcp/services/aoa-memo-mcp/scripts/release_check.py:5d5d7dea1a"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2c414154f653849f0836",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py:563e6c1eb7"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e5eedc8b70119947782b",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-memo-mcp/tests/test_memo_mcp.py:d80bcf8282"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b02915d538fe4b32ecee",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-session-memory-mcp/scripts/aoa_session_memory_mcp_server.py:1c3bcda9a4"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c8806a4949260c7cc303",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-session-memory-mcp/scripts/release_check.py",
+      "source_record_id": "file:mcp/services/aoa-session-memory-mcp/scripts/release_check.py:04d563135a"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:88f8f726f072662159e8",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py:b12da4671f"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:98377371dfd9c7e48b64",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-session-memory-mcp/tests/test_session_memory_mcp.py:3894ee72cf"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a424a99ec280c3f5c35a",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-telegram-connector-mcp/scripts/aoa_telegram_connector_mcp_server.py",
+      "source_record_id": "file:mcp/services/aoa-telegram-connector-mcp/scripts/aoa_telegram_connector_mcp_server.py:a4ec075bf8"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:eff34be9376d6b5f025e",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py:e6f9285e8b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:3fa0a96265d196f7736c",
+      "observation_state": "declared",
+      "path": "mcp/services/aoa-telegram-connector-mcp/tests/test_telegram_connector_mcp.py",
+      "source_record_id": "file:mcp/services/aoa-telegram-connector-mcp/tests/test_telegram_connector_mcp.py:39f7686efc"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:313cca5e333ee159b215",
+      "observation_state": "declared",
+      "path": "mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py",
+      "source_record_id": "file:mcp/services/tos-corpus-mcp/scripts/tos_corpus_mcp_server.py:edb74b0e53"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:92308b401fc59a3dd5fc",
+      "observation_state": "declared",
+      "path": "mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py",
+      "source_record_id": "file:mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py:349645c888"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:233a0b8aa9787f99e6a1",
+      "observation_state": "declared",
+      "path": "mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py",
+      "source_record_id": "file:mcp/services/tos-corpus-mcp/tests/test_tos_corpus_mcp.py:1a1e23023e"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d80514f8b356e8ce0ab2",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/build_duel_runtime_kernel_registry.py:c46dfcd199"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:cd4d112a9b317f04550d",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_registry.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/build_mechanical_trial_run_registry.py:f4477ce8dc"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a41581887b39bfb88344",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_duel_kernel.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_duel_kernel.py:546a4e5204"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:97762560bb9f7f536c0d",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_trials.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/simulate_mechanical_trials.py:7a10758e67"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:28abf81d07258b5c7e68",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/tests/test_duel_runtime_kernels.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/tests/test_duel_runtime_kernels.py:5ce3ed9b08"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8268fe9f324c9c007095",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/tests/test_mechanical_trial_runs.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/tests/test_mechanical_trial_runs.py:a801cfe1c8"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7e17d826a874f8d04b56",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/validate_duel_runtime_kernels.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/validate_duel_runtime_kernels.py:39ff8f6a68"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:22db6a3bf2ff260d9b5c",
+      "observation_state": "declared",
+      "path": "mechanics/agon-runtime/parts/runtime-kernels/validate_mechanical_trial_runs.py",
+      "source_record_id": "file:mechanics/agon-runtime/parts/runtime-kernels/validate_mechanical_trial_runs.py:d6d4611212"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:571f5c12676620fbb5a8",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh:ce487bc5b6"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8911e1e1c283b2f88876",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/aoa_preset_profiles.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/aoa_preset_profiles.sh:58ca34551f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9b3b13769d31e45184ed",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/aoa_profile_endpoints.sh:4355f38837"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:42040f136718b6f2bd28",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/aoa_profile_modules.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/aoa_profile_modules.sh:1ddfc78513"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:db0c72c70c42fdd86d59",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/aoa_render_config.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/aoa_render_config.sh:d38a7401cc"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8af3d08d8d5a4a4b9e09",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/aoa_render_services.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/aoa_render_services.sh:8c0916a17d"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:75b7f3babecb75947ded",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py",
+      "source_record_id": "file:mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py:03da311a8d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:57d314d70ff945a4e06c",
+      "observation_state": "declared",
+      "path": "mechanics/config-projection/parts/sync/aoa_sync_configs.sh",
+      "source_record_id": "file:mechanics/config-projection/parts/sync/aoa_sync_configs.sh:b49d9029b2"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f66c15eddf6975620a27",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.py:7bfee0cc6a"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9b478d0423c942aa7dc3",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnose-wrapper/aoa_diagnose.sh:7aadd58f2a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:639541e0e5b2dedb4a89",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnose-wrapper/tests/test_aoa_diagnose.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnose-wrapper/tests/test_aoa_diagnose.py:0d5dc6883c"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:363cee43598821c6bf13",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/diagnostic_surface_catalog_common.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnostic-surfaces/diagnostic_surface_catalog_common.py:5c2cb9da22"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:278ab0dfb9de61c3f812",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_contracts.py:d955b425cc"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ec12f7cbdddf279b9ecd",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py:451d8b6017"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1703cea7481aac83782c",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/doctor-readiness/aoa_doctor.sh:d62acd7c86"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a09363cb3eb2a782baeb",
+      "observation_state": "declared",
+      "path": "mechanics/diagnostic-spine/parts/doctor-readiness/tests/test_aoa_doctor.py",
+      "source_record_id": "file:mechanics/diagnostic-spine/parts/doctor-readiness/tests/test_aoa_doctor.py:7cb97790e5"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:948d5fb223b6675cf161",
+      "observation_state": "declared",
+      "path": "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave2_seed_contracts.py",
+      "source_record_id": "file:mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave2_seed_contracts.py:7c3f0c6b1b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8834b580be71f3c6b17f",
+      "observation_state": "declared",
+      "path": "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave3_seed_contracts.py",
+      "source_record_id": "file:mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave3_seed_contracts.py:12db1e7376"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:6a3cca530d523ed3c1a6",
+      "observation_state": "declared",
+      "path": "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave4_seed_contracts.py",
+      "source_record_id": "file:mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave4_seed_contracts.py:bae7588be6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d2d84803ec904fb17666",
+      "observation_state": "declared",
+      "path": "mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave5_seed_contracts.py",
+      "source_record_id": "file:mechanics/experience-runtime/legacy/artifacts/tests/test_experience_wave5_seed_contracts.py:da07fad33a"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1f09b59de0687ee1abbb",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/federation-checks/aoa_federated_check.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/federation-checks/aoa_federated_check.py:721cb772b5"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:264bcee9f9a8cf8b3f0e",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/federation-checks/tests/test_aoa_federated_check.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/federation-checks/tests/test_aoa_federated_check.py:8d5bab2b02"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:606cafa94c968c77f769",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/federation-checks/tests/test_langchain_api_federated.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/federation-checks/tests/test_langchain_api_federated.py:0f3878e93f"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f09608c6e464f036600f",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py:e69f9125be"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:970b13bfa9aed9df2ad8",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/rpg-runtime/aoa_rpg_runtime_projection.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/rpg-runtime/aoa_rpg_runtime_projection.py:418e0c21b7"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:94c4a52b028446e38a98",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py:f7a14552f3"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:edeb8acb8d2b936e10d9",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh",
+      "source_record_id": "file:mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh:7d2af99c4a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:da728c5b9e79b71df112",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/sync-wrapper/tests/test_sync_wrapper_freshness.py",
+      "source_record_id": "file:mechanics/federation-seams/parts/sync-wrapper/tests/test_sync_wrapper_freshness.py:5ee0bc9cb6"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:08a599cae0d750e39e8d",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/tos-graph/aoa_tos_graph.sh",
+      "source_record_id": "file:mechanics/federation-seams/parts/tos-graph/aoa_tos_graph.sh:15d4d9002f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0fa6cfa90f373c348035",
+      "observation_state": "declared",
+      "path": "mechanics/federation-seams/parts/tos-graph/tos_up.sh",
+      "source_record_id": "file:mechanics/federation-seams/parts/tos-graph/tos_up.sh:1a154e0016"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:314b29834cbc4458e59a",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py:6afb4e8925"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9c5c2c36893b85faa857",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py:f2631e1b47"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0773fd22af306fa1e86d",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/candidate-exports/aoa_export_artifact_hook_candidate.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/candidate-exports/aoa_export_artifact_hook_candidate.py:912fc40e7b"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:421a64699a271a403f31",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/candidate-exports/aoa_export_memo_candidate.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/candidate-exports/aoa_export_memo_candidate.py:22a1ce7e6a"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:91718288738783f78e47",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/candidate-exports/aoa_export_runtime_evidence_selection.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/candidate-exports/aoa_export_runtime_evidence_selection.py:36001b0dc6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1d6beb3d3169f7fa2a53",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py:f27fe9a040"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f51039e4e53c4911e6d1",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py:5ee7a40620"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ff91952e981982d8051a",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py:9c15f385bb"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:5f21f004e16187bdc78a",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_edit_specs.py:064505ff57"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f1d992918d4144a84b76",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_lifecycle.py:8dd05d1c07"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0907b147deb1f7df1c06",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_paths.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_paths.py:aa8b966383"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:99532a06c2fb2f8de877",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_policy_scope.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_policy_scope.py:e8738a8f1a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:5f00a9ecb15d38fea8a3",
+      "observation_state": "declared",
+      "path": "mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py",
+      "source_record_id": "file:mechanics/governed-execution/parts/governed-runner/tests/test_governed_runner_review_packets.py:1efa0ebb38"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7c25c986863675ba7774",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials",
+      "source_record_id": "file:mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-local-ai-trials:54824f16ed"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4498949d7c4ce85d37a6",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot",
+      "source_record_id": "file:mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w5-pilot:6568b5ad68"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:70ec25d52c79ab2b51c5",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot",
+      "source_record_id": "file:mechanics/inference-pilots/legacy/trials/artifacts/scripts/aoa-w6-pilot:e76c8ae623"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c437b8cd02c7e0c34941",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/langgraph-pilot/aoa_langgraph_pilot.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/langgraph-pilot/aoa_langgraph_pilot.py:1beac05215"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a07490c26ed8cfc8b494",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/llamacpp-pilot/aoa_llamacpp_pilot.py:1f63733307"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:db6b0e92df2deadf2ba7",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/llamacpp-pilot/tests/test_aoa_llamacpp_pilot.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/llamacpp-pilot/tests/test_aoa_llamacpp_pilot.py:e3a9e66e95"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7e570259e1f384d6f63a",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/local-trials/aoa_local_ai_trials.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/local-trials/aoa_local_ai_trials.py:c1de150964"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f5b10a4ee80aaf292117",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials",
+      "source_record_id": "file:mechanics/inference-pilots/parts/local-trials/compatibility-runners/aoa-local-ai-trials:03d315bb75"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c972d1f32aab1777f1d5",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/local-trials/tests/test_aoa_local_ai_trials.py:5256c9ad9d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e5cd5018eb8acc84bab5",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/local-trials/trial_compatibility_bridge.py:67a31b01e6"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7a74caef25c78c2a817d",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/promotion-loop/aoa_runtime_bench_index.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/promotion-loop/aoa_runtime_bench_index.py:a435a093d0"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e075667baaf4cf89c659",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh",
+      "source_record_id": "file:mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh:380f96427f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d8b828b5cc1620a84fe3",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh",
+      "source_record_id": "file:mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_long_horizon_pilot.sh:99e9ca0374"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:083c2d7824c2e3086df6",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot",
+      "source_record_id": "file:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w5-pilot:a847ac60d7"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a13e1dedb5b4aabe95ea",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot",
+      "source_record_id": "file:mechanics/inference-pilots/parts/quiet-bridge-commands/runners/aoa-w6-pilot:8f0c00fbc0"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c71358c7ad762d75ef0f",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh",
+      "source_record_id": "file:mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_bench.sh:0877daec8c"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:594e0dd4585dd83c1c70",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_check.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_check.py:acafe20e48"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ad97d70d46a69a19058f",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/qwen-routes/aoa_qwen_run.py:3f3c71eb42"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:58cc6cdc61378bdcc865",
+      "observation_state": "declared",
+      "path": "mechanics/inference-pilots/parts/qwen-routes/tests/test_aoa_qwen_check.py",
+      "source_record_id": "file:mechanics/inference-pilots/parts/qwen-routes/tests/test_aoa_qwen_check.py:22f37525c7"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:226b0b187bc687a75eff",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/fit-record/aoa_machine_fit.py:81e489ac17"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a26c5f5ea2069e7c4aac",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/fit-record/tests/test_aoa_machine_fit.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/fit-record/tests/test_aoa_machine_fit.py:82cc780ea9"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b2a0262ebea2bbb47740",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/host-facts/aoa_host_facts.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/host-facts/aoa_host_facts.py:e1dc02e131"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:aeaac1690027c02e2836",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/machine-bridge/aoa_machine_bridge.py:5ebb90fdab"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:69ec63a312e3cef9f7f2",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/machine-bridge/tests/test_machine_bridge_contracts.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/machine-bridge/tests/test_machine_bridge_contracts.py:19fc2406db"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a4df8adb472342974dd3",
+      "observation_state": "declared",
+      "path": "mechanics/machine-fit/parts/platform-adaptations/aoa_platform_adaptation.py",
+      "source_record_id": "file:mechanics/machine-fit/parts/platform-adaptations/aoa_platform_adaptation.py:94e362d348"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f3a24f9b97a63107ab8b",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/first-run-bootstrap/aoa_first_run.sh:f5c4d7daaa"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7a25e413d35a127ce669",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh:9fef57508e"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:005bd8baa2ee84165cab",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh:e9d211b7a4"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d4b6f51cf0421eaaee95",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh:f84227614b"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0d2596c7558dbd638824",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_optimization_audit_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_optimization_audit_status.py:721f625bea"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f9abf15ed63f83241fff",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_optimization_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_optimization_status.py:b045424d35"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7f9ef3ccc375992441f1",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_resource_guard_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_resource_guard_status.py:ef819ea912"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:06f3167d536f06747761",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_service_selection_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_service_selection_status.py:4af078352e"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:dd035cbe06b933529e35",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh:3f8faa0865"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:08188b3bf7e313c95d60",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_audit_status.py:5a53f3f529"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9facaa75afc0ebeeebd4",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/tests/test_optimization_status.py:3071a358f3"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:410796113e5a2a16eb8d",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_resource_guard_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/tests/test_resource_guard_status.py:a686d58d79"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:febdde9ebcc70313a36a",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_policy_validation.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_policy_validation.py:ca42b5a41d"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c7459c661a66ec72f1a7",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_status.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_status.py:bd1dfe2392"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b726ddc05473e9487b32",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/start-stop/aoa_apply_resource_guards.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/start-stop/aoa_apply_resource_guards.sh:79b0ff1659"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ca73d9f76ba10230cfaa",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/start-stop/aoa_down.sh:bfcca0672f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:49eeac3b595ebedca0c0",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/start-stop/aoa_up.sh:66c6c6d1f7"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b09757f4a7769f62e801",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/start-stop/aoa_warmup.sh:6c74973a4f"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:16de4f40ff5827eb90bd",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/start-stop/tests/test_aoa_warmup.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/start-stop/tests/test_aoa_warmup.py:c666d93e95"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:209c3f5b01dbe7a2e067",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/status-readouts/tests/test_runtime_hygiene.py",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/status-readouts/tests/test_runtime_hygiene.py:92c6da7644"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b37d367ea5bfcd53014b",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh:ca63db2cf1"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:350fabd4c62a5dfa5ef5",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_internal_probes.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/wait-smoke/aoa_internal_probes.sh:01bd1a1f9e"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:636555f05673d4b28a67",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/wait-smoke/aoa_smoke.sh:8908a7d1a7"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:6138e7cc130515ea66fd",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh",
+      "source_record_id": "file:mechanics/runtime-lifecycle/parts/wait-smoke/aoa_wait.sh:87c84308b1"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ec8c246a9079ea92a8b1",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_return_closeout_dry_run.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_return_closeout_dry_run.py:487a862cd3"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2187f141069ed0b25e3e",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py:9b706aa822"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:943c0641fdc637d2bf84",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/degradation-receipts/tests/test_degradation_receipts.py:71920eb202"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a45a33a3de0153ec85ab",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/memo-contradiction-sidecar/aoa_memo_contradiction_integrity.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/memo-contradiction-sidecar/aoa_memo_contradiction_integrity.py:80fead3427"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:caad3f446f2b7c0db2ef",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py:248109808b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:697686f75e7940afbd04",
+      "observation_state": "declared",
+      "path": "mechanics/runtime-repair/parts/repair-safe-closeout/tests/test_repair_safe_closeout_receipts.py",
+      "source_record_id": "file:mechanics/runtime-repair/parts/repair-safe-closeout/tests/test_repair_safe_closeout_receipts.py:1471cf374b"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:f3d91c1e8744352e817b",
+      "observation_state": "observed",
+      "path": "memo/receipts/.gitkeep",
+      "source_record_id": "file:memo/receipts/.gitkeep:eb3b036b02"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:7a7a596c9a5cfdd4491a",
+      "observation_state": "observed",
+      "path": "memo/receipts/20260520T051034Z.aoa-memo-mcp.validation-receipt.json",
+      "source_record_id": "file:memo/receipts/20260520t051034z.aoa-memo-mcp.validation-receipt.json:86d07d7337"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:9c1a9fdd85d83941c20b",
+      "observation_state": "observed",
+      "path": "memo/receipts/20260522T021004Z.aoa-memo-mcp-access-plane.forwarding-receipt.json",
+      "source_record_id": "file:memo/receipts/20260522t021004z.aoa-memo-mcp-access-plane.forwarding-receipt.json:1e82a732c3"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:80d228d9ef007edb3c23",
+      "observation_state": "observed",
+      "path": "memo/receipts/20260526T003500Z.os-access-plane-mcp-services.forwarding-receipt.json",
+      "source_record_id": "file:memo/receipts/20260526t003500z.os-access-plane-mcp-services.forwarding-receipt.json:74e503a869"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:364de99c9320f1b826e3",
+      "observation_state": "observed",
+      "path": "memo/receipts/20260526T003646Z.export-abyss-stack-20260526t003500z-os-access-pl.forwarding-receipt.json",
+      "source_record_id": "file:memo/receipts/20260526t003646z.export-abyss-stack-20260526t003500z-os-access-pl.forwarding-receipt.json:a5ee0a6421"
+    },
+    {
+      "event_kind": "validation_receipt",
+      "event_role": "receipt",
+      "heading_ref": null,
+      "id": "event:repo:a01c3a8fa3e81d89bef2",
+      "observation_state": "observed",
+      "path": "memo/receipts/20260526T021627Z.export-abyss-stack-20260526t021621z-aoa-memo-mcp.forwarding-receipt.json",
+      "source_record_id": "file:memo/receipts/20260526t021627z.export-abyss-stack-20260526t021621z-aoa-memo-mcp.forwarding-receipt.json:52591f88a2"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:af779f52b47ac9756c74",
+      "observation_state": "declared",
+      "path": "quests/scripts/build_quest_examples.py",
+      "source_record_id": "file:quests/scripts/build_quest_examples.py:f8f916b96a"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:67e3915471b71da0cbdb",
+      "observation_state": "declared",
+      "path": "quests/scripts/quest_surface.py",
+      "source_record_id": "file:quests/scripts/quest_surface.py:d9ca5648f8"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ef6d55433bbb5b0b5db0",
+      "observation_state": "declared",
+      "path": "scripts/aoa-a2a-return-closeout-dry-run",
+      "source_record_id": "file:scripts/aoa-a2a-return-closeout-dry-run:c85a362946"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f966cd987316ad1b958e",
+      "observation_state": "declared",
+      "path": "scripts/aoa-apply-resource-guards",
+      "source_record_id": "file:scripts/aoa-apply-resource-guards:9a55291939"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0126341ce3aa07a37b50",
+      "observation_state": "declared",
+      "path": "scripts/aoa-bootstrap-configs",
+      "source_record_id": "file:scripts/aoa-bootstrap-configs:7c5c58cf2b"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:59b58e93f95bd29da432",
+      "observation_state": "declared",
+      "path": "scripts/aoa-bounded-autonomy-pilot",
+      "source_record_id": "file:scripts/aoa-bounded-autonomy-pilot:1d2f4d6199"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:5740fe4169e77893e409",
+      "observation_state": "declared",
+      "path": "scripts/aoa-check-layout",
+      "source_record_id": "file:scripts/aoa-check-layout:4ed0e80deb"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7b1dc61eb2c060758f2a",
+      "observation_state": "declared",
+      "path": "scripts/aoa-diagnose",
+      "source_record_id": "file:scripts/aoa-diagnose:e532c4c0f0"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:beb0f1ea78427801a740",
+      "observation_state": "declared",
+      "path": "scripts/aoa-doctor",
+      "source_record_id": "file:scripts/aoa-doctor:30567ac5da"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7f7f2d3f755632df0add",
+      "observation_state": "declared",
+      "path": "scripts/aoa-down",
+      "source_record_id": "file:scripts/aoa-down:e4ad1e8f15"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:32b33c0fc8659f20ff41",
+      "observation_state": "declared",
+      "path": "scripts/aoa-export-artifact-hook-candidate",
+      "source_record_id": "file:scripts/aoa-export-artifact-hook-candidate:5c68b8be67"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:bccaf5dac4bcd902a839",
+      "observation_state": "declared",
+      "path": "scripts/aoa-export-memo-candidate",
+      "source_record_id": "file:scripts/aoa-export-memo-candidate:b8cccc5ec2"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9c93e721d7ff1257c717",
+      "observation_state": "declared",
+      "path": "scripts/aoa-export-runtime-evidence-selection",
+      "source_record_id": "file:scripts/aoa-export-runtime-evidence-selection:222e426fa7"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8883e18d806db9b02be7",
+      "observation_state": "declared",
+      "path": "scripts/aoa-federated-check",
+      "source_record_id": "file:scripts/aoa-federated-check:25993abd71"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:5abd8bc4a9636bdccc51",
+      "observation_state": "declared",
+      "path": "scripts/aoa-first-run",
+      "source_record_id": "file:scripts/aoa-first-run:2597a28933"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1619e957a4619446716f",
+      "observation_state": "declared",
+      "path": "scripts/aoa-governed-run",
+      "source_record_id": "file:scripts/aoa-governed-run:1d67b4aa42"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8910e60683272638ee1e",
+      "observation_state": "declared",
+      "path": "scripts/aoa-host-facts",
+      "source_record_id": "file:scripts/aoa-host-facts:9711270b29"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c2accc3f2e6b602fc8d8",
+      "observation_state": "declared",
+      "path": "scripts/aoa-install-layout",
+      "source_record_id": "file:scripts/aoa-install-layout:bed8486abe"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a7090283cd007a32b8c8",
+      "observation_state": "declared",
+      "path": "scripts/aoa-install-systemd",
+      "source_record_id": "file:scripts/aoa-install-systemd:3dea912770"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1c079675cfc2d057539b",
+      "observation_state": "declared",
+      "path": "scripts/aoa-internal-probes",
+      "source_record_id": "file:scripts/aoa-internal-probes:18e1d8b1d8"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0142cf40e972347eaed6",
+      "observation_state": "declared",
+      "path": "scripts/aoa-langgraph-pilot",
+      "source_record_id": "file:scripts/aoa-langgraph-pilot:1db25f64ca"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:92fe2dce93a4b63c083d",
+      "observation_state": "declared",
+      "path": "scripts/aoa-lib.sh",
+      "source_record_id": "file:scripts/aoa-lib.sh:574acb1b88"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9b37f7257a9a406fbc60",
+      "observation_state": "declared",
+      "path": "scripts/aoa-llamacpp-pilot",
+      "source_record_id": "file:scripts/aoa-llamacpp-pilot:cf3cd54381"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9cca17585a01eeddd187",
+      "observation_state": "declared",
+      "path": "scripts/aoa-local-ai-trials",
+      "source_record_id": "file:scripts/aoa-local-ai-trials:176f6c51b3"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ecb0a72c46c374f9c28b",
+      "observation_state": "declared",
+      "path": "scripts/aoa-logs",
+      "source_record_id": "file:scripts/aoa-logs:dd847f3b81"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:fc1e9077a16dba32bd97",
+      "observation_state": "declared",
+      "path": "scripts/aoa-long-horizon-pilot",
+      "source_record_id": "file:scripts/aoa-long-horizon-pilot:162e7c889e"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:381bef7c74126a9ded1d",
+      "observation_state": "declared",
+      "path": "scripts/aoa-machine-bridge",
+      "source_record_id": "file:scripts/aoa-machine-bridge:b9f7832f4b"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:cd3d726dcca34093af4c",
+      "observation_state": "declared",
+      "path": "scripts/aoa-machine-fit",
+      "source_record_id": "file:scripts/aoa-machine-fit:3d71f0ccea"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4f11d2270b5295f4c567",
+      "observation_state": "declared",
+      "path": "scripts/aoa-platform-adaptation",
+      "source_record_id": "file:scripts/aoa-platform-adaptation:5fa5c46a91"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2558d56c221f512ad1bc",
+      "observation_state": "declared",
+      "path": "scripts/aoa-preset-profiles",
+      "source_record_id": "file:scripts/aoa-preset-profiles:d00e44af28"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d5bb10572815e7451fce",
+      "observation_state": "declared",
+      "path": "scripts/aoa-profile-endpoints",
+      "source_record_id": "file:scripts/aoa-profile-endpoints:ccf174f638"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:838ea86a5c2572e7ba44",
+      "observation_state": "declared",
+      "path": "scripts/aoa-profile-modules",
+      "source_record_id": "file:scripts/aoa-profile-modules:3c49c1aa39"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b829c885e87ff18c7e33",
+      "observation_state": "declared",
+      "path": "scripts/aoa-qwen-bench",
+      "source_record_id": "file:scripts/aoa-qwen-bench:cb1c06bc4e"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9f5b271d5a08a3d0e6cc",
+      "observation_state": "declared",
+      "path": "scripts/aoa-qwen-check",
+      "source_record_id": "file:scripts/aoa-qwen-check:ef133b30c2"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8988e9c9d6fd7e33e8cd",
+      "observation_state": "declared",
+      "path": "scripts/aoa-qwen-run",
+      "source_record_id": "file:scripts/aoa-qwen-run:63daea3eb1"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:52caa0cb54aba729ae9b",
+      "observation_state": "declared",
+      "path": "scripts/aoa-render-config",
+      "source_record_id": "file:scripts/aoa-render-config:34fdb5b115"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:90fc4f785a539ce8d306",
+      "observation_state": "declared",
+      "path": "scripts/aoa-render-services",
+      "source_record_id": "file:scripts/aoa-render-services:638f8ce34d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:cd8757e224d1be36f875",
+      "observation_state": "declared",
+      "path": "scripts/aoa-rpg-runtime-projection",
+      "source_record_id": "file:scripts/aoa-rpg-runtime-projection:51072df02f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2d928efa7f5d10ff67ba",
+      "observation_state": "declared",
+      "path": "scripts/aoa-run-memo-contradiction-integrity",
+      "source_record_id": "file:scripts/aoa-run-memo-contradiction-integrity:cfd5a9ef9f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9ee1058d6e68109b4d63",
+      "observation_state": "declared",
+      "path": "scripts/aoa-runtime-bench-index",
+      "source_record_id": "file:scripts/aoa-runtime-bench-index:c59d5e995b"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:683e2189d122f05e6f14",
+      "observation_state": "declared",
+      "path": "scripts/aoa-smoke",
+      "source_record_id": "file:scripts/aoa-smoke:daedfb9fc5"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:bbf4faf29cb044225089",
+      "observation_state": "declared",
+      "path": "scripts/aoa-status",
+      "source_record_id": "file:scripts/aoa-status:6f81bdd93d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:aee556e26299e1c0c3db",
+      "observation_state": "declared",
+      "path": "scripts/aoa-sync-configs",
+      "source_record_id": "file:scripts/aoa-sync-configs:824d75d912"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4045d5f6d510fb999330",
+      "observation_state": "declared",
+      "path": "scripts/aoa-sync-federation-surfaces",
+      "source_record_id": "file:scripts/aoa-sync-federation-surfaces:b76886511d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4d8cba8620de7b7a42da",
+      "observation_state": "declared",
+      "path": "scripts/aoa-tos-graph",
+      "source_record_id": "file:scripts/aoa-tos-graph:8fa1d8be3a"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1962eebd7b925f920f74",
+      "observation_state": "declared",
+      "path": "scripts/aoa-up",
+      "source_record_id": "file:scripts/aoa-up:ce5c7f8816"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d3a44f1bba15b9c03c57",
+      "observation_state": "declared",
+      "path": "scripts/aoa-wait",
+      "source_record_id": "file:scripts/aoa-wait:4517aec074"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2e093079b3787f775f86",
+      "observation_state": "declared",
+      "path": "scripts/aoa-warmup",
+      "source_record_id": "file:scripts/aoa-warmup:be4f19df56"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e98901a133265c787c7d",
+      "observation_state": "declared",
+      "path": "scripts/build_diagnostic_surface_catalog.py",
+      "source_record_id": "file:scripts/build_diagnostic_surface_catalog.py:d9f44be0e6"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4e4ac36f63364d6cade3",
+      "observation_state": "declared",
+      "path": "scripts/build_workspace_decision_graph.py",
+      "source_record_id": "file:scripts/build_workspace_decision_graph.py:0d3fd5249d"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:838c190860da241e7fee",
+      "observation_state": "declared",
+      "path": "scripts/ci_gate.py",
+      "source_record_id": "file:scripts/ci_gate.py:c5138334e3"
+    },
+    {
+      "event_kind": "generation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:13568a3da3f8c177ca54",
+      "observation_state": "declared",
+      "path": "scripts/generate_decision_indexes.py",
+      "source_record_id": "file:scripts/generate_decision_indexes.py:9ee2698c6e"
+    },
+    {
+      "event_kind": "validation_lane_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7eadd5ba0cec518c3c97",
+      "observation_state": "declared",
+      "path": "scripts/release_check.py",
+      "source_record_id": "file:scripts/release_check.py:070046d3ac"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7270c715a9c0491a882a",
+      "observation_state": "declared",
+      "path": "scripts/tos-up",
+      "source_record_id": "file:scripts/tos-up:c16e7d4c63"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:dbf9c3e03cf8614a5b78",
+      "observation_state": "declared",
+      "path": "scripts/validate_decision_records.py",
+      "source_record_id": "file:scripts/validate_decision_records.py:20e04d231d"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f3c155a9f68f3ec66c39",
+      "observation_state": "declared",
+      "path": "scripts/validate_diagnostic_surface_catalog.py",
+      "source_record_id": "file:scripts/validate_diagnostic_surface_catalog.py:27a4326556"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:9f29680872744fa90e4e",
+      "observation_state": "declared",
+      "path": "scripts/validate_nested_agents.py",
+      "source_record_id": "file:scripts/validate_nested_agents.py:5befe5bd63"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:47fb2ce1f36879d86e19",
+      "observation_state": "declared",
+      "path": "scripts/validate_stack.py",
+      "source_record_id": "file:scripts/validate_stack.py:74162d6b81"
+    },
+    {
+      "event_kind": "validation_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0aac0c7b7a57e6920044",
+      "observation_state": "declared",
+      "path": "scripts/validate_workspace_decision_graph.py",
+      "source_record_id": "file:scripts/validate_workspace_decision_graph.py:1ed1a8f97f"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:789ded33d4f17912f55c",
+      "observation_state": "declared",
+      "path": "scripts/validation_lanes.py",
+      "source_record_id": "file:scripts/validation_lanes.py:dda053a98d"
+    },
+    {
+      "event_kind": "command_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ffeb373473d400b01b20",
+      "observation_state": "declared",
+      "path": "scripts/validators/sync_parity.py",
+      "source_record_id": "file:scripts/validators/sync_parity.py:56f9bf15a5"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:6195cf5576eca8a8fcc1",
+      "observation_state": "declared",
+      "path": "tests/test_active_topology_language_validator_module.py",
+      "source_record_id": "file:tests/test_active_topology_language_validator_module.py:b36a9428f7"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:4b4364f7403f231d9fc1",
+      "observation_state": "declared",
+      "path": "tests/test_agent_skill_projection_validator_module.py",
+      "source_record_id": "file:tests/test_agent_skill_projection_validator_module.py:17091dbf34"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:eafec29ea473f723c347",
+      "observation_state": "declared",
+      "path": "tests/test_aoa_lib_env_compat.py",
+      "source_record_id": "file:tests/test_aoa_lib_env_compat.py:09359ef81f"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:89c0188eaa6d25a419ea",
+      "observation_state": "declared",
+      "path": "tests/test_branch_policy_validator_module.py",
+      "source_record_id": "file:tests/test_branch_policy_validator_module.py:1433642661"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0baa50f9c946e58d43e6",
+      "observation_state": "declared",
+      "path": "tests/test_compose_contracts.py",
+      "source_record_id": "file:tests/test_compose_contracts.py:395c130db2"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0816ce61bc05881adfdc",
+      "observation_state": "declared",
+      "path": "tests/test_current_direction_routes.py",
+      "source_record_id": "file:tests/test_current_direction_routes.py:098f12afb4"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:ef5379c255c306c9f691",
+      "observation_state": "declared",
+      "path": "tests/test_decision_records.py",
+      "source_record_id": "file:tests/test_decision_records.py:111bd4e63c"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b68fc763b64e1dd45748",
+      "observation_state": "declared",
+      "path": "tests/test_decision_surface_validator_module.py",
+      "source_record_id": "file:tests/test_decision_surface_validator_module.py:814d23669a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:62bd4fd7ed00afc32501",
+      "observation_state": "declared",
+      "path": "tests/test_diagnostic_spine_validator_module.py",
+      "source_record_id": "file:tests/test_diagnostic_spine_validator_module.py:62c8f28663"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a01e6fbbd18b46f4d789",
+      "observation_state": "declared",
+      "path": "tests/test_federation_required_files_validator_module.py",
+      "source_record_id": "file:tests/test_federation_required_files_validator_module.py:04f4c1ca2b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:f7e2e16933a8adf5f3af",
+      "observation_state": "declared",
+      "path": "tests/test_federation_runtime_seams_validator_module.py",
+      "source_record_id": "file:tests/test_federation_runtime_seams_validator_module.py:0d6af0aa35"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:dda2cd49958e45c87327",
+      "observation_state": "declared",
+      "path": "tests/test_federation_validator_module.py",
+      "source_record_id": "file:tests/test_federation_validator_module.py:26122ad215"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d0eff2f007564b40d096",
+      "observation_state": "declared",
+      "path": "tests/test_inference_pilot_compatibility_validator_module.py",
+      "source_record_id": "file:tests/test_inference_pilot_compatibility_validator_module.py:46a6d11b0a"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:220ae18387039552a609",
+      "observation_state": "declared",
+      "path": "tests/test_machine_fit_validator_module.py",
+      "source_record_id": "file:tests/test_machine_fit_validator_module.py:002dd1b5b9"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:49c82f0682bb4a9794ba",
+      "observation_state": "declared",
+      "path": "tests/test_mechanics_topology_validator_module.py",
+      "source_record_id": "file:tests/test_mechanics_topology_validator_module.py:3c3d2e611d"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:b227346d5bfbd4ee7965",
+      "observation_state": "declared",
+      "path": "tests/test_platform_adaptation_backend.py",
+      "source_record_id": "file:tests/test_platform_adaptation_backend.py:c6dfa42cee"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:0b368e690b0d96c37de1",
+      "observation_state": "declared",
+      "path": "tests/test_profile_composition.py",
+      "source_record_id": "file:tests/test_profile_composition.py:b166d89766"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:449a856e0e9d62c49e8d",
+      "observation_state": "declared",
+      "path": "tests/test_profile_topology_validator_module.py",
+      "source_record_id": "file:tests/test_profile_topology_validator_module.py:e5a09b2169"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a7551caa11b0226830b3",
+      "observation_state": "declared",
+      "path": "tests/test_questbook_surface_contracts.py",
+      "source_record_id": "file:tests/test_questbook_surface_contracts.py:36ec0df867"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:311eaf2eccbe6845500a",
+      "observation_state": "declared",
+      "path": "tests/test_questbook_validator_module.py",
+      "source_record_id": "file:tests/test_questbook_validator_module.py:6f75023ad1"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1be12c91c767d9b39a0c",
+      "observation_state": "declared",
+      "path": "tests/test_rag_api_semantic_inventory.py",
+      "source_record_id": "file:tests/test_rag_api_semantic_inventory.py:fcef689905"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2d25da3f87ab53728790",
+      "observation_state": "declared",
+      "path": "tests/test_rag_bridge_contracts.py",
+      "source_record_id": "file:tests/test_rag_bridge_contracts.py:8ff9af7521"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:844538ac59a5cf9a0218",
+      "observation_state": "declared",
+      "path": "tests/test_return_policy_validator_module.py",
+      "source_record_id": "file:tests/test_return_policy_validator_module.py:c5003ffa4d"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:987c39cd08ddb1300998",
+      "observation_state": "declared",
+      "path": "tests/test_roadmap_parity.py",
+      "source_record_id": "file:tests/test_roadmap_parity.py:574915dc67"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c73180ad1e6b0b07ab25",
+      "observation_state": "declared",
+      "path": "tests/test_root_routes_validator_module.py",
+      "source_record_id": "file:tests/test_root_routes_validator_module.py:ac4a112b34"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:33653c6dcba4c738f9f5",
+      "observation_state": "declared",
+      "path": "tests/test_runtime_hygiene_validator_module.py",
+      "source_record_id": "file:tests/test_runtime_hygiene_validator_module.py:46bc30cdd6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:a04b0f5960e353738032",
+      "observation_state": "declared",
+      "path": "tests/test_runtime_lifecycle_user_unit.py",
+      "source_record_id": "file:tests/test_runtime_lifecycle_user_unit.py:05bab38ce2"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2cafe14a609a95e1e33f",
+      "observation_state": "declared",
+      "path": "tests/test_runtime_route_contracts_validator_module.py",
+      "source_record_id": "file:tests/test_runtime_route_contracts_validator_module.py:ffb0f6f1f4"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:643db15fed2a858f7903",
+      "observation_state": "declared",
+      "path": "tests/test_schema_contracts.py",
+      "source_record_id": "file:tests/test_schema_contracts.py:189cd51003"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:e7ed413f252a16f886e8",
+      "observation_state": "declared",
+      "path": "tests/test_script_topology.py",
+      "source_record_id": "file:tests/test_script_topology.py:6f0a306b0b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:d34890440baf2ebe238d",
+      "observation_state": "declared",
+      "path": "tests/test_service_app_guards.py",
+      "source_record_id": "file:tests/test_service_app_guards.py:61dac234f6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:30f9917773739b663187",
+      "observation_state": "declared",
+      "path": "tests/test_service_selection_validator_module.py",
+      "source_record_id": "file:tests/test_service_selection_validator_module.py:6e0bb2474e"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:3802603ce2c684b46214",
+      "observation_state": "declared",
+      "path": "tests/test_source_topology_validator_modules.py",
+      "source_record_id": "file:tests/test_source_topology_validator_modules.py:1aff09dc78"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:2145f2f52d6cd3f94558",
+      "observation_state": "declared",
+      "path": "tests/test_sync_parity_entrypoint_contracts.py",
+      "source_record_id": "file:tests/test_sync_parity_entrypoint_contracts.py:f3cc92936b"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:1ff4f0d7a2e96f2663c8",
+      "observation_state": "declared",
+      "path": "tests/test_sync_parity_validator_module.py",
+      "source_record_id": "file:tests/test_sync_parity_validator_module.py:e9763ad939"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:aa63dbd5271bcd98a574",
+      "observation_state": "declared",
+      "path": "tests/test_test_topology.py",
+      "source_record_id": "file:tests/test_test_topology.py:9474485b91"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:369e8bc843797db11b36",
+      "observation_state": "declared",
+      "path": "tests/test_tos_graph_corpus_runtime.py",
+      "source_record_id": "file:tests/test_tos_graph_corpus_runtime.py:c54019c5a6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:bdfcc83a1d0f85611f97",
+      "observation_state": "declared",
+      "path": "tests/test_tos_graph_ui_browser.py",
+      "source_record_id": "file:tests/test_tos_graph_ui_browser.py:2c331be465"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:c896afa8232562d9cd47",
+      "observation_state": "declared",
+      "path": "tests/test_validate_nested_agents.py",
+      "source_record_id": "file:tests/test_validate_nested_agents.py:46cd12457c"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:8f084cd313a8b26dc9e0",
+      "observation_state": "declared",
+      "path": "tests/test_validation_command_authority.py",
+      "source_record_id": "file:tests/test_validation_command_authority.py:78624b39c6"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:cbfd1b8d17fb1bb9e8a4",
+      "observation_state": "declared",
+      "path": "tests/test_validation_topology.py",
+      "source_record_id": "file:tests/test_validation_topology.py:f6818f763c"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:7b5301cb0417c2926411",
+      "observation_state": "declared",
+      "path": "tests/test_workspace_decision_graph.py",
+      "source_record_id": "file:tests/test_workspace_decision_graph.py:0f2e680584"
+    },
+    {
+      "event_kind": "test_run",
+      "event_role": "producer",
+      "heading_ref": null,
+      "id": "event:repo:68bf66b58772c7154396",
+      "observation_state": "declared",
+      "path": "tests/test_workspace_decision_graph_contract.py",
+      "source_record_id": "file:tests/test_workspace_decision_graph_contract.py:a4e41ece16"
+    }
+  ],
+  "index_identity": {
+    "artifact_kind": "repository_event_index",
+    "content_digest": "614617a1ad03beff5dce3f50ee82038efb0e07f3b517bb0b831caf373a5d5517",
+    "index_kind": "event",
+    "local_id": "index:repo-local:events",
+    "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
+  },
+  "registry_output": {
+    "consumer": "aoa-kag-mcp",
+    "resource_shape": "repo-local-event-index",
+    "stable_fields": [
+      "id",
+      "event_kind",
+      "event_role",
+      "source_record_id",
+      "path",
+      "heading_ref"
+    ]
+  },
+  "repo": {
+    "git_ref": "git-index-source-tree",
+    "name": "abyss-stack",
+    "owner_type": "runtime_source",
+    "root": "."
+  },
+  "schema_version": "aoa-repo-local-kag-repository-index-v1",
+  "source_index": {
+    "content_digest": "8b5043acd01c207f8e8f3bebf0304625ca0b4c631a0b6f69d3b41615057362f6",
+    "local_id": "index:repo-local:source-surfaces",
+    "path": "kag/indexes/source_surface_index.json"
+  },
+  "summary": {
+    "entry_count": 341,
+    "kind_counts": {
+      "command_run": 122,
+      "decision_record": 82,
+      "generation_run": 6,
+      "release_declaration": 5,
+      "release_lane": 1,
+      "test_run": 91,
+      "validation_lane_run": 7,
+      "validation_receipt": 7,
+      "validation_run": 18,
+      "workflow_run": 2
+    }
+  }
+}

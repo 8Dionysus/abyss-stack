@@ -1,0 +1,59 @@
+{
+  "schema_version": "aoa-local-kag-record-v1",
+  "repo": "abyss-stack",
+  "local_id": "projection:mcp:abyss-stack-source-return",
+  "record_class": "projection",
+  "source_refs": [
+    {
+      "repo": "abyss-stack",
+      "path": "README.md",
+      "source_class": "runtime_source",
+      "role": "owner_route",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
+      "path": "mcp/README.md",
+      "source_class": "runtime_source",
+      "role": "consumer_route",
+      "authority": "authored_source"
+    }
+  ],
+  "source_owner": "abyss-stack",
+  "provenance_mode": "strict_source_linked",
+  "derived_method": "source-return view over runtime source and MCP routes",
+  "generated_or_authored": "generated_from_source",
+  "status": "active",
+  "owner_return_route": {
+    "repo": "abyss-stack",
+    "surface": "README.md",
+    "route_kind": "runtime"
+  },
+  "freshness": {
+    "mode": "source_snapshot",
+    "state": "current",
+    "checked_ref": "README.md"
+  },
+  "builder": {
+    "route": "abyss-stack source validation",
+    "surface": "scripts/validate_stack.py"
+  },
+  "validator": {
+    "route": "aoa-kag local subtree validator",
+    "lane": "local-kag"
+  },
+  "storage_posture": {
+    "git_surface": "compact_readmodel",
+    "payload_class": "projection",
+    "runtime_route": "abyss-stack"
+  },
+  "consumer_route": "aoa-kag-mcp resource",
+  "projection_kind": "source_return_view",
+  "source_record_ids": [
+    "node:abyss-stack:runtime-source-home",
+    "node:abyss-stack:mcp-access-plane",
+    "edge:abyss-stack:source-routes-to-access-plane",
+    "index:abyss-stack:provider-records"
+  ],
+  "consumer_shape": "resources expose runtime source and MCP routes while authority returns to abyss-stack"
+}
