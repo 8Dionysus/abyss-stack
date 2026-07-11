@@ -87,7 +87,7 @@
   },
   "index_identity": {
     "artifact_kind": "source_surface_index",
-    "content_digest": "6b7b565f7e929b4baa5a4fe8026af1566e580e416b5e4c72b20444f3891f9b71",
+    "content_digest": "f3e10f68e4ff9caeb0d889fdebff5043f57d999590000cabcbded66bb6a30791",
     "local_id": "index:repo-local:source-surfaces",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json"
   },
@@ -4742,13 +4742,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "cf212fcd7e559450cf0978b5f466dfddade8f0251ca5c6a8c5e755a3c7dfa9f2",
+        "content_hash": "7c36a30e11ee1fe4c189da809d389bf237bce1c2af52974cbaeadb40975c1af1",
         "git_ref": "git-index-source-tree",
         "id": "file:changelog.md:06572a96a5",
         "mime": "text/markdown",
         "path": "CHANGELOG.md",
         "repo": "abyss-stack",
-        "size_bytes": 41546
+        "size_bytes": 41841
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -4805,217 +4805,217 @@
           {
             "anchor": "040-2026-06-07",
             "level": 2,
-            "line": 85,
+            "line": 89,
             "ref": "CHANGELOG.md#040-2026-06-07",
             "title": "[0.4.0] - 2026-06-07"
           },
           {
             "anchor": "summary",
             "level": 3,
-            "line": 87,
+            "line": 91,
             "ref": "CHANGELOG.md#summary",
             "title": "Summary"
           },
           {
             "anchor": "added-1",
             "level": 3,
-            "line": 110,
+            "line": 114,
             "ref": "CHANGELOG.md#added-1",
             "title": "Added"
           },
           {
             "anchor": "changed",
             "level": 3,
-            "line": 259,
+            "line": 263,
             "ref": "CHANGELOG.md#changed",
             "title": "Changed"
           },
           {
             "anchor": "included-in-this-release",
             "level": 3,
-            "line": 499,
+            "line": 503,
             "ref": "CHANGELOG.md#included-in-this-release",
             "title": "Included in this release"
           },
           {
             "anchor": "validation",
             "level": 3,
-            "line": 548,
+            "line": 552,
             "ref": "CHANGELOG.md#validation",
             "title": "Validation"
           },
           {
             "anchor": "notes",
             "level": 3,
-            "line": 559,
+            "line": 563,
             "ref": "CHANGELOG.md#notes",
             "title": "Notes"
           },
           {
             "anchor": "022-2026-04-23",
             "level": 2,
-            "line": 564,
+            "line": 568,
             "ref": "CHANGELOG.md#022-2026-04-23",
             "title": "[0.2.2] - 2026-04-23"
           },
           {
             "anchor": "summary-1",
             "level": 3,
-            "line": 566,
+            "line": 570,
             "ref": "CHANGELOG.md#summary-1",
             "title": "Summary"
           },
           {
             "anchor": "added-2",
             "level": 3,
-            "line": 579,
+            "line": 583,
             "ref": "CHANGELOG.md#added-2",
             "title": "Added"
           },
           {
             "anchor": "changed-1",
             "level": 3,
-            "line": 589,
+            "line": 593,
             "ref": "CHANGELOG.md#changed-1",
             "title": "Changed"
           },
           {
             "anchor": "validation-1",
             "level": 3,
-            "line": 595,
+            "line": 599,
             "ref": "CHANGELOG.md#validation-1",
             "title": "Validation"
           },
           {
             "anchor": "notes-1",
             "level": 3,
-            "line": 599,
+            "line": 603,
             "ref": "CHANGELOG.md#notes-1",
             "title": "Notes"
           },
           {
             "anchor": "021-2026-04-19",
             "level": 2,
-            "line": 604,
+            "line": 608,
             "ref": "CHANGELOG.md#021-2026-04-19",
             "title": "[0.2.1] - 2026-04-19"
           },
           {
             "anchor": "summary-2",
             "level": 3,
-            "line": 606,
+            "line": 610,
             "ref": "CHANGELOG.md#summary-2",
             "title": "Summary"
           },
           {
             "anchor": "added-3",
             "level": 3,
-            "line": 615,
+            "line": 619,
             "ref": "CHANGELOG.md#added-3",
             "title": "Added"
           },
           {
             "anchor": "changed-2",
             "level": 3,
-            "line": 620,
+            "line": 624,
             "ref": "CHANGELOG.md#changed-2",
             "title": "Changed"
           },
           {
             "anchor": "validation-2",
             "level": 3,
-            "line": 626,
+            "line": 630,
             "ref": "CHANGELOG.md#validation-2",
             "title": "Validation"
           },
           {
             "anchor": "notes-2",
             "level": 3,
-            "line": 630,
+            "line": 634,
             "ref": "CHANGELOG.md#notes-2",
             "title": "Notes"
           },
           {
             "anchor": "020-2026-04-10",
             "level": 2,
-            "line": 635,
+            "line": 639,
             "ref": "CHANGELOG.md#020-2026-04-10",
             "title": "[0.2.0] - 2026-04-10"
           },
           {
             "anchor": "summary-3",
             "level": 3,
-            "line": 637,
+            "line": 641,
             "ref": "CHANGELOG.md#summary-3",
             "title": "Summary"
           },
           {
             "anchor": "validation-3",
             "level": 3,
-            "line": 643,
+            "line": 647,
             "ref": "CHANGELOG.md#validation-3",
             "title": "Validation"
           },
           {
             "anchor": "notes-3",
             "level": 3,
-            "line": 647,
+            "line": 651,
             "ref": "CHANGELOG.md#notes-3",
             "title": "Notes"
           },
           {
             "anchor": "added-4",
             "level": 3,
-            "line": 651,
+            "line": 655,
             "ref": "CHANGELOG.md#added-4",
             "title": "Added"
           },
           {
             "anchor": "changed-3",
             "level": 3,
-            "line": 663,
+            "line": 667,
             "ref": "CHANGELOG.md#changed-3",
             "title": "Changed"
           },
           {
             "anchor": "included-in-this-release-1",
             "level": 3,
-            "line": 670,
+            "line": 674,
             "ref": "CHANGELOG.md#included-in-this-release-1",
             "title": "Included in this release"
           },
           {
             "anchor": "010-2026-04-01",
             "level": 2,
-            "line": 684,
+            "line": 688,
             "ref": "CHANGELOG.md#010-2026-04-01",
             "title": "[0.1.0] - 2026-04-01"
           },
           {
             "anchor": "summary-4",
             "level": 3,
-            "line": 690,
+            "line": 694,
             "ref": "CHANGELOG.md#summary-4",
             "title": "Summary"
           },
           {
             "anchor": "added-5",
             "level": 3,
-            "line": 696,
+            "line": 700,
             "ref": "CHANGELOG.md#added-5",
             "title": "Added"
           },
           {
             "anchor": "validation-4",
             "level": 3,
-            "line": 704,
+            "line": 708,
             "ref": "CHANGELOG.md#validation-4",
             "title": "Validation"
           },
           {
             "anchor": "notes-4",
             "level": 3,
-            "line": 710,
+            "line": 714,
             "ref": "CHANGELOG.md#notes-4",
             "title": "Notes"
           }
@@ -5027,7 +5027,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "cf212fcd7e559450cf0978b5f466dfddade8f0251ca5c6a8c5e755a3c7dfa9f2",
+        "digest": "7c36a30e11ee1fe4c189da809d389bf237bce1c2af52974cbaeadb40975c1af1",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -5651,13 +5651,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "a37922cbef4e8292ce6ff00b421dc90769ac9fd3ab509819f90fb56863563f27",
+        "content_hash": "8751392b5a024ef3ea45a356814e4783e1d25a5b12a957b57d8f3b95dc482eeb",
         "git_ref": "git-index-source-tree",
         "id": "file:design.md:3dc5dd454e",
         "mime": "text/markdown",
         "path": "DESIGN.md",
         "repo": "abyss-stack",
-        "size_bytes": 7755
+        "size_bytes": 7996
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -5735,28 +5735,28 @@
           {
             "anchor": "good-design-feels-like",
             "level": 2,
-            "line": 119,
+            "line": 123,
             "ref": "DESIGN.md#good-design-feels-like",
             "title": "Good Design Feels Like"
           },
           {
             "anchor": "bad-design-smells-like",
             "level": 2,
-            "line": 131,
+            "line": 135,
             "ref": "DESIGN.md#bad-design-smells-like",
             "title": "Bad Design Smells Like"
           },
           {
             "anchor": "relationship-to-other-root-surfaces",
             "level": 2,
-            "line": 141,
+            "line": 145,
             "ref": "DESIGN.md#relationship-to-other-root-surfaces",
             "title": "Relationship to Other Root Surfaces"
           },
           {
             "anchor": "use-by-agents",
             "level": 2,
-            "line": 152,
+            "line": 156,
             "ref": "DESIGN.md#use-by-agents",
             "title": "Use by Agents"
           }
@@ -5768,7 +5768,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "a37922cbef4e8292ce6ff00b421dc90769ac9fd3ab509819f90fb56863563f27",
+        "digest": "8751392b5a024ef3ea45a356814e4783e1d25a5b12a957b57d8f3b95dc482eeb",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -23822,13 +23822,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "73189267ee3247d3c735b3ea0714bd88f01a7454171d22277fbe84292b23eeaa",
+        "content_hash": "3b6638c7433049f025fc65acc85dfd568a14a40734b88ee95e73173c448fe062",
         "git_ref": "git-index-source-tree",
         "id": "file:docs/decisions/abyss-stack-d-0027-managed-systemd-unit-sources.md:2ceff1fdcb",
         "mime": "text/markdown",
         "path": "docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md",
         "repo": "abyss-stack",
-        "size_bytes": 4312
+        "size_bytes": 4878
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -23899,21 +23899,21 @@
           {
             "anchor": "consequences",
             "level": 2,
-            "line": 67,
+            "line": 73,
             "ref": "docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md#consequences",
             "title": "Consequences"
           },
           {
             "anchor": "source-surfaces",
             "level": 2,
-            "line": 80,
+            "line": 89,
             "ref": "docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md#source-surfaces",
             "title": "Source surfaces"
           },
           {
             "anchor": "follow-up-route",
             "level": 2,
-            "line": 100,
+            "line": 109,
             "ref": "docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md#follow-up-route",
             "title": "Follow-up route"
           }
@@ -23925,7 +23925,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "73189267ee3247d3c735b3ea0714bd88f01a7454171d22277fbe84292b23eeaa",
+        "digest": "3b6638c7433049f025fc65acc85dfd568a14a40734b88ee95e73173c448fe062",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -127297,13 +127297,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "cc24a22f5f31e75ee95a3295c80a894852f0015c5a3e769c6e17ac19309629f9",
+        "content_hash": "ae18090d8a21edeebeff93a204c9c9f5715ecc7ec29f16b67761972fab23ea93",
         "git_ref": "git-index-source-tree",
         "id": "file:systemd/user/agents.md:32d38508f0",
         "mime": "text/markdown",
         "path": "systemd/user/AGENTS.md",
         "repo": "abyss-stack",
-        "size_bytes": 3296
+        "size_bytes": 3743
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -127360,35 +127360,35 @@
           {
             "anchor": "unit-rules",
             "level": 2,
-            "line": 23,
+            "line": 27,
             "ref": "systemd/user/AGENTS.md#unit-rules",
             "title": "Unit rules"
           },
           {
             "anchor": "when-changing-units",
             "level": 2,
-            "line": 30,
+            "line": 34,
             "ref": "systemd/user/AGENTS.md#when-changing-units",
             "title": "When changing units"
           },
           {
             "anchor": "install-routes",
             "level": 2,
-            "line": 35,
+            "line": 42,
             "ref": "systemd/user/AGENTS.md#install-routes",
             "title": "Install routes"
           },
           {
             "anchor": "verify",
             "level": 2,
-            "line": 57,
+            "line": 64,
             "ref": "systemd/user/AGENTS.md#verify",
             "title": "Verify"
           },
           {
             "anchor": "hard-no",
             "level": 2,
-            "line": 70,
+            "line": 77,
             "ref": "systemd/user/AGENTS.md#hard-no",
             "title": "Hard no"
           }
@@ -127400,7 +127400,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "cc24a22f5f31e75ee95a3295c80a894852f0015c5a3e769c6e17ac19309629f9",
+        "digest": "ae18090d8a21edeebeff93a204c9c9f5715ecc7ec29f16b67761972fab23ea93",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -127448,13 +127448,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "493ecab587facf0d10cb86c65b1f34799d7fe94ac894692cfe3000aab9b80af7",
+        "content_hash": "2b86c5c1a75080218d776e96175dd5986f4cd48857109c0f4cdb4ecdf3dcc96c",
         "git_ref": "git-index-source-tree",
         "id": "file:systemd/user/readme.md:00ba17c0da",
         "mime": "text/markdown",
         "path": "systemd/user/README.md",
         "repo": "abyss-stack",
-        "size_bytes": 3274
+        "size_bytes": 3598
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -127511,7 +127511,7 @@
           {
             "anchor": "assumption",
             "level": 2,
-            "line": 80,
+            "line": 86,
             "ref": "systemd/user/README.md#assumption",
             "title": "Assumption"
           }
@@ -127523,7 +127523,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "493ecab587facf0d10cb86c65b1f34799d7fe94ac894692cfe3000aab9b80af7",
+        "digest": "2b86c5c1a75080218d776e96175dd5986f4cd48857109c0f4cdb4ecdf3dcc96c",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -130529,13 +130529,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "8525d052c75358a7185c9d20a8ee340f137fe70d85f310a05e9f1c0f19df0df0",
+        "content_hash": "9ee06174abf2419a9bd27b35baa3750be488b44db0d596786fbdc97df91d8022",
         "git_ref": "git-index-source-tree",
         "id": "file:systemd/user/aoa-stats-live-refresh.path:15c0cd93e1",
         "mime": "text/plain",
         "path": "systemd/user/aoa-stats-live-refresh.path",
         "repo": "abyss-stack",
-        "size_bytes": 747
+        "size_bytes": 661
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -130568,7 +130568,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "8525d052c75358a7185c9d20a8ee340f137fe70d85f310a05e9f1c0f19df0df0",
+        "digest": "9ee06174abf2419a9bd27b35baa3750be488b44db0d596786fbdc97df91d8022",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -130616,13 +130616,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "299134ac626845738791439d85975bc85f13dc41dd1a0e9710a602ca47db328a",
+        "content_hash": "7c6cf6bbc3a216b836ce3021991008d3b36140c5a749ba178342edad6f006b7e",
         "git_ref": "git-index-source-tree",
         "id": "file:systemd/user/aoa-stats-live-refresh.service:1bdf3a4972",
         "mime": "text/plain",
         "path": "systemd/user/aoa-stats-live-refresh.service",
         "repo": "abyss-stack",
-        "size_bytes": 293
+        "size_bytes": 226
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -130655,7 +130655,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "299134ac626845738791439d85975bc85f13dc41dd1a0e9710a602ca47db328a",
+        "digest": "7c6cf6bbc3a216b836ce3021991008d3b36140c5a749ba178342edad6f006b7e",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -133733,13 +133733,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "3530969fada2bcd71f2c04a690625eb498aa35a08bff67fd4b76b64df6ed84d2",
+        "content_hash": "b2237a969e8c8d9e9f064e76db37c0296096bba2bba47f572195d878df5ecf14",
         "git_ref": "git-index-source-tree",
         "id": "file:tests/test_runtime_lifecycle_user_unit.py:05bab38ce2",
         "mime": "text/x-python",
         "path": "tests/test_runtime_lifecycle_user_unit.py",
         "repo": "abyss-stack",
-        "size_bytes": 1585
+        "size_bytes": 3316
       },
       "mechanics_role": "none",
       "observed_form": "command",
@@ -133772,7 +133772,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "3530969fada2bcd71f2c04a690625eb498aa35a08bff67fd4b76b64df6ed84d2",
+        "digest": "b2237a969e8c8d9e9f064e76db37c0296096bba2bba47f572195d878df5ecf14",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
