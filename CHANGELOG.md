@@ -7,6 +7,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ## [Unreleased]
 
+### Added
+
+- `aoa-kag-mcp` now exposes each provider's source, entity, artifact, and event
+  index family plus optional owner-native domain index catalogs through bounded
+  read-only tools, resources, and CLI routes.
+
 ### Fixed
 
 - `aoa-session-memory-mcp` compact skill audit, usage-chain, neighborhood, and

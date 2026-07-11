@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ def main() -> None:
         "DESIGN.md",
         "docs/BOUNDARIES.md",
         "docs/THREAT_MODEL.md",
+        "src/aoa_kag_mcp/cli.py",
         "src/aoa_kag_mcp/core.py",
         "src/aoa_kag_mcp/server.py",
         "scripts/aoa_kag_mcp_server.py",
@@ -93,11 +95,81 @@ def main() -> None:
         raise SystemExit(f"{source_index_repo} repo-local-index resource returned no index")
     if not state.read_resource("aoa-kag://coverage/repo-local-source-indexes")["owners"]:
         raise SystemExit("aoa-kag coverage resource returned no owners")
-    server = build_server()
+    domain_catalog_count = 0
+    for provider in provider_status["providers"]:
+        repo = str(provider["repo"])
+        family = state.repository_index_family_lookup(repo)
+        if not family["family_complete"]:
+            raise SystemExit(f"{repo} repository index family is incomplete")
+        for index_kind in ("source", "entity", "artifact", "event"):
+            index = state.repository_index_lookup(repo, index_kind)
+            if not index["index_exists"]:
+                raise SystemExit(f"{repo} {index_kind} repository index is missing")
+        catalog = state.domain_index_catalog_lookup(repo)
+        if catalog["domain_index_catalog_ref"]:
+            domain_catalog_count += 1
+            if not catalog["catalog_exists"]:
+                raise SystemExit(f"{repo} domain index catalog is missing")
+
+    server = build_server(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+        provider_map_path=state.provider_map_path,
+        readiness_path=state.readiness_path,
+        coverage_path=state.coverage_path,
+    )
     if server is None:
         raise SystemExit("MCP server did not build")
 
-    print(json.dumps({"ok": True, "provider_count": status["provider_count"]}, indent=2))
+    handoff = state.provider_map().get("mcp_handoff", {})
+    expected_tools = {
+        f"aoa_kag_{name}" for name in handoff.get("tools", []) if isinstance(name, str)
+    }
+    actual_tools = {tool.name for tool in asyncio.run(server.list_tools())}
+    missing_tools = sorted(expected_tools - actual_tools)
+    if missing_tools:
+        raise SystemExit(f"MCP server is missing handoff tools: {missing_tools}")
+
+    expected_resources = {
+        str(item.get("uri_template"))
+        for item in handoff.get("resource_templates", [])
+        if isinstance(item, dict) and item.get("uri_template")
+    }
+    actual_resources = {
+        str(resource.uri) for resource in asyncio.run(server.list_resources())
+    }
+    actual_resources.update(
+        str(resource.uriTemplate)
+        for resource in asyncio.run(server.list_resource_templates())
+    )
+    missing_resources = sorted(expected_resources - actual_resources)
+    if missing_resources:
+        raise SystemExit(f"MCP server is missing handoff resources: {missing_resources}")
+
+    expected_prompts = {
+        name.replace("_", "-")
+        for name in handoff.get("prompts", [])
+        if isinstance(name, str)
+    }
+    actual_prompts = {prompt.name for prompt in asyncio.run(server.list_prompts())}
+    missing_prompts = sorted(expected_prompts - actual_prompts)
+    if missing_prompts:
+        raise SystemExit(f"MCP server is missing handoff prompts: {missing_prompts}")
+
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "provider_count": status["provider_count"],
+                "repository_index_family_count": len(provider_status["providers"]),
+                "domain_index_catalog_count": domain_catalog_count,
+                "handoff_tool_count": len(expected_tools),
+                "handoff_resource_count": len(expected_resources),
+                "handoff_prompt_count": len(expected_prompts),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -79,6 +79,35 @@ def build_server(
         return current_state().source_index_lookup(repo=repo)
 
     @mcp.tool()
+    def aoa_kag_repository_index_family_lookup(repo: str) -> dict[str, Any]:
+        """Return source, entity, artifact, and event index handles for one provider."""
+        return current_state().repository_index_family_lookup(repo=repo)
+
+    @mcp.tool()
+    def aoa_kag_repository_index_lookup(
+        repo: str,
+        index_kind: str,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        """Return one typed repository index and optional payload."""
+        return current_state().repository_index_lookup(
+            repo=repo,
+            index_kind=index_kind,
+            include_payload=include_payload,
+        )
+
+    @mcp.tool()
+    def aoa_kag_domain_index_catalog_lookup(
+        repo: str,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        """Return an owner-native domain index catalog when the provider publishes one."""
+        return current_state().domain_index_catalog_lookup(
+            repo=repo,
+            include_payload=include_payload,
+        )
+
+    @mcp.tool()
     def aoa_kag_repo_local_coverage_status(
         repo: str | None = None,
         status: str | None = None,
@@ -157,6 +186,30 @@ def build_server(
             indent=2,
         )
 
+    @mcp.resource("aoa-kag://providers/{repo}/repository-index-family")
+    def provider_repository_index_family_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/repository-index-family"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/indexes/{index_kind}")
+    def provider_repository_index_resource(repo: str, index_kind: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/indexes/{index_kind}"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.resource("aoa-kag://providers/{repo}/domain-index-catalog")
+    def provider_domain_index_catalog_resource(repo: str) -> str:
+        return json.dumps(
+            current_state().read_resource(f"aoa-kag://providers/{repo}/domain-index-catalog"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
     @mcp.resource("aoa-kag://coverage/repo-local-source-indexes")
     def repo_local_source_indexes_resource() -> str:
         return json.dumps(
@@ -185,7 +238,7 @@ def build_server(
         """Prompt route for reading one repo's KAG source surfaces."""
         return (
             f"Use aoa_kag_generation_route_lookup(repo={repo!r}), "
-            f"aoa_kag_source_index_lookup(repo={repo!r}), and "
+            f"aoa_kag_repository_index_family_lookup(repo={repo!r}), and "
             f"aoa_kag_source_return_lookup(repo={repo!r}) before summarizing repo-local source surfaces."
         )
 

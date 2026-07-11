@@ -4,7 +4,8 @@
 
 - Provider map and readiness matrix.
 - Repo-local `kag/` records.
-- Generation profiles, source-index handles, and repo-local coverage rows.
+- Generation profiles, repository index families, domain index catalogs, and
+  repo-local coverage rows.
 - Source-return route handles.
 - Local filesystem roots named by the provider map.
 
@@ -18,7 +19,8 @@
 ## Controls
 
 - Resource URI parsing accepts only the known `aoa-kag://` shapes.
-- Provider names and record classes are looked up from the provider map.
+- Provider names, index kinds, and record classes are looked up from the
+  provider map; local refs are resolved within the provider root.
 - Tools report source-return and freshness handles instead of mutating sources.
 - Validation checks the package shape, provider-map readability, and server
   build path.

@@ -13,6 +13,7 @@ DEFAULT_AOA_KAG_ROOT = DEFAULT_WORKSPACE_ROOT / "aoa-kag"
 PROVIDER_MAP_RELATIVE_PATH = Path("generated/local_kag_provider_map.min.json")
 READINESS_RELATIVE_PATH = Path("manifests/local_kag_readiness.json")
 REPO_LOCAL_COVERAGE_RELATIVE_PATH = Path("generated/repo_local_kag_coverage.min.json")
+REPOSITORY_INDEX_KINDS = ("source", "entity", "artifact", "event")
 RECORD_CLASS_DIRECTORIES = {
     "node": "nodes",
     "edge": "edges",
@@ -229,6 +230,33 @@ class AoAKagMCPState:
             "coverage_summary": payload.get("coverage_summary", {}),
             "classification_summary": payload.get("classification_summary", {}),
             "record_count": len(records) if isinstance(records, list) else None,
+        }
+
+    def _repository_index_summary(self, path: Path) -> dict[str, Any]:
+        payload = _read_json(path)
+        entries = payload.get("entries")
+        if not isinstance(entries, list):
+            entries = payload.get("records")
+        return {
+            "schema_version": payload.get("schema_version"),
+            "repo": payload.get("repo"),
+            "index_identity": payload.get("index_identity", {}),
+            "source_index": payload.get("source_index", {}),
+            "summary": payload.get("summary", {}),
+            "coverage_summary": payload.get("coverage_summary", {}),
+            "entry_count": len(entries) if isinstance(entries, list) else None,
+        }
+
+    def _domain_index_catalog_summary(self, path: Path) -> dict[str, Any]:
+        payload = _read_json(path)
+        entries = payload.get("entries")
+        return {
+            "schema_version": payload.get("schema_version"),
+            "repo": payload.get("repo"),
+            "catalog_identity": payload.get("catalog_identity", {}),
+            "entry_count": len(entries) if isinstance(entries, list) else None,
+            "owner_return_route": payload.get("owner_return_route"),
+            "consumer_routes": payload.get("consumer_routes", []),
         }
 
     def status(self) -> dict[str, Any]:
@@ -454,6 +482,131 @@ class AoAKagMCPState:
     def source_index_status(self, repo: str, *, include_payload: bool = False) -> dict[str, Any]:
         return self.source_index_lookup(repo, include_payload=include_payload)
 
+    def repository_index_family_lookup(self, repo: str) -> dict[str, Any]:
+        repo_index = self._provider_repo_local_index(repo)
+        provider = self._provider(repo)
+        if repo_index is None:
+            return {
+                "schema": "aoa_kag_repository_index_family_lookup_v1",
+                "repo": repo,
+                "status": "missing",
+                "family_complete": False,
+                "repository_index_family": {},
+                "indexes": {},
+                "lookup": self.provider_lookup(repo),
+                "authority_note": "Repository index families are read from the aoa-kag provider map.",
+            }
+        raw_family = repo_index.get("repository_index_family")
+        family = raw_family if isinstance(raw_family, dict) else {}
+        provider_root = self._provider_root(repo)
+        indexes: dict[str, dict[str, Any]] = {}
+        for index_kind in REPOSITORY_INDEX_KINDS:
+            index_ref = str(family.get(index_kind) or "")
+            index_path = _provider_child_path(provider_root, index_ref) if index_ref else None
+            indexes[index_kind] = {
+                "ref": index_ref,
+                "path": index_path.as_posix() if index_path else None,
+                "exists": bool(index_path and index_path.is_file()),
+            }
+        return {
+            "schema": "aoa_kag_repository_index_family_lookup_v1",
+            "repo": repo,
+            "status": repo_index.get("status", "unknown"),
+            "provider_status": provider.get("provider_status") if provider else None,
+            "provider_root": provider_root.as_posix(),
+            "family_complete": all(index["ref"] and index["exists"] for index in indexes.values()),
+            "repository_index_family": {
+                index_kind: indexes[index_kind]["ref"] for index_kind in REPOSITORY_INDEX_KINDS
+            },
+            "indexes": indexes,
+            "domain_index_catalog_ref": str(repo_index.get("domain_index_catalog_ref") or ""),
+            "authority_note": "The family is a provider-owned projection of repository source with return handles to local index files.",
+        }
+
+    def repository_index_lookup(
+        self,
+        repo: str,
+        index_kind: str,
+        *,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        if index_kind not in REPOSITORY_INDEX_KINDS:
+            raise KeyError(f"unknown repository index kind: {index_kind}")
+        repo_index = self._provider_repo_local_index(repo)
+        provider = self._provider(repo)
+        if repo_index is None:
+            return {
+                "schema": "aoa_kag_repository_index_lookup_v1",
+                "repo": repo,
+                "index_kind": index_kind,
+                "status": "missing",
+                "index_ref": "",
+                "index_path": None,
+                "index_exists": False,
+                "index_summary": {},
+                "index": None,
+                "lookup": self.provider_lookup(repo),
+            }
+        raw_family = repo_index.get("repository_index_family")
+        family = raw_family if isinstance(raw_family, dict) else {}
+        index_ref = str(family.get(index_kind) or "")
+        provider_root = self._provider_root(repo)
+        index_path = _provider_child_path(provider_root, index_ref) if index_ref else None
+        index_exists = bool(index_path and index_path.is_file())
+        return {
+            "schema": "aoa_kag_repository_index_lookup_v1",
+            "repo": repo,
+            "index_kind": index_kind,
+            "status": "available" if index_ref else "not_published",
+            "provider_index_status": repo_index.get("status", "unknown"),
+            "provider_status": provider.get("provider_status") if provider else None,
+            "provider_root": provider_root.as_posix(),
+            "index_ref": index_ref,
+            "index_path": index_path.as_posix() if index_path else None,
+            "index_exists": index_exists,
+            "index_summary": self._repository_index_summary(index_path) if index_exists and index_path else {},
+            "index": _read_json(index_path) if include_payload and index_exists and index_path else None,
+            "authority_note": "The returned index remains a derived read model owned by the provider repository.",
+        }
+
+    def domain_index_catalog_lookup(
+        self,
+        repo: str,
+        *,
+        include_payload: bool = False,
+    ) -> dict[str, Any]:
+        repo_index = self._provider_repo_local_index(repo)
+        provider = self._provider(repo)
+        if repo_index is None:
+            return {
+                "schema": "aoa_kag_domain_index_catalog_lookup_v1",
+                "repo": repo,
+                "status": "missing",
+                "domain_index_catalog_ref": "",
+                "catalog_path": None,
+                "catalog_exists": False,
+                "catalog_summary": {},
+                "domain_index_catalog": None,
+                "lookup": self.provider_lookup(repo),
+            }
+        catalog_ref = str(repo_index.get("domain_index_catalog_ref") or "")
+        provider_root = self._provider_root(repo)
+        catalog_path = _provider_child_path(provider_root, catalog_ref) if catalog_ref else None
+        catalog_exists = bool(catalog_path and catalog_path.is_file())
+        return {
+            "schema": "aoa_kag_domain_index_catalog_lookup_v1",
+            "repo": repo,
+            "status": "available" if catalog_ref else "not_published",
+            "provider_status": provider.get("provider_status") if provider else None,
+            "provider_root": provider_root.as_posix(),
+            "domain_index_catalog_ref": catalog_ref,
+            "catalog_path": catalog_path.as_posix() if catalog_path else None,
+            "catalog_exists": catalog_exists,
+            "catalog_summary": self._domain_index_catalog_summary(catalog_path) if catalog_exists and catalog_path else {},
+            "domain_index_catalog": _read_json(catalog_path) if include_payload and catalog_exists and catalog_path else None,
+            "authority_note": "Domain index catalogs route to owner-native indexes while their data and semantics remain with that owner.",
+        }
+
     def repo_local_coverage_status(
         self,
         repo: str | None = None,
@@ -634,6 +787,21 @@ class AoAKagMCPState:
             return self.repo_local_index(parts[0])
         if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "common-surface-profile":
             return self.common_surface_profile(parts[0])
+        if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "repository-index-family":
+            repo = parts[0]
+            if self._provider(repo) is None:
+                raise KeyError(f"unknown KAG provider: {repo}")
+            return self.repository_index_family_lookup(repo)
+        if parsed.netloc == "providers" and len(parts) == 3 and parts[1] == "indexes":
+            repo = parts[0]
+            if self._provider(repo) is None:
+                raise KeyError(f"unknown KAG provider: {repo}")
+            return self.repository_index_lookup(repo, parts[2], include_payload=True)
+        if parsed.netloc == "providers" and len(parts) == 2 and parts[1] == "domain-index-catalog":
+            repo = parts[0]
+            if self._provider(repo) is None:
+                raise KeyError(f"unknown KAG provider: {repo}")
+            return self.domain_index_catalog_lookup(repo, include_payload=True)
         if parsed.netloc == "providers" and len(parts) == 3 and parts[1] == "records":
             repo = parts[0]
             record_class = parts[2]
