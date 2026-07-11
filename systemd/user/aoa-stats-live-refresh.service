@@ -4,4 +4,4 @@ Description=Refresh aoa-stats live summaries from owner-local receipts
 [Service]
 Type=oneshot
 WorkingDirectory=/srv/AbyssOS/aoa-stats
-ExecStart=/usr/bin/env python3 /srv/AbyssOS/aoa-stats/scripts/refresh_live_stats.py --registry /srv/AbyssOS/aoa-stats/config/live_receipt_sources.json
+ExecStart=/usr/bin/env python3 /srv/AbyssOS/aoa-stats/scripts/refresh_live_stats.py

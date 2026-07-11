@@ -111,6 +111,10 @@ what was not checked, and what surface owns the next decision.
   provenance, landing notes, and validation paths.
 - **Seams are subordinate.** Federation routes may support sibling truth, but
   they cannot replace it.
+- **Adapters schedule; owners select inputs.** Runtime adapters may invoke a
+  sibling's deployed command, but they should not duplicate that sibling's
+  internal registry or source-selection policy when the command owns a stable
+  default.
 - **Generated companions stay companions.** Catalogs, indexes, diagnostics, and
   reports help navigation; source surfaces remain authoritative.
 - **Recovery is part of design.** A runtime surface is incomplete if it cannot

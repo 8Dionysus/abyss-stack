@@ -19,6 +19,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- The `aoa-stats` live-refresh user-unit adapter now watches only the six
+  currently admitted owner-local receipt surfaces and delegates registry
+  selection to the deployed `aoa-stats` refresh command instead of pinning the
+  retired runtime-wave receipt and a sibling-internal registry path.
 - `aoa-session-memory-mcp` now preserves producer-classified structured skill
   selection/load candidates and session-qualified task-episode refs across
   compact audit, usage-chain, and dossier packets, while keeping `loaded`
