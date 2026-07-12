@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -19,7 +20,7 @@ sys.path.insert(0, str(PART_ROOT))
 
 from kag_runtime import exact, graph, vector  # noqa: E402
 from kag_runtime.bundle import RetrievalBundle, canonical_json  # noqa: E402
-from kag_runtime.transport import HttpJsonError  # noqa: E402
+from kag_runtime.transport import HttpJsonError, JsonHttpClient  # noqa: E402
 
 
 def _digest(value: str) -> str:
@@ -316,7 +317,10 @@ class FakeGraph:
 
     def __init__(self) -> None:
         self.current: str | None = None
+        self.previous: str | None = None
         self.counts = {"owners": 0, "nodes": 0, "relations": 0, "external_references": 0}
+        self.stale_nodes = 0
+        self.cleanup_limits: list[int] = []
 
     def execute(self, statement: str, parameters: dict[str, Any] | None = None) -> list[list[Any]]:
         values = parameters or {}
@@ -330,10 +334,19 @@ class FakeGraph:
         elif "UNWIND" in statement and "MERGE (n:AoAKagNode" in statement:
             self.counts["nodes"] += len(rows)
         if "repo-self-current" in statement and "SET p.previous_digest" in statement:
+            self.previous = self.current
             self.current = str(values["projection"])
         return []
 
     def scalar(self, statement: str, parameters: dict[str, Any]) -> Any:
+        if "DETACH DELETE n" in statement:
+            limit = int(parameters["limit"])
+            self.cleanup_limits.append(limit)
+            removed = min(self.stale_nodes, limit)
+            self.stale_nodes -= removed
+            return removed
+        if "p.previous_digest" in statement:
+            return self.previous
         if "p.current_digest" in statement:
             return self.current
         if "AoAKagOwner" in statement:
@@ -462,6 +475,39 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(result["counts"]["nodes"], 2)
         checked = graph.check(self.bundle, graph=fake)
         self.assertEqual(checked["projection_digest"], self.bundle.projection_digest)
+
+    def test_neo4j_projection_resumes_bounded_retention_after_cutover(self) -> None:
+        fake = FakeGraph()
+        fake.current = self.bundle.projection_digest
+        fake.previous = "previous-projection"
+        fake.counts = {
+            "owners": 1,
+            "nodes": 2,
+            "relations": 1,
+            "external_references": 1,
+        }
+        fake.stale_nodes = 2500
+
+        result = graph.materialize(self.bundle, graph=fake, batch_size=1000)
+
+        self.assertEqual(result["previous_projection_digest"], "previous-projection")
+        self.assertEqual(
+            result["retained_projection_digests"],
+            [self.bundle.projection_digest, "previous-projection"],
+        )
+        self.assertEqual(fake.stale_nodes, 0)
+        self.assertTrue(fake.cleanup_limits)
+        self.assertTrue(all(limit == 1000 for limit in fake.cleanup_limits))
+
+    def test_http_client_wraps_remote_disconnect(self) -> None:
+        client = JsonHttpClient("http://example.test")
+        with mock.patch(
+            "kag_runtime.transport.request.urlopen",
+            side_effect=RemoteDisconnected("closed"),
+        ):
+            with self.assertRaises(HttpJsonError) as captured:
+                client.request("GET", "/health")
+        self.assertEqual(captured.exception.status, 0)
 
     def test_root_command_writes_exact_receipt_and_checks_projection(self) -> None:
         stack_root = self.root / "stack"

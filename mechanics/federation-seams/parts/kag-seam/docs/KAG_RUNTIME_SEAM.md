@@ -47,6 +47,8 @@ older managed projections are reclaimed.
 Vector builds resume an incomplete versioned collection from its confirmed
 document prefix. Transient embedding failures are retried, and a batch that
 exceeds live model capacity is split while preserving document order.
+Graph retention resumes independently after cutover and removes older
+projection nodes in bounded transactions.
 
 ## Operation
 

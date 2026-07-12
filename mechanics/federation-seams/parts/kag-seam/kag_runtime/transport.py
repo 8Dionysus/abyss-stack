@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from http.client import RemoteDisconnected
 from typing import Any, Mapping
 from urllib import error, request
 
@@ -44,6 +45,8 @@ class JsonHttpClient:
             raise HttpJsonError(exc.code, f"HTTP {exc.code} from {target}: {detail}") from exc
         except error.URLError as exc:
             raise HttpJsonError(0, f"request failed for {target}: {exc.reason}") from exc
+        except (ConnectionError, RemoteDisconnected, TimeoutError) as exc:
+            raise HttpJsonError(0, f"request failed for {target}: {exc}") from exc
         if not raw:
             return {}
         try:

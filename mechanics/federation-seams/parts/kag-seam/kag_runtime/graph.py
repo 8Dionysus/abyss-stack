@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from collections.abc import Callable
 from typing import Any, Iterable, Iterator
 
 from .bundle import RetrievalBundle, canonical_json
-from .transport import JsonHttpClient
+from .transport import HttpJsonError, JsonHttpClient
 
 
 SCHEMA_VERSION = "abyss-stack-repo-self-kag-neo4j-v1"
@@ -126,30 +127,23 @@ def _current_digest(graph: Neo4jProjection) -> str | None:
     return str(value) if value else None
 
 
-def materialize(
+def _previous_digest(graph: Neo4jProjection) -> str | None:
+    value = graph.scalar(
+        "MATCH (p:AoAKagProjection {name: 'repo-self-current'}) RETURN p.previous_digest",
+        {},
+    )
+    return str(value) if value else None
+
+
+def _load_projection(
     bundle: RetrievalBundle,
     *,
     graph: Neo4jProjection,
-    batch_size: int = 1000,
-    progress: Callable[[str, int, int], None] | None = None,
-) -> dict[str, Any]:
-    if batch_size <= 0:
-        raise ValueError("batch_size must be positive")
-    projection = bundle.projection_digest
-    previous = _current_digest(graph)
-    graph.execute(
-        "CREATE INDEX aoa_kag_node_identity IF NOT EXISTS "
-        "FOR (n:AoAKagNode) ON (n.projection_digest, n.id)"
-    )
-    graph.execute(
-        "CREATE INDEX aoa_kag_owner_identity IF NOT EXISTS "
-        "FOR (n:AoAKagOwner) ON (n.projection_digest, n.repo)"
-    )
-
-    totals = {
-        key: int(bundle.manifest["files"][key]["record_count"])
-        for key in ("owners", "nodes", "relations", "external_references")
-    }
+    projection: str,
+    totals: dict[str, int],
+    batch_size: int,
+    progress: Callable[[str, int, int], None] | None,
+) -> None:
     completed = 0
     for batch in _batches((_owner_row(item) for item in bundle.records("owners")), batch_size):
         graph.execute(
@@ -228,42 +222,102 @@ def materialize(
                 totals["external_references"],
             )
 
+
+def _cleanup_projections(
+    graph: Neo4jProjection,
+    *,
+    keep: list[str],
+    batch_size: int,
+) -> None:
+    for label in ("AoAKagNode", "AoAKagOwner", "AoAKagExternal"):
+        statement = (
+            f"MATCH (n:{label}) "
+            "WHERE n.projection_digest IS NOT NULL AND NOT n.projection_digest IN $keep "
+            "WITH n LIMIT $limit DETACH DELETE n RETURN count(*)"
+        )
+        while True:
+            for attempt in range(3):
+                try:
+                    removed = int(
+                        graph.scalar(
+                            statement,
+                            {"keep": keep, "limit": batch_size},
+                        )
+                        or 0
+                    )
+                    break
+                except HttpJsonError as exc:
+                    if exc.status not in {0, 502, 503, 504} or attempt == 2:
+                        raise
+                    time.sleep(2**attempt)
+            if removed == 0:
+                break
+
+
+def materialize(
+    bundle: RetrievalBundle,
+    *,
+    graph: Neo4jProjection,
+    batch_size: int = 1000,
+    progress: Callable[[str, int, int], None] | None = None,
+) -> dict[str, Any]:
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    projection = bundle.projection_digest
+    current = _current_digest(graph)
+    previous = _previous_digest(graph) if current == projection else current
+    graph.execute(
+        "CREATE INDEX aoa_kag_node_identity IF NOT EXISTS "
+        "FOR (n:AoAKagNode) ON (n.projection_digest, n.id)"
+    )
+    graph.execute(
+        "CREATE INDEX aoa_kag_owner_identity IF NOT EXISTS "
+        "FOR (n:AoAKagOwner) ON (n.projection_digest, n.repo)"
+    )
+
     expected = {
         key: int(bundle.manifest["files"][key]["record_count"])
         for key in ("owners", "nodes", "relations", "external_references")
     }
-    observed = _counts(graph, projection)
+    observed = _counts(graph, projection) if current == projection else {}
+    if observed != expected:
+        _load_projection(
+            bundle,
+            graph=graph,
+            projection=projection,
+            totals=expected,
+            batch_size=batch_size,
+            progress=progress,
+        )
+        observed = _counts(graph, projection)
     if observed != expected:
         raise RuntimeError(f"Neo4j projection counts mismatch: {observed} != {expected}")
 
-    graph.execute(
-        "MERGE (p:AoAKagProjection {name: 'repo-self-current'}) "
-        "SET p.previous_digest = p.current_digest, p.current_digest = $projection, "
-        "p.bundle_digest = $bundle, p.federation_digest = $federation, "
-        "p.owner_count = $owners, p.node_count = $nodes, "
-        "p.relation_count = $relations, p.external_reference_count = $external",
-        {
-            "projection": projection,
-            "bundle": bundle.bundle_digest,
-            "federation": bundle.federation_digest,
-            "owners": expected["owners"],
-            "nodes": expected["nodes"],
-            "relations": expected["relations"],
-            "external": expected["external_references"],
-        },
-    )
-    keep = [item for item in (projection, previous) if item]
-    graph.execute(
-        "MATCH (n) WHERE (n:AoAKagOwner OR n:AoAKagNode OR n:AoAKagExternal) "
-        "AND n.projection_digest IS NOT NULL AND NOT n.projection_digest IN $keep "
-        "DETACH DELETE n",
-        {"keep": keep},
-    )
+    if current != projection:
+        graph.execute(
+            "MERGE (p:AoAKagProjection {name: 'repo-self-current'}) "
+            "SET p.previous_digest = p.current_digest, p.current_digest = $projection, "
+            "p.bundle_digest = $bundle, p.federation_digest = $federation, "
+            "p.owner_count = $owners, p.node_count = $nodes, "
+            "p.relation_count = $relations, p.external_reference_count = $external",
+            {
+                "projection": projection,
+                "bundle": bundle.bundle_digest,
+                "federation": bundle.federation_digest,
+                "owners": expected["owners"],
+                "nodes": expected["nodes"],
+                "relations": expected["relations"],
+                "external": expected["external_references"],
+            },
+        )
+    keep = list(dict.fromkeys(item for item in (projection, previous) if item))
+    _cleanup_projections(graph, keep=keep, batch_size=batch_size)
     return {
         "schema_version": SCHEMA_VERSION,
         "database": graph.database,
         "projection_digest": projection,
         "previous_projection_digest": previous,
+        "retained_projection_digests": keep,
         "counts": observed,
     }
 
