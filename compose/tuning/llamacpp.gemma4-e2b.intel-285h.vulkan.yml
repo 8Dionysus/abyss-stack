@@ -6,6 +6,9 @@
 services:
   llama-cpp:
     image: "${AOA_LLAMACPP_VULKAN_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-vulkan@sha256:dca559dd886b415b4ced54f09197a2d84b55c432736a3a3fccca82359444f50c}"
+    command:
+      - "--sleep-idle-seconds"
+      - "600"
     labels:
       aoa.tuning.overlay: "llamacpp.gemma4-e2b.intel-285h.vulkan"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"

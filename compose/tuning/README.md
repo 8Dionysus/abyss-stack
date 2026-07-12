@@ -79,7 +79,9 @@ They are intentionally additive:
   Vulkan, keeps OVMS as the embeddings seam when used with `intel-worker`,
   uses one parallel slot, disables OpenAI literal-completions for the
   Gemma chat-template path, and points at a host-provided GGUF through
-  `AOA_GEMMA4_E2B_MODEL_HOST_PATH`
+  `AOA_GEMMA4_E2B_MODEL_HOST_PATH`; after 600 idle seconds it uses the
+  native `llama.cpp` sleep path so the model and KV cache can be released
+  without turning health probes into wake requests
 - `intel-text.ovms-gpu-lab` is a standalone OVMS text-generation sidecar harness for explicit model-card-driven Intel text screening, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
 - `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
 - `storage.intel-285h.resource-guard` bounds Postgres, Redis, Qdrant, and
