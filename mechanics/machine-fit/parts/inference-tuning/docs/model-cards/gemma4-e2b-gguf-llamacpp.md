@@ -44,6 +44,9 @@
 - the candidate overlay is text-only and intentionally does not mount an `mmproj`
 - keep `-np`/parallelism at one until swap and slot persistence are orchestrated
 - keep OVMS on embeddings in `intel-worker`; do not route this model through OVMS as the current stack promotion path
+- keep native `--sleep-idle-seconds 600` enabled; health, props, and model
+  metadata probes must remain non-waking, while a real inference request owns
+  the measured cold return
 - prefer the existing f16 KV cache posture until a Gemma 4-specific KV quantization packet proves quality and stability
 - use the host cache path through `AOA_GEMMA4_E2B_MODEL_HOST_PATH`; the model file itself is not source-managed
 - disable `LC_OPENAI_LITERAL_COMPLETIONS` for this lane; `llama.cpp`

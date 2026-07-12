@@ -818,7 +818,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "682debb9d44369ffaa74ecd82131b12f6a8e8ac63ef67cc193ccdbc8f1ae9df4",
+      "content_hash": "04389a58227eedba0b22c827e8c30388401a4f6d675ef9441d5a2f4626e5bb53",
       "id": "artifact:file:compose/tuning/readme.md:618e7f3d88",
       "path": "compose/tuning/README.md",
       "source_record_id": "file:compose/tuning/readme.md:618e7f3d88",
@@ -866,7 +866,7 @@
     },
     {
       "artifact_kind": "config",
-      "content_hash": "8c35979c60674236cef50e0f76de50ac4eee1d380b659377f273fafe382220ab",
+      "content_hash": "5a4beb7be8608b05391e535cea5e64f248dcc72fa7b4c8ef193be81904eb3582",
       "id": "artifact:file:compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml:9c2a5d8a1b",
       "path": "compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml",
       "source_record_id": "file:compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml:9c2a5d8a1b",
@@ -7370,7 +7370,7 @@
     },
     {
       "artifact_kind": "document",
-      "content_hash": "cdbed62242dd959c38b6423102ff7fb8f23daf6d0a75987f489d05917e799c66",
+      "content_hash": "60c84e159beda4fd29e9b07e07a0b6bc4db86021803dfe32a7cd1f362b15ba10",
       "id": "artifact:file:mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md:99bdfcb52a",
       "path": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md",
       "source_record_id": "file:mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md:99bdfcb52a",
@@ -10235,7 +10235,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_artifact_index",
-    "content_digest": "97d949fbeb981794b4f583dd2fc68d360acbab80e45d54da774c13a89f4f9969",
+    "content_digest": "e00822652cc11333f1408c3ba7c87aba0b992d088fde64412374ac65f572d74d",
     "index_kind": "artifact",
     "local_id": "index:repo-local:artifacts",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -10259,7 +10259,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v1",
   "source_index": {
-    "content_digest": "f3e10f68e4ff9caeb0d889fdebff5043f57d999590000cabcbded66bb6a30791",
+    "content_digest": "007c008457aaf7caae47dbbe5e91c08b0526f45eb1d047fb9caa326624bf2338",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },
