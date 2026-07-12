@@ -6,6 +6,8 @@
 - keep compatibility names isolated behind explicit bridge config and legacy
   inventory
 - keep generated RPG runtime collections source-rebuilt and checked
+- keep KAG runtime projection cost, latency, retrieval quality, and retention
+  measured against the bundle and receipts
 - keep route-api consumption subordinate to owner repositories
 
 ## Next candidates

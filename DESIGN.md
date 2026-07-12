@@ -65,6 +65,8 @@ The runtime body has these organs:
   that stay runtime-owned rather than proof-owned
 - **federation seams**: opt-in runtime bridges to sibling repositories that
   consume or mirror surfaces without stealing their authority
+- **runtime knowledge projections**: manifest-bound exact, lexical, vector,
+  and graph read models built from owner-qualified KAG records
 - **MCP access planes**: stdio or local-access adapters that expose live or
   derived context while keeping owner-layer authority outside the prompt
 - **local memo port**: runtime-side memory candidates, receipts, exports, and

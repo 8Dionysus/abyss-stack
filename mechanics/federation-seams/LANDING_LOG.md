@@ -36,3 +36,10 @@ Closed the RPG runtime materialization quest by writing source-generated
 collections into synthetic runtime `Logs/rpg/latest/` and timestamped
 `records/` files, then validating projection parity. This did not add live
 `/rpg/*` endpoints or source quest mutation.
+
+## 2026-07-11 - Repo-self KAG runtime projections
+
+Added verified bundle ingestion and versioned SQLite/FTS, Qdrant, and Neo4j
+materializers under the KAG seam, with stable operator routing and runtime
+receipts. Focused adapter tests, stack validation, source-fast, and live Qdrant
+and Neo4j API contract probes passed.

@@ -19,6 +19,11 @@ Persistent state and retrieval substrate:
 - Qdrant
 - Neo4j
 
+Repo-self KAG projection binds SQLite/FTS, Qdrant, and Neo4j to one verified
+`aoa-kag` bundle identity. Runtime files and receipts live under
+`Knowledge/kag/repo-self/`; canonical records remain in repository-owned
+`/kag` homes.
+
 ### 2. Workflow automation layer
 
 Optional workflow coordination and pipeline surfaces:

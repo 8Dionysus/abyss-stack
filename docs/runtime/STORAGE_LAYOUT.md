@@ -19,6 +19,8 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
   Models/
   Knowledge/
     federation/
+    kag/
+      repo-self/
   Logs/
     machine-bridge/
     diagnostics/
@@ -39,7 +41,7 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
 - `Services/` — persistent state for databases and runtime services, plus source-managed build contexts and service-local inputs for lightweight helper services such as `langchain-api`, `litellm`, `docs-api`, `route-api`, `rerank-api`, `tos-graph`, `qwen3-tts-api`, `babelvox-tts-api`, and `tts_router`
 - `Models/` — local model weights and related serving artifacts
-- `Knowledge/` — local knowledge corpora, helper inputs, and runtime-local mirrors of public-safe federation surfaces such as `Knowledge/federation/aoa-agents/`, `Knowledge/federation/aoa-routing/`, `Knowledge/federation/aoa-memo/`, `Knowledge/federation/aoa-evals/`, `Knowledge/federation/aoa-playbooks/`, `Knowledge/federation/aoa-kag/`, and the source-owned companion `Knowledge/federation/tos-source/`
+- `Knowledge/` — local knowledge corpora, repo-self KAG exact/vector/graph receipts under `Knowledge/kag/repo-self/`, and runtime-local mirrors of public-safe federation surfaces such as `Knowledge/federation/aoa-agents/`, `Knowledge/federation/aoa-routing/`, `Knowledge/federation/aoa-memo/`, `Knowledge/federation/aoa-evals/`, `Knowledge/federation/aoa-playbooks/`, `Knowledge/federation/aoa-kag/`, and the source-owned companion `Knowledge/federation/tos-source/`
 - `Logs/` — logs and generated runtime artifacts, including stack-side `abyss-machine` bridge records under `Logs/machine-bridge/`, diagnostic spine sessions, diagnosis companions, reviewed diagnosis refs, repair handoffs, and `last_good` anchors under `Logs/diagnostics/`, local private host-facts captures under `Logs/host-facts/`, memo export candidates under `Logs/memo-exports/`, eval export candidates under `Logs/eval-exports/`, RPG runtime copies under `Logs/rpg/`, ToS graph helper artifacts under `Logs/tos-graph/`, platform-adaptation records under `Logs/platform-adaptations/`, and runtime benchmark artifacts under `Logs/runtime-benchmarks/`
 - `.codex-home/` — isolated agent or codex-style runtime home
 

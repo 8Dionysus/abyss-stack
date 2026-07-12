@@ -65,6 +65,35 @@ def test_stale_runtime_root_is_blocked_outside_legacy_migration(tmp_path: Path) 
     )
 
 
+def test_stale_stack_root_is_blocked_in_active_source(tmp_path: Path) -> None:
+    write_valid_surface(tmp_path)
+    stale_doc = tmp_path / "docs" / "runtime" / "STALE_STACK_ROOT.md"
+    write_text(stale_doc, f"old root: {runtime_route_contracts.STALE_STACK_ROOT}")
+
+    errors = run_runtime_route_validator(tmp_path)
+
+    assert (
+        f"stale stack root '{runtime_route_contracts.STALE_STACK_ROOT}' "
+        "found in docs/runtime/STALE_STACK_ROOT.md"
+        in errors
+    )
+
+
+def test_historical_kag_indexes_are_not_reclassified_as_active_source(
+    tmp_path: Path,
+) -> None:
+    write_valid_surface(tmp_path)
+    event_index = tmp_path / "kag" / "indexes" / "repo_event_index.json"
+    write_text(
+        event_index,
+        '{"label":"historical '
+        + runtime_route_contracts.STALE_STACK_ROOT
+        + ' migration event"}\n',
+    )
+
+    assert run_runtime_route_validator(tmp_path) == []
+
+
 def test_readme_must_stay_route_focused(tmp_path: Path) -> None:
     write_valid_surface(tmp_path)
     readme_path = tmp_path / "README.md"

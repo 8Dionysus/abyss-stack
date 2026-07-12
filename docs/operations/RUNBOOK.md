@@ -267,6 +267,13 @@ curl -X POST http://127.0.0.1:5402/kag/query-mode \
   -d '{"mode":"global_search"}'
 ```
 
+For repo-self KAG runtime projection and parity:
+
+```bash
+scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all
+scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all --check
+```
+
 For combined surfaces:
 
 ```bash

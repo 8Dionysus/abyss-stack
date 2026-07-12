@@ -1,0 +1,11 @@
+{
+  "embedding_profile": {
+    "id": "qwen3-embed-0.6b-int8-ov",
+    "model": "qwen3-embed-0.6b-int8-ov",
+    "revision": "sha256:e5fa45cb772afbdfb360905241d24d11b62f80f2ab33a3b884d10a08e21224c4",
+    "dimensions": 1024,
+    "distance": "cosine",
+    "normalization": "l2",
+    "provider_contract": "abyss-stack-langchain-embeddings-v1"
+  }
+}
