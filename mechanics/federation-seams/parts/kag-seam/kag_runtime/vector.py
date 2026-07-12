@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Callable
+from itertools import islice
 from typing import Any, Iterable, Iterator
 
 from .bundle import RetrievalBundle
@@ -17,6 +19,8 @@ DISTANCES = {
     "euclid": "Euclid",
     "manhattan": "Manhattan",
 }
+TRANSIENT_EMBEDDING_STATUSES = {0, 429, 500, 502, 503, 504}
+EMBEDDING_RETRY_DELAYS = (1.0, 2.0, 4.0)
 
 
 def _batches(records: Iterable[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:
@@ -71,6 +75,31 @@ def _embedding_vectors(
     return [
         _normalize(item.get("embedding", []), str(profile["normalization"]), dimensions)
         for item in ordered
+    ]
+
+
+def _embedding_vectors_resilient(
+    client: JsonHttpClient,
+    documents: list[dict[str, Any]],
+    profile: dict[str, Any],
+) -> list[list[float]]:
+    last_error: HttpJsonError | None = None
+    for delay in (0.0, *EMBEDDING_RETRY_DELAYS):
+        if delay:
+            time.sleep(delay)
+        try:
+            return _embedding_vectors(client, documents, profile)
+        except HttpJsonError as exc:
+            if exc.status not in TRANSIENT_EMBEDDING_STATUSES:
+                raise
+            last_error = exc
+    if len(documents) == 1:
+        assert last_error is not None
+        raise last_error
+    midpoint = len(documents) // 2
+    return [
+        *_embedding_vectors_resilient(client, documents[:midpoint], profile),
+        *_embedding_vectors_resilient(client, documents[midpoint:], profile),
     ]
 
 
@@ -209,9 +238,18 @@ def materialize(
     collection = _collection_name(bundle)
     expected_count = int(bundle.manifest["files"]["documents"]["record_count"])
     existing = _collection(qdrant, collection)
-    if existing is not None and _validate_collection(existing, profile) != expected_count:
-        qdrant.request("DELETE", f"/collections/{collection}")
-        existing = None
+    embedded = 0
+    if existing is not None:
+        try:
+            embedded = _validate_collection(existing, profile)
+        except RuntimeError:
+            qdrant.request("DELETE", f"/collections/{collection}")
+            existing = None
+        else:
+            if embedded > expected_count:
+                qdrant.request("DELETE", f"/collections/{collection}")
+                existing = None
+                embedded = 0
     if existing is None:
         qdrant.request(
             "PUT",
@@ -226,9 +264,13 @@ def materialize(
                 "hnsw_config": {"on_disk": True},
             },
         )
-        embedded = 0
-        for documents in _batches(bundle.records("documents"), batch_size):
-            vectors = _embedding_vectors(embeddings, documents, profile)
+    resumed_from = embedded
+    if progress is not None and embedded:
+        progress(embedded, expected_count)
+    if embedded < expected_count:
+        remaining = islice(bundle.records("documents"), embedded, None)
+        for documents in _batches(remaining, batch_size):
+            vectors = _embedding_vectors_resilient(embeddings, documents, profile)
             points = [
                 _point(document, vector, str(profile["id"]))
                 for document, vector in zip(documents, vectors, strict=True)
@@ -241,8 +283,8 @@ def materialize(
             embedded += len(points)
             if progress is not None:
                 progress(embedded, expected_count)
-        if embedded != expected_count:
-            raise RuntimeError(f"Qdrant projection count mismatch: {embedded} != {expected_count}")
+    if embedded != expected_count:
+        raise RuntimeError(f"Qdrant projection count mismatch: {embedded} != {expected_count}")
 
     observed = _collection(qdrant, collection)
     if observed is None or _validate_collection(observed, profile) != expected_count:
@@ -256,6 +298,7 @@ def materialize(
         "collection": collection,
         "alias": alias,
         "point_count": expected_count,
+        "resumed_from_point_count": resumed_from,
         "embedding_profile": profile,
         "previous_collection": previous,
         "removed_collections": removed,

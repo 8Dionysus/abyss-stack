@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -226,6 +227,21 @@ class FakeEmbeddings:
         }
 
 
+class AdaptiveEmbeddings(FakeEmbeddings):
+    def __init__(self, max_batch_size: int) -> None:
+        self.max_batch_size = max_batch_size
+        self.batch_sizes: list[int] = []
+        self.texts: list[str] = []
+
+    def request(self, method: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        inputs = list(payload["input"])
+        self.batch_sizes.append(len(inputs))
+        if len(inputs) > self.max_batch_size:
+            raise HttpJsonError(502, "transient embedding capacity")
+        self.texts.extend(str(item) for item in inputs)
+        return super().request(method, path, payload)
+
+
 class FakeQdrant:
     def __init__(self) -> None:
         self.collections: dict[str, dict[str, Any]] = {}
@@ -377,6 +393,68 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(qdrant.points[0]["vector"], [0.6, 0.8, 0.0])
         checked = vector.check(self.bundle, qdrant=qdrant)
         self.assertEqual(checked["collection"], result["collection"])
+
+    def test_embedding_batches_retry_then_split_on_transient_capacity(self) -> None:
+        client = AdaptiveEmbeddings(max_batch_size=2)
+        documents = [{"text": f"document {index}"} for index in range(4)]
+        with mock.patch.object(vector.time, "sleep"):
+            vectors = vector._embedding_vectors_resilient(
+                client,
+                documents,
+                dict(self.bundle.manifest["embedding_profile"]),
+            )
+
+        self.assertEqual(len(vectors), 4)
+        self.assertEqual(client.batch_sizes[-2:], [2, 2])
+        self.assertEqual(client.texts, [item["text"] for item in documents])
+
+    def test_qdrant_projection_resumes_confirmed_document_prefix(self) -> None:
+        source = next(self.bundle.records("documents"))
+        documents = []
+        for index in range(4):
+            document = copy.deepcopy(source)
+            document["id"] = f"aoa:fixture:retrieval-document:{index}"
+            document["version_id"] = f"aoa:fixture:retrieval-document-version:{index}"
+            document["vector_point_id"] = f"00000000-0000-5000-8000-{index:012d}"
+            document["text"] = f"document {index}"
+            document["text_digest"] = hashlib.sha256(
+                document["text"].encode("utf-8")
+            ).hexdigest()
+            documents.append(document)
+
+        class BundleView:
+            projection_digest = self.bundle.projection_digest
+            manifest = copy.deepcopy(self.bundle.manifest)
+
+            def records(self, key: str):
+                assert key == "documents"
+                yield from documents
+
+        bundle = BundleView()
+        bundle.manifest["files"]["documents"]["record_count"] = len(documents)
+        collection = f"{vector.COLLECTION_PREFIX}{bundle.projection_digest[:20]}"
+        qdrant = FakeQdrant()
+        qdrant.collections[collection] = {
+            "count": 2,
+            "size": 3,
+            "distance": "Cosine",
+        }
+        embeddings = AdaptiveEmbeddings(max_batch_size=2)
+
+        result = vector.materialize(
+            bundle,
+            qdrant=qdrant,
+            embeddings=embeddings,
+            batch_size=2,
+        )
+
+        self.assertEqual(result["point_count"], 4)
+        self.assertEqual(result["resumed_from_point_count"], 2)
+        self.assertEqual(embeddings.texts, ["document 2", "document 3"])
+        self.assertEqual([point["id"] for point in qdrant.points], [
+            documents[2]["vector_point_id"],
+            documents[3]["vector_point_id"],
+        ])
 
     def test_neo4j_projection_switches_current_after_complete_counts(self) -> None:
         fake = FakeGraph()

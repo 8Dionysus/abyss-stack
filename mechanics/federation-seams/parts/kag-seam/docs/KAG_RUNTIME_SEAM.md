@@ -44,6 +44,10 @@ Each adapter completes and verifies its new version before switching its
 current pointer. One previous remote projection remains available for rollback;
 older managed projections are reclaimed.
 
+Vector builds resume an incomplete versioned collection from its confirmed
+document prefix. Transient embedding failures are retried, and a batch that
+exceeds live model capacity is split while preserving document order.
+
 ## Operation
 
 Build the bundle with `aoa-kag`, then materialize selected targets:
