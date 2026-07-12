@@ -87,7 +87,7 @@
   },
   "index_identity": {
     "artifact_kind": "source_surface_index",
-    "content_digest": "f3e10f68e4ff9caeb0d889fdebff5043f57d999590000cabcbded66bb6a30791",
+    "content_digest": "007c008457aaf7caae47dbbe5e91c08b0526f45eb1d047fb9caa326624bf2338",
     "local_id": "index:repo-local:source-surfaces",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json"
   },
@@ -10650,13 +10650,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "682debb9d44369ffaa74ecd82131b12f6a8e8ac63ef67cc193ccdbc8f1ae9df4",
+        "content_hash": "04389a58227eedba0b22c827e8c30388401a4f6d675ef9441d5a2f4626e5bb53",
         "git_ref": "git-index-source-tree",
         "id": "file:compose/tuning/readme.md:618e7f3d88",
         "mime": "text/markdown",
         "path": "compose/tuning/README.md",
         "repo": "abyss-stack",
-        "size_bytes": 8587
+        "size_bytes": 8748
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -10720,14 +10720,14 @@
           {
             "anchor": "machine-fit-overlays",
             "level": 2,
-            "line": 188,
+            "line": 190,
             "ref": "compose/tuning/README.md#machine-fit-overlays",
             "title": "Machine-fit overlays"
           },
           {
             "anchor": "why-this-directory-exists",
             "level": 2,
-            "line": 196,
+            "line": 198,
             "ref": "compose/tuning/README.md#why-this-directory-exists",
             "title": "Why this directory exists"
           }
@@ -10739,7 +10739,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "682debb9d44369ffaa74ecd82131b12f6a8e8ac63ef67cc193ccdbc8f1ae9df4",
+        "digest": "04389a58227eedba0b22c827e8c30388401a4f6d675ef9441d5a2f4626e5bb53",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -11232,13 +11232,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "8c35979c60674236cef50e0f76de50ac4eee1d380b659377f273fafe382220ab",
+        "content_hash": "5a4beb7be8608b05391e535cea5e64f248dcc72fa7b4c8ef193be81904eb3582",
         "git_ref": "git-index-source-tree",
         "id": "file:compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml:9c2a5d8a1b",
         "mime": "application/yaml",
         "path": "compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml",
         "repo": "abyss-stack",
-        "size_bytes": 2428
+        "size_bytes": 2486
       },
       "mechanics_role": "none",
       "observed_form": "file",
@@ -11271,7 +11271,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "8c35979c60674236cef50e0f76de50ac4eee1d380b659377f273fafe382220ab",
+        "digest": "5a4beb7be8608b05391e535cea5e64f248dcc72fa7b4c8ef193be81904eb3582",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
@@ -100692,13 +100692,13 @@
         "state": "current"
       },
       "identity": {
-        "content_hash": "cdbed62242dd959c38b6423102ff7fb8f23daf6d0a75987f489d05917e799c66",
+        "content_hash": "60c84e159beda4fd29e9b07e07a0b6bc4db86021803dfe32a7cd1f362b15ba10",
         "git_ref": "git-index-source-tree",
         "id": "file:mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md:99bdfcb52a",
         "mime": "text/markdown",
         "path": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md",
         "repo": "abyss-stack",
-        "size_bytes": 3076
+        "size_bytes": 3256
       },
       "mechanics_role": "part_doc",
       "observed_form": "file",
@@ -100776,14 +100776,14 @@
           {
             "anchor": "evidence-surfaces",
             "level": 2,
-            "line": 53,
+            "line": 56,
             "ref": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md#evidence-surfaces",
             "title": "Evidence Surfaces"
           },
           {
             "anchor": "next-tests",
             "level": 2,
-            "line": 61,
+            "line": 64,
             "ref": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md#next-tests",
             "title": "Next Tests"
           }
@@ -100795,7 +100795,7 @@
       },
       "signs": {
         "attestation_ref": "",
-        "digest": "cdbed62242dd959c38b6423102ff7fb8f23daf6d0a75987f489d05917e799c66",
+        "digest": "60c84e159beda4fd29e9b07e07a0b6bc4db86021803dfe32a7cd1f362b15ba10",
         "signature_ref": "",
         "verification_state": "digest-only"
       },
