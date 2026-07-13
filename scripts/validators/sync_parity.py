@@ -11,8 +11,10 @@ SYNC_MANAGED_ITEMS = (
     "config-templates",
     "docs",
     "mechanics",
+    "mcp",
     "quests",
     "scripts",
+    "schemas",
     "systemd",
     "env",
     "README.md",
@@ -95,6 +97,8 @@ def validate_runtime_configs_mirror(errors: list[str], *, root: Path) -> None:
         root / "config-templates" / "Services" / "route-api" / "app" / "main.py",
         root / "scripts" / "aoa-check-layout",
         root / "docs" / "install" / "DEPLOYMENT.md",
+        root / "mcp" / "services" / "aoa-decisions-mcp" / "scripts" / "aoa_decisions_mcp_server.py",
+        root / "schemas" / "workspace_decision_graph.schema.json",
     ]
     for path in required_runtime_paths:
         if not path.exists():

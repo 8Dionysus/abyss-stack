@@ -24,6 +24,9 @@ compares source files against a deployed or synthetic Configs root.
 Those checks are not generic source topology. They protect a specific
 source/runtime boundary: what the source checkout projects into runtime
 Configs and how release validation proves that projection has not drifted.
+That boundary includes stack-owned MCP packages and root contract schemas
+because live MCP user units execute from `Configs/mcp` and deployed graph
+validation resolves `Configs/schemas`.
 
 ## Options considered
 
@@ -61,6 +64,8 @@ the later owner-constant migration moved it into `sync_parity.py`.
 - Positive: source-to-Configs parity has an owner module.
 - Positive: sync-managed file filtering and deployed drift detection now have
   focused module tests.
+- Positive: MCP service code and root schemas cannot remain silently outside
+  source-to-Configs parity while their live consumers use deployed paths.
 - Positive: `release_check.py` keeps the same root validation call path.
 - Tradeoff: the first slice left sync-managed item constants in the root until
   the later owner-constant migration completed.
@@ -84,3 +89,11 @@ the later owner-constant migration moved it into `sync_parity.py`.
 
 Candidate next splits are federation seams, diagnostic-spine contracts,
 machine-fit evidence checks, or questbook validation.
+
+## Review note: 2026-07-13
+
+Live verification of the decision-graph source-posture repair showed that
+`aoa-sync-configs` projected the graph builder under `scripts/` but omitted the
+MCP package that calls it and the schemas that validate it. The sync-managed
+set now includes `mcp/` and `schemas/`, preserving the existing non-destructive
+default and keeping restart as a separate lifecycle action.

@@ -42,8 +42,10 @@ items=(
   config-templates
   docs
   mechanics
+  mcp
   quests
   scripts
+  schemas
   systemd
   env
   README.md
