@@ -70,7 +70,9 @@ decisions before editing source files.
 ## Consequences
 
 - `ci_gate.py --mode decision-graph` becomes the focused landing lane for
-  decision graph work and excludes unrelated eval checks.
+  decision graph work and excludes unrelated eval checks. Because the cache is
+  ignored and source posture includes HEAD, the lane refreshes the cache before
+  asserting `--check` parity so it also works in a clean checkout.
 - New node, edge, or surface types require schema/validator updates and tests.
 - A `fresh` cache claim is scoped to `local_workspace_filesystem`; agents must
   inspect source posture before treating the graph as current repo evidence.
