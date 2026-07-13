@@ -114,9 +114,12 @@ def seed_provider(
             "source": source_index_ref,
             "entity": "kag/indexes/repo_entity_index.json",
             "artifact": "kag/indexes/repo_artifact_index.json",
+            "anchor": "kag/indexes/repo_anchor_index.json",
             "event": "kag/indexes/repo_event_index.json",
+            "assertion": "kag/indexes/repo_assertion_index.json",
+            "relation": "kag/indexes/repo_relation_index.json",
         }
-        for index_kind in ("entity", "artifact", "event"):
+        for index_kind in ("entity", "artifact", "anchor", "event", "assertion", "relation"):
             write_json(
                 root / repository_index_family[index_kind],
                 {
@@ -399,12 +402,20 @@ def test_source_index_lookup_keeps_reads_inside_provider_root(tmp_path: Path) ->
         state.source_index_lookup("repo-a", include_payload=True)
 
 
-def test_repository_index_family_lookup_reports_all_four_indexes(tmp_path: Path) -> None:
+def test_repository_index_family_lookup_reports_all_canonical_indexes(tmp_path: Path) -> None:
     packet = seed_workspace(tmp_path).repository_index_family_lookup("repo-a")
 
     assert packet["schema"] == "aoa_kag_repository_index_family_lookup_v1"
     assert packet["family_complete"] is True
-    assert set(packet["indexes"]) == {"source", "entity", "artifact", "event"}
+    assert set(packet["indexes"]) == {
+        "source",
+        "entity",
+        "artifact",
+        "anchor",
+        "event",
+        "assertion",
+        "relation",
+    }
     assert all(index["exists"] for index in packet["indexes"].values())
 
 

@@ -13,7 +13,15 @@ DEFAULT_AOA_KAG_ROOT = DEFAULT_WORKSPACE_ROOT / "aoa-kag"
 PROVIDER_MAP_RELATIVE_PATH = Path("generated/local_kag_provider_map.min.json")
 READINESS_RELATIVE_PATH = Path("manifests/local_kag_readiness.json")
 REPO_LOCAL_COVERAGE_RELATIVE_PATH = Path("generated/repo_local_kag_coverage.min.json")
-REPOSITORY_INDEX_KINDS = ("source", "entity", "artifact", "event")
+REPOSITORY_INDEX_KINDS = (
+    "source",
+    "entity",
+    "artifact",
+    "anchor",
+    "event",
+    "assertion",
+    "relation",
+)
 RECORD_CLASS_DIRECTORIES = {
     "node": "nodes",
     "edge": "edges",

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .core import AoAKagMCPState
+from .core import AoAKagMCPState, REPOSITORY_INDEX_KINDS
 
 
 def _print(payload: dict[str, Any]) -> None:
@@ -49,7 +49,7 @@ def main() -> None:
 
     repository_index = sub.add_parser("repository-index")
     repository_index.add_argument("repo")
-    repository_index.add_argument("index_kind", choices=("source", "entity", "artifact", "event"))
+    repository_index.add_argument("index_kind", choices=REPOSITORY_INDEX_KINDS)
     repository_index.add_argument("--include-payload", action="store_true")
 
     domain_index_catalog = sub.add_parser("domain-index-catalog")
