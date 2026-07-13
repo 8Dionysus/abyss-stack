@@ -24,6 +24,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Decision graph freshness now distinguishes local cache parity from checkout
+  source posture, preserves lag/dirty warnings, and no longer treats arbitrary
+  worktree directory names as separate repositories.
+- Source-to-Configs sync and parity now include stack-owned `mcp/` packages and
+  root `schemas/`, so deployed MCP services cannot silently remain older than
+  their merged source packages.
 - The `aoa-stats` live-refresh user-unit adapter now watches only the six
   currently admitted owner-local receipt surfaces and delegates registry
   selection to the deployed `aoa-stats` refresh command instead of pinning the

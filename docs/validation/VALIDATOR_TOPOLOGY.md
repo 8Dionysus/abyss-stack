@@ -20,7 +20,7 @@ parity posture.
 | Active topology language | retired phase/wave/seed wording, RPG runtime projection language, playbook activation allowlist drift, and route-api active/compatibility bridge language | `scripts/validators/active_topology_language.py` | source-fast, release |
 | Agent skill projection | repo-local `.agents/skills` projection, sibling `aoa-skills` symlink targets, checkout-safe target files, and local overlay skill posture | `scripts/validators/agent_skill_projection.py` | source-fast, release |
 | Runtime service selection | selected service policy, screenshot inventory, current runtime shape parity | `scripts/validators/service_selection.py` | source-fast, release |
-| Source-to-Configs parity | sync-managed item coverage, runtime Configs mirror posture, deployed parity | `scripts/validators/sync_parity.py` | source-fast, release |
+| Source-to-Configs parity | sync-managed item coverage including runtime MCP packages and root schemas, runtime Configs mirror posture, deployed parity | `scripts/validators/sync_parity.py` | source-fast, release |
 | Questbook and RPG read models | quest source topology, generated quest examples, RPG runtime collection schemas | `scripts/validators/questbook_surface.py` | source-fast, release |
 | Federation runtime inputs and landing | runtime-loaded federation config input coverage, upstream compatibility bridge posture, landing docs | `scripts/validators/federation_surface.py` | source-fast, release |
 | Federation runtime seams | memo/eval/playbook/KAG runtime seam docs, bounded export schemas/examples, advisory route guards | `scripts/validators/federation_runtime_seams.py` | source-fast, release |
@@ -75,7 +75,7 @@ root-level wrapper APIs.
 | `scripts/validators/active_topology_language.py` | active topology language validator module | fix retired phase/wave/seed wording, RPG runtime projection language, playbook activation allowlists, route-api bridge language, or focused active-topology tests |
 | `scripts/validators/agent_skill_projection.py` | agent skill projection validator module | fix `.agents/skills` symlink/target-file projection, local overlay directories, diagnostic overlay skill installs, or focused agent-skill tests |
 | `scripts/validators/service_selection.py` | runtime service-selection policy validator module | fix service-selection policy, screenshot inventory, compose runtime-shape parity, or focused service-selection tests |
-| `scripts/validators/sync_parity.py` | source-to-Configs parity validator module | fix config-projection sync coverage, runtime Configs mirror shape, source/deployed parity, or focused sync parity tests |
+| `scripts/validators/sync_parity.py` | source-to-Configs parity validator module | fix config-projection sync coverage including `mcp/` and `schemas/`, runtime Configs mirror shape, source/deployed parity, or focused sync parity tests |
 | `scripts/validators/questbook_surface.py` | questbook and RPG read-model validator module | fix quest source files, generated quest examples, RPG runtime schemas/examples, or focused questbook tests |
 | `scripts/validators/federation_surface.py` | federation runtime-input validator module | fix federation config `required_files`, upstream compatibility bridge templates/language, landing docs, or focused federation tests |
 | `scripts/validators/federation_runtime_seams.py` | federation runtime seam validator module | fix memo/eval/playbook/KAG seam docs, bounded export examples, A2A handoff examples, or focused federation runtime seam tests |

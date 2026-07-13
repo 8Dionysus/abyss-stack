@@ -46,3 +46,11 @@ python scripts/ci_gate.py --mode release
 python mechanics/config-projection/parts/rendering/scripts/validate_abyss_machine_runtime_config_bundle.py
 abyss-machine artifacts registry-latest --registry-dir dist/abyss-artifact-registry/abyss-stack-runtime-config --artifact-class abyss_stack_runtime_config_bundle --consumer-intent runtime --source-repo abyss-stack --trust-root-mode host_managed --json
 ```
+
+## 2026-07-13 - MCP and schema projection closure
+
+Added stack-owned `mcp/` packages and root `schemas/` to the canonical
+source-to-Configs sync and parity boundary. This closes the gap where live MCP
+user units executed stale deployed packages even after their source changes
+landed. Sync remains non-destructive by default; parity and service restart
+remain explicit follow-up steps.

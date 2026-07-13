@@ -232,7 +232,7 @@
       "paths": [
         "scripts/validators/sync_parity.py"
       ],
-      "protects": "sync-managed source enumeration, config-projection sync coverage, runtime Configs mirror posture, and source/deployed parity checks",
+      "protects": "sync-managed source enumeration including runtime MCP packages and root schemas, config-projection sync coverage, runtime Configs mirror posture, and source/deployed parity checks",
       "owner_surface": "mechanics/config-projection/parts/sync/",
       "layer": "source/runtime parity",
       "lane": "source-fast/release",
@@ -243,7 +243,7 @@
         "tests/test_sync_parity_validator_module.py",
         "tests/test_sync_parity_entrypoint_contracts.py"
       ],
-      "failure_route": "Fix sync-managed item coverage, runtime Configs mirror route text, deployed parity, or sync_parity module contract.",
+      "failure_route": "Fix sync-managed item coverage including mcp and schemas, runtime Configs mirror route text, deployed parity, or sync_parity module contract.",
       "status": "active"
     },
     {

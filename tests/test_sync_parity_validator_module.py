@@ -41,3 +41,28 @@ def test_sync_parity_module_reports_deployed_drift(tmp_path: Path) -> None:
     )
 
     assert errors == ["source/deployed drift for synced path: README.md"]
+
+
+def test_sync_managed_items_include_runtime_mcp_and_root_schemas() -> None:
+    assert "mcp" in sync_parity.SYNC_MANAGED_ITEMS
+    assert "schemas" in sync_parity.SYNC_MANAGED_ITEMS
+
+
+def test_runtime_configs_mirror_requires_decisions_mcp_and_graph_schema(tmp_path: Path) -> None:
+    write_text(
+        tmp_path / "README.md",
+        "# Runtime mirror\n\nSource checkout shape\n/srv/AbyssOS/abyss-stack/Configs\n",
+    )
+    write_text(tmp_path / "scripts" / "AGENTS.md", "source checkout only\n")
+    errors: list[str] = []
+
+    sync_parity.validate_runtime_configs_mirror(errors, root=tmp_path)
+
+    assert (
+        "runtime Configs mirror is missing required path: "
+        "mcp/services/aoa-decisions-mcp/scripts/aoa_decisions_mcp_server.py"
+    ) in errors
+    assert (
+        "runtime Configs mirror is missing required path: "
+        "schemas/workspace_decision_graph.schema.json"
+    ) in errors

@@ -137,11 +137,15 @@ hand.
 ### `scripts/aoa-sync-configs`
 
 Copies repo-managed stack material from the source checkout into `${AOA_CONFIGS_ROOT}`,
-including public quest route metadata used by stack validation.
+including stack-owned runtime MCP packages, their root contract schemas, and
+public quest route metadata used by stack validation.
 By default it is non-destructive.
 An explicit `--delete` mode exists for a tighter mirror when that is desired.
 This is the boundary where a source-authored change becomes deployed.
 A source-authored change is not live until `scripts/aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`.
+This applies to MCP service code as well: user units execute the package
+entrypoints under `Configs/mcp`, while deployed decision-graph validation reads
+`Configs/schemas`.
 
 After syncing repo-managed surfaces, run:
 

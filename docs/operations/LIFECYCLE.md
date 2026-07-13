@@ -165,6 +165,8 @@ Truth progression must stay explicit:
 
 Do not collapse those states into one word such as "landed".
 A source-authored change becomes deployed only after `aoa-sync-configs` updates `/srv/AbyssOS/abyss-stack/Configs`.
+The sync-managed boundary includes stack-owned `mcp/` packages and root
+`schemas/`; service restart is a separate lifecycle action after parity.
 Use `python scripts/validate_stack.py --parity-check` when repo-managed surfaces should match the deployed Configs mirror.
 
 ## Profile rule
