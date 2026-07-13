@@ -792,7 +792,7 @@
     {"anchor_ids":["aoa:abyss-stack:anchor:0e1f57eb3c47cfd619b80998"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:ee93349dffd9adffba466607","label":"bootstrap","provenance_ref":"deterministic","semantic_key":"directory:mechanics/config-projection/parts/bootstrap","source_digest":"9bb4a99165cbee68c76745692b6d8616e35fbebf96dd2871f31bef1e7a78a5f9","source_record_ids":["aoa:abyss-stack:artifact:16f5a6e2d134c213003f8671"],"temporal_ref":"current","trust_ref":"deterministic"},
     {"anchor_ids":["aoa:abyss-stack:anchor:9d736489506408b2fbf87a0d"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:ee94f5901dd4029d74174823","label":"scripts","provenance_ref":"deterministic","semantic_key":"directory:mcp/services/aoa-4pda-connector-mcp/scripts","source_digest":"d005e742e62ac804092441f6f6c1b476e6f73434207b84001bcc085683d32b7d","source_record_ids":["aoa:abyss-stack:artifact:196f239da31fffb5a8c25a86"],"temporal_ref":"current","trust_ref":"deterministic"},
     {"anchor_ids":["aoa:abyss-stack:anchor:7582e1e78d1e1e1c243d7468"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:efe5f389fecc8abdf87ff520","label":"inference-pilots","provenance_ref":"deterministic","semantic_key":"directory:mechanics/inference-pilots","source_digest":"255f126352ce025ab18b19e6624f52222a46a08e3d14a5ea84ba4e7c723f458b","source_record_ids":["aoa:abyss-stack:artifact:045dc66f27ed69f10ace6d71"],"temporal_ref":"current","trust_ref":"deterministic"},
-    {"anchor_ids":["aoa:abyss-stack:anchor:3c1bd1247ea5b95c9b15bc64"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:f019620edd42955bd2ad859f","label":"workflows","provenance_ref":"deterministic","semantic_key":"directory:.github/workflows","source_digest":"ac4ef3453a7ec00286e9b92c8b7fe8dfb3b1af255fc7b2d08331425dc7bcaa33","source_record_ids":["aoa:abyss-stack:artifact:00aaa772fef24a295cbed7eb"],"temporal_ref":"current","trust_ref":"deterministic"},
+    {"anchor_ids":["aoa:abyss-stack:anchor:3c1bd1247ea5b95c9b15bc64"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:f019620edd42955bd2ad859f","label":"workflows","provenance_ref":"deterministic","semantic_key":"directory:.github/workflows","source_digest":"a0f2dcab374d2aca94d0cc0a2ae66ba527e108504b2564ee78775d272dcb9456","source_record_ids":["aoa:abyss-stack:artifact:00aaa772fef24a295cbed7eb"],"temporal_ref":"current","trust_ref":"deterministic"},
     {"anchor_ids":["aoa:abyss-stack:anchor:bfa63efbf319872e13df96af"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:f0f5e44610ca1ff0c53ac196","label":"system","provenance_ref":"deterministic","semantic_key":"directory:systemd/system","source_digest":"095abd66deaefd8d4eb8a0b428bf493bf5e913fdf966794c6cfa39337f297c5c","source_record_ids":["aoa:abyss-stack:artifact:01dab9a8e6dd1d90e6719c83"],"temporal_ref":"current","trust_ref":"deterministic"},
     {"anchor_ids":["aoa:abyss-stack:anchor:492b9be8bc9c28ab07f342b9"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:f38a242449d69b714545e64e","label":"tts","provenance_ref":"deterministic","semantic_key":"directory:config-templates/Configs/tts","source_digest":"eff1b02414dd2687b42558fb262fc2ad069a492eb2048918876fb7e5bc21ac88","source_record_ids":["aoa:abyss-stack:artifact:ba4fe7cad5b14a2d50f1a3b0"],"temporal_ref":"current","trust_ref":"deterministic"},
     {"anchor_ids":["aoa:abyss-stack:anchor:17c9e49786a408bbfef34fb5"],"entity_kind":"directory","id":"aoa:abyss-stack:entity:f4c5d80b274ab162cd6299ed","label":"rendering","provenance_ref":"deterministic","semantic_key":"directory:mechanics/config-projection/parts/rendering","source_digest":"aec206ca25971912f7f619c816f2298470cfa28f30a56704fdac355ac228b3ad","source_record_ids":["aoa:abyss-stack:artifact:1ddfc78513cdb720f116169f"],"temporal_ref":"current","trust_ref":"deterministic"},
@@ -6153,7 +6153,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_entity_index",
-    "content_digest": "fd889dc1b867fea22135dc1105cbf131c5412c68c58e565d3ee548ee8e390fe7",
+    "content_digest": "50763c1fe253b93a3cfe815aa8f2818cabd2f494e96fadaace0604ab771114b6",
     "index_kind": "entity",
     "local_id": "index:repo-local:entities",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -6238,7 +6238,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v2",
   "source_index": {
-    "content_digest": "0cc3317992c6fc1171960cb6bb7b73736f6370338e0535f7b27b8bd40e0b5451",
+    "content_digest": "875d56f9f2b3365a5e1afca231bfdacf59391642644ee45275da3f9def889825",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },

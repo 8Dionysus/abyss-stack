@@ -42,7 +42,7 @@
     {"anchor_id":"aoa:abyss-stack:anchor:bd4578d91356675f9b3ac8c5","artifact_kind":"document","content_hash":"fcd6e650a8f99643cc8b335f91d18df60cfb115d016b76508baae4473a069f61","id":"aoa:abyss-stack:artifact:438478e7713ffdb96be895cd","lineage_path":".github/README.md","mime":"text/markdown","path":".github/GITHUB_SURFACE.md","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:5f7eaf2018f408c0d780cb35"},
     {"anchor_id":"aoa:abyss-stack:anchor:2a184d34ee728656517d362d","artifact_kind":"document","content_hash":"8bae9624a3b05aaba718a06dcc56cb7e8f00fe3a23cf433e9f3117f63f31a75a","id":"aoa:abyss-stack:artifact:b2496e80299b8c3150b19444","lineage_path":".github/pull_request_template.md","mime":"text/markdown","path":".github/pull_request_template.md","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:c8b17efa0480adbd78781fef"},
     {"anchor_id":"aoa:abyss-stack:anchor:54d6edec6fe189251129ce7a","artifact_kind":"config","content_hash":"4ee21d82f4d24a2546432c60208952139a12cfba9038e8c20077395f4594a02c","id":"aoa:abyss-stack:artifact:cb496c3de199c9d8e3f893c2","lineage_path":".github/workflows/mirror-canary.yml","mime":"application/yaml","path":".github/workflows/mirror-canary.yml","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:e7fecc70bb8020e71d50c2fe"},
-    {"anchor_id":"aoa:abyss-stack:anchor:3c1bd1247ea5b95c9b15bc64","artifact_kind":"config","content_hash":"a395c47921928f66568af1377bdd6b0c133d54b530a8f1aa0a6602c5da6ea0d7","id":"aoa:abyss-stack:artifact:00aaa772fef24a295cbed7eb","lineage_path":".github/workflows/validate-stack.yml#generation-2","mime":"application/yaml","path":".github/workflows/validate-stack.yml","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:ac4ef3453a7ec00286e9b92c"},
+    {"anchor_id":"aoa:abyss-stack:anchor:3c1bd1247ea5b95c9b15bc64","artifact_kind":"config","content_hash":"c114f0a5730bacb2cf8371e382d6060968a24ac1e10086bccffcadb30a141597","id":"aoa:abyss-stack:artifact:00aaa772fef24a295cbed7eb","lineage_path":".github/workflows/validate-stack.yml#generation-2","mime":"application/yaml","path":".github/workflows/validate-stack.yml","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:a0f2dcab374d2aca94d0cc0a"},
     {"anchor_id":"aoa:abyss-stack:anchor:96e6e3d130aaaa62fa27d925","artifact_kind":"owner_metadata","content_hash":"60888da96cd54c6999e50cecdb7ed4cf6ffb5a13536778efaa821e588a1db908","id":"aoa:abyss-stack:artifact:bc37d034bad564583790a46f","lineage_path":".gitignore","mime":"text/plain","path":".gitignore","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:e38775d4743a916d0bd7c55d"},
     {"anchor_id":"aoa:abyss-stack:anchor:dd042eedde7e1f2371c0b6ee","artifact_kind":"document","content_hash":"cbcb6fe4fdc5f0138857ae5d665117ead16a6d7e24905e37c99301132d365c97","id":"aoa:abyss-stack:artifact:36a72687b6b4322369071168","lineage_path":"AGENTS.md#generation-2","mime":"text/markdown","path":"AGENTS.md","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:9b2f65ff0e50cd1df702e4d8"},
     {"anchor_id":"aoa:abyss-stack:anchor:c8a6795d4934162ad5f1ef12","artifact_kind":"document","content_hash":"451235301d77cc22ae8cf8db85374d893815e5706f05870f72aa74b017a4fb68","id":"aoa:abyss-stack:artifact:45e9a36bb68690da74806416","lineage_path":"BOUNDARIES.md#generation-2","mime":"text/markdown","path":"BOUNDARIES.md","provenance_ref":"deterministic","surface_state":"authored_source","temporal_ref":"current","trust_ref":"deterministic","version_id":"aoa:abyss-stack:artifact-version:d7d2e7433ba16c31dcfde7fc"},
@@ -1297,7 +1297,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_artifact_index",
-    "content_digest": "fd15e8be6683f6d29c32cd590af0f877153b1eb923439770bf7c0fb55d058ae6",
+    "content_digest": "2d41f90c1bb70ab8bc63843ec1068ebeafe2c8811c4720d109f694e1bc0bad8a",
     "index_kind": "artifact",
     "local_id": "index:repo-local:artifacts",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -1383,7 +1383,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v2",
   "source_index": {
-    "content_digest": "0cc3317992c6fc1171960cb6bb7b73736f6370338e0535f7b27b8bd40e0b5451",
+    "content_digest": "875d56f9f2b3365a5e1afca231bfdacf59391642644ee45275da3f9def889825",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },
