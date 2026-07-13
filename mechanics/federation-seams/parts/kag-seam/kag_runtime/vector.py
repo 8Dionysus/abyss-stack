@@ -13,6 +13,7 @@ from .transport import HttpJsonError, JsonHttpClient
 SCHEMA_VERSION = "abyss-stack-repo-self-kag-qdrant-v2"
 COLLECTION_PREFIX = "aoa_kag_repo_self_"
 DEFAULT_ALIAS = "aoa_kag_repo_self_current"
+DEFAULT_EMBEDDING_BATCH_SIZE = 1
 PAYLOAD_INDEXES = {
     "repo": "keyword",
     "node_class": "keyword",
@@ -337,7 +338,7 @@ def materialize(
     qdrant: JsonHttpClient,
     embeddings: JsonHttpClient,
     alias: str = DEFAULT_ALIAS,
-    batch_size: int = 16,
+    batch_size: int = DEFAULT_EMBEDDING_BATCH_SIZE,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
     if batch_size <= 0:
