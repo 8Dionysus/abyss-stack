@@ -628,6 +628,65 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(qdrant.points[0]["vector"], [0.6, 0.8, 0.0])
         self.assertEqual(qdrant.points[1]["vector"], [0.6, 0.8, 0.0])
 
+    def test_qdrant_projection_bounds_dense_changed_embedding_batches(self) -> None:
+        source = next(self.bundle.records("documents"))
+        documents = []
+        previous_points = {}
+        for index in range(6):
+            document = copy.deepcopy(source)
+            document["id"] = f"aoa:fixture:retrieval-document:{index}"
+            document["version_id"] = f"aoa:fixture:retrieval-document-version:{index}"
+            document["vector_point_id"] = f"00000000-0000-5000-8000-{index:012d}"
+            document["text"] = f"changed document {index}"
+            document["text_digest"] = hashlib.sha256(
+                document["text"].encode()
+            ).hexdigest()
+            documents.append(document)
+            previous_points[document["vector_point_id"]] = {
+                "id": document["vector_point_id"],
+                "vector": [0.0, 0.0, 1.0],
+                "payload": {
+                    "text_digest": "stale",
+                    "embedding_profile_id": "fixture-embedding-v1",
+                },
+            }
+
+        class BundleView:
+            projection_digest = "c" * 64
+            manifest = copy.deepcopy(self.bundle.manifest)
+
+            def records(self, key: str):
+                assert key == "documents"
+                yield from documents
+
+        bundle = BundleView()
+        bundle.manifest["files"]["documents"]["record_count"] = len(documents)
+        previous = "aoa_kag_repo_self_previous"
+        qdrant = FakeQdrant()
+        qdrant.collections[previous] = {
+            "count": len(documents),
+            "size": 3,
+            "distance": "Cosine",
+            "payload_schema": {},
+            "points": previous_points,
+        }
+        qdrant.aliases[vector.DEFAULT_ALIAS] = previous
+        embeddings = AdaptiveEmbeddings(max_batch_size=2)
+
+        result = vector.materialize(
+            bundle,
+            qdrant=qdrant,
+            embeddings=embeddings,
+            batch_size=2,
+        )
+
+        self.assertEqual(result["embedded_point_count"], len(documents))
+        self.assertEqual(embeddings.batch_sizes, [2, 2, 2])
+        self.assertEqual(
+            embeddings.texts,
+            [document["text"] for document in documents],
+        )
+
     def test_neo4j_projection_switches_current_after_complete_counts(self) -> None:
         fake = FakeGraph()
         result = graph.materialize(self.bundle, graph=fake, batch_size=1)
