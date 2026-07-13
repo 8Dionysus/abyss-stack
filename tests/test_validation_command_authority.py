@@ -91,6 +91,28 @@ def test_release_lane_runs_release_check_entrypoint_for_parity_stabilization() -
     assert steps[0].command[-1] == "scripts/release_check.py"
 
 
+def test_decision_graph_lane_refreshes_ignored_cache_before_checking_it() -> None:
+    steps = validation_lanes.command_sequence("decision_graph")
+    command_tails = [step.command[1:] for step in steps]
+
+    refresh = command_tails.index(
+        (
+            "scripts/build_workspace_decision_graph.py",
+            "--write",
+            "--json",
+        )
+    )
+    check = command_tails.index(
+        (
+            "scripts/build_workspace_decision_graph.py",
+            "--check",
+            "--json",
+        )
+    )
+
+    assert refresh < check
+
+
 def test_manifest_is_stdlib_json_and_python_commands_normalize() -> None:
     steps = validation_lanes.command_sequence("source_fast")
 

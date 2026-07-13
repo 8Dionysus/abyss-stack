@@ -31,7 +31,7 @@ def build_server(
 
     @mcp.tool()
     def aoa_decisions_status(force_refresh: bool = False) -> dict[str, Any]:
-        """Return workspace decision graph freshness, auto-refreshing when stale."""
+        """Return local cache freshness plus non-fetching repo source posture."""
         return current_state().ensure_fresh(force=force_refresh)
 
     @mcp.tool()
@@ -41,7 +41,7 @@ def build_server(
 
     @mcp.tool()
     def aoa_decisions_search(query: str, repo: str | None = None, limit: int = 20) -> dict[str, Any]:
-        """Search fresh decision graph decision nodes."""
+        """Search the local-cache-current decision graph and carry source warnings."""
         return current_state().search(query=query, repo=repo, limit=limit)
 
     @mcp.tool()
@@ -52,7 +52,7 @@ def build_server(
         path: str | None = None,
         limit: int = 12,
     ) -> dict[str, Any]:
-        """Return a compact fresh graph packet for a decision task."""
+        """Return a compact local graph packet with explicit source-posture limits."""
         return current_state().packet(
             query=query,
             repo=repo,
@@ -63,7 +63,7 @@ def build_server(
 
     @mcp.tool()
     def aoa_decisions_repo(repo: str) -> dict[str, Any]:
-        """Return a fresh repo-local decision graph slice."""
+        """Return a repo graph slice plus the checkout's full local source posture."""
         return current_state().repo(repo)
 
     @mcp.tool()
@@ -130,7 +130,8 @@ def build_server(
         """Prompt route for finding prior decision rationale."""
         return (
             f"Use aoa_decisions_packet(query={query!r}) first. "
-            "Then inspect the repo-local docs/decisions files named in the packet before making source-truth claims."
+            "Inspect its source warnings, then inspect the repo-local docs/decisions files named in the packet "
+            "before making source-truth claims. A cache-fresh packet is not remote-fresh proof."
         )
 
     @mcp.prompt(name="decision-create")
@@ -138,7 +139,9 @@ def build_server(
         """Prompt route for creating a decision with prior graph context."""
         return (
             f"Use aoa_decisions_repo(repo={repo!r}) and aoa_decisions_packet(query={intent!r}, repo={repo!r}) "
-            "before choosing the next local decision id, template, source surfaces, and supersession links."
+            "before choosing the next local decision id, template, source surfaces, and supersession links. "
+            "If repo source_posture is not clean and aligned, derive the id and current rationale from the "
+            "authoritative repo-local source rather than the workspace graph."
         )
 
     LOGGER.info("AoA decisions MCP server ready")

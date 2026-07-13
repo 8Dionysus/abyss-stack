@@ -110,6 +110,10 @@
         "command": ["python", "scripts/generate_decision_indexes.py", "--check"]
       },
       {
+        "label": "refresh workspace decision graph cache",
+        "command": ["python", "scripts/build_workspace_decision_graph.py", "--write", "--json"]
+      },
+      {
         "label": "check workspace decision graph cache",
         "command": ["python", "scripts/build_workspace_decision_graph.py", "--check", "--json"]
       },

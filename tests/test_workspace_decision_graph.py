@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,11 +14,150 @@ if str(SCRIPTS_DIR) not in sys.path:
 import build_workspace_decision_graph as workspace_graph  # noqa: E402
 
 
+def git(repo_root: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def initialize_tracked_git_repo(repo_root: Path) -> None:
+    git(repo_root, "init", "--initial-branch=main")
+    git(repo_root, "config", "user.name", "AoA Test")
+    git(repo_root, "config", "user.email", "aoa-test@example.invalid")
+    git(repo_root, "remote", "add", "origin", f"https://github.com/example/{repo_root.name}.git")
+    git(repo_root, "add", ".")
+    git(repo_root, "commit", "-m", "seed")
+    git(repo_root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+
+
 def test_default_local_stack_root_is_current_checkout() -> None:
     source = (SCRIPTS_DIR / "build_workspace_decision_graph.py").read_text(encoding="utf-8")
 
     assert workspace_graph.DEFAULT_LOCAL_STACK_ROOT == ROOT
     assert 'Path("/home/dionysus/src/abyss-stack")' not in source
+
+
+def test_repo_source_posture_distinguishes_alignment_dirty_and_local_ahead(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    write_decision(repo, decision_id="AAA-D-0001", title="First")
+    initialize_tracked_git_repo(repo)
+
+    aligned = workspace_graph.collect_repo_source_posture(repo)
+
+    assert aligned == {
+        "repo": "repo",
+        "head_sha": git(repo, "rev-parse", "HEAD"),
+        "head_ref": "main",
+        "local_tracking_ref": "origin/main",
+        "local_tracking_sha": git(repo, "rev-parse", "refs/remotes/origin/main"),
+        "ahead_count": 0,
+        "behind_count": 0,
+        "relation": "aligned",
+        "dirty": False,
+        "comparison_basis": "local_remote_tracking_ref_without_fetch",
+        "remote_freshness_checked": False,
+    }
+
+    (repo / "scratch.txt").write_text("dirty\n", encoding="utf-8")
+    dirty = workspace_graph.collect_repo_source_posture(repo)
+    assert dirty["relation"] == "aligned"
+    assert dirty["dirty"] is True
+
+    git(repo, "add", "scratch.txt")
+    git(repo, "commit", "-m", "local work")
+    ahead = workspace_graph.collect_repo_source_posture(repo)
+    assert ahead["relation"] == "ahead"
+    assert ahead["ahead_count"] == 1
+    assert ahead["behind_count"] == 0
+    assert ahead["dirty"] is False
+
+
+def test_workspace_fingerprint_and_graph_include_local_source_posture(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    write_decision(repo, decision_id="AAA-D-0001", title="First")
+    initialize_tracked_git_repo(repo)
+    records, surfaces, issues = workspace_graph.collect_workspace_decision_inputs([repo])
+    first_postures = workspace_graph.collect_repo_source_postures([repo])
+    first_fingerprint = workspace_graph.workspace_input_fingerprint([repo], first_postures)
+    first_graph = workspace_graph.build_workspace_graph(
+        records,
+        surfaces=surfaces,
+        input_fingerprint=first_fingerprint,
+        repo_source_postures=first_postures,
+    )
+
+    assert issues == []
+    assert first_graph["freshness_scope"] == "local_workspace_filesystem"
+    assert first_graph["remote_freshness_checked"] is False
+    assert first_graph["repo_source_posture_counts"] == {"aligned": 1}
+    assert first_graph["source_warning_repo_count"] == 0
+    assert first_graph["local_tracking_lag_repo_count"] == 0
+    assert first_graph["local_unpublished_repo_count"] == 0
+    assert first_graph["dirty_repo_count"] == 0
+    assert first_graph["unknown_source_posture_count"] == 0
+
+    (repo / "runtime-note.txt").write_text("local only\n", encoding="utf-8")
+    git(repo, "add", "runtime-note.txt")
+    git(repo, "commit", "-m", "advance local head")
+    second_postures = workspace_graph.collect_repo_source_postures([repo])
+    second_fingerprint = workspace_graph.workspace_input_fingerprint([repo], second_postures)
+    second_graph = workspace_graph.build_workspace_graph(
+        records,
+        surfaces=surfaces,
+        input_fingerprint=second_fingerprint,
+        repo_source_postures=second_postures,
+    )
+    summary = workspace_graph.graph_summary(second_graph, issues)
+
+    assert second_fingerprint != first_fingerprint
+    assert second_graph["repo_source_postures"][0]["relation"] == "ahead"
+    assert summary["source_warning_repo_count"] == 1
+    assert summary["local_unpublished_repo_count"] == 1
+
+
+def test_repo_identity_uses_origin_name_in_arbitrarily_named_worktree(tmp_path: Path) -> None:
+    repo = tmp_path / "abyss-stack-feature-worktree"
+    repo.mkdir()
+    write_decision(repo, decision_id="ABYSS-STACK-D-0001", title="First")
+    initialize_tracked_git_repo(repo)
+    git(repo, "remote", "set-url", "origin", "git@github.com:AbyssBootstrap/abyss-stack.git")
+
+    records, issues = workspace_graph.collect_workspace_decisions([repo])
+    posture = workspace_graph.collect_repo_source_posture(repo)
+
+    assert issues == []
+    assert workspace_graph.repo_identity(repo) == "abyss-stack"
+    assert records[0].repo == "abyss-stack"
+    assert posture["repo"] == "abyss-stack"
+
+
+def test_explicit_repo_root_wins_duplicate_origin_identity(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    canonical = workspace / "abyss-stack"
+    explicit = tmp_path / "abyss-stack-feature-worktree"
+    for repo, decision_id in (
+        (canonical, "ABYSS-STACK-D-0001"),
+        (explicit, "ABYSS-STACK-D-0002"),
+    ):
+        repo.mkdir(parents=True)
+        write_decision(repo, decision_id=decision_id, title=decision_id)
+        initialize_tracked_git_repo(repo)
+        git(repo, "remote", "set-url", "origin", "git@github.com:AbyssBootstrap/abyss-stack.git")
+
+    repos = workspace_graph.discover_decision_repos(
+        workspace_root=workspace,
+        extra_repo_roots=[explicit],
+    )
+
+    assert repos == [explicit.resolve()]
 
 
 def write_decision(

@@ -7,17 +7,22 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 from urllib.parse import quote
 
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_LOCAL_STACK_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("Logs/decision-graph/latest")
-GRAPH_SCHEMA = "abyss_workspace_decision_graph_v1"
-GRAPH_SUMMARY_SCHEMA = "abyss_workspace_decision_graph_summary_v1"
+GRAPH_SCHEMA = "abyss_workspace_decision_graph_v2"
+GRAPH_SUMMARY_SCHEMA = "abyss_workspace_decision_graph_summary_v2"
+FRESHNESS_SCOPE = "local_workspace_filesystem"
+SOURCE_POSTURE_NOTE = (
+    "Git posture is compared only with existing local tracking refs; no fetch or remote freshness check is performed."
+)
 EXEMPT_DECISION_FILES = {"AGENTS.md", "README.md", "TEMPLATE.md"}
 FINGERPRINT_EXCLUDED_DIRS = {"generated"}
 LANE_DOCUMENT_SURFACE_KINDS = {
@@ -128,10 +133,157 @@ def _fingerprint_files(repo_root: Path) -> tuple[Path, ...]:
     return tuple(files)
 
 
-def workspace_input_fingerprint(repo_roots: Sequence[Path]) -> str:
+def _git_output(repo_root: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "--no-optional-locks", *args],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return completed.stdout.strip()
+
+
+def repo_identity(repo_root: Path) -> str:
+    remote_url = (_git_output(repo_root, "config", "--get", "remote.origin.url") or "").strip().rstrip("/")
+    if remote_url:
+        candidate = remote_url.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+        if candidate.endswith(".git"):
+            candidate = candidate[:-4]
+        if re.fullmatch(r"[A-Za-z0-9._-]+", candidate):
+            return candidate
+    return repo_root.name
+
+
+def _local_tracking_ref(repo_root: Path) -> str | None:
+    upstream = _git_output(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+    if upstream:
+        return upstream
+    origin_head = _git_output(repo_root, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+    if origin_head:
+        return origin_head
+    for candidate in ("origin/main", "origin/master"):
+        if _git_output(repo_root, "rev-parse", "--verify", f"{candidate}^{{commit}}"):
+            return candidate
+    return None
+
+
+def collect_repo_source_posture(repo_root: Path) -> dict[str, Any]:
+    head_sha = _git_output(repo_root, "rev-parse", "--verify", "HEAD^{commit}")
+    head_ref = _git_output(repo_root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    local_tracking_ref = _local_tracking_ref(repo_root) if head_sha else None
+    local_tracking_sha = (
+        _git_output(repo_root, "rev-parse", "--verify", f"{local_tracking_ref}^{{commit}}")
+        if local_tracking_ref
+        else None
+    )
+    ahead_count: int | None = None
+    behind_count: int | None = None
+    relation = "unknown"
+    if head_sha and local_tracking_ref and local_tracking_sha:
+        counts = _git_output(repo_root, "rev-list", "--left-right", "--count", f"HEAD...{local_tracking_ref}")
+        if counts:
+            parts = counts.split()
+            if len(parts) == 2 and all(part.isdigit() for part in parts):
+                ahead_count, behind_count = (int(part) for part in parts)
+                if ahead_count and behind_count:
+                    relation = "diverged"
+                elif ahead_count:
+                    relation = "ahead"
+                elif behind_count:
+                    relation = "behind"
+                else:
+                    relation = "aligned"
+
+    worktree_status = _git_output(repo_root, "status", "--porcelain=v1", "--untracked-files=normal")
+    dirty = None if worktree_status is None else bool(worktree_status)
+    if local_tracking_ref:
+        comparison_basis = "local_remote_tracking_ref_without_fetch"
+    elif head_sha:
+        comparison_basis = "local_git_head_without_tracking_ref_or_fetch"
+    else:
+        comparison_basis = "git_metadata_unavailable_without_fetch"
+
+    return {
+        "repo": repo_identity(repo_root),
+        "head_sha": head_sha,
+        "head_ref": head_ref,
+        "local_tracking_ref": local_tracking_ref,
+        "local_tracking_sha": local_tracking_sha,
+        "ahead_count": ahead_count,
+        "behind_count": behind_count,
+        "relation": relation,
+        "dirty": dirty,
+        "comparison_basis": comparison_basis,
+        "remote_freshness_checked": False,
+    }
+
+
+def collect_repo_source_postures(repo_roots: Sequence[Path]) -> list[dict[str, Any]]:
+    return [
+        collect_repo_source_posture(repo_root)
+        for repo_root in sorted(
+            (path.resolve() for path in repo_roots),
+            key=lambda path: (repo_identity(path).lower(), path.as_posix()),
+        )
+    ]
+
+
+def summarize_repo_source_postures(repo_source_postures: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    relation_counts: dict[str, int] = {}
+    source_warning_repo_count = 0
+    local_tracking_lag_repo_count = 0
+    local_unpublished_repo_count = 0
+    dirty_repo_count = 0
+    unknown_source_posture_count = 0
+    for posture in repo_source_postures:
+        relation = str(posture.get("relation") or "unknown")
+        relation_counts[relation] = relation_counts.get(relation, 0) + 1
+        dirty = posture.get("dirty")
+        if relation in {"behind", "diverged"}:
+            local_tracking_lag_repo_count += 1
+        if relation in {"ahead", "diverged"}:
+            local_unpublished_repo_count += 1
+        if relation == "unknown":
+            unknown_source_posture_count += 1
+        if dirty is True:
+            dirty_repo_count += 1
+        if relation != "aligned" or dirty is not False:
+            source_warning_repo_count += 1
+    return {
+        "repo_source_posture_counts": dict(sorted(relation_counts.items())),
+        "source_warning_repo_count": source_warning_repo_count,
+        "local_tracking_lag_repo_count": local_tracking_lag_repo_count,
+        "local_unpublished_repo_count": local_unpublished_repo_count,
+        "dirty_repo_count": dirty_repo_count,
+        "unknown_source_posture_count": unknown_source_posture_count,
+    }
+
+
+def workspace_input_fingerprint(
+    repo_roots: Sequence[Path],
+    repo_source_postures: Sequence[dict[str, Any]] | None = None,
+) -> str:
     digest = hashlib.sha256()
-    for repo_root in sorted((path.resolve() for path in repo_roots), key=lambda path: path.name.lower()):
-        digest.update(f"repo:{repo_root.name}\n".encode("utf-8"))
+    postures = repo_source_postures if repo_source_postures is not None else collect_repo_source_postures(repo_roots)
+    posture_by_repo = {str(posture.get("repo")): posture for posture in postures}
+    for repo_root in sorted(
+        (path.resolve() for path in repo_roots),
+        key=lambda path: (repo_identity(path).lower(), path.as_posix()),
+    ):
+        identity = repo_identity(repo_root)
+        digest.update(f"repo:{identity}\n".encode("utf-8"))
+        posture = posture_by_repo.get(identity, {})
+        digest.update(
+            (
+                "source-posture:"
+                + json.dumps(posture, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                + "\n"
+            ).encode("utf-8")
+        )
         for path in _fingerprint_files(repo_root):
             relative = path.relative_to(repo_root).as_posix()
             digest.update(f"path:{relative}\nsha256:{_sha256(path)}\n".encode("utf-8"))
@@ -346,7 +498,7 @@ def discover_decision_repos(
         candidates.extend(sorted(path for path in workspace_root.iterdir() if path.is_dir()))
     candidates.extend(extra_repo_roots)
 
-    repos: list[Path] = []
+    repos_by_identity: dict[str, Path] = {}
     seen: set[Path] = set()
     for candidate in candidates:
         root = candidate.resolve()
@@ -357,14 +509,17 @@ def discover_decision_repos(
             continue
         if not (root / "docs" / "decisions").is_dir():
             continue
-        repos.append(root)
-    return sorted(repos, key=lambda path: path.name.lower())
+        repos_by_identity[repo_identity(root).lower()] = root
+    return sorted(
+        repos_by_identity.values(),
+        key=lambda path: (repo_identity(path).lower(), path.as_posix()),
+    )
 
 
 def load_repo_decisions(repo_root: Path) -> tuple[list[WorkspaceDecisionRecord], list[dict[str, str]]]:
     records: list[WorkspaceDecisionRecord] = []
     issues: list[dict[str, str]] = []
-    repo = repo_root.name
+    repo = repo_identity(repo_root)
     decisions_root = repo_root / "docs" / "decisions"
     for path in sorted(decisions_root.glob("*.md")):
         if path.name in EXEMPT_DECISION_FILES:
@@ -405,7 +560,7 @@ def collect_repo_decision_surfaces(
 ) -> tuple[list[WorkspaceDecisionSurface], list[dict[str, str]]]:
     surfaces: list[WorkspaceDecisionSurface] = []
     issues: list[dict[str, str]] = []
-    repo = repo_root.name
+    repo = repo_identity(repo_root)
     decisions_root = repo_root / "docs" / "decisions"
     record_paths = {record.repo_path for record in records}
     issue_paths = {
@@ -503,6 +658,7 @@ def build_workspace_graph(
     *,
     surfaces: Sequence[WorkspaceDecisionSurface] = (),
     input_fingerprint: str | None = None,
+    repo_source_postures: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, object]:
     nodes: dict[str, dict[str, object]] = {}
     edges: dict[tuple[str, str, str], dict[str, str]] = {}
@@ -521,6 +677,18 @@ def build_workspace_graph(
         by_repo.setdefault(record.repo, []).append(record)
     for surface in surfaces:
         surfaces_by_repo.setdefault(surface.repo, []).append(surface)
+
+    if repo_source_postures is None:
+        repo_roots_by_name = {
+            item.repo: item.repo_root
+            for item in (*records, *surfaces)
+        }
+        repo_source_postures = collect_repo_source_postures(tuple(repo_roots_by_name.values()))
+    source_postures = sorted(
+        (dict(posture) for posture in repo_source_postures),
+        key=lambda posture: str(posture.get("repo", "")).lower(),
+    )
+    posture_summary = summarize_repo_source_postures(source_postures)
 
     repo_names = sorted(set(by_repo) | set(surfaces_by_repo))
     for repo in repo_names:
@@ -634,6 +802,9 @@ def build_workspace_graph(
     return {
         "schema": GRAPH_SCHEMA,
         "authority_note": "Repo-local decision records own rationale; this workspace graph is a generated navigation read model.",
+        "freshness_scope": FRESHNESS_SCOPE,
+        "remote_freshness_checked": False,
+        "source_posture_note": SOURCE_POSTURE_NOTE,
         "input_fingerprint": input_fingerprint,
         "repo_count": len(repo_names),
         "decision_count": len(records),
@@ -644,6 +815,8 @@ def build_workspace_graph(
         "node_type_counts": dict(sorted(node_type_counts.items())),
         "edge_type_counts": dict(sorted(edge_type_counts.items())),
         "surface_kind_counts": dict(sorted(surface_kind_counts.items())),
+        "repo_source_postures": source_postures,
+        **posture_summary,
         "nodes": node_values,
         "edges": edge_values,
     }
@@ -652,6 +825,9 @@ def build_workspace_graph(
 def graph_summary(graph: dict[str, object], issues: Sequence[dict[str, str]]) -> dict[str, object]:
     return {
         "schema": GRAPH_SUMMARY_SCHEMA,
+        "freshness_scope": graph["freshness_scope"],
+        "remote_freshness_checked": graph["remote_freshness_checked"],
+        "source_posture_note": graph["source_posture_note"],
         "input_fingerprint": graph["input_fingerprint"],
         "repo_count": graph["repo_count"],
         "decision_count": graph["decision_count"],
@@ -662,6 +838,13 @@ def graph_summary(graph: dict[str, object], issues: Sequence[dict[str, str]]) ->
         "node_type_counts": graph["node_type_counts"],
         "edge_type_counts": graph["edge_type_counts"],
         "surface_kind_counts": graph["surface_kind_counts"],
+        "repo_source_postures": graph["repo_source_postures"],
+        "repo_source_posture_counts": graph["repo_source_posture_counts"],
+        "source_warning_repo_count": graph["source_warning_repo_count"],
+        "local_tracking_lag_repo_count": graph["local_tracking_lag_repo_count"],
+        "local_unpublished_repo_count": graph["local_unpublished_repo_count"],
+        "dirty_repo_count": graph["dirty_repo_count"],
+        "unknown_source_posture_count": graph["unknown_source_posture_count"],
         "issue_count": len(issues),
         "issues": list(issues),
     }
@@ -725,7 +908,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         extra_repo_roots=extra_roots,
     )
     records, surfaces, issues = collect_workspace_decision_inputs(repo_roots)
-    graph = build_workspace_graph(records, surfaces=surfaces, input_fingerprint=workspace_input_fingerprint(repo_roots))
+    repo_source_postures = collect_repo_source_postures(repo_roots)
+    graph = build_workspace_graph(
+        records,
+        surfaces=surfaces,
+        input_fingerprint=workspace_input_fingerprint(repo_roots, repo_source_postures),
+        repo_source_postures=repo_source_postures,
+    )
     summary = graph_summary(graph, issues)
 
     if args.write:

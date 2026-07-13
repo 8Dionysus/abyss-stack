@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import aoa_decisions_mcp.core as core
@@ -73,12 +74,35 @@ def write_decision(
     )
 
 
+def git(repo_root: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def initialize_tracked_git_repo(repo_root: Path) -> None:
+    git(repo_root, "init", "--initial-branch=main")
+    git(repo_root, "config", "user.name", "AoA Test")
+    git(repo_root, "config", "user.email", "aoa-test@example.invalid")
+    git(repo_root, "remote", "add", "origin", f"https://github.com/example/{repo_root.name}.git")
+    git(repo_root, "add", ".")
+    git(repo_root, "commit", "-m", "seed")
+    git(repo_root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+
+
 def seed_workspace(root: Path) -> None:
     repo = root / "repo-a"
-    (repo / ".git").mkdir(parents=True)
+    repo.mkdir(parents=True)
     (repo / "docs" / "decisions" / "indexes").mkdir(parents=True)
     (repo / "docs" / "decisions" / "indexes" / "README.md").write_text("# Index\n", encoding="utf-8")
     write_decision(repo, "AAA-D-0001", "First Decision", "docs/source.md", route_anchor="config/app.toml")
+    initialize_tracked_git_repo(repo)
 
 
 def state_for(root: Path) -> AoADecisionsMCPState:
@@ -97,10 +121,61 @@ def test_status_auto_refreshes_graph_cache(tmp_path: Path) -> None:
     status = state.ensure_fresh()
 
     assert status["status"] == "refreshed"
+    assert status["cache_status"] == "refreshed"
+    assert status["freshness_scope"] == "local_workspace_filesystem"
+    assert status["remote_freshness_checked"] is False
+    assert status["source_posture_status"] == "aligned"
+    assert status["source_warnings"] == []
+    assert "repo_source_postures" not in status
     assert status["decision_count"] == 1
     assert (tmp_path / "graph" / "workspace_decision_graph.json").is_file()
     assert (tmp_path / "graph" / "nodes.jsonl").is_file()
     assert (tmp_path / "graph" / "edges.jsonl").is_file()
+
+
+def test_status_downgrades_when_local_tracking_ref_is_ahead_of_checkout(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    repo = tmp_path / "repo-a"
+    state = state_for(tmp_path)
+    first = state.ensure_fresh()
+
+    git(repo, "switch", "-c", "origin-progress")
+    (repo / "remote-only.txt").write_text("tracking progress\n", encoding="utf-8")
+    git(repo, "add", "remote-only.txt")
+    git(repo, "commit", "-m", "tracking progress")
+    tracking_sha = git(repo, "rev-parse", "HEAD")
+    git(repo, "switch", "main")
+    git(repo, "update-ref", "refs/remotes/origin/main", tracking_sha)
+    git(repo, "branch", "-D", "origin-progress")
+
+    warning = state.ensure_fresh()
+    repo_packet = state.repo("repo-a")
+    issues_packet = state.issues(repo="repo-a")
+    cached_warning = state.ensure_fresh()
+
+    assert warning["status"] == "refreshed-with-source-warnings"
+    assert warning["cache_status"] == "refreshed"
+    assert warning["source_posture_status"] == "warnings"
+    assert warning["local_tracking_lag_repo_count"] == 1
+    assert warning["source_warning_repo_count"] == 1
+    assert warning["source_warnings"] == [
+        {
+            "repo": "repo-a",
+            "relation": "behind",
+            "dirty": False,
+            "ahead_count": 0,
+            "behind_count": 1,
+        }
+    ]
+    assert "repo_source_postures" not in warning
+    assert warning["issue_count"] == 0
+    assert warning["input_fingerprint"] != first["input_fingerprint"]
+    assert repo_packet["source_posture"]["relation"] == "behind"
+    assert repo_packet["source_posture"]["remote_freshness_checked"] is False
+    assert issues_packet["issue_count"] == 0
+    assert issues_packet["source_warning_repo_count"] == 1
+    assert cached_warning["status"] == "fresh-with-source-warnings"
+    assert cached_warning["cache_status"] == "fresh"
 
 
 def test_status_rebuilds_when_decision_lane_changes(tmp_path: Path) -> None:
@@ -115,6 +190,23 @@ def test_status_rebuilds_when_decision_lane_changes(tmp_path: Path) -> None:
     assert second["decision_count"] == 2
     assert first["input_fingerprint"] != second["input_fingerprint"]
     assert second["freshness"]["refreshed"] is True
+
+
+def test_cached_status_keeps_structural_issues_visible(tmp_path: Path) -> None:
+    seed_workspace(tmp_path)
+    unknown = tmp_path / "repo-a" / "docs" / "decisions" / "entities" / "unknown.yaml"
+    unknown.parent.mkdir(parents=True)
+    unknown.write_text("schema: unknown\n", encoding="utf-8")
+    state = state_for(tmp_path)
+
+    refreshed = state.ensure_fresh()
+    cached = state.ensure_fresh()
+
+    assert refreshed["status"] == "refreshed-with-issues"
+    assert refreshed["issue_count"] == 1
+    assert cached["status"] == "fresh-with-issues"
+    assert cached["cache_status"] == "fresh"
+    assert cached["issue_count"] == 1
 
 
 def test_search_and_packet_return_graph_context(tmp_path: Path) -> None:
