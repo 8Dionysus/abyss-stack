@@ -9,10 +9,12 @@ from typing import Any, Iterable, Iterator, Sequence
 from .bundle import RetrievalBundle, canonical_json, sha256_file
 
 
-SCHEMA_VERSION = "abyss-stack-repo-self-kag-sqlite-v1"
+SCHEMA_VERSION = "abyss-stack-repo-self-kag-sqlite-v2"
 
 
-def _batches(rows: Iterable[Sequence[Any]], size: int = 1000) -> Iterator[list[Sequence[Any]]]:
+def _batches(
+    rows: Iterable[Sequence[Any]], size: int = 1000
+) -> Iterator[list[Sequence[Any]]]:
     batch: list[Sequence[Any]] = []
     for row in rows:
         batch.append(row)
@@ -119,7 +121,9 @@ def _create_schema(connection: sqlite3.Connection) -> None:
 
         CREATE VIRTUAL TABLE documents_fts USING fts5(
             id UNINDEXED,
-            repo UNINDEXED,
+            repo,
+            node_class,
+            kind,
             path,
             label,
             text,
@@ -206,6 +210,8 @@ def _document_rows(
         fts_row = (
             str(record["id"]),
             str(record["repo"]),
+            str(record["node_class"]),
+            str(record["kind"]),
             str(record["path"]),
             str(record["label"]),
             str(record["text"]),
@@ -261,7 +267,8 @@ def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
                 [row for row, _ in batch],
             )
             connection.executemany(
-                "INSERT INTO documents_fts(id, repo, path, label, text) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO documents_fts(id, repo, node_class, kind, path, label, text) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [fts_row for _, fts_row in batch],
             )
             document_count += len(batch)
@@ -287,6 +294,7 @@ def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
         "bytes": size,
         "counts": counts,
     }
+
 
 def check(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
     destination = destination.resolve()
@@ -315,11 +323,12 @@ def check(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
         if counts["documents"] != counts.pop("documents_fts"):
             raise RuntimeError("SQLite FTS document count mismatch")
         expected = {
-            key: int(bundle.manifest["files"][key]["record_count"])
-            for key in counts
+            key: int(bundle.manifest["files"][key]["record_count"]) for key in counts
         }
         if counts != expected:
-            raise RuntimeError(f"SQLite projection counts mismatch: {counts} != {expected}")
+            raise RuntimeError(
+                f"SQLite projection counts mismatch: {counts} != {expected}"
+            )
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
         if not integrity or integrity[0] != "ok":
             raise RuntimeError(f"SQLite integrity check failed: {integrity}")

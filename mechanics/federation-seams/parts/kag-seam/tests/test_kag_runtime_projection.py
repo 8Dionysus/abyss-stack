@@ -28,7 +28,9 @@ def _digest(value: str) -> str:
 
 
 def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
-    content = "".join(f"{canonical_json(record)}\n" for record in records).encode("utf-8")
+    content = "".join(f"{canonical_json(record)}\n" for record in records).encode(
+        "utf-8"
+    )
     path.write_bytes(content)
     return {
         "path": path.name,
@@ -157,7 +159,10 @@ def write_bundle(root: Path) -> RetrievalBundle:
         "external_references": external,
         "documents": documents,
     }
-    files = {key: _write_jsonl(root / f"{key}.jsonl", value) for key, value in records.items()}
+    files = {
+        key: _write_jsonl(root / f"{key}.jsonl", value)
+        for key, value in records.items()
+    }
     manifest: dict[str, Any] = {
         "schema_version": "aoa-repo-local-kag-retrieval-bundle-v1",
         "bundle_identity": {
@@ -216,7 +221,9 @@ def write_bundle(root: Path) -> RetrievalBundle:
 
 
 class FakeEmbeddings:
-    def request(self, method: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def request(
+        self, method: str, path: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         assert method == "POST"
         assert path == "/embeddings"
         return {
@@ -234,7 +241,9 @@ class AdaptiveEmbeddings(FakeEmbeddings):
         self.batch_sizes: list[int] = []
         self.texts: list[str] = []
 
-    def request(self, method: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def request(
+        self, method: str, path: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         inputs = list(payload["input"])
         self.batch_sizes.append(len(inputs))
         if len(inputs) > self.max_batch_size:
@@ -256,7 +265,9 @@ class FakeQdrant:
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if method == "GET" and path == "/collections":
-            return {"result": {"collections": [{"name": key} for key in self.collections]}}
+            return {
+                "result": {"collections": [{"name": key} for key in self.collections]}
+            }
         if method == "GET" and path == "/aliases":
             return {
                 "result": {
@@ -274,6 +285,7 @@ class FakeQdrant:
             return {
                 "result": {
                     "points_count": collection["count"],
+                    "payload_schema": collection.get("payload_schema", {}),
                     "config": {
                         "params": {
                             "vectors": {
@@ -284,11 +296,31 @@ class FakeQdrant:
                     },
                 }
             }
+        if method == "POST" and path.endswith("/points"):
+            name = path.split("/", 3)[2]
+            points = self.collections[name].get("points", {})
+            return {
+                "result": [
+                    copy.deepcopy(points[point_id])
+                    for point_id in (payload or {})["ids"]
+                    if point_id in points
+                ]
+            }
         if method == "PUT" and "/points?" in path:
             name = path.split("/", 3)[2]
             points = (payload or {})["points"]
-            self.collections[name]["count"] += len(points)
+            stored = self.collections[name].setdefault("points", {})
+            self.collections[name]["count"] += sum(
+                point["id"] not in stored for point in points
+            )
+            stored.update({point["id"]: copy.deepcopy(point) for point in points})
             self.points.extend(points)
+            return {"result": {"status": "completed"}}
+        if method == "PUT" and "/index?" in path:
+            name = path.split("/", 3)[2]
+            schema = self.collections[name].setdefault("payload_schema", {})
+            values = payload or {}
+            schema[values["field_name"]] = {"data_type": values["field_schema"]}
             return {"result": {"status": "completed"}}
         if method == "PUT" and path.startswith("/collections/"):
             vectors = (payload or {})["vectors"]
@@ -296,6 +328,8 @@ class FakeQdrant:
                 "count": 0,
                 "size": vectors["size"],
                 "distance": vectors["distance"],
+                "payload_schema": {},
+                "points": {},
             }
             return {"result": True}
         if method == "DELETE" and path.startswith("/collections/"):
@@ -318,11 +352,18 @@ class FakeGraph:
     def __init__(self) -> None:
         self.current: str | None = None
         self.previous: str | None = None
-        self.counts = {"owners": 0, "nodes": 0, "relations": 0, "external_references": 0}
+        self.counts = {
+            "owners": 0,
+            "nodes": 0,
+            "relations": 0,
+            "external_references": 0,
+        }
         self.stale_nodes = 0
         self.cleanup_limits: list[int] = []
 
-    def execute(self, statement: str, parameters: dict[str, Any] | None = None) -> list[list[Any]]:
+    def execute(
+        self, statement: str, parameters: dict[str, Any] | None = None
+    ) -> list[list[Any]]:
         values = parameters or {}
         rows = values.get("rows", [])
         if "UNWIND" in statement and "AOA_KAG_EXTERNAL_REFERENCE" in statement:
@@ -384,7 +425,8 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         connection = sqlite3.connect(destination)
         try:
             hit = connection.execute(
-                "SELECT id FROM documents_fts WHERE documents_fts MATCH 'evidence'"
+                "SELECT id FROM documents_fts WHERE documents_fts MATCH "
+                "'repo:fixture AND kind:markdown_heading AND evidence'"
             ).fetchone()
         finally:
             connection.close()
@@ -451,6 +493,8 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             "count": 2,
             "size": 3,
             "distance": "Cosine",
+            "payload_schema": {},
+            "points": {},
         }
         embeddings = AdaptiveEmbeddings(max_batch_size=2)
 
@@ -464,10 +508,78 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(result["point_count"], 4)
         self.assertEqual(result["resumed_from_point_count"], 2)
         self.assertEqual(embeddings.texts, ["document 2", "document 3"])
-        self.assertEqual([point["id"] for point in qdrant.points], [
-            documents[2]["vector_point_id"],
-            documents[3]["vector_point_id"],
-        ])
+        self.assertEqual(
+            [point["id"] for point in qdrant.points],
+            [
+                documents[2]["vector_point_id"],
+                documents[3]["vector_point_id"],
+            ],
+        )
+
+    def test_qdrant_projection_reuses_unchanged_vectors_from_previous_alias(
+        self,
+    ) -> None:
+        source = next(self.bundle.records("documents"))
+        unchanged = copy.deepcopy(source)
+        changed = copy.deepcopy(source)
+        changed["id"] = "aoa:fixture:retrieval-document:changed"
+        changed["version_id"] = "aoa:fixture:retrieval-document-version:changed"
+        changed["vector_point_id"] = "00000000-0000-5000-8000-000000000002"
+        changed["text"] = "changed document"
+        changed["text_digest"] = hashlib.sha256(changed["text"].encode()).hexdigest()
+
+        class BundleView:
+            projection_digest = "b" * 64
+            manifest = copy.deepcopy(self.bundle.manifest)
+
+            def records(self, key: str):
+                assert key == "documents"
+                yield unchanged
+                yield changed
+
+        bundle = BundleView()
+        bundle.manifest["files"]["documents"]["record_count"] = 2
+        previous = "aoa_kag_repo_self_previous"
+        qdrant = FakeQdrant()
+        qdrant.collections[previous] = {
+            "count": 2,
+            "size": 3,
+            "distance": "Cosine",
+            "payload_schema": {},
+            "points": {
+                unchanged["vector_point_id"]: {
+                    "id": unchanged["vector_point_id"],
+                    "vector": [0.6, 0.8, 0.0],
+                    "payload": {
+                        "text_digest": unchanged["text_digest"],
+                        "embedding_profile_id": "fixture-embedding-v1",
+                    },
+                },
+                changed["vector_point_id"]: {
+                    "id": changed["vector_point_id"],
+                    "vector": [0.0, 0.0, 1.0],
+                    "payload": {
+                        "text_digest": "stale",
+                        "embedding_profile_id": "fixture-embedding-v1",
+                    },
+                },
+            },
+        }
+        qdrant.aliases[vector.DEFAULT_ALIAS] = previous
+        embeddings = AdaptiveEmbeddings(max_batch_size=2)
+
+        result = vector.materialize(
+            bundle,
+            qdrant=qdrant,
+            embeddings=embeddings,
+            batch_size=2,
+        )
+
+        self.assertEqual(result["reused_point_count"], 1)
+        self.assertEqual(result["embedded_point_count"], 1)
+        self.assertEqual(embeddings.texts, ["changed document"])
+        self.assertEqual(qdrant.points[0]["vector"], [0.6, 0.8, 0.0])
+        self.assertEqual(qdrant.points[1]["vector"], [0.6, 0.8, 0.0])
 
     def test_neo4j_projection_switches_current_after_complete_counts(self) -> None:
         fake = FakeGraph()

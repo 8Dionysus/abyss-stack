@@ -10,9 +10,15 @@ from .bundle import RetrievalBundle
 from .transport import HttpJsonError, JsonHttpClient
 
 
-SCHEMA_VERSION = "abyss-stack-repo-self-kag-qdrant-v1"
+SCHEMA_VERSION = "abyss-stack-repo-self-kag-qdrant-v2"
 COLLECTION_PREFIX = "aoa_kag_repo_self_"
 DEFAULT_ALIAS = "aoa_kag_repo_self_current"
+PAYLOAD_INDEXES = {
+    "repo": "keyword",
+    "node_class": "keyword",
+    "kind": "keyword",
+    "access.scope": "keyword",
+}
 DISTANCES = {
     "cosine": "Cosine",
     "dot": "Dot",
@@ -23,7 +29,9 @@ TRANSIENT_EMBEDDING_STATUSES = {0, 429, 500, 502, 503, 504}
 EMBEDDING_RETRY_DELAYS = (1.0, 2.0, 4.0)
 
 
-def _batches(records: Iterable[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:
+def _batches(
+    records: Iterable[dict[str, Any]], size: int
+) -> Iterator[list[dict[str, Any]]]:
     batch: list[dict[str, Any]] = []
     for record in records:
         batch.append(record)
@@ -103,7 +111,9 @@ def _embedding_vectors_resilient(
     ]
 
 
-def _point(document: dict[str, Any], vector: list[float], profile_id: str) -> dict[str, Any]:
+def _point(
+    document: dict[str, Any], vector: list[float], profile_id: str
+) -> dict[str, Any]:
     payload_keys = (
         "id",
         "version_id",
@@ -175,6 +185,92 @@ def _validate_collection(
     return _point_count(response)
 
 
+def _ensure_payload_indexes(client: JsonHttpClient, collection: str) -> None:
+    observed = _collection(client, collection)
+    if observed is None:
+        raise RuntimeError(f"missing Qdrant collection: {collection}")
+    result = observed.get("result")
+    schema = result.get("payload_schema") if isinstance(result, dict) else None
+    schema = schema if isinstance(schema, dict) else {}
+    for field, data_type in PAYLOAD_INDEXES.items():
+        entry = schema.get(field)
+        if isinstance(entry, dict) and entry.get("data_type") == data_type:
+            continue
+        client.request(
+            "PUT",
+            f"/collections/{collection}/index?wait=true",
+            {"field_name": field, "field_schema": data_type},
+        )
+
+
+def _validate_payload_indexes(response: dict[str, Any]) -> None:
+    result = response.get("result")
+    schema = result.get("payload_schema") if isinstance(result, dict) else None
+    if not isinstance(schema, dict):
+        raise RuntimeError("Qdrant collection payload schema is missing")
+    observed = {
+        field: entry.get("data_type") if isinstance(entry, dict) else None
+        for field, entry in schema.items()
+    }
+    missing = {
+        field: data_type
+        for field, data_type in PAYLOAD_INDEXES.items()
+        if observed.get(field) != data_type
+    }
+    if missing:
+        raise RuntimeError(f"Qdrant payload indexes mismatch: {missing}")
+
+
+def _reusable_vectors(
+    client: JsonHttpClient,
+    collection: str | None,
+    documents: list[dict[str, Any]],
+    profile: dict[str, Any],
+) -> dict[str, list[float]]:
+    if not collection or not documents:
+        return {}
+    try:
+        response = client.request(
+            "POST",
+            f"/collections/{collection}/points",
+            {
+                "ids": [str(document["vector_point_id"]) for document in documents],
+                "with_payload": True,
+                "with_vector": True,
+            },
+        )
+    except HttpJsonError as exc:
+        if exc.status == 404:
+            return {}
+        raise
+    records = response.get("result")
+    if not isinstance(records, list):
+        raise RuntimeError("Qdrant point retrieval response is missing result")
+    documents_by_point = {
+        str(document["vector_point_id"]): document for document in documents
+    }
+    reusable: dict[str, list[float]] = {}
+    for record in records:
+        point_id = str(record.get("id", ""))
+        document = documents_by_point.get(point_id)
+        payload = record.get("payload")
+        raw_vector = record.get("vector")
+        if (
+            document is None
+            or not isinstance(payload, dict)
+            or not isinstance(raw_vector, list)
+            or payload.get("text_digest") != document["text_digest"]
+            or payload.get("embedding_profile_id") != profile["id"]
+        ):
+            continue
+        reusable[point_id] = _normalize(
+            raw_vector,
+            str(profile["normalization"]),
+            int(profile["dimensions"]),
+        )
+    return reusable
+
+
 def _alias_collection(client: JsonHttpClient, alias: str) -> str | None:
     response = client.request("GET", "/aliases")
     result = response.get("result")
@@ -237,6 +333,7 @@ def materialize(
     profile = dict(bundle.manifest["embedding_profile"])
     collection = _collection_name(bundle)
     expected_count = int(bundle.manifest["files"]["documents"]["record_count"])
+    previous = _alias_collection(qdrant, alias)
     existing = _collection(qdrant, collection)
     embedded = 0
     if existing is not None:
@@ -264,32 +361,63 @@ def materialize(
                 "hnsw_config": {"on_disk": True},
             },
         )
+    _ensure_payload_indexes(qdrant, collection)
     resumed_from = embedded
+    reused = 0
+    newly_embedded = 0
     if progress is not None and embedded:
         progress(embedded, expected_count)
     if embedded < expected_count:
         remaining = islice(bundle.records("documents"), embedded, None)
-        for documents in _batches(remaining, batch_size):
-            vectors = _embedding_vectors_resilient(embeddings, documents, profile)
+        source_batch_size = max(batch_size, 256) if previous else batch_size
+        for documents in _batches(remaining, source_batch_size):
+            reusable = _reusable_vectors(qdrant, previous, documents, profile)
+            changed = [
+                document
+                for document in documents
+                if str(document["vector_point_id"]) not in reusable
+            ]
+            changed_vectors = (
+                _embedding_vectors_resilient(
+                    embeddings,
+                    changed,
+                    profile,
+                )
+                if changed
+                else []
+            )
+            vectors_by_point = {
+                str(document["vector_point_id"]): vector
+                for document, vector in zip(changed, changed_vectors, strict=True)
+            }
+            vectors_by_point.update(reusable)
             points = [
-                _point(document, vector, str(profile["id"]))
-                for document, vector in zip(documents, vectors, strict=True)
+                _point(
+                    document,
+                    vectors_by_point[str(document["vector_point_id"])],
+                    str(profile["id"]),
+                )
+                for document in documents
             ]
             qdrant.request(
                 "PUT",
                 f"/collections/{collection}/points?wait=true",
                 {"points": points},
             )
+            reused += len(reusable)
+            newly_embedded += len(changed)
             embedded += len(points)
             if progress is not None:
                 progress(embedded, expected_count)
     if embedded != expected_count:
-        raise RuntimeError(f"Qdrant projection count mismatch: {embedded} != {expected_count}")
+        raise RuntimeError(
+            f"Qdrant projection count mismatch: {embedded} != {expected_count}"
+        )
 
     observed = _collection(qdrant, collection)
     if observed is None or _validate_collection(observed, profile) != expected_count:
         raise RuntimeError("Qdrant collection did not reach the expected point count")
-    previous = _alias_collection(qdrant, alias)
+    _validate_payload_indexes(observed)
     if previous != collection:
         _switch_alias(qdrant, alias, collection, previous)
     removed = _cleanup_collections(qdrant, current=collection, previous=previous)
@@ -299,6 +427,8 @@ def materialize(
         "alias": alias,
         "point_count": expected_count,
         "resumed_from_point_count": resumed_from,
+        "reused_point_count": reused,
+        "embedded_point_count": newly_embedded,
         "embedding_profile": profile,
         "previous_collection": previous,
         "removed_collections": removed,
@@ -317,12 +447,15 @@ def check(
     if observed is None:
         raise RuntimeError(f"missing Qdrant collection: {collection}")
     count = _validate_collection(observed, profile)
+    _validate_payload_indexes(observed)
     expected = int(bundle.manifest["files"]["documents"]["record_count"])
     if count != expected:
         raise RuntimeError(f"Qdrant point count mismatch: {count} != {expected}")
     active = _alias_collection(qdrant, alias)
     if active != collection:
-        raise RuntimeError(f"Qdrant alias {alias} points to {active}, expected {collection}")
+        raise RuntimeError(
+            f"Qdrant alias {alias} points to {active}, expected {collection}"
+        )
     return {
         "schema_version": SCHEMA_VERSION,
         "collection": collection,

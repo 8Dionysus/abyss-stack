@@ -44,9 +44,16 @@ Each adapter completes and verifies its new version before switching its
 current pointer. One previous remote projection remains available for rollback;
 older managed projections are reclaimed.
 
+SQLite FTS indexes owner, node class, kind, path, label, and text so scoped BM25
+queries stay inside their selected corpus. Qdrant indexes the matching owner,
+node-class, kind, and access fields used by filtered semantic retrieval.
+
 Vector builds resume an incomplete versioned collection from its confirmed
-document prefix. Transient embedding failures are retried, and a batch that
-exceeds live model capacity is split while preserving document order.
+document prefix. A new projection reuses vectors from the current collection
+when point identity, text digest, and embedding profile still match, then
+embeds only changed documents. Transient embedding failures are retried, and a
+batch that exceeds live model capacity is split while preserving document
+order.
 Graph retention resumes independently after cutover and removes older
 projection nodes in bounded transactions.
 
