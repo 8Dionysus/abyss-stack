@@ -111,6 +111,18 @@ def _embedding_vectors_resilient(
     ]
 
 
+def _embedding_vectors_batched(
+    client: JsonHttpClient,
+    documents: list[dict[str, Any]],
+    profile: dict[str, Any],
+    batch_size: int,
+) -> list[list[float]]:
+    vectors: list[list[float]] = []
+    for batch in _batches(documents, batch_size):
+        vectors.extend(_embedding_vectors_resilient(client, batch, profile))
+    return vectors
+
+
 def _point(
     document: dict[str, Any], vector: list[float], profile_id: str
 ) -> dict[str, Any]:
@@ -378,10 +390,11 @@ def materialize(
                 if str(document["vector_point_id"]) not in reusable
             ]
             changed_vectors = (
-                _embedding_vectors_resilient(
+                _embedding_vectors_batched(
                     embeddings,
                     changed,
                     profile,
+                    batch_size,
                 )
                 if changed
                 else []
