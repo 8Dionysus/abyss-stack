@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
+    Path("schemas/workspace_decision_repo_source_posture.schema.json"),
     Path("schemas/workspace_decision_graph.schema.json"),
     Path("schemas/workspace_decision_graph_edge.schema.json"),
     Path("schemas/workspace_decision_graph_node.schema.json"),

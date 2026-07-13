@@ -88,8 +88,8 @@ root-level wrapper APIs.
 | `scripts/validate_nested_agents.py` | AGENTS route topology | fix nearest active `AGENTS.md`, required route doc, or explicit legacy-archive classification |
 | `scripts/validators/decision_surface.py` | decision surface route validator module | fix decision route cards, template shape, validator/generator handoff text, or focused decision-surface tests |
 | `scripts/validate_decision_records.py` | decision record shape | fix decision metadata or generated decision read models |
-| `scripts/build_workspace_decision_graph.py` | local workspace decision graph builder | refresh `Logs/decision-graph/latest/` with `--write` or verify it with `--check`; do not treat it as stronger than repo-local records |
-| `scripts/validate_workspace_decision_graph.py` | local workspace graph schema and coverage contract | refresh the graph cache, repair schema enums/counts, or model unknown decision-lane surfaces |
+| `scripts/build_workspace_decision_graph.py` | local workspace decision graph builder | refresh `Logs/decision-graph/latest/` with `--write` or verify it with `--check`; inspect source-posture warnings and do not treat local cache freshness as repo or remote freshness |
+| `scripts/validate_workspace_decision_graph.py` | local workspace graph schema, source-posture, and coverage contract | refresh the graph cache, repair schema enums/counts/posture projection, or model unknown decision-lane surfaces |
 | MCP service validators | service-local access-plane checks | fix the service package and owner-boundary docs |
 
 ## Must Not Claim

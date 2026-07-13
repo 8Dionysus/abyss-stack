@@ -19,6 +19,8 @@ This stack-owned MCP surface owns:
   decision graph access.
 - Mandatory lazy freshness over the ignored local graph cache under
   `Logs/decision-graph/latest/`.
+- Honest local source-posture reporting without remote fetch or checkout
+  mutation.
 - Decision-surface coverage reporting for every fingerprinted
   `docs/decisions/` input.
 - The access-plane boundary between source repo decision lanes and agent-facing
@@ -58,6 +60,7 @@ It does not own:
 - MCP exposes access; it does not promote generated graph packets to source
   truth.
 - Every read route must call `ensure_fresh()` before reading graph outputs.
+- Keep `cache_status`, source posture, and remote freshness as distinct claims.
 - Refresh may write only the ignored local graph cache under `Logs/`.
 - Do not hide unmodeled decision-lane files; add a graph-registry entry or
   report a summary issue.

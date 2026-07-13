@@ -13,8 +13,9 @@ decision validators. It gives agents one repeatable route to ask:
 - which repo decision lane owns the rationale;
 - which repos have comparable decision-lane coverage posture;
 - which graph issues or unknown surfaces need attention;
-- whether the local workspace graph is fresh and covers all known decision-lane
-  input surfaces.
+- whether the local workspace graph is fresh relative to the checked-out files,
+  how each checkout compares with its existing local tracking ref, and whether
+  all known decision-lane input surfaces are covered.
 
 ## Source Hierarchy
 
@@ -55,6 +56,20 @@ All read tools auto-refresh the ignored local graph cache before returning.
 Refresh writes only under `Logs/decision-graph/latest/`.
 If a new file appears under `docs/decisions/` without a graph-registry entry,
 the refreshed summary reports an issue instead of silently hiding that surface.
+
+Freshness is deliberately split into two claims:
+
+- `cache_status` says whether the generated cache matches the current local
+  filesystem inputs;
+- `source_posture_status` and each repo's `source_posture` report dirty,
+  ahead, behind, diverged, or unknown checkout posture against an already
+  available local tracking ref.
+
+The service never runs `git fetch`. `remote_freshness_checked` therefore stays
+`false`, and `freshness_scope` stays `local_workspace_filesystem`. A status
+ending in `-with-source-warnings` is usable for navigation but requires the
+agent to inspect the named repo's authoritative source before claiming current
+repo truth.
 
 ## Agent Route
 

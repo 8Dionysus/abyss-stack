@@ -108,3 +108,25 @@ def test_workspace_graph_contract_validator_flags_unknown_node_type(tmp_path: Pa
     )
 
     assert any("unknown node types: future_node" in message for _, message in issues)
+
+
+def test_workspace_graph_contract_validator_flags_source_posture_count_drift(tmp_path: Path) -> None:
+    repo, output_dir = seed_graph(tmp_path)
+    repo_root = copy_schemas(tmp_path)
+    graph_path = output_dir / "workspace_decision_graph.json"
+    summary_path = output_dir / "summary.json"
+    graph = json.loads(graph_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    graph["source_warning_repo_count"] = 7
+    summary["source_warning_repo_count"] = 7
+    graph_path.write_text(json.dumps(graph, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_path.write_text(json.dumps(summary, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    issues = graph_contract.validate(
+        repo_root=repo_root,
+        workspace_root=tmp_path,
+        output_dir=output_dir,
+        include_stack_repo=False,
+    )
+
+    assert any("source posture summary must match repo_source_postures" in message for _, message in issues)

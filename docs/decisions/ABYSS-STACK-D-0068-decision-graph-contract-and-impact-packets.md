@@ -16,9 +16,10 @@
 
 ## Context
 
-The workspace decision graph already refreshes automatically and now reports
-unknown decision-lane surfaces. That closes hidden drift, but agents still need
-a stronger contract for graph shape and a faster way to answer practical
+The workspace decision graph refreshes automatically and reports unknown
+decision-lane surfaces. That closes cache drift, but cache freshness alone can
+still hide a stale, dirty, or unpublished source checkout. Agents also need a
+stronger contract for graph shape and a faster way to answer practical
 questions such as "which decisions cite this source surface?" or "what records
 are relevant to this changed path?"
 
@@ -39,7 +40,18 @@ Choose option 3.
 
 Add a workspace graph schema contract and validator that checks graph JSON,
 summary JSON, nodes JSONL, edges JSONL, node and edge type enums, count parity,
-and freshness against current decision-lane inputs.
+freshness against current decision-lane inputs, and local repo source-posture
+projection.
+
+Split freshness into local cache status and local Git source posture. Compare
+HEAD only with already available local tracking refs, never fetch from this
+read-only access plane, and state explicitly that remote freshness was not
+checked. Source warnings degrade the MCP status but remain advisory rather than
+becoming structural graph issues.
+
+Derive stable repo identity from the local `origin` name when available so
+arbitrarily named worktrees remain in the canonical repo slice. Prefer an
+explicit source root when it duplicates a workspace repo identity.
 
 Extend `aoa_decisions` with read-only impact packets for source surfaces, owner
 surfaces, changed paths, repo symmetry posture, and graph issues. These routes
@@ -60,6 +72,10 @@ decisions before editing source files.
 - `ci_gate.py --mode decision-graph` becomes the focused landing lane for
   decision graph work and excludes unrelated eval checks.
 - New node, edge, or surface types require schema/validator updates and tests.
+- A `fresh` cache claim is scoped to `local_workspace_filesystem`; agents must
+  inspect source posture before treating the graph as current repo evidence.
+- Dirty, ahead, behind, diverged, and unknown source postures remain visible on
+  cached reads without authorizing fetch, reset, clean, switch, or source edit.
 - MCP packets remain read-only; decision creation and correction still happen
   through repo-local `docs/decisions/` files and validators.
 - Repo coverage comparisons are advisory and must not force identical decision
@@ -73,6 +89,7 @@ decisions before editing source files.
 - `schemas/workspace_decision_graph_summary.schema.json`
 - `schemas/workspace_decision_graph_node.schema.json`
 - `schemas/workspace_decision_graph_edge.schema.json`
+- `schemas/workspace_decision_repo_source_posture.schema.json`
 - `mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/core.py`
 - `mcp/services/aoa-decisions-mcp/src/aoa_decisions_mcp/server.py`
 - `mcp/services/aoa-decisions-mcp/tests/test_decisions_mcp.py`
@@ -81,4 +98,15 @@ decisions before editing source files.
 ## Follow-up route
 
 Update the `aoa-decision` skill chain so find/create/correct workflows use the
-new impact and issue packets before broad manual scans or decision-lane writes.
+new impact and issue packets before broad manual scans or decision-lane writes,
+and fall back to repo-local source whenever the target repo has source-posture
+warnings.
+
+## Review note: 2026-07-13
+
+The decision was corrected after live workspace validation showed that a graph
+could be cache-fresh while `aoa-skills` lagged its local `origin/main` by many
+commits. The same validation also exposed worktree-directory names as unstable
+repo identifiers. The source-posture and stable-identity clauses above close
+those false-green paths without widening the MCP into a source mutation or
+network owner.

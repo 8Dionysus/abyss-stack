@@ -11,9 +11,11 @@ source remains each repo's `docs/decisions/` lane.
 ## Operation
 
 Every resource and tool calls `ensure_fresh()` before reading graph outputs.
-Freshness is based on a deterministic fingerprint of discovered workspace
-decision lanes. If the fingerprint differs from the cached summary, the MCP
-rebuilds the ignored local graph cache before responding.
+Cache freshness is based on a deterministic fingerprint of discovered
+workspace decision lanes plus local Git source posture. If decision content,
+HEAD, the available local tracking ref, ahead/behind relation, or clean/dirty
+posture changes, the MCP rebuilds the ignored local graph cache before
+responding.
 
 ```text
 repo-local docs/decisions -> build_workspace_decision_graph.py -> Logs/decision-graph/latest -> MCP packets
@@ -23,12 +25,30 @@ The graph builder also owns a decision-surface registry. Every fingerprinted
 file under `docs/decisions/` must either become a known graph node type or be
 reported in summary issues as an unmodeled surface.
 
+Source posture is intentionally local-only. The builder compares each checkout
+with an existing local tracking ref without fetching. It returns exact
+comparison basis and `remote_freshness_checked=false`; source lag is advisory
+and does not become a structural graph issue. When source warnings exist, the
+MCP status is degraded from `fresh` or `refreshed` to the corresponding
+`-with-source-warnings` status while preserving a separate `cache_status`.
+Packet-level freshness carries counts plus a compact warning projection; full
+Git posture remains on graph, repo, and issue surfaces so ordinary search
+packets do not pay the context cost of every SHA.
+
+Repo identity comes from the local `origin` URL when available, with the
+checkout directory name as fallback. This keeps arbitrarily named worktrees in
+the canonical repo slice. If the workspace and an explicit extra root resolve
+to the same identity, the explicit root wins so the running source checkout is
+not merged with a second copy.
+
 ## Boundaries
 
 - The graph is a navigation read model.
 - Repo-local decision records own rationale.
 - Repo-local validators and generated indexes own local decision-lane health.
 - MCP writes only ignored cache files under `Logs/decision-graph/latest/`.
+- MCP does not fetch, switch, reset, clean, or otherwise mutate source repos.
+- Cache freshness does not claim owner-source or remote freshness.
 - Unknown decision-lane surface types require graph-registry work before agents
   rely on them through this MCP.
 - Hook, timer, daemon, and durable registry installation are separate owner

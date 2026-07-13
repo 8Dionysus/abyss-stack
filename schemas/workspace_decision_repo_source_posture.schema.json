@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/workspace_decision_repo_source_posture.schema.json",
+  "title": "AoA workspace decision repo source posture",
+  "type": "object",
+  "required": [
+    "repo",
+    "head_sha",
+    "head_ref",
+    "local_tracking_ref",
+    "local_tracking_sha",
+    "ahead_count",
+    "behind_count",
+    "relation",
+    "dirty",
+    "comparison_basis",
+    "remote_freshness_checked"
+  ],
+  "properties": {
+    "repo": {"type": "string", "minLength": 1},
+    "head_sha": {"type": ["string", "null"]},
+    "head_ref": {"type": ["string", "null"]},
+    "local_tracking_ref": {"type": ["string", "null"]},
+    "local_tracking_sha": {"type": ["string", "null"]},
+    "ahead_count": {"type": ["integer", "null"], "minimum": 0},
+    "behind_count": {"type": ["integer", "null"], "minimum": 0},
+    "relation": {"enum": ["aligned", "ahead", "behind", "diverged", "unknown"]},
+    "dirty": {"type": ["boolean", "null"]},
+    "comparison_basis": {
+      "enum": [
+        "local_remote_tracking_ref_without_fetch",
+        "local_git_head_without_tracking_ref_or_fetch",
+        "git_metadata_unavailable_without_fetch"
+      ]
+    },
+    "remote_freshness_checked": {"const": false}
+  },
+  "additionalProperties": false
+}

@@ -6,6 +6,9 @@
   "required": [
     "schema",
     "authority_note",
+    "freshness_scope",
+    "remote_freshness_checked",
+    "source_posture_note",
     "input_fingerprint",
     "repo_count",
     "decision_count",
@@ -16,12 +19,22 @@
     "node_type_counts",
     "edge_type_counts",
     "surface_kind_counts",
+    "repo_source_postures",
+    "repo_source_posture_counts",
+    "source_warning_repo_count",
+    "local_tracking_lag_repo_count",
+    "local_unpublished_repo_count",
+    "dirty_repo_count",
+    "unknown_source_posture_count",
     "nodes",
     "edges"
   ],
   "properties": {
-    "schema": {"const": "abyss_workspace_decision_graph_v1"},
+    "schema": {"const": "abyss_workspace_decision_graph_v2"},
     "authority_note": {"type": "string"},
+    "freshness_scope": {"const": "local_workspace_filesystem"},
+    "remote_freshness_checked": {"const": false},
+    "source_posture_note": {"type": "string"},
     "input_fingerprint": {"type": ["string", "null"]},
     "repo_count": {"type": "integer", "minimum": 0},
     "decision_count": {"type": "integer", "minimum": 0},
@@ -32,6 +45,16 @@
     "node_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
     "edge_type_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
     "surface_kind_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "repo_source_postures": {
+      "type": "array",
+      "items": {"$ref": "workspace_decision_repo_source_posture.schema.json"}
+    },
+    "repo_source_posture_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "source_warning_repo_count": {"type": "integer", "minimum": 0},
+    "local_tracking_lag_repo_count": {"type": "integer", "minimum": 0},
+    "local_unpublished_repo_count": {"type": "integer", "minimum": 0},
+    "dirty_repo_count": {"type": "integer", "minimum": 0},
+    "unknown_source_posture_count": {"type": "integer", "minimum": 0},
     "nodes": {
       "type": "array",
       "items": {"$ref": "workspace_decision_graph_node.schema.json"}

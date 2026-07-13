@@ -23,6 +23,7 @@ GRAPH_SCHEMA_PATH = SCHEMA_DIR / "workspace_decision_graph.schema.json"
 SUMMARY_SCHEMA_PATH = SCHEMA_DIR / "workspace_decision_graph_summary.schema.json"
 NODE_SCHEMA_PATH = SCHEMA_DIR / "workspace_decision_graph_node.schema.json"
 EDGE_SCHEMA_PATH = SCHEMA_DIR / "workspace_decision_graph_edge.schema.json"
+SOURCE_POSTURE_SCHEMA_PATH = SCHEMA_DIR / "workspace_decision_repo_source_posture.schema.json"
 
 
 def _load_json(path: Path, issues: list[tuple[str, str]]) -> Any | None:
@@ -115,11 +116,13 @@ def validate(
     summary_schema = _load_json(repo_root / SUMMARY_SCHEMA_PATH, issues)
     node_schema = _load_json(repo_root / NODE_SCHEMA_PATH, issues)
     edge_schema = _load_json(repo_root / EDGE_SCHEMA_PATH, issues)
+    source_posture_schema = _load_json(repo_root / SOURCE_POSTURE_SCHEMA_PATH, issues)
     schemas = {
         GRAPH_SCHEMA_PATH: graph_schema,
         SUMMARY_SCHEMA_PATH: summary_schema,
         NODE_SCHEMA_PATH: node_schema,
         EDGE_SCHEMA_PATH: edge_schema,
+        SOURCE_POSTURE_SCHEMA_PATH: source_posture_schema,
     }
     for path, schema in schemas.items():
         if not isinstance(schema, dict):
@@ -209,7 +212,23 @@ def validate(
     if graph.get("edge_type_counts") != edge_type_counts:
         issues.append((graph_path.as_posix(), "edge_type_counts must match edges"))
 
+    repo_source_postures = graph.get("repo_source_postures", [])
+    if isinstance(repo_source_postures, list) and all(isinstance(item, dict) for item in repo_source_postures):
+        expected_posture_summary = builder.summarize_repo_source_postures(repo_source_postures)
+        if any(graph.get(key) != value for key, value in expected_posture_summary.items()):
+            issues.append((graph_path.as_posix(), "source posture summary must match repo_source_postures"))
+        posture_repos = [str(item.get("repo", "")) for item in repo_source_postures]
+        graph_repos = sorted(
+            (str(repo) for repo in graph.get("repo_decision_counts", {})),
+            key=str.lower,
+        )
+        if posture_repos != graph_repos:
+            issues.append((graph_path.as_posix(), "repo_source_postures must cover each graph repo exactly once"))
+
     for key in (
+        "freshness_scope",
+        "remote_freshness_checked",
+        "source_posture_note",
         "input_fingerprint",
         "repo_count",
         "decision_count",
@@ -220,6 +239,13 @@ def validate(
         "node_type_counts",
         "edge_type_counts",
         "surface_kind_counts",
+        "repo_source_postures",
+        "repo_source_posture_counts",
+        "source_warning_repo_count",
+        "local_tracking_lag_repo_count",
+        "local_unpublished_repo_count",
+        "dirty_repo_count",
+        "unknown_source_posture_count",
     ):
         if summary.get(key) != graph.get(key):
             issues.append((summary_path.as_posix(), f"{key} must match workspace_decision_graph.json"))
@@ -231,10 +257,12 @@ def validate(
         extra_repo_roots=[builder.DEFAULT_LOCAL_STACK_ROOT] if include_stack_repo and builder.DEFAULT_LOCAL_STACK_ROOT.is_dir() else [],
     )
     records, surfaces, source_issues = builder.collect_workspace_decision_inputs(repo_roots)
+    repo_source_postures = builder.collect_repo_source_postures(repo_roots)
     expected_graph = builder.build_workspace_graph(
         records,
         surfaces=surfaces,
-        input_fingerprint=builder.workspace_input_fingerprint(repo_roots),
+        input_fingerprint=builder.workspace_input_fingerprint(repo_roots, repo_source_postures),
+        repo_source_postures=repo_source_postures,
     )
     if not builder.output_matches(expected_graph, source_issues, output):
         issues.append((output.as_posix(), "workspace decision graph cache is stale; run scripts/build_workspace_decision_graph.py --write"))

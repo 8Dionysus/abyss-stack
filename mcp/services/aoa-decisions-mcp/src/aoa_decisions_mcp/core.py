@@ -173,7 +173,11 @@ class AoADecisionsMCPState:
 
     def current_input_fingerprint(self) -> str:
         builder = self._builder()
-        return builder.workspace_input_fingerprint(self.repo_roots())
+        repo_roots = self.repo_roots()
+        return builder.workspace_input_fingerprint(
+            repo_roots,
+            builder.collect_repo_source_postures(repo_roots),
+        )
 
     def cached_summary(self) -> dict[str, Any] | None:
         summary = _read_json(self.summary_path)
@@ -218,34 +222,63 @@ class AoADecisionsMCPState:
         before_fingerprint = before.get("input_fingerprint") if before else None
         current_fingerprint = self.current_input_fingerprint()
         if not force and before_fingerprint == current_fingerprint and self.graph_path.is_file():
-            return self._freshness_payload(refreshed=False, status="fresh", summary=before)
+            return self._freshness_payload(refreshed=False, cache_status="fresh", summary=before)
 
         with self._refresh_lock():
             if not force and self.cache_is_fresh():
-                return self._freshness_payload(refreshed=False, status="fresh", summary=self.cached_summary())
+                return self._freshness_payload(refreshed=False, cache_status="fresh", summary=self.cached_summary())
 
             builder = self._builder()
             repo_roots = self.repo_roots()
             records, surfaces, issues = builder.collect_workspace_decision_inputs(repo_roots)
-            fingerprint = builder.workspace_input_fingerprint(repo_roots)
-            graph = builder.build_workspace_graph(records, surfaces=surfaces, input_fingerprint=fingerprint)
+            repo_source_postures = builder.collect_repo_source_postures(repo_roots)
+            fingerprint = builder.workspace_input_fingerprint(repo_roots, repo_source_postures)
+            graph = builder.build_workspace_graph(
+                records,
+                surfaces=surfaces,
+                input_fingerprint=fingerprint,
+                repo_source_postures=repo_source_postures,
+            )
             builder.write_graph_outputs(graph, issues, self.output_dir)
             summary = builder.graph_summary(graph, issues)
-            status = "refreshed" if not issues else "refreshed-with-issues"
-            return self._freshness_payload(refreshed=True, status=status, summary=summary)
+            return self._freshness_payload(refreshed=True, cache_status="refreshed", summary=summary)
 
     def _freshness_payload(
         self,
         *,
         refreshed: bool,
-        status: str,
+        cache_status: str,
         summary: dict[str, Any] | None,
     ) -> dict[str, Any]:
         summary = summary or {}
+        issue_count = int(summary.get("issue_count") or 0)
+        source_warning_repo_count = int(summary.get("source_warning_repo_count") or 0)
+        source_warnings = [
+            {
+                "repo": posture.get("repo"),
+                "relation": posture.get("relation"),
+                "dirty": posture.get("dirty"),
+                "ahead_count": posture.get("ahead_count"),
+                "behind_count": posture.get("behind_count"),
+            }
+            for posture in summary.get("repo_source_postures", [])
+            if isinstance(posture, dict)
+            and (posture.get("relation") != "aligned" or posture.get("dirty") is not False)
+        ]
+        status = cache_status
+        if issue_count:
+            status = f"{cache_status}-with-issues"
+        elif source_warning_repo_count:
+            status = f"{cache_status}-with-source-warnings"
         return {
-            "schema": "aoa_decisions_graph_freshness_v1",
+            "schema": "aoa_decisions_graph_freshness_v2",
             "status": status,
+            "cache_status": cache_status,
             "refreshed": refreshed,
+            "freshness_scope": summary.get("freshness_scope", "local_workspace_filesystem"),
+            "remote_freshness_checked": bool(summary.get("remote_freshness_checked", False)),
+            "source_posture_status": "warnings" if source_warning_repo_count else "aligned",
+            "source_posture_note": summary.get("source_posture_note"),
             "output_dir": self.output_dir.as_posix(),
             "graph_path": self.graph_path.as_posix(),
             "summary_path": self.summary_path.as_posix(),
@@ -255,7 +288,14 @@ class AoADecisionsMCPState:
             "decision_surface_count": summary.get("decision_surface_count", 0),
             "node_count": summary.get("node_count", 0),
             "edge_count": summary.get("edge_count", 0),
-            "issue_count": summary.get("issue_count", 0),
+            "issue_count": issue_count,
+            "repo_source_posture_counts": summary.get("repo_source_posture_counts", {}),
+            "source_warnings": source_warnings,
+            "source_warning_repo_count": source_warning_repo_count,
+            "local_tracking_lag_repo_count": summary.get("local_tracking_lag_repo_count", 0),
+            "local_unpublished_repo_count": summary.get("local_unpublished_repo_count", 0),
+            "dirty_repo_count": summary.get("dirty_repo_count", 0),
+            "unknown_source_posture_count": summary.get("unknown_source_posture_count", 0),
         }
 
     def graph(self) -> dict[str, Any]:
@@ -275,6 +315,14 @@ class AoADecisionsMCPState:
 
     def repo(self, repo: str) -> dict[str, Any]:
         graph = self.graph()
+        source_posture = next(
+            (
+                posture
+                for posture in graph.get("repo_source_postures", [])
+                if isinstance(posture, dict) and posture.get("repo") == repo
+            ),
+            None,
+        )
         decision_nodes = [
             node
             for node in graph.get("nodes", [])
@@ -293,6 +341,7 @@ class AoADecisionsMCPState:
             "decision_count": len(decision_nodes),
             "decisions": decision_nodes,
             "edges": related_edges,
+            "source_posture": source_posture,
             "authority_note": graph.get("authority_note"),
         }
 
@@ -598,6 +647,14 @@ class AoADecisionsMCPState:
                     "decision_index_count": len(indexes),
                     "lane_doc_surface_kinds": surface_kinds,
                     "issue_count": issue_counts.get(repo_name, 0),
+                    "source_posture": next(
+                        (
+                            posture
+                            for posture in graph.get("repo_source_postures", [])
+                            if isinstance(posture, dict) and posture.get("repo") == repo_name
+                        ),
+                        None,
+                    ),
                     "symmetry_note": "compare coverage posture; do not force identical repo structure",
                 }
             )
@@ -624,6 +681,13 @@ class AoADecisionsMCPState:
             "issue_count": len(issues),
             "issues": issues,
             "summary_issue_count": summary.get("issue_count", 0),
+            "source_posture_status": summary["freshness"].get("source_posture_status"),
+            "source_warning_repo_count": summary["freshness"].get("source_warning_repo_count", 0),
+            "source_postures": [
+                posture
+                for posture in summary.get("repo_source_postures", [])
+                if isinstance(posture, dict) and (not repo or posture.get("repo") == repo)
+            ],
         }
 
     def read_resource(self, uri: str) -> dict[str, Any]:

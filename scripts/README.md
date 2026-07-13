@@ -50,8 +50,9 @@ still synced into deployed `Configs/` with the wrappers.
 - Use `python scripts/build_workspace_decision_graph.py --check` to fail fast
   when that local workspace graph is stale.
 - Use `python scripts/validate_workspace_decision_graph.py` to validate the
-  workspace graph schema, JSONL parity, counts, freshness, and coverage
-  contract.
+  workspace graph schema, JSONL parity, counts, local cache freshness, repo
+  source-posture projection, and coverage contract. This route does not fetch
+  remotes or prove remote freshness.
 - Keep lane command sequences in
   `docs/validation/validation_lanes.json`; `ci_gate.py` and `release_check.py`
   read that manifest instead of owning duplicate command lists.

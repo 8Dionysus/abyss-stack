@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1657,
+  "edge_count": 1658,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 662,
+    "CITES_SOURCE_SURFACE": 663,
     "DATED": 76,
     "GUARDED_BY": 197,
     "HAS_STATUS": 76,
@@ -6688,6 +6688,11 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0068",
+      "target": "source_surface:schemas/workspace_decision_repo_source_posture.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0068",
       "target": "source_surface:scripts/build_workspace_decision_graph.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -8303,7 +8308,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 710,
+  "node_count": 711,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
@@ -8311,7 +8316,7 @@
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
-    "source_surface": 401,
+    "source_surface": 402,
     "stack_lane": 27,
     "status": 2,
     "surface_class": 59
@@ -11391,6 +11396,11 @@
     {
       "id": "source_surface:schemas/workspace_decision_graph_summary.schema.json",
       "label": "schemas/workspace_decision_graph_summary.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:schemas/workspace_decision_repo_source_posture.schema.json",
+      "label": "schemas/workspace_decision_repo_source_posture.schema.json",
       "type": "source_surface"
     },
     {
