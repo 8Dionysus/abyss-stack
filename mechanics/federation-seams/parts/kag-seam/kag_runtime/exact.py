@@ -117,6 +117,9 @@ def _create_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX documents_repo_path ON documents(repo, path, start_line);
         CREATE INDEX documents_node ON documents(node_id);
         CREATE INDEX documents_kind ON documents(node_class, kind);
+        CREATE INDEX documents_filter ON documents(
+            repo, path, node_class, kind, start_line, chunk_index, id
+        );
         CREATE INDEX documents_digest ON documents(text_digest);
 
         CREATE VIRTUAL TABLE documents_fts USING fts5(

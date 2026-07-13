@@ -428,9 +428,17 @@ class KagRuntimeProjectionTests(unittest.TestCase):
                 "SELECT id FROM documents_fts WHERE documents_fts MATCH "
                 "'repo:fixture AND kind:markdown_heading AND evidence'"
             ).fetchone()
+            filter_columns = [
+                row[2]
+                for row in connection.execute("PRAGMA index_info(documents_filter)")
+            ]
         finally:
             connection.close()
         self.assertEqual(hit[0], "aoa:fixture:retrieval-document:intro")
+        self.assertEqual(
+            filter_columns,
+            ["repo", "path", "node_class", "kind", "start_line", "chunk_index", "id"],
+        )
 
     def test_qdrant_projection_uses_bundle_point_identity_and_alias(self) -> None:
         qdrant = FakeQdrant()
