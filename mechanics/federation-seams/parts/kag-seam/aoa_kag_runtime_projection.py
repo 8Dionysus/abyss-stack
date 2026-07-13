@@ -176,7 +176,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--neo4j-database",
         default=os.environ.get("AOA_KAG_NEO4J_DATABASE", "neo4j"),
     )
-    parser.add_argument("--vector-batch-size", type=int, default=16)
+    parser.add_argument(
+        "--vector-batch-size",
+        type=int,
+        default=vector.DEFAULT_EMBEDDING_BATCH_SIZE,
+    )
     parser.add_argument("--graph-batch-size", type=int, default=1000)
     parser.add_argument("--http-timeout", type=float, default=180.0)
     return parser

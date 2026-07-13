@@ -671,17 +671,16 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             "points": previous_points,
         }
         qdrant.aliases[vector.DEFAULT_ALIAS] = previous
-        embeddings = AdaptiveEmbeddings(max_batch_size=2)
+        embeddings = AdaptiveEmbeddings(max_batch_size=1)
 
         result = vector.materialize(
             bundle,
             qdrant=qdrant,
             embeddings=embeddings,
-            batch_size=2,
         )
 
         self.assertEqual(result["embedded_point_count"], len(documents))
-        self.assertEqual(embeddings.batch_sizes, [2, 2, 2])
+        self.assertEqual(embeddings.batch_sizes, [1] * len(documents))
         self.assertEqual(
             embeddings.texts,
             [document["text"] for document in documents],
