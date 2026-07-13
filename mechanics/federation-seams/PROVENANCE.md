@@ -28,5 +28,7 @@ repositories own the meaning of their source surfaces.
   contains active detailed upstream identifier accounting.
 - [parts/rpg-runtime/README.md](parts/rpg-runtime/README.md) owns RPG runtime
   projection as a read model.
+- [parts/kag-seam/README.md](parts/kag-seam/README.md) owns materialization of
+  the `aoa-kag` repo-self retrieval bundle into runtime stores.
 - [../config-projection/README.md](../config-projection/README.md) owns
   projection of config material that feeds runtime mirrors.

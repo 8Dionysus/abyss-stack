@@ -99,6 +99,7 @@
         "mechanics/federation-seams/parts/federation-checks/tests/test_aoa_federated_check.py",
         "mechanics/federation-seams/parts/federation-checks/tests/test_langchain_api_federated.py",
         "mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py",
+        "mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
         "mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py",
         "mechanics/federation-seams/parts/sync-wrapper/tests/test_sync_wrapper_freshness.py",
         "mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py",

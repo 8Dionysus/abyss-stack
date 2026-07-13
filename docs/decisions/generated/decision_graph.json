@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 75,
-  "edge_count": 1629,
+  "decision_count": 76,
+  "edge_count": 1657,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 651,
-    "DATED": 75,
-    "GUARDED_BY": 193,
-    "HAS_STATUS": 75,
-    "HAS_SURFACE_CLASS": 182,
-    "IN_STACK_LANE": 148,
-    "NEXT_DECISION": 74,
-    "OWNED_BY_SURFACE": 79,
-    "OWNS_DECISION": 75,
+    "CITES_SOURCE_SURFACE": 662,
+    "DATED": 76,
+    "GUARDED_BY": 197,
+    "HAS_STATUS": 76,
+    "HAS_SURFACE_CLASS": 186,
+    "IN_STACK_LANE": 151,
+    "NEXT_DECISION": 75,
+    "OWNED_BY_SURFACE": 80,
+    "OWNS_DECISION": 76,
     "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 76
+    "UNDER_MECHANIC_PARENT": 77
   },
   "edges": [
     {
@@ -7778,11 +7778,146 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
+      "target": "decision:ABYSS-STACK-D-0076",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
       "target": "owner_surface:mcp/services/aoa-kag-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:aoa-kag%3Aschemas/repo-local-kag-retrieval-bundle.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:config-templates/Configs/rag/repo-self-kag-embedding-profile.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/kag_runtime/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:scripts/aoa-kag-runtime-eval",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:scripts/aoa-kag-runtime-projection",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "date:2026-07-11",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:atomic%20cutover",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:bundle%20integrity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:owner-qualified%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "guard_family:runtime%20receipts",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:KAG%20runtime%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:exact%20search",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:graph%20store",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "surface_class:vector%20store",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:federation%20seam",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:operator%20command",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "stack_lane:runtime%20knowledge",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "mechanic_parent:federation-seams",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -8160,21 +8295,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0075",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0076",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 685,
+  "node_count": 710,
   "node_type_counts": {
-    "date": 18,
-    "decision": 75,
-    "guard_family": 73,
+    "date": 19,
+    "decision": 76,
+    "guard_family": 77,
     "mechanic_parent": 10,
-    "owner_surface": 37,
+    "owner_surface": 38,
     "repo": 1,
-    "source_surface": 390,
-    "stack_lane": 24,
+    "source_surface": 401,
+    "stack_lane": 27,
     "status": 2,
-    "surface_class": 55
+    "surface_class": 59
   },
   "nodes": [
     {
@@ -8265,6 +8405,11 @@
     {
       "id": "date:2026-06-28",
       "label": "2026-06-28",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-07-11",
+      "label": "2026-07-11",
       "type": "date"
     },
     {
@@ -9018,6 +9163,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-11",
+      "id": "decision:ABYSS-STACK-D-0076",
+      "label": "ABYSS-STACK-D-0076",
+      "path": "docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md",
+      "posture": "accepted repo-self materialization rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -9038,8 +9193,18 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:atomic%20cutover",
+      "label": "atomic cutover",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:branch%20policy",
       "label": "branch policy",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:bundle%20integrity",
+      "label": "bundle integrity",
       "type": "guard_family"
     },
     {
@@ -9173,6 +9338,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:owner-qualified%20provenance",
+      "label": "owner-qualified provenance",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:parity%20check",
       "label": "parity check",
       "type": "guard_family"
@@ -9270,6 +9440,11 @@
     {
       "id": "guard_family:runtime%20boundary",
       "label": "runtime boundary",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:runtime%20receipts",
+      "label": "runtime receipts",
       "type": "guard_family"
     },
     {
@@ -9490,6 +9665,11 @@
     {
       "id": "owner_surface:mechanics/federation-seams/",
       "label": "mechanics/federation-seams/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
+      "label": "mechanics/federation-seams/parts/kag-seam/",
       "type": "owner_surface"
     },
     {
@@ -9814,6 +9994,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:aoa-kag%3Aschemas/repo-local-kag-retrieval-bundle.schema.json",
+      "label": "aoa-kag:schemas/repo-local-kag-retrieval-bundle.schema.json",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:aoa-telegram-connector%3Adocs/MCP_ROLLOUT.md",
       "label": "aoa-telegram-connector:docs/MCP_ROLLOUT.md",
       "type": "source_surface"
@@ -10071,6 +10256,11 @@
     {
       "id": "source_surface:config-templates/Configs/rag/",
       "label": "config-templates/Configs/rag/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:config-templates/Configs/rag/repo-self-kag-embedding-profile.json",
+      "label": "config-templates/Configs/rag/repo-self-kag-embedding-profile.json",
       "type": "source_surface"
     },
     {
@@ -10864,6 +11054,41 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/README.md",
+      "label": "mechanics/federation-seams/parts/kag-seam/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "label": "mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
+      "label": "mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
+      "label": "mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
+      "label": "mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/kag_runtime/",
+      "label": "mechanics/federation-seams/parts/kag-seam/kag_runtime/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
+      "label": "mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md",
       "label": "mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md",
       "type": "source_surface"
@@ -11176,6 +11401,16 @@
     {
       "id": "source_surface:scripts/README.md",
       "label": "scripts/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-kag-runtime-eval",
+      "label": "scripts/aoa-kag-runtime-eval",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-kag-runtime-projection",
+      "label": "scripts/aoa-kag-runtime-projection",
       "type": "source_surface"
     },
     {
@@ -11604,6 +11839,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:federation%20seam",
+      "label": "federation seam",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:federation%20seams",
       "label": "federation seams",
       "type": "stack_lane"
@@ -11629,6 +11869,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:operator%20command",
+      "label": "operator command",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:profiles%20and%20presets",
       "label": "profiles and presets",
       "type": "stack_lane"
@@ -11641,6 +11886,11 @@
     {
       "id": "stack_lane:release/tooling",
       "label": "release/tooling",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:runtime%20knowledge",
+      "label": "runtime knowledge",
       "type": "stack_lane"
     },
     {
@@ -11709,6 +11959,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:KAG%20runtime%20projection",
+      "label": "KAG runtime projection",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:MCP%20access%20plane",
       "label": "MCP access plane",
       "type": "surface_class"
@@ -11769,6 +12024,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:exact%20search",
+      "label": "exact search",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:federation%20seam",
       "label": "federation seam",
       "type": "surface_class"
@@ -11806,6 +12066,11 @@
     {
       "id": "surface_class:governed%20policy",
       "label": "governed policy",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:graph%20store",
+      "label": "graph store",
       "type": "surface_class"
     },
     {
@@ -11976,6 +12241,11 @@
     {
       "id": "surface_class:validation%20topology",
       "label": "validation topology",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:vector%20store",
+      "label": "vector store",
       "type": "surface_class"
     }
   ],

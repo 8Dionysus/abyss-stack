@@ -9,6 +9,11 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- Repo-self KAG bundles can now be verified and materialized into atomic
+  SQLite/FTS, versioned Qdrant, and versioned Neo4j runtime projections with a
+  shared current receipt and source-return identities; owner-aware FTS and
+  Qdrant filters are indexed, and new vector projections reuse unchanged
+  embeddings before processing their document delta.
 - `aoa-evals-mcp` now consumes the `aoa-evals` local-port inventory v2 read
   model, exposing source-contract-ready, stale, invalid, or absent local suite
   execution posture without running suite commands or widening the local-port

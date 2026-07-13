@@ -80,7 +80,7 @@ def build_server(
 
     @mcp.tool()
     def aoa_kag_repository_index_family_lookup(repo: str) -> dict[str, Any]:
-        """Return source, entity, artifact, and event index handles for one provider."""
+        """Return the canonical repository index handles for one provider."""
         return current_state().repository_index_family_lookup(repo=repo)
 
     @mcp.tool()

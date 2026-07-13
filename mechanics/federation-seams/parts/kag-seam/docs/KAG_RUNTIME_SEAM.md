@@ -1,86 +1,112 @@
-# KAG RUNTIME SEAM
+# KAG Runtime Seam
 
-`abyss-stack` mirrors a bounded, public-safe advisory slice from `aoa-kag` and a source-owned handoff companion slice from `Tree-of-Sophia`.
-This landing is advisory-only.
-It does not turn the runtime into a live KAG query engine, a canon owner, or a reasoning authority.
+## Role
 
-## What is mirrored
+The KAG runtime seam turns the verified repo-self projection bundle from
+`aoa-kag` into local search and graph stores. Every result remains traceable to
+the owner-qualified records and source anchors carried by that bundle.
 
-From `aoa-kag`, the runtime mirrors:
-- registry and federation spine surfaces
-- reasoning handoff and recurrence regrounding packs
-- tiny consumer bundle and technique-lift pack
-- ToS retrieval-axis, text-chunk, and cross-source projection packs
-- the standalone Zarathustra route retrieval pack for `AOA-K-0011`
-- counterpart exposure review and supporting schemas/docs
+## Input
 
-From `tos-source`, the runtime mirrors:
-- `generated/kag_export.min.json`
-- `examples/source_node.example.json`
-- `examples/tos_tiny_entry_route.example.json`
-- the small source-owned docs and schemas that explain those surfaces
+The bundle contains:
 
-The mirrored runtime paths are:
-- `${AOA_STACK_ROOT}/Knowledge/federation/aoa-kag/`
-- `${AOA_STACK_ROOT}/Knowledge/federation/tos-source/`
+- `manifest.json`, binding canonical owner inputs, projection identities,
+  embedding profile, counts, and file digests;
+- JSONL streams for owners, nodes, relations, external references, and
+  retrieval documents;
+- stable vector point identities prepared by `aoa-kag`.
 
-The sync step is explicit:
+The promoted embedding profile is stored at
+`config-templates/Configs/rag/repo-self-kag-embedding-profile.json`. Its model,
+revision digest, dimensions, distance, and normalization are part of the
+projection identity.
+
+## Runtime Topology
+
+`scripts/aoa-kag-runtime-projection` writes mutable state under:
+
+```text
+${AOA_STACK_ROOT}/Knowledge/kag/repo-self/
+  exact/repo-self.sqlite3
+  receipts/<projection-digest>/<target>.json
+  current.json
+```
+
+The target adapters are:
+
+| Target | Runtime output | Function |
+|---|---|---|
+| `exact` | SQLite plus FTS5 | owner, node, relation, artifact, anchor, filter, and BM25 reads |
+| `vector` | versioned Qdrant collection and `aoa_kag_repo_self_current` alias | semantic and hybrid retrieval |
+| `graph` | versioned Neo4j owner/node/relation subgraph and current marker | hierarchy, cross-repo, and multi-hop traversal |
+
+Each adapter completes and verifies its new version before switching its
+current pointer. One previous remote projection remains available for rollback;
+older managed projections are reclaimed.
+
+SQLite FTS indexes owner, node class, kind, path, label, and text so scoped BM25
+queries stay inside their selected corpus. Qdrant indexes the matching owner,
+node-class, kind, and access fields used by filtered semantic retrieval.
+
+Vector builds resume an incomplete versioned collection from its confirmed
+document prefix. A new projection reuses vectors from the current collection
+when point identity, text digest, and embedding profile still match, then
+embeds only changed documents. Transient embedding failures are retried, and a
+batch that exceeds live model capacity is split while preserving document
+order.
+Graph retention resumes independently after cutover and removes older
+projection nodes in bounded transactions.
+
+## Operation
+
+Build the bundle with `aoa-kag`, then materialize selected targets:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all
+```
+
+Verify the active projections against the same bundle:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all \
+  --check
+```
+
+Measure the active retrieval routes:
+
+```bash
+scripts/aoa-kag-runtime-eval
+```
+
+The eval derives exact, filtered, lexical, and graph cases from the active
+projection and reads curated semantic cases from
+`config/repo-self-retrieval-eval.json`. It records recall, MRR, NDCG,
+groundedness, graph evidence-chain completeness, graph advantage, latency, and
+canonical identity/reference quality in
+`receipts/<projection-digest>/retrieval-eval.json`. `--check` runs the same
+measurement without updating runtime receipts.
+
+Embedding, Qdrant, and Neo4j endpoints are host-local by default and can be
+selected through the corresponding `AOA_KAG_*` environment variables. Neo4j
+credentials come from `AOA_KAG_NEO4J_*`, `AOA_RAG_NEO4J_*`, `NEO4J_AUTH`, or
+the deployed `Secrets/Configs/stack.env`.
+Receipts expose endpoint-independent identities, counts, durations, retrieval
+metrics, and output handles.
+
+## Ownership
+
+Each repository owns its canonical `/kag` records. `aoa-kag` owns their common
+language, builders, federation, and retrieval bundle. `abyss-stack` owns the
+mutable runtime stores, cutover, retention, and receipts described here.
+
+The existing `aoa-kag` and `tos-source` mirrors remain the advisory-only
+inspection route for `/kag/*` and the source-owned `Tree-of-Sophia` handoff:
 
 ```bash
 scripts/aoa-sync-federation-surfaces --layer aoa-kag
 scripts/aoa-sync-federation-surfaces --layer tos-source
 ```
-
-## What `/kag/*` exposes
-
-The localhost-only `route-api` exposes raw and structured advisory reads under `/kag/*`.
-
-Raw reads include:
-- `/kag/registry`
-- `/kag/federation-spine`
-- `/kag/tiny-consumer-bundle`
-- `/kag/reasoning-handoff-pack`
-- `/kag/return-regrounding-pack`
-- `/kag/technique-lift-pack`
-- `/kag/tos-retrieval-axis-pack`
-- `/kag/tos-text-chunk-map`
-- `/kag/cross-source-node-projection`
-- `/kag/counterpart-exposure-review`
-- `/kag/tos-export`
-- `/kag/tos-entry-surface`
-
-Structured reads include:
-- `/kag/inspect`
-- `/kag/query-mode`
-- `/kag/regrounding`
-- `/kag/repo-entry`
-- `/kag/chunk`
-- `/kag/axis`
-- `/kag/projection`
-
-These surfaces let the runtime inspect derived retrieval/regrounding metadata and inspect the `Tree-of-Sophia` handoff companion without mutating either side.
-`/kag/inspect` stays the same bounded entrypoint and now also resolves `AOA-K-0011` from the mirrored Zarathustra route retrieval pack without adding a new endpoint family.
-`langchain-api` may now consume these existing `/kag/*` advisory reads during opt-in `POST /run/federated` when a bounded `kag` selector is provided, but that does not promote KAG into a routing or runtime authority layer.
-
-## Why `tos-source` is mirrored separately
-
-`aoa-kag` owns derived retrieval and handoff packs.
-It does not own `Tree-of-Sophia` canon.
-
-The runtime therefore mirrors `tos-source` as a source-owned companion so the `Tree-of-Sophia` export remains visibly source-authored rather than being collapsed into a KAG-owned payload.
-That keeps the authority boundary legible:
-- `aoa-kag` provides derived retrieval/regrounding surfaces
-- `Tree-of-Sophia` remains the source-owned handoff authority
-
-## What this landing does not do
-
-This landing is advisory-only and intentionally does not add:
-- live KAG querying
-- runtime reasoning execution
-- graph traversal beyond mirrored pack contents
-- source mutation
-- memo writeback
-- eval verdict logic
-- canon authorship
-
-It is a runtime inspection seam, not a live retrieval engine.

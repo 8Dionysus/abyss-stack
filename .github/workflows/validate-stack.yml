@@ -14,7 +14,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Check repo-local KAG index family
-        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@a8045bdfecd4256b93736805b7303048a993ae01
+        uses: 8Dionysus/aoa-kag/.github/actions/repo-local-kag-index@da9f50a581645b2173b99dbf771a63d447ec2fec
+        with:
+          history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
+          event-history-ref: ${{ github.event.pull_request.base.sha || (github.ref == 'refs/heads/main' && github.event.before) || '' }}
 
       - name: Clone abyss-machine verifier
         run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"

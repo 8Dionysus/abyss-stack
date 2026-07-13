@@ -12,7 +12,7 @@ SRC = SERVICE_ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from aoa_kag_mcp.core import AoAKagMCPState  # noqa: E402
+from aoa_kag_mcp.core import AoAKagMCPState, REPOSITORY_INDEX_KINDS  # noqa: E402
 from aoa_kag_mcp.server import build_server  # noqa: E402
 
 
@@ -101,7 +101,7 @@ def main() -> None:
         family = state.repository_index_family_lookup(repo)
         if not family["family_complete"]:
             raise SystemExit(f"{repo} repository index family is incomplete")
-        for index_kind in ("source", "entity", "artifact", "event"):
+        for index_kind in REPOSITORY_INDEX_KINDS:
             index = state.repository_index_lookup(repo, index_kind)
             if not index["index_exists"]:
                 raise SystemExit(f"{repo} {index_kind} repository index is missing")

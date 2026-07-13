@@ -29,6 +29,7 @@ WORKSPACE_SIBLING_ROOTS = {
 STALE_ABYSS_PATH_ALLOWED = {
     Path("docs") / "legacy" / "MIGRATION_FROM_OLD.md",
 }
+DERIVED_KAG_INDEX_ROOT = Path("kag") / "indexes"
 LOCAL_AI_TRIALS_PATH = (
     Path("mechanics")
     / "inference-pilots"
@@ -244,6 +245,8 @@ def validate_stale_path_hygiene(
         if text is None:
             continue
         relative_path = path.relative_to(root)
+        if relative_path.is_relative_to(DERIVED_KAG_INDEX_ROOT):
+            continue
         if STALE_ABYSS_PATTERN.search(text) and relative_path not in STALE_ABYSS_PATH_ALLOWED:
             errors.append(
                 f"stale path '{STALE_ABYSS_PATH}' found in {relative_path}"
