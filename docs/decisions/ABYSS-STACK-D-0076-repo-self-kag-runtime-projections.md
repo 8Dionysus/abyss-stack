@@ -65,9 +65,12 @@ state each remain with their natural owner.
 - `mechanics/federation-seams/parts/kag-seam/README.md`
 - `mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md`
 - `mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py`
+- `mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py`
+- `mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json`
 - `mechanics/federation-seams/parts/kag-seam/kag_runtime/`
 - `mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py`
 - `scripts/aoa-kag-runtime-projection`
+- `scripts/aoa-kag-runtime-eval`
 - `config-templates/Configs/rag/repo-self-kag-embedding-profile.json`
 - `aoa-kag:schemas/repo-local-kag-retrieval-bundle.schema.json`
 

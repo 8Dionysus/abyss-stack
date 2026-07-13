@@ -76,12 +76,26 @@ scripts/aoa-kag-runtime-projection \
   --check
 ```
 
+Measure the active retrieval routes:
+
+```bash
+scripts/aoa-kag-runtime-eval
+```
+
+The eval derives exact, filtered, lexical, and graph cases from the active
+projection and reads curated semantic cases from
+`config/repo-self-retrieval-eval.json`. It records recall, MRR, NDCG,
+groundedness, graph evidence-chain completeness, graph advantage, latency, and
+canonical identity/reference quality in
+`receipts/<projection-digest>/retrieval-eval.json`. `--check` runs the same
+measurement without updating runtime receipts.
+
 Embedding, Qdrant, and Neo4j endpoints are host-local by default and can be
 selected through the corresponding `AOA_KAG_*` environment variables. Neo4j
 credentials come from `AOA_KAG_NEO4J_*`, `AOA_RAG_NEO4J_*`, `NEO4J_AUTH`, or
 the deployed `Secrets/Configs/stack.env`.
-Receipts expose endpoint-independent identities, counts, durations, and output
-handles.
+Receipts expose endpoint-independent identities, counts, durations, retrieval
+metrics, and output handles.
 
 ## Ownership
 

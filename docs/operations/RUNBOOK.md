@@ -272,6 +272,7 @@ For repo-self KAG runtime projection and parity:
 ```bash
 scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all
 scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all --check
+scripts/aoa-kag-runtime-eval
 ```
 
 For combined surfaces:

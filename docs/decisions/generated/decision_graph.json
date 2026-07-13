@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 76,
-  "edge_count": 1654,
+  "edge_count": 1657,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 659,
+    "CITES_SOURCE_SURFACE": 662,
     "DATED": 76,
     "GUARDED_BY": 197,
     "HAS_STATUS": 76,
@@ -7808,7 +7808,17 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
       "target": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -7824,6 +7834,11 @@
     {
       "source": "decision:ABYSS-STACK-D-0076",
       "target": "source_surface:mechanics/federation-seams/parts/kag-seam/tests/test_kag_runtime_projection.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0076",
+      "target": "source_surface:scripts/aoa-kag-runtime-eval",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -8288,7 +8303,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 707,
+  "node_count": 710,
   "node_type_counts": {
     "date": 19,
     "decision": 76,
@@ -8296,7 +8311,7 @@
     "mechanic_parent": 10,
     "owner_surface": 38,
     "repo": 1,
-    "source_surface": 398,
+    "source_surface": 401,
     "stack_lane": 27,
     "status": 2,
     "surface_class": 59
@@ -11044,8 +11059,18 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "label": "mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_eval.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
       "label": "mechanics/federation-seams/parts/kag-seam/aoa_kag_runtime_projection.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
+      "label": "mechanics/federation-seams/parts/kag-seam/config/repo-self-retrieval-eval.json",
       "type": "source_surface"
     },
     {
@@ -11376,6 +11401,11 @@
     {
       "id": "source_surface:scripts/README.md",
       "label": "scripts/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-kag-runtime-eval",
+      "label": "scripts/aoa-kag-runtime-eval",
       "type": "source_surface"
     },
     {

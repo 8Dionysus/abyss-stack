@@ -463,3 +463,60 @@ def check(
         "point_count": count,
         "embedding_profile": profile,
     }
+
+
+def active_collection(
+    qdrant: JsonHttpClient,
+    alias: str = DEFAULT_ALIAS,
+) -> str:
+    collection = _alias_collection(qdrant, alias)
+    if not collection:
+        raise RuntimeError(f"Qdrant alias is missing: {alias}")
+    return collection
+
+
+def search(
+    query: str,
+    *,
+    qdrant: JsonHttpClient,
+    embeddings: JsonHttpClient,
+    profile: dict[str, Any],
+    collection: str | None = None,
+    alias: str = DEFAULT_ALIAS,
+    repo: str | None = None,
+    kind: str | None = None,
+    limit: int = 10,
+) -> tuple[list[dict[str, Any]], float]:
+    started = time.perf_counter()
+    instructed_query = (
+        "Instruct: Retrieve the OS Abyss repository evidence that best answers the query.\n"
+        f"Query: {query}"
+    )
+    query_vector = _embedding_vectors(
+        embeddings,
+        [{"text": instructed_query}],
+        profile,
+    )[0]
+    payload: dict[str, Any] = {
+        "query": query_vector,
+        "limit": limit,
+        "with_payload": True,
+    }
+    conditions = []
+    if repo:
+        conditions.append({"key": "repo", "match": {"value": repo}})
+    if kind:
+        conditions.append({"key": "kind", "match": {"value": kind}})
+    if conditions:
+        payload["filter"] = {"must": conditions}
+    selected_collection = collection or active_collection(qdrant, alias)
+    response = qdrant.request(
+        "POST",
+        f"/collections/{selected_collection}/points/query",
+        payload,
+    )
+    result = response.get("result")
+    points = result.get("points") if isinstance(result, dict) else None
+    if not isinstance(points, list):
+        raise RuntimeError("Qdrant query response is missing points")
+    return points, (time.perf_counter() - started) * 1000

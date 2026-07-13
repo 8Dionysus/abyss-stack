@@ -21,6 +21,7 @@ sys.path.insert(0, str(PART_ROOT))
 from kag_runtime import exact, graph, vector  # noqa: E402
 from kag_runtime.bundle import RetrievalBundle, canonical_json  # noqa: E402
 from kag_runtime.transport import HttpJsonError, JsonHttpClient  # noqa: E402
+import aoa_kag_runtime_eval as runtime_eval  # noqa: E402
 
 
 def _digest(value: str) -> str:
@@ -257,6 +258,7 @@ class FakeQdrant:
         self.collections: dict[str, dict[str, Any]] = {}
         self.aliases: dict[str, str] = {}
         self.points: list[dict[str, Any]] = []
+        self.queries: list[dict[str, Any]] = []
 
     def request(
         self,
@@ -294,6 +296,14 @@ class FakeQdrant:
                             }
                         }
                     },
+                }
+            }
+        if method == "POST" and path.endswith("/points/query"):
+            name = path.split("/", 3)[2]
+            self.queries.append(copy.deepcopy(payload or {}))
+            return {
+                "result": {
+                    "points": list(self.collections[name].get("points", {}).values())
                 }
             }
         if method == "POST" and path.endswith("/points"):
@@ -457,6 +467,35 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         checked = vector.check(self.bundle, qdrant=qdrant)
         self.assertEqual(checked["collection"], result["collection"])
 
+    def test_qdrant_query_uses_active_collection_and_owner_filter(self) -> None:
+        qdrant = FakeQdrant()
+        collection = "aoa_kag_repo_self_fixture"
+        qdrant.collections[collection] = {
+            "count": 1,
+            "size": 3,
+            "distance": "Cosine",
+            "points": {
+                "fixture": {
+                    "id": "fixture",
+                    "payload": {"id": "fixture", "repo": "fixture"},
+                }
+            },
+        }
+        qdrant.aliases[vector.DEFAULT_ALIAS] = collection
+        hits, latency = vector.search(
+            "repository evidence",
+            qdrant=qdrant,
+            embeddings=FakeEmbeddings(),
+            profile=dict(self.bundle.manifest["embedding_profile"]),
+            repo="fixture",
+        )
+        self.assertEqual(hits[0]["id"], "fixture")
+        self.assertGreaterEqual(latency, 0.0)
+        self.assertEqual(
+            qdrant.queries[0]["filter"]["must"],
+            [{"key": "repo", "match": {"value": "fixture"}}],
+        )
+
     def test_embedding_batches_retry_then_split_on_transient_capacity(self) -> None:
         client = AdaptiveEmbeddings(max_batch_size=2)
         documents = [{"text": f"document {index}"} for index in range(4)]
@@ -596,6 +635,37 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         checked = graph.check(self.bundle, graph=fake)
         self.assertEqual(checked["projection_digest"], self.bundle.projection_digest)
 
+    def test_neo4j_multihop_query_returns_grounded_chain(self) -> None:
+        projection = mock.Mock(spec=graph.Neo4jProjection)
+        projection.execute.return_value = [
+            [
+                "target",
+                "fixture",
+                ["source:target"],
+                ["anchor:target"],
+                "public",
+                "relation:first",
+                ["anchor:first"],
+                "provenance:first",
+                "trust:first",
+                "relation:second",
+                ["anchor:second"],
+                "provenance:second",
+                "trust:second",
+            ]
+        ]
+        hits, latency, completeness = graph.search_multihop(
+            graph=projection,
+            projection="projection",
+            source_id="source",
+            first_relation="defines",
+            second_relation="calls",
+            source_path="README.md",
+        )
+        self.assertEqual(hits[0]["id"], "target")
+        self.assertGreaterEqual(latency, 0.0)
+        self.assertEqual(completeness, 1.0)
+
     def test_neo4j_projection_resumes_bounded_retention_after_cutover(self) -> None:
         fake = FakeGraph()
         fake.current = self.bundle.projection_digest
@@ -653,6 +723,53 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+
+    def test_retrieval_eval_config_has_unique_semantic_cases(self) -> None:
+        config = runtime_eval.load_config(runtime_eval.DEFAULT_CASES_PATH)
+        names = [case["name"] for case in config["semantic_cases"]]
+        self.assertEqual(config["expected_owner_count"], 24)
+        self.assertEqual(len(names), len(set(names)))
+        self.assertIn("graph_recall_advantage", config["thresholds"]["minimums"])
+
+    def test_retrieval_eval_exact_lexical_and_quality_metrics(self) -> None:
+        sqlite_path = self.root / "repo-self.sqlite3"
+        exact.materialize(self.bundle, sqlite_path)
+        connection = sqlite3.connect(
+            f"file:{sqlite_path}?mode=ro&immutable=1",
+            uri=True,
+        )
+        connection.row_factory = sqlite3.Row
+        try:
+            target = runtime_eval.exact_targets(connection)[0]
+            exact_hits, _ = runtime_eval.exact_search(connection, target["id"])
+            lexical_hits, _ = runtime_eval.lexical_search(
+                connection,
+                target["label"],
+                repo=target["repo"],
+                kind=target["kind"],
+            )
+            quality = runtime_eval.canonical_quality(connection)
+        finally:
+            connection.close()
+        self.assertEqual(runtime_eval.hit_id(exact_hits[0]), target["id"])
+        self.assertEqual(runtime_eval.hit_id(lexical_hits[0]), target["id"])
+        self.assertEqual(quality["relation_endpoint_resolution"], 1.0)
+        self.assertEqual(quality["unsupported_edge_rate"], 0.0)
+
+    def test_retrieval_eval_weighted_fusion_keeps_lexical_weight(self) -> None:
+        lexical = [
+            {"id": "lexical-first", "payload": {"id": "lexical-first"}},
+            {"id": "shared", "payload": {"id": "shared"}},
+        ]
+        vector_hits = [
+            {"id": "shared", "payload": {"id": "shared"}},
+            {"id": "vector-second", "payload": {"id": "vector-second"}},
+        ]
+        fused = runtime_eval.reciprocal_rank_fusion(lexical, vector_hits)
+        self.assertEqual(
+            [runtime_eval.hit_id(hit) for hit in fused[:2]],
+            ["lexical-first", "shared"],
+        )
 
 
 if __name__ == "__main__":

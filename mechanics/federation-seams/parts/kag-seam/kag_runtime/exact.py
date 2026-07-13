@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
@@ -345,3 +348,120 @@ def check(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
         "bytes": size,
         "counts": counts,
     }
+
+
+def _document_hit(row: sqlite3.Row) -> dict[str, Any]:
+    return {"id": row["id"], "payload": json.loads(row["metadata_json"])}
+
+
+def _fts_expression(value: str, operator: str) -> str:
+    tokens = re.findall(r"\w+", value.casefold(), flags=re.UNICODE)
+    return f" {operator} ".join(
+        f'"{token.replace(chr(34), chr(34) * 2)}"' for token in tokens
+    )
+
+
+def _fts_literal(value: str) -> str:
+    return f'"{value.replace(chr(34), chr(34) * 2)}"'
+
+
+def search_exact(
+    connection: sqlite3.Connection,
+    query: str,
+    *,
+    limit: int = 10,
+) -> tuple[list[dict[str, Any]], float]:
+    started = time.perf_counter()
+    rows = connection.execute(
+        "SELECT * FROM documents WHERE id=? LIMIT ?",
+        (query, limit),
+    ).fetchall()
+    if not rows:
+        rows = connection.execute(
+            "SELECT * FROM documents WHERE path=? "
+            "ORDER BY repo,start_line,chunk_index,id LIMIT ?",
+            (query, limit),
+        ).fetchall()
+    if not rows:
+        rows = connection.execute(
+            "SELECT * FROM documents WHERE label=? "
+            "ORDER BY repo,path,start_line,id LIMIT ?",
+            (query, limit),
+        ).fetchall()
+    return [_document_hit(row) for row in rows], (time.perf_counter() - started) * 1000
+
+
+def search_filter(
+    connection: sqlite3.Connection,
+    *,
+    repo: str,
+    path: str,
+    node_class: str,
+    kind: str,
+    limit: int = 10,
+) -> tuple[list[dict[str, Any]], float]:
+    started = time.perf_counter()
+    rows = connection.execute(
+        "SELECT * FROM documents WHERE repo=? AND path=? AND node_class=? AND kind=? "
+        "ORDER BY start_line, chunk_index, id LIMIT ?",
+        (repo, path, node_class, kind, limit),
+    ).fetchall()
+    return [_document_hit(row) for row in rows], (time.perf_counter() - started) * 1000
+
+
+def search_lexical(
+    connection: sqlite3.Connection,
+    query: str,
+    *,
+    repo: str | None = None,
+    kind: str | None = None,
+    operator: str = "AND",
+    limit: int = 10,
+) -> tuple[list[dict[str, Any]], float]:
+    started = time.perf_counter()
+    expression = _fts_expression(query, operator)
+    if not expression:
+        return [], 0.0
+    fts_columns = [
+        str(row[1]) for row in connection.execute("PRAGMA table_info(documents_fts)")
+    ]
+    schema_version = connection.execute(
+        "SELECT value FROM metadata WHERE key='schema_version'"
+    ).fetchone()[0]
+    scoped_columns = set(fts_columns) if str(schema_version).endswith("-v2") else set()
+    clauses: list[str] = []
+    values: list[Any] = [expression]
+    scopes: list[str] = []
+    if repo and "repo" in scoped_columns:
+        scopes.append(f"repo:{_fts_literal(repo)}")
+    elif repo:
+        clauses.append("d.repo=?")
+        values.append(repo)
+    if kind and "kind" in scoped_columns:
+        scopes.append(f"kind:{_fts_literal(kind)}")
+    elif kind:
+        clauses.append("d.kind=?")
+        values.append(kind)
+    if scopes:
+        values[0] = " AND ".join((*scopes, f"({expression})"))
+    filter_clause = " AND " + " AND ".join(clauses) if clauses else ""
+    weights_by_column = {
+        "id": 0.0,
+        "repo": 0.0,
+        "node_class": 0.0,
+        "kind": 0.0,
+        "path": 2.0,
+        "label": 10.0,
+        "text": 1.0,
+    }
+    weights = ", ".join(
+        str(weights_by_column.get(column, 1.0)) for column in fts_columns
+    )
+    values.append(limit)
+    rows = connection.execute(
+        "SELECT d.* FROM documents_fts f JOIN documents d ON d.id=f.id "
+        f"WHERE documents_fts MATCH ?{filter_clause} "
+        f"ORDER BY bm25(documents_fts, {weights}), d.id LIMIT ?",
+        tuple(values),
+    ).fetchall()
+    return [_document_hit(row) for row in rows], (time.perf_counter() - started) * 1000

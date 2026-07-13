@@ -1,0 +1,83 @@
+{
+  "schema_version": "abyss-stack-repo-self-kag-retrieval-eval-v1",
+  "top_k": 10,
+  "expected_owner_count": 24,
+  "minimum_graph_cases": 12,
+  "semantic_cases": [
+    {
+      "name": "owner_local_federation",
+      "query": "each repository owns canonical local knowledge while shared runtime services build search and graph projections",
+      "repo": "aoa-kag",
+      "path": "DESIGN.md",
+      "label": "7. Owner-local federation"
+    },
+    {
+      "name": "canonical_repository_kernel",
+      "query": "versioned canonical repository knowledge with artifacts anchors entities events assertions and relations",
+      "repo": "aoa-kag",
+      "path": "docs/decisions/AOA-KAG-D-0014-canonical-repository-knowledge-kernel.md",
+      "label": "Decision"
+    },
+    {
+      "name": "runtime_projection_topology",
+      "query": "where verified repository self knowledge is materialized into SQLite Qdrant and Neo4j stores",
+      "repo": "abyss-stack",
+      "path": "mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
+      "label": "Runtime Topology"
+    },
+    {
+      "name": "session_memory_owner_split",
+      "query": "separate the session memory product indexes from the index describing the repository itself",
+      "repo": "aoa-session-memory",
+      "path": "kag/AGENTS.md",
+      "label": "Owner Split"
+    },
+    {
+      "name": "tree_kag_source_rule",
+      "query": "Tree of Sophia exports derived graph knowledge while philosophical source meaning remains in the tree",
+      "repo": "Tree-of-Sophia",
+      "path": "mechanics/boundary-bridge/parts/derived-kag-seam/docs/KAG_EXPORT.md",
+      "label": "Core rule"
+    },
+    {
+      "name": "script_topology_families",
+      "query": "classification of script families by owner route validation lane and command function",
+      "repo": "aoa-techniques",
+      "path": "docs/validation/SCRIPT_TOPOLOGY.md",
+      "label": "Script Families"
+    },
+    {
+      "name": "agent_route_mesh",
+      "query": "agent guidance as a navigable local route mesh instead of one giant instruction wall",
+      "repo": "Agents-of-Abyss",
+      "path": "DESIGN.AGENTS.md",
+      "label": "Design Thesis"
+    },
+    {
+      "name": "os_abyss_system_aim",
+      "query": "long horizon local first human AI operating environment with memory knowledge routing proof and agents",
+      "repo": "Agents-of-Abyss",
+      "path": "DESIGN.md",
+      "label": "Design as Aim"
+    }
+  ],
+  "thresholds": {
+    "minimums": {
+      "exact_recall_at_10": 1.0,
+      "filter_recall_at_10": 1.0,
+      "lexical_known_item_recall_at_10": 0.9,
+      "vector_semantic_recall_at_10": 0.5,
+      "hybrid_semantic_recall_at_10": 0.6,
+      "graph_multihop_recall_at_10": 1.0,
+      "graph_evidence_chain_completeness": 1.0,
+      "graph_recall_advantage": 0.8,
+      "retrieval_groundedness": 1.0,
+      "entity_resolution_accuracy": 1.0,
+      "relation_endpoint_resolution": 1.0
+    },
+    "maximums": {
+      "duplicate_id_rate": 0.0,
+      "unsupported_edge_rate": 0.0
+    }
+  }
+}

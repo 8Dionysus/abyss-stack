@@ -353,3 +353,86 @@ def check(bundle: RetrievalBundle, *, graph: Neo4jProjection) -> dict[str, Any]:
         "projection_digest": projection,
         "counts": counts,
     }
+
+
+def search_multihop(
+    *,
+    graph: Neo4jProjection,
+    projection: str,
+    source_id: str,
+    first_relation: str,
+    second_relation: str,
+    source_path: str,
+    limit: int = 10,
+) -> tuple[list[dict[str, Any]], float, float]:
+    started = time.perf_counter()
+    rows = graph.execute(
+        "MATCH (source:AoAKagNode {projection_digest:$projection,id:$source_id}) "
+        "-[r1:AOA_KAG_RELATION]->(middle:AoAKagNode)"
+        "-[r2:AOA_KAG_RELATION]->(target:AoAKagNode) "
+        "WHERE r1.projection_digest=$projection AND r2.projection_digest=$projection "
+        "AND r1.relation_kind=$first AND r2.relation_kind=$second "
+        "RETURN target.id,target.repo,target.source_record_ids,target.anchor_ids,"
+        "target.access_scope,r1.id,r1.evidence_anchor_ids,r1.provenance_ref,"
+        "r1.trust_ref,r2.id,r2.evidence_anchor_ids,r2.provenance_ref,r2.trust_ref "
+        "ORDER BY target.id LIMIT $limit",
+        {
+            "projection": projection,
+            "source_id": source_id,
+            "first": first_relation,
+            "second": second_relation,
+            "limit": limit,
+        },
+    )
+    latency = (time.perf_counter() - started) * 1000
+    hits_by_id: dict[str, dict[str, Any]] = {}
+    complete = 0
+    for row in rows:
+        edges = (
+            {
+                "id": row[5],
+                "anchors": row[6],
+                "provenance": row[7],
+                "trust": row[8],
+            },
+            {
+                "id": row[9],
+                "anchors": row[10],
+                "provenance": row[11],
+                "trust": row[12],
+            },
+        )
+        chain_complete = bool(
+            row[1]
+            and row[2]
+            and row[4]
+            and all(
+                edge["id"]
+                and edge["anchors"]
+                and edge["provenance"]
+                and edge["trust"]
+                for edge in edges
+            )
+        )
+        if row[0] in hits_by_id:
+            continue
+        complete += int(chain_complete)
+        hits_by_id[row[0]] = {
+            "id": row[0],
+            "payload": {
+                "id": row[0],
+                "repo": row[1],
+                "path": source_path,
+                "locator": {"source_id": source_id},
+                "source_record_ids": row[2],
+                "anchor_ids": row[3]
+                or [anchor for edge in edges for anchor in edge["anchors"]],
+                "provenance_ref": edges[0]["provenance"],
+                "trust_ref": edges[0]["trust"],
+                "freshness": {"projection_digest": projection},
+                "access": {"scope": row[4]},
+                "evidence_chain": edges,
+            },
+        }
+    hits = list(hits_by_id.values())
+    return hits, latency, complete / max(len(hits), 1)
