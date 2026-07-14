@@ -20,6 +20,7 @@ services:
     image: localhost/aoa-browser-img:latest
     container_name: aoa-browser
     restart: unless-stopped
+    init: true
     expose:
       - "8000"
     environment:

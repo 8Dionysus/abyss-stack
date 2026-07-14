@@ -66,6 +66,10 @@ class ComposeContractsTests(unittest.TestCase):
                 self.assertIsInstance(services, dict)
                 self.assertTrue(services, f"{path.name} has no services")
 
+    def test_browser_helper_uses_container_init_reaper(self) -> None:
+        service = load_compose(MODULE_DIR / "51-browser-tools.yml")["services"]["aoa-browser"]
+        self.assertEqual(service.get("init"), "true")
+
     def test_host_published_ports_are_loopback_bound(self) -> None:
         for path in sorted(MODULE_DIR.glob("*.yml")):
             services = load_compose(path).get("services", {})
