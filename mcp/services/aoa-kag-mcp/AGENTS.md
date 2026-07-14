@@ -50,4 +50,5 @@ python scripts/validate_nested_agents.py
 ## Closeout
 
 Report resources, tools, prompts, provider-map shape, owner layer touched, and
-whether the change only widened stdio access or also changed runtime exposure.
+whether the change affected portable stdio, loopback shared HTTP, or any wider
+runtime exposure.

@@ -20,7 +20,7 @@ agents one repeatable route to ask:
 | `/etc/abyss-machine` | host source contracts, policies, route law |
 | `/var/lib/abyss-machine` | generated latest facts, indexes, validation output, histories |
 | `abyss-machine` CLI | owner command surface and validators |
-| `abyss-stack` | runnable MCP package and stdio topology |
+| `abyss-stack` | runnable MCP package and local transport topology |
 | `abyss-machine-mcp` | read-only access plane over host read models |
 
 ## MCP Surface

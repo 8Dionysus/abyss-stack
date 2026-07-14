@@ -33,7 +33,7 @@ def main() -> None:
 
     state = AbyssMachineMCPState.discover(timeout_seconds=15)
     brief = state.machine_brief(profile="fast")
-    if brief["authority_boundary"]["mcp_role"] != "stdio read-only access plane over abyss-machine host read models":
+    if brief["authority_boundary"]["mcp_role"] != "local read-only access plane over abyss-machine host read models":
         raise SystemExit("authority boundary drifted")
     if brief["constraints"]["mutation_gates"] in (None, []):
         raise SystemExit("machine brief lost mutation gate refs")

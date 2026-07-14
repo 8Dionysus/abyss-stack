@@ -9,6 +9,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- Stack-owned MCP packages now retain portable stdio defaults while supporting
+  explicit loopback-only shared Streamable HTTP owners on stable per-package
+  ports, with source-owned systemd template/bundle lifecycle and per-owner
+  canary boundaries.
+- Configs sync now supports non-mutating `--dry-run` previews and repeatable
+  allowlisted `--item` selection while excluding source-control, bytecode, and
+  test/tool cache residue from deployed runtime mirrors.
 - Repo-self KAG bundles can now be verified and materialized into atomic
   SQLite/FTS, versioned Qdrant, and versioned Neo4j runtime projections with a
   shared current receipt and source-return identities; owner-aware FTS and
@@ -24,6 +31,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` transport preflight now recognizes fresh or stale
+  loopback shared owners, rejects remote, credential-bearing, and malformed
+  HTTP endpoints without crashing, and does not require a per-Codex child for
+  a configured shared owner.
+- User-unit installation preserves existing `/dev/null` masks instead of
+  replacing an operator-disabled unit while linking the managed allowlist.
 - Decision graph freshness now distinguishes local cache parity from checkout
   source posture, preserves lag/dirty warnings, and no longer treats arbitrary
   worktree directory names as separate repositories.

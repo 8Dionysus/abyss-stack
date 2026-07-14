@@ -18,7 +18,9 @@ This stack-owned MCP surface owns:
 
 - MCP resources, tools, prompts, CLI, smoke tests, and service-local docs for
   session-evidence access.
-- The stdio access-plane boundary between `abyss-stack` and `.aoa`.
+- The local transport boundary between `abyss-stack` and `.aoa`: portable
+  stdio by default and optional loopback-only shared HTTP under
+  `ABYSS-STACK-D-0077`.
 - Compact route/evidence packets that preserve refs into `.aoa`.
 
 It does not own:
@@ -76,13 +78,14 @@ If the package is installed, the server entry point is:
 aoa-session-memory-mcp-server
 ```
 
-Codex starts MCP servers once per Codex process. Existing tool implementations
-auto-reload `core.py` when its source hash changes, but tool-surface, schema,
-server-wrapper, or Python import-path changes still require restarting the
-Codex session or MCP process before treating `tool_search` /
-`mcp__aoa_session_memory.*` output as current. Killing the running stdio server
-inside an already-open Codex session closes the transport; it does not prove
-tool registry reload.
+Codex may either start the portable stdio server once per Codex process or
+attach to the source-owned loopback shared HTTP owner. Existing tool
+implementations auto-reload `core.py` when its source hash changes, but
+tool-surface, schema, server-wrapper, or Python import-path changes still
+require restarting the configured owner before treating `tool_search` /
+`mcp__aoa_session_memory.*` output as current. Killing an attached stdio server
+closes that transport; restarting a shared HTTP owner does not itself prove
+that an already-running Codex client reloaded changed tool schemas.
 
 ## Smoke
 
@@ -142,5 +145,5 @@ python scripts/validate_nested_agents.py
 ## Report
 
 State which MCP surface changed, which `.aoa` route/search/readiness surface it
-wraps, what validation ran, and whether the change widened runtime exposure or
-only changed stdio access.
+wraps, what validation ran, and whether the change affected portable stdio,
+loopback shared HTTP, or any wider runtime exposure.

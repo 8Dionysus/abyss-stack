@@ -2,6 +2,8 @@
 # by scripts/aoa-install-systemd --all-user-units.
 podman-compose-abyss.service
 abyss-stack-resource-guards-apply.service
+aoa-mcp-http@.service
+aoa-mcp-http.service
 ydotoold.service
 abyss-dictation-server.service
 abyss-tts-server.service

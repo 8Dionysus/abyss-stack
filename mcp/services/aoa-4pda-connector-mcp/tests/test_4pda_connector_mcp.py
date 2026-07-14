@@ -95,6 +95,8 @@ def test_source_route_names_owner_split_and_read_only(tmp_path: Path) -> None:
     assert route["network_touched"] is False
     assert "aoa-4pda answer" in route["wrapped_commands"]
     assert "source_owner" in route["owner_split"]
+    assert route["exposure"] == "stdio-default; optional loopback streamable-http"
+    assert "local transport route" in route["owner_split"]["runtime_owner"]
     assert any("crawl" in line for line in route["stop_lines"])
 
 

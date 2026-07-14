@@ -304,10 +304,10 @@ class AoA4PDAConnectorMCPState:
             "mcp_surface": ["status", "source_route", "query_graph", "query_hybrid", "answer"],
             "read_only": True,
             "network_touched": False,
-            "exposure": "stdio-only",
+            "exposure": "stdio-default; optional loopback streamable-http",
             "owner_split": {
                 "source_owner": "aoa-4pda-connector owns 4PDA policy, CLI, schemas, storage contract, answer packet semantics, and generated packet truth.",
-                "runtime_owner": "abyss-stack owns the runnable MCP service package, stdio route, stack validation, and deployment posture.",
+                "runtime_owner": "abyss-stack owns the runnable MCP service package, local transport route, stack validation, and deployment posture.",
             },
             "stop_lines": STOP_LINES,
         }

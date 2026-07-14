@@ -107,5 +107,5 @@ python scripts/validate_nested_agents.py
 ## Report
 
 State which MCP surface changed, whether mandatory freshness behavior changed,
-what validation ran, and whether the change widened runtime exposure or only
-changed stdio access.
+what validation ran, and whether the change affected portable stdio, loopback
+shared HTTP, or any wider runtime exposure.

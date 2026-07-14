@@ -304,7 +304,7 @@ STOP_LINES = [
     "Do not write, repair, reindex, relabel, export, distill, or promote session memory from this MCP.",
     "Do not treat generated atlas/search/readiness output as reviewed truth.",
     "Do not expose bulk raw transcript payloads by default.",
-    "Do not widen beyond stdio without a later decision.",
+    "Do not bind HTTP beyond loopback or bypass the source-owned MCP lifecycle decision.",
 ]
 ROUTE_LAYERS = [
     "scope_contract",
@@ -2843,7 +2843,7 @@ class AoASessionMemoryMCPState:
     def authority_boundary(self) -> dict[str, Any]:
         return {
             "schema": "aoa_session_memory_mcp_authority_boundary_v1",
-            "mcp_role": "stdio read-only access plane over .aoa session evidence, search, atlas, and diagnostics",
+            "mcp_role": "local read-only access plane over .aoa session evidence, search, atlas, and diagnostics",
             "service_owner": "abyss-stack owns the runnable MCP package only",
             "stronger_owners": [
                 ".aoa raw transcript archive and generated indexes",
@@ -2859,7 +2859,7 @@ class AoASessionMemoryMCPState:
                 "session.index.json, registry, atlas maps, search index, diagnostics",
                 "MCP compact route/evidence packets",
             ],
-            "exposure": "stdio-only",
+            "exposure": "stdio-default; optional loopback streamable-http",
             "mutation_posture": "no write, no repair, no reindex, no relabel, no distillation, no promotion",
             "stop_lines": STOP_LINES,
         }
@@ -3001,14 +3001,50 @@ class AoASessionMemoryMCPState:
             try:
                 config = tomllib.loads(config_path.read_text(encoding="utf-8"))
                 server = (config.get("mcp_servers") or {}).get("aoa_session_memory") or {}
+                raw_url = server.get("url") if isinstance(server.get("url"), str) else ""
+                try:
+                    parsed_url = urlparse(raw_url) if raw_url else None
+                    url_host = parsed_url.hostname if parsed_url is not None else None
+                    url_port = parsed_url.port if parsed_url is not None else None
+                    url_path = parsed_url.path if parsed_url is not None else ""
+                except ValueError:
+                    parsed_url = None
+                    url_host = None
+                    url_port = None
+                    url_path = ""
+                http_boundary_valid = bool(
+                    parsed_url is not None
+                    and parsed_url.scheme in {"http", "https"}
+                    and url_host in {"127.0.0.1", "localhost", "::1"}
+                    and url_path.rstrip("/") == "/mcp"
+                    and parsed_url.username is None
+                    and parsed_url.password is None
+                    and not parsed_url.query
+                    and not parsed_url.fragment
+                )
+                if parsed_url is not None and url_host is not None:
+                    display_host = f"[{url_host}]" if ":" in url_host else url_host
+                    display_url = f"{parsed_url.scheme}://{display_host}"
+                    if url_port is not None:
+                        display_url += f":{url_port}"
+                    display_url += url_path
+                else:
+                    display_url = None
+                transport = "streamable-http" if raw_url else "stdio"
+                configured = bool(server) and (not raw_url or http_boundary_valid)
                 configured_server.update(
                     {
-                        "configured": bool(server),
+                        "configured": configured,
+                        "transport": transport,
+                        "url": display_url,
+                        "loopback_boundary_valid": http_boundary_valid if raw_url else None,
                         "command": server.get("command"),
                         "args": server.get("args") if isinstance(server.get("args"), list) else [],
                         "cwd": server.get("cwd"),
                     }
                 )
+                if raw_url and not http_boundary_valid:
+                    configured_server["diagnostics"] = ["http_endpoint_must_be_loopback_mcp"]
             except (OSError, tomllib.TOMLDecodeError) as exc:
                 configured_server.update({"configured": False, "diagnostics": [f"config_read_error:{exc}"]})
 
@@ -3022,7 +3058,7 @@ class AoASessionMemoryMCPState:
                 "codex_session": {"available": False, "reason": "procfs_unavailable"},
                 "running_mcp_processes": {"available": False, "reason": "procfs_unavailable"},
                 "direct_tool_transport_status": "unknown",
-                "next_action": "Run configured stdio smoke or restart Codex before treating mcp__aoa_session_memory calls as proof.",
+                "next_action": "Use the configured transport's owner check before treating mcp__aoa_session_memory calls as proof.",
                 "authority_boundary": self.authority_boundary(),
             }
 
@@ -3118,25 +3154,60 @@ class AoASessionMemoryMCPState:
             current_mcp_child_processes and current_stale_mcp_child_count < current_mcp_child_count
         )
         configured = bool(configured_server.get("configured"))
+        configured_transport = str(configured_server.get("transport") or "stdio")
+        shared_http = configured_transport == "streamable-http"
         config_reload_advisory = bool(
             current_codex
             and configured
+            and not shared_http
             and current_predates_config
             and current_has_fresh_mcp_child
         )
-        live_transport_restart_advisory = bool(
-            current_codex
-            and configured
-            and not current_has_fresh_mcp_child
-        )
         stale_mcp_process_count = sum(1 for process in mcp_processes if process["started_before_current_source"])
-        if live_transport_restart_advisory:
+        fresh_mcp_process_count = len(mcp_processes) - stale_mcp_process_count
+        if shared_http and not configured:
+            direct_status = "invalid_http_config"
+            live_transport_restart_advisory = False
+            direct_ok = False
+            next_action = "Keep aoa_session_memory on an authenticated local process route or a loopback-only /mcp URL."
+        elif shared_http and not mcp_processes:
+            direct_status = "shared_http_unavailable"
+            live_transport_restart_advisory = True
+            direct_ok = False
+            next_action = (
+                "Check or start the shared HTTP owner outside MCP, then retry; "
+                "this read-only preflight does not mutate service lifecycle."
+            )
+        elif shared_http and not fresh_mcp_process_count:
+            direct_status = "restart_required"
+            live_transport_restart_advisory = True
+            direct_ok = False
+            next_action = (
+                "Restart the shared HTTP owner after source/deployed parity, then retry "
+                "mcp__aoa_session_memory before using its packet as current proof."
+            )
+        elif shared_http:
+            direct_status = "attached_shared_http"
+            live_transport_restart_advisory = False
+            direct_ok = True
+            next_action = (
+                "Use mcp__aoa_session_memory tools; the loopback shared owner is intentionally "
+                "external to the Codex process tree."
+            )
+        else:
+            live_transport_restart_advisory = bool(
+                current_codex
+                and configured
+                and not current_has_fresh_mcp_child
+            )
+            direct_ok = configured and not live_transport_restart_advisory
+        if not shared_http and live_transport_restart_advisory:
             direct_status = "restart_required"
             next_action = (
                 "Restart the Codex/MCP process before using mcp__aoa_session_memory; "
                 "configured stdio may still be used as a source health proof."
             )
-        elif configured and current_codex and current_has_fresh_mcp_child:
+        elif not shared_http and configured and current_codex and current_has_fresh_mcp_child:
             direct_status = "attached"
             if config_reload_advisory:
                 next_action = (
@@ -3145,16 +3216,16 @@ class AoASessionMemoryMCPState:
                 )
             else:
                 next_action = "Use mcp__aoa_session_memory tools, then expand to raw/segment refs when claims matter."
-        elif not current_codex:
+        elif not shared_http and not current_codex:
             direct_status = "not_in_codex_process"
             next_action = "Use this as a CLI preflight; run configured stdio smoke for server proof or call MCP from a fresh Codex session."
-        else:
+        elif not shared_http:
             direct_status = "not_configured_or_not_spawned"
             next_action = "Check Codex MCP config and restart Codex before using direct mcp__aoa_session_memory calls."
 
         return {
             "schema": "aoa_session_memory_mcp_transport_preflight_v1",
-            "ok": configured and direct_status != "restart_required",
+            "ok": direct_ok,
             "mutates": False,
             "configured_server": configured_server,
             "runtime": self.runtime_identity(),
@@ -3183,11 +3254,17 @@ class AoASessionMemoryMCPState:
                 "available": True,
                 "process_count": len(mcp_processes),
                 "stale_process_count": stale_mcp_process_count,
+                "fresh_process_count": fresh_mcp_process_count,
                 "restart_advisory": bool(stale_mcp_process_count),
                 "processes": mcp_processes[:12],
                 "omitted_process_count": max(0, len(mcp_processes) - 12),
             },
             "configured_stdio_check_route": "python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py",
+            "configured_transport_check_route": (
+                "systemctl --user status aoa-mcp-http@aoa-session-memory.service"
+                if shared_http
+                else "python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py"
+            ),
             "next_action": next_action,
             "authority_boundary": self.authority_boundary(),
         }

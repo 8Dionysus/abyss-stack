@@ -75,11 +75,13 @@
 - [ABYSS-STACK-D-0016 Live Runtime Cutover And Machine Parity](../ABYSS-STACK-D-0016-live-runtime-cutover-parity.md) (`docs/decisions/ABYSS-STACK-D-0016-live-runtime-cutover-parity.md`)
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## runtime lifecycle
 
 - [ABYSS-STACK-D-0005 Operator Wrappers With Part-Local Backends](../ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md) (`docs/decisions/ABYSS-STACK-D-0005-operator-wrappers-with-part-local-backends.md`)
 - [ABYSS-STACK-D-0027 Managed Systemd Unit Sources](../ABYSS-STACK-D-0027-managed-systemd-unit-sources.md) (`docs/decisions/ABYSS-STACK-D-0027-managed-systemd-unit-sources.md`)
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## machine fit
 
@@ -175,6 +177,10 @@
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+
+## MCP access plane
+
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## Tree of Sophia access
 

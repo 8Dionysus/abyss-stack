@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tomllib
+from contextlib import AsyncExitStack
 from datetime import timedelta
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from aoa_session_memory_mcp.core import AoASessionMemoryMCPState  # noqa: E402
 from aoa_session_memory_mcp.server import build_server  # noqa: E402
 from mcp import ClientSession  # noqa: E402
 from mcp.client.stdio import StdioServerParameters, stdio_client  # noqa: E402
+from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 
 REQUIRED_STDIO_SMOKE_TOOLS = {
@@ -458,7 +460,7 @@ def _running_mcp_process_advisory(proc_root: Path = Path("/proc")) -> dict:
     }
 
 
-def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServerParameters | None, dict]:
+def _configured_transport_spec(state: AoASessionMemoryMCPState) -> tuple[dict | None, dict]:
     config_path = _codex_config_path()
     if not config_path.exists():
         return None, {"available": False, "reason": "codex_config_missing", "config_path": config_path.as_posix()}
@@ -468,6 +470,25 @@ def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServ
     entry = servers.get("aoa_session_memory") if isinstance(servers.get("aoa_session_memory"), dict) else None
     if not entry:
         return None, {"available": False, "reason": "aoa_session_memory_config_missing", "config_path": config_path.as_posix()}
+
+    raw_url = entry.get("url")
+    if raw_url is not None and not isinstance(raw_url, str):
+        raise SystemExit("configured Codex MCP aoa_session_memory url must be a string")
+    if raw_url:
+        preflight = state.session_mcp_transport_preflight(proc_root=Path("/__aoa_validator_no_procfs__"))
+        configured_server = preflight.get("configured_server") if isinstance(preflight, dict) else None
+        if not isinstance(configured_server, dict) or configured_server.get("configured") is not True:
+            diagnostics = configured_server.get("diagnostics") if isinstance(configured_server, dict) else None
+            raise SystemExit(f"configured Codex MCP aoa_session_memory HTTP endpoint is invalid: {diagnostics}")
+        return (
+            {"transport": "streamable-http", "url": raw_url},
+            {
+                "available": True,
+                "config_path": config_path.as_posix(),
+                "transport": "streamable-http",
+                "url": configured_server.get("url"),
+            },
+        )
 
     command = entry.get("command")
     args = entry.get("args")
@@ -496,7 +517,8 @@ def _configured_stdio_params(state: AoASessionMemoryMCPState) -> tuple[StdioServ
         "args": args,
         "cwd": cwd.as_posix(),
     }
-    return params, meta
+    meta["transport"] = "stdio"
+    return {"transport": "stdio", "params": params}, meta
 
 
 def _payload_count(payload: dict, key: str) -> int:
@@ -1135,12 +1157,20 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     )
 
 
-async def _configured_stdio_smoke(state: AoASessionMemoryMCPState) -> dict:
-    params, meta = _configured_stdio_params(state)
-    if params is None:
+async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
+    transport_spec, meta = _configured_transport_spec(state)
+    if transport_spec is None:
         return {**meta, "ok": True, "skipped": True}
 
-    async with stdio_client(params) as (read_stream, write_stream):
+    async with AsyncExitStack() as stack:
+        if transport_spec["transport"] == "streamable-http":
+            read_stream, write_stream, _ = await stack.enter_async_context(
+                streamable_http_client(str(transport_spec["url"]))
+            )
+        else:
+            read_stream, write_stream = await stack.enter_async_context(
+                stdio_client(transport_spec["params"])
+            )
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
             tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
@@ -1369,7 +1399,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Validate the aoa-session-memory MCP service with live archive, "
-            "stdio, and configured Codex MCP smoke checks."
+            "portable stdio, and configured Codex MCP transport smoke checks."
         )
     )
     return parser.parse_args(argv)
@@ -1470,9 +1500,10 @@ def main(argv: list[str] | None = None) -> None:
     if server is None:
         raise SystemExit("MCP server did not build")
     stdio_smoke = asyncio.run(_stdio_tool_smoke(state, latest_session))
-    configured_stdio_smoke = asyncio.run(_configured_stdio_smoke(state))
-    running_processes = _running_mcp_process_advisory()
-    codex_session = _codex_session_advisory()
+    configured_transport_smoke = asyncio.run(_configured_transport_smoke(state))
+    transport_preflight = state.session_mcp_transport_preflight()
+    running_processes = transport_preflight.get("running_mcp_processes", {})
+    codex_session = transport_preflight.get("codex_session", {})
 
     print(
         json.dumps(
@@ -1587,7 +1618,9 @@ def main(argv: list[str] | None = None) -> None:
                 "stdio_maintenance_smoke_skipped": stdio_smoke["maintenance_smoke_skipped"],
                 "stdio_projection_status_ok": stdio_smoke["projection_status_ok"],
                 "stdio_projection_completeness_status": stdio_smoke["projection_completeness_status"],
-                "configured_stdio": configured_stdio_smoke,
+                "configured_transport": configured_transport_smoke,
+                "transport_preflight_status": transport_preflight.get("direct_tool_transport_status"),
+                "transport_preflight_ok": transport_preflight.get("ok"),
                 "running_processes": running_processes,
                 "codex_session": codex_session,
             },

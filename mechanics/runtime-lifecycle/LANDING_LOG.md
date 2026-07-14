@@ -36,3 +36,11 @@ Added package-local packet routes for source/runtime parity and live runtime cut
 cutover inspection. The parity packet may update the deployed `Configs` mirror;
 the cutover packet remains read-only until an operator explicitly chooses a
 start, stop, restart, systemd, profile, or exposure-changing action.
+
+## 2026-07-13 - Loopback MCP owner lifecycle
+
+Added a source-owned user-unit template and bundle for one shared process per
+local MCP owner while retaining package-level stdio defaults. The lifecycle is
+loopback-only, launches deployed Configs wrappers, preserves existing unit
+masks, and requires bounded source/deployed preview, parity, and per-owner
+canaries before restart. See `ABYSS-STACK-D-0077`.

@@ -8,7 +8,7 @@
 | generated readers | deterministic catalog, capsule, section, comparison, and report read models | proof interpretation stronger than source bundles |
 | runtime-candidate readers | candidate evidence and artifact hook templates | accepted proof or verdicts |
 | `aoa-evals-mcp` | read access, selection, find-or-propose routing, inspection, expansion, comparison, template lookup, runtime status, Eval Forge front-door access packets, candidate packet validation, runtime candidate export read-model, report skeletons, and gated sibling repo-local eval-port writes | eval running, verdict computation, receipt publication, bundle promotion, central `aoa-evals` source mutation, proposal approval, evidence acceptance, worksheet acceptance, arbitrary sibling path mutation |
-| `abyss-stack` | runnable MCP package and stdio service topology | proof meaning |
+| `abyss-stack` | runnable MCP package and local transport topology | proof meaning |
 
 ## Interface
 

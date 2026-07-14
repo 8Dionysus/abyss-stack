@@ -60,7 +60,9 @@ It does not own:
   mutation, source mutation, or private raw capture reads.
 - Treat generated/latest JSON as evidence and route accelerators; source
   contracts under `/etc/abyss-machine` remain stronger.
-- Keep the server stdio-only unless a later decision widens exposure.
+- Keep stdio as the portable default. The optional shared Streamable HTTP
+  owner must stay loopback-only under `ABYSS-STACK-D-0077`; any wider or
+  remote exposure requires a later decision.
 
 ## Run
 

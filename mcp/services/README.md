@@ -18,5 +18,35 @@ route card, and validation path.
 | [`aoa-telegram-connector-mcp`](aoa-telegram-connector-mcp/README.md) | local Telegram connector status, source-route, graph query, and answer packets preserving permission/evidence reports |
 | [`aoa-discord-connector-mcp`](aoa-discord-connector-mcp/README.md) | local Discord connector status, source-route, graph query, and answer packets preserving permission/evidence reports |
 
+## Local transport lifecycle
+
+Every package keeps stdio as its portable default. A host may explicitly set
+`AOA_MCP_TRANSPORT=streamable-http` to run one shared owner process, but the
+server rejects any `AOA_MCP_HOST` outside `127.0.0.1`, `localhost`, or `::1`.
+This route is local transport consolidation, not network publication. Remote,
+wildcard-bind, gateway, proxy, and authentication topology require a later
+decision than [D-0077](../../docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md).
+
+| Owner instance | Default port |
+|---|---:|
+| `aoa-decisions` | 5420 |
+| `aoa-memo` | 5421 |
+| `aoa-session-memory` | 5422 |
+| `abyss-machine` | 5423 |
+| `aoa-evals` | 5424 |
+| `aoa-kag` | 5425 |
+| `aoa-4pda-connector` | 5426 |
+| `aoa-telegram-connector` | 5427 |
+| `aoa-discord-connector` | 5428 |
+| `tos-corpus` | 5429 |
+
+`systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
+the deployed workspace wrapper, not a source checkout. The
+`aoa-mcp-http.service` bundle wants the nine wrappers currently present in the
+shared Codex plane. `tos-corpus` implements the same guarded transport contract
+but remains outside the bundle until its workspace wrapper and live canary are
+source-owned. Installing units only links and reloads them; starting or
+restarting an owner is a separate operator action after source/deployed parity.
+
 For district law, read [AGENTS](AGENTS.md). For the parent access-plane route,
 read [mcp/AGENTS](../AGENTS.md).

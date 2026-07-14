@@ -7,7 +7,7 @@
 | `.aoa` | raw sessions, manifests, segment indexes, route-signal classifier, search index, atlas maps, diagnostics, retrieval packets | MCP packaging |
 | generated `.aoa` companions | deterministic route/search/readiness read models | reviewed truth stronger than raw evidence |
 | `aoa-session-memory-mcp` | read-only access, compact route/evidence packets, freshness checks, prompts, CLI, service-local validation | archive mutation, reindexing, repair, distillation, naming, promotion, writeback, durable memory |
-| `abyss-stack` | runnable MCP package and stdio service topology | `.aoa` archive meaning or session evidence authority |
+| `abyss-stack` | runnable MCP package and local transport topology | `.aoa` archive meaning or session evidence authority |
 | `aoa-memo` | durable reviewed memory and writeback review | raw session archive truth |
 
 ## Interface
@@ -36,3 +36,5 @@ and MCP responses are not reviewed truth.
 - No raw transcript bulk exposure by default.
 - No treating MCP output as stronger than `.aoa` raw refs or reviewed owner
   sources.
+- No remote, wildcard-bind, gateway, or proxy exposure; optional shared HTTP
+  remains loopback-only under `ABYSS-STACK-D-0077`.

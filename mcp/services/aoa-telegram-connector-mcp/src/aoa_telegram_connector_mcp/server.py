@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -10,6 +11,22 @@ from mcp.server.fastmcp import FastMCP
 from aoa_telegram_connector_mcp.core import AoATelegramConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_PORT = 5427
+
+
+def _run_server(server: Any) -> None:
+    transport = os.environ.get("AOA_MCP_TRANSPORT", "stdio").strip() or "stdio"
+    if transport == "stdio":
+        server.run(transport="stdio")
+        return
+    if transport != "streamable-http":
+        raise SystemExit(f"unsupported AOA_MCP_TRANSPORT: {transport}")
+    host = os.environ.get("AOA_MCP_HOST", "127.0.0.1").strip()
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise SystemExit("AOA_MCP_HOST must remain loopback-only")
+    server.settings.host = host
+    server.settings.port = int(os.environ.get("AOA_MCP_PORT", DEFAULT_HTTP_PORT))
+    server.run(transport="streamable-http")
 
 
 def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
@@ -63,7 +80,7 @@ def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     LOGGER.info("AoA Telegram connector MCP server ready")
-    build_server().run()
+    _run_server(build_server())
 
 
 if __name__ == "__main__":

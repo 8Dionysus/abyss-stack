@@ -17,9 +17,11 @@ prompts for agents.
 
 ## Runtime Shape
 
-The first service slice is stdio/read-only. It keeps provider-map reads cheap,
-uses explicit source-return handles, and leaves graph databases, vector stores,
-embedding caches, and live indexing to later runtime-owned contracts.
+The service remains read-only. Stdio is the portable default, while
+`ABYSS-STACK-D-0077` permits an explicitly selected loopback-only shared HTTP
+owner. Both routes keep provider-map reads cheap, use explicit source-return
+handles, and leave graph databases, vector stores, embedding caches, and live
+indexing to their runtime-owned contracts.
 
 ## Interface
 

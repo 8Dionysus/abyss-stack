@@ -147,6 +147,22 @@ This applies to MCP service code as well: user units execute the package
 entrypoints under `Configs/mcp`, while deployed decision-graph validation reads
 `Configs/schemas`.
 
+Preview the exact bounded projection before a lifecycle-sensitive rollout:
+
+```bash
+scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
+scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-install-systemd --all-user-units
+```
+
+`--item` is repeatable and accepts only the public-safe managed allowlist;
+unknown items and `Secrets` fail closed. `--dry-run` requires an existing
+target and never mutates it. Source-control, bytecode, and test/tool caches are
+excluded from deployment. The systemd installer links and reloads only,
+preserves existing masks, and does not start or restart the newly linked MCP
+owners. Verify parity, then canary owners one at a time before using live MCP
+responses as current evidence.
+
 After syncing repo-managed surfaces, run:
 
 ```bash

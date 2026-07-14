@@ -2,12 +2,29 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
 from .core import AoAMemoMCPState
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_PORT = 5421
+
+
+def _run_server(server: Any) -> None:
+    transport = os.environ.get("AOA_MCP_TRANSPORT", "stdio").strip() or "stdio"
+    if transport == "stdio":
+        server.run(transport="stdio")
+        return
+    if transport != "streamable-http":
+        raise SystemExit(f"unsupported AOA_MCP_TRANSPORT: {transport}")
+    host = os.environ.get("AOA_MCP_HOST", "127.0.0.1").strip()
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise SystemExit("AOA_MCP_HOST must remain loopback-only")
+    server.settings.host = host
+    server.settings.port = int(os.environ.get("AOA_MCP_PORT", DEFAULT_HTTP_PORT))
+    server.run(transport="streamable-http")
 
 
 def build_server(workspace_root: str | Path | None = None) -> Any:
@@ -195,4 +212,4 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    build_server().run(transport="stdio")
+    _run_server(build_server())

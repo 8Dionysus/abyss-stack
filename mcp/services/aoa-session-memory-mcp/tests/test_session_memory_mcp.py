@@ -11,6 +11,7 @@ import sys
 import time
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -3860,6 +3861,179 @@ def test_transport_preflight_reports_current_codex_restart_need(tmp_path: Path, 
     assert preflight["direct_tool_transport_status"] == "restart_required"
     assert preflight["live_transport_restart_advisory"] is True
     assert preflight["codex_session"]["current_session_has_aoa_session_memory_child"] is False
+
+
+def test_transport_preflight_recognizes_fresh_shared_http_owner(tmp_path: Path, monkeypatch: Any) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    package_root = tmp_path / "aoa-session-memory-mcp"
+    core_path = package_root / "src" / "aoa_session_memory_mcp" / "core.py"
+    server_path = package_root / "src" / "aoa_session_memory_mcp" / "server.py"
+    wrapper_path = package_root / "scripts" / "aoa_session_memory_mcp_server.py"
+    for path in (core_path, server_path, wrapper_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (1_000.0, 1_000.0))
+    monkeypatch.setattr(module, "MCP_CORE_SOURCE_PATH", core_path)
+    monkeypatch.setattr(module, "MCP_SERVER_SOURCE_PATH", server_path)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "url = \"http://127.0.0.1:5422/mcp\"\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    process_dir = proc / "301"
+    process_dir.mkdir()
+    process_dir.joinpath("cmdline").write_bytes(
+        b"python3\0/srv/AbyssOS/.codex/bin/aoa-session-memory-mcp-server.py\0"
+    )
+    process_dir.joinpath("status").write_text("Name:\tfixture\nPPid:\t1\n", encoding="utf-8")
+    start_ticks = int((2_000.0 - 1_000.0) * float(ticks))
+    process_dir.joinpath("stat").write_text(
+        " ".join(["301", "(fixture)", "S", *(["0"] * 18), str(start_ticks)]),
+        encoding="utf-8",
+    )
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["ok"] is True
+    assert preflight["configured_server"]["transport"] == "streamable-http"
+    assert preflight["configured_server"]["url"] == "http://127.0.0.1:5422/mcp"
+    assert preflight["direct_tool_transport_status"] == "attached_shared_http"
+    assert preflight["live_transport_restart_advisory"] is False
+    assert preflight["running_mcp_processes"]["fresh_process_count"] == 1
+    assert preflight["authority_boundary"]["exposure"] == "stdio-default; optional loopback streamable-http"
+
+
+def test_transport_preflight_rejects_unsafe_or_malformed_http_config(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    for invalid_url in (
+        "http://example.com:5422/mcp",
+        "http://127.0.0.1:99999/mcp",
+        "http://operator@127.0.0.1:5422/mcp",
+    ):
+        config_path.write_text(
+            "[mcp_servers.aoa_session_memory]\n"
+            f'url = "{invalid_url}"\n',
+            encoding="utf-8",
+        )
+
+        preflight = state.session_mcp_transport_preflight(proc_root=tmp_path / "missing-proc")
+
+        assert preflight["ok"] is False
+        assert preflight["configured_server"]["configured"] is False
+        assert preflight["configured_server"]["transport"] == "streamable-http"
+        assert preflight["configured_server"]["loopback_boundary_valid"] is False
+        assert preflight["configured_server"]["diagnostics"] == ["http_endpoint_must_be_loopback_mcp"]
+
+
+def test_validator_configured_transport_accepts_loopback_http(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    validator = load_validator_module()
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        'url = "http://127.0.0.1:5422/mcp"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    transport, meta = validator._configured_transport_spec(state)
+
+    assert transport == {
+        "transport": "streamable-http",
+        "url": "http://127.0.0.1:5422/mcp",
+    }
+    assert meta["available"] is True
+    assert meta["transport"] == "streamable-http"
+    assert meta["url"] == "http://127.0.0.1:5422/mcp"
+
+
+def test_transport_preflight_requires_restart_for_stale_shared_http_owner(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    module = sys.modules[AoASessionMemoryMCPState.__module__]
+    package_root = tmp_path / "aoa-session-memory-mcp"
+    core_path = package_root / "src" / "aoa_session_memory_mcp" / "core.py"
+    server_path = package_root / "src" / "aoa_session_memory_mcp" / "server.py"
+    wrapper_path = package_root / "scripts" / "aoa_session_memory_mcp_server.py"
+    for path in (core_path, server_path, wrapper_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# source\n", encoding="utf-8")
+        os.utime(path, (3_000.0, 3_000.0))
+    monkeypatch.setattr(module, "MCP_CORE_SOURCE_PATH", core_path)
+    monkeypatch.setattr(module, "MCP_SERVER_SOURCE_PATH", server_path)
+
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        "url = \"http://127.0.0.1:5422/mcp\"\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    (proc / "stat").write_text("btime 1000\n", encoding="utf-8")
+    ticks = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", "SC_CLK_TCK"))
+    process_dir = proc / "301"
+    process_dir.mkdir()
+    process_dir.joinpath("cmdline").write_bytes(
+        b"python3\0/srv/AbyssOS/.codex/bin/aoa-session-memory-mcp-server.py\0"
+    )
+    process_dir.joinpath("status").write_text("Name:\tfixture\nPPid:\t1\n", encoding="utf-8")
+    start_ticks = int((2_000.0 - 1_000.0) * float(ticks))
+    process_dir.joinpath("stat").write_text(
+        " ".join(["301", "(fixture)", "S", *(["0"] * 18), str(start_ticks)]),
+        encoding="utf-8",
+    )
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=proc)
+
+    assert preflight["ok"] is False
+    assert preflight["direct_tool_transport_status"] == "restart_required"
+    assert preflight["live_transport_restart_advisory"] is True
+    assert preflight["running_mcp_processes"]["fresh_process_count"] == 0
+    assert "shared HTTP owner" in preflight["next_action"]
 
 
 def test_transport_preflight_treats_config_mtime_as_advisory_when_child_is_fresh(

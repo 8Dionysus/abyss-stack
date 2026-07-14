@@ -202,6 +202,10 @@ aoa_link_user_unit() {
   if [[ -e "$target_path" || -L "$target_path" ]]; then
     if [[ -L "$target_path" ]]; then
       previous_target="$(readlink "$target_path" || true)"
+      if [[ "$previous_target" == "/dev/null" ]]; then
+        aoa_note "preserving masked user unit: ${target_path}"
+        return 0
+      fi
       if [[ "$previous_target" == "$source_path" ]]; then
         aoa_note "unit already linked: ${target_path}"
         return 0
