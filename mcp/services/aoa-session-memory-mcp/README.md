@@ -114,6 +114,12 @@ Prompts:
 
 All tools are read-only. They do not reindex, repair, distill, relabel,
 export, promote, write memory, accept evidence, or mutate `.aoa`.
+Every published tool also advertises the matching MCP safety contract:
+`readOnlyHint=true`, `destructiveHint=false`, `idempotentHint=true`, and
+`openWorldHint=false`. Codex can therefore distinguish these local evidence
+reads from side-effecting calls when it applies MCP approval policy. Package
+tests and the stdio/configured-transport validator check the metadata; the
+annotations remain hints and do not replace behavior-level smoke tests.
 
 ### Skill-evidence compact contract
 

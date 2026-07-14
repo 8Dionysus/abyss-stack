@@ -208,5 +208,7 @@ The first layer is ready when:
   carrying raw transcript bodies or computing a verdict;
 - freshness checks do not claim more than they can prove;
 - prompts route agents through evidence before writeback or promotion;
+- every tool publishes closed-world read-only, non-destructive, idempotent MCP
+  annotations so approval clients do not have to infer side effects from prose;
 - validation proves the service did not become a writer, maintainer, reindexer,
   distiller, or archive authority.
