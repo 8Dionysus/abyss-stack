@@ -5,136 +5,122 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .core import AoAKagMCPState, REPOSITORY_INDEX_KINDS
+from .core import AoAKagMCPState
+from .runtime import build_application
 
 
 def _print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 
 
+def _common(parser: argparse.ArgumentParser, *, default: str = "compact") -> None:
+    parser.add_argument(
+        "--detail",
+        choices=("compact", "summary", "full"),
+        default=default,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="aoa-kag-mcp")
-    parser.add_argument("--workspace-root", default=None)
-    parser.add_argument("--aoa-kag-root", default=None)
-    parser.add_argument("--provider-map-path", default=None)
-    parser.add_argument("--readiness-path", default=None)
-    parser.add_argument("--coverage-path", default=None)
+    parser.add_argument("--workspace-root")
+    parser.add_argument("--aoa-kag-root")
+    parser.add_argument("--provider-map-path")
+    parser.add_argument("--readiness-path")
+    parser.add_argument("--coverage-path")
+    parser.add_argument("--stack-root")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("status")
+    discover = sub.add_parser("discover")
+    discover.add_argument("--owner")
+    _common(discover)
 
-    provider_status = sub.add_parser("provider-status")
-    provider_status.add_argument("--repo")
+    search = sub.add_parser("search")
+    search.add_argument("query")
+    search.add_argument(
+        "--strategy",
+        choices=("auto", "exact", "lexical", "semantic", "hybrid", "graph"),
+        default="auto",
+    )
+    search.add_argument("--owner")
+    search.add_argument("--record-class")
+    search.add_argument("--kind")
+    search.add_argument("--document-role")
+    search.add_argument("--surface-state")
+    search.add_argument("--path")
+    search.add_argument("--path-prefix")
+    search.add_argument("--limit", type=int, default=10)
+    search.add_argument("--cursor")
+    _common(search)
 
-    provider = sub.add_parser("provider")
-    provider.add_argument("repo")
+    read = sub.add_parser("read")
+    read.add_argument("uri")
+    _common(read, default="full")
 
-    freshness = sub.add_parser("freshness")
-    freshness.add_argument("--repo")
+    traverse = sub.add_parser("traverse")
+    traverse.add_argument("source_ids", nargs="+")
+    traverse.add_argument("--owner")
+    traverse.add_argument("--query", default="")
+    traverse.add_argument(
+        "--direction",
+        choices=("outgoing", "incoming", "both"),
+        default="outgoing",
+    )
+    traverse.add_argument("--relation-kind", action="append", dest="relation_kinds")
+    traverse.add_argument("--max-depth", type=int, default=2)
+    traverse.add_argument("--limit", type=int, default=10)
+    traverse.add_argument("--cursor")
+    _common(traverse)
 
-    source_return = sub.add_parser("source-return")
-    source_return.add_argument("repo")
-    source_return.add_argument("--local-id")
-    source_return.add_argument("--path")
-
-    repo_local_index = sub.add_parser("repo-local-index")
-    repo_local_index.add_argument("repo")
-
-    source_index = sub.add_parser("source-index")
-    source_index.add_argument("repo")
-    source_index.add_argument("--include-payload", action="store_true")
-
-    repository_index_family = sub.add_parser("repository-index-family")
-    repository_index_family.add_argument("repo")
-
-    repository_index = sub.add_parser("repository-index")
-    repository_index.add_argument("repo")
-    repository_index.add_argument("index_kind", choices=REPOSITORY_INDEX_KINDS)
-    repository_index.add_argument("--include-payload", action="store_true")
-
-    domain_index_catalog = sub.add_parser("domain-index-catalog")
-    domain_index_catalog.add_argument("repo")
-    domain_index_catalog.add_argument("--include-payload", action="store_true")
-
-    common_surface_profile = sub.add_parser("common-surface-profile")
-    common_surface_profile.add_argument("repo")
-
-    generation = sub.add_parser("generation-route")
-    generation.add_argument("repo")
-
-    coverage = sub.add_parser("coverage-status")
-    coverage.add_argument("--repo")
-    coverage.add_argument("--status")
-
-    registry = sub.add_parser("registry-slice")
-    registry.add_argument("--status")
-    registry.add_argument("--repo")
-    registry.add_argument("--limit", type=int, default=50)
-
-    composition = sub.add_parser("composition-slice")
-    composition.add_argument("--query", default="")
-    composition.add_argument("--limit", type=int, default=20)
-
-    validation = sub.add_parser("validation-status")
-    validation.add_argument("--include-provider-homes", action="store_true")
-
-    resource = sub.add_parser("read-resource")
-    resource.add_argument("uri")
+    explain = sub.add_parser("explain")
+    explain.add_argument("trace_id")
+    _common(explain, default="summary")
 
     args = parser.parse_args()
     state = AoAKagMCPState.discover(
         workspace_root=args.workspace_root,
         aoa_kag_root=args.aoa_kag_root,
-        provider_map_path=Path(args.provider_map_path) if args.provider_map_path else None,
+        provider_map_path=(
+            Path(args.provider_map_path) if args.provider_map_path else None
+        ),
         readiness_path=Path(args.readiness_path) if args.readiness_path else None,
         coverage_path=Path(args.coverage_path) if args.coverage_path else None,
     )
-
-    if args.command == "status":
-        _print(state.status())
-    elif args.command == "provider-status":
-        _print(state.provider_status(repo=args.repo))
-    elif args.command == "provider":
-        _print(state.provider_lookup(repo=args.repo))
-    elif args.command == "freshness":
-        _print(state.freshness_check(repo=args.repo))
-    elif args.command == "source-return":
-        _print(state.source_return_lookup(repo=args.repo, local_id=args.local_id, path=args.path))
-    elif args.command == "repo-local-index":
-        _print(state.repo_local_index(repo=args.repo))
-    elif args.command == "source-index":
-        _print(state.source_index_lookup(repo=args.repo, include_payload=args.include_payload))
-    elif args.command == "repository-index-family":
-        _print(state.repository_index_family_lookup(repo=args.repo))
-    elif args.command == "repository-index":
-        _print(
-            state.repository_index_lookup(
-                repo=args.repo,
-                index_kind=args.index_kind,
-                include_payload=args.include_payload,
-            )
+    application = build_application(state, stack_root=args.stack_root)
+    if args.command == "discover":
+        payload = application.discover(owner=args.owner, detail=args.detail)
+    elif args.command == "search":
+        payload = application.search(
+            args.query,
+            strategy=args.strategy,
+            owner=args.owner,
+            record_class=args.record_class,
+            kind=args.kind,
+            document_role=args.document_role,
+            surface_state=args.surface_state,
+            path=args.path,
+            path_prefix=args.path_prefix,
+            detail=args.detail,
+            limit=args.limit,
+            cursor=args.cursor,
         )
-    elif args.command == "domain-index-catalog":
-        _print(
-            state.domain_index_catalog_lookup(
-                repo=args.repo,
-                include_payload=args.include_payload,
-            )
+    elif args.command == "read":
+        payload = application.read(args.uri, detail=args.detail)
+    elif args.command == "traverse":
+        payload = application.traverse(
+            args.source_ids,
+            owner=args.owner,
+            query=args.query,
+            direction=args.direction,
+            relation_kinds=args.relation_kinds,
+            max_depth=args.max_depth,
+            detail=args.detail,
+            limit=args.limit,
+            cursor=args.cursor,
         )
-    elif args.command == "common-surface-profile":
-        _print(state.common_surface_profile(repo=args.repo))
-    elif args.command == "generation-route":
-        _print(state.generation_route_lookup(repo=args.repo))
-    elif args.command == "coverage-status":
-        _print(state.repo_local_coverage_status(repo=args.repo, status=args.status))
-    elif args.command == "registry-slice":
-        _print(state.registry_slice(status=args.status, repo=args.repo, limit=args.limit))
-    elif args.command == "composition-slice":
-        _print(state.composition_slice(query=args.query, limit=args.limit))
-    elif args.command == "validation-status":
-        _print(state.validation_status(include_provider_homes=args.include_provider_homes))
-    elif args.command == "read-resource":
-        _print(state.read_resource(args.uri))
+    else:
+        payload = application.explain(args.trace_id, detail=args.detail)
+    _print(payload)
 
 
 if __name__ == "__main__":

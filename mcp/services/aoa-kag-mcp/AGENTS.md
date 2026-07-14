@@ -7,13 +7,12 @@ nearer card narrows the lane.
 
 ## Role
 
-`aoa-kag-mcp` is a thin read-only MCP access plane over the `aoa-kag` provider
-map and repo-local `kag/` provider packets.
+`aoa-kag-mcp` is the read-only agent access plane over canonical repo-local KAG
+records and stack-owned runtime projections.
 
-It helps agents inspect provider status, source-return routes, freshness
-handles, generation routes, repository index families, domain index catalogs,
-repo-local coverage, registry slices, and bounded provider records without
-turning the MCP service into KAG source authority.
+Its public behavior is the compact `discover`, `search`, `read`, `traverse`,
+and `explain` application protocol. Results preserve owner identity, source
+anchors, provenance, freshness, access, projection state, and evidence routes.
 
 ## Read before editing
 
@@ -23,13 +22,11 @@ tests, and `aoa-kag/kag/LOCAL_SUBTREE_PROTOCOL.md` before changing behavior.
 
 ## Boundaries
 
-`aoa-kag` owns schema, readiness, generated provider map, provider validation,
-and KAG composition meaning. Repo-local `kag/` homes own their source-return
-handles. This package owns only MCP resource, tool, prompt, CLI, validator, and
-test shape.
-
-Runtime graph, vector, embedding, cache, and serving state stay outside this
-package unless a later source-owned contract adds that route.
+Repo-local `kag/` homes own canonical repository records. `aoa-kag` owns the
+common schemas, qualified identity, retrieval semantics, federation,
+provenance, freshness, and generated handoff. `kag-seam` owns runtime adapters
+and mutable projection state. This package owns MCP mapping, resources,
+transports, CLI, service validation, and focused contract tests.
 
 ## Validation
 
@@ -49,6 +46,6 @@ python scripts/validate_nested_agents.py
 
 ## Closeout
 
-Report resources, tools, prompts, provider-map shape, owner layer touched, and
-whether the change affected portable stdio, loopback shared HTTP, or any wider
-runtime exposure.
+Report the five-tool contract, resources, application route, owner layer
+touched, degradation behavior, and whether portable stdio or loopback HTTP
+changed.

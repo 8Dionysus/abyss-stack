@@ -699,6 +699,16 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     kwargs = module._http_auth_kwargs(expected_port)
 
                 self.assertEqual(kwargs["auth"].required_scopes, ["mcp:access"])
+                security = kwargs["transport_security"]
+                self.assertTrue(security.enable_dns_rebinding_protection)
+                self.assertEqual(
+                    security.allowed_hosts,
+                    [
+                        f"127.0.0.1:{expected_port}",
+                        f"localhost:{expected_port}",
+                        f"[::1]:{expected_port}",
+                    ],
+                )
                 verifier = kwargs["token_verifier"]
                 self.assertIsNone(asyncio.run(verifier.verify_token("wrong-token")))
                 access = asyncio.run(verifier.verify_token(MCP_HTTP_AUTH_TOKEN))
@@ -869,6 +879,34 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as wrong_auth:
                 urllib.request.urlopen(wrong_request, timeout=2)
             self.assertEqual(wrong_auth.exception.code, 401)
+
+            invalid_origin_request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/mcp",
+                data=b"{}",
+                method="POST",
+                headers={
+                    "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
+                    "Content-Type": "application/json",
+                    "Origin": "https://untrusted.example",
+                },
+            )
+            with self.assertRaises(urllib.error.HTTPError) as invalid_origin:
+                urllib.request.urlopen(invalid_origin_request, timeout=2)
+            self.assertEqual(invalid_origin.exception.code, 403)
+
+            invalid_host_request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/mcp",
+                data=b"{}",
+                method="POST",
+                headers={
+                    "Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}",
+                    "Content-Type": "application/json",
+                    "Host": "untrusted.example",
+                },
+            )
+            with self.assertRaises(urllib.error.HTTPError) as invalid_host:
+                urllib.request.urlopen(invalid_host_request, timeout=2)
+            self.assertEqual(invalid_host.exception.code, 421)
 
             async def authenticated_inventory() -> int:
                 import httpx

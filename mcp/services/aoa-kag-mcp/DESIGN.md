@@ -1,33 +1,41 @@
 # aoa-kag-mcp Design
 
-## Purpose
+## System Flow
 
-`aoa-kag-mcp` turns the `aoa-kag` provider map into MCP resources, tools, and
-prompts for agents.
+1. Each repository publishes its canonical repo-self family under `kag/`.
+2. `aoa-kag` validates owner identity, composes the federation bundle, and
+   publishes the MCP capability and result contracts.
+3. `abyss-stack` materializes exact, vector, and graph projections from that
+   verified bundle.
+4. The `kag-seam` application port composes canonical and runtime adapters into
+   storage-neutral KAG operations.
+5. `aoa-kag-mcp` maps those operations to MCP tools and `aoa-kag://` resources.
 
-## Source Flow
+## Application Port
 
-1. `aoa-kag/manifests/local_kag_readiness.json` names direct repos and OS
-   surfaces.
-2. Repo-local `kag/` homes carry manifest, node, edge, index, projection, and
-   receipt records.
-3. `aoa-kag/generated/local_kag_provider_map.min.json` composes the compact
-   access packet.
-4. `aoa-kag-mcp` reads that packet and returns bounded access-plane views.
+The public behavior is `discover`, `search`, `read`, `traverse`, and `explain`.
+Storage names stay behind the port. Every response states the strategy and
+adapters actually used, projection identity, freshness, degradation, and
+evidence links.
 
-## Runtime Shape
+Canonical repo-local reads are the source-grounded fallback. Runtime SQLite,
+Qdrant, and Neo4j are replaceable projections. A backend outage changes route
+quality and capability state rather than the MCP tool ABI.
 
-The service remains read-only. Stdio is the portable default, while
-`ABYSS-STACK-D-0077` permits an explicitly selected authenticated loopback
-shared HTTP owner. Both routes keep provider-map reads cheap, use explicit
-source-return handles, and leave graph databases, vector stores, embedding
-caches, and live indexing to their runtime-owned contracts.
+## Context Shape
 
-## Interface
+Capability discovery is compact. Search and traversal return bounded envelopes
+with cursor pagination. `compact`, `summary`, and `full` detail levels move
+source text, score detail, and evidence expansion behind explicit requests.
 
-Resources expose exact packet surfaces. Tools return typed JSON packets over
-provider status, canonical repository index families,
-owner-native domain index catalogs, repo-local coverage, freshness,
-source-return routes, registry slices, and simple composition search. Prompts
-guide agents through provider records, source-return routes, and repo-local
-source surfaces before making meaning claims.
+Nine resource shapes address capabilities, owner manifests, records,
+documents, source anchors, source text, evidence traces, schemas, and runtime
+projection state. The current agent scenarios gained no measurable value from
+MCP prompts, Tasks, or Apps, so the access plane publishes none.
+
+## Transport
+
+Stdio is the portable process-local route. Streamable HTTP is a shared
+single-operator loopback route protected by bearer authentication, Host and
+Origin validation, fixed per-call bounds, and backend timeouts. Both
+transports expose the same tools, resources, and result contracts.

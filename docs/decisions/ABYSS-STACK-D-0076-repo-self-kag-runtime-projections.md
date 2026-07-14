@@ -76,5 +76,5 @@ state each remain with their natural owner.
 
 ## Follow-up route
 
-Use retrieval evals and runtime receipts to tune batching, retention, and query
-adapters before exposing the projections through the next KAG access plane.
+Use `ABYSS-STACK-D-0079` for the storage-neutral query application port and MCP
+access plane over these projections.

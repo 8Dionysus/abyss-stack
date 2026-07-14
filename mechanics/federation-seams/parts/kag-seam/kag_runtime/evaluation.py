@@ -100,8 +100,7 @@ def case_score(
     reciprocal_rank = 1.0 / min(relevant_ranks) if relevant_ranks else 0.0
     dcg = sum(1.0 / math.log2(rank + 1) for rank in relevant_ranks)
     ideal = sum(
-        1.0 / math.log2(rank + 1)
-        for rank in range(1, min(len(relevant), top_k) + 1)
+        1.0 / math.log2(rank + 1) for rank in range(1, min(len(relevant), top_k) + 1)
     )
     return {
         "name": name,
@@ -112,9 +111,7 @@ def case_score(
         "mrr": round(reciprocal_rank, 6),
         f"ndcg_at_{top_k}": round(dcg / ideal if ideal else 0.0, 6),
         "groundedness": round(
-            sum(grounded(hit) for hit in selected) / len(selected)
-            if selected
-            else 1.0,
+            sum(grounded(hit) for hit in selected) / len(selected) if selected else 1.0,
             6,
         ),
         "latency_ms": round(latency_ms, 3),
@@ -179,12 +176,23 @@ def canonical_quality(connection: sqlite3.Connection) -> dict[str, Any]:
         "LEFT JOIN nodes target ON target.id=r.to_id "
         "WHERE source.id IS NULL OR target.id IS NULL"
     ).fetchone()[0]
-    unsupported_edges = connection.execute(
-        "SELECT count(*) FROM relations WHERE "
-        "coalesce(json_array_length(json_extract(payload_json,'$.evidence_anchor_ids')),0)=0 "
-        "OR coalesce(json_extract(payload_json,'$.provenance_ref'),'')='' "
-        "OR coalesce(json_extract(payload_json,'$.trust_ref'),'')=''"
-    ).fetchone()[0]
+    relation_columns = {
+        str(row[1]) for row in connection.execute("PRAGMA table_info(relations)")
+    }
+    if "evidence_anchor_count" in relation_columns:
+        unsupported_query = (
+            "SELECT count(*) FROM relations WHERE "
+            "evidence_anchor_count=0 OR provenance_ref='' OR trust_ref=''"
+        )
+    else:
+        unsupported_query = (
+            "SELECT count(*) FROM relations WHERE "
+            "coalesce(json_array_length(json_extract(payload_json,"
+            "'$.evidence_anchor_ids')),0)=0 "
+            "OR coalesce(json_extract(payload_json,'$.provenance_ref'),'')='' "
+            "OR coalesce(json_extract(payload_json,'$.trust_ref'),'')=''"
+        )
+    unsupported_edges = connection.execute(unsupported_query).fetchone()[0]
     return {
         "node_count": node_count,
         "relation_count": relation_count,

@@ -33,9 +33,10 @@ Tracking starts with the community-docs baseline for this repository.
   model, exposing source-contract-ready, stale, invalid, or absent local suite
   execution posture without running suite commands or widening the local-port
   write allowlist; v1 and unknown inputs fail closed to `absent`.
-- `aoa-kag-mcp` now exposes each provider's source, entity, artifact, and event
-  index family plus optional owner-native domain index catalogs through bounded
-  read-only tools, resources, and CLI routes.
+- `aoa-kag-mcp` now serves repo-self knowledge through five stable read-only
+  operations over canonical, SQLite/FTS, Qdrant, and Neo4j adapters, with
+  addressed resources, evidence traces, bounded context, and explicit
+  canonical fallback during projection degradation.
 - `aoa-stats-mcp` now provides a stack-owned read-only access plane for the
   central derived catalog, compact boundary refs, canonical owner inventory,
   owner-local measurement definitions, and transport-neutral packet

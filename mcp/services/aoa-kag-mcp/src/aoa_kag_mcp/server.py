@@ -3,15 +3,24 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
+from urllib.parse import quote, unquote
+
+from pydantic import Field
 
 from ._http_auth import http_auth_kwargs as _http_auth_kwargs
 from ._http_auth import transport_settings as _transport_settings
 from .core import AoAKagMCPState
+from .runtime import build_application
 
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTTP_PORT = 5425
+Detail = Literal["compact", "summary", "full"]
+Strategy = Literal["auto", "exact", "lexical", "semantic", "hybrid", "graph"]
+Direction = Literal["outgoing", "incoming", "both"]
+PageLimit = Annotated[int, Field(ge=1, le=10)]
+TraversalDepth = Annotated[int, Field(ge=1, le=4)]
 
 
 def _run_server(server: Any) -> None:
@@ -27,252 +36,208 @@ def _run_server(server: Any) -> None:
     server.run(transport="streamable-http")
 
 
+def _json(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _uri(resource_class: str, identifier: str, owner: str | None = None) -> str:
+    segments = [resource_class]
+    if owner:
+        segments.append(quote(owner, safe=""))
+    segments.append(quote(identifier, safe=""))
+    return "aoa-kag://" + "/".join(segments)
+
+
 def build_server(
     workspace_root: str | Path | None = None,
     aoa_kag_root: str | Path | None = None,
     provider_map_path: str | Path | None = None,
     readiness_path: str | Path | None = None,
     coverage_path: str | Path | None = None,
+    stack_root: str | Path | None = None,
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
-        raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
+        raise SystemExit(
+            "Missing dependency 'mcp'. Install with: python -m pip install -e ."
+        ) from exc
 
-    mcp = FastMCP("aoa-kag-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
+    state = AoAKagMCPState.discover(
+        workspace_root=workspace_root,
+        aoa_kag_root=aoa_kag_root,
+        provider_map_path=provider_map_path,
+        readiness_path=readiness_path,
+        coverage_path=coverage_path,
+    )
+    application = build_application(state, stack_root=stack_root)
+    annotations = ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+    mcp = FastMCP(
+        "aoa-kag-mcp",
+        instructions=(
+            "Discover KAG capabilities, search owner-qualified repository knowledge, "
+            "read returned aoa-kag:// resources, traverse bounded relations, and inspect "
+            "the evidence trace used for each answer."
+        ),
+        json_response=True,
+        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+    )
 
-    def current_state() -> AoAKagMCPState:
-        return AoAKagMCPState.discover(
-            workspace_root=workspace_root,
-            aoa_kag_root=aoa_kag_root,
-            provider_map_path=provider_map_path,
-            readiness_path=readiness_path,
-            coverage_path=coverage_path,
-        )
+    @mcp.tool(annotations=annotations, structured_output=True)
+    def kag_discover(
+        owner: str | None = None,
+        detail: Detail = "compact",
+    ) -> dict[str, Any]:
+        """Discover KAG owners, record classes, retrieval strategies, projections, and bounds."""
+        return application.discover(owner=owner, detail=detail)
 
-    @mcp.tool()
-    def aoa_kag_provider_status(repo: str | None = None) -> dict[str, Any]:
-        """Return provider-map status for one repo or the whole registry."""
-        return current_state().provider_status(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_provider_lookup(repo: str) -> dict[str, Any]:
-        """Return one provider or explicit remaining route from the provider map."""
-        return current_state().provider_lookup(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_freshness_check(repo: str | None = None) -> dict[str, Any]:
-        """Return freshness handles from provider receipts without running validators."""
-        return current_state().freshness_check(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_source_return_lookup(
-        repo: str,
-        local_id: str | None = None,
+    @mcp.tool(annotations=annotations, structured_output=True)
+    def kag_search(
+        query: str,
+        strategy: Strategy = "auto",
+        owner: str | None = None,
+        record_class: str | None = None,
+        kind: str | None = None,
+        document_role: str | None = None,
+        surface_state: str | None = None,
         path: str | None = None,
+        path_prefix: str | None = None,
+        detail: Detail = "compact",
+        limit: PageLimit = 10,
+        cursor: str | None = None,
     ) -> dict[str, Any]:
-        """Return source-return routes for one provider or matching record."""
-        return current_state().source_return_lookup(repo=repo, local_id=local_id, path=path)
+        """Search KAG through an explicit or automatically selected retrieval strategy."""
+        return application.search(
+            query,
+            strategy=strategy,
+            owner=owner,
+            record_class=record_class,
+            kind=kind,
+            document_role=document_role,
+            surface_state=surface_state,
+            path=path,
+            path_prefix=path_prefix,
+            detail=detail,
+            limit=limit,
+            cursor=cursor,
+        )
 
-    @mcp.tool()
-    def aoa_kag_source_index_status(repo: str, include_payload: bool = False) -> dict[str, Any]:
-        """Return repo-local source-index status for one provider."""
-        return current_state().source_index_lookup(repo=repo, include_payload=include_payload)
+    @mcp.tool(annotations=annotations, structured_output=True)
+    def kag_read(uri: str, detail: Detail = "full") -> dict[str, Any]:
+        """Read one addressable KAG owner, record, source, schema, evidence, or projection resource."""
+        return application.read(uri, detail=detail)
 
-    @mcp.tool()
-    def aoa_kag_common_surface_profile(repo: str) -> dict[str, Any]:
-        """Return the common source-surface profile for one provider."""
-        return current_state().common_surface_profile(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_generation_route_lookup(repo: str) -> dict[str, Any]:
-        """Return source-owned generation route metadata for one provider."""
-        return current_state().generation_route_lookup(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_source_index_lookup(repo: str) -> dict[str, Any]:
-        """Return compact repo-local source-index metadata for one provider."""
-        return current_state().source_index_lookup(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_repository_index_family_lookup(repo: str) -> dict[str, Any]:
-        """Return the canonical repository index handles for one provider."""
-        return current_state().repository_index_family_lookup(repo=repo)
-
-    @mcp.tool()
-    def aoa_kag_repository_index_lookup(
-        repo: str,
-        index_kind: str,
-        include_payload: bool = False,
+    @mcp.tool(annotations=annotations, structured_output=True)
+    def kag_traverse(
+        source_ids: list[str],
+        owner: str | None = None,
+        query: str = "",
+        direction: Direction = "outgoing",
+        relation_kinds: list[str] | None = None,
+        max_depth: TraversalDepth = 2,
+        detail: Detail = "compact",
+        limit: PageLimit = 10,
+        cursor: str | None = None,
     ) -> dict[str, Any]:
-        """Return one typed repository index and optional payload."""
-        return current_state().repository_index_lookup(
-            repo=repo,
-            index_kind=index_kind,
-            include_payload=include_payload,
+        """Traverse owner-qualified KAG relations with bounded depth and complete path evidence."""
+        return application.traverse(
+            source_ids,
+            owner=owner,
+            query=query,
+            direction=direction,
+            relation_kinds=relation_kinds,
+            max_depth=max_depth,
+            detail=detail,
+            limit=limit,
+            cursor=cursor,
         )
 
-    @mcp.tool()
-    def aoa_kag_domain_index_catalog_lookup(
-        repo: str,
-        include_payload: bool = False,
-    ) -> dict[str, Any]:
-        """Return an owner-native domain index catalog when the provider publishes one."""
-        return current_state().domain_index_catalog_lookup(
-            repo=repo,
-            include_payload=include_payload,
+    @mcp.tool(annotations=annotations, structured_output=True)
+    def kag_explain(trace_id: str, detail: Detail = "summary") -> dict[str, Any]:
+        """Explain the route, projections, degradation, and evidence behind one KAG trace."""
+        return application.explain(trace_id, detail=detail)
+
+    @mcp.resource(
+        "aoa-kag://capabilities",
+        description="Current KAG owners, retrieval strategies, bounds, and projection state.",
+        mime_type="application/json",
+    )
+    def capabilities_resource() -> str:
+        return _json(application.discover(detail="summary"))
+
+    @mcp.resource(
+        "aoa-kag://owners/{repo}/manifest",
+        description="Canonical manifest and freshness state for one repository owner.",
+        mime_type="application/json",
+    )
+    def owner_manifest_resource(repo: str) -> str:
+        return _json(
+            application.read(f"aoa-kag://owners/{quote(repo, safe='')}/manifest")
         )
 
-    @mcp.tool()
-    def aoa_kag_repo_local_coverage_status(
-        repo: str | None = None,
-        status: str | None = None,
-    ) -> dict[str, Any]:
-        """Return repo-local KAG source-index coverage rows."""
-        return current_state().repo_local_coverage_status(repo=repo, status=status)
+    @mcp.resource(
+        "aoa-kag://records/{qualified_id}",
+        description="One owner-qualified KAG entity, event, artifact, assertion, anchor, or relation.",
+        mime_type="application/json",
+    )
+    def record_resource(qualified_id: str) -> str:
+        return _json(application.read(_uri("records", unquote(qualified_id))))
 
-    @mcp.tool()
-    def aoa_kag_registry_slice(
-        status: str | None = None,
-        repo: str | None = None,
-        limit: int = 50,
-    ) -> dict[str, Any]:
-        """Return a bounded provider-map registry slice."""
-        return current_state().registry_slice(status=status, repo=repo, limit=limit)
+    @mcp.resource(
+        "aoa-kag://documents/{document_id}",
+        description="One addressable retrieval document with provenance and source links.",
+        mime_type="application/json",
+    )
+    def document_resource(document_id: str) -> str:
+        return _json(application.read(_uri("documents", unquote(document_id))))
 
-    @mcp.tool()
-    def aoa_kag_composition_slice(query: str = "", limit: int = 20) -> dict[str, Any]:
-        """Search provider-map fields for a bounded composition packet."""
-        return current_state().composition_slice(query=query, limit=limit)
+    @mcp.resource(
+        "aoa-kag://anchors/{anchor_id}",
+        description="One source anchor resolving a KAG claim or record to repository content.",
+        mime_type="application/json",
+    )
+    def anchor_resource(anchor_id: str) -> str:
+        return _json(application.read(_uri("anchors", unquote(anchor_id))))
 
-    @mcp.tool()
-    def aoa_kag_validation_status(include_provider_homes: bool = False) -> dict[str, Any]:
-        """Return provider-map validation posture and optional provider-home presence checks."""
-        return current_state().validation_status(include_provider_homes=include_provider_homes)
-
-    @mcp.resource("aoa-kag://registry/provider-map")
-    def provider_map_resource() -> str:
-        return json.dumps(current_state().provider_map(), ensure_ascii=False, indent=2)
-
-    @mcp.resource("aoa-kag://readiness/os-surfaces")
-    def os_surfaces_resource() -> str:
-        return json.dumps(current_state().read_resource("aoa-kag://readiness/os-surfaces"), ensure_ascii=False, indent=2)
-
-    @mcp.resource("aoa-kag://providers/{repo}/manifest")
-    def provider_manifest_resource(repo: str) -> str:
-        return json.dumps(current_state().read_resource(f"aoa-kag://providers/{repo}/manifest"), ensure_ascii=False, indent=2)
-
-    @mcp.resource("aoa-kag://providers/{repo}/records/{record_class}")
-    def provider_records_resource(repo: str, record_class: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/records/{record_class}"),
-            ensure_ascii=False,
-            indent=2,
+    @mcp.resource(
+        "aoa-kag://sources/{repo}/{document_id}",
+        description="Bounded source content for one repository-owned retrieval document.",
+        mime_type="application/json",
+    )
+    def source_resource(repo: str, document_id: str) -> str:
+        return _json(
+            application.read(_uri("sources", unquote(document_id), unquote(repo)))
         )
 
-    @mcp.resource("aoa-kag://providers/{repo}/generation")
-    def provider_generation_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/generation"),
-            ensure_ascii=False,
-            indent=2,
-        )
+    @mcp.resource(
+        "aoa-kag://evidence/{trace_id}",
+        description="Retrieval route, projection state, and evidence retained for one trace.",
+        mime_type="application/json",
+    )
+    def evidence_resource(trace_id: str) -> str:
+        return _json(application.read(_uri("evidence", unquote(trace_id))))
 
-    @mcp.resource("aoa-kag://providers/{repo}/repo-local-index")
-    def provider_repo_local_index_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/repo-local-index"),
-            ensure_ascii=False,
-            indent=2,
-        )
+    @mcp.resource(
+        "aoa-kag://schemas/{name}",
+        description="One public aoa-kag JSON Schema used by KAG records or MCP results.",
+        mime_type="application/json",
+    )
+    def schema_resource(name: str) -> str:
+        return _json(application.read(_uri("schemas", unquote(name))))
 
-    @mcp.resource("aoa-kag://providers/{repo}/source-index")
-    def provider_source_index_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/source-index"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.resource("aoa-kag://providers/{repo}/common-surface-profile")
-    def provider_common_surface_profile_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/common-surface-profile"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.resource("aoa-kag://providers/{repo}/repository-index-family")
-    def provider_repository_index_family_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/repository-index-family"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.resource("aoa-kag://providers/{repo}/indexes/{index_kind}")
-    def provider_repository_index_resource(repo: str, index_kind: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/indexes/{index_kind}"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.resource("aoa-kag://providers/{repo}/domain-index-catalog")
-    def provider_domain_index_catalog_resource(repo: str) -> str:
-        return json.dumps(
-            current_state().read_resource(f"aoa-kag://providers/{repo}/domain-index-catalog"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.resource("aoa-kag://coverage/repo-local-source-indexes")
-    def repo_local_source_indexes_resource() -> str:
-        return json.dumps(
-            current_state().read_resource("aoa-kag://coverage/repo-local-source-indexes"),
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    @mcp.prompt(name="bounded-provider-query")
-    def bounded_provider_query(repo: str, question: str) -> str:
-        """Prompt route for querying one provider without crossing source ownership."""
-        return (
-            f"Use aoa_kag_provider_lookup(repo={repo!r}), then "
-            f"aoa_kag_source_return_lookup(repo={repo!r}). Answer {question!r} only from returned provider records and source-return surfaces."
-        )
-
-    @mcp.prompt(name="source-return-summary")
-    def source_return_summary(repo: str) -> str:
-        """Prompt route for summarizing owner-return paths."""
-        return (
-            f"Use aoa_kag_source_return_lookup(repo={repo!r}) and inspect the owner_return_routes before changing meaning."
-        )
-
-    @mcp.prompt(name="repo-source-surface-brief")
-    def repo_source_surface_brief(repo: str) -> str:
-        """Prompt route for reading one repo's KAG source surfaces."""
-        return (
-            f"Use aoa_kag_generation_route_lookup(repo={repo!r}), "
-            f"aoa_kag_repository_index_family_lookup(repo={repo!r}), and "
-            f"aoa_kag_source_return_lookup(repo={repo!r}) before summarizing repo-local source surfaces."
-        )
-
-    @mcp.prompt(name="cross-repo-relation-preview")
-    def cross_repo_relation_preview(query: str) -> str:
-        """Prompt route for previewing provider-map relations without claiming graph truth."""
-        return (
-            f"Use aoa_kag_composition_slice(query={query!r}) for a bounded preview. "
-            "Treat results as provider-map routing context, then return to source owners."
-        )
-
-    @mcp.prompt(name="runtime-handoff-brief")
-    def runtime_handoff_brief() -> str:
-        """Prompt route for reading the MCP handoff packet."""
-        return (
-            "Use aoa_kag_registry_slice(limit=20), aoa_kag_validation_status(include_provider_homes=True), "
-            "and aoa-kag://registry/provider-map before editing MCP service behavior."
-        )
+    @mcp.resource(
+        "aoa-kag://projections/{digest}",
+        description="Runtime projection digest, target states, and materialization evidence.",
+        mime_type="application/json",
+    )
+    def projection_resource(digest: str) -> str:
+        return _json(application.read(_uri("projections", unquote(digest))))
 
     LOGGER.info("AoA KAG MCP server ready")
     return mcp
