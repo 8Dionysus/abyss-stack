@@ -22,6 +22,7 @@ STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
+GEMMA_DIGEST_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-gemma4-spark-digest.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
 MCP_HTTP_AUTH_BUILDER = REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
 MCP_HTTP_CODEX_CLIENT = REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
@@ -114,6 +115,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+
+    def test_gemma_digest_reserves_background_model_wake(self) -> None:
+        unit = GEMMA_DIGEST_UNIT.read_text(encoding="utf-8")
+        exec_start = next(
+            line.removeprefix("ExecStart=")
+            for line in unit.splitlines()
+            if line.startswith("ExecStart=")
+        )
+
+        self.assertTrue(exec_start.startswith("/usr/local/bin/abyss-machine resource launch "))
+        self.assertIn("--memory-demand-mib 2048", exec_start)
+        self.assertIn("--demand-key abyss-stack:llama-cpp:gemma4-e2b-background-wake", exec_start)
+        self.assertIn("--demand-owner abyss-stack", exec_start)
+        self.assertIn("--success-on-block", exec_start)
+        self.assertTrue(
+            exec_start.endswith(
+                "-- /srv/abyss-machine/tools/abyss-gemma4-spark-resident digest --limit 3 --json"
+            )
+        )
 
     def test_empty_preset_assignment_fails_before_runtime_selection(self) -> None:
         result = self.run_install_systemd("--preset=")
