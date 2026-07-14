@@ -43,9 +43,10 @@ def test_sync_parity_module_reports_deployed_drift(tmp_path: Path) -> None:
     assert errors == ["source/deployed drift for synced path: README.md"]
 
 
-def test_sync_managed_items_include_runtime_mcp_and_root_schemas() -> None:
+def test_sync_managed_items_include_runtime_mcp_root_schemas_and_stats() -> None:
     assert "mcp" in sync_parity.SYNC_MANAGED_ITEMS
     assert "schemas" in sync_parity.SYNC_MANAGED_ITEMS
+    assert "stats" in sync_parity.SYNC_MANAGED_ITEMS
 
 
 def test_runtime_configs_mirror_requires_decisions_mcp_and_graph_schema(tmp_path: Path) -> None:
@@ -65,4 +66,7 @@ def test_runtime_configs_mirror_requires_decisions_mcp_and_graph_schema(tmp_path
     assert (
         "runtime Configs mirror is missing required path: "
         "schemas/workspace_decision_graph.schema.json"
+    ) in errors
+    assert (
+        "runtime Configs mirror is missing required path: stats/port.manifest.json"
     ) in errors

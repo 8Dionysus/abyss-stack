@@ -120,7 +120,9 @@ class AoAStatsMCPState:
             stats_root = workspace / stats_root
 
         resolved_sources = _parse_source_roots(source_roots)
-        stack_source = os.environ.get("AOA_SOURCE_ROOT")
+        stack_source = os.environ.get("AOA_SOURCE_ROOT") or os.environ.get(
+            "AOA_ABYSS_STACK_ROOT"
+        )
         if stack_source and "abyss-stack" not in resolved_sources:
             resolved_sources["abyss-stack"] = Path(stack_source).expanduser().resolve()
         machine_source = os.environ.get("ABYSS_MACHINE_REPO_ROOT") or os.environ.get(

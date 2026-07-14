@@ -209,6 +209,37 @@ def test_owner_inventory_reports_materialization_without_promoting_it_to_truth(t
     assert packet["routed_surfaces"][0]["classification"] == "routed_to_stronger_owner"
 
 
+def test_deployed_stack_environment_materializes_stack_owner_port(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, workspace, central, stack = seed_workspace(tmp_path)
+    write_json(
+        stack / "stats/port.manifest.json",
+        {
+            "schema_version": "aoa_stats_local_port_v1",
+            "contract_version": "1.0.0",
+            "owner_repo": "abyss-stack",
+            "status": "active",
+            "questions": [],
+            "measurements": [],
+            "exports": [],
+        },
+    )
+    monkeypatch.delenv("AOA_SOURCE_ROOT", raising=False)
+    monkeypatch.setenv("AOA_ABYSS_STACK_ROOT", str(stack))
+
+    state = AoAStatsMCPState.discover(
+        workspace_root=workspace,
+        aoa_stats_root=central,
+    )
+    packet = state.owner_port_read(repo="abyss-stack")
+
+    assert state.source_roots["abyss-stack"] == stack.resolve()
+    assert packet["status"] == "available"
+    assert packet["port"]["owner_repo"] == "abyss-stack"
+
+
 def test_owner_measurement_read_preserves_definition_and_evidence_refs(tmp_path: Path) -> None:
     state, _, _, _ = seed_workspace(tmp_path)
 
