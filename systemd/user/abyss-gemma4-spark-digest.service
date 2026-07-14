@@ -10,10 +10,10 @@ IOSchedulingClass=idle
 CPUWeight=20
 IOWeight=20
 MemoryHigh=256M
-TimeoutStartSec=90s
+TimeoutStartSec=3min
 Environment=ABYSS_GEMMA4_SPARK_SERVING_OWNER=abyss-stack
 Environment=ABYSS_GEMMA4_SPARK_BASE_URL=http://127.0.0.1:11435
 Environment=ABYSS_GEMMA4_SPARK_ALLOW_LOCAL_FALLBACK=0
-ExecStart=/srv/abyss-machine/tools/abyss-gemma4-spark-resident digest --limit 3 --json
+ExecStart=/usr/local/bin/abyss-machine resource launch --class medium --kind ai --unattended --timeout 150 --memory-demand-mib 2048 --demand-key abyss-stack:llama-cpp:gemma4-e2b-background-wake --demand-owner abyss-stack --estimate-source measured-llama-sleep-wake-delta --estimate-confidence high --success-on-block --no-thermal-sample --json -- /srv/abyss-machine/tools/abyss-gemma4-spark-resident digest --limit 3 --json
 StandardOutput=null
 StandardError=journal
