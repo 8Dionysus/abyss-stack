@@ -49,6 +49,7 @@ MCP_SERVER_PACKAGES = {
     "aoa_telegram_connector_mcp": ("aoa-telegram-connector-mcp", 5427),
     "aoa_discord_connector_mcp": ("aoa-discord-connector-mcp", 5428),
     "tos_corpus_mcp": ("tos-corpus-mcp", 5429),
+    "aoa_stats_mcp": ("aoa-stats-mcp", 5430),
 }
 EXPECTED_MCP_HTTP_INSTANCES = {
     "aoa-mcp-http@aoa-decisions.service",

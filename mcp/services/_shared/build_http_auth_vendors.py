@@ -19,6 +19,7 @@ TARGETS = {
     "aoa-kag-mcp": "aoa_kag_mcp",
     "aoa-memo-mcp": "aoa_memo_mcp",
     "aoa-session-memory-mcp": "aoa_session_memory_mcp",
+    "aoa-stats-mcp": "aoa_stats_mcp",
     "aoa-telegram-connector-mcp": "aoa_telegram_connector_mcp",
     "tos-corpus-mcp": "tos_corpus_mcp",
 }

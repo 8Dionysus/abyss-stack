@@ -45,6 +45,12 @@ source-return routes, freshness handles, bounded registry slices, and provider
 records while keeping KAG schema, generated maps, validation, and repo-local
 `kag/` truth in `aoa-kag` and the source repos.
 
+For federated statistical access, `mcp/services/aoa-stats-mcp/` exposes the
+`aoa-stats` derived catalog, compact boundary refs, canonical owner inventory,
+owner-local root `stats/` ports, and public packet compatibility while keeping
+shared statistical meaning in `aoa-stats` and local measurement meaning with
+each owner repository.
+
 For host-machine context work, `mcp/services/abyss-machine-mcp/` exposes
 `abyss-machine` bridge, evidence, resource, memory, typing, nervous, heartbeat,
 and change-ledger read models while keeping host authority in `abyss-machine`.
@@ -104,6 +110,13 @@ For `aoa-kag-mcp` changes, run:
 ```bash
 python mcp/services/aoa-kag-mcp/scripts/validate_kag_mcp.py
 python -m pytest mcp/services/aoa-kag-mcp/tests -q
+```
+
+For `aoa-stats-mcp` changes, run:
+
+```bash
+python mcp/services/aoa-stats-mcp/scripts/validate_stats_mcp.py
+python -m pytest mcp/services/aoa-stats-mcp/tests -q
 ```
 
 For `abyss-machine-mcp` changes, run:

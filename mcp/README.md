@@ -23,3 +23,7 @@ repo slices, decision neighborhoods, or compact packets.
 and philosophy graph projection: it reads ToS-owned derived resources and
 returns graph-review packets without making `abyss-stack` the owner of ToS
 meaning.
+
+`aoa-stats-mcp` is the access plane for the federated stats system: it reads
+the `aoa-stats` public contracts and inventory plus owner-local root `stats/`
+ports without moving statistical or domain meaning into the runtime adapter.

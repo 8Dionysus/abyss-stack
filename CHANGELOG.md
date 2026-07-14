@@ -36,6 +36,11 @@ Tracking starts with the community-docs baseline for this repository.
 - `aoa-kag-mcp` now exposes each provider's source, entity, artifact, and event
   index family plus optional owner-native domain index catalogs through bounded
   read-only tools, resources, and CLI routes.
+- `aoa-stats-mcp` now provides a stack-owned read-only access plane for the
+  central derived catalog, compact boundary refs, canonical owner inventory,
+  owner-local measurement definitions, and transport-neutral packet
+  compatibility without moving statistical meaning out of `aoa-stats` or its
+  local owners.
 
 ### Changed
 

@@ -11,6 +11,7 @@ route card, and validation path.
 | [`aoa-decisions-mcp`](aoa-decisions-mcp/README.md) | fresh workspace decision graph status, search, repo slices, decision neighborhoods, and task packets |
 | [`aoa-evals-mcp`](aoa-evals-mcp/README.md) | bounded eval selection, bundle inspection, comparison readers, runtime evidence templates, candidate-only report skeletons |
 | [`aoa-kag-mcp`](aoa-kag-mcp/README.md) | OS Abyss KAG provider status, repository index families, domain index catalogs, source-return routes, and freshness |
+| [`aoa-stats-mcp`](aoa-stats-mcp/README.md) | federated stats catalog, owner-local port inspection, compact boundaries, and packet compatibility |
 | [`abyss-machine-mcp`](abyss-machine-mcp/README.md) | compact owner-aware machine brief, host evidence map, resource/memory/typing/nervous read models, non-mutating route preflight |
 | [`aoa-session-memory-mcp`](aoa-session-memory-mcp/README.md) | `.aoa` session search, route traces, atlas map lookup, graph/GraphRAG evidence packets, quality samples, freshness checks, and diagnostics |
 | [`tos-corpus-mcp`](tos-corpus-mcp/README.md) | Tree of Sophia corpus index and philosophy graph projection status, graph-view packets, resource search, node lookup, relation-pack access, and philosophy neighborhoods |
@@ -44,21 +45,17 @@ topology require a later decision than
 | `aoa-telegram-connector` | 5427 |
 | `aoa-discord-connector` | 5428 |
 | `tos-corpus` | 5429 |
+| `aoa-stats` | 5430 |
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The
 `aoa-mcp-http.service` bundle wants the nine wrappers currently present in the
-shared Codex plane. `tos-corpus` implements the same guarded transport contract
-but remains outside the bundle until its workspace wrapper and live canary are
-source-owned. Installing units only links and reloads them; starting or
-restarting an owner is a separate operator action after source/deployed parity.
-
-Provision the host-local credential explicitly; this never prints its value:
-
-```bash
-scripts/aoa-install-systemd --provision-mcp-http-auth
-scripts/aoa-install-systemd --install-mcp-http-codex-client
-```
+shared Codex plane. `tos-corpus` and `aoa-stats` implement the same guarded
+transport contract but remain outside the bundle until their workspace
+wrappers and live canaries are source-owned. Installing units only links and
+reloads them; starting or restarting an owner is a separate operator action
+after source/deployed parity. Credential provisioning and Codex client-install
+routes remain owned by the systemd route card and executable installer.
 
 The provision route creates a missing `Secrets/Configs` directory privately,
 preserves an existing directory's permissions, and rejects symlinked secret
