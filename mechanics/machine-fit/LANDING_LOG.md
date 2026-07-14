@@ -6,8 +6,7 @@ Created the machine-fit package as the route home for reference platform facts,
 host facts, machine-fit capture, platform adaptation, and read-only machine
 bridge integration.
 
-Validation route: `python scripts/validate_nested_agents.py` and
-`python scripts/validate_stack.py`.
+Validation followed the package and root validation routes.
 
 ## 2026-05-13 - Stack-side machine bridge and wrapper topology
 
@@ -15,8 +14,7 @@ Kept operator wrappers stable while moving host-facts, fit-record,
 machine-bridge, platform-adaptation, Windows bridge, reference-platform, and
 inference-tuning surfaces into package parts.
 
-Validation route: py_compile for machine-fit backends and
-`python scripts/validate_stack.py`.
+Validation covered machine-fit backend compilation and the root source route.
 
 ## 2026-05-13 - Package card completion
 
@@ -45,5 +43,5 @@ Fixed the fit-record runtime recommendation so source checkout runs resolve
 `Configs`. This keeps stale live mirrors visible as parity drift instead of
 letting them poison the source-owned machine-fit packet.
 
-Validation route: targeted fit-record tests, `scripts/aoa-machine-fit --mode
-public`, and `python scripts/validate_stack.py`.
+Validation covered targeted fit-record tests, the public machine-fit readout,
+and the root source route.

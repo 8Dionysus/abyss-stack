@@ -16,6 +16,8 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - infra helper services and adapters
 - runtime-owned MCP access planes and adapters
 - local memory ports for runtime candidates, receipts, exports, and local notes
+- runtime-owned statistical questions, measurement definitions, and live
+  derivations over stack-owned evidence
 - platform-aware path contracts for Fedora-first deployment and Windows-usable workflows
 - normative host posture and public-safe/private host-facts contracts
 - runtime benchmark policies, schemas, normalized manifests, and raw runtime evidence
@@ -35,6 +37,8 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - role contracts in `aoa-agents`
 - scenario compositions in `aoa-playbooks`
 - derived knowledge substrate meaning in `aoa-kag`
+- shared measurement grammar and cross-owner statistical composition in
+  `aoa-stats`
 - authored reasons, scenario triggers, and semantic anchor meaning from sibling AoA repositories
 
 ## Anti-drift rule
@@ -50,6 +54,8 @@ If the answer points to authored meaning or duplicated authority, it does not be
 Runtime benchmark evidence may live here; proof wording about what that evidence means does not.
 Public-safe host-facts contracts may live here; private captures belong in runtime logs, not git history.
 Platform-adaptation records may live here; they should stay bounded to runtime seams, adaptations, and portability notes.
+Runtime statistical meaning may live here; shared measurement grammar and
+cross-owner conclusions do not.
 
 ## Related root surfaces
 

@@ -89,16 +89,9 @@ connector's source-side contracts ask for that expansion.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/aoa-4pda-connector-mcp/scripts/validate_4pda_connector_mcp.py
-python -m pytest mcp/services/aoa-4pda-connector-mcp/tests -q
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_decision_records.py
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Use the connector service `AGENTS.md`, parent MCP route, decision district
+route, and root validation route. Those active owners retain the exact
+commands.
 
 For local OS Abyss smoke, point `AOA_4PDA_CONNECTOR_REPO` at the connector
 checkout and run an answer against an existing materialized connector run.

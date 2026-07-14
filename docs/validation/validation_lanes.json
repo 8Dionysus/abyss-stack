@@ -12,7 +12,7 @@
       "posture": "blocking",
       "command_sequence": "source_fast",
       "owner_surface": "docs/validation/VALIDATOR_TOPOLOGY.md",
-      "purpose": "Growth-safe source route, decision, AGENTS, and stack topology gate.",
+      "purpose": "Growth-safe source route, decision, AGENTS, stack topology, and local stats contract gate.",
       "does_not_own": [
         "source/runtime parity",
         "shellcheck availability",
@@ -84,6 +84,10 @@
       {
         "label": "validate stack",
         "command": ["python", "scripts/validate_stack.py"]
+      },
+      {
+        "label": "validate local stats port",
+        "command": ["python", "scripts/validate_local_stats_port.py"]
       },
       {
         "label": "validate command authority",
@@ -309,6 +313,10 @@
       {
         "label": "validate stack",
         "command": ["python", "scripts/validate_stack.py"]
+      },
+      {
+        "label": "validate local stats port",
+        "command": ["python", "scripts/validate_local_stats_port.py"]
       },
       {
         "label": "check diagnostic surface catalog",

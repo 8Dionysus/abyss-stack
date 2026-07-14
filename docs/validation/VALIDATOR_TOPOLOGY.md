@@ -20,6 +20,7 @@ parity posture.
 | Active topology language | retired phase/wave/seed wording, RPG runtime projection language, playbook activation allowlist drift, and route-api active/compatibility bridge language | `scripts/validators/active_topology_language.py` | source-fast, release |
 | Agent skill projection | repo-local `.agents/skills` projection, sibling `aoa-skills` symlink targets, checkout-safe target files, and local overlay skill posture | `scripts/validators/agent_skill_projection.py` | source-fast, release |
 | Runtime service selection | selected service policy, screenshot inventory, current runtime shape parity | `scripts/validators/service_selection.py` | source-fast, release |
+| Owner-local stats port | stack-owned measurement meaning and compatibility with the shared `aoa-stats` grammar | `stats/`, delegated through `scripts/validate_local_stats_port.py` | source-fast, release |
 | Source-to-Configs parity | sync-managed item coverage including runtime MCP packages and root schemas, runtime Configs mirror posture, deployed parity | `scripts/validators/sync_parity.py` | source-fast, release |
 | Questbook and RPG read models | quest source topology, generated quest examples, RPG runtime collection schemas | `scripts/validators/questbook_surface.py` | source-fast, release |
 | Federation runtime inputs and landing | runtime-loaded federation config input coverage, upstream compatibility bridge posture, landing docs | `scripts/validators/federation_surface.py` | source-fast, release |
@@ -87,6 +88,7 @@ root-level wrapper APIs.
 | `scripts/validators/branch_policy.py` | branch governance validator module | fix CONTRIBUTING branch route, branch-policy main/retirement language, source/runtime checkout refs, or focused branch-policy tests |
 | `scripts/validators/root_routes.py` | root design and entry route validator module | fix root design cards, start-here route exposure, route modes, command-authority handoff text, or focused root-route tests |
 | `scripts/validate_nested_agents.py` | AGENTS route topology | fix nearest active `AGENTS.md`, required route doc, or explicit legacy-archive classification |
+| `scripts/validate_local_stats_port.py` | delegated owner-local stats contract | fix `stats/` owner meaning or the shared contract at `aoa-stats` |
 | `scripts/validators/decision_surface.py` | decision surface route validator module | fix decision route cards, template shape, validator/generator handoff text, or focused decision-surface tests |
 | `scripts/validate_decision_records.py` | decision record shape | fix decision metadata or generated decision read models |
 | `scripts/build_workspace_decision_graph.py` | local workspace decision graph builder | refresh `Logs/decision-graph/latest/` with `--write` or verify it with `--check`; inspect source-posture warnings and do not treat local cache freshness as repo or remote freshness |

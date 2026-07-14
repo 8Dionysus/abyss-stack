@@ -31,6 +31,8 @@ This directory owns the runtime bridge, bootstrap helpers, introspection helpers
   `docs/validation/validation_lanes.json`. It is a loader/API, not a second
   command list.
 - `scripts/ci_gate.py` executes named validation lanes from the manifest.
+- `scripts/validate_local_stats_port.py` delegates the local port contract to
+  the `aoa-stats` validator and does not own shared measurement semantics.
 - `scripts/release_check.py` remains the release entrypoint and Configs parity
   stabilizer, but its release command sequence comes from the lane manifest.
 - `scripts/decision_indexes.py` and `scripts/generate_decision_indexes.py`

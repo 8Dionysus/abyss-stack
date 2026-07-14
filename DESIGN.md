@@ -31,8 +31,8 @@ A healthy `abyss-stack` looks like a working runtime map:
   secrets, models, logs, or private captures
 - an explicit deployed runtime root under `/srv/AbyssOS/abyss-stack`
 - clear districts for compose modules, config templates, env examples, systemd
-  units, scripts, mechanics, MCP access planes, local memo ports, docs, tests,
-  and local agent overlays
+  units, scripts, mechanics, MCP access planes, local memo and stats ports,
+  docs, tests, and local agent overlays
 - profile and preset surfaces that make service selection visible
 - mechanic packages that describe runtime moves as packages and parts, not as a
   flat pile of historical files
@@ -71,6 +71,9 @@ The runtime body has these organs:
   derived context while keeping owner-layer authority outside the prompt
 - **local memo port**: runtime-side memory candidates, receipts, exports, and
   local notes that route durable review to `aoa-memo`
+- **local stats port**: runtime-owned statistical questions whose definitions
+  stay beside their owner evidence while `aoa-stats` supplies shared grammar
+  and cross-owner composition
 - **diagnostics and repair**: read models, receipts, closeout contracts, and
   repair posture that support honest operation without claiming autonomous
   healing
@@ -113,6 +116,9 @@ what was not checked, and what surface owns the next decision.
   provenance, landing notes, and validation paths.
 - **Seams are subordinate.** Federation routes may support sibling truth, but
   they cannot replace it.
+- **Local semantics, shared grammar.** Runtime populations, windows, and
+  evidence stay with their stack owner; `aoa-stats` validates their common
+  measurement form without absorbing that meaning.
 - **Adapters schedule; owners select inputs.** Runtime adapters may invoke a
   sibling's deployed command, but they should not duplicate that sibling's
   internal registry or source-selection policy when the command owns a stable

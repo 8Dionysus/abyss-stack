@@ -22,6 +22,13 @@ jobs:
       - name: Clone abyss-machine verifier
         run: git clone --depth 1 https://github.com/8Dionysus/abyss-machine "$RUNNER_TEMP/abyss-machine-verifier"
 
+      - name: Checkout aoa-stats contract owner
+        run: |
+          git init "$RUNNER_TEMP/aoa-stats-validator"
+          git -C "$RUNNER_TEMP/aoa-stats-validator" remote add origin https://github.com/8Dionysus/aoa-stats
+          git -C "$RUNNER_TEMP/aoa-stats-validator" fetch --depth 1 origin 4e117a7d996fca5892b98b92fbdeb57e2b8dca2d
+          git -C "$RUNNER_TEMP/aoa-stats-validator" checkout --detach FETCH_HEAD
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -38,6 +45,7 @@ jobs:
       - name: Run release audit
         env:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
+          AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator
         run: python scripts/ci_gate.py --mode release
 
       - name: Shellcheck scripts

@@ -16,6 +16,10 @@ Tracking starts with the community-docs baseline for this repository.
 - Configs sync now supports non-mutating `--dry-run` previews and repeatable
   allowlisted `--item` selection while excluding source-control, bytecode, and
   test/tool cache residue from deployed runtime mirrors.
+- A root `stats/` port now declares the live-capable, declaration-only selected
+  service running-coverage question, while the service-selection readout keeps
+  failed observation distinct from an observed zero and exposes the ratio over
+  the full `selected_now` population.
 - Repo-self KAG bundles can now be verified and materialized into atomic
   SQLite/FTS, versioned Qdrant, and versioned Neo4j runtime projections with a
   shared current receipt and source-return identities; owner-aware FTS and
@@ -28,6 +32,14 @@ Tracking starts with the community-docs baseline for this repository.
 - `aoa-kag-mcp` now exposes each provider's source, entity, artifact, and event
   index family plus optional owner-native domain index catalogs through bounded
   read-only tools, resources, and CLI routes.
+
+### Changed
+
+- Validation and test commands now route through active `AGENTS.md` cards,
+  command-owner docs, and the canonical lane manifest instead of being copied
+  into decision records, landing logs, or the root audit contract; the dated
+  service-optimization completion report and its systemd documentation link
+  were removed after its durable routes had owners.
 
 ### Fixed
 
@@ -579,12 +591,9 @@ and the repository diff from `v0.2.2` through the published `v0.4.0` tag.
 
 ### Validation
 
-- `python scripts/ci_gate.py --mode source-fast`
-- `python scripts/validate_stack.py`
-- `python scripts/validate_nested_agents.py`
-- `python scripts/generate_decision_indexes.py --check`
-- `python -m pytest -q`
-- `python scripts/release_check.py`
+The release was verified through the then-current source, topology, generated,
+test, and release lanes. Exact commands remain in the active validation owner
+surfaces rather than this historical log.
 - GitHub `Repo Validation` and `validate-windows-host-bridge` on the release
   landing PRs
 
@@ -626,7 +635,7 @@ and the repository diff from `v0.2.2` through the published `v0.4.0` tag.
 
 ### Validation
 
-- `python scripts/release_check.py`
+The release was verified through the then-current release route.
 
 ### Notes
 
@@ -657,7 +666,7 @@ and the repository diff from `v0.2.2` through the published `v0.4.0` tag.
 
 ### Validation
 
-- `python scripts/release_check.py`
+The release was verified through the then-current release route.
 
 ### Notes
 
@@ -674,7 +683,7 @@ and the repository diff from `v0.2.2` through the published `v0.4.0` tag.
 
 ### Validation
 
-- `python scripts/release_check.py`
+The release was verified through the then-current release route.
 
 ### Notes
 
@@ -735,9 +744,8 @@ This changelog entry uses the release-prep merge date.
 
 ### Validation
 
-- `python scripts/validate_stack.py`
-- `python scripts/validate_stack.py --parity-check`
-- `python -m py_compile scripts/validate_stack.py scripts/aoa-host-facts scripts/aoa-machine-fit scripts/aoa-qwen-run`
+The baseline was verified through the then-current source, parity, and Python
+compilation routes.
 
 ### Notes
 

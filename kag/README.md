@@ -10,7 +10,7 @@ source checkout.
 | role | local KAG provider for runtime source topology, mechanics, and MCP access planes |
 | records | `nodes/`, `edges/`, `indexes/`, `projections/`, `receipts/` |
 | manifest | `manifest.json` |
-| source route | `README.md`, `DESIGN.md`, `mechanics/README.md`, and `mcp/README.md` |
+| source route | `README.md`, `DESIGN.md`, `mechanics/README.md`, `stats/README.md`, and `mcp/README.md` |
 | consumer route | `aoa-kag` registry/composition, `aoa-kag-mcp`, runtime services |
 | owner return | `README.md` |
 

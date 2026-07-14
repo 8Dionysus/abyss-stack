@@ -35,9 +35,8 @@
 1. Start from current `main`.
 2. Create one short-lived topic branch.
 3. Keep the branch rebased or otherwise current with `main`.
-4. Validate before merge:
-   - `python scripts/validate_stack.py`
-   - any syntax or smoke checks touched by the change
+4. Validate before merge through the root `AGENTS.md` route, including any
+   syntax or smoke checks owned by the changed surface.
 5. Merge the branch into `main` once the branch is internally clean.
 6. Push `main`.
 7. Delete the topic branch locally and on `origin`.

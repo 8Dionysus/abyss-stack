@@ -79,14 +79,8 @@ owner truth it routes to.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Use the service-local `AGENTS.md`, parent MCP route, and root validation route.
+Exact commands remain with those active owners.
 
 Use ToS repository validators before changing the corpus index shape that this
 MCP service reads.

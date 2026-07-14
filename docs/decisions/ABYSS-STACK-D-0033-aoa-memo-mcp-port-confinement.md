@@ -71,11 +71,8 @@ runnable service.
 
 ## Follow-up route
 
-Run the service release check after boundary changes:
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/release_check.py
-```
+Use the service-local `AGENTS.md` release route after boundary changes. It owns
+the current command and failure route.
 
 When a second MCP service lands, add a parent `mcp/` service registry instead
 of embedding registry behavior in `aoa-memo-mcp`.

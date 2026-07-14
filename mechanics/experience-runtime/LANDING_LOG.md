@@ -7,8 +7,8 @@
   package-local `legacy`.
 - Added provenance and archive index surfaces for follow-up validation.
 
-Validation status is recorded in the session report after path rewrites and
-test execution.
+Validation follows the package `AGENTS.md` route after path rewrites and test
+execution.
 
 ## 2026-05-13 - Experience records distillation audit
 

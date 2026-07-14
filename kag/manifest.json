@@ -26,6 +26,13 @@
     },
     {
       "repo": "abyss-stack",
+      "path": "stats/README.md",
+      "source_class": "runtime_source",
+      "role": "supporting",
+      "authority": "authored_source"
+    },
+    {
+      "repo": "abyss-stack",
       "path": "mcp/README.md",
       "source_class": "runtime_source",
       "role": "consumer_route",

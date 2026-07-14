@@ -6,8 +6,7 @@ Created the runtime-lifecycle package as the route home for install, layout,
 start, stop, wait, smoke, logs, status, warmup, systemd user units, and
 operator runbook flow.
 
-Validation route: `python scripts/validate_nested_agents.py` and
-`python scripts/validate_stack.py`.
+Validation followed the package and root validation routes.
 
 ## 2026-05-13 - Wrapper/backend topology
 
@@ -15,8 +14,8 @@ Kept stable root command wrappers while moving lifecycle implementation bodies
 into package parts for layout, first-run, start/stop, wait/smoke, logs/status,
 and user-unit helpers.
 
-Validation route: shell syntax checks, status-readout tests, systemd user-unit
-verification where available, and `python scripts/validate_stack.py`.
+Validation covered shell syntax, status-readout tests, systemd user-unit
+verification where available, and the root source route.
 
 ## 2026-05-13 - Package card completion
 

@@ -77,13 +77,8 @@ service restarts, and datasource health remain runtime/operator concerns.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python scripts/validate_stack.py
-python scripts/ci_gate.py --mode source-fast
-python -m pytest mechanics/runtime-lifecycle/parts/logs-status/tests/test_service_selection_policy_validation.py -q
-```
+Use the runtime-lifecycle `AGENTS.md` and root validation route. Exact commands
+remain in the active owner cards and validation lane manifest.
 
 Use the controlled source-to-runtime route before claiming live Tempo/OTLP
 availability.

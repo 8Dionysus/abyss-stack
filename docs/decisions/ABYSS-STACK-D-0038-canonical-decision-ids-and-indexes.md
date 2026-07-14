@@ -113,13 +113,8 @@ local addresses, not durable external contracts.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_decision_records.py
-python -m pytest tests/test_decision_records.py
-```
+Use `docs/decisions/AGENTS.md` and the root validation route. Exact commands
+remain in the decision district route card and validation lane manifest.
 
 Revisit this decision only if `abyss-stack` changes its decision object prefix,
 generated index fields, or active decision path policy.
