@@ -13,6 +13,10 @@ Tracking starts with the community-docs baseline for this repository.
   explicit authenticated loopback shared Streamable HTTP owners on stable
   per-package ports, with source-owned systemd credential/template/bundle
   lifecycle and per-owner canary boundaries.
+- New interactive Codex launches can use those shared owners through an
+  idempotent, removable user-scoped Zsh integration that keeps the bearer out
+  of shell configuration and leaves the managed binary and running sessions
+  unchanged.
 - Configs sync now supports non-mutating `--dry-run` previews and repeatable
   allowlisted `--item` selection while excluding source-control, bytecode, and
   test/tool cache residue from deployed runtime mirrors.

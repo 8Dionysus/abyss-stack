@@ -57,6 +57,7 @@ Provision the host-local credential explicitly; this never prints its value:
 
 ```bash
 scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --install-mcp-http-codex-client
 ```
 
 The provision route creates a missing `Secrets/Configs` directory privately,
@@ -71,13 +72,18 @@ url = "http://127.0.0.1:5422/mcp"
 bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"
 ```
 
-Before launching a Codex process that uses the shared owners, load the
-credential from the deployed `Secrets/Configs` file into that process's
-environment without echoing it. The systemd owner receives the same value via
-`LoadCredential`, so neither the unit nor `config.toml` contains the secret.
-This bearer prevents unauthenticated local callers; it does not sandbox a
-compromised same-UID process that already has access to the operator's Secrets
-tree.
+The client install adds one bounded function to the target user's `.zshrc`.
+For each new interactive `codex` launch, that function delegates to the
+deployed source-owned launcher, which validates the credential and places it
+only in the Codex process environment before `exec`. It does not replace the
+Codex installer symlink, export the bearer into the parent shell, or alter
+already running shells and sessions. Remove only this managed route with
+`scripts/aoa-install-systemd --remove-mcp-http-codex-client`.
+
+The systemd owner receives the same value via `LoadCredential`, so neither the
+unit, `.zshrc`, nor `config.toml` contains the secret. This bearer prevents
+unauthenticated local callers; it does not sandbox a compromised same-UID
+process that already has access to the operator's Secrets tree.
 
 For district law, read [AGENTS](AGENTS.md). For the parent access-plane route,
 read [mcp/AGENTS](../AGENTS.md).

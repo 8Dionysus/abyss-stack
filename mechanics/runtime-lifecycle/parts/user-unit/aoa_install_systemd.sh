@@ -12,6 +12,8 @@ restart_now=0
 link_all_user_units=0
 link_system_units=0
 provision_mcp_http_auth=0
+install_mcp_http_codex_client=0
+remove_mcp_http_codex_client=0
 preset_spec=""
 profile_spec=""
 overlay_spec=""
@@ -78,6 +80,12 @@ while (($#)); do
     --provision-mcp-http-auth)
       provision_mcp_http_auth=1
       ;;
+    --install-mcp-http-codex-client)
+      install_mcp_http_codex_client=1
+      ;;
+    --remove-mcp-http-codex-client)
+      remove_mcp_http_codex_client=1
+      ;;
     --preset)
       shift
       (($#)) || aoa_die "missing value after --preset"
@@ -131,10 +139,21 @@ if ((overlay_set && ! selection_set)); then
   aoa_die "--overlay requires --preset or --profile so the full runtime shape stays explicit"
 fi
 aoa_validate_overlay_spec "$overlay_spec"
+if ((install_mcp_http_codex_client && remove_mcp_http_codex_client)); then
+  aoa_die "cannot install and remove the MCP HTTP Codex client in one transaction"
+fi
+if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
+  aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
+fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
 mcp_http_credential_path="${mcp_http_secret_dir}/${mcp_http_credential_name}"
+mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
+mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
+mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
+mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
+mcp_http_codex_block_present=0
 
 aoa_provision_mcp_http_auth() {
   local token=""
@@ -173,11 +192,124 @@ aoa_provision_mcp_http_auth() {
   aoa_note "provisioned MCP HTTP bearer credential under the deployed Secrets root"
 }
 
-if ((provision_mcp_http_auth)); then
-  aoa_provision_mcp_http_auth
-  if ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
-    exit 0
+aoa_validate_mcp_http_codex_zshrc() {
+  local start_count=0
+  local end_count=0
+  local start_line=0
+  local end_line=0
+
+  mcp_http_codex_block_present=0
+  if [[ ! -e "$mcp_http_codex_zshrc" && ! -L "$mcp_http_codex_zshrc" ]]; then
+    return 0
   fi
+  [[ -f "$mcp_http_codex_zshrc" && ! -L "$mcp_http_codex_zshrc" ]] || \
+    aoa_die "Codex client install target must be a regular non-symlink .zshrc"
+
+  start_count="$(grep -Fxc -- "$mcp_http_codex_block_start" "$mcp_http_codex_zshrc" || true)"
+  end_count="$(grep -Fxc -- "$mcp_http_codex_block_end" "$mcp_http_codex_zshrc" || true)"
+  if ((start_count == 0 && end_count == 0)); then
+    return 0
+  fi
+  if ((start_count != 1 || end_count != 1)); then
+    aoa_die "managed MCP HTTP Codex client block in .zshrc is malformed"
+  fi
+  start_line="$(grep -Fn -- "$mcp_http_codex_block_start" "$mcp_http_codex_zshrc" | cut -d: -f1)"
+  end_line="$(grep -Fn -- "$mcp_http_codex_block_end" "$mcp_http_codex_zshrc" | cut -d: -f1)"
+  ((start_line < end_line)) || aoa_die "managed MCP HTTP Codex client block in .zshrc is malformed"
+  mcp_http_codex_block_present=1
+}
+
+aoa_render_zshrc_without_mcp_http_codex_client() {
+  local line=""
+  local in_block=0
+
+  if [[ ! -e "$mcp_http_codex_zshrc" ]]; then
+    return 0
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$mcp_http_codex_block_start" ]]; then
+      in_block=1
+      continue
+    fi
+    if [[ "$line" == "$mcp_http_codex_block_end" ]]; then
+      in_block=0
+      continue
+    fi
+    ((in_block)) || printf '%s\n' "$line"
+  done < "$mcp_http_codex_zshrc"
+}
+
+aoa_write_mcp_http_codex_zshrc() {
+  local mode="$1"
+  local target_dir=""
+  local temp_path=""
+
+  aoa_validate_mcp_http_codex_zshrc
+  target_dir="$(dirname -- "$mcp_http_codex_zshrc")"
+  mkdir -p -- "$target_dir"
+  temp_path="$(mktemp "${target_dir}/.zshrc.abyss-stack.XXXXXX")"
+  if ! aoa_render_zshrc_without_mcp_http_codex_client > "$temp_path"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to prepare the MCP HTTP Codex client .zshrc update"
+  fi
+
+  if [[ "$mode" == "install" ]]; then
+    [[ -f "$mcp_http_codex_launcher" && ! -L "$mcp_http_codex_launcher" && -x "$mcp_http_codex_launcher" ]] || {
+      rm -f -- "$temp_path"
+      aoa_die "deployed MCP HTTP Codex client launcher is unavailable: ${mcp_http_codex_launcher}"
+    }
+    {
+      printf '%s\n' "$mcp_http_codex_block_start"
+      printf 'function codex {\n'
+      printf '  command %q "$@"\n' "$mcp_http_codex_launcher"
+      printf '}\n'
+      printf '%s\n' "$mcp_http_codex_block_end"
+    } >> "$temp_path"
+  elif [[ "$mode" != "remove" ]]; then
+    rm -f -- "$temp_path"
+    aoa_die "invalid MCP HTTP Codex client .zshrc update mode"
+  fi
+
+  if [[ -e "$mcp_http_codex_zshrc" ]]; then
+    chmod --reference="$mcp_http_codex_zshrc" "$temp_path"
+  else
+    chmod 0644 "$temp_path"
+  fi
+  if ! mv -- "$temp_path" "$mcp_http_codex_zshrc"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to install the MCP HTTP Codex client .zshrc update"
+  fi
+}
+
+aoa_install_mcp_http_codex_client() {
+  aoa_write_mcp_http_codex_zshrc install
+  aoa_note "MCP HTTP Codex client installed for new interactive Zsh launches"
+  aoa_note "existing shells and running Codex processes were not changed"
+}
+
+aoa_remove_mcp_http_codex_client() {
+  aoa_validate_mcp_http_codex_zshrc
+  if ((!mcp_http_codex_block_present)); then
+    aoa_note "MCP HTTP Codex client block is already absent from .zshrc"
+    return 0
+  fi
+  aoa_write_mcp_http_codex_zshrc remove
+  aoa_note "MCP HTTP Codex client removed from future interactive Zsh launches"
+  aoa_note "existing shells and running Codex processes were not changed"
+}
+
+if ((provision_mcp_http_auth || install_mcp_http_codex_client)); then
+  aoa_provision_mcp_http_auth
+fi
+if ((install_mcp_http_codex_client)); then
+  aoa_install_mcp_http_codex_client
+fi
+if ((remove_mcp_http_codex_client)); then
+  aoa_remove_mcp_http_codex_client
+fi
+if ((provision_mcp_http_auth || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+  ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
+  exit 0
 fi
 
 unit_source="${AOA_CONFIGS_ROOT}/systemd/user/podman-compose-abyss.service"
