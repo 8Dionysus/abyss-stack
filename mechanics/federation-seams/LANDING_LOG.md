@@ -6,8 +6,7 @@ Created the federation-seams package as the route home for runtime consumption
 of sibling owner surfaces, advisory mirrors, route-api posture, and federation
 sync checks.
 
-Validation route: `python scripts/validate_nested_agents.py` and
-`python scripts/validate_stack.py`.
+Validation followed the package and root validation routes.
 
 ## 2026-05-13 - RPG and compatibility containment
 
@@ -15,8 +14,8 @@ Kept RPG runtime projection generated surfaces under their owning part and
 moved upstream compatibility identifiers behind explicit compatibility bridges
 and legacy inventory.
 
-Validation route: RPG projection check, focused pytest, py_compile, and
-`python scripts/validate_stack.py`.
+Validation covered the RPG projection, focused tests, Python compilation, and
+root source route.
 
 ## 2026-05-13 - Package card completion
 

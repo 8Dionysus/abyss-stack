@@ -58,8 +58,8 @@ operator wants a cutover-grade gate.
 
 - `aoa-doctor` reports stale or mismatched machine evidence instead of treating
   any latest file as sufficient.
-- Operators should refresh `scripts/aoa-machine-bridge --write-latest` and
-  `scripts/aoa-machine-fit --mode private --write ...` before live cutover,
+- Operators should refresh machine-bridge and private machine-fit evidence
+  through the active machine-fit route before live cutover,
   long-running local AI, or launch-window review.
 - Source-root detection in autonomy and diagnostic helpers must use the
   current `docs/install/DEPLOYMENT.md` marker, not the old flat docs path.

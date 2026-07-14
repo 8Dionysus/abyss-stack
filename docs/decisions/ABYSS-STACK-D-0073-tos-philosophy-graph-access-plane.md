@@ -86,15 +86,8 @@ later behind the same ToS authority boundary.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/tos-corpus-mcp/scripts/validate_tos_corpus_mcp.py
-python -m pytest mcp/services/tos-corpus-mcp/tests -q
-python -m pytest tests/test_tos_graph_corpus_runtime.py -q
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Use the corpus service `AGENTS.md`, parent MCP route, ToS graph owner route,
+and root validation route. Those active owners retain the exact commands.
 
 Use Tree of Sophia validators before changing either ToS-derived export shape
 that this access plane reads.

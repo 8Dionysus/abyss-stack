@@ -149,6 +149,6 @@ possible.
 
 ## Follow-up route
 
-Use source/deployed parity, `systemd-analyze --user verify`, per-package
-validators, protocol inventory parity, and sequential live owner canaries
-before treating the shared lifecycle as current runtime proof.
+Use source/deployed parity, the runtime-lifecycle user-unit verification route,
+per-package validators, protocol inventory parity, and sequential live owner
+canaries before treating the shared lifecycle as current runtime proof.

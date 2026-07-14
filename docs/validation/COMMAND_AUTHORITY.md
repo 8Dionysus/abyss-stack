@@ -40,7 +40,7 @@ stabilizer, but it reads the release command sequence from the lane manifest.
 
 | Lane | Purpose |
 |---|---|
-| `source-fast` | growth-safe route, decision, nested AGENTS, and stack topology checks |
+| `source-fast` | growth-safe route, decision, nested AGENTS, stack topology, and local stats contract checks |
 | `generated` | generated decision, diagnostic read-model, and vendored MCP HTTP auth helper freshness |
 | `tests` | default pytest collection for current source checkout contracts |
 | `mechanics-part-local` | mechanic part-local pytest homes, including currently active provenance tests |

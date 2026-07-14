@@ -96,64 +96,24 @@ Never:
 
 ### Minimum after meaningful changes
 
-```bash
-python scripts/validate_stack.py
-```
+Use the root `AGENTS.md` source-validation route. The executable lane sequence
+is owned by `docs/validation/validation_lanes.json`.
 
 ### When touching bootstrap, layout, env examples, or secrets mapping
 
-```bash
-scripts/aoa-first-run --strict
-scripts/aoa-check-layout --ignore-secrets
-```
+Use the bootstrap and layout checks owned by `docs/install/FIRST_RUN.md`,
+`docs/install/DEPLOYMENT.md`, and the runtime-lifecycle route card.
 
 ### When touching scripts
 
-Run `shellcheck` on every touched shell script.
-
-The current CI validates a broad script set including:
-
-- `scripts/aoa-doctor`
-- `scripts/aoa-install-layout`
-- `scripts/aoa-sync-configs`
-- `scripts/aoa-bootstrap-configs`
-- `scripts/aoa-check-layout`
-- `scripts/aoa-install-systemd`
-- `scripts/aoa-first-run`
-- `scripts/aoa-preset-profiles`
-- `scripts/aoa-profile-modules`
-- `scripts/aoa-profile-endpoints`
-- `scripts/aoa-internal-probes`
-- `scripts/aoa-render-services`
-- `scripts/aoa-render-config`
-- `scripts/aoa-up`
-- `scripts/aoa-down`
-- `scripts/aoa-status`
-- `scripts/aoa-logs`
-- `scripts/aoa-smoke`
-- `scripts/aoa-wait`
+Use the syntax and shellcheck route in `scripts/AGENTS.md`. The current wrapper
+and backend inventory remains in `docs/validation/script_inventory.json`.
 
 ### When touching profiles, presets, modules, or render truth
 
-Run the smallest relevant render/introspection checks for the affected surface, for example:
-
-```bash
-scripts/aoa-profile-modules --profile substrate --paths
-scripts/aoa-profile-endpoints --profile substrate
-scripts/aoa-render-services --profile substrate
-scripts/aoa-render-config --profile substrate >/dev/null
-scripts/aoa-profile-modules --profile workflows --paths
-scripts/aoa-profile-endpoints --profile workflows
-```
-
-For preset changes, use the matching preset:
-
-```bash
-scripts/aoa-profile-modules --preset agent-full --paths
-scripts/aoa-profile-endpoints --preset agent-full
-scripts/aoa-render-services --preset agent-full
-scripts/aoa-render-config --preset agent-full >/dev/null
-```
+Use the smallest matching render and introspection checks owned by
+`docs/profiles/PROFILES.md`, `docs/profiles/PRESETS.md`, and
+`docs/profiles/PROFILE_RECIPES.md`.
 
 Do not claim a render/bootstrap check was run unless it was actually run.
 
@@ -195,9 +155,9 @@ Every audit or patch report for this repo should include:
 
 ### VERIFY
 
-- `python scripts/validate_stack.py` status
-- any render/profile/preset/bootstrap checks actually run
-- any `shellcheck` commands actually run
+- root validation lane status
+- any render, profile, preset, or bootstrap checks actually run
+- any script syntax checks actually run
 - what was not run
 
 ### REPORT

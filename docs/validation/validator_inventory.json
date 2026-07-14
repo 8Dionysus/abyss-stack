@@ -441,6 +441,23 @@
       "status": "active"
     },
     {
+      "family": "owner-local-stats-port-validator",
+      "paths": [
+        "scripts/validate_local_stats_port.py"
+      ],
+      "protects": "the abyss-stack owner-local question, measurement contract, declaration-only export posture, and central grammar compatibility",
+      "owner_surface": "stats/",
+      "layer": "stats/owner-local-contract",
+      "lane": "source-fast/release",
+      "mode": "blocking-delegated-owner-validator",
+      "callers": [
+        "docs/validation/validation_lanes.json",
+        "stats/AGENTS.md"
+      ],
+      "failure_route": "Fix the stack-owned question or evidence route in stats/, or fix the shared grammar at aoa-stats when the central contract itself is wrong.",
+      "status": "active"
+    },
+    {
       "family": "decision-rationale-validators",
       "paths": [
         "scripts/validate_decision_records.py",

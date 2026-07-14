@@ -23,7 +23,11 @@ selected services that are missing and opt-in, fallback, lab, or unknown service
 that are unexpectedly running. Its JSON summary mirrors the resource-guard
 readout pattern with flat counters such as `running_selected`,
 `missing_selected`, `unexpected_running`, and `unknown_running`, while retaining
-the nested `counts` map.
+the nested `counts` map. It also exposes
+`abyss-stack/selected-service-running-coverage-ratio` over every
+`selected_now` policy entry. A successful observation with no running selected
+services is zero; an unavailable container observation or an empty selected
+population is unknown.
 
 Use `scripts/aoa-status --optimization` for the operator-facing summary that
 combines service selection, resource-guard application state, and

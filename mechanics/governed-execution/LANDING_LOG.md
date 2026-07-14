@@ -6,8 +6,7 @@ Created the governed-execution package as the route home for governed local
 worker execution, autonomy-gate reporting, return policy, candidate export, and
 reviewable run records.
 
-Validation route: `python scripts/validate_nested_agents.py` and
-`python scripts/validate_stack.py`.
+Validation followed the package and root validation routes.
 
 ## 2026-05-13 - Part-local runner and candidate surfaces
 
@@ -15,8 +14,8 @@ Kept root wrappers stable while moving governed-runner, autonomy-status,
 return-policy, local-worker-path, runtime-contract, and candidate-export
 surfaces into package parts with focused tests and validators.
 
-Validation route: focused governed-execution pytest, py_compile, and
-`python scripts/validate_stack.py`.
+Validation covered focused governed-execution tests, Python compilation, and
+the root source route.
 
 ## 2026-05-13 - Package card completion
 

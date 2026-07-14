@@ -243,6 +243,13 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'candidates/',
         'mcp/services/aoa-memo-mcp/AGENTS.md',
     ),
+    'stats/AGENTS.md': (
+        'stack-local statistical questions',
+        'aoa-stats',
+        'selected_now',
+        'unknown, not zero',
+        'python scripts/validate_local_stats_port.py',
+    ),
     '.agents/spark/AGENTS.md': (
         'fast-loop lane',
         '.agents/spark/README.md',

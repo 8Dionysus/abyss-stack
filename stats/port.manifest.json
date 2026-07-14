@@ -1,0 +1,111 @@
+{
+  "schema_version": "aoa_stats_local_port_v1",
+  "contract_version": "1.0.0",
+  "owner_repo": "abyss-stack",
+  "status": "active",
+  "owner_boundary_ref": "BOUNDARIES.md",
+  "central_contract_refs": [
+    "aoa-stats:stats/measurement-contract/measurement-contract.schema.json",
+    "aoa-stats:stats/measurement-contract/measurement-packet.schema.json"
+  ],
+  "evidence_posture": {
+    "live_state": "live_capable",
+    "privacy": "internal",
+    "raw_content_allowed": false
+  },
+  "questions": [
+    {
+      "id": "question:selected-service-running-coverage-ratio",
+      "question": "What fraction of services classified as selected_now by the loaded owner service-selection policy are observed running in one service-selection readout?",
+      "consumer_refs": [
+        "mechanics/runtime-lifecycle/parts/logs-status/aoa_service_selection_status.py",
+        "scripts/aoa-status"
+      ]
+    }
+  ],
+  "measurements": [
+    {
+      "schema_version": "aoa_stats_measurement_contract_v1",
+      "measurement_id": "abyss-stack/selected-service-running-coverage-ratio",
+      "contract_version": "1.0.0",
+      "owner_repo": "abyss-stack",
+      "question_ref": "question:selected-service-running-coverage-ratio",
+      "semantic_class": "statistic",
+      "statistic": "ratio",
+      "object_kind": "selected-now-service-policy-entry",
+      "unit": {
+        "symbol": "1",
+        "quantity": "proportion"
+      },
+      "population": {
+        "subject": "services classified as selected_now by the loaded owner service-selection policy",
+        "definition": "one unique service entry in docs/runtime/service-selection-policy.v1.json whose posture is selected_now, assessed against the project containers observed by one service-selection readout",
+        "inclusion_rule": "every selected_now policy entry remains in the denominator whether its matching container is running or missing",
+        "exclusion_rule": "non-selected policy entries, running services absent from the policy, and per-container duplicates",
+        "sampling": "census"
+      },
+      "window": {
+        "temporality": "instant",
+        "clock": "owner_defined"
+      },
+      "dimensions": {
+        "allowed": [],
+        "prohibited": [
+          "service_name",
+          "container_name",
+          "compose_project_name",
+          "configs_root",
+          "preset",
+          "profile"
+        ]
+      },
+      "aggregation": {
+        "operator": "none",
+        "across": []
+      },
+      "missingness": {
+        "states": [
+          "missing",
+          "unknown",
+          "stale"
+        ],
+        "zero_is_observation": true
+      },
+      "uncertainty": {
+        "required": false,
+        "methods": [
+          "not_applicable"
+        ]
+      },
+      "provenance": {
+        "evidence_refs_required": true,
+        "source_revision_required": false
+      },
+      "lifecycle": {
+        "status": "active",
+        "compatible_with": []
+      },
+      "privacy": {
+        "classification": "internal",
+        "raw_content_allowed": false,
+        "sensitive_dimensions_allowed": false
+      },
+      "live_state": {
+        "capability": "live_capable"
+      },
+      "authority_ceiling": "Reports running-container observation coverage over the selected_now population in one owner readout only; it does not establish individual service health, availability over time, correctness, performance, quality, user value, routing truth, or permission to restart or change deployment policy."
+    }
+  ],
+  "exports": [
+    {
+      "measurement_id": "abyss-stack/selected-service-running-coverage-ratio",
+      "posture": "declaration_only",
+      "packet_refs": [],
+      "evidence_refs": [
+        "docs/runtime/service-selection-policy.v1.json",
+        "mechanics/runtime-lifecycle/parts/logs-status/aoa_service_selection_status.py",
+        "mechanics/runtime-lifecycle/parts/logs-status/README.md"
+      ]
+    }
+  ]
+}

@@ -97,14 +97,8 @@ routes. Session evidence can feed memory review, but it is not the same organ.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py
-python -m pytest mcp/services/aoa-session-memory-mcp/tests -q
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Use the service-local `AGENTS.md`, parent MCP route, and root validation route.
+Exact commands remain with those active owners.
 
 Register the shared Codex-plane server name `aoa_session_memory` through the
 Codex-plane owner surfaces before claiming it is available to new Codex

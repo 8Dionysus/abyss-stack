@@ -40,6 +40,7 @@ Read only what matches your entry need.
 | Source/install bootstrap | [runtime/PATHS](docs/runtime/PATHS.md), [install/DEPLOYMENT](docs/install/DEPLOYMENT.md), [install/FIRST_RUN](docs/install/FIRST_RUN.md), [mechanics/config-projection](mechanics/config-projection/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
 | Runtime operation and incidents | [operations/RUNBOOK](docs/operations/RUNBOOK.md), [scripts/README](scripts/README.md), [mechanics/runtime-lifecycle](mechanics/runtime-lifecycle/README.md) |
 | Working substrate selection | [profiles/PROFILES](docs/profiles/PROFILES.md), [profiles/PROFILE_RECIPES](docs/profiles/PROFILE_RECIPES.md), [compose](compose/README.md) |
+| Runtime-owned statistical questions | [stats](stats/README.md), then the owner evidence named by its measurement contract |
 | Branch and recurrence posture | [governance/BRANCH_POLICY](docs/governance/BRANCH_POLICY.md), [RECURRENCE_RUNTIME_POLICY](mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md) |
 | Host and machine fit | [REFERENCE_PLATFORM](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM.md), [REFERENCE_PLATFORM_SPEC](mechanics/machine-fit/parts/reference-platform/docs/REFERENCE_PLATFORM_SPEC.md), [MACHINE_FIT_POLICY](mechanics/machine-fit/parts/fit-record/docs/MACHINE_FIT_POLICY.md), [PLATFORM_ADAPTATION_POLICY](mechanics/machine-fit/parts/platform-adaptations/docs/PLATFORM_ADAPTATION_POLICY.md) |
 | Windows and WSL bridge | [Windows bridge](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_BRIDGE.md), [Windows setup](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_SETUP.md), [Windows performance](mechanics/machine-fit/parts/windows-bridge/docs/WINDOWS_PERFORMANCE.md) |
@@ -98,7 +99,8 @@ surface that can answer it.
 | Is this durable rationale rather than active law? | [docs/decisions](docs/decisions/README.md) |
 | Is this mechanic-local doctrine, validation, or landing detail? | [mechanics](mechanics/README.md), then the package `README.md` |
 | Is this live state, private machine data, a model, a log, or a secret? | deployed runtime or operator-owned surface, not git |
-| Does this copy AoA, ToS, skill, eval, memo, routing, playbook, KAG, stats, or agent authority? | the sibling owner repository |
+| Is this a statistical question whose population and evidence are owned by this runtime? | [stats](stats/README.md), with shared grammar validated by `aoa-stats` |
+| Does this copy AoA, ToS, skill, eval, memo, routing, playbook, KAG, shared stats, or agent authority? | the sibling owner repository |
 
 ## Current Contour
 
@@ -131,6 +133,8 @@ The active source shape is:
   authority
 - `memo/` is the local runtime memory port for candidates, receipts, exports,
   and stack-local notes
+- `stats/` declares runtime-owned statistical questions while live observations
+  remain in their mechanic readouts and shared grammar remains in `aoa-stats`
 
 Detailed package contracts belong in mechanic packages. Detailed release
 history belongs in `CHANGELOG.md`.
@@ -168,6 +172,7 @@ storage.
 | [mcp](mcp/README.md) | stdio/local access planes for owner-layer context |
 | [memo](memo/README.md) | local runtime memory candidates, receipts, exports, and notes |
 | [kag](kag/README.md) | source-linked provider records and repository indexes |
+| [stats](stats/README.md) | runtime-owned statistical questions using the shared `aoa-stats` grammar |
 | [scripts](scripts/README.md) | stable operator wrappers and repository validators |
 | [systemd](systemd/README.md) | user-unit source skeletons and managed working-service adapters |
 | [tests](tests/README.md) | repository-level tests and validation routes |

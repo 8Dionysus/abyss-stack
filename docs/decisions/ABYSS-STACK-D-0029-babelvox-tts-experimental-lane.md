@@ -64,7 +64,7 @@ experiment.
 
 ## Follow-up route
 
-Use `scripts/aoa-smoke --profile speech-fast-experimental` for health-only
-activation checks. Use `POST /synthesize` only after memory pressure is below
+Use the speech-fast experimental health route owned by the active profile and
+smoke documentation for activation checks. Use `POST /synthesize` only after memory pressure is below
 the host policy's hot zram window, then compare latency and zram deltas against
 the protected host warm TTS route before considering promotion.

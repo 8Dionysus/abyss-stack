@@ -63,12 +63,9 @@ Some old values are still upstream contracts. Isolating them behind one bridge p
 
 ## Validation
 
-Use the touched package checks plus the root validation stack:
-
-- `python -m pytest mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py mechanics/runtime-repair/parts/a2a-return-dry-run/tests/test_a2a_return_closeout_dry_run.py mechanics/runtime-repair/parts/memo-contradiction-sidecar/tests/test_memo_contradiction_integrity_runner.py -q`
-- `scripts/aoa-rpg-runtime-projection --generated-only --check`
-- `python scripts/validate_stack.py`
-- `python scripts/validate_nested_agents.py`
+Use the touched federation, governed-execution, runtime-repair, and RPG owner
+checks plus the root validation route. Exact commands remain in the nearest
+`AGENTS.md` files and the validation lane manifest.
 
 ## Source surfaces
 

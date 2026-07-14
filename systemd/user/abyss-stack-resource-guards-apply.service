@@ -1,7 +1,6 @@
 [Unit]
 Description=Abyss Stack guarded resource-limit apply
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/docs/runtime/SERVICE_SELECTION.md
-Documentation=file:///srv/AbyssOS/abyss-stack/Configs/docs/runtime/SERVICE_OPTIMIZATION_COMPLETION_AUDIT_2026_05_16.md
 After=podman-compose-abyss.service
 
 [Service]

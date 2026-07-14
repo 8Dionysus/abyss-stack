@@ -37,11 +37,11 @@ Use `docs/legacy/AGENTS_ROOT_REFERENCE.md` only when the short card is not enoug
 
 `abyss-stack` owns runtime, deployment, storage layout, lifecycle, security
 posture, reference-platform posture, MCP access planes, local runtime memory
-ports, and infrastructure glue.
+ports, owner-local runtime statistical questions, and infrastructure glue.
 
 It does not own AoA constitutional doctrine, ToS authored meaning, SDK
 control-plane truth, operator companion behavior, or skill, eval, memo, routing,
-playbook, role, KAG, stats, or seed doctrine.
+playbook, role, KAG, shared stats, or seed doctrine.
 
 Keep the source checkout distinct from the deployed runtime root:
 
@@ -64,6 +64,12 @@ python scripts/ci_gate.py --mode source-fast
 python scripts/validate_stack.py
 python scripts/validate_nested_agents.py
 python -m pytest -q
+```
+
+If `stats/` or its service-selection derivation changes, also run:
+
+```bash
+python scripts/validate_local_stats_port.py
 ```
 
 If the diagnostic spine changes, also run:
@@ -104,6 +110,8 @@ This repository owns:
   repositories
 - runtime access-plane adapters such as `mcp/`, plus local candidate ports such
   as `memo/`, when they preserve sibling-owner authority
+- runtime-owned statistical questions under `stats/`, using the shared
+  `aoa-stats` grammar without moving runtime meaning into the central organ
 
 It does not own:
 
@@ -149,6 +157,7 @@ meaning synchronized across entry surfaces.
 | Repair posture | `mechanics/runtime-repair/README.md` |
 | MCP access plane | `mcp/AGENTS.md` and the package-local card |
 | Local memory port | `memo/AGENTS.md` |
+| Local stats port | `stats/AGENTS.md` |
 | Repository KAG provider | `kag/AGENTS.md` |
 | Scripts | `scripts/README.md` and the owning mechanic part |
 | Repo-local agent overlays | `.agents/README.md` and the nearest `.agents/**/AGENTS.md` |
@@ -263,7 +272,7 @@ Update only the ones that moved; otherwise say no update was needed.
 - The change authors ToS meaning, corpus structure, interpretation, or knowledge
   lineage. Route to `Tree-of-Sophia`.
 - The change owns reusable techniques, skills, evals, memo objects, routing,
-  playbooks, roles, KAG meaning, stats, or seed canon. Route to the matching
+  playbooks, roles, KAG meaning, shared stats grammar, or seed canon. Route to the matching
   `aoa-*` or sibling repository.
 - The change needs private live state, secrets, logs, models, or machine-local
   captures. Keep it out of the GitHub mirror and route through runtime/operator

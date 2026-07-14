@@ -67,22 +67,34 @@ def load_policy(configs_root: Path) -> dict[str, Any]:
     return json.loads(policy_path.read_text(encoding="utf-8"))
 
 
-def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
-    ps = run_command(["podman", "ps", "-a", "--format", "{{.ID}}"])
+def inspect_compose_containers(
+    project_name: str,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    try:
+        ps = run_command(["podman", "ps", "-a", "--format", "{{.ID}}"])
+    except OSError:
+        return [], {"status": "unknown", "reason": "podman_list_unavailable"}
     if ps.returncode != 0:
-        return []
+        return [], {"status": "unknown", "reason": "podman_list_failed"}
     container_ids = [line.strip() for line in ps.stdout.splitlines() if line.strip()]
     if not container_ids:
-        return []
+        return [], {"status": "observed", "reason": "no_containers"}
 
-    inspected = run_command(["podman", "inspect", *container_ids])
+    try:
+        inspected = run_command(["podman", "inspect", *container_ids])
+    except OSError:
+        return [], {"status": "unknown", "reason": "podman_inspect_unavailable"}
     if inspected.returncode != 0:
-        return []
+        return [], {"status": "unknown", "reason": "podman_inspect_failed"}
 
     try:
         containers = json.loads(inspected.stdout)
     except json.JSONDecodeError:
-        return []
+        return [], {"status": "unknown", "reason": "podman_inspect_invalid_json"}
+    if not isinstance(containers, list) or not all(
+        isinstance(container, dict) for container in containers
+    ):
+        return [], {"status": "unknown", "reason": "podman_inspect_invalid_payload"}
 
     selected: list[dict[str, Any]] = []
     for container in containers:
@@ -100,7 +112,10 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
                 "state": state.get("Status", ""),
             }
         )
-    return sorted(selected, key=lambda item: (item["service"], item["name"]))
+    return sorted(selected, key=lambda item: (item["service"], item["name"])), {
+        "status": "observed",
+        "reason": "complete",
+    }
 
 
 def classify_service(policy_entry: dict[str, Any], live: dict[str, Any] | None) -> str:
@@ -113,8 +128,71 @@ def classify_service(policy_entry: dict[str, Any], live: dict[str, Any] | None) 
     return "not_running_expected"
 
 
-def summarize_service_selection(counts: dict[str, int], service_count: int) -> dict[str, Any]:
-    if counts.get("missing_selected"):
+def selected_service_running_coverage(
+    counts: dict[str, int],
+    selected_service_count: int,
+    observation: dict[str, str],
+) -> dict[str, Any]:
+    running = counts.get("running_selected", 0)
+    missing = counts.get("missing_selected", 0)
+    observed = observation.get("status") == "observed"
+    accounting_complete = (
+        isinstance(running, int)
+        and not isinstance(running, bool)
+        and running >= 0
+        and isinstance(missing, int)
+        and not isinstance(missing, bool)
+        and missing >= 0
+        and isinstance(selected_service_count, int)
+        and not isinstance(selected_service_count, bool)
+        and selected_service_count >= 0
+        and running + missing == selected_service_count
+    )
+
+    if not observed:
+        status = "unknown"
+        reason = observation.get("reason") or "observation_unavailable"
+        numerator: int | None = None
+        ratio: float | None = None
+    elif not accounting_complete:
+        status = "unknown"
+        reason = "incomplete_selected_population_accounting"
+        numerator = None
+        ratio = None
+    elif selected_service_count == 0:
+        status = "unknown"
+        reason = "empty_selected_population"
+        numerator = 0
+        ratio = None
+    else:
+        status = "observed"
+        reason = "complete"
+        numerator = running
+        ratio = round(running / selected_service_count, 6)
+
+    return {
+        "measurement_id": "abyss-stack/selected-service-running-coverage-ratio",
+        "status": status,
+        "reason": reason,
+        "numerator": numerator,
+        "denominator": selected_service_count,
+        "ratio": ratio,
+        "unit": "1",
+        "population": "selected_now_services_in_service_selection_policy",
+        "window": "service_selection_invocation",
+        "reporting_rule": "running_selected_over_all_selected_now_services",
+    }
+
+
+def summarize_service_selection(
+    counts: dict[str, int],
+    service_count: int,
+    selected_service_count: int,
+    observation: dict[str, str],
+) -> dict[str, Any]:
+    if observation.get("status") != "observed":
+        overall = "observation_unknown"
+    elif counts.get("missing_selected"):
         overall = "missing_selected"
     elif counts.get("unexpected_running") or counts.get("unknown_running"):
         overall = "unexpected_running"
@@ -129,7 +207,13 @@ def summarize_service_selection(counts: dict[str, int], service_count: int) -> d
         "unexpected_running": counts.get("unexpected_running", 0),
         "unknown_running": counts.get("unknown_running", 0),
         "not_running_expected": counts.get("not_running_expected", 0),
+        "observation_unknown": counts.get("observation_unknown", 0),
         "counts": counts,
+        "selected_service_running_coverage": selected_service_running_coverage(
+            counts,
+            selected_service_count,
+            observation,
+        ),
     }
 
 
@@ -143,7 +227,7 @@ def build_status() -> dict[str, Any]:
         for entry in policy.get("services", [])
         if isinstance(entry, dict) and entry.get("name")
     }
-    live_containers = inspect_compose_containers(project_name)
+    live_containers, observation = inspect_compose_containers(project_name)
     live_by_service = {
         str(container.get("service")): container
         for container in live_containers
@@ -152,9 +236,15 @@ def build_status() -> dict[str, Any]:
 
     service_status: list[dict[str, Any]] = []
     counts: dict[str, int] = {}
+    selected_service_count = sum(
+        entry.get("posture") == "selected_now" for entry in policy_services.values()
+    )
     for service_name, entry in sorted(policy_services.items()):
         live = live_by_service.get(service_name)
-        status = classify_service(entry, live)
+        if observation["status"] == "observed":
+            status = classify_service(entry, live)
+        else:
+            status = "observation_unknown"
         counts[status] = counts.get(status, 0) + 1
         service_status.append(
             {
@@ -185,7 +275,13 @@ def build_status() -> dict[str, Any]:
             "compose_project_name": project_name,
             "configs_root": str(configs_root),
         },
-        "summary": summarize_service_selection(counts, len(service_status)),
+        "observation": observation,
+        "summary": summarize_service_selection(
+            counts,
+            len(service_status),
+            selected_service_count,
+            observation,
+        ),
         "services": service_status,
         "unknown_running": unknown_running,
     }
@@ -197,6 +293,8 @@ def print_text(status: dict[str, Any]) -> None:
     print(f"service selection: {summary['status']}")
     print(f"preset: {selection.get('preset') or '(none)'}")
     print(f"profile: {selection.get('profile') or '(none)'}")
+    if status["observation"]["status"] != "observed":
+        print(f"observation: unknown ({status['observation']['reason']})")
     print("")
     for item in status["services"]:
         if item["status"] in {"missing_selected", "unexpected_running"}:

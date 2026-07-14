@@ -75,14 +75,9 @@ uses the repository's route vocabulary.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/aoa-memo-mcp/scripts/validate_memo_mcp.py
-python -m pytest mcp/services/aoa-memo-mcp/tests -q
-python scripts/validate_stack.py
-python scripts/validate_nested_agents.py
-```
+Use the service-local `AGENTS.md`, then the parent `mcp/services/AGENTS.md` and
+root validation route. Exact commands remain owned by those route cards and
+`docs/validation/validation_lanes.json`.
 
 Use this path for future MCP service packages unless a later decision introduces
 a different service topology.

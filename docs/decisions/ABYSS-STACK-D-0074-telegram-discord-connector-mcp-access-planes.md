@@ -104,18 +104,9 @@ proof state.
 
 ## Follow-up route
 
-Run:
-
-```bash
-python mcp/services/aoa-telegram-connector-mcp/scripts/validate_telegram_connector_mcp.py
-python -m pytest mcp/services/aoa-telegram-connector-mcp/tests -q
-python mcp/services/aoa-discord-connector-mcp/scripts/validate_discord_connector_mcp.py
-python -m pytest mcp/services/aoa-discord-connector-mcp/tests -q
-python scripts/ci_gate.py --mode source-fast
-python scripts/ci_gate.py --mode mcp-services
-python scripts/generate_decision_indexes.py --check
-python scripts/validate_decision_records.py
-```
+Use each connector service `AGENTS.md`, the parent MCP route, the decision
+district route, and root validation. Those active owners retain the exact
+commands.
 
 For local OS Abyss smoke, point `AOA_TELEGRAM_CONNECTOR_REPO` and
 `AOA_DISCORD_CONNECTOR_REPO` at the connector checkouts and run MCP `status`.
