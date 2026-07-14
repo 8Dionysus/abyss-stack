@@ -4,6 +4,18 @@ This note records the current abyss-stack service selection and tuning posture
 for the Intel Core Ultra 9 285H workstation. It is an operator research packet,
 not a promotion of every selected service to always-resident status.
 
+## July 2026 OVMS Correction
+
+Later cgroup v2 evidence narrowed the May preference for container-level hard
+caps. The selected OVMS embedding lane reached its private memory and swap
+boundaries while the host still had substantial `MemAvailable`, producing
+avoidable local reclaim. Its thin-host overlay now keeps CPU/thread tuning and
+`mem_reservation` protection but leaves `memory.max` and `memory.swap.max`
+unbounded; owner health, config reload, embedding parity, and rollback remain
+the release controls. The May storage and optional-service conclusions below
+remain historical context and require their own measured canaries before any
+equivalent change.
+
 ## Local Evidence
 
 - Live stack service set at inspection time: storage (`postgres`, `redis`,

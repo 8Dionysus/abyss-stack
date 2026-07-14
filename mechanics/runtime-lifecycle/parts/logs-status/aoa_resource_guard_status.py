@@ -8,6 +8,7 @@ import re
 import shlex
 import subprocess
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -189,14 +190,43 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
     return sorted(selected, key=lambda item: (item["service"], item["name"]))
 
 
+def parse_compose_memory_bytes(value: str | None) -> int:
+    if not value:
+        return 0
+
+    match = re.fullmatch(
+        r"([0-9]+(?:\.[0-9]+)?)\s*([kmgt]?)(?:i?b)?",
+        value.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        raise ValueError(f"unsupported compose memory value: {value!r}")
+
+    amount = Decimal(match.group(1))
+    exponent = {"": 0, "k": 1, "m": 2, "g": 3, "t": 4}[match.group(2).lower()]
+    return int(amount * (1024**exponent))
+
+
+def parse_compose_cpus_nano(value: str | None) -> int:
+    if not value:
+        return 0
+    try:
+        amount = Decimal(value.strip())
+    except InvalidOperation as exc:
+        raise ValueError(f"unsupported compose cpu value: {value!r}") from exc
+    if amount < 0:
+        raise ValueError(f"compose cpu value must not be negative: {value!r}")
+    return int(amount * 1_000_000_000)
+
+
 def classify_guard(expected: dict[str, str], live: dict[str, Any] | None) -> str:
     if live is None:
         return "missing_live_container"
 
-    memory_needed = bool(expected.get("mem_limit"))
-    cpu_needed = bool(expected.get("cpus"))
-    memory_applied = not memory_needed or int(live.get("mem_limit_bytes") or 0) > 0
-    cpu_applied = not cpu_needed or int(live.get("nano_cpus") or 0) > 0
+    expected_memory_bytes = parse_compose_memory_bytes(expected.get("mem_limit"))
+    expected_nano_cpus = parse_compose_cpus_nano(expected.get("cpus"))
+    memory_applied = int(live.get("mem_limit_bytes") or 0) == expected_memory_bytes
+    cpu_applied = int(live.get("nano_cpus") or 0) == expected_nano_cpus
 
     if memory_applied and cpu_applied:
         return "applied"

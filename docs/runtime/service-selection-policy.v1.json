@@ -1,6 +1,6 @@
 {
   "schema": "abyss_stack_service_selection_policy_v1",
-  "updated_at": "2026-05-16",
+  "updated_at": "2026-07-14",
   "host_class": "intel-core-ultra-9-285h",
   "current_runtime_shape": {
     "preset": "intel-full",
@@ -79,7 +79,7 @@
       "posture": "selected_now",
       "tier": "embedding_lane",
       "resource_guard": "compose/tuning/intel-worker.thin-host.yml",
-      "decision": "keep as OpenVINO embeddings seam, not as Gemma 4 text serving"
+      "decision": "keep as OpenVINO embeddings seam with soft reclaim protection and owner lifecycle, not a hard memory ceiling or Gemma 4 text serving"
     },
     {
       "name": "langchain-api",

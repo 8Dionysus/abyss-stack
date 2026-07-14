@@ -142,7 +142,7 @@ needs bounded CPU, memory, retention, or sampling posture:
 | Overlay | Use With | Purpose |
 |---|---|---|
 | `compose/tuning/storage.intel-285h.resource-guard.yml` | `substrate` or presets containing it | caps Postgres, Redis, Qdrant, and Neo4j without changing the storage base |
-| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | caps OVMS embeddings and `langchain-api` without changing the worker lane |
+| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | protects OVMS embeddings with a soft reservation and bounded CPU/threading while leaving its memory ceiling owner-managed; caps `langchain-api` without changing the worker lane |
 | `compose/tuning/federation.thin-host.yml` | `federation` | caps advisory `route-api` without changing federation surfaces |
 | `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards, PromQL, and LogQL available with shorter retention, lower cAdvisor cadence, and bounded Loki/Alloy resources |
 | `compose/tuning/tools.thin-host.yml` | `tools`, `agent-tools`, `intel-tools`, full presets | caps speech/browser helpers when selected |
@@ -152,6 +152,13 @@ needs bounded CPU, memory, retention, or sampling posture:
 Do not apply a helper overlay to a preset that does not select the matching
 services; use the profile-specific overlay with the profile that owns those
 services.
+
+OVMS is a trusted, reloadable model owner rather than an untrusted batch job.
+On the current cgroup v2 host, its former `4g` hard ceiling filled the matching
+private swap allowance while physical memory remained available. The worker
+overlay therefore keeps `mem_reservation` as best-effort reclaim protection and
+uses OVMS health, config reload, embedding parity, and rollback as its lifecycle
+boundary instead of imposing `mem_limit`.
 
 Persist host-local overlay choices through `scripts/aoa-install-systemd` instead
 of editing the source unit skeleton or relying on a shell export. The live
@@ -165,13 +172,15 @@ Do not pass `--restart-now` while the workstation is busy unless the operator
 has explicitly opened a restart window. Without a restart, the drop-in is staged
 for the next controlled `podman-compose-abyss.service` restart or reload.
 Use `scripts/aoa-apply-resource-guards --dry-run` to verify that the game guard
-and staged-vs-live readout agree before applying the staged guards. The apply
-wrapper refuses to touch the live stack while an active game is detected unless
-`--force` is passed. Its default `recreate` method reloads the user unit with a
-temporary `AOA_UP_FORCE_RECREATE=1` environment so already-running containers
-are recreated with the staged cgroup limits. Use `--method reload` only for a
-lighter best-effort apply, or `--method restart` when a full down/up window is
-acceptable.
+and exact rendered-vs-live CPU and memory values agree before applying the
+staged guards. A removed guard expects an unlimited live value, so an old hard
+ceiling remains `staged_not_applied` until the container is recreated. The
+apply wrapper refuses to touch the live stack while an active game is detected
+unless `--force` is passed. Its default `recreate` method reloads the user unit
+with a temporary `AOA_UP_FORCE_RECREATE=1` environment so already-running
+containers are recreated with the staged cgroup limits. Use `--method reload`
+only for a lighter best-effort apply, or `--method restart` when a full down/up
+window is acceptable.
 When the workstation is occupied but the operator wants the apply to happen as
 soon as the safe window opens, use
 `scripts/aoa-apply-resource-guards --wait-game-guard-clear --wait-resource-plan-clear`;

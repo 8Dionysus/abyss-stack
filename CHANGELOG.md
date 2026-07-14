@@ -52,6 +52,11 @@ Tracking starts with the community-docs baseline for this repository.
 - The authenticated loopback MCP bundle now admits the source-owned
   `aoa-stats` wrapper, while Configs sync carries the stack-local `stats/` port
   and the service resolves that source route through the deployed stack root.
+- The Intel worker overlay now protects the trusted OVMS embedding lane with a
+  soft reclaim reservation and owner-native health/reload controls instead of a
+  hard memory ceiling that can force private reclaim while host RAM is free;
+  the resource-guard apply route also detects and recreates containers that
+  retain a stale live ceiling after the rendered guard is removed.
 - Validation and test commands now route through active `AGENTS.md` cards,
   command-owner docs, and the canonical lane manifest instead of being copied
   into decision records, landing logs, or the root audit contract; the dated

@@ -83,6 +83,11 @@ class ComposeContractsTests(unittest.TestCase):
         service = load_compose(MODULE_DIR / "51-browser-tools.yml")["services"]["aoa-browser"]
         self.assertEqual(service.get("init"), "true")
 
+    def test_ovms_uses_soft_reclaim_protection_without_a_hard_memory_cap(self) -> None:
+        service = load_compose(TUNING_DIR / "intel-worker.thin-host.yml")["services"]["ovms"]
+        self.assertNotIn("mem_limit", service)
+        self.assertEqual(service.get("mem_reservation"), "${AOA_OVMS_MEM_RESERVATION:-1g}")
+
     def test_host_published_ports_are_loopback_bound(self) -> None:
         for path in sorted(MODULE_DIR.glob("*.yml")):
             services = load_compose(path).get("services", {})

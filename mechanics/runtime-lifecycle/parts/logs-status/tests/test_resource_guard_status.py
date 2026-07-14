@@ -74,8 +74,26 @@ volumes:
             "applied",
         )
         self.assertEqual(
+            resource_guard_status.classify_guard(
+                expected,
+                {"mem_limit_bytes": 1073741824, "nano_cpus": 500000000},
+            ),
+            "staged_not_applied",
+        )
+        self.assertEqual(
             resource_guard_status.classify_guard(expected, None),
             "missing_live_container",
+        )
+
+    def test_classify_guard_detects_stale_live_memory_limit(self) -> None:
+        expected = {"cpus": "2.0", "mem_reservation": "1g"}
+
+        self.assertEqual(
+            resource_guard_status.classify_guard(
+                expected,
+                {"mem_limit_bytes": 4294967296, "nano_cpus": 2000000000},
+            ),
+            "staged_not_applied",
         )
 
     def test_summary_exposes_flat_counts_for_gate_scripts(self) -> None:

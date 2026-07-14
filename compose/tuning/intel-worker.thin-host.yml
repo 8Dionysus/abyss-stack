@@ -6,7 +6,8 @@ services:
       aoa.tuning.overlay: "intel-worker.thin-host"
       aoa.tuning.posture: "candidate"
     cpus: "${AOA_OVMS_CPUS:-2.0}"
-    mem_limit: "${AOA_OVMS_MEM_LIMIT:-4g}"
+    # Protect the warm embedding lane from reclaim without forcing it into a
+    # private hard ceiling; OVMS health and owner lifecycle govern release.
     mem_reservation: "${AOA_OVMS_MEM_RESERVATION:-1g}"
     environment:
       OMP_NUM_THREADS: "${AOA_OVMS_OMP_NUM_THREADS:-2}"
