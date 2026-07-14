@@ -23,6 +23,7 @@ STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.se
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
 GEMMA_DIGEST_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-gemma4-spark-digest.service"
+STORAGE_MONITOR_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-storage-monitor.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
 MCP_HTTP_AUTH_BUILDER = REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
 MCP_HTTP_CODEX_CLIENT = REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
@@ -134,6 +135,27 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "-- /srv/abyss-machine/tools/abyss-gemma4-spark-resident digest --limit 3 --json"
             )
         )
+
+    def test_storage_monitor_reserves_measured_startup_memory(self) -> None:
+        unit = STORAGE_MONITOR_UNIT.read_text(encoding="utf-8")
+        exec_start = next(
+            line.removeprefix("ExecStart=")
+            for line in unit.splitlines()
+            if line.startswith("ExecStart=")
+        )
+
+        self.assertTrue(exec_start.startswith("/usr/local/bin/abyss-machine resource launch "))
+        self.assertIn("--memory-demand-mib 2048", exec_start)
+        self.assertIn("--demand-key abyss-machine:storage-monitor:hourly", exec_start)
+        self.assertIn("--demand-owner abyss-machine-storage", exec_start)
+        self.assertIn("--estimate-source measured-systemd-unit-p99", exec_start)
+        self.assertIn("--estimate-confidence high", exec_start)
+        self.assertIn("--success-on-block", exec_start)
+        self.assertTrue(
+            exec_start.endswith("-- /usr/local/bin/abyss-machine storage monitor --json")
+        )
+        self.assertNotIn("MemoryHigh=", unit)
+        self.assertNotIn("MemoryMax=", unit)
 
     def test_empty_preset_assignment_fails_before_runtime_selection(self) -> None:
         result = self.run_install_systemd("--preset=")
