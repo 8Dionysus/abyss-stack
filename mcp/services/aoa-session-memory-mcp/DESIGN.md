@@ -26,7 +26,9 @@ promotion queues.
 `aoa-session-memory-mcp` owns just-in-time read-only access, compact route
 packets, freshness checks, route prompts, and MCP service packaging.
 
-`abyss-stack` owns the runnable MCP service package and stdio topology.
+`abyss-stack` owns the runnable MCP service package and local transport
+topology: portable stdio by default and the optional authenticated loopback
+shared HTTP owner defined by `ABYSS-STACK-D-0077`.
 
 `aoa-memo` owns durable reviewed memory and writeback review. This MCP may
 prepare evidence refs for that route, but it does not write memory.

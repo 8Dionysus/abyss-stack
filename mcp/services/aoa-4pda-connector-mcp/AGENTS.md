@@ -29,8 +29,10 @@ Answer packets must preserve `agent_answer`, evidence-chain fields, and
 
 - Keep `aoa-4pda-connector` canonical for source policy, parser, normalizer,
   index, graph, answer packet, readiness, and storage contracts.
-- Keep `abyss-stack` responsible only for MCP packaging, stdio runtime access,
-  stack validation, and deployment posture.
+- Keep `abyss-stack` responsible only for MCP packaging, local transport
+  access, stack validation, and deployment posture. Stdio remains the portable
+  default; optional shared HTTP stays authenticated and loopback-only under
+  `ABYSS-STACK-D-0077`.
 - Do not expose crawl, refresh-build, materialize, reindex, seed-edit, or write
   tools in this first slice.
 - Do not call 4PDA internal search, network routes, login/private/QMS/post,

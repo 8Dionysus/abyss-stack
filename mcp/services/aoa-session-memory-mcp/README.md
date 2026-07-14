@@ -53,7 +53,13 @@ Resources:
 Tools:
 
 - `aoa_session_memory_status(include_live)`
-- `aoa_session_transport_preflight()`; diagnoses whether the current Codex process has a live `aoa_session_memory` MCP child, whether the process predates current config/source, and what the next action is when `mcp__aoa_session_memory` calls return `Transport closed`.
+- `aoa_session_transport_preflight()`; diagnoses portable stdio child state or
+  loopback shared HTTP owner state, distinguishes stale source/config from an
+  unavailable owner, rejects non-loopback or malformed HTTP endpoints, requires
+  configured and available bearer authentication without exposing its value,
+  distinguishes client/CLI environment readiness from owner-side systemd
+  credential readiness, and reports the next action when direct calls are not
+  current proof.
 - `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters. MCP returns compact hits, `mcp_route_plan`, and a provider freshness summary by default; follow `full_search_route` for the full archive CLI packet. `date_from`/`date_to` filter indexed search document/session dates; hook receipt timestamp checks should follow the returned `hook_receipts_route`.
 - `aoa_session_literal_query_plan(query="", kind="auto", filters)`; plans the cheapest reliable route before broad literal raw-text search. It prefers `entity_usage_chain` for typed operational anchors, entity registry/inventory for broad class queries such as skills/MCP/hooks/tools, rehydrate plus session-scoped search for exact session ids, structured filters for exact route reads, scoped full-text shards when available, and monolith fallback only as a bounded recall safety net. The packet exposes `classifications`, `cost_profile`, `fallback_plan`, and `next_expansion_command` so agents can see why the route was selected and where to expand next.
 - `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
@@ -157,11 +163,11 @@ fallback:
 PYTHONPATH=mcp/services/aoa-session-memory-mcp/src python -m aoa_session_memory_mcp.cli transport-preflight
 ```
 
-If it reports `direct_tool_transport_status=restart_required`, the configured
-stdio server can still be validated with
-`python mcp/services/aoa-session-memory-mcp/scripts/validate_session_memory_mcp.py`,
-but direct `mcp__aoa_session_memory` calls need a fresh Codex/MCP process
-before they are proof.
+If it reports `direct_tool_transport_status=restart_required`, first follow its
+`configured_transport_check_route`. For stdio, the package validator can prove
+a freshly started source server while direct calls still need a fresh
+Codex/MCP process. For shared HTTP, source/deployed parity and a fresh owner
+process must be restored before direct calls count as current evidence.
 
 Entity inventory packets include a compact `provider` summary from
 `search-provider-status --provider portable_sqlite`, so agents can see whether
@@ -252,22 +258,25 @@ When installed as a package, the direct server entry point is
 `aoa-session-memory-mcp-server`; `aoa-session-memory-mcp` remains the CLI entry
 point.
 
-Codex discovers MCP tools at MCP server start. The server auto-reloads the
-`core.py` implementation for existing tools when the source file changes, so
-packet logic and provider/freshness fixes do not require a manual restart.
-Changes to the tool list, tool schemas, server wrapper, or import path still
-require restarting the Codex session or MCP process before using live MCP
-output as proof. Source-local CLI smokes with
-`PYTHONPATH=mcp/services/aoa-session-memory-mcp/src` prove the code path, while
-the configured stdio smoke proves a freshly started Codex-configured server.
-The validator checks `aoa_session_maintenance_status` through the direct source
-route; stdio smoke verifies that the tool is registered but does not call that
-heavy route, so freshness proof does not stall behind maintenance work.
-It also reports a `codex_session` block that distinguishes a healthy fresh
-stdio server from an already-running Codex process that predates current MCP
-config/source or has no direct `aoa-session-memory-mcp` child; in that case
-direct in-session MCP calls need a Codex/MCP restart before they can be used as
-freshness proof.
+Codex discovers MCP tools when it attaches to the configured owner. The server
+auto-reloads the `core.py` implementation for existing tools when the source
+file changes, so packet logic and provider/freshness fixes do not require a
+manual restart. Changes to the tool list, tool schemas, server wrapper, or
+import path still require restarting the configured owner and, when the client
+registry changed, the Codex client before using live output as proof.
+Source-local CLI smokes prove the code path. The package validator proves a
+fresh stdio process; `systemctl --user status
+aoa-mcp-http@aoa-session-memory.service` is the owner check for configured
+shared HTTP. A shared HTTP Codex entry must set
+`bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"`, and the corresponding
+credential must be present in the Codex process environment. The preflight
+reports URL validity, bearer configuration, execution context, environment and
+systemd-credential readiness, source conflicts, and transport-specific process
+freshness without returning either bearer value. In a client/CLI context only
+the environment credential proves client smoke readiness; inside the shared
+owner, either its environment credential or its systemd credential may prove
+owner startup readiness. It does not treat the absence of a per-Codex child as
+failure when a fresh, authenticated loopback owner is configured.
 
 ## Agent Route
 

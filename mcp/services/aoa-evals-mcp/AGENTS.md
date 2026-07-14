@@ -85,7 +85,9 @@ It does not own:
   must dry-run before `apply=true`.
 - V1 or unknown local-port inventory input must never infer runnable posture;
   injected suite execution fields fail closed to `absent`.
-- Keep the server stdio-only unless a later decision widens exposure.
+- Keep stdio as the portable default. Optional shared Streamable HTTP must stay
+  authenticated and loopback-only under `ABYSS-STACK-D-0077`; wider exposure
+  still requires a later decision.
 
 ## Run
 

@@ -1,0 +1,30 @@
+[Unit]
+Description=AoA MCP loopback owner (%i)
+Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/README.md
+PartOf=aoa-mcp-http.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/AbyssOS
+Environment=AOA_WORKSPACE_ROOT=/srv/AbyssOS
+Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs
+Environment=AOA_MCP_TRANSPORT=streamable-http
+Environment=AOA_MCP_HOST=127.0.0.1
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=aoa-mcp-http-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token
+ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=full
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -17,7 +17,8 @@
 - generated graph output being treated as stronger than source records;
 - prompt-injection text inside decision records being repeated as instructions;
 - hidden write paths widening from cache refresh into source edits;
-- concurrent agents corrupting graph cache output.
+- concurrent agents corrupting graph cache output;
+- anonymous local callers reading decision/workspace posture through loopback HTTP.
 
 ## Controls
 
@@ -31,3 +32,5 @@
 - MCP packet text names source records as stronger authority;
 - tools return paths and refs, not imperative instructions from decision body;
 - source edits stay outside this MCP package.
+- Optional loopback HTTP requires the source-owned bearer credential; missing
+  or invalid authentication fails before MCP dispatch.

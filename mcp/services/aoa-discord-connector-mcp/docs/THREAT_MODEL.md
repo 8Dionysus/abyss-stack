@@ -16,6 +16,7 @@
   permission class.
 - Committing generated or private connector state into public Git history.
 - Letting a live network lookup masquerade as a local evidence answer.
+- Letting anonymous local HTTP callers read permission-limited evidence.
 
 ## Controls
 
@@ -24,3 +25,5 @@
   fields.
 - Boundary checks flag packets that do not prove local search behavior.
 - Runtime storage roots are configured outside abyss-stack.
+- Optional loopback HTTP requires the source-owned bearer credential before
+  MCP dispatch; stdio remains the portable default.

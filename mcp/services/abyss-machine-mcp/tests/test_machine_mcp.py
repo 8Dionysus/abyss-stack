@@ -523,6 +523,15 @@ def test_fast_brief_returns_owner_constraints_and_evidence() -> None:
     assert brief["evidence"]["count"] == 2
     assert brief["owner_layers"][0]["layer"] == "abyss-machine"
     assert brief["authority_boundary"]["mutation_posture"].startswith("no write")
+    assert brief["authority_boundary"]["exposure"] == (
+        "stdio-default; optional authenticated loopback streamable-http"
+    )
+    assert any(
+        "local transport service topology" in item
+        for layer in brief["owner_layers"]
+        if layer["layer"] == "abyss-stack"
+        for item in layer["owns"]
+    )
     assert runner.calls.count(("stack-bridge", "--json")) == 1
 
 

@@ -5,10 +5,26 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ._http_auth import http_auth_kwargs as _http_auth_kwargs
+from ._http_auth import transport_settings as _transport_settings
 from .core import AbyssMachineMCPState, CommandRunner
 
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_PORT = 5423
+
+
+def _run_server(server: Any) -> None:
+    settings = _transport_settings(DEFAULT_HTTP_PORT)
+    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    if settings.transport == "stdio":
+        server.run(transport="stdio")
+        return
+    assert settings.host is not None
+    assert settings.port is not None
+    server.settings.host = settings.host
+    server.settings.port = settings.port
+    server.run(transport="streamable-http")
 
 
 def build_server(
@@ -22,7 +38,7 @@ def build_server(
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("abyss-machine-mcp", json_response=True)
+    mcp = FastMCP("abyss-machine-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
 
     def current_state() -> AbyssMachineMCPState:
         return AbyssMachineMCPState.discover(
@@ -252,4 +268,4 @@ def build_server(
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    build_server().run(transport="stdio")
+    _run_server(build_server())

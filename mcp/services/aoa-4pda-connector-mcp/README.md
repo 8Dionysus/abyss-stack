@@ -26,8 +26,9 @@ It returns:
 
 `aoa-4pda-connector` owns 4PDA-specific source policy, local data contracts,
 CLI behavior, schemas, and answer packet semantics. `abyss-stack` owns this MCP
-runtime package and stdio access. Generated corpora, indexes, vectors, graphs,
-receipts, and caches remain outside Git.
+runtime package and local transport access: portable stdio by default and an
+optional authenticated loopback shared HTTP owner. Generated corpora, indexes,
+vectors, graphs, receipts, and caches remain outside Git.
 
 ## Configuration
 

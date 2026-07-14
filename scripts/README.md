@@ -37,6 +37,8 @@ still synced into deployed `Configs/` with the wrappers.
 - Use `aoa-install-systemd --all-user-units` when the deployed Configs mirror
   should become the source path for every allowlisted working user unit without
   restarting those services.
+- Use `aoa-install-systemd --provision-mcp-http-auth` as the explicit,
+  non-printing secret action before starting authenticated shared MCP owners.
 - Use `aoa-install-systemd --system-units` only through `pkexec` or an
   equivalent privileged route, and only for the allowlisted support units under
   `systemd/system/managed-units.txt`.

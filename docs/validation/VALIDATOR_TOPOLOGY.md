@@ -34,6 +34,7 @@ parity posture.
 | Decision surface routes | docs/decisions route cards, template requirements, validator/generator handoff, and test route exposure | `scripts/validators/decision_surface.py` | source-fast, release |
 | Decision rationale | canonical decision IDs, generated repo graph, local workspace decision graph freshness, and graph schema/coverage contract | `docs/decisions/`, `scripts/build_workspace_decision_graph.py`, `scripts/validate_workspace_decision_graph.py` | source-fast, generated, decision-graph, release |
 | Generated diagnostics | diagnostic surface catalog and generated read model | `mechanics/diagnostic-spine/` | generated, release |
+| Vendored MCP HTTP auth | standalone package copies match the canonical secret-safe helper | `mcp/services/_shared/build_http_auth_vendors.py --check` | source-fast, generated, release |
 | Script surface | root wrappers, part-local backends, MCP scripts, quest helpers, side effects | `docs/validation/script_inventory.json` | source-fast |
 | Test surface | root, mechanic part-local, and MCP tests | `docs/testing/test_inventory.json` | tests, release |
 | MCP access plane | stack-owned MCP service validators and package tests | `mcp/services/*` | mcp-services, release |

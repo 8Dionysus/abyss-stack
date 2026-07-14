@@ -26,7 +26,7 @@ SYNC_MANAGED_ITEMS = (
     "ROADMAP.md",
     "AGENTS.md",
 )
-PARITY_IGNORED_PARTS = {".git", "__pycache__"}
+PARITY_IGNORED_PARTS = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".coverage"}
 PARITY_IGNORED_SUFFIXES = {".pyc"}
 
 

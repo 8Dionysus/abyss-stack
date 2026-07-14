@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `abyss-machine` | host facts, source contracts, policies, generated latest files, validators, change ledger, bridge contracts | stack MCP packaging |
 | `abyss-machine-mcp` | compact read-only access, route prompts, allowlisted surface adapters, evidence refs | host policy, mutation authority, arbitrary commands, private raw capture interpretation |
-| `abyss-stack` | runnable MCP package, stdio topology, stack-side decision record | host facts or host source truth |
+| `abyss-stack` | runnable MCP package, local transport topology, stack-side decision record | host facts or host source truth |
 | `aoa-memo` | durable reviewed memory | live host truth |
 | `aoa-evals` | proof and verdict authority | host or stack runtime state |
 
@@ -42,4 +42,6 @@ intent.
 - No artifact signing, sidecar building, evidence promotion, registry writes,
   or trust-root mutation.
 - No KAG publication or delivery into AoA organs.
-- No non-stdio exposure without a later decision.
+- No exposure beyond portable stdio or the decision-bound authenticated
+  loopback shared HTTP owner; remote, wildcard-bind, gateway, or proxy
+  exposure requires a later decision.

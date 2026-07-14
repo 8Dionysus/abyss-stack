@@ -181,6 +181,10 @@
 - [ABYSS-STACK-D-0011 Legacy-Heavy Runtime Package Distillation](../ABYSS-STACK-D-0011-legacy-heavy-runtime-package-distillation.md) (`docs/decisions/ABYSS-STACK-D-0011-legacy-heavy-runtime-package-distillation.md`)
 - [ABYSS-STACK-D-0031 AoA Memo MCP Under Stack MCP](../ABYSS-STACK-D-0031-aoa-memo-mcp-under-stack-mcp.md) (`docs/decisions/ABYSS-STACK-D-0031-aoa-memo-mcp-under-stack-mcp.md`)
 
+## Configs projection
+
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
+
 ## KAG provider map
 
 - [ABYSS-STACK-D-0075 AoA KAG MCP Access Plane](../ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md`)
@@ -188,6 +192,10 @@
 ## KAG runtime projection
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
+
+## MCP transport
+
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## active topology language
 
@@ -273,6 +281,10 @@
 ## local overlay
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
+
+## loopback owner lifecycle
+
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## mechanic topology
 

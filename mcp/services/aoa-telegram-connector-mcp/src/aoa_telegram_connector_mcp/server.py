@@ -7,14 +7,34 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from aoa_telegram_connector_mcp._http_auth import http_auth_kwargs as _http_auth_kwargs
+from aoa_telegram_connector_mcp._http_auth import transport_settings as _transport_settings
 from aoa_telegram_connector_mcp.core import AoATelegramConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_PORT = 5427
+
+
+def _run_server(server: Any) -> None:
+    settings = _transport_settings(DEFAULT_HTTP_PORT)
+    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    if settings.transport == "stdio":
+        server.run(transport="stdio")
+        return
+    assert settings.host is not None
+    assert settings.port is not None
+    server.settings.host = settings.host
+    server.settings.port = settings.port
+    server.run(transport="streamable-http")
 
 
 def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
     service_state = state or AoATelegramConnectorMCPState.discover()
-    mcp = FastMCP("aoa-telegram-connector-mcp", json_response=True)
+    mcp = FastMCP(
+        "aoa-telegram-connector-mcp",
+        json_response=True,
+        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+    )
 
     @mcp.tool()
     def aoa_telegram_connector_status() -> dict[str, Any]:
@@ -63,7 +83,7 @@ def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     LOGGER.info("AoA Telegram connector MCP server ready")
-    build_server().run()
+    _run_server(build_server())
 
 
 if __name__ == "__main__":

@@ -147,6 +147,27 @@ This applies to MCP service code as well: user units execute the package
 entrypoints under `Configs/mcp`, while deployed decision-graph validation reads
 `Configs/schemas`.
 
+Preview the exact bounded projection before a lifecycle-sensitive rollout:
+
+```bash
+scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
+scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --all-user-units
+```
+
+`--item` is repeatable and accepts only the public-safe managed allowlist;
+unknown items and `Secrets` fail closed. `--dry-run` requires an existing
+target and never mutates it. Source-control, bytecode, and test/tool caches are
+excluded from deployment. The systemd installer links and reloads only,
+preserves existing masks, and does not start or restart the newly linked MCP
+owners. The explicit provision action creates the optional host-local MCP
+bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
+Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
+`bearer_token_env_var`; the value must never be copied into `config.toml`.
+Verify parity, then canary authenticated owners one at a time before using live
+MCP responses as current evidence.
+
 After syncing repo-managed surfaces, run:
 
 ```bash

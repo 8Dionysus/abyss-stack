@@ -17,6 +17,13 @@ Expected live pattern:
 - example env files in `env/`
 - real env files never committed
 
+Optional shared MCP HTTP owners use the host-local
+`Secrets/Configs/aoa-mcp-http-bearer-token`. The server receives it through a
+systemd credential and Codex receives it through the named environment
+variable; neither committed units nor `config.toml` contain the value. Bearer
+authentication blocks anonymous local callers but does not isolate mutually
+untrusted processes running as the same OS user.
+
 ## Forbidden habits
 
 - committing live `stack.env`

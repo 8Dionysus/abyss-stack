@@ -9,7 +9,7 @@
 | Wait and smoke | `parts/wait-smoke/` | `scripts/aoa-wait`, `scripts/aoa-smoke`, `scripts/aoa-internal-probes`, `parts/wait-smoke/aoa_wait.sh`, `parts/wait-smoke/aoa_smoke.sh`, `parts/wait-smoke/aoa_internal_probes.sh`, `mechanics/runtime-lifecycle/parts/wait-smoke/docs/INTERNAL_PROBES.md` |
 | Logs and status | `parts/logs-status/` | `scripts/aoa-logs`, `scripts/aoa-status`, `parts/logs-status/aoa_logs.sh`, `parts/logs-status/aoa_status.sh`, `parts/logs-status/aoa_resource_guard_status.py`, `parts/logs-status/aoa_service_selection_status.py`, `parts/logs-status/aoa_optimization_status.py`, `mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md`, `mechanics/runtime-lifecycle/parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md`, `mechanics/runtime-lifecycle/parts/status-readouts/docs/USAGE_BUDGET_POLICY.md` |
 | Status readouts | `parts/status-readouts/` | `mechanics/runtime-lifecycle/parts/status-readouts/docs/GATEWAY_CACHE_POLICY.md`, `mechanics/runtime-lifecycle/parts/status-readouts/docs/USAGE_BUDGET_POLICY.md`, runtime gateway cache and usage snapshot schemas, examples, and focused tests |
-| User unit | `parts/user-unit/` | `systemd/user/podman-compose-abyss.service`, `scripts/aoa-install-systemd`, `parts/user-unit/aoa_install_systemd.sh` |
+| User unit | `parts/user-unit/` | `systemd/user/podman-compose-abyss.service`, `systemd/user/aoa-mcp-http@.service`, `systemd/user/aoa-mcp-http.service`, `systemd/user/managed-units.txt`, `scripts/aoa-install-systemd`, `parts/user-unit/aoa_install_systemd.sh` |
 
 Do not move these parts until validators and deployment sync expectations are
 updated with the movement.

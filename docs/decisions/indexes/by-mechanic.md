@@ -19,6 +19,7 @@
 - [ABYSS-STACK-D-0058 Profile Topology Validator Module](../ABYSS-STACK-D-0058-profile-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0058-profile-topology-validator-module.md`)
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## diagnostic-spine
 
@@ -90,6 +91,7 @@
 - [ABYSS-STACK-D-0063 Root Validator Wrapper Tail Removal](../ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md) (`docs/decisions/ABYSS-STACK-D-0063-root-validator-wrapper-tail-removal.md`)
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
+- [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
 ## cross-mechanic
 

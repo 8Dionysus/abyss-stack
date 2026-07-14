@@ -5,9 +5,25 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ._http_auth import http_auth_kwargs as _http_auth_kwargs
+from ._http_auth import transport_settings as _transport_settings
 from .core import AoAMemoMCPState
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_PORT = 5421
+
+
+def _run_server(server: Any) -> None:
+    settings = _transport_settings(DEFAULT_HTTP_PORT)
+    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    if settings.transport == "stdio":
+        server.run(transport="stdio")
+        return
+    assert settings.host is not None
+    assert settings.port is not None
+    server.settings.host = settings.host
+    server.settings.port = settings.port
+    server.run(transport="streamable-http")
 
 
 def build_server(workspace_root: str | Path | None = None) -> Any:
@@ -16,7 +32,7 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("aoa-memo-mcp", json_response=True)
+    mcp = FastMCP("aoa-memo-mcp", json_response=True, **_http_auth_kwargs(DEFAULT_HTTP_PORT))
 
     def current_state() -> AoAMemoMCPState:
         return AoAMemoMCPState.discover(workspace_root)
@@ -195,4 +211,4 @@ def build_server(workspace_root: str | Path | None = None) -> Any:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    build_server().run(transport="stdio")
+    _run_server(build_server())

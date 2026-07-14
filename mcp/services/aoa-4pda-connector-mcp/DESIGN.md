@@ -39,4 +39,6 @@ stronger authority.
   tools.
 - No network access from answer/query/status paths.
 - No internal 4PDA search or private/account routes.
-- No long-running service lifecycle or non-stdio exposure in this slice.
+- No remote, wildcard-bind, gateway, or proxy exposure. The only long-running
+  route is the source-owned authenticated loopback shared HTTP owner from
+  `ABYSS-STACK-D-0077`; stdio remains the portable default.

@@ -15,6 +15,7 @@
 - Reading outside declared provider roots through crafted resource URIs.
 - Hiding stale provider-map state behind successful MCP responses.
 - Adding write, indexing, embedding, or graph-build actions to the access plane.
+- Letting anonymous local HTTP callers enumerate private provider roots or status.
 
 ## Controls
 
@@ -24,3 +25,5 @@
 - Tools report source-return and freshness handles instead of mutating sources.
 - Validation checks the package shape, provider-map readability, and server
   build path.
+- Optional loopback HTTP requires the source-owned bearer credential before
+  MCP dispatch; stdio remains the portable default.

@@ -40,7 +40,7 @@ STOP_LINES = [
     "Do not mutate abyss-machine, abyss-stack, AoA, work, or game roots.",
     "Do not read raw private capture payloads by default.",
     "Do not land durable memory or compute proof verdicts.",
-    "Do not widen beyond stdio without a later decision.",
+    "Do not bind HTTP beyond loopback or bypass the source-owned MCP lifecycle decision.",
 ]
 
 OWNER_LAYERS = [
@@ -61,7 +61,7 @@ OWNER_LAYERS = [
         "layer": "abyss-stack",
         "owns": [
             "runnable MCP package",
-            "stdio service topology",
+            "local transport service topology",
             "stack-side access-plane decision record",
         ],
         "truth_roots": ["mcp/services/abyss-machine-mcp", "docs/decisions"],
@@ -592,7 +592,7 @@ class AbyssMachineMCPState:
     def authority_boundary(self) -> dict[str, Any]:
         return {
             "schema": "abyss_machine_mcp_authority_boundary_v1",
-            "mcp_role": "stdio read-only access plane over abyss-machine host read models",
+            "mcp_role": "local read-only access plane over abyss-machine host read models",
             "service_owner": "abyss-stack owns the runnable MCP package only",
             "stronger_owners": [
                 "abyss-machine source contracts under /etc/abyss-machine",
@@ -608,7 +608,7 @@ class AbyssMachineMCPState:
                 "append-only host histories and evidence refs",
                 "MCP compact summaries",
             ],
-            "exposure": "stdio-only",
+            "exposure": "stdio-default; optional authenticated loopback streamable-http",
             "mutation_posture": "no write, no repair, no privileged command, no arbitrary shell",
             "stop_lines": STOP_LINES,
         }

@@ -74,6 +74,10 @@
         "command": ["python", "scripts/generate_decision_indexes.py", "--check"]
       },
       {
+        "label": "check vendored MCP HTTP auth helpers",
+        "command": ["python", "mcp/services/_shared/build_http_auth_vendors.py", "--check"]
+      },
+      {
         "label": "validate nested AGENTS",
         "command": ["python", "scripts/validate_nested_agents.py"]
       },
@@ -90,6 +94,10 @@
       {
         "label": "check decision indexes",
         "command": ["python", "scripts/generate_decision_indexes.py", "--check"]
+      },
+      {
+        "label": "check vendored MCP HTTP auth helpers",
+        "command": ["python", "mcp/services/_shared/build_http_auth_vendors.py", "--check"]
       },
       {
         "label": "check diagnostic surface catalog",
@@ -309,6 +317,10 @@
       {
         "label": "validate diagnostic surface catalog",
         "command": ["python", "scripts/validate_diagnostic_surface_catalog.py"]
+      },
+      {
+        "label": "check vendored MCP HTTP auth helpers",
+        "command": ["python", "mcp/services/_shared/build_http_auth_vendors.py", "--check"]
       },
       {
         "label": "run tests",

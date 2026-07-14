@@ -6,6 +6,9 @@ This directory stores user-unit skeletons for the deployed runtime.
 
 - `podman-compose-abyss.service`
 - `abyss-stack-resource-guards-apply.service`
+- `aoa-mcp-http@.service`, one authenticated loopback shared owner per MCP
+  instance
+- `aoa-mcp-http.service`, the nine-owner local bundle
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 
@@ -47,7 +50,8 @@ That mode only links unit files and reloads the user daemon. It does not start,
 stop, restart, enable, disable, or mask services. Existing user-unit drop-ins
 remain host-local and continue to apply, which lets the stack take ownership of
 the unit source path without losing per-machine memory or runtime-selection
-overrides.
+overrides. Existing `/dev/null` masks are preserved rather than silently
+replaced with source links.
 
 The current allowlist covers the local working surface:
 
@@ -55,6 +59,10 @@ The current allowlist covers the local working surface:
 - `abyss-stack-resource-guards-apply.service`, a manual one-shot unit that runs
   `aoa-apply-resource-guards --wait-game-guard-clear` and applies staged cgroup
   limits only after the game guard clears
+- the `aoa-mcp-http@.service` template and `aoa-mcp-http.service` bundle; these
+  run deployed workspace wrappers with explicit authenticated loopback
+  Streamable HTTP, preserve each MCP package's tool authority, and reject
+  unauthenticated callers before dispatch
 - warm dictation and TTS services, plus the `gemma4.spark` stack endpoint
   bridge
 - TTS keep-warm timer that periodically exercises the protected warm server
@@ -69,6 +77,14 @@ command route. Its path unit mirrors the receipt surfaces currently admitted by
 `aoa-stats`; its service invokes the deployed refresh command without an
 explicit registry argument, leaving canonical registry selection with the
 sibling owner.
+
+Linking the MCP units does not start them. After source-to-Configs parity is
+green, canary one instance with `systemctl --user restart
+aoa-mcp-http@OWNER.service`, verify its loopback port and MCP inventory, then
+advance to the next owner. The bundle is lifecycle grouping, not a gateway.
+Provision the non-committed bearer first with
+`scripts/aoa-install-systemd --provision-mcp-http-auth`; the template reads it
+through `LoadCredential` and never places the value in the unit environment.
 
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.

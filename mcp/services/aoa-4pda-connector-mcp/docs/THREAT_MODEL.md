@@ -16,6 +16,7 @@ truth and stack-owned MCP access behavior.
   `network_touched=false` while wrapping answers.
 - Committing generated corpora, indexes, vectors, graphs, receipts, sqlite,
   parquet, qdrant, lancedb, or caches into `abyss-stack`.
+- Letting anonymous local HTTP callers query connector-derived evidence.
 
 ## Mitigations
 
@@ -25,3 +26,5 @@ truth and stack-owned MCP access behavior.
 - Tests use a fake command runner and assert answer packet preservation.
 - The validator checks package files, read-only source-route posture, server
   build, and a fake Xiaomi 13T answer packet.
+- Optional loopback HTTP requires the source-owned bearer credential before
+  MCP dispatch; stdio remains the portable default.

@@ -12,7 +12,7 @@
 | private capture leakage | no raw private capture tools; recall remains evidence, not instruction |
 | artifact trust read access becomes signing or promotion authority | artifact surfaces expose only allowlisted read models; signing, sidecar build, evidence promotion, registry writes, and trust-root changes stay outside MCP |
 | stack absorbs host ownership | docs and responses route host truth back to `abyss-machine` |
-| broad exposure widens attack surface | service is stdio-only until a later decision |
+| loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the source-owned bearer credential under `ABYSS-STACK-D-0077` |
 
 ## Trust Boundary
 
@@ -28,7 +28,8 @@ arbitrary argument vector.
 
 Add a new `abyss-stack` decision before enabling any of these:
 
-- non-stdio exposure;
+- exposure beyond the decision-bound authenticated loopback shared HTTP owner;
+- bypass, removal, or weakening of the bearer requirement;
 - write tools;
 - privileged commands;
 - repair or cleanup tools;

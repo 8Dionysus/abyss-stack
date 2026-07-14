@@ -25,7 +25,20 @@ the selected user-unit shape must include the `federation` profile so
 Use `aoa-install-systemd --all-user-units` to link every source-managed user
 unit from the deployed Configs mirror into `~/.config/systemd/user`. This is a
 link-and-reload operation only; it preserves enable state, running processes,
-and host-local drop-ins.
+host-local drop-ins, and existing `/dev/null` masks.
+
+The allowlist includes `aoa-mcp-http@.service` and its bundle. The template
+launches one deployed workspace MCP wrapper with
+`AOA_MCP_TRANSPORT=streamable-http` and `AOA_MCP_HOST=127.0.0.1`; package code
+still defaults to stdio outside that explicit lifecycle. It also loads the
+non-committed `aoa-mcp-http-bearer-token` systemd credential; package startup
+fails before bind if the credential is missing or invalid. Provision it only
+through the explicit `aoa-install-systemd --provision-mcp-http-auth` action,
+which never prints or replaces an existing valid value. A missing secret root
+is created with mode `0700`; an existing root keeps its current permissions,
+and symlinked roots or credential files fail closed. Install never starts or
+restarts an owner. Canary and restart each instance separately after
+source/deployed parity so one failed owner cannot hide behind bundle state.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned
