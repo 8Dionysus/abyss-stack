@@ -42,6 +42,6 @@ intent.
 - No artifact signing, sidecar building, evidence promotion, registry writes,
   or trust-root mutation.
 - No KAG publication or delivery into AoA organs.
-- No exposure beyond portable stdio or the decision-bound loopback-only shared
-  HTTP owner; remote, wildcard-bind, gateway, or proxy exposure requires a
-  later decision.
+- No exposure beyond portable stdio or the decision-bound authenticated
+  loopback shared HTTP owner; remote, wildcard-bind, gateway, or proxy
+  exposure requires a later decision.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import socket
@@ -8,8 +9,10 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest import mock
+import urllib.error
+import urllib.request
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +22,10 @@ STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.se
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
+MCP_HTTP_AUTH_BUILDER = REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
+MCP_HTTP_AUTH_TOKEN = "test-only-" + ("a" * 54)
+MCP_HTTP_CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
+MCP_HTTP_SECRET_RELATIVE = Path("Secrets") / "Configs" / MCP_HTTP_CREDENTIAL_NAME
 EXPECTED_STATS_RECEIPT_PATHS = (
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/session-harvest-family.jsonl",
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/core-skill-applications.jsonl",
@@ -68,7 +75,13 @@ class DummyServer:
 
 def mcp_environment(**overrides: str) -> dict[str, str]:
     env = os.environ.copy()
-    for name in ("AOA_MCP_TRANSPORT", "AOA_MCP_HOST", "AOA_MCP_PORT"):
+    for name in (
+        "AOA_MCP_TRANSPORT",
+        "AOA_MCP_HOST",
+        "AOA_MCP_PORT",
+        "AOA_MCP_HTTP_BEARER_TOKEN",
+        "CREDENTIALS_DIRECTORY",
+    ):
         env.pop(name, None)
     env.update(overrides)
     return env
@@ -185,10 +198,143 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertIn("preserving masked user unit", result.stdout)
 
+    def test_mcp_http_auth_provision_is_explicit_idempotent_and_secret_safe(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            secret_dir.mkdir(parents=True, mode=0o750)
+            secret_dir.chmod(0o750)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+            first = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-mcp-http-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            token_path = stack_root / MCP_HTTP_SECRET_RELATIVE
+            token = token_path.read_text(encoding="utf-8").removesuffix("\n")
+            self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
+            self.assertEqual(token_path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(secret_dir.stat().st_mode & 0o777, 0o750)
+            self.assertNotIn(token, first.stdout + first.stderr)
+            self.assertIn("provisioned MCP HTTP bearer credential", first.stdout)
+            self.assertNotIn("unit linked", first.stdout)
+
+            second = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-mcp-http-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(token_path.read_text(encoding="utf-8").removesuffix("\n"), token)
+            self.assertNotIn(token, second.stdout + second.stderr)
+            self.assertIn("already provisioned", second.stdout)
+
+    def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-mcp-http-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            secret_dir = stack_root / "Secrets" / "Configs"
+            token_path = stack_root / MCP_HTTP_SECRET_RELATIVE
+            self.assertEqual(secret_dir.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(token_path.stat().st_mode & 0o777, 0o600)
+
+    def test_mcp_http_auth_provision_rejects_symlinked_secret_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secrets_root = stack_root / "Secrets"
+            secrets_root.mkdir(parents=True)
+            outside = root / "outside"
+            outside.mkdir()
+            secret_dir = secrets_root / "Configs"
+            secret_dir.symlink_to(outside, target_is_directory=True)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            symlinked_root = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-mcp-http-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(symlinked_root.returncode, 0)
+            self.assertIn("secret root must be a directory, not a symlink", symlinked_root.stderr)
+            self.assertFalse(outside.joinpath(MCP_HTTP_CREDENTIAL_NAME).exists())
+
+            secret_dir.unlink()
+            secret_dir.mkdir()
+            outside_token = outside / "existing-token"
+            outside_token.write_text(MCP_HTTP_AUTH_TOKEN, encoding="utf-8")
+            secret_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).symlink_to(outside_token)
+
+            symlinked_token = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-mcp-http-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(symlinked_token.returncode, 0)
+            self.assertIn("regular non-symlink file", symlinked_token.stderr)
+            self.assertEqual(outside_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("Environment=AOA_MCP_TRANSPORT=streamable-http", template)
         self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", template)
+        self.assertIn(
+            "LoadCredential=aoa-mcp-http-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token",
+            template,
+        )
+        self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", template)
         self.assertIn("Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs", template)
         self.assertIn("WorkingDirectory=/srv/AbyssOS", template)
         self.assertIn("ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py", template)
@@ -216,6 +362,24 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
 
 class McpLoopbackLifecycleTests(unittest.TestCase):
+    def test_all_standalone_packages_require_the_tested_mcp_auth_api(self) -> None:
+        for directory, _ in MCP_SERVER_PACKAGES.values():
+            with self.subTest(directory=directory):
+                pyproject = (
+                    REPO_ROOT / "mcp" / "services" / directory / "pyproject.toml"
+                ).read_text(encoding="utf-8")
+                self.assertIn('"mcp>=1.27.2,<2",', pyproject)
+
+    def test_generated_http_auth_helpers_are_current(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(MCP_HTTP_AUTH_BUILDER), "--check"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_all_servers_share_the_guarded_transport_contract(self) -> None:
         ports: set[int] = set()
         for package, (directory, expected_port) in MCP_SERVER_PACKAGES.items():
@@ -232,7 +396,10 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 server = DummyServer()
                 with mock.patch.dict(
                     os.environ,
-                    mcp_environment(AOA_MCP_TRANSPORT="streamable-http"),
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                    ),
                     clear=True,
                 ):
                     module._run_server(server)
@@ -247,6 +414,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                         AOA_MCP_TRANSPORT="streamable-http",
                         AOA_MCP_HOST="localhost",
                         AOA_MCP_PORT="6543",
+                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
                     ),
                     clear=True,
                 ):
@@ -267,6 +435,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                     mcp_environment(
                         AOA_MCP_TRANSPORT="streamable-http",
                         AOA_MCP_HOST="0.0.0.0",
+                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
                     ),
                     clear=True,
                 ):
@@ -282,6 +451,148 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
                 run_server.assert_called_once_with(built_server)
 
         self.assertEqual(len(ports), len(MCP_SERVER_PACKAGES))
+
+    def test_all_http_servers_require_and_verify_bearer_auth(self) -> None:
+        for package, (directory, expected_port) in MCP_SERVER_PACKAGES.items():
+            with self.subTest(package=package):
+                module = import_mcp_server(package, directory)
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(AOA_MCP_TRANSPORT="streamable-http"),
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(SystemExit, "bearer authentication"):
+                        module._http_auth_kwargs(expected_port)
+
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        AOA_MCP_HTTP_BEARER_TOKEN="too-short",
+                    ),
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(SystemExit, "invalid bearer credential"):
+                        module._http_auth_kwargs(expected_port)
+
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                    ),
+                    clear=True,
+                ):
+                    kwargs = module._http_auth_kwargs(expected_port)
+
+                self.assertEqual(kwargs["auth"].required_scopes, ["mcp:access"])
+                verifier = kwargs["token_verifier"]
+                self.assertIsNone(asyncio.run(verifier.verify_token("wrong-token")))
+                access = asyncio.run(verifier.verify_token(MCP_HTTP_AUTH_TOKEN))
+                self.assertIsNotNone(access)
+                assert access is not None
+                self.assertEqual(access.client_id, "aoa-loopback-codex")
+                self.assertEqual(access.scopes, ["mcp:access"])
+
+    def test_http_auth_accepts_systemd_credential_and_rejects_conflict(self) -> None:
+        module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credential_dir = Path(tmpdir)
+            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).write_text(
+                MCP_HTTP_AUTH_TOKEN + "\n",
+                encoding="utf-8",
+            )
+            with mock.patch.dict(
+                os.environ,
+                mcp_environment(
+                    AOA_MCP_TRANSPORT="streamable-http",
+                    CREDENTIALS_DIRECTORY=str(credential_dir),
+                ),
+                clear=True,
+            ):
+                kwargs = module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+            access = asyncio.run(kwargs["token_verifier"].verify_token(MCP_HTTP_AUTH_TOKEN))
+            self.assertIsNotNone(access)
+
+            with mock.patch.dict(
+                os.environ,
+                mcp_environment(
+                    AOA_MCP_TRANSPORT="streamable-http",
+                    AOA_MCP_HTTP_BEARER_TOKEN="different-" + ("b" * 54),
+                    CREDENTIALS_DIRECTORY=str(credential_dir),
+                ),
+                clear=True,
+            ):
+                with self.assertRaisesRegex(SystemExit, "conflicting bearer credentials"):
+                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+
+            with mock.patch.dict(
+                os.environ,
+                mcp_environment(
+                    AOA_MCP_TRANSPORT="streamable-http",
+                    AOA_MCP_HTTP_BEARER_TOKEN="too-short",
+                    CREDENTIALS_DIRECTORY=str(credential_dir),
+                ),
+                clear=True,
+            ):
+                with self.assertRaisesRegex(SystemExit, "invalid bearer credential"):
+                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+
+    def test_http_auth_rejects_symlinked_systemd_credential(self) -> None:
+        module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            credential_dir = Path(tmpdir)
+            target = credential_dir / "outside-token"
+            target.write_text(MCP_HTTP_AUTH_TOKEN, encoding="utf-8")
+            credential_dir.joinpath(MCP_HTTP_CREDENTIAL_NAME).symlink_to(target)
+
+            with mock.patch.dict(
+                os.environ,
+                mcp_environment(
+                    AOA_MCP_TRANSPORT="streamable-http",
+                    CREDENTIALS_DIRECTORY=str(credential_dir),
+                ),
+                clear=True,
+            ):
+                with self.assertRaisesRegex(SystemExit, "regular non-symlink"):
+                    module._http_auth_kwargs(module.DEFAULT_HTTP_PORT)
+
+    def test_http_transport_rejects_invalid_port(self) -> None:
+        module = import_mcp_server("aoa_decisions_mcp", "aoa-decisions-mcp")
+        for value in ("zero", "0", "65536"):
+            with self.subTest(value=value):
+                with mock.patch.dict(
+                    os.environ,
+                    mcp_environment(
+                        AOA_MCP_TRANSPORT="streamable-http",
+                        AOA_MCP_PORT=value,
+                        AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
+                    ),
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(SystemExit, "AOA_MCP_PORT"):
+                        module._run_server(DummyServer())
+
+    def test_decisions_http_entrypoint_fails_closed_without_bearer(self) -> None:
+        script = (
+            REPO_ROOT
+            / "mcp"
+            / "services"
+            / "aoa-decisions-mcp"
+            / "scripts"
+            / "aoa_decisions_mcp_server.py"
+        )
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            env=mcp_environment(AOA_MCP_TRANSPORT="streamable-http"),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bearer authentication", result.stderr)
 
     def test_decisions_http_entrypoint_stays_alive_on_loopback(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -300,6 +611,7 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             AOA_MCP_TRANSPORT="streamable-http",
             AOA_MCP_HOST="127.0.0.1",
             AOA_MCP_PORT=str(port),
+            AOA_MCP_HTTP_BEARER_TOKEN=MCP_HTTP_AUTH_TOKEN,
         )
         process = subprocess.Popen(
             [sys.executable, str(script)],
@@ -325,13 +637,52 @@ class McpLoopbackLifecycleTests(unittest.TestCase):
             self.assertIsNone(process.poll(), "aoa-decisions MCP exited after declaring readiness")
             with socket.create_connection(("127.0.0.1", port), timeout=1):
                 pass
+
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/mcp",
+                data=b"{}",
+                method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as missing_auth:
+                urllib.request.urlopen(request, timeout=2)
+            self.assertEqual(missing_auth.exception.code, 401)
+
+            wrong_request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/mcp",
+                data=b"{}",
+                method="POST",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+            with self.assertRaises(urllib.error.HTTPError) as wrong_auth:
+                urllib.request.urlopen(wrong_request, timeout=2)
+            self.assertEqual(wrong_auth.exception.code, 401)
+
+            async def authenticated_inventory() -> int:
+                import httpx
+                from mcp import ClientSession
+                from mcp.client.streamable_http import streamable_http_client
+
+                async with httpx.AsyncClient(
+                    headers={"Authorization": f"Bearer {MCP_HTTP_AUTH_TOKEN}"}
+                ) as http_client:
+                    async with streamable_http_client(
+                        f"http://127.0.0.1:{port}/mcp",
+                        http_client=http_client,
+                    ) as (read_stream, write_stream, _):
+                        async with ClientSession(read_stream, write_stream) as session:
+                            await session.initialize()
+                            tools = await session.list_tools()
+                            return len(tools.tools)
+
+            self.assertGreater(asyncio.run(authenticated_inventory()), 0)
         finally:
             process.terminate()
             try:
-                process.communicate(timeout=5)
+                stdout, stderr = process.communicate(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
-                process.communicate(timeout=5)
+                stdout, stderr = process.communicate(timeout=5)
+        self.assertNotIn(MCP_HTTP_AUTH_TOKEN, stdout + stderr)
 
 
 if __name__ == "__main__":

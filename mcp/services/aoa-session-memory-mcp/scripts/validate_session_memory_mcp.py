@@ -480,13 +480,33 @@ def _configured_transport_spec(state: AoASessionMemoryMCPState) -> tuple[dict | 
         if not isinstance(configured_server, dict) or configured_server.get("configured") is not True:
             diagnostics = configured_server.get("diagnostics") if isinstance(configured_server, dict) else None
             raise SystemExit(f"configured Codex MCP aoa_session_memory HTTP endpoint is invalid: {diagnostics}")
+        authentication = configured_server.get("authentication")
+        if not isinstance(authentication, dict) or authentication.get("configured") is not True:
+            raise SystemExit("configured Codex MCP aoa_session_memory HTTP bearer route is invalid")
+        environment = authentication.get("environment")
+        if not isinstance(environment, dict) or environment.get("available") is not True:
+            raise SystemExit("configured Codex MCP aoa_session_memory HTTP bearer credential is unavailable")
+        if environment.get("valid") is not True:
+            raise SystemExit("configured Codex MCP aoa_session_memory HTTP bearer credential is invalid")
+        bearer_token_env_var = authentication.get("env_var")
+        if not isinstance(bearer_token_env_var, str) or not bearer_token_env_var:
+            raise SystemExit("configured Codex MCP aoa_session_memory HTTP bearer env var is invalid")
         return (
-            {"transport": "streamable-http", "url": raw_url},
+            {
+                "transport": "streamable-http",
+                "url": raw_url,
+                "bearer_token_env_var": bearer_token_env_var,
+            },
             {
                 "available": True,
                 "config_path": config_path.as_posix(),
                 "transport": "streamable-http",
                 "url": configured_server.get("url"),
+                "authentication": {
+                    "mode": "bearer_env",
+                    "env_var": bearer_token_env_var,
+                    "client_environment_ready": True,
+                },
             },
         )
 
@@ -1164,8 +1184,20 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
 
     async with AsyncExitStack() as stack:
         if transport_spec["transport"] == "streamable-http":
+            import httpx
+
+            bearer_token_env_var = str(transport_spec["bearer_token_env_var"])
+            bearer_token = os.environ.get(bearer_token_env_var)
+            if not bearer_token:
+                raise SystemExit("configured Codex MCP bearer credential became unavailable during smoke")
+            http_client = await stack.enter_async_context(
+                httpx.AsyncClient(headers={"Authorization": f"Bearer {bearer_token}"})
+            )
             read_stream, write_stream, _ = await stack.enter_async_context(
-                streamable_http_client(str(transport_spec["url"]))
+                streamable_http_client(
+                    str(transport_spec["url"]),
+                    http_client=http_client,
+                )
             )
         else:
             read_stream, write_stream = await stack.enter_async_context(

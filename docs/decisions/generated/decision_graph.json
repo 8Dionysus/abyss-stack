@@ -1,9 +1,9 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
   "decision_count": 77,
-  "edge_count": 1686,
+  "edge_count": 1688,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 673,
+    "CITES_SOURCE_SURFACE": 675,
     "DATED": 77,
     "GUARDED_BY": 201,
     "HAS_STATUS": 77,
@@ -7943,6 +7943,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0077",
+      "target": "source_surface:mcp/services/_shared/build_http_auth_vendors.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0077",
+      "target": "source_surface:mcp/services/_shared/http_auth.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0077",
       "target": "source_surface:mcp/services/aoa-session-memory-mcp/src/aoa_session_memory_mcp/core.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -7988,12 +7998,12 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0077",
-      "target": "guard_family:authority%20preservation",
+      "target": "guard_family:authenticated%20loopback%20exposure",
       "type": "GUARDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0077",
-      "target": "guard_family:loopback-only%20exposure",
+      "target": "guard_family:authority%20preservation",
       "type": "GUARDED_BY"
     },
     {
@@ -8448,7 +8458,7 @@
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 728,
+  "node_count": 730,
   "node_type_counts": {
     "date": 20,
     "decision": 77,
@@ -8456,7 +8466,7 @@
     "mechanic_parent": 10,
     "owner_surface": 40,
     "repo": 1,
-    "source_surface": 407,
+    "source_surface": 409,
     "stack_lane": 28,
     "status": 2,
     "surface_class": 62
@@ -9358,6 +9368,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:authenticated%20loopback%20exposure",
+      "label": "authenticated loopback exposure",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:authority%20preservation",
       "label": "authority preservation",
       "type": "guard_family"
@@ -9475,11 +9490,6 @@
     {
       "id": "guard_family:legacy%20metadata%20containment",
       "label": "legacy metadata containment",
-      "type": "guard_family"
-    },
-    {
-      "id": "guard_family:loopback-only%20exposure",
-      "label": "loopback-only exposure",
       "type": "guard_family"
     },
     {
@@ -10711,6 +10721,16 @@
     {
       "id": "source_surface:mcp/services/README.md",
       "label": "mcp/services/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/_shared/build_http_auth_vendors.py",
+      "label": "mcp/services/_shared/build_http_auth_vendors.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mcp/services/_shared/http_auth.py",
+      "label": "mcp/services/_shared/http_auth.py",
       "type": "source_surface"
     },
     {

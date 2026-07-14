@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -121,6 +122,9 @@ MCP_SERVER_LOADED_SHA256 = globals().get("MCP_SERVER_LOADED_SHA256") or _file_sh
 
 DEFAULT_WORKSPACE_ROOT = Path("/srv/AbyssOS")
 DEFAULT_TIMEOUT_SECONDS = 20.0
+HTTP_BEARER_TOKEN_ENV_VAR = "AOA_MCP_HTTP_BEARER_TOKEN"
+HTTP_BEARER_CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
+HTTP_BEARER_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9._~-]{43,512}")
 STATUS_TIMEOUT_SECONDS = 60.0
 SEARCH_TIMEOUT_SECONDS = 60.0
 EVIDENCE_PACKET_TIMEOUT_SECONDS = 90.0
@@ -182,6 +186,92 @@ GRAPH_EVIDENCE_REF_SAMPLE_LIMIT = 6
 GRAPH_ITEM_TEXT_PREVIEW_CHARS = 64
 INVENTORY_SAMPLE_LABEL_CHARS = 64
 INVENTORY_TOTAL_SAMPLE_LIMIT = 12
+
+
+def _http_bearer_auth_state() -> dict[str, Any]:
+    environment_value = os.environ.get(HTTP_BEARER_TOKEN_ENV_VAR)
+    environment_available = environment_value is not None
+    environment_valid = bool(
+        environment_value is not None
+        and HTTP_BEARER_TOKEN_PATTERN.fullmatch(environment_value)
+    )
+
+    owner_context = os.environ.get("AOA_MCP_TRANSPORT", "").strip() == "streamable-http"
+    systemd_available = False
+    systemd_readable = False
+    systemd_valid = False
+    systemd_value: str | None = None
+    if owner_context:
+        credential_dir = os.environ.get("CREDENTIALS_DIRECTORY", "").strip()
+        if credential_dir:
+            credential_path = Path(credential_dir) / HTTP_BEARER_CREDENTIAL_NAME
+            systemd_available = credential_path.is_file() and not credential_path.is_symlink()
+            if systemd_available:
+                try:
+                    systemd_value = credential_path.read_text(encoding="utf-8").removesuffix("\n")
+                except (OSError, UnicodeError):
+                    systemd_value = None
+                systemd_readable = systemd_value is not None
+                systemd_valid = bool(
+                    systemd_value is not None
+                    and HTTP_BEARER_TOKEN_PATTERN.fullmatch(systemd_value)
+                )
+
+    sources_conflict = False
+    if owner_context and environment_valid and systemd_valid:
+        assert environment_value is not None
+        assert systemd_value is not None
+        # Valid credentials are URL-safe ASCII, so UTF-8 cannot expose an
+        # encoding-dependent failure or the credential value.
+        sources_conflict = not hmac.compare_digest(
+            environment_value.encode("utf-8"),
+            systemd_value.encode("utf-8"),
+        )
+    environment_ready = bool(environment_available and environment_valid)
+    systemd_ready = bool(systemd_available and systemd_readable and systemd_valid)
+    all_present_sources_valid = bool(
+        (not environment_available or environment_valid)
+        and (not systemd_available or systemd_ready)
+    )
+    owner_ready = bool(
+        owner_context
+        and all_present_sources_valid
+        and not sources_conflict
+        and (environment_ready or systemd_ready)
+    )
+    return {
+        "execution_context": "shared_http_owner" if owner_context else "client_or_cli",
+        "environment": {
+            "available": environment_available,
+            "valid": environment_valid,
+            "ready": environment_ready,
+        },
+        "systemd_credential": {
+            "observable": owner_context,
+            "available": systemd_available if owner_context else None,
+            "readable": systemd_readable if owner_context else None,
+            "valid": systemd_valid if owner_context else None,
+            "ready": systemd_ready if owner_context else None,
+        },
+        "sources_conflict": sources_conflict,
+        "ready": owner_ready if owner_context else environment_ready,
+    }
+
+
+def _http_bearer_next_action(configured_server: dict[str, Any]) -> str:
+    authentication = configured_server.get("authentication")
+    if (
+        isinstance(authentication, dict)
+        and authentication.get("execution_context") == "shared_http_owner"
+    ):
+        return (
+            "Correct or provision the shared HTTP owner's environment/systemd bearer sources, "
+            "then restart that owner without printing either credential."
+        )
+    return (
+        "Make the configured bearer credential available to the Codex process through "
+        "AOA_MCP_HTTP_BEARER_TOKEN without printing it."
+    )
 
 ALLOWED_TRACE_KINDS = {
     "auto",
@@ -2859,7 +2949,7 @@ class AoASessionMemoryMCPState:
                 "session.index.json, registry, atlas maps, search index, diagnostics",
                 "MCP compact route/evidence packets",
             ],
-            "exposure": "stdio-default; optional loopback streamable-http",
+            "exposure": "stdio-default; optional authenticated loopback streamable-http",
             "mutation_posture": "no write, no repair, no reindex, no relabel, no distillation, no promotion",
             "stop_lines": STOP_LINES,
         }
@@ -3031,7 +3121,15 @@ class AoASessionMemoryMCPState:
                 else:
                     display_url = None
                 transport = "streamable-http" if raw_url else "stdio"
-                configured = bool(server) and (not raw_url or http_boundary_valid)
+                raw_bearer_env_var = server.get("bearer_token_env_var")
+                bearer_configured = bool(
+                    raw_url and raw_bearer_env_var == HTTP_BEARER_TOKEN_ENV_VAR
+                )
+                bearer_state = _http_bearer_auth_state()
+                bearer_ready = bool(bearer_configured and bearer_state["ready"])
+                configured = bool(server) and (
+                    not raw_url or (http_boundary_valid and bearer_configured)
+                )
                 configured_server.update(
                     {
                         "configured": configured,
@@ -3043,22 +3141,72 @@ class AoASessionMemoryMCPState:
                         "cwd": server.get("cwd"),
                     }
                 )
+                if raw_url:
+                    configured_server["authentication"] = {
+                        "mode": "bearer_env",
+                        "env_var": (
+                            raw_bearer_env_var
+                            if isinstance(raw_bearer_env_var, str)
+                            else None
+                        ),
+                        "configured": bearer_configured,
+                        "execution_context": bearer_state["execution_context"],
+                        "environment": bearer_state["environment"],
+                        "systemd_credential": bearer_state["systemd_credential"],
+                        "sources_conflict": bearer_state["sources_conflict"],
+                        "ready": bearer_ready,
+                    }
                 if raw_url and not http_boundary_valid:
                     configured_server["diagnostics"] = ["http_endpoint_must_be_loopback_mcp"]
+                elif raw_url and raw_bearer_env_var is None:
+                    configured_server["diagnostics"] = ["http_bearer_token_env_var_required"]
+                elif raw_url and not bearer_configured:
+                    configured_server["diagnostics"] = ["http_bearer_token_env_var_invalid"]
+                elif raw_url and bearer_state["execution_context"] == "shared_http_owner" and bearer_state["sources_conflict"]:
+                    configured_server["diagnostics"] = ["http_owner_credential_conflict"]
+                elif raw_url and bearer_state["execution_context"] == "shared_http_owner" and not (
+                    bearer_state["environment"]["available"]
+                    or bearer_state["systemd_credential"]["available"]
+                ):
+                    configured_server["diagnostics"] = ["http_owner_credential_unavailable"]
+                elif raw_url and bearer_state["execution_context"] == "shared_http_owner" and not bearer_state["ready"]:
+                    configured_server["diagnostics"] = ["http_owner_credential_invalid"]
+                elif raw_url and not bearer_state["environment"]["available"]:
+                    configured_server["diagnostics"] = ["http_client_credential_unavailable"]
+                elif raw_url and not bearer_state["environment"]["valid"]:
+                    configured_server["diagnostics"] = ["http_client_credential_invalid"]
             except (OSError, tomllib.TOMLDecodeError) as exc:
                 configured_server.update({"configured": False, "diagnostics": [f"config_read_error:{exc}"]})
 
         if not proc_root.is_dir():
             return {
                 "schema": "aoa_session_memory_mcp_transport_preflight_v1",
-                "ok": bool(configured_server.get("configured")),
+                "ok": bool(
+                    configured_server.get("configured")
+                    and (
+                        configured_server.get("transport") != "streamable-http"
+                        or configured_server.get("authentication", {}).get("ready") is True
+                    )
+                ),
                 "mutates": False,
                 "configured_server": configured_server,
                 "runtime": self.runtime_identity(),
                 "codex_session": {"available": False, "reason": "procfs_unavailable"},
                 "running_mcp_processes": {"available": False, "reason": "procfs_unavailable"},
-                "direct_tool_transport_status": "unknown",
-                "next_action": "Use the configured transport's owner check before treating mcp__aoa_session_memory calls as proof.",
+                "direct_tool_transport_status": (
+                    "http_auth_unavailable"
+                    if configured_server.get("transport") == "streamable-http"
+                    and configured_server.get("configured") is True
+                    and configured_server.get("authentication", {}).get("ready") is not True
+                    else "unknown"
+                ),
+                "next_action": (
+                    _http_bearer_next_action(configured_server)
+                    if configured_server.get("transport") == "streamable-http"
+                    and configured_server.get("configured") is True
+                    and configured_server.get("authentication", {}).get("ready") is not True
+                    else "Use the configured transport's owner check before treating mcp__aoa_session_memory calls as proof."
+                ),
                 "authority_boundary": self.authority_boundary(),
             }
 
@@ -3156,6 +3304,9 @@ class AoASessionMemoryMCPState:
         configured = bool(configured_server.get("configured"))
         configured_transport = str(configured_server.get("transport") or "stdio")
         shared_http = configured_transport == "streamable-http"
+        http_auth_ready = bool(
+            configured_server.get("authentication", {}).get("ready")
+        )
         config_reload_advisory = bool(
             current_codex
             and configured
@@ -3170,6 +3321,11 @@ class AoASessionMemoryMCPState:
             live_transport_restart_advisory = False
             direct_ok = False
             next_action = "Keep aoa_session_memory on an authenticated local process route or a loopback-only /mcp URL."
+        elif shared_http and not http_auth_ready:
+            direct_status = "http_auth_unavailable"
+            live_transport_restart_advisory = False
+            direct_ok = False
+            next_action = _http_bearer_next_action(configured_server)
         elif shared_http and not mcp_processes:
             direct_status = "shared_http_unavailable"
             live_transport_restart_advisory = True

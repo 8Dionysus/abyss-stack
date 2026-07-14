@@ -31,7 +31,7 @@ Answer packets must preserve `agent_answer`, evidence-chain fields, and
   index, graph, answer packet, readiness, and storage contracts.
 - Keep `abyss-stack` responsible only for MCP packaging, local transport
   access, stack validation, and deployment posture. Stdio remains the portable
-  default; optional shared HTTP stays loopback-only under
+  default; optional shared HTTP stays authenticated and loopback-only under
   `ABYSS-STACK-D-0077`.
 - Do not expose crawl, refresh-build, materialize, reindex, seed-edit, or write
   tools in this first slice.

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from aoa_telegram_connector_mcp._http_auth import http_auth_kwargs as _http_auth_kwargs
+from aoa_telegram_connector_mcp._http_auth import transport_settings as _transport_settings
 from aoa_telegram_connector_mcp.core import AoATelegramConnectorMCPState
 
 LOGGER = logging.getLogger(__name__)
@@ -15,23 +16,25 @@ DEFAULT_HTTP_PORT = 5427
 
 
 def _run_server(server: Any) -> None:
-    transport = os.environ.get("AOA_MCP_TRANSPORT", "stdio").strip() or "stdio"
-    if transport == "stdio":
+    settings = _transport_settings(DEFAULT_HTTP_PORT)
+    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    if settings.transport == "stdio":
         server.run(transport="stdio")
         return
-    if transport != "streamable-http":
-        raise SystemExit(f"unsupported AOA_MCP_TRANSPORT: {transport}")
-    host = os.environ.get("AOA_MCP_HOST", "127.0.0.1").strip()
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise SystemExit("AOA_MCP_HOST must remain loopback-only")
-    server.settings.host = host
-    server.settings.port = int(os.environ.get("AOA_MCP_PORT", DEFAULT_HTTP_PORT))
+    assert settings.host is not None
+    assert settings.port is not None
+    server.settings.host = settings.host
+    server.settings.port = settings.port
     server.run(transport="streamable-http")
 
 
 def build_server(state: AoATelegramConnectorMCPState | None = None) -> FastMCP:
     service_state = state or AoATelegramConnectorMCPState.discover()
-    mcp = FastMCP("aoa-telegram-connector-mcp", json_response=True)
+    mcp = FastMCP(
+        "aoa-telegram-connector-mcp",
+        json_response=True,
+        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+    )
 
     @mcp.tool()
     def aoa_telegram_connector_status() -> dict[str, Any]:

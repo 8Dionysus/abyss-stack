@@ -26,8 +26,8 @@ hardware evidence, typed-text intake state, nervous read models, resource
 planning, heartbeats, reactions, responses, and change-ledger routes.
 
 `abyss-stack` owns the runnable MCP package and local transport topology:
-portable stdio by default and an explicitly selected loopback-only shared HTTP
-owner under `ABYSS-STACK-D-0077`.
+portable stdio by default and an explicitly selected authenticated loopback
+shared HTTP owner under `ABYSS-STACK-D-0077`.
 
 `aoa-memo` owns reviewed memory. `aoa-evals` owns proof and verdict authority.
 

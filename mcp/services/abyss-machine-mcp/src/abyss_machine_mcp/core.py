@@ -608,7 +608,7 @@ class AbyssMachineMCPState:
                 "append-only host histories and evidence refs",
                 "MCP compact summaries",
             ],
-            "exposure": "stdio-default; optional loopback streamable-http",
+            "exposure": "stdio-default; optional authenticated loopback streamable-http",
             "mutation_posture": "no write, no repair, no privileged command, no arbitrary shell",
             "stop_lines": STOP_LINES,
         }

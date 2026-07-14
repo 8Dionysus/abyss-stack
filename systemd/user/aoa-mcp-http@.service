@@ -13,6 +13,7 @@ Environment=AOA_ABYSS_STACK_ROOT=/srv/AbyssOS/abyss-stack/Configs
 Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=aoa-mcp-http-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token
 ExecStart=/usr/bin/env python3 /srv/AbyssOS/.codex/bin/%i-mcp-server.py
 Restart=on-failure
 RestartSec=2

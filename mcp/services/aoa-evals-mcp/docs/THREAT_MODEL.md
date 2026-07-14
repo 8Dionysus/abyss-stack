@@ -10,9 +10,9 @@
 | verdict is inferred from selection results | report skeleton leaves verdict unset |
 | proposal context is mistaken for source authoring approval | find-or-propose returns read-only `eval_need_v1` context and repo-local scaffold route only |
 | stack absorbs sibling proof meaning | local docs route proof meaning back to `aoa-evals` |
-| broad exposure widens attack surface | stdio remains the portable default; optional shared HTTP rejects non-loopback binds under `ABYSS-STACK-D-0077` |
+| loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the source-owned bearer credential under `ABYSS-STACK-D-0077` |
 | evidence laundering | candidate validation reports shape only and requires human review posture |
-| private runtime candidate leakage | export listing omits nested private payloads by default and stays on local-process or loopback-only transport |
+| private runtime candidate leakage | export listing omits nested private payloads by default and stays on local-process or authenticated loopback transport |
 | stale mirror use | runtime status reports missing manifests and refresh route |
 | local inventory causes unsafe repo mutation | inventory is read-only routing evidence; write tools remain gated and port-scoped |
 | path traversal or unintended overwrite through local-port writes | repo IDs must resolve under the workspace, explicit file slugs reject path syntax, and existing files require `replace_existing=true` |
@@ -43,7 +43,8 @@ Existing target files are not overwritten unless the caller explicitly sets
 
 Add a new `abyss-stack` decision before enabling any of these:
 
-- exposure beyond the decision-bound loopback-only shared HTTP owner;
+- exposure beyond the decision-bound authenticated loopback shared HTTP owner;
+- bypass, removal, or weakening of the bearer requirement;
 - write tools outside sibling repo-local `evals/` ports;
 - central `aoa-evals` source mutation;
 - proposal approval or source bundle creation;

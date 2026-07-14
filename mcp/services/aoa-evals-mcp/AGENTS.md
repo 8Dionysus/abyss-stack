@@ -86,8 +86,8 @@ It does not own:
 - V1 or unknown local-port inventory input must never infer runnable posture;
   injected suite execution fields fail closed to `absent`.
 - Keep stdio as the portable default. Optional shared Streamable HTTP must stay
-  loopback-only under `ABYSS-STACK-D-0077`; wider exposure still requires a
-  later decision.
+  authenticated and loopback-only under `ABYSS-STACK-D-0077`; wider exposure
+  still requires a later decision.
 
 ## Run
 

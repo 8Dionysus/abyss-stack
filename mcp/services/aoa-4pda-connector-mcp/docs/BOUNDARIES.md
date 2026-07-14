@@ -4,7 +4,8 @@
   schemas, storage contract, parser, normalizer, indexes, graph, answer
   packets, readiness, and eval routes.
 - `abyss-stack` owns this runnable MCP package, portable stdio and optional
-  loopback-only shared HTTP routes, stack validation, and deployment posture.
+  authenticated loopback shared HTTP routes, stack validation, and deployment
+  posture.
 - The MCP package reads local connector JSON packets and does not author 4PDA
   facts or proof claims.
 - Answer packets must preserve `agent_answer`, `evidence_chain`,

@@ -12,7 +12,8 @@
 | writeback evidence is laundered into memory | evidence packets are candidate-only and point to `aoa-memo` review |
 | skill-file reads, edits, or mentions are laundered into behavioral invocation | compact packets preserve producer candidate states and `invocation_claim_allowed` instead of flattening all activity into usage |
 | a parallel tool result is attached to the wrong skill event | source, observed, and rejected correlation ids remain visible and foreign results stay in a separate bounded rejection bucket |
-| broad exposure widens attack surface | stdio remains the portable default; optional shared HTTP rejects non-loopback binds under `ABYSS-STACK-D-0077` |
+| loopback HTTP widens the caller surface beyond stdio | stdio remains the portable default; optional HTTP rejects non-loopback binds and requires the source-owned bearer credential under `ABYSS-STACK-D-0077` |
+| bearer value leaks into source, config, or diagnostics | systemd uses `LoadCredential`, Codex config stores only `bearer_token_env_var`, and preflight reports availability without the value |
 | arbitrary file read through route resources | resources resolve fixed URI shapes and `.aoa` map/session roots only |
 
 ## Trust Boundary
@@ -29,7 +30,8 @@ commands.
 
 Add a new `abyss-stack` decision before enabling any of these:
 
-- exposure beyond the decision-bound loopback-only shared HTTP owner;
+- exposure beyond the decision-bound authenticated loopback shared HTTP owner;
+- bypass, removal, or weakening of the bearer requirement;
 - write tools;
 - maintenance apply, reindex, repair, relabel, naming, distillation, export, or
   install commands;

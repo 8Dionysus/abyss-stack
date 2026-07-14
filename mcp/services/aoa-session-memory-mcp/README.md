@@ -55,8 +55,11 @@ Tools:
 - `aoa_session_memory_status(include_live)`
 - `aoa_session_transport_preflight()`; diagnoses portable stdio child state or
   loopback shared HTTP owner state, distinguishes stale source/config from an
-  unavailable owner, rejects non-loopback or malformed HTTP endpoints, and
-  reports the next action when direct calls are not current proof.
+  unavailable owner, rejects non-loopback or malformed HTTP endpoints, requires
+  configured and available bearer authentication without exposing its value,
+  distinguishes client/CLI environment readiness from owner-side systemd
+  credential readiness, and reports the next action when direct calls are not
+  current proof.
 - `aoa_session_search(query="", filters, limit)`; route-only search is valid when filters such as `route_signal` and `doc_type` are supplied. `layer` is accepted as an input alias for `route_layer`, and explicit `use_shards`/`max_shards` filter controls are honored for bounded fan-out instead of being reported as unsupported filters. MCP returns compact hits, `mcp_route_plan`, and a provider freshness summary by default; follow `full_search_route` for the full archive CLI packet. `date_from`/`date_to` filter indexed search document/session dates; hook receipt timestamp checks should follow the returned `hook_receipts_route`.
 - `aoa_session_literal_query_plan(query="", kind="auto", filters)`; plans the cheapest reliable route before broad literal raw-text search. It prefers `entity_usage_chain` for typed operational anchors, entity registry/inventory for broad class queries such as skills/MCP/hooks/tools, rehydrate plus session-scoped search for exact session ids, structured filters for exact route reads, scoped full-text shards when available, and monolith fallback only as a bounded recall safety net. The packet exposes `classifications`, `cost_profile`, `fallback_plan`, and `next_expansion_command` so agents can see why the route was selected and where to expand next.
 - `aoa_session_agent_responses(query, session, agent_events, episode, closeout_final, verification_state, failure_state, limit)`
@@ -264,9 +267,16 @@ registry changed, the Codex client before using live output as proof.
 Source-local CLI smokes prove the code path. The package validator proves a
 fresh stdio process; `systemctl --user status
 aoa-mcp-http@aoa-session-memory.service` is the owner check for configured
-shared HTTP. The preflight reports transport-specific process freshness and
-does not treat the absence of a per-Codex child as failure when a fresh
-loopback shared owner is configured.
+shared HTTP. A shared HTTP Codex entry must set
+`bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"`, and the corresponding
+credential must be present in the Codex process environment. The preflight
+reports URL validity, bearer configuration, execution context, environment and
+systemd-credential readiness, source conflicts, and transport-specific process
+freshness without returning either bearer value. In a client/CLI context only
+the environment credential proves client smoke readiness; inside the shared
+owner, either its environment credential or its systemd credential may prove
+owner startup readiness. It does not treat the absence of a per-Codex child as
+failure when a fresh, authenticated loopback owner is configured.
 
 ## Agent Route
 

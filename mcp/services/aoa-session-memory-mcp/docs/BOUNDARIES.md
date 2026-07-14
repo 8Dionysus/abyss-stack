@@ -37,4 +37,4 @@ and MCP responses are not reviewed truth.
 - No treating MCP output as stronger than `.aoa` raw refs or reviewed owner
   sources.
 - No remote, wildcard-bind, gateway, or proxy exposure; optional shared HTTP
-  remains loopback-only under `ABYSS-STACK-D-0077`.
+  remains authenticated and loopback-only under `ABYSS-STACK-D-0077`.

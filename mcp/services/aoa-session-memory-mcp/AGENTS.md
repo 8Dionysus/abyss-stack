@@ -19,7 +19,7 @@ This stack-owned MCP surface owns:
 - MCP resources, tools, prompts, CLI, smoke tests, and service-local docs for
   session-evidence access.
 - The local transport boundary between `abyss-stack` and `.aoa`: portable
-  stdio by default and optional loopback-only shared HTTP under
+  stdio by default and optional authenticated loopback shared HTTP under
   `ABYSS-STACK-D-0077`.
 - Compact route/evidence packets that preserve refs into `.aoa`.
 
@@ -79,8 +79,8 @@ aoa-session-memory-mcp-server
 ```
 
 Codex may either start the portable stdio server once per Codex process or
-attach to the source-owned loopback shared HTTP owner. Existing tool
-implementations auto-reload `core.py` when its source hash changes, but
+attach to the source-owned authenticated loopback shared HTTP owner. Existing
+tool implementations auto-reload `core.py` when its source hash changes, but
 tool-surface, schema, server-wrapper, or Python import-path changes still
 require restarting the configured owner before treating `tool_search` /
 `mcp__aoa_session_memory.*` output as current. Killing an attached stdio server

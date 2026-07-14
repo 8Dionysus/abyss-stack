@@ -61,8 +61,9 @@ It does not own:
 - Treat generated/latest JSON as evidence and route accelerators; source
   contracts under `/etc/abyss-machine` remain stronger.
 - Keep stdio as the portable default. The optional shared Streamable HTTP
-  owner must stay loopback-only under `ABYSS-STACK-D-0077`; any wider or
-  remote exposure requires a later decision.
+  owner must stay authenticated and loopback-only under
+  `ABYSS-STACK-D-0077`; any wider or remote exposure requires a later
+  decision.
 
 ## Run
 

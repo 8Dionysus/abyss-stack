@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import core as core_module
+from ._http_auth import http_auth_kwargs as _http_auth_kwargs
+from ._http_auth import transport_settings as _transport_settings
 
 
 LOGGER = logging.getLogger(__name__)
@@ -15,17 +17,15 @@ DEFAULT_HTTP_PORT = 5422
 
 
 def _run_server(server: Any) -> None:
-    transport = os.environ.get("AOA_MCP_TRANSPORT", "stdio").strip() or "stdio"
-    if transport == "stdio":
+    settings = _transport_settings(DEFAULT_HTTP_PORT)
+    _http_auth_kwargs(DEFAULT_HTTP_PORT)
+    if settings.transport == "stdio":
         server.run(transport="stdio")
         return
-    if transport != "streamable-http":
-        raise SystemExit(f"unsupported AOA_MCP_TRANSPORT: {transport}")
-    host = os.environ.get("AOA_MCP_HOST", "127.0.0.1").strip()
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise SystemExit("AOA_MCP_HOST must remain loopback-only")
-    server.settings.host = host
-    server.settings.port = int(os.environ.get("AOA_MCP_PORT", DEFAULT_HTTP_PORT))
+    assert settings.host is not None
+    assert settings.port is not None
+    server.settings.host = settings.host
+    server.settings.port = settings.port
     server.run(transport="streamable-http")
 
 
@@ -65,7 +65,11 @@ def build_server(
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
-    mcp = FastMCP("aoa-session-memory-mcp", json_response=True)
+    mcp = FastMCP(
+        "aoa-session-memory-mcp",
+        json_response=True,
+        **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+    )
 
     def current_state() -> core_module.AoASessionMemoryMCPState:
         _reload_core_if_changed()

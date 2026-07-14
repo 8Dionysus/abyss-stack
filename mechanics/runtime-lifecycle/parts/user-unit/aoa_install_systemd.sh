@@ -11,6 +11,7 @@ enable_now=0
 restart_now=0
 link_all_user_units=0
 link_system_units=0
+provision_mcp_http_auth=0
 preset_spec=""
 profile_spec=""
 overlay_spec=""
@@ -74,6 +75,9 @@ while (($#)); do
     --system-units)
       link_system_units=1
       ;;
+    --provision-mcp-http-auth)
+      provision_mcp_http_auth=1
+      ;;
     --preset)
       shift
       (($#)) || aoa_die "missing value after --preset"
@@ -127,6 +131,54 @@ if ((overlay_set && ! selection_set)); then
   aoa_die "--overlay requires --preset or --profile so the full runtime shape stays explicit"
 fi
 aoa_validate_overlay_spec "$overlay_spec"
+
+mcp_http_credential_name="aoa-mcp-http-bearer-token"
+mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
+mcp_http_credential_path="${mcp_http_secret_dir}/${mcp_http_credential_name}"
+
+aoa_provision_mcp_http_auth() {
+  local token=""
+  local token_size=0
+  local file_size=0
+  local temp_path=""
+
+  if [[ -e "$mcp_http_secret_dir" || -L "$mcp_http_secret_dir" ]]; then
+    [[ -d "$mcp_http_secret_dir" && ! -L "$mcp_http_secret_dir" ]] || \
+      aoa_die "MCP HTTP secret root must be a directory, not a symlink"
+  else
+    install -d -m 0700 "$mcp_http_secret_dir"
+  fi
+  if [[ -e "$mcp_http_credential_path" || -L "$mcp_http_credential_path" ]]; then
+    [[ -f "$mcp_http_credential_path" && ! -L "$mcp_http_credential_path" ]] || \
+      aoa_die "existing MCP HTTP bearer credential must be a regular non-symlink file"
+    token="$(<"$mcp_http_credential_path")"
+    token_size="${#token}"
+    file_size="$(stat -c '%s' "$mcp_http_credential_path")"
+    if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
+      ! ((file_size == token_size || file_size == token_size + 1)); then
+      aoa_die "existing MCP HTTP bearer credential has invalid content"
+    fi
+    chmod 0600 "$mcp_http_credential_path"
+    aoa_note "MCP HTTP bearer credential already provisioned under the deployed Secrets root"
+    return 0
+  fi
+
+  temp_path="$(mktemp "${mcp_http_secret_dir}/.${mcp_http_credential_name}.XXXXXX")"
+  if ! /usr/bin/env python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
+    rm -f -- "$temp_path"
+    aoa_die "failed to generate MCP HTTP bearer credential"
+  fi
+  chmod 0600 "$temp_path"
+  mv -- "$temp_path" "$mcp_http_credential_path"
+  aoa_note "provisioned MCP HTTP bearer credential under the deployed Secrets root"
+}
+
+if ((provision_mcp_http_auth)); then
+  aoa_provision_mcp_http_auth
+  if ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
+    exit 0
+  fi
+fi
 
 unit_source="${AOA_CONFIGS_ROOT}/systemd/user/podman-compose-abyss.service"
 unit_manifest="${AOA_CONFIGS_ROOT}/systemd/user/managed-units.txt"

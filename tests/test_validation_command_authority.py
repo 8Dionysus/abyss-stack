@@ -113,6 +113,16 @@ def test_decision_graph_lane_refreshes_ignored_cache_before_checking_it() -> Non
     assert refresh < check
 
 
+def test_source_and_generated_lanes_check_vendored_mcp_http_auth() -> None:
+    expected = (
+        "mcp/services/_shared/build_http_auth_vendors.py",
+        "--check",
+    )
+    for sequence in ("source_fast", "generated", "release_check"):
+        commands = [step.command[1:] for step in validation_lanes.command_sequence(sequence)]
+        assert expected in commands
+
+
 def test_manifest_is_stdlib_json_and_python_commands_normalize() -> None:
     steps = validation_lanes.command_sequence("source_fast")
 

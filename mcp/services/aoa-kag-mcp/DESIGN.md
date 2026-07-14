@@ -18,10 +18,10 @@ prompts for agents.
 ## Runtime Shape
 
 The service remains read-only. Stdio is the portable default, while
-`ABYSS-STACK-D-0077` permits an explicitly selected loopback-only shared HTTP
-owner. Both routes keep provider-map reads cheap, use explicit source-return
-handles, and leave graph databases, vector stores, embedding caches, and live
-indexing to their runtime-owned contracts.
+`ABYSS-STACK-D-0077` permits an explicitly selected authenticated loopback
+shared HTTP owner. Both routes keep provider-map reads cheap, use explicit
+source-return handles, and leave graph databases, vector stores, embedding
+caches, and live indexing to their runtime-owned contracts.
 
 ## Interface
 

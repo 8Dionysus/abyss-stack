@@ -13,6 +13,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
@@ -21,6 +22,7 @@ from aoa_session_memory_mcp.server import build_server
 
 
 VALIDATOR_PATH = Path(__file__).resolve().parents[1] / "scripts" / "validate_session_memory_mcp.py"
+MCP_HTTP_TEST_TOKEN = "test-only-" + ("a" * 54)
 
 
 def load_validator_module():
@@ -3880,10 +3882,20 @@ def test_transport_preflight_recognizes_fresh_shared_http_owner(tmp_path: Path, 
     codex_home.mkdir()
     (codex_home / "config.toml").write_text(
         "[mcp_servers.aoa_session_memory]\n"
-        "url = \"http://127.0.0.1:5422/mcp\"\n",
+        "url = \"http://127.0.0.1:5422/mcp\"\n"
+        "bearer_token_env_var = \"AOA_MCP_HTTP_BEARER_TOKEN\"\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.delenv("AOA_MCP_HTTP_BEARER_TOKEN", raising=False)
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    credential_dir = tmp_path / "credentials"
+    credential_dir.mkdir()
+    credential_dir.joinpath("aoa-mcp-http-bearer-token").write_text(
+        MCP_HTTP_TEST_TOKEN,
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY", credential_dir.as_posix())
 
     proc = tmp_path / "proc"
     proc.mkdir()
@@ -3911,10 +3923,32 @@ def test_transport_preflight_recognizes_fresh_shared_http_owner(tmp_path: Path, 
     assert preflight["ok"] is True
     assert preflight["configured_server"]["transport"] == "streamable-http"
     assert preflight["configured_server"]["url"] == "http://127.0.0.1:5422/mcp"
+    assert preflight["configured_server"]["authentication"] == {
+        "mode": "bearer_env",
+        "env_var": "AOA_MCP_HTTP_BEARER_TOKEN",
+        "configured": True,
+        "execution_context": "shared_http_owner",
+        "environment": {
+            "available": False,
+            "valid": False,
+            "ready": False,
+        },
+        "systemd_credential": {
+            "observable": True,
+            "available": True,
+            "readable": True,
+            "valid": True,
+            "ready": True,
+        },
+        "sources_conflict": False,
+        "ready": True,
+    }
     assert preflight["direct_tool_transport_status"] == "attached_shared_http"
     assert preflight["live_transport_restart_advisory"] is False
     assert preflight["running_mcp_processes"]["fresh_process_count"] == 1
-    assert preflight["authority_boundary"]["exposure"] == "stdio-default; optional loopback streamable-http"
+    assert preflight["authority_boundary"]["exposure"] == (
+        "stdio-default; optional authenticated loopback streamable-http"
+    )
 
 
 def test_transport_preflight_rejects_unsafe_or_malformed_http_config(
@@ -3925,6 +3959,7 @@ def test_transport_preflight_rejects_unsafe_or_malformed_http_config(
     codex_home.mkdir()
     config_path = codex_home / "config.toml"
     monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.setenv("AOA_MCP_HTTP_BEARER_TOKEN", MCP_HTTP_TEST_TOKEN)
     state = AoASessionMemoryMCPState(
         workspace_root=tmp_path,
         aoa_root=tmp_path / ".aoa",
@@ -3938,7 +3973,8 @@ def test_transport_preflight_rejects_unsafe_or_malformed_http_config(
     ):
         config_path.write_text(
             "[mcp_servers.aoa_session_memory]\n"
-            f'url = "{invalid_url}"\n',
+            f'url = "{invalid_url}"\n'
+            'bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"\n',
             encoding="utf-8",
         )
 
@@ -3951,6 +3987,58 @@ def test_transport_preflight_rejects_unsafe_or_malformed_http_config(
         assert preflight["configured_server"]["diagnostics"] == ["http_endpoint_must_be_loopback_mcp"]
 
 
+def test_transport_preflight_requires_bearer_config_and_available_credential(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    validator = load_validator_module()
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    config_path = codex_home / "config.toml"
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.delenv("AOA_MCP_HTTP_BEARER_TOKEN", raising=False)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        'url = "http://127.0.0.1:5422/mcp"\n',
+        encoding="utf-8",
+    )
+    missing_config = state.session_mcp_transport_preflight(proc_root=tmp_path / "missing-proc")
+    assert missing_config["ok"] is False
+    assert missing_config["configured_server"]["configured"] is False
+    assert missing_config["configured_server"]["diagnostics"] == [
+        "http_bearer_token_env_var_required"
+    ]
+    with pytest.raises(SystemExit, match="bearer"):
+        validator._configured_transport_spec(state)
+
+    config_path.write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        'url = "http://127.0.0.1:5422/mcp"\n'
+        'bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"\n',
+        encoding="utf-8",
+    )
+    unavailable = state.session_mcp_transport_preflight(proc_root=tmp_path / "missing-proc")
+    assert unavailable["ok"] is False
+    assert unavailable["configured_server"]["configured"] is True
+    authentication = unavailable["configured_server"]["authentication"]
+    assert authentication["execution_context"] == "client_or_cli"
+    assert authentication["environment"]["ready"] is False
+    assert authentication["systemd_credential"]["observable"] is False
+    assert authentication["ready"] is False
+    assert unavailable["configured_server"]["diagnostics"] == [
+        "http_client_credential_unavailable"
+    ]
+    assert "Codex process" in unavailable["next_action"]
+    with pytest.raises(SystemExit, match="credential is unavailable"):
+        validator._configured_transport_spec(state)
+
+
 def test_validator_configured_transport_accepts_loopback_http(
     tmp_path: Path,
     monkeypatch: Any,
@@ -3960,10 +4048,12 @@ def test_validator_configured_transport_accepts_loopback_http(
     codex_home.mkdir()
     (codex_home / "config.toml").write_text(
         "[mcp_servers.aoa_session_memory]\n"
-        'url = "http://127.0.0.1:5422/mcp"\n',
+        'url = "http://127.0.0.1:5422/mcp"\n'
+        'bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"\n',
         encoding="utf-8",
     )
     monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.setenv("AOA_MCP_HTTP_BEARER_TOKEN", MCP_HTTP_TEST_TOKEN)
     state = AoASessionMemoryMCPState(
         workspace_root=tmp_path,
         aoa_root=tmp_path / ".aoa",
@@ -3975,10 +4065,101 @@ def test_validator_configured_transport_accepts_loopback_http(
     assert transport == {
         "transport": "streamable-http",
         "url": "http://127.0.0.1:5422/mcp",
+        "bearer_token_env_var": "AOA_MCP_HTTP_BEARER_TOKEN",
     }
     assert meta["available"] is True
     assert meta["transport"] == "streamable-http"
     assert meta["url"] == "http://127.0.0.1:5422/mcp"
+    assert meta["authentication"] == {
+        "mode": "bearer_env",
+        "env_var": "AOA_MCP_HTTP_BEARER_TOKEN",
+        "client_environment_ready": True,
+    }
+
+
+def test_transport_preflight_accepts_manual_http_owner_environment_credential(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    codex_home.joinpath("config.toml").write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        'url = "http://127.0.0.1:5422/mcp"\n'
+        'bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("AOA_MCP_HTTP_BEARER_TOKEN", MCP_HTTP_TEST_TOKEN)
+    monkeypatch.delenv("CREDENTIALS_DIRECTORY", raising=False)
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=tmp_path / "missing-proc")
+
+    assert preflight["ok"] is True
+    authentication = preflight["configured_server"]["authentication"]
+    assert authentication["execution_context"] == "shared_http_owner"
+    assert authentication["environment"]["ready"] is True
+    assert authentication["systemd_credential"] == {
+        "observable": True,
+        "available": False,
+        "readable": False,
+        "valid": False,
+        "ready": False,
+    }
+    assert authentication["sources_conflict"] is False
+    assert authentication["ready"] is True
+
+
+def test_transport_preflight_rejects_conflicting_http_owner_credentials(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    codex_home.joinpath("config.toml").write_text(
+        "[mcp_servers.aoa_session_memory]\n"
+        'url = "http://127.0.0.1:5422/mcp"\n'
+        'bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"\n',
+        encoding="utf-8",
+    )
+    environment_token = "environment-" + ("a" * 48)
+    systemd_token = "systemd-" + ("b" * 52)
+    credential_dir = tmp_path / "credentials"
+    credential_dir.mkdir()
+    credential_dir.joinpath("aoa-mcp-http-bearer-token").write_text(
+        systemd_token,
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("AOA_MCP_HTTP_BEARER_TOKEN", environment_token)
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY", credential_dir.as_posix())
+    state = AoASessionMemoryMCPState(
+        workspace_root=tmp_path,
+        aoa_root=tmp_path / ".aoa",
+        script_path=tmp_path / ".aoa/scripts/aoa_session_memory.py",
+    )
+
+    preflight = state.session_mcp_transport_preflight(proc_root=tmp_path / "missing-proc")
+
+    assert preflight["ok"] is False
+    authentication = preflight["configured_server"]["authentication"]
+    assert authentication["sources_conflict"] is True
+    assert authentication["ready"] is False
+    assert preflight["configured_server"]["diagnostics"] == [
+        "http_owner_credential_conflict"
+    ]
+    assert "shared HTTP owner" in preflight["next_action"]
+    assert "Codex process" not in preflight["next_action"]
+    rendered = json.dumps(preflight)
+    assert environment_token not in rendered
+    assert systemd_token not in rendered
 
 
 def test_transport_preflight_requires_restart_for_stale_shared_http_owner(
@@ -4001,10 +4182,12 @@ def test_transport_preflight_requires_restart_for_stale_shared_http_owner(
     codex_home.mkdir()
     (codex_home / "config.toml").write_text(
         "[mcp_servers.aoa_session_memory]\n"
-        "url = \"http://127.0.0.1:5422/mcp\"\n",
+        "url = \"http://127.0.0.1:5422/mcp\"\n"
+        "bearer_token_env_var = \"AOA_MCP_HTTP_BEARER_TOKEN\"\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("CODEX_HOME", codex_home.as_posix())
+    monkeypatch.setenv("AOA_MCP_HTTP_BEARER_TOKEN", MCP_HTTP_TEST_TOKEN)
 
     proc = tmp_path / "proc"
     proc.mkdir()

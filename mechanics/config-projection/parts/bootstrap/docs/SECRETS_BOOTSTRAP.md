@@ -91,9 +91,32 @@ If `TOS_GRAPH_NEO4J_PASSWORD` is omitted from `tos-graph.env`, the helper
 derives Neo4j credentials from the mounted stack-level `NEO4J_AUTH` value at
 runtime instead of duplicating the secret into a second committed example.
 
+### 6. Optional authenticated MCP HTTP bearer
+
+Real location:
+
+- `/srv/AbyssOS/abyss-stack/Secrets/Configs/aoa-mcp-http-bearer-token`
+
+This credential is required only when the optional shared Streamable HTTP MCP
+owners are used. Provision it through the explicit source-owned route:
+
+```bash
+scripts/aoa-install-systemd --provision-mcp-http-auth
+```
+
+The command creates a missing `Secrets/Configs` directory with mode `0700` but
+preserves the permissions of an existing directory. It rejects symlinked
+secret roots or credential files, creates a long random URL-safe value with
+mode `0600`, reuses an existing valid value, and never prints or replaces it.
+The user unit consumes the file through `LoadCredential`; Codex config stores
+only `bearer_token_env_var = "AOA_MCP_HTTP_BEARER_TOKEN"`. General layout
+checks do not require this optional secret when MCP remains on stdio.
+
 ## Minimum expectation
 
-Before trying to run the full Intel-aware or local-worker surface, ensure that these paths exist in real form.
+Before trying to run the full Intel-aware or local-worker surface, ensure that
+its required paths exist in real form. Provision the optional MCP bearer before
+starting any `aoa-mcp-http@...` owner.
 
 ## Helpful check
 
