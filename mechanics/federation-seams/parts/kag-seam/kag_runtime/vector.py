@@ -10,7 +10,7 @@ from .bundle import RetrievalBundle
 from .transport import HttpJsonError, JsonHttpClient
 
 
-SCHEMA_VERSION = "abyss-stack-repo-self-kag-qdrant-v2"
+SCHEMA_VERSION = "abyss-stack-repo-self-kag-qdrant-v3"
 COLLECTION_PREFIX = "aoa_kag_repo_self_"
 DEFAULT_ALIAS = "aoa_kag_repo_self_current"
 DEFAULT_EMBEDDING_BATCH_SIZE = 1
@@ -18,6 +18,8 @@ PAYLOAD_INDEXES = {
     "repo": "keyword",
     "node_class": "keyword",
     "kind": "keyword",
+    "document_role": "keyword",
+    "surface_state": "keyword",
     "access.scope": "keyword",
 }
 DISTANCES = {
@@ -140,6 +142,8 @@ def _point(
         "locator",
         "text",
         "text_digest",
+        "document_role",
+        "surface_state",
         "source_record_ids",
         "source_version_ids",
         "anchor_ids",
@@ -317,19 +321,26 @@ def _cleanup_collections(
     current: str,
     previous: str | None,
 ) -> list[str]:
-    response = client.request("GET", "/collections")
+    if (
+        not previous
+        or previous == current
+        or not previous.startswith(COLLECTION_PREFIX)
+    ):
+        return []
+    response = client.request("GET", "/aliases")
     result = response.get("result")
-    collections = result.get("collections") if isinstance(result, dict) else None
-    if not isinstance(collections, list):
-        raise RuntimeError("Qdrant collection inventory is missing")
-    keep = {current, previous}
-    removed: list[str] = []
-    for item in collections:
-        name = str(item.get("name", ""))
-        if name.startswith(COLLECTION_PREFIX) and name not in keep:
-            client.request("DELETE", f"/collections/{name}")
-            removed.append(name)
-    return sorted(removed)
+    aliases = result.get("aliases") if isinstance(result, dict) else None
+    if not isinstance(aliases, list):
+        raise RuntimeError("Qdrant alias inventory is missing")
+    referenced = {
+        str(item.get("collection_name") or "")
+        for item in aliases
+        if isinstance(item, dict)
+    }
+    if previous in referenced:
+        return []
+    client.request("DELETE", f"/collections/{previous}")
+    return [previous]
 
 
 def materialize(
@@ -498,7 +509,13 @@ def search(
     collection: str | None = None,
     alias: str = DEFAULT_ALIAS,
     repo: str | None = None,
+    node_class: str | None = None,
     kind: str | None = None,
+    path: str | None = None,
+    document_role: str | None = None,
+    surface_state: str | None = None,
+    access_scopes: tuple[str, ...] = ("public",),
+    offset: int = 0,
     limit: int = 10,
 ) -> tuple[list[dict[str, Any]], float]:
     started = time.perf_counter()
@@ -514,15 +531,37 @@ def search(
     payload: dict[str, Any] = {
         "query": query_vector,
         "limit": limit,
+        "offset": offset,
         "with_payload": True,
     }
-    conditions = []
+    conditions: list[dict[str, Any]] = []
+    scopes = tuple(dict.fromkeys(access_scopes))
+    if not scopes:
+        return [], (time.perf_counter() - started) * 1000
+    if len(scopes) == 1:
+        conditions.append({"key": "access.scope", "match": {"value": scopes[0]}})
+    else:
+        conditions.append({"key": "access.scope", "match": {"any": list(scopes)}})
     if repo:
         conditions.append({"key": "repo", "match": {"value": repo}})
+    if node_class:
+        conditions.append({"key": "node_class", "match": {"value": node_class}})
     if kind:
         conditions.append({"key": "kind", "match": {"value": kind}})
-    if conditions:
-        payload["filter"] = {"must": conditions}
+    if path:
+        conditions.append({"key": "path", "match": {"value": path}})
+    if document_role:
+        conditions.append({"key": "document_role", "match": {"value": document_role}})
+    if surface_state:
+        conditions.append({"key": "surface_state", "match": {"value": surface_state}})
+    payload["filter"] = {"must": conditions}
+    if not document_role:
+        payload["filter"]["must_not"] = [
+            {
+                "key": "document_role",
+                "match": {"value": "evaluation_fixture"},
+            }
+        ]
     selected_collection = collection or active_collection(qdrant, alias)
     response = qdrant.request(
         "POST",

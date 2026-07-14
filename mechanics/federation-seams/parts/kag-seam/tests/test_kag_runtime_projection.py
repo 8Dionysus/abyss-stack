@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ PART_ROOT = REPO_ROOT / "mechanics" / "federation-seams" / "parts" / "kag-seam"
 sys.path.insert(0, str(PART_ROOT))
 
 from kag_runtime import exact, graph, vector  # noqa: E402
+from kag_runtime.application import KagApplication, RuntimeConfig  # noqa: E402
 from kag_runtime.bundle import RetrievalBundle, canonical_json  # noqa: E402
 from kag_runtime.transport import HttpJsonError, JsonHttpClient  # noqa: E402
 import aoa_kag_runtime_eval as runtime_eval  # noqa: E402
@@ -58,9 +60,9 @@ def write_bundle(root: Path) -> RetrievalBundle:
             "node_counts": {
                 "artifact": 1,
                 "anchor": 1,
-                "entity": 0,
-                "event": 0,
-                "assertion": 0,
+                "entity": 1,
+                "event": 1,
+                "assertion": 1,
             },
             "relation_count": 1,
         }
@@ -72,9 +74,18 @@ def write_bundle(root: Path) -> RetrievalBundle:
             "namespace": "aoa:fixture",
             "node_class": "artifact",
             "kind": "markdown",
+            "record_form": "projection_handle",
+            "label": "README.md",
+            "path": "README.md",
+            "search_text": "README.md markdown repository introduction",
             "source_record_ids": ["source:readme"],
             "anchor_ids": ["aoa:fixture:anchor:intro"],
             "access_scope": "public",
+            "document_role": "readme",
+            "surface_state": "authored_source",
+            "provenance_ref": "provenance:fixture",
+            "temporal_ref": "temporal:current",
+            "trust_ref": "trust:deterministic",
         },
         {
             "id": "aoa:fixture:anchor:intro",
@@ -82,9 +93,75 @@ def write_bundle(root: Path) -> RetrievalBundle:
             "namespace": "aoa:fixture",
             "node_class": "anchor",
             "kind": "markdown_heading",
+            "record_form": "projection_handle",
+            "label": "Introduction",
+            "path": "README.md",
+            "search_text": "Introduction repository evidence README.md markdown heading",
             "source_record_ids": ["source:readme"],
             "anchor_ids": ["aoa:fixture:anchor:intro"],
             "access_scope": "public",
+            "document_role": "readme",
+            "surface_state": "authored_source",
+            "provenance_ref": "provenance:fixture",
+            "temporal_ref": "temporal:current",
+            "trust_ref": "trust:deterministic",
+        },
+        {
+            "id": "aoa:fixture:entity:repository",
+            "repo": "fixture",
+            "namespace": "aoa:fixture",
+            "node_class": "entity",
+            "kind": "repository",
+            "record_form": "projection_handle",
+            "label": "Fixture repository",
+            "path": "README.md",
+            "search_text": "Fixture repository entity owner route",
+            "source_record_ids": ["source:readme"],
+            "anchor_ids": ["aoa:fixture:anchor:intro"],
+            "access_scope": "public",
+            "document_role": "readme",
+            "surface_state": "authored_source",
+            "provenance_ref": "provenance:fixture",
+            "temporal_ref": "temporal:current",
+            "trust_ref": "trust:deterministic",
+        },
+        {
+            "id": "aoa:fixture:event:release",
+            "repo": "fixture",
+            "namespace": "aoa:fixture",
+            "node_class": "event",
+            "kind": "release",
+            "record_form": "projection_handle",
+            "label": "Fixture release",
+            "path": "",
+            "search_text": "Fixture release event observed history",
+            "source_record_ids": [],
+            "anchor_ids": [],
+            "access_scope": "public",
+            "document_role": "repository_event",
+            "surface_state": "observed_history",
+            "provenance_ref": "provenance:fixture",
+            "temporal_ref": "temporal:current",
+            "trust_ref": "trust:deterministic",
+        },
+        {
+            "id": "aoa:fixture:assertion:owner",
+            "repo": "fixture",
+            "namespace": "aoa:fixture",
+            "node_class": "assertion",
+            "kind": "ownership",
+            "record_form": "projection_handle",
+            "label": "owned_by: fixture",
+            "path": "README.md",
+            "search_text": "owned by fixture assertion repository",
+            "source_record_ids": ["source:readme"],
+            "anchor_ids": ["aoa:fixture:anchor:intro"],
+            "access_scope": "public",
+            "document_role": "readme",
+            "surface_state": "authored_source",
+            "provenance_ref": "provenance:fixture",
+            "temporal_ref": "temporal:current",
+            "trust_ref": "trust:deterministic",
         },
     ]
     relations = [
@@ -96,6 +173,14 @@ def write_bundle(root: Path) -> RetrievalBundle:
             "source_repo": "fixture",
             "target_repo": "fixture",
             "scope": "local",
+            "record_form": "canonical_record",
+            "label": "contains: README.md -> Introduction",
+            "path": "README.md",
+            "search_text": "contains README.md Introduction relation",
+            "source_record_ids": ["source:readme"],
+            "access_scope": "public",
+            "document_role": "readme",
+            "surface_state": "authored_source",
             "evidence_anchor_ids": [nodes[1]["id"]],
             "evidence_class": "deterministic",
             "confidence": 1.0,
@@ -202,7 +287,7 @@ def write_bundle(root: Path) -> RetrievalBundle:
         },
         "federation_summary": {
             "owner_count": 1,
-            "node_count": 2,
+            "node_count": 5,
             "relation_count": 1,
             "cross_repo_relation_count": 0,
             "external_reference_count": 1,
@@ -362,6 +447,9 @@ class FakeGraph:
     def __init__(self) -> None:
         self.current: str | None = None
         self.previous: str | None = None
+        self.retained_digests: list[str] = []
+        self.cleanup_keep: list[str] = []
+        self.observed_channels: list[str] = []
         self.counts = {
             "owners": 0,
             "nodes": 0,
@@ -384,7 +472,8 @@ class FakeGraph:
             self.counts["owners"] += len(rows)
         elif "UNWIND" in statement and "MERGE (n:AoAKagNode" in statement:
             self.counts["nodes"] += len(rows)
-        if "repo-self-current" in statement and "SET p.previous_digest" in statement:
+        if "SET p.previous_digest" in statement:
+            self.observed_channels.append(str(values.get("channel") or ""))
             self.previous = self.current
             self.current = str(values["projection"])
         return []
@@ -393,12 +482,27 @@ class FakeGraph:
         if "DETACH DELETE n" in statement:
             limit = int(parameters["limit"])
             self.cleanup_limits.append(limit)
+            self.cleanup_keep = list(parameters["keep"])
             removed = min(self.stale_nodes, limit)
             self.stale_nodes -= removed
             return removed
+        if "RETURN collect(digest)" in statement:
+            return list(
+                dict.fromkeys(
+                    item
+                    for item in (
+                        self.current,
+                        self.previous,
+                        *self.retained_digests,
+                    )
+                    if item
+                )
+            )
         if "p.previous_digest" in statement:
+            self.observed_channels.append(str(parameters.get("channel") or ""))
             return self.previous
         if "p.current_digest" in statement:
+            self.observed_channels.append(str(parameters.get("channel") or ""))
             return self.current
         if "AoAKagOwner" in statement:
             return self.counts["owners"]
@@ -421,8 +525,10 @@ class KagRuntimeProjectionTests(unittest.TestCase):
     def test_bundle_verification_detects_drift(self) -> None:
         report = self.bundle.verify()
         self.assertEqual(report["files"]["documents"]["record_count"], 1)
-        with self.bundle.path("documents").open("a", encoding="utf-8") as handle:
-            handle.write("{}\n")
+        document_path = self.bundle.path("documents")
+        original = document_path.read_text(encoding="utf-8")
+        with document_path.open("a", encoding="utf-8") as handle:
+            handle.write(original)
         with self.assertRaisesRegex(RuntimeError, "digest mismatch"):
             self.bundle.verify()
 
@@ -435,20 +541,411 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         connection = sqlite3.connect(destination)
         try:
             hit = connection.execute(
-                "SELECT id FROM documents_fts WHERE documents_fts MATCH "
-                "'repo:fixture AND kind:markdown_heading AND evidence'"
+                "SELECT d.id FROM documents_fts "
+                "JOIN documents d ON d.rowid=documents_fts.rowid "
+                "WHERE documents_fts MATCH "
+                "'repo:fixture AND kind:markdown AND kind:heading AND evidence'"
             ).fetchone()
             filter_columns = [
                 row[2]
-                for row in connection.execute("PRAGMA index_info(documents_filter)")
+                for row in connection.execute("PRAGMA index_info(documents_path)")
             ]
+            objects = dict(
+                connection.execute(
+                    "SELECT name,type FROM sqlite_master "
+                    "WHERE name IN ('nodes','records_fts_content','documents_fts_content')"
+                )
+            )
         finally:
             connection.close()
         self.assertEqual(hit[0], "aoa:fixture:retrieval-document:intro")
         self.assertEqual(
             filter_columns,
-            ["repo", "path", "node_class", "kind", "start_line", "chunk_index", "id"],
+            ["path", "repo", "node_class", "kind", "start_line", "chunk_index", "id"],
         )
+        self.assertEqual(objects, {"nodes": "view"})
+
+    def test_sqlite_record_index_covers_every_base_record_class(self) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        result = exact.materialize(self.bundle, destination)
+        self.assertEqual(result["counts"]["records"], 6)
+        connection = sqlite3.connect(destination)
+        connection.row_factory = sqlite3.Row
+        try:
+            classes = {row[1] for row in exact.record_kinds(connection)}
+            searches = {
+                node_class: exact.search_records_lexical(
+                    connection,
+                    query,
+                    node_class=node_class,
+                    limit=2,
+                )[0]
+                for node_class, query in {
+                    "entity": "repository owner route",
+                    "event": "release observed history",
+                    "assertion": "owned fixture assertion",
+                    "relation": "contains introduction relation",
+                }.items()
+            }
+            relation = exact.read_record(
+                connection,
+                "aoa:fixture:relation:contains",
+            )
+        finally:
+            connection.close()
+        self.assertEqual(
+            classes,
+            {"anchor", "artifact", "assertion", "entity", "event", "relation"},
+        )
+        self.assertTrue(all(searches.values()))
+        self.assertEqual(relation["relation_kind"], "contains")
+
+    def test_record_read_keeps_document_text_behind_document_resources(self) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(self.bundle, destination)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=destination,
+        )
+        application = KagApplication(config=config)
+
+        result = application.read(
+            "aoa-kag://records/aoa%3Afixture%3Aanchor%3Aintro",
+            detail="full",
+        )
+        payload = result["resource"]["payload"]
+
+        self.assertEqual(payload["document_count"], 1)
+        self.assertEqual(len(payload["documents"]), 1)
+        self.assertIn("snippet", payload["documents"][0])
+        self.assertNotIn("text", payload["documents"][0])
+
+    def test_agent_result_pages_are_bounded_to_ten_records(self) -> None:
+        application = KagApplication()
+
+        with self.assertRaisesRegex(ValueError, "from 1 through 10"):
+            application.search("repository", limit=11)
+        with self.assertRaisesRegex(ValueError, "from 1 through 10"):
+            application.traverse(["aoa:fixture:entity:repository"], limit=11)
+
+    def test_indexed_unicode_controls_are_reported_as_data_findings(self) -> None:
+        payload = KagApplication._bounded_payload(
+            {"text": "report\u202etxt role\u200badmin"}
+        )
+
+        inspection = payload["content_inspection"]
+        self.assertEqual(inspection["state"], "flagged")
+        self.assertEqual(
+            [item["code_point"] for item in inspection["findings"]],
+            ["U+202E", "U+200B"],
+        )
+
+    def test_record_kind_discovery_respects_access_scope(self) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(self.bundle, destination)
+        connection = sqlite3.connect(destination)
+        connection.row_factory = sqlite3.Row
+        try:
+            source = connection.execute(
+                "SELECT * FROM records WHERE node_class='artifact' LIMIT 1"
+            ).fetchone()
+            values = dict(source)
+            values.update(
+                {
+                    "id": "aoa:fixture:artifact:private",
+                    "kind": "secret_record",
+                    "label": "Private record",
+                    "access_scope": "private",
+                }
+            )
+            payload = json.loads(values["payload_json"])
+            payload.update(
+                {
+                    "id": values["id"],
+                    "kind": values["kind"],
+                    "label": values["label"],
+                    "access_scope": values["access_scope"],
+                }
+            )
+            values["payload_json"] = canonical_json(payload)
+            columns = list(values)
+            connection.execute(
+                f"INSERT INTO records ({','.join(columns)}) VALUES "
+                f"({','.join('?' for _ in columns)})",
+                [values[column] for column in columns],
+            )
+            connection.commit()
+
+            public_kinds = exact.record_kinds(connection)
+            private_kinds = exact.record_kinds(
+                connection,
+                access_scopes=("private",),
+            )
+        finally:
+            connection.close()
+
+        self.assertNotIn(("fixture", "artifact", "secret_record"), public_kinds)
+        self.assertIn(("fixture", "artifact", "secret_record"), private_kinds)
+
+    def test_runtime_query_failure_returns_bounded_degradation(self) -> None:
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=self.root / "missing.sqlite3",
+        )
+        application = KagApplication(config=config)
+        with mock.patch.object(
+            application,
+            "_runtime_hits",
+            side_effect=sqlite3.OperationalError("interrupted"),
+        ):
+            result = application.search(
+                "repository owner route",
+                strategy="lexical",
+            )
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["results"], [])
+        self.assertEqual(
+            result["route"]["degradation"],
+            [
+                {
+                    "target": "runtime",
+                    "state": "unavailable",
+                    "fallback": "empty-bounded-result",
+                    "reason": "OperationalError",
+                }
+            ],
+        )
+
+    def test_self_described_exact_projection_reports_missing_runtime_state(
+        self,
+    ) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(self.bundle, destination)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=destination,
+        )
+        application = KagApplication(config=config)
+
+        result = application.search(
+            "README.md",
+            strategy="exact",
+            record_class="artifact",
+        )
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertIn(
+            {
+                "target": "runtime-projection-state",
+                "state": "mismatched",
+                "fallback": "sqlite-self-described-projection",
+            },
+            result["route"]["degradation"],
+        )
+        self.assertEqual(
+            result["results"][0]["qualified_id"],
+            "aoa:fixture:artifact:readme",
+        )
+
+    def test_owner_source_failure_degrades_freshness_without_hiding_runtime(
+        self,
+    ) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(self.bundle, destination)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=destination,
+        )
+        canonical = mock.Mock()
+        canonical.owner_digest.side_effect = ValueError("escaped owner route")
+        application = KagApplication(config=config, canonical=canonical)
+
+        result = application.discover(owner="fixture", detail="full")
+
+        self.assertEqual([item["repo"] for item in result["owners"]], ["fixture"])
+        self.assertEqual(
+            result["owners"][0]["freshness"],
+            {
+                "state": "source_unavailable",
+                "runtime_source_digest": _digest("source"),
+                "canonical_source_digest": "",
+                "canonical_error": "ValueError",
+            },
+        )
+
+    def test_owner_discovery_reports_canonical_fallback_capabilities(self) -> None:
+        config = RuntimeConfig.discover(stack_root=self.root)
+        canonical = mock.Mock()
+        canonical.owner_names.return_value = ["fixture"]
+        canonical.owner_digest.return_value = _digest("source")
+        canonical.discover_owner.return_value = {
+            "kind_counts": {
+                "artifact": {"document": 2},
+                "entity": {"repository": 1},
+            }
+        }
+        application = KagApplication(config=config, canonical=canonical)
+
+        result = application.discover(owner="fixture", detail="full")
+        strategies = {item["name"]: item for item in result["strategies"]}
+
+        self.assertTrue(strategies["exact"]["available"])
+        self.assertTrue(strategies["lexical"]["available"])
+        self.assertEqual(result["kinds"]["artifact"], ["document"])
+        self.assertEqual(result["kinds"]["entity"], ["repository"])
+
+    def test_qualified_owner_survives_canonical_route_failure(self) -> None:
+        canonical = mock.Mock()
+        canonical.resolve_owner.side_effect = OSError("owner map unavailable")
+        application = KagApplication(canonical=canonical)
+
+        owner = application._record_owner("aoa:fixture:artifact:readme")
+
+        self.assertEqual(owner, "fixture")
+
+    def test_result_merges_return_each_qualified_record_once(self) -> None:
+        documents = [
+            {"id": "aoa:fixture:anchor:a", "document_id": "document:a:1"},
+            {"id": "aoa:fixture:anchor:a", "document_id": "document:a:2"},
+            {"id": "aoa:fixture:anchor:b", "document_id": "document:b:1"},
+        ]
+        records = [
+            {"id": "aoa:fixture:anchor:a"},
+            {"id": "aoa:fixture:entity:c"},
+        ]
+
+        exact_hits = KagApplication._merge_exact_hits(
+            documents, records, offset=0, limit=10
+        )
+        lexical_hits = KagApplication._merge_lexical_hits(
+            documents, records, offset=0, limit=10
+        )
+        hybrid_hits = KagApplication._hybrid(
+            lexical=[documents[0], documents[1]],
+            semantic=[documents[1], documents[2]],
+            limit=10,
+        )
+
+        self.assertEqual(
+            [item["id"] for item in exact_hits],
+            [
+                "aoa:fixture:anchor:a",
+                "aoa:fixture:entity:c",
+                "aoa:fixture:anchor:b",
+            ],
+        )
+        self.assertEqual(len({item["id"] for item in lexical_hits}), 3)
+        self.assertEqual(
+            [item["id"] for item in hybrid_hits],
+            ["aoa:fixture:anchor:a", "aoa:fixture:anchor:b"],
+        )
+        self.assertEqual(
+            set(hybrid_hits[0]["hybrid_components"]), {"lexical", "semantic"}
+        )
+
+    def test_missing_graph_projection_uses_exact_relation_paths(self) -> None:
+        sqlite_path = self.root / "repo-self.sqlite3"
+        exact.materialize(self.bundle, sqlite_path)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=sqlite_path,
+        )
+        config.current_path.parent.mkdir(parents=True)
+        config.current_path.write_text(
+            json.dumps(
+                {
+                    "projection_identity": {
+                        "content_digest": self.bundle.projection_digest
+                    },
+                    "targets": {"graph": {"status": "missing"}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        application = KagApplication(config=config)
+        graph_capability = next(
+            item
+            for item in application.discover()["strategies"]
+            if item["name"] == "graph"
+        )
+        result = application.traverse(
+            ["aoa:fixture:artifact:readme"],
+            owner="fixture",
+            max_depth=2,
+        )
+        self.assertTrue(graph_capability["available"])
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(
+            result["route"]["adapters"][0]["adapter"],
+            "sqlite-exact-relations",
+        )
+        self.assertEqual(
+            [item["qualified_id"] for item in result["results"]],
+            ["aoa:fixture:anchor:intro"],
+        )
+        evidence = result["results"][0]["evidence_path"]
+        self.assertEqual(evidence["depth"], 1)
+        self.assertEqual(
+            [item["id"] for item in evidence["relations"]],
+            ["aoa:fixture:relation:contains"],
+        )
+
+    def test_graph_results_are_enriched_from_exact_records(self) -> None:
+        sqlite_path = self.root / "repo-self.sqlite3"
+        exact.materialize(self.bundle, sqlite_path)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=sqlite_path,
+        )
+        config.current_path.parent.mkdir(parents=True)
+        config.current_path.write_text(
+            json.dumps(
+                {
+                    "projection_identity": {
+                        "content_digest": self.bundle.projection_digest
+                    },
+                    "targets": {"graph": {"status": "current"}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        graph_hit = {
+            "id": "aoa:fixture:entity:repository",
+            "repo": "fixture",
+            "namespace": "aoa:fixture",
+            "node_class": "entity",
+            "kind": "repository",
+            "access": {"scope": "public"},
+            "evidence_path": {
+                "source_id": "aoa:fixture:artifact:readme",
+                "target_id": "aoa:fixture:entity:repository",
+                "depth": 1,
+                "nodes": [],
+                "relations": [],
+            },
+        }
+        application = KagApplication(config=config)
+
+        with (
+            mock.patch(
+                "kag_runtime.application._neo4j_headers",
+                return_value={},
+            ),
+            mock.patch.object(
+                graph,
+                "traverse",
+                return_value=([graph_hit], 1.0),
+            ),
+        ):
+            result = application.traverse(
+                ["aoa:fixture:artifact:readme"],
+                detail="full",
+            )
+
+        hit = result["results"][0]
+        self.assertEqual(hit["label"], "Fixture repository")
+        self.assertEqual(hit["path"], "README.md")
+        self.assertEqual(hit["record"]["id"], hit["qualified_id"])
 
     def test_qdrant_projection_uses_bundle_point_identity_and_alias(self) -> None:
         qdrant = FakeQdrant()
@@ -466,6 +963,37 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(qdrant.points[0]["vector"], [0.6, 0.8, 0.0])
         checked = vector.check(self.bundle, qdrant=qdrant)
         self.assertEqual(checked["collection"], result["collection"])
+
+    def test_qdrant_projection_cleanup_stays_with_its_alias(self) -> None:
+        qdrant = FakeQdrant()
+        old_active = f"{vector.COLLECTION_PREFIX}old-active"
+        other_profile = f"{vector.COLLECTION_PREFIX}other-profile"
+        for name in (old_active, other_profile):
+            qdrant.collections[name] = {
+                "count": 0,
+                "size": 3,
+                "distance": "Cosine",
+                "payload_schema": {},
+                "points": {},
+            }
+        qdrant.aliases.update(
+            {
+                "lab-active": old_active,
+                "lab-other": other_profile,
+            }
+        )
+
+        result = vector.materialize(
+            self.bundle,
+            qdrant=qdrant,
+            embeddings=FakeEmbeddings(),
+            alias="lab-active",
+        )
+
+        self.assertNotIn(old_active, qdrant.collections)
+        self.assertEqual(result["removed_collections"], [old_active])
+        self.assertIn(other_profile, qdrant.collections)
+        self.assertEqual(qdrant.aliases["lab-other"], other_profile)
 
     def test_qdrant_query_uses_active_collection_and_owner_filter(self) -> None:
         qdrant = FakeQdrant()
@@ -493,7 +1021,10 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertGreaterEqual(latency, 0.0)
         self.assertEqual(
             qdrant.queries[0]["filter"]["must"],
-            [{"key": "repo", "match": {"value": "fixture"}}],
+            [
+                {"key": "access.scope", "match": {"value": "public"}},
+                {"key": "repo", "match": {"value": "fixture"}},
+            ],
         )
 
     def test_embedding_batches_retry_then_split_on_transient_capacity(self) -> None:
@@ -689,7 +1220,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
     def test_neo4j_projection_switches_current_after_complete_counts(self) -> None:
         fake = FakeGraph()
         result = graph.materialize(self.bundle, graph=fake, batch_size=1)
-        self.assertEqual(result["counts"]["nodes"], 2)
+        self.assertEqual(result["counts"]["nodes"], 5)
         checked = graph.check(self.bundle, graph=fake)
         self.assertEqual(checked["projection_digest"], self.bundle.projection_digest)
 
@@ -730,7 +1261,7 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         fake.previous = "previous-projection"
         fake.counts = {
             "owners": 1,
-            "nodes": 2,
+            "nodes": 5,
             "relations": 1,
             "external_references": 1,
         }
@@ -746,6 +1277,27 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(fake.stale_nodes, 0)
         self.assertTrue(fake.cleanup_limits)
         self.assertTrue(all(limit == 1000 for limit in fake.cleanup_limits))
+
+    def test_neo4j_projection_retains_other_runtime_channels(self) -> None:
+        fake = FakeGraph()
+        fake.current = self.bundle.projection_digest
+        fake.previous = "previous-projection"
+        fake.retained_digests = ["other-channel-current"]
+        fake.counts = {
+            "owners": 1,
+            "nodes": 5,
+            "relations": 1,
+            "external_references": 1,
+        }
+        fake.stale_nodes = 1
+
+        result = graph.materialize(self.bundle, graph=fake, batch_size=1000)
+
+        self.assertIn("other-channel-current", result["retained_projection_digests"])
+        self.assertIn("other-channel-current", fake.cleanup_keep)
+        self.assertTrue(
+            all(channel == graph.DEFAULT_CHANNEL for channel in fake.observed_channels)
+        )
 
     def test_http_client_wraps_remote_disconnect(self) -> None:
         client = JsonHttpClient("http://example.test")

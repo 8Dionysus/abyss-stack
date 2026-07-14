@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 78,
-  "edge_count": 1728,
+  "decision_count": 79,
+  "edge_count": 1753,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 700,
-    "DATED": 78,
-    "GUARDED_BY": 205,
-    "HAS_STATUS": 78,
-    "HAS_SURFACE_CLASS": 192,
-    "IN_STACK_LANE": 157,
-    "NEXT_DECISION": 77,
-    "OWNED_BY_SURFACE": 83,
-    "OWNS_DECISION": 78,
-    "SUPERSEDED_BY": 1,
-    "UNDER_MECHANIC_PARENT": 79
+    "CITES_SOURCE_SURFACE": 708,
+    "DATED": 79,
+    "GUARDED_BY": 209,
+    "HAS_STATUS": 79,
+    "HAS_SURFACE_CLASS": 195,
+    "IN_STACK_LANE": 160,
+    "NEXT_DECISION": 78,
+    "OWNED_BY_SURFACE": 84,
+    "OWNS_DECISION": 79,
+    "SUPERSEDED_BY": 2,
+    "UNDER_MECHANIC_PARENT": 80
   },
   "edges": [
     {
@@ -7748,7 +7748,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
-      "target": "status:accepted",
+      "target": "status:superseded",
       "type": "HAS_STATUS"
     },
     {
@@ -7790,6 +7790,11 @@
       "source": "decision:ABYSS-STACK-D-0075",
       "target": "owner_surface:mcp/services/aoa-kag-mcp/",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0075",
+      "target": "decision:ABYSS-STACK-D-0079",
+      "type": "SUPERSEDED_BY"
     },
     {
       "source": "decision:ABYSS-STACK-D-0075",
@@ -8263,8 +8268,123 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0078",
+      "target": "decision:ABYSS-STACK-D-0079",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0078",
       "target": "owner_surface:mcp/services/aoa-stats-mcp/",
       "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:aoa-kag%3Agenerated/local_kag_provider_map.min.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:aoa-kag%3Aschemas/kag-mcp-capabilities.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:aoa-kag%3Aschemas/kag-mcp-result.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:mcp/services/_shared/http_auth.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:mcp/services/aoa-kag-mcp/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:mechanics/federation-seams/parts/kag-seam/kag_runtime/application.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "source_surface:systemd/user/aoa-mcp-http%40.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "date:2026-07-14",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "guard_family:bounded%20context",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "guard_family:canonical%20fallback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "guard_family:loopback%20transport%20security",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "guard_family:owner-qualified%20provenance",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "surface_class:KAG%20application%20port",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "surface_class:MCP%20access%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "surface_class:runtime%20retrieval",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "stack_lane:MCP%20services",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "stack_lane:federation%20seam",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "stack_lane:runtime%20knowledge",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
     },
     {
       "source": "repo:abyss-stack",
@@ -8655,21 +8775,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0078",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0079",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 753,
+  "node_count": 763,
   "node_type_counts": {
     "date": 21,
-    "decision": 78,
-    "guard_family": 83,
+    "decision": 79,
+    "guard_family": 86,
     "mechanic_parent": 10,
     "owner_surface": 41,
     "repo": 1,
-    "source_surface": 424,
+    "source_surface": 428,
     "stack_lane": 29,
     "status": 2,
-    "surface_class": 64
+    "surface_class": 66
   },
   "nodes": [
     {
@@ -9522,8 +9647,8 @@
       "id": "decision:ABYSS-STACK-D-0075",
       "label": "ABYSS-STACK-D-0075",
       "path": "docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md",
-      "posture": "accepted KAG access-plane rationale",
-      "status": "accepted",
+      "posture": "superseded provider-map-only access-plane rationale",
+      "status": "superseded",
       "title": "ABYSS-STACK-D-0075 AoA KAG MCP Access Plane",
       "type": "decision"
     },
@@ -9555,6 +9680,16 @@
       "posture": "accepted federated stats access-plane rationale",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0078 Federated Stats MCP Access Plane",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-14",
+      "id": "decision:ABYSS-STACK-D-0079",
+      "label": "ABYSS-STACK-D-0079",
+      "path": "docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md",
+      "posture": "accepted KAG query and MCP access rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0079 KAG Query Application Port",
       "type": "decision"
     },
     {
@@ -9593,6 +9728,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:bounded%20context",
+      "label": "bounded context",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:branch%20policy",
       "label": "branch policy",
       "type": "guard_family"
@@ -9600,6 +9740,11 @@
     {
       "id": "guard_family:bundle%20integrity",
       "label": "bundle integrity",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:canonical%20fallback",
+      "label": "canonical fallback",
       "type": "guard_family"
     },
     {
@@ -9705,6 +9850,11 @@
     {
       "id": "guard_family:legacy%20metadata%20containment",
       "label": "legacy metadata containment",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:loopback%20transport%20security",
+      "label": "loopback transport security",
       "type": "guard_family"
     },
     {
@@ -10421,6 +10571,16 @@
     {
       "id": "source_surface:aoa-kag%3Amanifests/local_kag_readiness.json",
       "label": "aoa-kag:manifests/local_kag_readiness.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Aschemas/kag-mcp-capabilities.schema.json",
+      "label": "aoa-kag:schemas/kag-mcp-capabilities.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:aoa-kag%3Aschemas/kag-mcp-result.schema.json",
+      "label": "aoa-kag:schemas/kag-mcp-result.schema.json",
       "type": "source_surface"
     },
     {
@@ -11179,6 +11339,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mcp/services/aoa-kag-mcp/",
+      "label": "mcp/services/aoa-kag-mcp/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mcp/services/aoa-kag-mcp/AGENTS.md",
       "label": "mcp/services/aoa-kag-mcp/AGENTS.md",
       "type": "source_surface"
@@ -11606,6 +11771,11 @@
     {
       "id": "source_surface:mechanics/federation-seams/parts/kag-seam/kag_runtime/",
       "label": "mechanics/federation-seams/parts/kag-seam/kag_runtime/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/kag-seam/kag_runtime/application.py",
+      "label": "mechanics/federation-seams/parts/kag-seam/kag_runtime/application.py",
       "type": "source_surface"
     },
     {
@@ -12514,6 +12684,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:KAG%20application%20port",
+      "label": "KAG application port",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:KAG%20provider%20map",
       "label": "KAG provider map",
       "type": "surface_class"
@@ -12761,6 +12936,11 @@
     {
       "id": "surface_class:runtime%20profile",
       "label": "runtime profile",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20retrieval",
+      "label": "runtime retrieval",
       "type": "surface_class"
     },
     {

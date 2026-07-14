@@ -25,7 +25,11 @@ def _now() -> str:
 
 
 def _targets(values: Sequence[str]) -> list[str]:
-    selected = list(TARGETS) if "all" in values else [item for item in TARGETS if item in values]
+    selected = (
+        list(TARGETS)
+        if "all" in values
+        else [item for item in TARGETS if item in values]
+    )
     if not selected:
         raise SystemExit("at least one --target is required")
     return selected
@@ -177,6 +181,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("AOA_KAG_NEO4J_DATABASE", "neo4j"),
     )
     parser.add_argument(
+        "--graph-channel",
+        default=os.environ.get("AOA_KAG_GRAPH_CHANNEL", graph.DEFAULT_CHANNEL),
+    )
+    parser.add_argument(
         "--vector-batch-size",
         type=int,
         default=vector.DEFAULT_EMBEDDING_BATCH_SIZE,
@@ -236,7 +244,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 headers=_neo4j_headers(args.stack_root.resolve()),
                 timeout=args.http_timeout,
             )
-            graph_projection = graph.Neo4jProjection(neo4j, args.neo4j_database)
+            graph_projection = graph.Neo4jProjection(
+                neo4j,
+                args.neo4j_database,
+                args.graph_channel,
+            )
             if args.check:
                 result = graph.check(bundle, graph=graph_projection)
             else:

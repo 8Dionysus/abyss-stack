@@ -10,9 +10,12 @@ from .transport import HttpJsonError, JsonHttpClient
 
 
 SCHEMA_VERSION = "abyss-stack-repo-self-kag-neo4j-v1"
+DEFAULT_CHANNEL = "repo-self-current"
 
 
-def _batches(records: Iterable[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:
+def _batches(
+    records: Iterable[dict[str, Any]], size: int
+) -> Iterator[list[dict[str, Any]]]:
     batch: list[dict[str, Any]] = []
     for record in records:
         batch.append(record)
@@ -24,9 +27,17 @@ def _batches(records: Iterable[dict[str, Any]], size: int) -> Iterator[list[dict
 
 
 class Neo4jProjection:
-    def __init__(self, client: JsonHttpClient, database: str = "neo4j") -> None:
+    def __init__(
+        self,
+        client: JsonHttpClient,
+        database: str = "neo4j",
+        channel: str = DEFAULT_CHANNEL,
+    ) -> None:
+        if not channel.strip():
+            raise ValueError("Neo4j projection channel must be non-empty")
         self.client = client
         self.database = database
+        self.channel = channel
 
     def execute(
         self,
@@ -121,18 +132,31 @@ def _external_row(record: dict[str, Any]) -> dict[str, Any]:
 
 def _current_digest(graph: Neo4jProjection) -> str | None:
     value = graph.scalar(
-        "MATCH (p:AoAKagProjection {name: 'repo-self-current'}) RETURN p.current_digest",
-        {},
+        "MATCH (p:AoAKagProjection {name: $channel}) RETURN p.current_digest",
+        {"channel": getattr(graph, "channel", DEFAULT_CHANNEL)},
     )
     return str(value) if value else None
 
 
 def _previous_digest(graph: Neo4jProjection) -> str | None:
     value = graph.scalar(
-        "MATCH (p:AoAKagProjection {name: 'repo-self-current'}) RETURN p.previous_digest",
-        {},
+        "MATCH (p:AoAKagProjection {name: $channel}) RETURN p.previous_digest",
+        {"channel": getattr(graph, "channel", DEFAULT_CHANNEL)},
     )
     return str(value) if value else None
+
+
+def _retained_digests(graph: Neo4jProjection) -> list[str]:
+    value = graph.scalar(
+        "MATCH (p:AoAKagProjection) "
+        "UNWIND [p.current_digest,p.previous_digest] AS digest "
+        "WITH DISTINCT digest WHERE digest IS NOT NULL AND digest <> '' "
+        "RETURN collect(digest)",
+        {},
+    )
+    if not isinstance(value, list):
+        raise RuntimeError("Neo4j projection channel inventory is missing")
+    return sorted(str(item) for item in value if item)
 
 
 def _load_projection(
@@ -145,7 +169,9 @@ def _load_projection(
     progress: Callable[[str, int, int], None] | None,
 ) -> None:
     completed = 0
-    for batch in _batches((_owner_row(item) for item in bundle.records("owners")), batch_size):
+    for batch in _batches(
+        (_owner_row(item) for item in bundle.records("owners")), batch_size
+    ):
         graph.execute(
             "UNWIND $rows AS row "
             "MERGE (o:AoAKagOwner {projection_digest: $projection, repo: row.repo}) "
@@ -159,7 +185,9 @@ def _load_projection(
             progress("owners", completed, totals["owners"])
 
     completed = 0
-    for batch in _batches((_node_row(item) for item in bundle.records("nodes")), batch_size):
+    for batch in _batches(
+        (_node_row(item) for item in bundle.records("nodes")), batch_size
+    ):
         graph.execute(
             "UNWIND $rows AS row "
             "MERGE (n:AoAKagNode {projection_digest: $projection, id: row.id}) "
@@ -291,16 +319,19 @@ def materialize(
         )
         observed = _counts(graph, projection)
     if observed != expected:
-        raise RuntimeError(f"Neo4j projection counts mismatch: {observed} != {expected}")
+        raise RuntimeError(
+            f"Neo4j projection counts mismatch: {observed} != {expected}"
+        )
 
     if current != projection:
         graph.execute(
-            "MERGE (p:AoAKagProjection {name: 'repo-self-current'}) "
+            "MERGE (p:AoAKagProjection {name: $channel}) "
             "SET p.previous_digest = p.current_digest, p.current_digest = $projection, "
             "p.bundle_digest = $bundle, p.federation_digest = $federation, "
             "p.owner_count = $owners, p.node_count = $nodes, "
             "p.relation_count = $relations, p.external_reference_count = $external",
             {
+                "channel": getattr(graph, "channel", DEFAULT_CHANNEL),
                 "projection": projection,
                 "bundle": bundle.bundle_digest,
                 "federation": bundle.federation_digest,
@@ -310,11 +341,16 @@ def materialize(
                 "external": expected["external_references"],
             },
         )
-    keep = list(dict.fromkeys(item for item in (projection, previous) if item))
+    keep = list(
+        dict.fromkeys(
+            item for item in (projection, previous, *_retained_digests(graph)) if item
+        )
+    )
     _cleanup_projections(graph, keep=keep, batch_size=batch_size)
     return {
         "schema_version": SCHEMA_VERSION,
         "database": graph.database,
+        "channel": getattr(graph, "channel", DEFAULT_CHANNEL),
         "projection_digest": projection,
         "previous_projection_digest": previous,
         "retained_projection_digests": keep,
@@ -339,17 +375,19 @@ def check(bundle: RetrievalBundle, *, graph: Neo4jProjection) -> dict[str, Any]:
     projection = bundle.projection_digest
     current = _current_digest(graph)
     if current != projection:
-        raise RuntimeError(f"Neo4j current projection is {current}, expected {projection}")
+        raise RuntimeError(
+            f"Neo4j current projection is {current}, expected {projection}"
+        )
     counts = _counts(graph, projection)
     expected = {
-        key: int(bundle.manifest["files"][key]["record_count"])
-        for key in counts
+        key: int(bundle.manifest["files"][key]["record_count"]) for key in counts
     }
     if counts != expected:
         raise RuntimeError(f"Neo4j projection counts mismatch: {counts} != {expected}")
     return {
         "schema_version": SCHEMA_VERSION,
         "database": graph.database,
+        "channel": getattr(graph, "channel", DEFAULT_CHANNEL),
         "projection_digest": projection,
         "counts": counts,
     }
@@ -407,10 +445,7 @@ def search_multihop(
             and row[2]
             and row[4]
             and all(
-                edge["id"]
-                and edge["anchors"]
-                and edge["provenance"]
-                and edge["trust"]
+                edge["id"] and edge["anchors"] and edge["provenance"] and edge["trust"]
                 for edge in edges
             )
         )
@@ -436,3 +471,122 @@ def search_multihop(
         }
     hits = list(hits_by_id.values())
     return hits, latency, complete / max(len(hits), 1)
+
+
+def traverse(
+    *,
+    graph: Neo4jProjection,
+    projection: str,
+    source_ids: list[str],
+    direction: str = "outgoing",
+    relation_kinds: list[str] | None = None,
+    owner: str | None = None,
+    access_scopes: list[str] | None = None,
+    max_depth: int = 2,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[dict[str, Any]], float]:
+    """Traverse a bounded simple path set without exposing Cypher to callers."""
+    if direction not in {"outgoing", "incoming", "both"}:
+        raise ValueError(f"unsupported traversal direction: {direction}")
+    if not 1 <= max_depth <= 4:
+        raise ValueError("max_depth must be from 1 through 4")
+    if not source_ids:
+        return [], 0.0
+    if len(source_ids) > 32:
+        raise ValueError("source_ids must contain at most 32 identifiers")
+    scopes = list(dict.fromkeys(access_scopes or ["public"]))
+    if not scopes:
+        return [], 0.0
+
+    if direction == "outgoing":
+        pattern = f"(source)-[:AOA_KAG_RELATION*1..{max_depth}]->(target)"
+    elif direction == "incoming":
+        pattern = f"(source)<-[:AOA_KAG_RELATION*1..{max_depth}]-(target)"
+    else:
+        pattern = f"(source)-[:AOA_KAG_RELATION*1..{max_depth}]-(target)"
+
+    conditions = [
+        "all(r IN relationships(p) WHERE r.projection_digest=$projection)",
+        "all(n IN nodes(p) WHERE n.access_scope IN $access_scopes)",
+        "all(n IN nodes(p) WHERE single(m IN nodes(p) WHERE m = n))",
+    ]
+    if relation_kinds:
+        conditions.append(
+            "all(r IN relationships(p) WHERE r.relation_kind IN $relation_kinds)"
+        )
+    if owner:
+        conditions.append("target.repo=$owner")
+
+    started = time.perf_counter()
+    rows = graph.execute(
+        "MATCH (source:AoAKagNode {projection_digest:$projection}) "
+        "WHERE source.id IN $source_ids AND source.access_scope IN $access_scopes "
+        f"MATCH p={pattern} "
+        f"WHERE {' AND '.join(conditions)} "
+        "RETURN source.id,target.id,target.repo,target.namespace,target.node_class,"
+        "target.kind,target.source_record_ids,target.anchor_ids,target.access_scope,"
+        "length(p),"
+        "[n IN nodes(p) | {id:n.id,repo:n.repo,namespace:n.namespace,"
+        "node_class:n.node_class,kind:n.kind,access_scope:n.access_scope}],"
+        "[r IN relationships(p) | {id:r.id,relation_kind:r.relation_kind,"
+        "from_id:startNode(r).id,to_id:endNode(r).id,scope:r.scope,"
+        "evidence_anchor_ids:r.evidence_anchor_ids,evidence_class:r.evidence_class,"
+        "confidence:r.confidence,provenance_ref:r.provenance_ref,"
+        "temporal_ref:r.temporal_ref,trust_ref:r.trust_ref}] "
+        "ORDER BY length(p),target.id,source.id,"
+        "[r IN relationships(p) | r.id] SKIP $offset LIMIT $limit",
+        {
+            "projection": projection,
+            "source_ids": list(dict.fromkeys(source_ids)),
+            "access_scopes": scopes,
+            "relation_kinds": list(dict.fromkeys(relation_kinds or [])),
+            "owner": owner,
+            "offset": offset,
+            "limit": limit,
+        },
+    )
+    latency = (time.perf_counter() - started) * 1000
+    hits: list[dict[str, Any]] = []
+    for row in rows:
+        edges = list(row[11] or [])
+        path_id = hashlib.sha256(
+            canonical_json(
+                {
+                    "source_id": str(row[0]),
+                    "target_id": str(row[1]),
+                    "relation_ids": [str(edge.get("id") or "") for edge in edges],
+                }
+            ).encode("utf-8")
+        ).hexdigest()
+        anchors = sorted(
+            {
+                str(anchor)
+                for edge in edges
+                for anchor in (edge.get("evidence_anchor_ids") or [])
+            }
+        )
+        hits.append(
+            {
+                "source_id": str(row[0]),
+                "id": str(row[1]),
+                "repo": str(row[2]),
+                "namespace": str(row[3]),
+                "node_class": str(row[4]),
+                "kind": str(row[5]),
+                "source_record_ids": list(row[6] or []),
+                "anchor_ids": list(row[7] or []) or anchors,
+                "access": {"scope": str(row[8])},
+                "depth": int(row[9]),
+                "evidence_path": {
+                    "path_id": path_id,
+                    "source_id": str(row[0]),
+                    "target_id": str(row[1]),
+                    "depth": int(row[9]),
+                    "nodes": list(row[10] or []),
+                    "relations": edges,
+                    "anchor_ids": anchors,
+                },
+            }
+        )
+    return hits, latency

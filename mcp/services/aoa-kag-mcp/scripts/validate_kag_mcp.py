@@ -5,167 +5,176 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
+STACK_ROOT = SERVICE_ROOT.parents[2]
 SRC = SERVICE_ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from aoa_kag_mcp.core import AoAKagMCPState, REPOSITORY_INDEX_KINDS  # noqa: E402
+from aoa_kag_mcp.core import AoAKagMCPState  # noqa: E402
 from aoa_kag_mcp.server import build_server  # noqa: E402
 
 
-def main() -> None:
-    required = [
-        "AGENTS.md",
-        "README.md",
-        "DESIGN.md",
-        "docs/BOUNDARIES.md",
-        "docs/THREAT_MODEL.md",
-        "src/aoa_kag_mcp/cli.py",
-        "src/aoa_kag_mcp/core.py",
-        "src/aoa_kag_mcp/server.py",
-        "scripts/aoa_kag_mcp_server.py",
-    ]
-    missing = [path for path in required if not (SERVICE_ROOT / path).exists()]
-    if missing:
-        raise SystemExit(f"missing required files: {missing}")
+EXPECTED_TOOLS = (
+    "kag_discover",
+    "kag_search",
+    "kag_read",
+    "kag_traverse",
+    "kag_explain",
+)
+EXPECTED_RESOURCES = {
+    "aoa-kag://capabilities",
+    "aoa-kag://owners/{repo}/manifest",
+    "aoa-kag://records/{qualified_id}",
+    "aoa-kag://documents/{document_id}",
+    "aoa-kag://anchors/{anchor_id}",
+    "aoa-kag://sources/{repo}/{document_id}",
+    "aoa-kag://evidence/{trace_id}",
+    "aoa-kag://schemas/{name}",
+    "aoa-kag://projections/{digest}",
+}
+EXPECTED_SCHEMAS = {
+    "kag-mcp-capabilities.schema.json": "aoa-kag-mcp-capabilities-v1",
+    "kag-mcp-result.schema.json": "aoa-kag-mcp-result-v1",
+}
+EXPECTED_RUNTIME_ROUTE = "abyss-stack/mechanics/federation-seams/parts/kag-seam"
 
-    state = AoAKagMCPState.discover()
-    status = state.status()
-    if not status["provider_map_exists"]:
-        raise SystemExit("aoa-kag provider map is missing")
-    if not status["readiness_exists"]:
-        raise SystemExit("aoa-kag readiness matrix is missing")
-    if not status["coverage_exists"]:
-        raise SystemExit("aoa-kag repo-local coverage report is missing")
-    if int(status["provider_count"]) < 1:
+
+def _read_object(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SystemExit(f"missing required file: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid JSON in {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"expected JSON object: {path}")
+    return payload
+
+
+def _validate_owner_contract(state: AoAKagMCPState) -> int:
+    for label, exists in (
+        ("provider map", state.provider_map_exists()),
+        ("readiness matrix", state.readiness_exists()),
+        ("repo-local coverage", state.coverage_exists()),
+    ):
+        if not exists:
+            raise SystemExit(f"aoa-kag {label} is missing")
+
+    provider_map = state.provider_map()
+    providers = provider_map.get("providers")
+    if not isinstance(providers, list) or not providers:
         raise SystemExit("aoa-kag provider map returned no providers")
-    if state.provider_lookup("aoa-kag")["status"] != "provider_ready":
-        raise SystemExit("aoa-kag provider lookup did not return provider_ready")
-    provider_status = state.provider_status()
-    source_index_repo = None
-    for provider in provider_status["providers"]:
-        repo_local_index = provider.get("repo_local_index")
-        if not isinstance(repo_local_index, dict):
-            continue
-        if (
-            repo_local_index.get("status") == "passed"
-            and repo_local_index.get("source_index_ref")
-        ):
-            source_index_repo = str(provider["repo"])
-            break
-    if not source_index_repo:
-        raise SystemExit("aoa-kag provider map returned no passed repo-local source index")
-    repo_local_index = state.repo_local_index(source_index_repo)
-    if repo_local_index["repo_local_index"].get("status") != "passed":
-        raise SystemExit(f"{source_index_repo} repo-local index is not passed")
-    source_index = state.source_index_status(source_index_repo)
-    if not source_index["source_index_exists"]:
-        raise SystemExit(f"{source_index_repo} source index resource is missing")
-    common_surface_profile = state.common_surface_profile(source_index_repo)
-    if common_surface_profile["common_surface_profile"].get("source") != "source_surface_index":
-        raise SystemExit(f"{source_index_repo} common surface profile is not sourced from source_surface_index")
-    if not state.freshness_check()["ok"]:
-        raise SystemExit("aoa-kag provider freshness handles are missing receipts")
-    generation = state.generation_route_lookup("aoa-kag")
-    if generation["status"] != "available" or not generation["builder_routes"]:
-        raise SystemExit("aoa-kag generation route lookup returned no builder routes")
-    source_index = state.source_index_lookup("aoa-kag")
-    if not source_index["repo_local_index"]:
-        raise SystemExit("aoa-kag source-index lookup returned no repo-local index")
-    coverage = state.repo_local_coverage_status()
-    if int(coverage["count"]) < 1:
-        raise SystemExit("aoa-kag repo-local coverage returned no owner rows")
-    registry = state.registry_slice(limit=3)
-    if not registry["items"]:
-        raise SystemExit("aoa-kag registry slice returned no items")
-    resource = state.read_resource("aoa-kag://registry/provider-map")
-    if resource.get("schema_version") != "aoa-local-kag-provider-map-v1":
-        raise SystemExit("aoa-kag provider-map resource has unexpected schema")
-    profile_resource = state.read_resource(f"aoa-kag://providers/{source_index_repo}/common-surface-profile")
-    if profile_resource["common_surface_profile"].get("source") != "source_surface_index":
-        raise SystemExit(f"{source_index_repo} common-surface-profile resource is not readable")
-    if state.read_resource("aoa-kag://providers/aoa-kag/generation")["status"] != "available":
-        raise SystemExit("aoa-kag generation resource has unexpected status")
-    if not state.read_resource(f"aoa-kag://providers/{source_index_repo}/source-index")["repo_local_index"]:
-        raise SystemExit(f"{source_index_repo} source-index resource returned no index")
-    if not state.read_resource(f"aoa-kag://providers/{source_index_repo}/repo-local-index")["repo_local_index"]:
-        raise SystemExit(f"{source_index_repo} repo-local-index resource returned no index")
-    if not state.read_resource("aoa-kag://coverage/repo-local-source-indexes")["owners"]:
-        raise SystemExit("aoa-kag coverage resource returned no owners")
-    domain_catalog_count = 0
-    for provider in provider_status["providers"]:
-        repo = str(provider["repo"])
-        family = state.repository_index_family_lookup(repo)
-        if not family["family_complete"]:
-            raise SystemExit(f"{repo} repository index family is incomplete")
-        for index_kind in REPOSITORY_INDEX_KINDS:
-            index = state.repository_index_lookup(repo, index_kind)
-            if not index["index_exists"]:
-                raise SystemExit(f"{repo} {index_kind} repository index is missing")
-        catalog = state.domain_index_catalog_lookup(repo)
-        if catalog["domain_index_catalog_ref"]:
-            domain_catalog_count += 1
-            if not catalog["catalog_exists"]:
-                raise SystemExit(f"{repo} domain index catalog is missing")
+    handoff = provider_map.get("mcp_handoff")
+    if not isinstance(handoff, dict):
+        raise SystemExit("aoa-kag provider map has no MCP handoff")
+    if handoff.get("tools") != list(EXPECTED_TOOLS):
+        raise SystemExit("aoa-kag MCP handoff tool contract drifted")
+    templates = handoff.get("resource_templates")
+    if not isinstance(templates, list):
+        raise SystemExit("aoa-kag MCP handoff resources are missing")
+    resource_uris = {
+        str(item.get("uri_template"))
+        for item in templates
+        if isinstance(item, dict) and item.get("uri_template")
+    }
+    if resource_uris != EXPECTED_RESOURCES:
+        raise SystemExit("aoa-kag MCP handoff resource contract drifted")
+    if handoff.get("prompts") != []:
+        raise SystemExit("aoa-kag MCP handoff prompt contract drifted")
+    if handoff.get("runtime_state_route") != EXPECTED_RUNTIME_ROUTE:
+        raise SystemExit("aoa-kag MCP runtime owner route drifted")
 
+    for filename, schema_version in EXPECTED_SCHEMAS.items():
+        schema = _read_object(state.aoa_kag_root / "schemas" / filename)
+        if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+            raise SystemExit(f"{filename} must use JSON Schema 2020-12")
+        properties = schema.get("properties")
+        version_property = (
+            properties.get("schema_version") if isinstance(properties, dict) else None
+        )
+        if not isinstance(version_property, dict) or version_property.get("const") != schema_version:
+            raise SystemExit(f"{filename} carries an unexpected schema version")
+    return len(providers)
+
+
+def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
     server = build_server(
         workspace_root=state.workspace_root,
         aoa_kag_root=state.aoa_kag_root,
         provider_map_path=state.provider_map_path,
         readiness_path=state.readiness_path,
         coverage_path=state.coverage_path,
+        stack_root=STACK_ROOT,
     )
-    if server is None:
-        raise SystemExit("MCP server did not build")
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    if set(tools) != set(EXPECTED_TOOLS):
+        raise SystemExit("aoa-kag MCP server tool surface drifted")
+    for tool in tools.values():
+        annotations = tool.annotations
+        if (
+            not tool.outputSchema
+            or annotations is None
+            or annotations.readOnlyHint is not True
+            or annotations.destructiveHint is not False
+            or annotations.idempotentHint is not True
+            or annotations.openWorldHint is not False
+        ):
+            raise SystemExit(f"{tool.name} must keep its read-only structured contract")
 
-    handoff = state.provider_map().get("mcp_handoff", {})
-    expected_tools = {
-        f"aoa_kag_{name}" for name in handoff.get("tools", []) if isinstance(name, str)
-    }
-    actual_tools = {tool.name for tool in asyncio.run(server.list_tools())}
-    missing_tools = sorted(expected_tools - actual_tools)
-    if missing_tools:
-        raise SystemExit(f"MCP server is missing handoff tools: {missing_tools}")
+    search_limit = tools["kag_search"].inputSchema["properties"]["limit"]
+    traversal_depth = tools["kag_traverse"].inputSchema["properties"]["max_depth"]
+    traversal_limit = tools["kag_traverse"].inputSchema["properties"]["limit"]
+    if (search_limit.get("minimum"), search_limit.get("maximum")) != (1, 10):
+        raise SystemExit("kag_search limit contract drifted")
+    if (traversal_limit.get("minimum"), traversal_limit.get("maximum")) != (1, 10):
+        raise SystemExit("kag_traverse limit contract drifted")
+    if (traversal_depth.get("minimum"), traversal_depth.get("maximum")) != (1, 4):
+        raise SystemExit("kag_traverse depth contract drifted")
 
-    expected_resources = {
-        str(item.get("uri_template"))
-        for item in handoff.get("resource_templates", [])
-        if isinstance(item, dict) and item.get("uri_template")
-    }
-    actual_resources = {
-        str(resource.uri) for resource in asyncio.run(server.list_resources())
-    }
-    actual_resources.update(
-        str(resource.uriTemplate)
-        for resource in asyncio.run(server.list_resource_templates())
+    resources = {str(item.uri) for item in asyncio.run(server.list_resources())}
+    resources.update(
+        str(item.uriTemplate) for item in asyncio.run(server.list_resource_templates())
     )
-    missing_resources = sorted(expected_resources - actual_resources)
-    if missing_resources:
-        raise SystemExit(f"MCP server is missing handoff resources: {missing_resources}")
+    if resources != EXPECTED_RESOURCES:
+        raise SystemExit("aoa-kag MCP server resource surface drifted")
+    if asyncio.run(server.list_prompts()):
+        raise SystemExit("aoa-kag MCP server unexpectedly exposes prompts")
+    return len(tools), len(resources)
 
-    expected_prompts = {
-        name.replace("_", "-")
-        for name in handoff.get("prompts", [])
-        if isinstance(name, str)
-    }
-    actual_prompts = {prompt.name for prompt in asyncio.run(server.list_prompts())}
-    missing_prompts = sorted(expected_prompts - actual_prompts)
-    if missing_prompts:
-        raise SystemExit(f"MCP server is missing handoff prompts: {missing_prompts}")
 
+def main() -> None:
+    required = (
+        "AGENTS.md",
+        "README.md",
+        "DESIGN.md",
+        "docs/BOUNDARIES.md",
+        "docs/THREAT_MODEL.md",
+        "src/aoa_kag_mcp/canonical.py",
+        "src/aoa_kag_mcp/cli.py",
+        "src/aoa_kag_mcp/core.py",
+        "src/aoa_kag_mcp/runtime.py",
+        "src/aoa_kag_mcp/server.py",
+        "scripts/aoa_kag_mcp_server.py",
+    )
+    missing = [path for path in required if not (SERVICE_ROOT / path).is_file()]
+    if missing:
+        raise SystemExit(f"missing required files: {missing}")
+
+    state = AoAKagMCPState.discover()
+    provider_count = _validate_owner_contract(state)
+    tool_count, resource_count = _validate_server_contract(state)
     print(
         json.dumps(
             {
                 "ok": True,
-                "provider_count": status["provider_count"],
-                "repository_index_family_count": len(provider_status["providers"]),
-                "domain_index_catalog_count": domain_catalog_count,
-                "handoff_tool_count": len(expected_tools),
-                "handoff_resource_count": len(expected_resources),
-                "handoff_prompt_count": len(expected_prompts),
+                "provider_count": provider_count,
+                "tool_count": tool_count,
+                "resource_count": resource_count,
+                "prompt_count": 0,
             },
             indent=2,
         )

@@ -39,11 +39,10 @@ For bounded proof work, `mcp/services/aoa-evals-mcp/` exposes `aoa-evals`
 catalog, bundle, comparison, runtime-candidate, and report-skeleton routes
 while keeping proof authority in `aoa-evals`.
 
-For KAG provider-map access, `mcp/services/aoa-kag-mcp/` exposes `aoa-kag`
-provider status, repository index families, domain index catalogs,
-source-return routes, freshness handles, bounded registry slices, and provider
-records while keeping KAG schema, generated maps, validation, and repo-local
-`kag/` truth in `aoa-kag` and the source repos.
+For repository-knowledge access, `mcp/services/aoa-kag-mcp/` exposes compact
+discovery, search, addressed read, bounded traversal, and evidence explanation.
+Repo-local `kag/` homes retain canonical records, `aoa-kag` retains common KAG
+contracts and federation, and `kag-seam` retains mutable runtime projections.
 
 For federated statistical access, `mcp/services/aoa-stats-mcp/` exposes the
 `aoa-stats` derived catalog, compact boundary refs, canonical owner inventory,

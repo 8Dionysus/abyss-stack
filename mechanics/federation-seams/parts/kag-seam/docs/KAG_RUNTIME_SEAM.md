@@ -57,6 +57,24 @@ order.
 Graph retention resumes independently after cutover and removes older
 projection nodes in bounded transactions.
 
+## Query Application Port
+
+`kag_runtime.application.KagApplication` is the stable read boundary above the
+stores. It provides capability discovery, retrieval, addressed reads, bounded
+relation traversal, and trace explanation without exposing backend-specific
+operations to consumers.
+
+The application selects exact, lexical, semantic, hybrid, graph, or composed
+routes from current projection state. Each response records the requested and
+used strategy, adapter timings, projection identity, degradation, provenance,
+source anchors, and owner-return resources. Canonical repo-local queries remain
+available as the source-grounded fallback for absent, stale, incomplete, or
+damaged runtime state.
+
+Public bounds are ten results per page, graph depth four, and 4096 source-text
+characters in a full read. Backend calls and SQLite execution have explicit
+timeouts, while trace evidence remains in a bounded in-process cache.
+
 ## Operation
 
 Build the bundle with `aoa-kag`, then materialize selected targets:

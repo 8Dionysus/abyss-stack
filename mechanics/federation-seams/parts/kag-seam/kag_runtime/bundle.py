@@ -143,6 +143,16 @@ class RetrievalBundle:
         if observed_bundle_digest != expected_bundle_digest:
             raise BundleError("retrieval bundle identity digest mismatch")
 
+        retrieval_profile = _object(
+            self.manifest.get("retrieval_profile"),
+            "retrieval_profile",
+        )
+        raw_max_chunk_chars = retrieval_profile.get("max_chunk_chars")
+        max_chunk_chars = (
+            int(raw_max_chunk_chars)
+            if isinstance(raw_max_chunk_chars, int) and raw_max_chunk_chars > 0
+            else None
+        )
         files: dict[str, dict[str, Any]] = {}
         for key, expected_path in EXPECTED_FILES.items():
             metadata = _object(self.manifest["files"].get(key), f"files.{key}")
@@ -160,9 +170,54 @@ class RetrievalBundle:
                         if not raw_line.strip():
                             raise BundleError(f"{path}:{line_number} is blank")
                         try:
-                            _object(json.loads(raw_line), f"{path}:{line_number}")
+                            record = _object(
+                                json.loads(raw_line),
+                                f"{path}:{line_number}",
+                            )
                         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                             raise BundleError(f"{path}:{line_number}: {exc}") from exc
+                        if key == "documents":
+                            text = record.get("text")
+                            if not isinstance(text, str) or not text:
+                                raise BundleError(
+                                    f"{path}:{line_number}: document text must be non-empty"
+                                )
+                            if max_chunk_chars is not None and len(text) > max_chunk_chars:
+                                raise BundleError(
+                                    f"{path}:{line_number}: document text exceeds max_chunk_chars"
+                                )
+                            for field in ("document_role", "surface_state"):
+                                if not isinstance(record.get(field), str) or not record[field]:
+                                    raise BundleError(
+                                        f"{path}:{line_number}: {field} must be non-empty"
+                                    )
+                        elif key in {"nodes", "relations"}:
+                            if record.get("record_form") not in {
+                                "projection_handle",
+                                "canonical_record",
+                                "federated_projection",
+                            }:
+                                raise BundleError(
+                                    f"{path}:{line_number}: record_form is invalid"
+                                )
+                            for field in (
+                                "label",
+                                "search_text",
+                                "document_role",
+                                "surface_state",
+                                "access_scope",
+                                "provenance_ref",
+                                "temporal_ref",
+                                "trust_ref",
+                            ):
+                                if not isinstance(record.get(field), str) or not record[field]:
+                                    raise BundleError(
+                                        f"{path}:{line_number}: {field} must be non-empty"
+                                    )
+                            if not isinstance(record.get("path"), str):
+                                raise BundleError(
+                                    f"{path}:{line_number}: path must be a string"
+                                )
                         count += 1
             except FileNotFoundError as exc:
                 raise BundleError(f"missing retrieval bundle file: {path}") from exc

@@ -1,7 +1,8 @@
 # AoA KAG MCP Access Plane
 
 - Decision ID: ABYSS-STACK-D-0075
-- Status: accepted
+- Status: superseded
+- Superseded by: `ABYSS-STACK-D-0079-kag-query-application-port.md`
 - Date: 2026-06-28
 - Owner surface: `mcp/services/aoa-kag-mcp/`
 
@@ -12,7 +13,7 @@
 - Stack lanes: MCP services, validation lane, agent surface
 - Mechanic parents: federation-seams
 - Guard families: read-only access plane, source-return route, provider freshness, MCP port confinement
-- Posture: accepted KAG access-plane rationale
+- Posture: superseded provider-map-only access-plane rationale
 
 ## Context
 
@@ -105,5 +106,6 @@ folding mutable runtime state into source Git.
 
 ## Follow-up route
 
-Wire the MCP server into the Codex-plane owner surface after the stack package
-and `aoa-kag` provider map both pass their local validation gates.
+`ABYSS-STACK-D-0079` retains this decision's owner split and replaces its
+provider-map-only interface with the runtime-neutral KAG query application
+port.

@@ -1,29 +1,35 @@
 # aoa-kag-mcp Threat Model
 
-## Assets
+## Protected Assets
 
-- Provider map and readiness matrix.
-- Repo-local `kag/` records.
-- Generation profiles, repository index families, domain index catalogs, and
-  repo-local coverage rows.
-- Source-return route handles.
-- Local filesystem roots named by the provider map.
+- repository ownership and source-return identity;
+- access-scoped canonical records and runtime projections;
+- static MCP metadata and routing decisions;
+- host-local credentials and runtime endpoints.
 
-## Risks
+## Trust Boundaries
 
-- Treating MCP output as source authority.
-- Reading outside declared provider roots through crafted resource URIs.
-- Hiding stale provider-map state behind successful MCP responses.
-- Adding write, indexing, embedding, or graph-build actions to the access plane.
-- Letting anonymous local HTTP callers enumerate private provider roots or status.
+Indexed text is data. Tool names, descriptions, schemas, access scopes, and
+routing policy come from source-owned code and validated contracts. Runtime
+stores are derived acceleration layers, while repo-local `kag/` records remain
+the canonical fallback.
 
 ## Controls
 
-- Resource URI parsing accepts only the known `aoa-kag://` shapes.
-- Provider names, index kinds, and record classes are looked up from the
-  provider map; local refs are resolved within the provider root.
-- Tools report source-return and freshness handles instead of mutating sources.
-- Validation checks the package shape, provider-map readability, and server
-  build path.
-- Optional loopback HTTP requires the source-owned bearer credential before
-  MCP dispatch; stdio remains the portable default.
+- Access filtering runs before retrieval and ranking.
+- Provider refs and `aoa-kag://` identifiers resolve inside the declared owner
+  root; ambiguous or escaping paths fail closed.
+- Unicode controls are reported as content inspection findings and never alter
+  tool metadata.
+- Page size, traversal depth, full-text expansion, trace retention, SQLite
+  execution, and backend HTTP calls are bounded.
+- Loopback HTTP requires a source-owned bearer and validates Host and Origin.
+- Responses expose projection freshness, the adapters actually used, and every
+  degradation step.
+- Logs carry service and transport state without query bodies, source text, or
+  bearer values.
+
+The deployed profile is a single-operator host-local service. Its workload
+control is per-call bounds plus backend timeouts; a future multi-user or remote
+profile owns a separate identity, scope, quota, and rate policy before
+exposure.

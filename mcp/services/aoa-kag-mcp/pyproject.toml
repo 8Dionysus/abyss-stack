@@ -5,11 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aoa-kag-mcp"
 version = "0.1.0"
-description = "MCP access plane for AoA KAG provider maps"
+description = "Read-only MCP access plane for OS Abyss repository knowledge"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "mcp>=1.27.2,<2",
+  "pydantic>=2.11,<3",
 ]
 
 [project.scripts]

@@ -110,6 +110,23 @@ def _http_authority(host: str, port: int) -> str:
     return f"http://{rendered_host}:{port}"
 
 
+def _loopback_transport_security(port: int) -> Any:
+    from mcp.server.transport_security import (  # type: ignore[import-not-found]
+        TransportSecuritySettings,
+    )
+
+    authorities = [
+        f"127.0.0.1:{port}",
+        f"localhost:{port}",
+        f"[::1]:{port}",
+    ]
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=authorities,
+        allowed_origins=[f"http://{authority}" for authority in authorities],
+    )
+
+
 def http_auth_kwargs(default_port: int) -> dict[str, Any]:
     settings = transport_settings(default_port)
     if settings.transport == "stdio":
@@ -135,4 +152,5 @@ def http_auth_kwargs(default_port: int) -> dict[str, Any]:
             issuer=issuer,
             resource=resource,
         ),
+        "transport_security": _loopback_transport_security(settings.port),
     }
