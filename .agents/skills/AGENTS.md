@@ -19,6 +19,9 @@ targets are historical drift, not an active route.
 - Keep symlink targets under `/srv/AbyssOS/aoa-skills/.agents/skills/`.
 - Keep local overlays thin, source-safe, and explicit about their canonical
   upstream.
+- Keep every local overlay `SKILL.md` loadable by Codex: its frontmatter must
+  declare the directory name, a non-empty trigger description, and the current
+  canonical source path under standard `metadata.aoa_*` keys.
 - When an overlay references stack surfaces, point to package-local mechanics
   paths rather than old root topology.
 
