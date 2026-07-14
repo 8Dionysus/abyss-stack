@@ -43,6 +43,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- The repo-local `abyss-self-diagnostic-spine` overlay now carries valid
+  trigger metadata and the current canonical `aoa-skills` source path, while
+  the skill-projection validator rejects missing descriptions, stale canonical
+  routes, and legacy top-level frontmatter before Codex startup.
 - `aoa-session-memory-mcp` now publishes and validates exact closed-world
   read-only annotations for every tool, allowing Codex approval policy to
   distinguish evidence reads from side-effecting MCP calls without a per-tool

@@ -17,7 +17,19 @@ def write_minimal_skill_projection(repo_root: Path) -> Path:
     skill_root = repo_root / agent_skill_projection.SKILL_ROOT
     skill_root.mkdir(parents=True)
     write_text(skill_root / "AGENTS.md", "# Skill surface\n")
-    write_text(skill_root / "abyss-self-diagnostic-spine" / "SKILL.md", "# Overlay\n")
+    write_text(
+        skill_root / "abyss-self-diagnostic-spine" / "SKILL.md",
+        """---
+name: abyss-self-diagnostic-spine
+description: Diagnose a concrete abyss runtime target through the repo-local read-only overlay.
+metadata:
+  aoa_canonical_skill_repo: 8Dionysus/aoa-skills
+  aoa_canonical_skill_path: skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md
+---
+
+# Overlay
+""",
+    )
     return skill_root
 
 
@@ -74,6 +86,70 @@ def test_local_overlay_must_remain_directory_with_skill_md(tmp_path: Path) -> No
 
     assert errors == [
         ".agents/skills/abyss-self-diagnostic-spine must stay as a local overlay directory with SKILL.md"
+    ]
+
+
+def test_local_overlay_requires_codex_skill_metadata(tmp_path: Path) -> None:
+    skill_root = write_minimal_skill_projection(tmp_path)
+    write_text(
+        skill_root / "abyss-self-diagnostic-spine" / "SKILL.md",
+        """---
+name: abyss-self-diagnostic-spine
+metadata:
+  aoa_canonical_skill_repo: 8Dionysus/aoa-skills
+  aoa_canonical_skill_path: skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md
+---
+
+# Overlay
+""",
+    )
+
+    errors = run_skill_projection_validator(tmp_path)
+
+    assert errors == [
+        ".agents/skills/abyss-self-diagnostic-spine/SKILL.md must declare a non-empty description"
+    ]
+
+
+def test_local_overlay_requires_current_canonical_skill_path(tmp_path: Path) -> None:
+    skill_root = write_minimal_skill_projection(tmp_path)
+    write_text(
+        skill_root / "abyss-self-diagnostic-spine" / "SKILL.md",
+        """---
+name: abyss-self-diagnostic-spine
+description: Diagnose a concrete abyss runtime target through the repo-local read-only overlay.
+metadata:
+  aoa_canonical_skill_repo: 8Dionysus/aoa-skills
+  aoa_canonical_skill_path: skills/abyss-self-diagnostic-spine/SKILL.md
+---
+
+# Overlay
+""",
+    )
+
+    errors = run_skill_projection_validator(tmp_path)
+
+    assert errors == [
+        ".agents/skills/abyss-self-diagnostic-spine/SKILL.md must route metadata.aoa_canonical_skill_path to "
+        "skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md"
+    ]
+
+
+def test_local_overlay_rejects_legacy_top_level_metadata(tmp_path: Path) -> None:
+    skill_root = write_minimal_skill_projection(tmp_path)
+    skill_md = skill_root / "abyss-self-diagnostic-spine" / "SKILL.md"
+    write_text(
+        skill_md,
+        skill_md.read_text(encoding="utf-8").replace(
+            "description: Diagnose a concrete abyss runtime target through the repo-local read-only overlay.\n",
+            "description: Diagnose a concrete abyss runtime target through the repo-local read-only overlay.\nscope: project\n",
+        ),
+    )
+
+    errors = run_skill_projection_validator(tmp_path)
+
+    assert errors == [
+        ".agents/skills/abyss-self-diagnostic-spine/SKILL.md has unsupported top-level frontmatter keys: scope"
     ]
 
 

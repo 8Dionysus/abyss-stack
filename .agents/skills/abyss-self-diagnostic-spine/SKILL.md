@@ -1,12 +1,13 @@
 ---
 name: abyss-self-diagnostic-spine
-scope: project
-status: overlay
-summary: Thin repo-local overlay for the abyss diagnostic spine. Canonical skill law lives in aoa-skills and this file keeps the local surface portable across source checkouts, CI, and deployed mirrors.
-invocation_mode: explicit-preferred
-canonical_skill:
-  repo: 8Dionysus/aoa-skills
-  path: skills/abyss-self-diagnostic-spine/SKILL.md
+description: Apply the aoa-session-self-diagnose workflow inside abyss-stack using repo-relative runtime evidence, bounded diagnostic-session artifacts, last-good comparison posture, and honest owner-aware handoff. Use when the base diagnosis workflow is correct but abyss-stack needs a thin runtime-owned diagnostic read model before any repair claim becomes honest. Do not use for silent repair, when no concrete target path exists, or when the base skill is sufficient without local adaptation.
+license: Apache-2.0
+metadata:
+  aoa_scope: project
+  aoa_status: overlay
+  aoa_invocation_mode: explicit-preferred
+  aoa_canonical_skill_repo: 8Dionysus/aoa-skills
+  aoa_canonical_skill_path: skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md
 ---
 
 # abyss-self-diagnostic-spine
@@ -19,7 +20,7 @@ Use the canonical skill in `aoa-skills` as the source of truth, then adapt it
 through the local runtime contracts and docs that live in this repository.
 
 Canonical source:
-- `repo:8Dionysus/aoa-skills skills/abyss-self-diagnostic-spine/SKILL.md`
+- `repo:8Dionysus/aoa-skills skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md`
 
 ## Local overlay notes
 

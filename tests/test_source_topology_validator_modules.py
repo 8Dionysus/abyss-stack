@@ -10,6 +10,16 @@ from scripts.validators import source_hygiene
 from scripts.validators import source_structure
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+VALID_LOCAL_OVERLAY_SKILL = """---
+name: abyss-self-diagnostic-spine
+description: Diagnose a concrete abyss runtime target through the repo-local read-only overlay.
+metadata:
+  aoa_canonical_skill_repo: 8Dionysus/aoa-skills
+  aoa_canonical_skill_path: skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md
+---
+
+# Overlay
+"""
 
 
 class SourceTopologyValidatorModulesTests(unittest.TestCase):
@@ -322,7 +332,7 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
             (skill_root / "AGENTS.md").write_text("# Skill surface\n", encoding="utf-8")
             overlay = skill_root / "abyss-self-diagnostic-spine"
             overlay.mkdir()
-            (overlay / "SKILL.md").write_text("# Overlay\n", encoding="utf-8")
+            (overlay / "SKILL.md").write_text(VALID_LOCAL_OVERLAY_SKILL, encoding="utf-8")
             (skill_root / "aoa-change-protocol").symlink_to(
                 "/srv/AbyssOS/aoa-skills/.agents/skills/aoa-change-protocol"
             )
@@ -353,7 +363,7 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
             (skill_root / "AGENTS.md").write_text("# Skill surface\n", encoding="utf-8")
             overlay = skill_root / "abyss-self-diagnostic-spine"
             overlay.mkdir()
-            (overlay / "SKILL.md").write_text("# Overlay\n", encoding="utf-8")
+            (overlay / "SKILL.md").write_text(VALID_LOCAL_OVERLAY_SKILL, encoding="utf-8")
             expected_target = "/srv/AbyssOS/aoa-skills/.agents/skills/aoa-change-protocol"
             (skill_root / "aoa-change-protocol").write_text(expected_target + "\n", encoding="utf-8")
 
