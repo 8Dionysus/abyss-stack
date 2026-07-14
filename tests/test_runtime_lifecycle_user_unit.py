@@ -58,6 +58,7 @@ EXPECTED_MCP_HTTP_INSTANCES = {
     "aoa-mcp-http@abyss-machine.service",
     "aoa-mcp-http@aoa-evals.service",
     "aoa-mcp-http@aoa-kag.service",
+    "aoa-mcp-http@aoa-stats.service",
     "aoa-mcp-http@aoa-4pda-connector.service",
     "aoa-mcp-http@aoa-telegram-connector.service",
     "aoa-mcp-http@aoa-discord-connector.service",

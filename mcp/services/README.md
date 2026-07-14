@@ -49,10 +49,10 @@ topology require a later decision than
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The
-`aoa-mcp-http.service` bundle wants the nine wrappers currently present in the
-shared Codex plane. `tos-corpus` and `aoa-stats` implement the same guarded
-transport contract but remain outside the bundle until their workspace
-wrappers and live canaries are source-owned. Installing units only links and
+`aoa-mcp-http.service` bundle wants the ten owner wrappers currently present in
+the shared Codex plane, including `aoa-stats`. `tos-corpus` implements the same
+guarded transport contract but remains outside the bundle until its workspace
+wrapper and live canary are source-owned. Installing units only links and
 reloads them; starting or restarting an owner is a separate operator action
 after source/deployed parity. Credential provisioning and Codex client-install
 routes remain owned by the systemd route card and executable installer.

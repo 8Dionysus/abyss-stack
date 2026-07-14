@@ -14,11 +14,13 @@ Quest route surfaces, including `quests/` and `QUESTBOOK.md`, are also synced
 because stack validation and deployed Configs self-checks use the quest surface
 builder as source-managed public metadata.
 
-Stack-owned runtime MCP packages under `mcp/` and their root contract schemas
-under `schemas/` are sync-managed too. User services launch MCP entrypoints
-from deployed `Configs/mcp`, and deployed graph validators resolve
-`Configs/schemas`; leaving either tree outside the projection would make a
-source-green MCP change impossible to verify as live through the owner route.
+Stack-owned runtime MCP packages under `mcp/`, their root contract schemas
+under `schemas/`, and the stack-owned local measurement port under `stats/`
+are sync-managed too. User services launch MCP entrypoints from deployed
+`Configs/mcp`, deployed graph validators resolve `Configs/schemas`, and the
+stats access plane resolves the stack port from `Configs/stats`; leaving any of
+these trees outside the projection would make a source-green change impossible
+to verify as live through the owner route.
 
 The default command projects the complete public-safe allowlist. Use repeatable
 `--item NAME` flags for a bounded projection and `--dry-run` to preview exact

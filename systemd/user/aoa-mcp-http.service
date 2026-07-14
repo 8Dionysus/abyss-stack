@@ -6,6 +6,7 @@ Wants=aoa-mcp-http@aoa-session-memory.service
 Wants=aoa-mcp-http@abyss-machine.service
 Wants=aoa-mcp-http@aoa-evals.service
 Wants=aoa-mcp-http@aoa-kag.service
+Wants=aoa-mcp-http@aoa-stats.service
 Wants=aoa-mcp-http@aoa-4pda-connector.service
 Wants=aoa-mcp-http@aoa-telegram-connector.service
 Wants=aoa-mcp-http@aoa-discord-connector.service

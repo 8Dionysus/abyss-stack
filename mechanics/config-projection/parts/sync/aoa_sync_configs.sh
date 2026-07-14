@@ -18,6 +18,7 @@ managed_items=(
   quests
   scripts
   schemas
+  stats
   systemd
   env
   README.md

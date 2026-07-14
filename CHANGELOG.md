@@ -44,6 +44,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- The authenticated loopback MCP bundle now admits the source-owned
+  `aoa-stats` wrapper, while Configs sync carries the stack-local `stats/` port
+  and the service resolves that source route through the deployed stack root.
 - Validation and test commands now route through active `AGENTS.md` cards,
   command-owner docs, and the canonical lane manifest instead of being copied
   into decision records, landing logs, or the root audit contract; the dated

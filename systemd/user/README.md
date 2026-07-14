@@ -8,7 +8,7 @@ This directory stores user-unit skeletons for the deployed runtime.
 - `abyss-stack-resource-guards-apply.service`
 - `aoa-mcp-http@.service`, one authenticated loopback shared owner per MCP
   instance
-- `aoa-mcp-http.service`, the nine-owner local bundle
+- `aoa-mcp-http.service`, the ten-owner local bundle
 - `managed-units.txt` allowlists the host-local user units that can be linked
   from the deployed Configs mirror.
 
