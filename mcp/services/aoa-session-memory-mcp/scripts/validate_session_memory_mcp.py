@@ -174,6 +174,39 @@ def _stdio_env(state: AoASessionMemoryMCPState) -> dict[str, str]:
     }
 
 
+def _read_only_tool_annotation_summary(tools: list[object], context: str) -> dict[str, object]:
+    invalid: list[dict[str, object]] = []
+    for tool in tools:
+        name = str(getattr(tool, "name", "<unnamed>"))
+        annotations = getattr(tool, "annotations", None)
+        observed = {
+            "readOnlyHint": getattr(annotations, "readOnlyHint", None),
+            "destructiveHint": getattr(annotations, "destructiveHint", None),
+            "idempotentHint": getattr(annotations, "idempotentHint", None),
+            "openWorldHint": getattr(annotations, "openWorldHint", None),
+        }
+        expected = {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+        if observed != expected:
+            invalid.append({"tool": name, "observed": observed})
+    if invalid:
+        raise SystemExit(f"{context} MCP tool annotation contract failed: {invalid}")
+    return {
+        "schema": "aoa_session_memory_mcp_tool_annotation_contract_v1",
+        "ok": True,
+        "tool_count": len(tools),
+        "read_only": True,
+        "destructive": False,
+        "idempotent": True,
+        "open_world": False,
+        "contract_limit": "metadata contract only; tool behavior remains covered by package tests and smoke calls",
+    }
+
+
 def _codex_config_path() -> Path:
     codex_home = os.environ.get("CODEX_HOME")
     if codex_home:
@@ -834,7 +867,9 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
     async with stdio_client(params) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
-            tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
+            listed_tools = (await mcp_session.list_tools()).tools
+            tool_annotation_contract = _read_only_tool_annotation_summary(listed_tools, "stdio")
+            tools = {tool.name for tool in listed_tools}
             missing_tools = sorted(REQUIRED_STDIO_SMOKE_TOOLS - tools)
             if missing_tools:
                 raise SystemExit(f"stdio MCP tool list is missing required tools: {missing_tools}")
@@ -1143,7 +1178,7 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         raise SystemExit(f"stdio MCP projection status returned invalid payload: {projection_status.get('diagnostics')}")
     if projection_status.get("mcp_access", {}).get("does_not_run_projection_catchup") is not True:
         raise SystemExit(f"stdio MCP projection status violated read-only catchup boundary: {projection_status.get('mcp_access')}")
-    return _stdio_route_count_summary(
+    summary = _stdio_route_count_summary(
         inventory,
         mcp_service_inventory,
         hook_inventory,
@@ -1175,6 +1210,8 @@ async def _stdio_tool_smoke(state: AoASessionMemoryMCPState, session: str) -> di
         projection_status,
         tool_count=len(tools),
     )
+    summary["tool_annotation_contract"] = tool_annotation_contract
+    return summary
 
 
 async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
@@ -1205,7 +1242,9 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
             )
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
-            tools = {tool.name for tool in (await mcp_session.list_tools()).tools}
+            listed_tools = (await mcp_session.list_tools()).tools
+            tool_annotation_contract = _read_only_tool_annotation_summary(listed_tools, "configured Codex")
+            tools = {tool.name for tool in listed_tools}
             missing_tools = sorted(REQUIRED_STDIO_SMOKE_TOOLS - tools)
             if missing_tools:
                 raise SystemExit(f"configured Codex MCP tool list is missing required tools: {missing_tools}")
@@ -1391,6 +1430,7 @@ async def _configured_transport_smoke(state: AoASessionMemoryMCPState) -> dict:
         "ok": True,
         "skipped": False,
         "tool_count": len(tools),
+        "tool_annotation_contract": tool_annotation_contract,
         "status_ok": payload.get("ok"),
         "search_alias_result_count": search_payload.get("result_count") if isinstance(search_payload, dict) else None,
         "literal_plan_primary_route": literal_plan_payload.get("primary_route", {}).get("route_id")
@@ -1570,6 +1610,7 @@ def main(argv: list[str] | None = None) -> None:
                 "freshness_projection": freshness.get("projection_freshness", {}).get("status"),
                 "raw_line_freshness_checked": raw_checked,
                 "stdio_tool_count": stdio_smoke["tool_count"],
+                "stdio_tool_annotation_contract": stdio_smoke["tool_annotation_contract"],
                 "stdio_inventory_entity_count": stdio_smoke["inventory_entity_count"],
                 "stdio_inventory_source": stdio_smoke["inventory_source"],
                 "stdio_inventory_latest_session_date": stdio_smoke["inventory_latest_session_date"],

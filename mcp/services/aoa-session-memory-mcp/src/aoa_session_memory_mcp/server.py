@@ -62,6 +62,7 @@ def build_server(
 ) -> Any:
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+        from mcp.types import ToolAnnotations  # type: ignore[import-not-found]
     except ImportError as exc:
         raise SystemExit("Missing dependency 'mcp'. Install with: python -m pip install -e .") from exc
 
@@ -69,6 +70,14 @@ def build_server(
         "aoa-session-memory-mcp",
         json_response=True,
         **_http_auth_kwargs(DEFAULT_HTTP_PORT),
+    )
+    read_only_tool = mcp.tool(
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
     )
 
     def current_state() -> core_module.AoASessionMemoryMCPState:
@@ -79,27 +88,27 @@ def build_server(
             script_path=script_path,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_memory_status(include_live: bool = False) -> dict[str, Any]:
         """Report .aoa search, atlas, route-readiness, and freshness posture."""
         return current_state().session_memory_status(include_live=include_live)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_transport_preflight() -> dict[str, Any]:
         """Diagnose whether the current Codex process has a live aoa-session-memory MCP transport."""
         return current_state().session_mcp_transport_preflight()
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_search(query: str = "", filters: dict[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
         """Search .aoa session evidence and return route refs plus freshness data."""
         return current_state().session_search(query=query, filters=filters, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_literal_query_plan(query: str = "", kind: str = "auto", filters: dict[str, Any] | None = None) -> dict[str, Any]:
         """Plan the cheapest reliable route for a literal skill/MCP/hook/tool/API/path/query before raw-text fallback."""
         return current_state().session_literal_query_plan(query=query, kind=kind, filters=filters)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_agent_responses(
         query: str = "",
         session: str = "",
@@ -122,17 +131,17 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_agent_closeouts(query: str = "", session: str = "", episode: str = "", limit: int = 20) -> dict[str, Any]:
         """Find assistant final closeout events separately from progress updates."""
         return current_state().session_agent_closeouts(query=query, session=session, episode=episode, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_agent_progress_updates(query: str = "", session: str = "", episode: str = "", limit: int = 20) -> dict[str, Any]:
         """Find assistant progress updates separately from final answers."""
         return current_state().session_agent_progress_updates(query=query, session=session, episode=episode, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_agent_reasoning_windows(
         query: str = "",
         session: str = "",
@@ -153,7 +162,7 @@ def build_server(
             explain=explain,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_task_episodes(
         target: str = "all",
         session: str = "",
@@ -174,7 +183,7 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_goal_lifecycles(
         target: str = "all",
         session: str = "",
@@ -195,7 +204,7 @@ def build_server(
             order=order,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_answer_neighborhood(
         query: str = "",
         session: str = "",
@@ -218,7 +227,7 @@ def build_server(
             explain=explain,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_trace(
         anchor: str,
         kind: str = "auto",
@@ -237,7 +246,7 @@ def build_server(
             doc_type=doc_type,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_dossier(
         anchor: str,
         kind: str = "auto",
@@ -258,7 +267,7 @@ def build_server(
             graph_edge_limit=graph_edge_limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_usage_audit(
         anchor: str,
         kind: str = "auto",
@@ -281,7 +290,7 @@ def build_server(
             full=full,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_usage_chain(
         anchor: str,
         kind: str = "auto",
@@ -304,12 +313,12 @@ def build_server(
             full=full,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_registry(kind: str = "all", query: str = "", lookup: str = "", limit: int = 50) -> dict[str, Any]:
         """Read generated entity registry or lookup one skill/MCP/tool/hook/API/etc anchor."""
         return current_state().session_entity_registry(kind=kind, query=query, lookup=lookup, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_usage_neighborhood(
         anchor: str,
         kind: str = "auto",
@@ -336,7 +345,7 @@ def build_server(
             full=full,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_usage_scenario_audit(
         sample_size: int = 8,
         seed: str = "entity-usage-scenario-audit",
@@ -363,7 +372,7 @@ def build_server(
             full=full,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_live_scenario_audit(
         seed: str = "live-scenario-audit",
         profiles: list[str] | None = None,
@@ -380,7 +389,7 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_live_scenario_corpus_check(
         case_limit: int = 0,
         full: bool = False,
@@ -391,12 +400,12 @@ def build_server(
             full=full,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_live_scenario_corpus_inventory(full: bool = False) -> dict[str, Any]:
         """List reviewed live-scenario corpus cases without running them."""
         return current_state().session_live_scenario_corpus_inventory(full=full)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_route(
         axis: str,
         key: str = "",
@@ -411,12 +420,12 @@ def build_server(
             include_entry_payloads=include_entry_payloads,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_brief(session: str = "latest", max_segments: int = 5) -> dict[str, Any]:
         """Return a compact session brief with manifest/index/raw refs."""
         return current_state().session_brief(session=session, max_segments=max_segments)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_retrieve(
         recipe: str = "continue-session",
         query: str = "",
@@ -433,7 +442,7 @@ def build_server(
             event_limit=event_limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_evidence_packet(
         intent: str,
         query: str = "",
@@ -450,17 +459,17 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_freshness_check(refs: list[str] | None = None, session: str = "") -> dict[str, Any]:
         """Check whether evidence refs are present and whether the search provider is ready."""
         return current_state().session_freshness_check(refs=refs, session=session)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_pattern_scan(pattern: str, filters: dict[str, Any] | None = None, limit: int = 50) -> dict[str, Any]:
         """Aggregate recurring session-event patterns from .aoa search hits."""
         return current_state().session_pattern_scan(pattern=pattern, filters=filters, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_entity_inventory(
         layer: str = "skill",
         query: str = "",
@@ -477,7 +486,7 @@ def build_server(
             sample_limit=sample_limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_hook_receipts(
         event_name: str = "UserPromptSubmit",
         session: str = "",
@@ -494,7 +503,7 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_latest_diagnostics(
         kind: str = "route-layer-readiness",
         limit: int = 5,
@@ -503,7 +512,7 @@ def build_server(
         """Read latest .aoa diagnostics summaries without mutating the archive."""
         return current_state().latest_diagnostics(kind=kind, limit=limit, include_payload=include_payload)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_maintenance_status(
         deep: bool = False,
         include_timers: bool = True,
@@ -512,12 +521,12 @@ def build_server(
         """Return the canonical read-only .aoa maintenance status packet."""
         return current_state().session_maintenance_status(deep=deep, include_timers=include_timers, full=full)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_maintenance_plan() -> dict[str, Any]:
         """Return the non-mutating maintenance status through the older plan name."""
         return current_state().maintenance_plan()
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_route_rollup_query(
         query: str = "",
         layer: str = "tool",
@@ -536,7 +545,7 @@ def build_server(
             ref_limit=ref_limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_direct_event_rollup_query(
         query: str = "",
         usage_role: str = "result",
@@ -561,12 +570,12 @@ def build_server(
             ref_limit=ref_limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_projection_status(include_payload: bool = False) -> dict[str, Any]:
         """Read the latest projection-catchup completeness diagnostic without running maintenance."""
         return current_state().session_projection_status(include_payload=include_payload)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_neighborhood(
         anchor: str,
         kind: str = "auto",
@@ -577,17 +586,17 @@ def build_server(
         """Return a graph route neighborhood for a skill, MCP, hook, tool, API, path, goal, or other operational anchor."""
         return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit, edge_limit=edge_limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_timeline(anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
         """Return event timeline nodes near a skill, MCP, hook, tool, path, or route anchor."""
         return current_state().graph_timeline(anchor=anchor, kind=kind, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_shortest_path(source: str, target: str, kind: str = "auto", max_depth: int = 4) -> dict[str, Any]:
         """Find a bounded evidence graph path between two operational anchors."""
         return current_state().graph_shortest_path(source=source, target=target, kind=kind, max_depth=max_depth)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_bridge(
         source: str,
         target: str,
@@ -608,12 +617,12 @@ def build_server(
             limit=limit,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_cooccurrence(anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
         """Aggregate route-signal cooccurrences around an anchor with evidence samples."""
         return current_state().graph_cooccurrence(anchor=anchor, kind=kind, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graphrag_packet(
         query: str,
         anchor: str = "",
@@ -632,7 +641,7 @@ def build_server(
             rerank_local=rerank_local,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_explain_graph_packet(
         intent: str,
         anchor: str = "",
@@ -642,7 +651,7 @@ def build_server(
         """Explain how a graph/GraphRAG evidence packet was assembled and which refs bound it."""
         return current_state().explain_graph_packet(intent=intent, anchor=anchor, query=query, limit=limit)
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_eval(
         limit: int = 6,
         include_semantic_context: bool = False,
@@ -655,7 +664,7 @@ def build_server(
             rerank_local=rerank_local,
         )
 
-    @mcp.tool()
+    @read_only_tool
     def aoa_session_graph_quality_audit(
         limit: int = 4,
         sample_ref_limit: int = 2,

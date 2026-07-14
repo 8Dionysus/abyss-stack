@@ -4576,6 +4576,21 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "chronological" in rendered_goal_order_schema
 
 
+def test_published_tools_advertise_closed_world_read_only_contract(tmp_path: Path) -> None:
+    aoa = seed_archive(tmp_path)
+    server = build_server(workspace_root=tmp_path, aoa_root=aoa, script_path=aoa / "scripts/aoa_session_memory.py")
+
+    tools = asyncio.run(server.list_tools())
+
+    assert tools
+    for tool in tools:
+        assert tool.annotations is not None, tool.name
+        assert tool.annotations.readOnlyHint is True, tool.name
+        assert tool.annotations.destructiveHint is False, tool.name
+        assert tool.annotations.idempotentHint is True, tool.name
+        assert tool.annotations.openWorldHint is False, tool.name
+
+
 def test_stdio_server_round_trips_tool_call_against_fixture_archive(tmp_path: Path) -> None:
     aoa = seed_archive(tmp_path)
     server_script = Path(__file__).resolve().parents[1] / "scripts" / "aoa_session_memory_mcp_server.py"

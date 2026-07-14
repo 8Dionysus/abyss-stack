@@ -43,6 +43,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-session-memory-mcp` now publishes and validates exact closed-world
+  read-only annotations for every tool, allowing Codex approval policy to
+  distinguish evidence reads from side-effecting MCP calls without a per-tool
+  approval bypass.
 - Shared MCP HTTP startup now fails closed without a valid host-local bearer;
   Codex receives only the named environment route, systemd loads the secret as
   a credential, and provisioning rejects symlinked secret paths without
