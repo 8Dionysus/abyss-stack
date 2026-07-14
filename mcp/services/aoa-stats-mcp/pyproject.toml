@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aoa-stats-mcp"
+version = "0.1.0"
+description = "MCP access plane for the federated OS Abyss stats system"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.27.2,<2",
+]
+
+[project.scripts]
+aoa-stats-mcp = "aoa_stats_mcp.cli:main"
+aoa-stats-mcp-server = "aoa_stats_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
