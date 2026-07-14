@@ -153,6 +153,7 @@ Preview the exact bounded projection before a lifecycle-sensitive rollout:
 scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd
 scripts/aoa-install-systemd --provision-mcp-http-auth
+scripts/aoa-install-systemd --install-mcp-http-codex-client
 scripts/aoa-install-systemd --all-user-units
 ```
 
@@ -165,6 +166,10 @@ owners. The explicit provision action creates the optional host-local MCP
 bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
 Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
 `bearer_token_env_var`; the value must never be copied into `config.toml`.
+The Codex client install adds a removable Zsh launch function that delegates
+to the deployed launcher without replacing the managed Codex executable or
+exporting the bearer into the parent shell. It affects only new interactive
+shell launches and leaves running Codex sessions unchanged.
 Verify parity, then canary authenticated owners one at a time before using live
 MCP responses as current evidence.
 

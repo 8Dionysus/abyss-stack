@@ -295,7 +295,8 @@
           "mechanics/runtime-lifecycle/parts/wait-smoke/aoa_internal_probes.sh",
           "mechanics/runtime-lifecycle/parts/logs-status/aoa_logs.sh",
           "mechanics/runtime-lifecycle/parts/logs-status/aoa_status.sh",
-          "mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh"
+          "mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+          "mcp/services/_shared/codex_http_client.sh"
         ]
       }
     ],

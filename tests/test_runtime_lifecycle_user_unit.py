@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -23,6 +24,7 @@ MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
 MCP_HTTP_AUTH_BUILDER = REPO_ROOT / "mcp" / "services" / "_shared" / "build_http_auth_vendors.py"
+MCP_HTTP_CODEX_CLIENT = REPO_ROOT / "mcp" / "services" / "_shared" / "codex_http_client.sh"
 MCP_HTTP_AUTH_TOKEN = "test-only-" + ("a" * 54)
 MCP_HTTP_CREDENTIAL_NAME = "aoa-mcp-http-bearer-token"
 MCP_HTTP_SECRET_RELATIVE = Path("Secrets") / "Configs" / MCP_HTTP_CREDENTIAL_NAME
@@ -325,6 +327,173 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertNotEqual(symlinked_token.returncode, 0)
             self.assertIn("regular non-symlink file", symlinked_token.stderr)
             self.assertEqual(outside_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+
+    def test_mcp_http_codex_client_scopes_bearer_to_execed_codex(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            credential = stack_root / MCP_HTTP_SECRET_RELATIVE
+            credential.parent.mkdir(parents=True)
+            credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
+            credential.chmod(0o600)
+            capture_token = root / "captured-token"
+            capture_args = root / "captured-args"
+            fake_codex = root / "codex"
+            fake_codex.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s' \"$AOA_MCP_HTTP_BEARER_TOKEN\" > \"$CAPTURE_TOKEN\"\n"
+                "printf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\n",
+                encoding="utf-8",
+            )
+            fake_codex.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CODEX_EXECUTABLE": str(fake_codex),
+                    "CAPTURE_TOKEN": str(capture_token),
+                    "CAPTURE_ARGS": str(capture_args),
+                }
+            )
+            env.pop("AOA_MCP_HTTP_BEARER_TOKEN", None)
+
+            result = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "resume", "test-thread"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+            self.assertEqual(
+                capture_args.read_text(encoding="utf-8").splitlines(),
+                ["resume", "test-thread"],
+            )
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, result.stdout + result.stderr)
+
+            env["AOA_MCP_HTTP_BEARER_TOKEN"] = "different-" + ("b" * 54)
+            conflict = subprocess.run(
+                [str(MCP_HTTP_CODEX_CLIENT), "--version"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("conflicts", conflict.stderr)
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, conflict.stdout + conflict.stderr)
+
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "MCP HTTP Codex client installs are user-scoped",
+    )
+    def test_mcp_http_codex_client_install_is_idempotent_and_removable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            configs_root = root / "Configs"
+            deployed_launcher = (
+                configs_root / "mcp" / "services" / "_shared" / "codex_http_client.sh"
+            )
+            deployed_launcher.parent.mkdir(parents=True)
+            deployed_launcher.write_bytes(MCP_HTTP_CODEX_CLIENT.read_bytes())
+            deployed_launcher.chmod(0o755)
+            credential = stack_root / MCP_HTTP_SECRET_RELATIVE
+            credential.parent.mkdir(parents=True)
+            credential.write_text(f"{MCP_HTTP_AUTH_TOKEN}\n", encoding="utf-8")
+            credential.chmod(0o600)
+            home = root / "home"
+            home.mkdir()
+            zshrc = home / ".zshrc"
+            zshrc.write_text("export KEEP_EXISTING=1\n", encoding="utf-8")
+            zshrc.chmod(0o640)
+            fake_codex = root / "codex"
+            capture_token = root / "captured-token"
+            fake_codex.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s' \"$AOA_MCP_HTTP_BEARER_TOKEN\" > \"$CAPTURE_TOKEN\"\n",
+                encoding="utf-8",
+            )
+            fake_codex.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(configs_root),
+                    "HOME": str(home),
+                    "AOA_CODEX_EXECUTABLE": str(fake_codex),
+                    "CAPTURE_TOKEN": str(capture_token),
+                }
+            )
+            env.pop("ZDOTDIR", None)
+            env.pop("AOA_MCP_HTTP_BEARER_TOKEN", None)
+
+            first = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            first_zshrc = zshrc.read_text(encoding="utf-8")
+            self.assertEqual(first_zshrc.count("abyss-stack MCP HTTP Codex client >>>"), 1)
+            self.assertIn(str(deployed_launcher), first_zshrc)
+            self.assertIn("export KEEP_EXISTING=1", first_zshrc)
+            self.assertNotIn(MCP_HTTP_AUTH_TOKEN, first_zshrc + first.stdout + first.stderr)
+            self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
+
+            second = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--install-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(zshrc.read_text(encoding="utf-8"), first_zshrc)
+
+            zsh = shutil.which("zsh")
+            if zsh is not None:
+                syntax = subprocess.run(
+                    [zsh, "-n", str(zshrc)],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(syntax.returncode, 0, syntax.stderr)
+                launch = subprocess.run(
+                    [zsh, "-dfc", 'source "$HOME/.zshrc"; codex --version'],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(launch.returncode, 0, launch.stderr)
+                self.assertEqual(capture_token.read_text(encoding="utf-8"), MCP_HTTP_AUTH_TOKEN)
+
+            remove = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--remove-mcp-http-codex-client"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(remove.returncode, 0, remove.stderr)
+            removed_zshrc = zshrc.read_text(encoding="utf-8")
+            self.assertEqual(removed_zshrc, "export KEEP_EXISTING=1\n")
+            self.assertNotIn("MCP HTTP Codex client", removed_zshrc)
+            self.assertEqual(zshrc.stat().st_mode & 0o777, 0o640)
 
     def test_loopback_mcp_units_keep_owner_processes_and_deployed_paths(self) -> None:
         template = MCP_HTTP_TEMPLATE.read_text(encoding="utf-8")

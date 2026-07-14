@@ -40,6 +40,14 @@ and symlinked roots or credential files fail closed. Install never starts or
 restarts an owner. Canary and restart each instance separately after
 source/deployed parity so one failed owner cannot hide behind bundle state.
 
+Use `aoa-install-systemd --install-mcp-http-codex-client` once for the target
+user after the MCP package has been projected into deployed `Configs`. The
+action validates or provisions the same credential and adds one managed Zsh
+function that delegates new interactive Codex launches to the deployed
+client-side launcher. The bearer is inherited only by Codex, the managed Codex
+binary symlink is unchanged, and running shells and sessions are untouched.
+`--remove-mcp-http-codex-client` removes only that managed Zsh block.
+
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned
 copies into `/etc/systemd/system`, reloads the system daemon, and deliberately

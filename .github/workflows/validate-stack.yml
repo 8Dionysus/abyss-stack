@@ -37,10 +37,10 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
 
-      - name: Install shellcheck, rsync, podman and podman-compose
+      - name: Install shellcheck, rsync, zsh, podman and podman-compose
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck rsync podman podman-compose
+          sudo apt-get install -y shellcheck rsync zsh podman podman-compose
 
       - name: Run release audit
         env:
