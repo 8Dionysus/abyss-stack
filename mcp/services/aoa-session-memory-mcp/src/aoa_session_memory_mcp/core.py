@@ -11,7 +11,7 @@ import subprocess
 import tomllib
 import time
 import datetime as dt
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -184,6 +184,9 @@ GRAPH_EDGE_SAMPLE_LIMIT = 8
 GRAPH_EVENT_SAMPLE_LIMIT = 8
 GRAPH_EVIDENCE_REF_SAMPLE_LIMIT = 6
 GRAPH_ITEM_TEXT_PREVIEW_CHARS = 64
+GRAPH_ROUTE_TERM_SHARD_LIMIT = 12
+GRAPH_ROUTE_TERM_MATCH_LIMIT = 48
+GRAPH_SQLITE_EDGE_BUDGET_MAX = 400
 INVENTORY_SAMPLE_LABEL_CHARS = 64
 INVENTORY_TOTAL_SAMPLE_LIMIT = 12
 
@@ -2660,7 +2663,13 @@ def _compact_dossier_graph(payload: dict[str, Any]) -> dict[str, Any]:
         if payload.get(key) not in (None, "", [], {})
     }
     mcp_access = payload.get("mcp_access") if isinstance(payload.get("mcp_access"), dict) else {}
-    for key in ("full_graph_route", "response_compacted", "read_model"):
+    for key in (
+        "full_graph_route",
+        "response_compacted",
+        "read_model",
+        "deep_archive_fallback_executed",
+        "deep_archive_fallback_deferred",
+    ):
         if mcp_access.get(key) not in (None, "", [], {}):
             compact[key] = mcp_access.get(key)
     return _without_omitted_field_counts(compact)
@@ -5032,6 +5041,8 @@ class AoASessionMemoryMCPState:
         usage_mcp_access = usage.get("mcp_access") if isinstance(usage.get("mcp_access"), dict) else {}
         neighborhood_mcp_access = neighborhood.get("mcp_access") if isinstance(neighborhood.get("mcp_access"), dict) else {}
         graph_mcp_access = graph.get("mcp_access") if isinstance(graph.get("mcp_access"), dict) else {}
+        if graph_mcp_access.get("deep_archive_fallback_deferred"):
+            noise_flags.append("graph_neighborhood_deep_expansion_deferred")
         next_expansion = [
             {
                 "id": "full_usage_audit",
@@ -7097,25 +7108,93 @@ class AoASessionMemoryMCPState:
         if edge_limit is not None:
             bounded_edge_limit = _coerce_limit(edge_limit, 40, 2000)
             args.extend(["--edge-limit", str(bounded_edge_limit)])
+        full_route = self._archive_command_line("graph-neighborhood", args)
         fast_payload = self._graph_neighborhood_sqlite_fast_path(
             anchor=anchor_text,
             kind=route_kind,
             depth=bounded_depth,
             limit=bounded_limit,
             edge_limit=bounded_edge_limit,
-            full_route=self._archive_command_line("graph-neighborhood", args),
+            full_route=full_route,
         )
         if fast_payload is not None:
-            return fast_payload
-        payload = self._archive_command("graph-neighborhood", args)
-        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
-        payload.setdefault("authority_boundary", self.authority_boundary())
+            return _compact_graph_payload(
+                fast_payload,
+                full_route=full_route,
+                node_limit=min(bounded_limit, GRAPH_NODE_SAMPLE_LIMIT),
+                edge_limit=min(bounded_edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
+            )
+        payload = self._graph_neighborhood_deferred_payload(
+            anchor=anchor_text,
+            requested_kind=kind,
+            kind=route_kind,
+            depth=bounded_depth,
+            limit=bounded_limit,
+            edge_limit=bounded_edge_limit,
+            full_route=full_route,
+        )
         return _compact_graph_payload(
             payload,
-            full_route=self._archive_command_line("graph-neighborhood", args),
+            full_route=full_route,
             node_limit=min(bounded_limit, GRAPH_NODE_SAMPLE_LIMIT),
             edge_limit=min(bounded_edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
         )
+
+    def _graph_neighborhood_deferred_payload(
+        self,
+        *,
+        anchor: str,
+        requested_kind: str,
+        kind: str,
+        depth: int,
+        limit: int,
+        edge_limit: int,
+        full_route: str,
+    ) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "artifact_type": "session_memory_graph_neighborhood",
+            "ok": False,
+            "mutates": False,
+            "anchor": anchor,
+            "kind": kind,
+            "requested_kind": requested_kind,
+            "depth": depth,
+            "parameters": {
+                "limit": limit,
+                "edge_limit": edge_limit,
+            },
+            "source": "mcp_bounded_graph_deferred",
+            "node_count": 0,
+            "edge_count": 0,
+            "nodes": [],
+            "edges": [],
+            "evidence_refs": [],
+            "freshness": {
+                "status": "bounded_graph_route_unresolved",
+                "checked": False,
+            },
+            "quality": {
+                "route": "indexed_graph_only",
+                "direct_sqlite_fast_path": False,
+                "deep_archive_fallback_executed": False,
+            },
+            "diagnostics": ["bounded_graph_route_unresolved_deep_archive_fallback_deferred"],
+            "next_expansion_command": full_route,
+            "next_expansion_reason": (
+                "The compact MCP route found no indexed graph node. Run the named archive command "
+                "outside MCP through owner-aware resource admission when deep expansion is justified."
+            ),
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "deep_archive_fallback_executed": False,
+                "deep_archive_fallback_deferred": True,
+                "full_graph_route": full_route,
+                "authority_boundary": "MCP stays on bounded read models; deep archive expansion requires owner admission.",
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
 
     def _graph_neighborhood_node_candidates(self, *, anchor: str, kind: str) -> list[str]:
         if anchor.startswith("route:") or anchor.startswith("event:") or anchor.startswith("session:") or anchor.startswith("segment:"):
@@ -7134,6 +7213,141 @@ class AoASessionMemoryMCPState:
             candidates.append(f"route:{route_key}:{route_key}:{key}")
             candidates.append(f"route:{route_key}:entity:entity_{key}")
         return list(dict.fromkeys(candidates))
+
+    def _graph_route_term_db_paths(self) -> list[Path]:
+        shard_root = self.aoa_root / "search" / "shards"
+        try:
+            resolved_root = shard_root.resolve(strict=True)
+        except OSError:
+            return []
+        candidates: list[Path] = []
+        catalog = _read_json(self.aoa_root / "search" / "catalog.json")
+        entries = catalog.get("shards") if isinstance(catalog, dict) and isinstance(catalog.get("shards"), list) else []
+        for entry in reversed(entries):
+            if not isinstance(entry, dict):
+                continue
+            raw_path = entry.get("shard_db_path")
+            if not raw_path:
+                continue
+            path = Path(str(raw_path))
+            if not path.is_absolute():
+                path = self.aoa_root / path
+            try:
+                resolved = path.resolve(strict=True)
+                resolved.relative_to(resolved_root)
+            except (OSError, ValueError):
+                continue
+            if resolved.is_file() and resolved not in candidates:
+                candidates.append(resolved)
+        if not candidates:
+            for path in sorted(shard_root.glob("*/aoa-search.sqlite3"), reverse=True):
+                try:
+                    resolved = path.resolve(strict=True)
+                    resolved.relative_to(resolved_root)
+                except (OSError, ValueError):
+                    continue
+                if resolved.is_file() and resolved not in candidates:
+                    candidates.append(resolved)
+        return candidates[:GRAPH_ROUTE_TERM_SHARD_LIMIT]
+
+    def _graph_route_term_node_candidates(self, *, anchor: str, kind: str) -> tuple[list[str], dict[str, Any]]:
+        anchor_key = _route_key(anchor)
+        if len(anchor_key) < 3:
+            return [], {
+                "strategy": "sharded_route_terms",
+                "status": "anchor_too_short",
+                "requested_key": anchor_key,
+                "matched_route_term_count": 0,
+            }
+        namespace_prefixes = (
+            "",
+            "aoa_session_",
+            "aoa_session_memory_",
+            "aoa_session_memory_mcp_",
+            "aoa_session_memory_mcp_aoa_session_",
+        )
+        base_keys = [anchor_key]
+        for prefix in namespace_prefixes[1:]:
+            if anchor_key.startswith(prefix):
+                stripped = anchor_key[len(prefix) :]
+                if stripped:
+                    base_keys.append(stripped)
+        candidate_keys: list[str] = []
+        for base_key in base_keys:
+            for prefix in namespace_prefixes:
+                candidate = f"{prefix}{base_key}"
+                if candidate not in candidate_keys:
+                    candidate_keys.append(candidate)
+        route_layers = [kind, "entity", "tool", "mcp_tool", "mcp", "skill", "script", "hook", "command", "api"]
+        candidate_signals = list(
+            dict.fromkeys(
+                f"{layer}:{key}"
+                for layer in route_layers
+                if layer not in {"", "auto", "all"}
+                for key in candidate_keys
+            )
+        )[:GRAPH_ROUTE_TERM_MATCH_LIMIT]
+        node_ids: list[str] = []
+        matches: list[dict[str, str]] = []
+        checked_paths: list[str] = []
+        diagnostics: list[str] = []
+        for db_path in self._graph_route_term_db_paths():
+            conn: sqlite3.Connection | None = None
+            try:
+                conn = sqlite3.connect(f"{db_path.as_uri()}?mode=ro", uri=True, timeout=0.25)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA query_only = ON")
+                conn.execute("PRAGMA busy_timeout = 250")
+                if not self._sqlite_table_exists(conn, "route_terms"):
+                    continue
+                checked_paths.append(db_path.as_posix())
+                remaining = max(1, GRAPH_ROUTE_TERM_MATCH_LIMIT - len(node_ids))
+                placeholders = ", ".join("?" for _ in candidate_signals)
+                rows = conn.execute(
+                    f"""
+                    SELECT layer, key, route_signal
+                    FROM route_terms
+                    WHERE route_signal IN ({placeholders})
+                    ORDER BY
+                      CASE WHEN layer = ? THEN 0 WHEN layer = 'entity' THEN 1 ELSE 2 END,
+                      CASE WHEN key = ? THEN 0 ELSE 1 END,
+                      LENGTH(key),
+                      key
+                    LIMIT ?
+                    """,
+                    (*candidate_signals, kind, anchor_key, remaining),
+                ).fetchall()
+                for row in rows:
+                    layer = str(row["layer"] or "")
+                    key = str(row["key"] or "")
+                    signal = str(row["route_signal"] or "")
+                    if not layer or not key or not signal:
+                        continue
+                    node_id = f"route:{layer}:{signal}"
+                    if node_id in node_ids:
+                        continue
+                    node_ids.append(node_id)
+                    if len(matches) < 12:
+                        matches.append({"layer": layer, "key": key, "route_signal": signal})
+                    if len(node_ids) >= GRAPH_ROUTE_TERM_MATCH_LIMIT:
+                        break
+            except sqlite3.Error as exc:
+                diagnostics.append(f"route_terms_read_failed:{db_path.name}:{exc.__class__.__name__}")
+            finally:
+                if conn is not None:
+                    conn.close()
+            if len(node_ids) >= GRAPH_ROUTE_TERM_MATCH_LIMIT:
+                break
+        return node_ids, {
+            "strategy": "sharded_route_terms",
+            "status": "matched" if node_ids else "no_match",
+            "requested_key": anchor_key,
+            "candidate_route_signal_count": len(candidate_signals),
+            "matched_route_term_count": len(node_ids),
+            "matched_route_terms": matches,
+            "checked_read_models": checked_paths,
+            "diagnostics": diagnostics,
+        }
 
     def _loads_graph_payload(self, value: Any) -> dict[str, Any]:
         if not value:
@@ -7222,8 +7436,6 @@ class AoASessionMemoryMCPState:
         edge_limit: int,
         full_route: str,
     ) -> dict[str, Any] | None:
-        if depth > 1:
-            return None
         db_path = self.aoa_root / "graph" / "graph.sqlite3"
         if not db_path.is_file():
             return None
@@ -7231,45 +7443,114 @@ class AoASessionMemoryMCPState:
         if not candidates:
             return None
         conn: sqlite3.Connection | None = None
+        route_term_resolution: dict[str, Any] = {
+            "strategy": "synthetic_exact_candidates",
+            "status": "not_needed",
+            "matched_route_term_count": 0,
+        }
+        edge_query_truncated = False
+        omitted_node_count = 0
+        omitted_edge_count = 0
         try:
-            conn = sqlite3.connect(str(db_path))
+            conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=0.5)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only = ON")
+            conn.execute("PRAGMA busy_timeout = 500")
             if not self._sqlite_table_exists(conn, "nodes") or not self._sqlite_table_exists(conn, "edges"):
                 return None
-            placeholders = ", ".join("?" for _ in candidates)
-            start_rows = conn.execute(
-                f"""
-                SELECT id, node_type, payload_json, count
-                FROM nodes
-                WHERE id IN ({placeholders})
-                LIMIT ?
-                """,
-                [*candidates, min(max(1, limit), 20)],
-            ).fetchall()
+
+            def start_rows_for(node_ids: list[str]) -> list[sqlite3.Row]:
+                if not node_ids:
+                    return []
+                placeholders = ", ".join("?" for _ in node_ids)
+                return conn.execute(
+                    f"""
+                    SELECT id, node_type, payload_json, count
+                    FROM nodes
+                    WHERE id IN ({placeholders})
+                    LIMIT ?
+                    """,
+                    [*node_ids, min(max(1, limit), 20)],
+                ).fetchall()
+
+            start_rows = start_rows_for(candidates)
+            if not start_rows:
+                route_term_candidates, route_term_resolution = self._graph_route_term_node_candidates(
+                    anchor=anchor,
+                    kind=kind,
+                )
+                candidates = list(dict.fromkeys([*candidates, *route_term_candidates]))
+                start_rows = start_rows_for(candidates)
             if not start_rows:
                 return None
             start_ids = [str(row["id"]) for row in start_rows]
-            edge_budget = max(1, min(edge_limit, 400))
-            edge_rows = conn.execute(
-                f"""
-                SELECT id, edge_type, source_node, target_node, payload_json, count
-                FROM edges
-                WHERE source_node IN ({", ".join("?" for _ in start_ids)})
-                   OR target_node IN ({", ".join("?" for _ in start_ids)})
-                ORDER BY count DESC, id
-                LIMIT ?
-                """,
-                [*start_ids, *start_ids, edge_budget + 1],
-            ).fetchall()
-            selected_edge_rows = edge_rows[:edge_budget]
-            node_ids = list(start_ids)
-            for row in selected_edge_rows:
-                for key in ("source_node", "target_node"):
-                    node_id = str(row[key])
-                    if node_id not in node_ids:
-                        node_ids.append(node_id)
             node_limit = max(1, min(limit, 200))
-            selected_node_ids = node_ids[:node_limit]
+            edge_budget = max(1, min(edge_limit, GRAPH_SQLITE_EDGE_BUDGET_MAX))
+            queue: deque[tuple[str, int]] = deque()
+            queued_ids: set[str] = set()
+            for node_id in start_ids:
+                if len(queue) >= node_limit:
+                    omitted_node_count += 1
+                    continue
+                queue.append((node_id, 0))
+                queued_ids.add(node_id)
+            selected_node_ids: list[str] = []
+            selected_node_set: set[str] = set()
+            selected_edge_rows: list[sqlite3.Row] = []
+            seen_edge_ids: set[str] = set()
+            while queue and len(selected_node_ids) < node_limit:
+                node_id, distance = queue.popleft()
+                if node_id in selected_node_set:
+                    continue
+                selected_node_ids.append(node_id)
+                selected_node_set.add(node_id)
+                if distance >= depth:
+                    continue
+                if len(selected_edge_rows) >= edge_budget:
+                    edge_query_truncated = True
+                    continue
+                fetched: list[sqlite3.Row] = []
+                local_edge_ids: set[str] = set()
+                for column in ("source_node", "target_node"):
+                    rows = conn.execute(
+                        f"""
+                        SELECT id, edge_type, source_node, target_node, payload_json, count
+                        FROM edges
+                        WHERE {column} = ?
+                        ORDER BY count DESC, id
+                        LIMIT ?
+                        """,
+                        (node_id, edge_budget + 1),
+                    ).fetchall()
+                    if len(rows) > edge_budget:
+                        edge_query_truncated = True
+                    for row in rows:
+                        edge_id = str(row["id"])
+                        if edge_id in local_edge_ids:
+                            continue
+                        local_edge_ids.add(edge_id)
+                        fetched.append(row)
+                fetched.sort(key=lambda row: (-int(row["count"] or 0), str(row["id"])))
+                for row in fetched:
+                    edge_id = str(row["id"])
+                    if edge_id in seen_edge_ids:
+                        continue
+                    seen_edge_ids.add(edge_id)
+                    if len(selected_edge_rows) >= edge_budget:
+                        omitted_edge_count += 1
+                        edge_query_truncated = True
+                        continue
+                    selected_edge_rows.append(row)
+                    neighbor = str(row["target_node"] if str(row["source_node"]) == node_id else row["source_node"])
+                    if neighbor in selected_node_set or neighbor in queued_ids:
+                        continue
+                    if len(selected_node_ids) + len(queue) >= node_limit:
+                        omitted_node_count += 1
+                        continue
+                    queue.append((neighbor, distance + 1))
+                    queued_ids.add(neighbor)
+
+            omitted_node_count += len(queue)
             node_placeholders = ", ".join("?" for _ in selected_node_ids)
             node_rows = conn.execute(
                 f"""
@@ -7287,7 +7568,7 @@ class AoASessionMemoryMCPState:
                 node_ids=selected_node_ids,
                 edge_ids=[str(row["id"]) for row in selected_edge_rows],
             )
-        except sqlite3.Error:
+        except (OSError, sqlite3.Error):
             return None
         finally:
             if conn is not None:
@@ -7301,16 +7582,17 @@ class AoASessionMemoryMCPState:
             "kind": kind,
             "depth": depth,
             "source": "mcp_sqlite_graph_fast_path",
-            "node_count": len(node_ids),
+            "node_count": len(selected_node_ids),
             "edge_count": len(selected_edge_rows),
-            "truncated": len(edge_rows) > len(selected_edge_rows) or len(node_ids) > len(selected_node_ids),
-            "omitted_node_count": max(0, len(node_ids) - len(selected_node_ids)),
-            "omitted_edge_count": max(0, len(edge_rows) - len(selected_edge_rows)),
+            "truncated": bool(edge_query_truncated or omitted_node_count or omitted_edge_count),
+            "omitted_node_count": omitted_node_count,
+            "omitted_edge_count": omitted_edge_count,
             "nodes": ordered_nodes,
             "edges": edges,
             "evidence_refs": evidence_refs,
             "freshness": {
                 "status": "graph_store_read_model",
+                "checked": False,
                 "read_model": db_path.as_posix(),
             },
             "provider": {
@@ -7319,9 +7601,12 @@ class AoASessionMemoryMCPState:
                 "db_path": db_path.as_posix(),
             },
             "quality": {
-                "route": "exact_graph_node_then_indexed_adjacent_edges",
+                "route": "resolved_graph_nodes_then_indexed_bounded_bfs",
                 "start_node_count": len(start_ids),
                 "direct_sqlite_fast_path": True,
+                "requested_depth": depth,
+                "route_term_resolution": route_term_resolution,
+                "deep_archive_fallback_executed": False,
                 "raw_or_segment_ref_present": any(
                     isinstance(ref.get("refs"), dict) and (ref["refs"].get("raw") or ref["refs"].get("segment"))
                     for ref in evidence_refs
@@ -7336,15 +7621,12 @@ class AoASessionMemoryMCPState:
                 "read_model": db_path.as_posix(),
                 "response_compacted": True,
                 "next_expansion_command": full_route,
+                "deep_archive_fallback_executed": False,
+                "route_term_resolution": route_term_resolution,
                 "authority_boundary": "MCP fast path reads generated graph store; raw/segment evidence remains authoritative.",
             },
         }
-        return _compact_graph_payload(
-            payload,
-            full_route=full_route,
-            node_limit=min(limit, GRAPH_NODE_SAMPLE_LIMIT),
-            edge_limit=min(edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
-        )
+        return payload
 
     def graph_timeline(self, anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")

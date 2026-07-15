@@ -5111,12 +5111,15 @@ def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
     assert dossier["usage"]["usage_event_count"] == 1
     assert dossier["consequence_chain"]["usage_consequence_event_count"] == 1
     assert dossier["neighborhood"]["window_count"] == 1
-    assert dossier["graph_neighborhood"]["node_count"] == 3
+    assert dossier["graph_neighborhood"]["node_count"] == 0
+    assert dossier["graph_neighborhood"]["source"] == "mcp_bounded_graph_deferred"
+    assert dossier["graph_neighborhood"]["deep_archive_fallback_deferred"] is True
     assert dossier["evidence"]["raw_or_segment_ref_present"] is True
     assert not any(isinstance(ref.get("graph"), int) for ref in dossier["evidence"]["refs"])
     assert dossier["quality"]["one_short_route"] is True
     assert dossier["quality"]["source_identity_present"] is True
     assert "source_identity_not_found_in_generated_entity_registry" not in dossier["noise_flags"]
+    assert "graph_neighborhood_deep_expansion_deferred" in dossier["noise_flags"]
     assert dossier["mcp_access"]["read_only_composite_route"] is True
     assert dossier["mcp_access"]["source_tools"] == [
         "aoa_session_entity_registry",
@@ -5130,7 +5133,7 @@ def test_entity_dossier_composes_first_route_packet(tmp_path: Path) -> None:
     commands = [command for command, _args in runner.calls]
     assert "entity-usage-audit" in commands
     assert "entity-usage-neighborhood" in commands
-    assert "graph-neighborhood" in commands
+    assert "graph-neighborhood" not in commands
 
 
 def test_entity_dossier_keeps_usage_neighborhood_fallback_expansion_command(tmp_path: Path) -> None:
@@ -6308,6 +6311,7 @@ def test_pattern_scan_aggregates_route_signals(tmp_path: Path) -> None:
 def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
+    long_text = "must not cross the compact MCP boundary " * 40
     graph_db = state.aoa_root / "graph/graph.sqlite3"
     graph_db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(graph_db)
@@ -6358,15 +6362,24 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
             "label": "mcp:aoa_session_memory_mcp",
             "route_layer": "mcp",
             "route_signal": "mcp:aoa_session_memory_mcp",
+            "content": long_text,
         }
         event_node = {"id": "event:session-1:000:000001", "type": "event", "title": "debug mcp"}
         session_node = {"id": "session:session-1", "type": "session", "label": "session-1"}
+        alias_route_node = {
+            "id": "route:entity:entity:aoa_session_transport_preflight",
+            "type": "entity",
+            "label": "entity:aoa_session_transport_preflight",
+            "route_layer": "entity",
+            "route_signal": "entity:aoa_session_transport_preflight",
+        }
         conn.executemany(
             "INSERT INTO nodes (id, node_type, payload_json, count) VALUES (?, ?, ?, ?)",
             [
                 (route_node["id"], "mcp", json.dumps(route_node), 9),
                 (event_node["id"], "event", json.dumps(event_node), 1),
                 (session_node["id"], "session", json.dumps(session_node), 3),
+                (alias_route_node["id"], "entity", json.dumps(alias_route_node), 4),
             ],
         )
         edge_payloads = [
@@ -6406,6 +6419,14 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
                 route_node["id"],
                 {"type": "mentions_route_signal", "event_id": "000002"},
                 1,
+            ),
+            (
+                "edge:alias",
+                "mentions_route_signal",
+                event_node["id"],
+                alias_route_node["id"],
+                {"type": "mentions_route_signal", "event_id": "000001"},
+                4,
             ),
         ]
         conn.executemany(
@@ -6447,6 +6468,46 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     finally:
         conn.close()
 
+    shard_db = state.aoa_root / "search/shards/month_2026_06/aoa-search.sqlite3"
+    shard_db.parent.mkdir(parents=True, exist_ok=True)
+    shard_conn = sqlite3.connect(shard_db)
+    try:
+        shard_conn.execute(
+            """
+            CREATE TABLE route_terms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                layer TEXT NOT NULL,
+                key TEXT NOT NULL,
+                route_signal TEXT NOT NULL,
+                UNIQUE(layer, key),
+                UNIQUE(route_signal)
+            )
+            """
+        )
+        shard_conn.execute(
+            "INSERT INTO route_terms (layer, key, route_signal) VALUES (?, ?, ?)",
+            ("entity", "aoa_session_transport_preflight", "entity:aoa_session_transport_preflight"),
+        )
+        shard_conn.commit()
+    finally:
+        shard_conn.close()
+    (state.aoa_root / "search/catalog.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "artifact_type": "session_memory_search_catalog",
+                "shards": [
+                    {
+                        "shard": "month/2026-06",
+                        "shard_db_path": str(shard_db),
+                        "status": "current",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=1, limit=4, edge_limit=2)
 
     assert neighborhood["source"] == "mcp_sqlite_graph_fast_path"
@@ -6458,16 +6519,29 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     assert neighborhood["truncated"] is True
     assert any(str(ref.get("refs", {}).get("session", "")).endswith("session.manifest.json") for ref in neighborhood["evidence_refs"])
     assert any(ref.get("refs", {}).get("raw") == "raw:line:1" for ref in neighborhood["evidence_refs"])
+    assert all("content" not in node for node in neighborhood["nodes"])
     assert neighborhood["mcp_access"]["archive_command"] is None
     assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
     assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
     deeper = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=4, edge_limit=2)
 
-    assert deeper.get("source") != "mcp_sqlite_graph_fast_path"
-    graph_calls = [call for call in runner.calls if call[0] == "graph-neighborhood"]
-    assert graph_calls
-    assert graph_calls[-1][1][graph_calls[-1][1].index("--depth") + 1] == "2"
+    assert deeper["source"] == "mcp_sqlite_graph_fast_path"
+    assert deeper["depth"] == 2
+    assert deeper["mcp_access"]["deep_archive_fallback_executed"] is False
+    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
+
+    alias = state.graph_neighborhood("transport-preflight", kind="tool", depth=1, limit=4, edge_limit=4)
+
+    assert alias["ok"] is True
+    assert alias["source"] == "mcp_sqlite_graph_fast_path"
+    assert alias["quality"]["route_term_resolution"]["strategy"] == "sharded_route_terms"
+    assert alias["quality"]["route_term_resolution"]["status"] == "matched"
+    assert alias["quality"]["route_term_resolution"]["matched_route_term_count"] == 1
+    assert any(node["id"] == alias_route_node["id"] for node in alias["nodes"])
+    assert alias["mcp_access"]["archive_command"] is None
+    assert alias["mcp_access"]["deep_archive_fallback_executed"] is False
+    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
 
 def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path: Path) -> None:
@@ -6484,26 +6558,14 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     eval_payload = state.graph_eval(limit=4)
     quality = state.graph_quality_audit(limit=4)
 
-    assert neighborhood["evidence_refs"][0]["refs"]["raw"] == "raw:line:1"
-    assert neighborhood["truncated"] is True
-    assert neighborhood["next_command"].startswith("python3 scripts/aoa_session_memory.py graph-neighborhood")
-    assert neighborhood["next_expansion_command"].startswith(
-        "python3 scripts/aoa_session_memory.py graph-neighborhood"
-    )
+    assert neighborhood["ok"] is False
+    assert neighborhood["source"] == "mcp_bounded_graph_deferred"
+    assert "graph-neighborhood" in neighborhood["next_expansion_command"]
     assert neighborhood["next_expansion_reason"]
-    assert neighborhood["freshness"]["status"] == "graph_store_stale"
-    assert neighborhood["freshness"]["warning"].startswith("graph store")
-    assert neighborhood["freshness"]["actionable_graph_source_count"] == 2531
-    assert neighborhood["freshness"]["deferred_live_source_count"] == 1139
-    assert neighborhood["freshness"]["ledger_store_missing_count"] == 52
-    assert neighborhood["freshness"]["latest_maintenance_remaining_count"] == 2452
-    assert neighborhood["freshness"]["hot_gate_diagnostics"] == [
-        "maintenance_queue_empty_but_ledger_actionable_sources_present"
-    ]
-    assert neighborhood["freshness"]["maintenance_recommendation"]["route"] == "budgeted_graph_maintenance"
-    assert neighborhood["freshness"]["maintenance_recommendation"]["command"].startswith(
-        "python3 scripts/aoa_session_memory.py graph-maintenance"
-    )
+    assert neighborhood["freshness"]["status"] == "bounded_graph_route_unresolved"
+    assert neighborhood["quality"]["deep_archive_fallback_executed"] is False
+    assert neighborhood["mcp_access"]["archive_command"] is None
+    assert neighborhood["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
     assert neighborhood["mcp_access"]["response_compacted"] is True
     assert timeline["events"][0]["type"] == "event"
@@ -6527,7 +6589,6 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     assert quality["artifact_type"] == "session_memory_graph_quality_audit"
     assert quality["samples"][0]["review_status"] == "ready_for_manual_verdict"
     assert {call[0] for call in runner.calls} >= {
-        "graph-neighborhood",
         "graph-timeline",
         "graph-shortest-path",
         "graph-bridge",
@@ -6537,8 +6598,7 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
         "graph-eval",
         "graph-quality-audit",
     }
-    graph_call_args = next(args for command, args in runner.calls if command == "graph-neighborhood")
-    assert "--edge-limit" in graph_call_args
+    assert not any(command == "graph-neighborhood" for command, _args in runner.calls)
 
 
 def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path) -> None:
@@ -6646,18 +6706,12 @@ def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path
     timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp", limit=50)
     encoded = json.dumps({"neighborhood": neighborhood, "timeline": timeline})
 
+    assert neighborhood["ok"] is False
+    assert neighborhood["source"] == "mcp_bounded_graph_deferred"
     assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
     assert neighborhood["mcp_access"]["response_compacted"] is True
-    assert len(neighborhood["nodes"]) == 8
-    assert neighborhood["omitted_node_count"] == 52
-    assert len(neighborhood["edges"]) == 8
-    assert neighborhood["omitted_edge_count"] == 92
-    assert len(neighborhood["evidence_refs"]) == 6
-    assert neighborhood["evidence_ref_count"] == 40
-    assert neighborhood["unique_evidence_ref_count"] == 30
-    assert neighborhood["deduplicated_evidence_ref_count"] == 10
-    assert neighborhood["omitted_evidence_ref_count"] == 24
-    assert neighborhood["nodes"][0]["refs"]["raw"] == "raw:line:0"
+    assert neighborhood["mcp_access"]["deep_archive_fallback_deferred"] is True
+    assert neighborhood["mcp_access"]["archive_command"] is None
     assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
 
     assert timeline["mcp_payload_policy"]["response_compacted"] is True
@@ -6668,8 +6722,7 @@ def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path
     assert "content" not in encoded
     assert "omitted_field_count" not in encoded
     assert len(encoded) < 14000
-    graph_call_args = next(args for command, args in runner.calls if command == "graph-neighborhood")
-    assert graph_call_args[graph_call_args.index("--edge-limit") + 1] == "80"
+    assert not any(command == "graph-neighborhood" for command, _args in runner.calls)
 
 
 def test_read_resource_and_server_build(tmp_path: Path) -> None:
