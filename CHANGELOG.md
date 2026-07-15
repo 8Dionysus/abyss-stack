@@ -49,6 +49,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- The Gemma 4 E2B `llama.cpp` lane now keeps its 4 GiB soft reclaim
+  reservation but leaves residency release to native idle sleep instead of an
+  8 GiB hard memory ceiling.
 - The authenticated loopback MCP bundle now admits the source-owned
   `aoa-stats` wrapper, while Configs sync carries the stack-local `stats/` port
   and the service resolves that source route through the deployed stack root.

@@ -1294,6 +1294,7 @@
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:330c6ce6bc81642ac5c74e4a"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:720e1735b1446fc4476db793","id":"aoa:abyss-stack:relation:45160dca1bc697d03ed3535e","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:c3155c1f37cacf53fb143482","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:891cfd3a5d6a09274b0a7182"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:7217e8cbd4bfb5dd7bab85d1","id":"aoa:abyss-stack:relation:bc06560a6eb6071ec68a082f","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:4aafdd96b250a520731364c2","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:77f631fcec67def0c0815a4e"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:7255946af751cbb4c2cbb4b2","id":"aoa:abyss-stack:relation:77d380a6a94fa6254db26020","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:7255946af751cbb4c2cbb4b2","trust_ref":"deterministic"},
+    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:d6bd28f2522af1ae75b8e4da"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:72adb37b61e9f70114134f81","id":"aoa:abyss-stack:relation:384129bb0e16d6cb259b07b1","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:d71cec8b576a0bc674d0e24a","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:ad647bf1ea3105fe2f834f9b"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:72c25d86f066aff4174a7f2c","id":"aoa:abyss-stack:relation:23eba47d650bad8a1036aa42","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:bea544309fa3f4ac18ac6cf4","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:ad647bf1ea3105fe2f834f9b"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:72c25d86f066aff4174a7f2c","id":"aoa:abyss-stack:relation:66954fd42065a631d3a390ec","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:dea142f208c3bd67a5688fcc","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:b07792ae70d95e3bfbe9e2fa"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:72d88819f5174e8d0d463151","id":"aoa:abyss-stack:relation:626998aebd21f9a1edd874b9","provenance_ref":"deterministic","relation_kind":"calls","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:6c2319be0cf408375c667a6f","trust_ref":"deterministic"},
@@ -6121,6 +6122,7 @@
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:8185475bef96c5af148afd23"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:ba4c2c915e08ef3d77d6bb67","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:1edf146e00fefbfd78228f91","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:347926183e34dfcd4090a448"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:c2e29072e1619b66f8beb71e","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:1fcffba37406ad2674119022","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:63f986a8fe21db779c3ca85b"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:1e66856cbb62bac5f9a0d052","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:2421250dd4cecd33917cf0bc","trust_ref":"deterministic"},
+    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:d6bd28f2522af1ae75b8e4da"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:e39d21e6acdcdb27f6680b30","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:72adb37b61e9f70114134f81","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:b993fb0d48900f0e5d5f64eb"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:60f3b9b3b70feade548c9c05","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:7c5799608d139f889d507f0c","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:37e583c7cd2c35db23ef888d"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:5b7de2e6014cb28f9be2302c","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:8e97db141c95c30e4989a3d2","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:b8650055eb2ced5652e5bcbd"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:artifact:395c130db2603818245bdecb","id":"aoa:abyss-stack:relation:56fac5ed168dad3415c39bb6","provenance_ref":"deterministic","relation_kind":"defines","temporal_ref":"current","to_id":"aoa:abyss-stack:entity:ac5a0824de79c30447c2554e","trust_ref":"deterministic"},
@@ -10774,8 +10776,8 @@
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:8d6d582b351709dd559b20cf"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d2f304b5053b5f8d031d22fe","id":"aoa:abyss-stack:relation:7b3267a8b36bc690758cd444","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:8cfe68dd81abce0cd526f5bb","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:f4f13d5092f1732628c539aa"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d2f304b5053b5f8d031d22fe","id":"aoa:abyss-stack:relation:bcdd79a2bd52d10e0743666e","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:8f0f0bfcf805d5ced2d47fea","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:8ab3dfb8bbfdecbc4fa59ffc"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d2f304b5053b5f8d031d22fe","id":"aoa:abyss-stack:relation:023a1d395d93a335b4c9e21c","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:da17175fe4ec2e4e3cc993a7","trust_ref":"deterministic"},
-    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:5e5b0521d1ef846577d0acba"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d450cc6aba0b08f8fb999679","id":"aoa:abyss-stack:relation:61eef9a2fb7b5158e4ace92e","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:5fafbddfc979abf6c9d1b35e","trust_ref":"deterministic"},
-    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:b28a8024bec2e9dcd921d897"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d450cc6aba0b08f8fb999679","id":"aoa:abyss-stack:relation:bc98dd555ac18997041a472e","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:de33f036cc299638a8579491","trust_ref":"deterministic"},
+    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:dbd9b6834f56b83aa0163869"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d450cc6aba0b08f8fb999679","id":"aoa:abyss-stack:relation:5d66533a4d82de17fb92a57f","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:5fafbddfc979abf6c9d1b35e","trust_ref":"deterministic"},
+    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:65b654d3244b164a2fbdd478"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d450cc6aba0b08f8fb999679","id":"aoa:abyss-stack:relation:1e4a73cc088313a6f614c275","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:de33f036cc299638a8579491","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:fc671737517379033fe3eea8"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d5750ebec826303e54558321","id":"aoa:abyss-stack:relation:af78a148f981d37d19f692c0","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:f9c6b9336d1225b5fb5ce853","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:22f9a0a131b2c494105c0c51"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:d8658ac17ebcd0bfad57eca1","id":"aoa:abyss-stack:relation:03266a4aeead683533344a50","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:722ed359cd33461469b4a323","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:d3f1870893f1497354883cb3"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:dccb80e0cfc2d38f71b51927","id":"aoa:abyss-stack:relation:1105860e206ad1c8ebf8125e","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:40ce7c10340ed832821c8635","trust_ref":"deterministic"},
@@ -12002,7 +12004,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_relation_index",
-    "content_digest": "8ae0f1a2d78bd51f4c2e1c033e0d15471a7b1296f6acf6d2c77dba0c3896e789",
+    "content_digest": "90f24654cc5668731478f2f728d0a48da8ef348abe82f977244b0a22c9411e93",
     "index_kind": "relation",
     "local_id": "index:repo-local:relations",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -12088,16 +12090,16 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v2",
   "source_index": {
-    "content_digest": "98b7e65b7308f7ca3d222dac3ddd1390360074034da1959e93c6e008744ca1be",
+    "content_digest": "fbccb901b6602b697fa5af6d429c757225a8eb02d24724cb59da8eee1c08da5f",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },
   "summary": {
-    "entry_count": 11999,
+    "entry_count": 12001,
     "kind_counts": {
-      "calls": 2793,
+      "calls": 2794,
       "contains": 1776,
-      "defines": 5186,
+      "defines": 5187,
       "references": 1352,
       "represents": 892
     }

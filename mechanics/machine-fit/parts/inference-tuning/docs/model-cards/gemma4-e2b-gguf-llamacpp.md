@@ -49,6 +49,8 @@
 - keep native `--sleep-idle-seconds 600` enabled; health, props, and model
   metadata probes must remain non-waking, while a real inference request owns
   the measured cold return
+- keep the 4 GiB `mem_reservation` as soft reclaim protection; native idle sleep
+  owns residency release, not a private hard memory ceiling
 - use the `llama-swap` overlay only as an explicit candidate after the native
   Vulkan overlay. Its proxy remains resident while the model process is cold,
   admits the measured 2560 MiB load through the private owner socket, and

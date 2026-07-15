@@ -88,6 +88,15 @@ class ComposeContractsTests(unittest.TestCase):
         self.assertNotIn("mem_limit", service)
         self.assertEqual(service.get("mem_reservation"), "${AOA_OVMS_MEM_RESERVATION:-1g}")
 
+    def test_gemma4_uses_native_sleep_and_soft_reclaim_protection(self) -> None:
+        service = load_compose(
+            TUNING_DIR / "llamacpp.gemma4-e2b.intel-285h.vulkan.yml"
+        )["services"]["llama-cpp"]
+
+        self.assertEqual(service.get("mem_limit"), "0")
+        self.assertEqual(service.get("mem_reservation"), "4g")
+        self.assertEqual(service.get("command"), ["--sleep-idle-seconds", "600"])
+
     def test_host_published_ports_are_loopback_bound(self) -> None:
         for path in sorted(MODULE_DIR.glob("*.yml")):
             services = load_compose(path).get("services", {})
