@@ -98,8 +98,9 @@ selection/load and stronger behavioral signals ahead of weak context or
 cooccurrence buckets while preserving omission counts; MCP still does not
 reclassify producer evidence or compute a verdict.
 
-Agent-event and lightweight usage-neighborhood routes have MCP-local fast
-paths over the portable SQLite projection. They are deliberately bounded:
+Agent-event, exact agent-event usage-audit, and lightweight
+usage-neighborhood routes have MCP-local fast paths over the portable SQLite
+projection. They are deliberately bounded:
 session-scoped answer/closeout/progress/reasoning packets can return zero
 classified events without failing, and lightweight entity-neighborhood probes
 can return route-signal refs without raw previews. The packet names the deeper
@@ -118,18 +119,22 @@ aoa_session_evidence_packet(intent, query, anchors, refs)
 aoa_session_graphrag_packet(query, anchor)
 ```
 
-Graph and GraphRAG calls are evidence-packet builders. They may expand from
-lexical hits into route-signal neighborhoods, timelines, shortest paths, and
-cooccurrence clusters, but they still return raw/segment/session refs instead
-of final claims.
-For relation questions between two anchors, the bridge route wraps shortest
-path plus source/target timeline evidence into one compact packet so agents do
-not have to manually stitch several graph calls before opening refs.
-For exact route anchors, graph neighborhood first reads the generated
-`graph/graph.sqlite3` store directly through indexed node and edge lookups. The
-fast path is still a read-only MCP evidence packet: it reports truncation,
-omitted counts, quality/freshness hints, and an archive `graph-neighborhood`
-expansion command instead of treating the generated graph as reviewed truth.
+Graph neighborhood, timeline, and cooccurrence are bounded evidence-packet
+builders. They read the generated `graph/graph.sqlite3` store through indexed
+node and edge lookups with fixed budgets.
+
+Shortest-path, bridge, GraphRAG, graph explanation, evaluation, and quality
+audit can fault broad graph pages or expand lexical, semantic, rerank, and
+multi-anchor work. MCP returns a canonical `abyss-machine resource launch`
+command that wraps the exact owner command, declares the request foreground,
+and lets the host admission plane learn its demand; MCP never runs that work as
+a hidden read side effect. Unresolved indexed anchors follow the same rule.
+Activate these expansion routes only after the host provides `abyss-machine
+resource launch --activity`; the host capability must land before the MCP
+route that emits it.
+Packets report truncation, omitted counts, freshness, and admission-required
+owner expansion while raw/segment/session refs remain stronger than the
+generated graph.
 
 Freshness and readiness stay explicit:
 

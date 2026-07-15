@@ -60,6 +60,13 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Session-memory MCP graph reads now keep neighborhood, timeline, and
+  cooccurrence work on bounded indexed SQLite reads, while path, bridge,
+  GraphRAG, explanation, evaluation, quality audit, and unresolved expansion
+  return the exact owner command wrapped by canonical `abyss-machine resource
+  launch` admission instead of starting hidden archive scans. Exact agent-event
+  usage audits now use their existing indexed read model and defer broad
+  consequence expansion through the same owner-admitted route.
 - The repo-local `abyss-self-diagnostic-spine` overlay now carries valid
   trigger metadata and the current canonical `aoa-skills` source path, while
   the skill-projection validator rejects missing descriptions, stale canonical
