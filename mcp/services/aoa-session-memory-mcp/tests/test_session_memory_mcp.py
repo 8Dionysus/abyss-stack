@@ -6524,6 +6524,14 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
     assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
+    route_signal = state.graph_neighborhood("mcp:aoa_session_memory_mcp", kind="auto", depth=1, limit=4, edge_limit=2)
+
+    assert route_signal["ok"] is True
+    assert route_signal["source"] == "mcp_sqlite_graph_fast_path"
+    assert any(node["id"] == route_node["id"] for node in route_signal["nodes"])
+    assert route_signal["mcp_access"]["archive_command"] is None
+    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
+
     deeper = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp", depth=2, limit=4, edge_limit=2)
 
     assert deeper["source"] == "mcp_sqlite_graph_fast_path"

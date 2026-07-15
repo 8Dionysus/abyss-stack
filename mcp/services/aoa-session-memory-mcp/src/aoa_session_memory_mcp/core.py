@@ -643,6 +643,17 @@ def _normalize_trace_kind(kind: str | None) -> str:
     return TRACE_KIND_ALIASES.get(normalized, normalized)
 
 
+def _explicit_route_signal_parts(value: str) -> tuple[str, str, str] | None:
+    layer_text, separator, key_text = value.partition(":")
+    if not separator:
+        return None
+    layer = _normalize_trace_kind(layer_text)
+    key = _route_key(key_text)
+    if layer not in ALLOWED_TRACE_KINDS - {"auto"} or not key:
+        return None
+    return layer, key, f"{layer}:{key}"
+
+
 def _requested_trace_kind_key(kind: str | None) -> str:
     return _route_key(str(kind or "auto")) or "auto"
 
@@ -7199,14 +7210,17 @@ class AoASessionMemoryMCPState:
     def _graph_neighborhood_node_candidates(self, *, anchor: str, kind: str) -> list[str]:
         if anchor.startswith("route:") or anchor.startswith("event:") or anchor.startswith("session:") or anchor.startswith("segment:"):
             return [anchor]
-        key = _route_key(anchor)
+        explicit_route = _explicit_route_signal_parts(anchor)
+        key = explicit_route[1] if explicit_route else _route_key(anchor)
         if not key:
             return []
-        kinds = [kind]
+        kinds = [explicit_route[0]] if explicit_route else [kind]
         if kind == "auto":
-            kinds = ["mcp", "skill", "tool", "hook", "api", "script", "validator", "test", "eval", "graph", "memory", "goal", "git"]
-        candidates: list[str] = []
-        for route_kind in kinds:
+            kinds.extend(["mcp", "skill", "tool", "hook", "api", "script", "validator", "test", "eval", "graph", "memory", "goal", "git"])
+        elif kind not in kinds:
+            kinds.append(kind)
+        candidates = [f"route:{explicit_route[0]}:{explicit_route[2]}"] if explicit_route else []
+        for route_kind in dict.fromkeys(kinds):
             route_key = _route_key(route_kind)
             if not route_key:
                 continue
@@ -7251,7 +7265,8 @@ class AoASessionMemoryMCPState:
         return candidates[:GRAPH_ROUTE_TERM_SHARD_LIMIT]
 
     def _graph_route_term_node_candidates(self, *, anchor: str, kind: str) -> tuple[list[str], dict[str, Any]]:
-        anchor_key = _route_key(anchor)
+        explicit_route = _explicit_route_signal_parts(anchor)
+        anchor_key = explicit_route[1] if explicit_route else _route_key(anchor)
         if len(anchor_key) < 3:
             return [], {
                 "strategy": "sharded_route_terms",
@@ -7278,15 +7293,15 @@ class AoASessionMemoryMCPState:
                 candidate = f"{prefix}{base_key}"
                 if candidate not in candidate_keys:
                     candidate_keys.append(candidate)
-        route_layers = [kind, "entity", "tool", "mcp_tool", "mcp", "skill", "script", "hook", "command", "api"]
-        candidate_signals = list(
-            dict.fromkeys(
-                f"{layer}:{key}"
-                for layer in route_layers
-                if layer not in {"", "auto", "all"}
-                for key in candidate_keys
-            )
-        )[:GRAPH_ROUTE_TERM_MATCH_LIMIT]
+        route_layers = [explicit_route[0] if explicit_route else kind, kind, "entity", "tool", "mcp_tool", "mcp", "skill", "script", "hook", "command", "api"]
+        candidate_signals = [explicit_route[2]] if explicit_route else []
+        candidate_signals.extend(
+            f"{layer}:{key}"
+            for layer in route_layers
+            if layer not in {"", "auto", "all"}
+            for key in candidate_keys
+        )
+        candidate_signals = list(dict.fromkeys(candidate_signals))[:GRAPH_ROUTE_TERM_MATCH_LIMIT]
         node_ids: list[str] = []
         matches: list[dict[str, str]] = []
         checked_paths: list[str] = []
