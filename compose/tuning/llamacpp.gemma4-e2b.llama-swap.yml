@@ -1,0 +1,25 @@
+# Optional cold-load owner for the Gemma 4 E2B Vulkan lane. Apply this after
+# llamacpp.gemma4-e2b.intel-285h.vulkan.yml; removing it restores native sleep.
+services:
+  llama-cpp:
+    image: "${AOA_LLAMA_SWAP_IMAGE:-ghcr.io/mostlygeek/llama-swap@sha256:001cade722eccb0d70e37ad7b04270d98b95799241cb58bf932163410f0bb3e1}"
+    entrypoint:
+      - /usr/local/bin/llama-swap
+    command:
+      - -config
+      - /config/config.yaml
+      - -listen
+      - 0.0.0.0:8080
+    init: true
+    cpus: "0"
+    mem_limit: "0"
+    mem_reservation: "0"
+    labels:
+      aoa.tuning.overlay: "llamacpp.gemma4-e2b.llama-swap"
+      aoa.tuning.owner_admission: "required"
+      aoa.tuning.posture: "candidate"
+      aoa.tuning.rollback: "native-llamacpp-sleep"
+    volumes:
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/llama-swap/gemma4-e2b.yaml:/config/config.yaml:ro"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/llama-swap/owner_cold_load.py:/opt/owner-cold-load.py:ro"
+      - "${AOA_RESOURCE_ADMISSION_DIR:-/run/user/1000/abyss-machine/resource}:/run/abyss-machine/resource:ro"

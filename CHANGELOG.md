@@ -9,6 +9,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- An explicit Gemma 4 E2B `llama-swap` tuning candidate now admits measured
+  cold loads through the private `abyss-machine` owner socket, keeps proxy
+  history bounded to zero, releases the model after idle, removes inherited
+  static caps, and rolls back to the existing native-sleep overlay.
 - Stack-owned MCP packages now retain portable stdio defaults while supporting
   explicit authenticated loopback shared Streamable HTTP owners on stable
   per-package ports, with source-owned systemd credential/template/bundle

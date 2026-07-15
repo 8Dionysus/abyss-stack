@@ -1025,6 +1025,7 @@ def build_snapshot_report(payload: dict[str, Any]) -> str:
         "## Snapshot",
         f"- captured_at: `{payload['captured_at']}`",
         f"- run_root: `{payload['run_root']}`",
+        f"- runtime_kind: `{payload.get('runtime_kind')}`",
         f"- llama_cpp_status: `{payload.get('llama_cpp_status')}`",
         f"- with_checks: `{payload.get('with_checks')}`",
         "",
@@ -1064,13 +1065,52 @@ def build_snapshot_report(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def llamacpp_snapshot_probes(timeout_s: float) -> dict[str, Any]:
+    running_status, running = http_get_json("http://127.0.0.1:11435/running", timeout_s=timeout_s)
+    is_swap = (
+        running_status == 200
+        and isinstance(running, dict)
+        and isinstance(running.get("running"), list)
+    )
+    if is_swap:
+        health_status, health_body = http_get_text("http://127.0.0.1:11435/health", timeout_s=timeout_s)
+        models_status, models = http_get_json("http://127.0.0.1:11435/v1/models", timeout_s=timeout_s)
+        return {
+            "runtime_kind": "llama-swap",
+            "llama_status": health_status,
+            "props": None,
+            "slots_status": None,
+            "slots_text": "",
+            "metrics_status": None,
+            "metrics_text": "",
+            "proxy": {
+                "health": {"status": health_status, "body": health_body},
+                "running": {"status": running_status, "payload": running},
+                "models": {"status": models_status, "payload": models},
+                "model_endpoints_skipped_while_cold": True,
+            },
+        }
+
+    props_status, props = http_get_json("http://127.0.0.1:11435/props", timeout_s=timeout_s)
+    slots_status, slots_text = http_get_text("http://127.0.0.1:11435/slots", timeout_s=timeout_s)
+    metrics_status, metrics_text = http_get_text("http://127.0.0.1:11435/metrics", timeout_s=timeout_s)
+    return {
+        "runtime_kind": "llama.cpp",
+        "llama_status": props_status,
+        "props": props,
+        "slots_status": slots_status,
+        "slots_text": slots_text,
+        "metrics_status": metrics_status,
+        "metrics_text": metrics_text,
+        "proxy": None,
+    }
+
+
 def snapshot_command(args: argparse.Namespace) -> int:
     run_root = Path(args.output_root).expanduser().resolve() if args.output_root else TUNING_SNAPSHOT_ROOT / "runs" / timestamp_dir()
     run_root.mkdir(parents=True, exist_ok=True)
 
-    props_status, props = http_get_json("http://127.0.0.1:11435/props", timeout_s=args.timeout)
-    slots_status, slots_text = http_get_text("http://127.0.0.1:11435/slots", timeout_s=args.timeout)
-    metrics_status, metrics_text = http_get_text("http://127.0.0.1:11435/metrics", timeout_s=args.timeout)
+    probes = llamacpp_snapshot_probes(args.timeout)
     logs = container_logs("llama-cpp", tail=args.log_tail)
 
     commands = {
@@ -1112,15 +1152,17 @@ def snapshot_command(args: argparse.Namespace) -> int:
         "captured_at": utc_now(),
         "run_root": str(run_root),
         "with_checks": bool(args.with_checks),
-        "llama_cpp_status": props_status,
-        "props": props,
+        "runtime_kind": probes["runtime_kind"],
+        "llama_cpp_status": probes["llama_status"],
+        "props": probes["props"],
+        "proxy": probes["proxy"],
         "slots": {
-            "status": slots_status,
-            "body": slots_text,
+            "status": probes["slots_status"],
+            "body": probes["slots_text"],
         },
         "metrics": {
-            "status": metrics_status,
-            "parsed": parse_prometheus_metrics(metrics_text),
+            "status": probes["metrics_status"],
+            "parsed": parse_prometheus_metrics(probes["metrics_text"]),
             "raw_ref": "metrics.prom",
         },
         "llama_env": sorted(env_lines),
@@ -1130,7 +1172,7 @@ def snapshot_command(args: argparse.Namespace) -> int:
     }
 
     write_json(run_root / "snapshot.json", payload)
-    write_text(run_root / "metrics.prom", metrics_text)
+    write_text(run_root / "metrics.prom", probes["metrics_text"])
     write_text(run_root / "llama-cpp.log", logs)
     write_text(run_root / "report.md", build_snapshot_report(payload))
     write_json(
@@ -1144,8 +1186,9 @@ def snapshot_command(args: argparse.Namespace) -> int:
         },
     )
 
-    print(json.dumps({"snapshot_id": TUNING_SNAPSHOT_ID, "ok": props_status == 200, "run_root": str(run_root)}, ensure_ascii=True))
-    return 0 if props_status == 200 else 1
+    ok = probes["llama_status"] == 200
+    print(json.dumps({"snapshot_id": TUNING_SNAPSHOT_ID, "ok": ok, "run_root": str(run_root)}, ensure_ascii=True))
+    return 0 if ok else 1
 
 
 def screening_artifact_root() -> Path:
