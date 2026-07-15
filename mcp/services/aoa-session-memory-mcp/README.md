@@ -93,15 +93,15 @@ Tools:
 - `aoa_session_route_rollup_query(query, layer="tool", key, route_signal, limit, ref_limit)`; reads the materialized `.aoa` operational route-rollup projection without running maintenance, resampling shards, opening the monolith, using FTS, or hydrating raw body text. Use it when maintenance status says `use_operational_route_rollup_projection`; materialization remains an operator route outside MCP.
 - `aoa_session_direct_event_rollup_query(query, usage_role="result", event_type, session_act, layer, key, route_signal, limit, ref_limit)`; reads the materialized direct operational-event rollup without running maintenance, resampling shards, opening the monolith, using FTS, or hydrating raw body text. Use it for compact event-class navigation; behavior proof still expands through `usage-chain` plus raw/segment refs.
 - `aoa_session_projection_status(include_payload)`; reads the latest `projection-catchup` diagnostic and returns its `projection_completeness` block plus current maintenance summary. It does not run `projection-catchup`; that writer route stays outside MCP.
-- `aoa_session_graph_neighborhood(anchor, kind, depth, limit, edge_limit)`; returns compact graph packets by default. Raise `edge_limit` only when a deeper relation walk is explicitly needed.
-- `aoa_session_graph_timeline(anchor, kind, limit)`
-- `aoa_session_graph_shortest_path(source, target, kind, max_depth)`
-- `aoa_session_graph_bridge(source, target, kind, source_kind, target_kind, max_depth, limit)`; first compact route for "how are these two operational anchors connected?", wrapping bounded path, source/target timeline samples, refs, freshness, and next expansion.
-- `aoa_session_graph_cooccurrence(anchor, kind, limit)`; bounded first route for dense operational anchors such as common tools, MCP services, hooks, or skills. It aggregates nearby route-signal cooccurrences with evidence refs without running maintenance or hydrating raw transcript bodies.
-- `aoa_session_graphrag_packet(query, anchor, mode, limit, include_semantic_context, rerank_local)`
-- `aoa_session_explain_graph_packet(intent, anchor, query, limit)`
-- `aoa_session_graph_eval(limit, include_semantic_context, rerank_local)`
-- `aoa_session_graph_quality_audit(limit, sample_ref_limit, anchors, full_graphrag)`
+- `aoa_session_graph_neighborhood(anchor, kind, depth, limit, edge_limit)`; reads exact or indexed route nodes from the generated SQLite graph under fixed node/edge budgets. An unresolved anchor returns an explicit admission-required owner command instead of running the archive route inside MCP.
+- `aoa_session_graph_timeline(anchor, kind, limit)`; reads only direct indexed event edges for the resolved anchor and defers deeper timeline expansion.
+- `aoa_session_graph_shortest_path(source, target, kind, max_depth)`; returns the exact owner path command wrapped by canonical `abyss-machine resource launch` admission without faulting broad graph pages inside MCP.
+- `aoa_session_graph_bridge(source, target, kind, source_kind, target_kind, max_depth, limit)`; returns the owner bridge command through the same host admission route instead of combining path and timeline expansion as a hidden read.
+- `aoa_session_graph_cooccurrence(anchor, kind, limit)`; aggregates a bounded two-hop event-to-route neighborhood without running maintenance or hydrating raw transcript bodies.
+- `aoa_session_graphrag_packet(query, anchor, mode, limit, include_semantic_context, rerank_local)`; returns any available bounded graph packet plus the explicit admission-required owner GraphRAG command. Broad lexical/semantic/rerank work never starts as an MCP side effect.
+- `aoa_session_explain_graph_packet(intent, anchor, query, limit)`; returns any available bounded graph packet and defers broad explanation expansion to the owner route.
+- `aoa_session_graph_eval(limit, include_semantic_context, rerank_local)`; returns an admission-required owner batch command without executing the evaluation inside MCP.
+- `aoa_session_graph_quality_audit(limit, sample_ref_limit, anchors, full_graphrag)`; returns an admission-required owner audit command without executing a multi-anchor sweep inside MCP.
 
 Prompts:
 
@@ -200,6 +200,11 @@ be expanded through raw refs. Text-query fallbacks and
 `next_expansion_command` use the `.aoa` shard-aware archive route
 (`--use-shards --max-shards 24`) when raw before/after windows or richer
 consequence analysis are needed.
+Exact `kind="agent_event"` usage audits reuse that indexed read path and treat
+the returned rows as event-class occurrences, not causal entity-use claims.
+If deeper consequence analysis is needed, or the bounded projection is
+unavailable, MCP returns the owner audit command through `abyss-machine
+resource launch` instead of starting a broad search subprocess.
 
 `aoa_session_entity_usage_neighborhood` has the same shape for lightweight
 probes: when `raw_preview_chars=0` with small limits, or when the deep archive
@@ -239,12 +244,19 @@ the operator command to run outside MCP instead of starting catch-up itself.
 source/target edges, compacts nodes/edges/evidence refs, reports truncation and
 omitted counts, and keeps the archive `graph-neighborhood` command as
 `next_expansion_command`. If the exact node or graph store is unavailable, MCP
-falls back to the `.aoa` archive route. The packet remains route evidence, not
-reviewed truth.
-`aoa_session_graph_bridge(...)` is the MCP first move for a relation question
-between two anchors. It delegates to `.aoa graph-bridge`, keeps the result
-compact, and returns path/timeline refs plus freshness/noise posture instead of
-claiming the graph relation as reviewed truth.
+returns a deferred packet and leaves that command outside MCP for owner-aware
+resource admission. Timeline and cooccurrence use bounded indexed reads.
+Shortest-path, bridge, GraphRAG, explanation, evaluation, and quality-audit
+remain explicit owner routes and are never hidden behind an ordinary MCP read.
+Their `next_expansion_command` uses `abyss-machine resource launch` with a
+stable session-memory demand key, owner-declared foreground activity, and no
+static memory cap. The host therefore admits and learns the new process through
+its existing transient-unit path; MCP remains a read-only planner and does not
+become another resident scheduler.
+Deployment must provide the `abyss-machine resource launch --activity`
+capability before activating this MCP route; packets expose that requirement in
+`mcp_access.owner_admission.required_host_capability`.
+Every packet remains route evidence, not reviewed truth.
 
 When `.aoa` is actively catching up to open Codex transcripts,
 `aoa_session_freshness_check(...)` may report

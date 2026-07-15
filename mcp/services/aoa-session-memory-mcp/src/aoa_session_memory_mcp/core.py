@@ -1818,6 +1818,8 @@ def _compact_graph_payload(
         "requested_kind",
         "source",
         "target",
+        "source_anchor",
+        "target_anchor",
         "max_depth",
         "depth",
         "path_found",
@@ -1904,16 +1906,20 @@ def _compact_graph_bridge_payload(payload: dict[str, Any], *, full_route: str) -
         "generated_at",
         "ok",
         "mutates",
+        "source",
         "source_anchor",
         "target_anchor",
         "kind",
         "requested_kind",
         "source_kind",
         "target_kind",
+        "max_depth",
+        "parameters",
         "truth_status",
         "next_route",
         "next_command",
         "next_expansion_command",
+        "next_expansion_reason",
         "quality",
         "freshness",
         "noise_flags",
@@ -2186,6 +2192,7 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
         "generated_at",
         "ok",
         "mutates",
+        "source",
         "truth_status",
         "anchor",
         "kind",
@@ -2205,6 +2212,8 @@ def _compact_entity_usage_audit_payload(payload: dict[str, Any], *, full_route: 
         "quality",
         "diagnostics",
         "provider",
+        "next_expansion_command",
+        "next_expansion_reason",
     )
     for key in passthrough_keys:
         if payload.get(key) not in (None, "", [], {}):
@@ -3497,6 +3506,57 @@ class AoASessionMemoryMCPState:
     def _archive_command_line(self, command: str, args: list[str] | None = None) -> str:
         return shlex.join(self._archive_argv(command, args))
 
+    def _resource_admitted_archive_route(
+        self,
+        command: str,
+        args: list[str],
+        *,
+        workload_class: str,
+        activity: str = "foreground",
+    ) -> dict[str, Any]:
+        owner_command = self._archive_argv(command, args)
+        demand_key = f"aoa-session-memory:{_route_key(command)}"
+        latency = "interactive" if activity == "foreground" else "balanced"
+        launch_argv = [
+            "abyss-machine",
+            "resource",
+            "launch",
+            "--class",
+            workload_class,
+            "--kind",
+            "indexing",
+            "--latency",
+            latency,
+            "--activity",
+            activity,
+            "--demand-key",
+            demand_key,
+            "--demand-owner",
+            "aoa-session-memory",
+            "--json",
+            "--",
+            *owner_command,
+        ]
+        return {
+            "owner": "aoa-session-memory",
+            "activity": activity,
+            "importance_source": "owner_declared_request_context",
+            "pressure_facts_assign_importance": False,
+            "class": workload_class,
+            "kind": "indexing",
+            "latency": latency,
+            "demand_key": demand_key,
+            "demand_owner": "aoa-session-memory",
+            "new_processes_only": True,
+            "required_host_capability": {
+                "command": "abyss-machine resource launch",
+                "owner_activity_flag": "--activity",
+                "activation_order": "host_capability_before_mcp_route",
+            },
+            "owner_command": shlex.join(owner_command),
+            "launch_command": shlex.join(launch_argv),
+        }
+
     def _compact_portable_provider_status(self) -> dict[str, Any]:
         args = ["--provider", "portable_sqlite"]
         payload = self._archive_command(
@@ -3568,8 +3628,10 @@ class AoASessionMemoryMCPState:
 
         conn: sqlite3.Connection | None = None
         try:
-            conn = sqlite3.connect(str(db_path))
+            conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=0.5)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only = ON")
+            conn.execute("PRAGMA busy_timeout = 500")
             meta = {
                 str(row["key"]): row["value"]
                 for row in conn.execute("SELECT key, value FROM meta").fetchall()
@@ -4154,6 +4216,8 @@ class AoASessionMemoryMCPState:
             filters = ["doc_type = 'event'"]
             params: list[Any] = []
             table_expr = "documents"
+            order_expr = "rowid DESC"
+            ordered_by = "sqlite_rowid_desc_agent_event_fast_path"
             indexes = self._sqlite_index_names(conn, "documents")
             session_dir = self._resolve_session_dir(session) if session else None
             if session:
@@ -4161,6 +4225,14 @@ class AoASessionMemoryMCPState:
                     return None
                 if "idx_documents_session_agent_event" in indexes:
                     table_expr = "documents INDEXED BY idx_documents_session_agent_event"
+                elif "idx_documents_event_session_agent_date" in indexes:
+                    table_expr = "documents INDEXED BY idx_documents_event_session_agent_date"
+                    order_expr = "session_date DESC, rowid DESC"
+                    ordered_by = "sqlite_session_date_rowid_desc_agent_event_fast_path"
+                elif "idx_documents_session" in indexes:
+                    table_expr = "documents INDEXED BY idx_documents_session"
+                else:
+                    return None
                 filters.append("session_label = ?")
                 params.append(session_dir.name if session_dir is not None else session)
             elif explicit_agent_events and "agent_event" in columns:
@@ -4168,6 +4240,10 @@ class AoASessionMemoryMCPState:
                     table_expr = "documents INDEXED BY idx_documents_agent_event"
                 elif "idx_documents_agent_event_date" in indexes:
                     table_expr = "documents INDEXED BY idx_documents_agent_event_date"
+                    order_expr = "session_date DESC, rowid DESC"
+                    ordered_by = "sqlite_session_date_rowid_desc_agent_event_fast_path"
+                else:
+                    return None
             if episode and "task_episode_id" in columns:
                 filters.append("task_episode_id = ?")
                 params.append(episode)
@@ -4226,7 +4302,7 @@ class AoASessionMemoryMCPState:
                     {select_expr("stale_reason")}
                 FROM {table_expr}
                 WHERE {" AND ".join(filters)}
-                ORDER BY rowid DESC
+                ORDER BY {order_expr}
                 LIMIT ?
                 """,
                 [*params, limit],
@@ -4237,7 +4313,7 @@ class AoASessionMemoryMCPState:
             if conn is not None:
                 conn.close()
         results = [self._agent_event_hit_from_sqlite_row(row) for row in rows]
-        quality = self._agent_event_sqlite_quality_summary(results)
+        quality = self._agent_event_sqlite_quality_summary(results, ordered_by=ordered_by)
         return {
             "schema_version": 1,
             "artifact_type": "agent_event_route_results",
@@ -4287,7 +4363,12 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
-    def _agent_event_sqlite_quality_summary(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+    def _agent_event_sqlite_quality_summary(
+        self,
+        results: list[dict[str, Any]],
+        *,
+        ordered_by: str,
+    ) -> dict[str, Any]:
         agent_event_counts: Counter[str] = Counter()
         freshness_counts: Counter[str] = Counter()
         source_counts: Counter[str] = Counter()
@@ -4328,7 +4409,7 @@ class AoASessionMemoryMCPState:
         latest_freshness = latest.get("freshness") if isinstance(latest.get("freshness"), dict) else {}
         return {
             "result_count": len(results),
-            "ordered_by": "sqlite_rowid_desc_agent_event_fast_path",
+            "ordered_by": ordered_by,
             "query_rank_active": False,
             "agent_event_counts": dict(sorted(agent_event_counts.items())),
             "freshness_counts": dict(sorted(freshness_counts.items())),
@@ -4811,6 +4892,81 @@ class AoASessionMemoryMCPState:
         if session:
             args.extend(["--session", _safe_selector(session, "session")])
         full_route = self._archive_command_line("entity-usage-audit", args)
+        if route_kind == "agent_event":
+            normalized_events, requested_events = _normalize_agent_event_classes([anchor_text])
+            fast_payload = self._agent_event_sqlite_fast_path(
+                command="entity-usage-audit",
+                query="",
+                session=session,
+                episode="",
+                agent_events=normalized_events,
+                requested_agent_events=requested_events,
+                limit=min(_coerce_limit(limit, 20, 200), 100),
+                archive_args=args,
+            )
+            admission = self._resource_admitted_archive_route(
+                "entity-usage-audit",
+                args,
+                workload_class="medium",
+            )
+            events = [
+                {**event, "role": "outcome", "relation": "classified_agent_event_occurrence"}
+                for event in (fast_payload or {}).get("results", [])
+                if isinstance(event, dict)
+            ]
+            fast_quality = (fast_payload or {}).get("quality")
+            payload = {
+                "schema_version": 1,
+                "artifact_type": "session_memory_entity_usage_audit",
+                "ok": fast_payload is not None,
+                "mutates": False,
+                "source": (
+                    "mcp_sqlite_agent_event_usage_audit"
+                    if fast_payload is not None
+                    else "mcp_bounded_agent_event_usage_deferred"
+                ),
+                "truth_status": "session_memory_entity_usage_routes_to_evidence_not_reviewed_truth",
+                "anchor": anchor_text,
+                "kind": route_kind,
+                "requested_kind": kind,
+                "session": session or None,
+                "event_count": len(events),
+                "entrypoint_event_count": 0,
+                "usage_event_count": 0,
+                "result_event_count": 0,
+                "outcome_event_count": len(events),
+                "context_event_count": 0,
+                "consequence_event_count": 0,
+                "outcome_events": events,
+                "quality": {
+                    **(fast_quality if isinstance(fast_quality, dict) else {}),
+                    "route": "bounded_agent_event_sqlite_projection",
+                    "direct_sqlite_fast_path": fast_payload is not None,
+                    "event_class_occurrence_not_entity_causality": True,
+                    "deep_archive_fallback_executed": False,
+                },
+                "diagnostics": (
+                    list(fast_payload.get("diagnostics", []))
+                    if fast_payload is not None
+                    else ["bounded_agent_event_projection_unavailable_deep_archive_fallback_deferred"]
+                ),
+                "provider": (fast_payload or {}).get("provider", {}),
+                "next_expansion_command": admission["launch_command"],
+                "next_expansion_reason": (
+                    "Run the owner usage-audit command only when the bounded event-class occurrences are insufficient."
+                ),
+                "mcp_access": {
+                    "mutates": False,
+                    "archive_command": None,
+                    "read_model": ((fast_payload or {}).get("mcp_access") or {}).get("read_model"),
+                    "deep_archive_fallback_executed": False,
+                    "deep_archive_fallback_deferred": fast_payload is None,
+                    "owner_admission_required_for_expansion": True,
+                    "owner_admission": admission,
+                },
+                "authority_boundary": self.authority_boundary(),
+            }
+            return _compact_entity_usage_audit_payload(payload, full_route=full_route)
         payload = self._archive_command(
             "entity-usage-audit",
             args,
@@ -7137,6 +7293,11 @@ class AoASessionMemoryMCPState:
                 node_limit=min(bounded_limit, GRAPH_NODE_SAMPLE_LIMIT),
                 edge_limit=min(bounded_edge_limit, GRAPH_EDGE_SAMPLE_LIMIT),
             )
+        admission = self._resource_admitted_archive_route(
+            "graph-neighborhood",
+            args,
+            workload_class="medium",
+        )
         payload = self._graph_neighborhood_deferred_payload(
             anchor=anchor_text,
             requested_kind=kind,
@@ -7145,6 +7306,7 @@ class AoASessionMemoryMCPState:
             limit=bounded_limit,
             edge_limit=bounded_edge_limit,
             full_route=full_route,
+            admission=admission,
         )
         return _compact_graph_payload(
             payload,
@@ -7163,8 +7325,9 @@ class AoASessionMemoryMCPState:
         limit: int,
         edge_limit: int,
         full_route: str,
+        admission: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": 1,
             "artifact_type": "session_memory_graph_neighborhood",
             "ok": False,
@@ -7193,7 +7356,7 @@ class AoASessionMemoryMCPState:
                 "deep_archive_fallback_executed": False,
             },
             "diagnostics": ["bounded_graph_route_unresolved_deep_archive_fallback_deferred"],
-            "next_expansion_command": full_route,
+            "next_expansion_command": str((admission or {}).get("launch_command") or full_route),
             "next_expansion_reason": (
                 "The compact MCP route found no indexed graph node. Run the named archive command "
                 "outside MCP through owner-aware resource admission when deep expansion is justified."
@@ -7203,11 +7366,15 @@ class AoASessionMemoryMCPState:
                 "archive_command": None,
                 "deep_archive_fallback_executed": False,
                 "deep_archive_fallback_deferred": True,
+                "owner_admission_required": bool(admission),
                 "full_graph_route": full_route,
                 "authority_boundary": "MCP stays on bounded read models; deep archive expansion requires owner admission.",
             },
             "authority_boundary": self.authority_boundary(),
         }
+        if admission:
+            payload["mcp_access"]["owner_admission"] = admission
+        return payload
 
     def _graph_neighborhood_read_error_payload(
         self,
@@ -7670,6 +7837,14 @@ class AoASessionMemoryMCPState:
             "kind": kind,
             "depth": depth,
             "source": "mcp_sqlite_graph_fast_path",
+            "resolved": {
+                "start_node_ids": start_ids,
+                "resolver_strategy": (
+                    route_term_resolution.get("strategy")
+                    if route_term_resolution.get("status") == "matched"
+                    else "synthetic_exact_candidates"
+                ),
+            },
             "node_count": len(selected_node_ids),
             "edge_count": len(selected_edge_rows),
             "truncated": bool(edge_query_truncated or omitted_node_count or omitted_edge_count),
@@ -7716,20 +7891,326 @@ class AoASessionMemoryMCPState:
         }
         return payload
 
+    def _deferred_graph_route_payload(
+        self,
+        *,
+        artifact_type: str,
+        full_route: str,
+        reason: str,
+        source: str = "mcp_bounded_graph_deferred",
+        identity: dict[str, Any] | None = None,
+        admission: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "schema_version": 1,
+            "artifact_type": artifact_type,
+            "ok": False,
+            "mutates": False,
+            "source": source,
+            **(identity or {}),
+            "freshness": {
+                "status": "bounded_graph_route_deferred",
+                "checked": False,
+            },
+            "quality": {
+                "route": "bounded_read_models_only",
+                "deep_archive_fallback_executed": False,
+            },
+            "diagnostics": ["hidden_deep_archive_work_deferred_from_mcp"],
+            "next_expansion_command": str((admission or {}).get("launch_command") or full_route),
+            "next_expansion_reason": reason,
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "deep_archive_fallback_executed": False,
+                "deep_archive_fallback_deferred": True,
+                "owner_admission_required": bool(admission),
+                "full_graph_route": full_route,
+                "authority_boundary": (
+                    "MCP stays on bounded read models; deep graph expansion requires owner-aware resource admission."
+                ),
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+        if admission:
+            payload["mcp_access"]["owner_admission"] = admission
+        return payload
+
+    def _graph_sqlite_event_routes(
+        self,
+        graph: dict[str, Any],
+        *,
+        event_limit: int,
+        route_limit: int = 0,
+    ) -> dict[str, Any] | None:
+        start_ids = [str(node_id) for node_id in (graph.get("resolved") or {}).get("start_node_ids", []) if node_id]
+        if not start_ids:
+            return None
+        db_path = self.aoa_root / "graph" / "graph.sqlite3"
+        selected_event_limit = max(1, min(event_limit, 200))
+        selected_route_limit = max(0, min(route_limit, 100))
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=0.5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only = ON")
+            conn.execute("PRAGMA busy_timeout = 500")
+
+            def edges_for(node_ids: list[str], budget: int) -> tuple[list[sqlite3.Row], bool]:
+                placeholders = ", ".join("?" for _ in node_ids)
+                rows: list[sqlite3.Row] = []
+                seen: set[str] = set()
+                truncated = False
+                for column in ("source_node", "target_node"):
+                    fetched = conn.execute(
+                        f"""
+                        SELECT id, edge_type, source_node, target_node, payload_json, count
+                        FROM edges
+                        WHERE edge_type = ? AND {column} IN ({placeholders})
+                        ORDER BY count DESC, id
+                        LIMIT ?
+                        """,
+                        ["mentions_route_signal", *node_ids, budget + 1],
+                    ).fetchall()
+                    if len(fetched) > budget:
+                        truncated = True
+                    for row in fetched:
+                        edge_id = str(row["id"])
+                        if edge_id in seen:
+                            continue
+                        seen.add(edge_id)
+                        if len(rows) >= budget:
+                            truncated = True
+                            break
+                        rows.append(row)
+                return rows, truncated
+
+            direct_budget = min(max(selected_event_limit * 4, 32), GRAPH_SQLITE_EDGE_BUDGET_MAX)
+            direct_edges, direct_truncated = edges_for(start_ids, direct_budget)
+            candidate_event_ids = list(
+                dict.fromkeys(
+                    neighbor
+                    for row in direct_edges
+                    for neighbor in [
+                        str(row["target_node"] if str(row["source_node"]) in start_ids else row["source_node"])
+                    ]
+                    if neighbor.startswith("event:")
+                )
+            )
+            event_rows: list[sqlite3.Row] = []
+            if candidate_event_ids:
+                placeholders = ", ".join("?" for _ in candidate_event_ids)
+                event_rows = conn.execute(
+                    f"""
+                    SELECT id, node_type, payload_json, count
+                    FROM nodes
+                    WHERE id IN ({placeholders}) AND node_type = 'event'
+                    """,
+                    candidate_event_ids,
+                ).fetchall()
+            event_by_id = {str(row["id"]): row for row in event_rows}
+            event_pairs = [
+                (node_id, self._graph_sqlite_row_payload(event_by_id[node_id], kind="event"))
+                for node_id in candidate_event_ids
+                if node_id in event_by_id
+            ]
+            event_pairs.sort(
+                key=lambda item: (
+                    str(item[1].get("timestamp") or ""),
+                    str(item[1].get("session_label") or ""),
+                    str(item[1].get("event_id") or item[0]),
+                )
+            )
+            selected_event_pairs = event_pairs[:selected_event_limit]
+            event_ids = [node_id for node_id, _event in selected_event_pairs]
+            events = [event for _node_id, event in selected_event_pairs]
+
+            related_edges: list[sqlite3.Row] = []
+            related_truncated = False
+            cooccurrences: list[dict[str, Any]] = []
+            if selected_route_limit and event_ids:
+                related_budget = min(max(selected_event_limit * 8, 64), GRAPH_SQLITE_EDGE_BUDGET_MAX)
+                related_edges, related_truncated = edges_for(event_ids, related_budget)
+                event_id_set = set(event_ids)
+                event_to_routes: dict[str, set[str]] = {}
+                route_ids: set[str] = set()
+                for row in related_edges:
+                    source_id = str(row["source_node"])
+                    target_id = str(row["target_node"])
+                    if source_id in event_id_set and target_id.startswith("route:"):
+                        event_to_routes.setdefault(source_id, set()).add(target_id)
+                        route_ids.add(target_id)
+                    if target_id in event_id_set and source_id.startswith("route:"):
+                        event_to_routes.setdefault(target_id, set()).add(source_id)
+                        route_ids.add(source_id)
+                route_ids.difference_update(start_ids)
+                route_by_id: dict[str, dict[str, Any]] = {}
+                if route_ids:
+                    placeholders = ", ".join("?" for _ in route_ids)
+                    route_rows = conn.execute(
+                        f"""
+                        SELECT id, node_type, payload_json, count
+                        FROM nodes
+                        WHERE id IN ({placeholders})
+                        """,
+                        list(route_ids),
+                    ).fetchall()
+                    route_by_id = {
+                        str(row["id"]): self._graph_sqlite_row_payload(row, kind=str(row["node_type"]))
+                        for row in route_rows
+                    }
+                counts: Counter[str] = Counter(
+                    route_id
+                    for event_id in event_ids
+                    for route_id in event_to_routes.get(event_id, set())
+                    if route_id in route_by_id
+                )
+                ranked = sorted(
+                    counts.items(),
+                    key=lambda item: (-item[1], -int(route_by_id[item[0]].get("count") or 0), item[0]),
+                )[:selected_route_limit]
+                cooccurrences = [
+                    {"node": route_by_id[node_id], "count": count}
+                    for node_id, count in ranked
+                ]
+
+            evidence_refs = self._graph_sqlite_evidence_refs(
+                conn,
+                node_ids=event_ids,
+                edge_ids=[str(row["id"]) for row in [*direct_edges, *related_edges]],
+            )
+            return {
+                "ok": True,
+                "start_node_ids": start_ids,
+                "event_ids": event_ids,
+                "events": events,
+                "cooccurrences": cooccurrences,
+                "evidence_refs": evidence_refs,
+                "truncated": bool(
+                    direct_truncated
+                    or related_truncated
+                    or len(candidate_event_ids) > len(event_ids)
+                ),
+            }
+        except (OSError, sqlite3.Error) as exc:
+            return {"ok": False, "read_error": exc.__class__.__name__}
+        finally:
+            if conn is not None:
+                conn.close()
+
     def graph_timeline(self, anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
         bounded_limit = _coerce_limit(limit, 40, 200)
         args = [anchor_text, "--kind", route_kind, "--limit", str(bounded_limit)]
-        payload = self._archive_command(
+        full_route = self._archive_command_line("graph-timeline", args)
+        admission = self._resource_admitted_archive_route(
             "graph-timeline",
             args,
+            workload_class="medium",
         )
-        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
-        payload.setdefault("authority_boundary", self.authority_boundary())
+        graph = self._graph_neighborhood_sqlite_fast_path(
+            anchor=anchor_text,
+            kind=route_kind,
+            depth=0,
+            limit=20,
+            edge_limit=1,
+            full_route=full_route,
+        )
+        if graph is None:
+            payload = self._deferred_graph_route_payload(
+                artifact_type="session_memory_graph_timeline",
+                full_route=full_route,
+                reason=(
+                    "The exact anchor was not available in the bounded graph store. Run the named timeline command "
+                    "outside MCP through owner-aware resource admission when deeper ordering evidence is justified."
+                ),
+                identity={"anchor": anchor_text, "kind": route_kind, "requested_kind": kind},
+                admission=admission,
+            )
+            return _compact_graph_payload(payload, full_route=full_route, event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT))
+        if graph.get("ok") is False:
+            payload = dict(graph)
+            payload.update(
+                {
+                    "artifact_type": "session_memory_graph_timeline",
+                    "anchor": anchor_text,
+                    "kind": route_kind,
+                    "requested_kind": kind,
+                }
+            )
+            return _compact_graph_payload(payload, full_route=full_route, event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT))
+
+        direct = self._graph_sqlite_event_routes(graph, event_limit=bounded_limit)
+        if direct is None:
+            payload = self._deferred_graph_route_payload(
+                artifact_type="session_memory_graph_timeline",
+                full_route=full_route,
+                reason=(
+                    "The indexed anchor could not be resolved into direct event routes. Run the named timeline "
+                    "command through owner-aware resource admission when deeper ordering evidence is justified."
+                ),
+                identity={"anchor": anchor_text, "kind": route_kind, "requested_kind": kind},
+                admission=admission,
+            )
+            return _compact_graph_payload(payload, full_route=full_route, event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT))
+        if direct.get("ok") is False:
+            payload = self._graph_neighborhood_read_error_payload(
+                anchor=anchor_text,
+                kind=route_kind,
+                depth=0,
+                limit=20,
+                edge_limit=1,
+                full_route=full_route,
+                db_path=self.aoa_root / "graph" / "graph.sqlite3",
+                reason=str(direct.get("read_error") or "unknown_read_error"),
+            )
+            payload.update({"artifact_type": "session_memory_graph_timeline", "requested_kind": kind})
+            return _compact_graph_payload(payload, full_route=full_route, event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT))
+
+        events = list(direct.get("events", []))
+        events.sort(
+            key=lambda node: (
+                str(node.get("timestamp") or ""),
+                str(node.get("session_label") or node.get("session_id") or ""),
+                _safe_int(node.get("line")) or 0,
+                str(node.get("event_id") or node.get("id") or ""),
+            )
+        )
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "session_memory_graph_timeline",
+            "ok": True,
+            "mutates": False,
+            "anchor": anchor_text,
+            "kind": route_kind,
+            "requested_kind": kind,
+            "source": "mcp_sqlite_graph_timeline",
+            "event_count": len(events),
+            "events": events[:bounded_limit],
+            "evidence_refs": direct.get("evidence_refs", []),
+            "freshness": graph.get("freshness", {}),
+            "quality": {
+                "route": "resolved_anchor_then_indexed_direct_event_edges",
+                "direct_sqlite_fast_path": True,
+                "truncated": bool(direct.get("truncated")),
+                "deep_archive_fallback_executed": False,
+            },
+            "next_expansion_command": admission["launch_command"],
+            "next_expansion_reason": "Run the owner command only when more event ordering evidence is needed.",
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": (graph.get("provider") or {}).get("db_path"),
+                "deep_archive_fallback_executed": False,
+                "owner_admission_required_for_expansion": True,
+                "owner_admission": admission,
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
         return _compact_graph_payload(
             payload,
-            full_route=self._archive_command_line("graph-timeline", args),
+            full_route=full_route,
             event_limit=min(bounded_limit, GRAPH_EVENT_SAMPLE_LIMIT),
         )
 
@@ -7737,13 +8218,34 @@ class AoASessionMemoryMCPState:
         source_text = _ensure_short_text(source, "source")
         target_text = _ensure_short_text(target, "target")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
-        payload = self._archive_command(
+        bounded_depth = _coerce_limit(max_depth, 4, 8)
+        args = [source_text, target_text, "--kind", route_kind, "--max-depth", str(bounded_depth)]
+        full_route = self._archive_command_line("graph-shortest-path", args)
+        admission = self._resource_admitted_archive_route(
             "graph-shortest-path",
-            [source_text, target_text, "--kind", route_kind, "--max-depth", str(_coerce_limit(max_depth, 4, 8))],
+            args,
+            workload_class="heavy",
         )
-        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        payload = self._deferred_graph_route_payload(
+            artifact_type="session_memory_graph_shortest_path",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "Shortest-path traversal can fault broad graph pages under memory pressure. Run the named owner "
+                "command through resource admission; use graph-neighborhood for compact MCP topology."
+            ),
+            identity={
+                "source_anchor": source_text,
+                "target_anchor": target_text,
+                "kind": route_kind,
+                "requested_kind": kind,
+                "max_depth": bounded_depth,
+                "path_found": False,
+                "distance": None,
+            },
+            admission=admission,
+        )
+        return _compact_graph_payload(payload, full_route=full_route)
 
     def graph_bridge(
         self,
@@ -7776,27 +8278,142 @@ class AoASessionMemoryMCPState:
             "--limit",
             str(selected_limit),
         ]
-        payload = self._archive_command(
+        full_route = self._archive_command_line("graph-bridge", args)
+        admission = self._resource_admitted_archive_route(
             "graph-bridge",
             args,
+            workload_class="heavy",
         )
-        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        return _compact_graph_bridge_payload(
-            payload,
-            full_route=self._archive_command_line("graph-bridge", args),
+        payload = self._deferred_graph_route_payload(
+            artifact_type="session_memory_graph_bridge",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "Bridge assembly combines path traversal and timeline expansion. Run the named owner command through "
+                "resource admission; use graph-neighborhood or graph-timeline for compact MCP evidence."
+            ),
+            identity={
+                "source_anchor": source_text,
+                "target_anchor": target_text,
+                "kind": route_kind,
+                "requested_kind": kind,
+                "source_kind": selected_source_kind,
+                "target_kind": selected_target_kind,
+                "max_depth": selected_max_depth,
+                "parameters": {"limit": selected_limit},
+            },
+            admission=admission,
         )
+        return _compact_graph_bridge_payload(payload, full_route=full_route)
 
     def graph_cooccurrence(self, anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
         anchor_text = _ensure_short_text(anchor, "anchor")
         route_kind = _coerce_trace_kind(kind, error_label="graph kind")
-        payload = self._archive_command(
+        bounded_limit = _coerce_limit(limit, 30, 100)
+        args = [anchor_text, "--kind", route_kind, "--limit", str(bounded_limit)]
+        full_route = self._archive_command_line("graph-cooccurrence", args)
+        admission = self._resource_admitted_archive_route(
             "graph-cooccurrence",
-            [anchor_text, "--kind", route_kind, "--limit", str(_coerce_limit(limit, 30, 100))],
+            args,
+            workload_class="medium",
         )
-        _annotate_trace_kind_payload(payload, requested_kind=kind, normalized_kind=route_kind)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        graph = self._graph_neighborhood_sqlite_fast_path(
+            anchor=anchor_text,
+            kind=route_kind,
+            depth=0,
+            limit=20,
+            edge_limit=1,
+            full_route=full_route,
+        )
+        if graph is None:
+            payload = self._deferred_graph_route_payload(
+                artifact_type="session_memory_graph_cooccurrence",
+                full_route=full_route,
+                reason=(
+                    "The exact anchor was unavailable in the bounded graph store. Run the named cooccurrence command "
+                    "outside MCP through owner-aware resource admission when deeper aggregation is justified."
+                ),
+                identity={"anchor": anchor_text, "kind": route_kind, "requested_kind": kind},
+                admission=admission,
+            )
+            return _compact_graph_payload(payload, full_route=full_route)
+        if graph.get("ok") is False:
+            payload = dict(graph)
+            payload.update(
+                {
+                    "artifact_type": "session_memory_graph_cooccurrence",
+                    "anchor": anchor_text,
+                    "kind": route_kind,
+                    "requested_kind": kind,
+                }
+            )
+            return _compact_graph_payload(payload, full_route=full_route)
+
+        direct = self._graph_sqlite_event_routes(
+            graph,
+            event_limit=min(max(bounded_limit * 8, 64), 200),
+            route_limit=bounded_limit,
+        )
+        if direct is None:
+            payload = self._deferred_graph_route_payload(
+                artifact_type="session_memory_graph_cooccurrence",
+                full_route=full_route,
+                reason=(
+                    "The indexed anchor could not be resolved into direct event routes. Run the named cooccurrence "
+                    "command through owner-aware resource admission when deeper aggregation is justified."
+                ),
+                identity={"anchor": anchor_text, "kind": route_kind, "requested_kind": kind},
+                admission=admission,
+            )
+            return _compact_graph_payload(payload, full_route=full_route)
+        if direct.get("ok") is False:
+            payload = self._graph_neighborhood_read_error_payload(
+                anchor=anchor_text,
+                kind=route_kind,
+                depth=0,
+                limit=20,
+                edge_limit=1,
+                full_route=full_route,
+                db_path=self.aoa_root / "graph" / "graph.sqlite3",
+                reason=str(direct.get("read_error") or "unknown_read_error"),
+            )
+            payload.update({"artifact_type": "session_memory_graph_cooccurrence", "requested_kind": kind})
+            return _compact_graph_payload(payload, full_route=full_route)
+
+        cooccurrences = list(direct.get("cooccurrences", []))
+        payload = {
+            "schema_version": 1,
+            "artifact_type": "session_memory_graph_cooccurrence",
+            "ok": True,
+            "mutates": False,
+            "anchor": anchor_text,
+            "kind": route_kind,
+            "requested_kind": kind,
+            "source": "mcp_sqlite_graph_cooccurrence",
+            "cooccurrence_count": len(cooccurrences),
+            "cooccurrences": cooccurrences,
+            "evidence_refs": direct.get("evidence_refs", []),
+            "freshness": graph.get("freshness", {}),
+            "quality": {
+                "route": "resolved_anchor_then_two_hop_event_route_aggregation",
+                "direct_sqlite_fast_path": True,
+                "anchor_event_count": len(direct.get("event_ids", [])),
+                "truncated": bool(direct.get("truncated")),
+                "deep_archive_fallback_executed": False,
+            },
+            "next_expansion_command": admission["launch_command"],
+            "next_expansion_reason": "Run the owner command only when the bounded cooccurrence sample is insufficient.",
+            "mcp_access": {
+                "mutates": False,
+                "archive_command": None,
+                "read_model": (graph.get("provider") or {}).get("db_path"),
+                "deep_archive_fallback_executed": False,
+                "owner_admission_required_for_expansion": True,
+                "owner_admission": admission,
+            },
+            "authority_boundary": self.authority_boundary(),
+        }
+        return _compact_graph_payload(payload, full_route=full_route)
 
     def graphrag_packet(
         self,
@@ -7822,8 +8439,36 @@ class AoASessionMemoryMCPState:
             args.append("--include-semantic-context")
         if rerank_local:
             args.append("--rerank-local")
-        payload = self._archive_command("graphrag-packet", args)
-        payload.setdefault("authority_boundary", self.authority_boundary())
+        full_route = self._archive_command_line("graphrag-packet", args)
+        admission = self._resource_admitted_archive_route(
+            "graphrag-packet",
+            args,
+            workload_class="heavy",
+        )
+        payload = self._deferred_graph_route_payload(
+            artifact_type="session_memory_graphrag_packet",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "GraphRAG may combine broad lexical, graph, semantic, and rerank work. Run the named owner command "
+                "outside MCP through owner-aware resource admission."
+            ),
+            identity={
+                "query": query_text,
+                "anchor": _ensure_short_text(anchor, "anchor") if anchor else "",
+                "mode": _safe_selector(mode or "hybrid", "mode", limit=80),
+                "parameters": {
+                    "limit": _coerce_limit(limit, 8, 50),
+                    "include_semantic_context": bool(include_semantic_context),
+                    "rerank_local": bool(rerank_local),
+                },
+            },
+            admission=admission,
+        )
+        bounded_anchor = anchor or query_text
+        bounded_graph = self.graph_neighborhood(bounded_anchor, depth=1, limit=min(_coerce_limit(limit, 8, 50), 8), edge_limit=8)
+        if bounded_graph.get("ok"):
+            payload["bounded_graph"] = bounded_graph
         return payload
 
     def graph_eval(self, limit: int = 6, include_semantic_context: bool = False, rerank_local: bool = False) -> dict[str, Any]:
@@ -7832,9 +8477,29 @@ class AoASessionMemoryMCPState:
             args.append("--include-semantic-context")
         if rerank_local:
             args.append("--rerank-local")
-        payload = self._archive_command("graph-eval", args)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        return payload
+        full_route = self._archive_command_line("graph-eval", args)
+        admission = self._resource_admitted_archive_route(
+            "graph-eval",
+            args,
+            workload_class="heavy",
+        )
+        return self._deferred_graph_route_payload(
+            artifact_type="session_memory_graph_eval",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "Graph evaluation is batch analytical work, not a compact MCP read. Run the named owner command "
+                "outside MCP through owner-aware resource admission."
+            ),
+            identity={
+                "parameters": {
+                    "limit": _coerce_limit(limit, 6, 30),
+                    "include_semantic_context": bool(include_semantic_context),
+                    "rerank_local": bool(rerank_local),
+                }
+            },
+            admission=admission,
+        )
 
     def graph_quality_audit(
         self,
@@ -7860,10 +8525,30 @@ class AoASessionMemoryMCPState:
             args.extend(["--anchor", _ensure_short_text(str(item), "anchor")])
         if full_graphrag:
             args.append("--full-graphrag")
-        payload = self._archive_command("graph-quality-audit", args, allow_nonzero_json=True)
-        payload.setdefault("authority_boundary", self.authority_boundary())
-        payload.setdefault("mcp_note", "MCP defaults to a bounded anchor sample; run the CLI graph-quality-audit for a full default sweep.")
-        return payload
+        full_route = self._archive_command_line("graph-quality-audit", args)
+        admission = self._resource_admitted_archive_route(
+            "graph-quality-audit",
+            args,
+            workload_class="heavy",
+        )
+        return self._deferred_graph_route_payload(
+            artifact_type="session_memory_graph_quality_audit",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "Graph quality audit is multi-anchor analytical work. Run the named owner command outside MCP "
+                "through owner-aware resource admission."
+            ),
+            identity={
+                "parameters": {
+                    "limit": _coerce_limit(limit, 4, 20),
+                    "sample_ref_limit": _coerce_limit(sample_ref_limit, 2, 6),
+                    "anchor_count": len(selected[:8]),
+                    "full_graphrag": bool(full_graphrag),
+                }
+            },
+            admission=admission,
+        )
 
     def explain_graph_packet(self, intent: str, anchor: str = "", query: str = "", limit: int = 8) -> dict[str, Any]:
         intent_text = _ensure_short_text(intent or query or anchor, "intent")
@@ -7872,8 +8557,32 @@ class AoASessionMemoryMCPState:
             args.extend(["--anchor", _ensure_short_text(anchor, "anchor")])
         if query:
             args.extend(["--query", _ensure_short_text(query, "query")])
-        payload = self._archive_command("graph-explain-packet", args)
-        payload.setdefault("authority_boundary", self.authority_boundary())
+        full_route = self._archive_command_line("graph-explain-packet", args)
+        admission = self._resource_admitted_archive_route(
+            "graph-explain-packet",
+            args,
+            workload_class="heavy",
+        )
+        payload = self._deferred_graph_route_payload(
+            artifact_type="session_memory_graph_explain_packet",
+            full_route=full_route,
+            source="mcp_owner_admission_deferred",
+            reason=(
+                "Graph explanation may expand lexical and graph evidence. Run the named owner command outside MCP "
+                "through owner-aware resource admission when the bounded graph packet is insufficient."
+            ),
+            identity={
+                "intent": intent_text,
+                "anchor": _ensure_short_text(anchor, "anchor") if anchor else "",
+                "query": _ensure_short_text(query, "query") if query else "",
+                "parameters": {"limit": _coerce_limit(limit, 8, 50)},
+            },
+            admission=admission,
+        )
+        bounded_anchor = anchor or query or intent_text
+        bounded_graph = self.graph_neighborhood(bounded_anchor, depth=1, limit=min(_coerce_limit(limit, 8, 50), 8), edge_limit=8)
+        if bounded_graph.get("ok"):
+            payload["bounded_graph"] = bounded_graph
         return payload
 
     def read_resource(self, uri: str) -> dict[str, Any]:

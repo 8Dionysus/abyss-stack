@@ -583,17 +583,17 @@ def build_server(
         limit: int = 40,
         edge_limit: int | None = None,
     ) -> dict[str, Any]:
-        """Return a graph route neighborhood for a skill, MCP, hook, tool, API, path, goal, or other operational anchor."""
+        """Read a bounded indexed graph neighborhood or return an admission-required owner command."""
         return current_state().graph_neighborhood(anchor=anchor, kind=kind, depth=depth, limit=limit, edge_limit=edge_limit)
 
     @read_only_tool
     def aoa_session_graph_timeline(anchor: str, kind: str = "auto", limit: int = 40) -> dict[str, Any]:
-        """Return event timeline nodes near a skill, MCP, hook, tool, path, or route anchor."""
+        """Read bounded direct event edges for an indexed operational anchor."""
         return current_state().graph_timeline(anchor=anchor, kind=kind, limit=limit)
 
     @read_only_tool
     def aoa_session_graph_shortest_path(source: str, target: str, kind: str = "auto", max_depth: int = 4) -> dict[str, Any]:
-        """Find a bounded evidence graph path between two operational anchors."""
+        """Return the admission-required owner command for graph path traversal."""
         return current_state().graph_shortest_path(source=source, target=target, kind=kind, max_depth=max_depth)
 
     @read_only_tool
@@ -606,7 +606,7 @@ def build_server(
         max_depth: int = 4,
         limit: int = 8,
     ) -> dict[str, Any]:
-        """Return a compact bridge packet between two operational anchors with path, timeline, refs, freshness, and next expansion."""
+        """Return the admission-required owner bridge command without hidden archive work."""
         return current_state().graph_bridge(
             source=source,
             target=target,
@@ -619,7 +619,7 @@ def build_server(
 
     @read_only_tool
     def aoa_session_graph_cooccurrence(anchor: str, kind: str = "auto", limit: int = 30) -> dict[str, Any]:
-        """Aggregate route-signal cooccurrences around an anchor with evidence samples."""
+        """Aggregate a bounded two-hop indexed event-to-route neighborhood."""
         return current_state().graph_cooccurrence(anchor=anchor, kind=kind, limit=limit)
 
     @read_only_tool
@@ -631,7 +631,7 @@ def build_server(
         include_semantic_context: bool = False,
         rerank_local: bool = False,
     ) -> dict[str, Any]:
-        """Build a GraphRAG evidence packet: lexical hits, graph expansion, cooccurrence, refs, freshness."""
+        """Return bounded graph evidence plus the admission-required owner GraphRAG command."""
         return current_state().graphrag_packet(
             query=query,
             anchor=anchor,
@@ -648,7 +648,7 @@ def build_server(
         query: str = "",
         limit: int = 8,
     ) -> dict[str, Any]:
-        """Explain how a graph/GraphRAG evidence packet was assembled and which refs bound it."""
+        """Return bounded graph evidence plus the admission-required owner explanation command."""
         return current_state().explain_graph_packet(intent=intent, anchor=anchor, query=query, limit=limit)
 
     @read_only_tool
@@ -657,7 +657,7 @@ def build_server(
         include_semantic_context: bool = False,
         rerank_local: bool = False,
     ) -> dict[str, Any]:
-        """Compare lexical, vector, graph, hybrid, and GraphRAG surfaces on known debug anchors."""
+        """Plan admission-required graph evaluation without running batch analysis inside MCP."""
         return current_state().graph_eval(
             limit=limit,
             include_semantic_context=include_semantic_context,
@@ -671,7 +671,7 @@ def build_server(
         anchors: list[Any] | None = None,
         full_graphrag: bool = False,
     ) -> dict[str, Any]:
-        """Sample graph/RAG anchor quality for refs, freshness, and manual verdict readiness."""
+        """Plan an admission-required multi-anchor quality audit without running it inside MCP."""
         return current_state().graph_quality_audit(
             limit=limit,
             sample_ref_limit=sample_ref_limit,

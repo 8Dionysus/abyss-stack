@@ -2518,12 +2518,11 @@ def test_trace_kind_aliases_bridge_entity_registry_and_usage_routes(tmp_path: Pa
     calls = runner.calls
     trace_args = next(args for command, args in calls if command == "trace-route")
     audit_args = next(args for command, args in calls if command == "entity-usage-audit")
-    timeline_args = next(args for command, args in calls if command == "graph-timeline")
-    quality_args = next(args for command, args in calls if command == "graph-quality-audit")
     assert trace_args[trace_args.index("--kind") + 1] == "mcp"
     assert audit_args[audit_args.index("--kind") + 1] == "mcp"
-    assert timeline_args[timeline_args.index("--kind") + 1] == "tool"
-    assert "session_memory_mcp:mcp:aoa-session-memory-mcp" in quality_args
+    assert "--kind tool" in timeline["next_expansion_command"]
+    assert "session_memory_mcp:mcp:aoa-session-memory-mcp" in quality["next_expansion_command"]
+    assert not any(command in {"graph-timeline", "graph-quality-audit"} for command, _args in calls)
 
 
 def test_route_only_search_uses_filters_without_text_query(tmp_path: Path) -> None:
@@ -3131,6 +3130,12 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     )
     reasoning = state.session_agent_reasoning_windows(session="session-1", limit=1)
     neighborhood = state.session_answer_neighborhood(session="session-1", limit=1)
+    agent_event_audit = state.session_entity_usage_audit(
+        "answer",
+        kind="agent_event",
+        limit=2,
+        per_route_limit=2,
+    )
 
     assert responses["source"] == "portable_sqlite_agent_event_fast_path"
     assert responses["result_count"] == 2
@@ -3183,6 +3188,16 @@ def test_agent_event_routes_use_sqlite_fast_path_when_live_schema_exists(tmp_pat
     assert neighborhood["search_projection"]["mode"] == "mcp_sqlite_agent_event_fast_path"
     assert neighborhood["cost_profile"]["lightweight_route"] is True
     assert neighborhood["quality"]["ordered_by"] == "sqlite_rowid_desc_agent_event_fast_path"
+    assert agent_event_audit["ok"] is True
+    assert agent_event_audit["source"] == "mcp_sqlite_agent_event_usage_audit"
+    assert agent_event_audit["requested_kind"] == "agent_event"
+    assert agent_event_audit["outcome_event_count"] == 1
+    assert agent_event_audit["outcome_events"][0]["agent_event"] == "assistant_answer"
+    assert agent_event_audit["outcome_events"][0]["role"] == "outcome"
+    assert agent_event_audit["quality"]["direct_sqlite_fast_path"] is True
+    assert agent_event_audit["mcp_access"]["archive_command"] is None
+    assert agent_event_audit["mcp_access"]["owner_admission_required_for_expansion"] is True
+    assert "entity-usage-audit" in agent_event_audit["next_expansion_command"]
     assert not any(call[0] in {"agent-responses", "answer-neighborhood"} for call in runner.calls)
 
 
@@ -3265,6 +3280,7 @@ def test_agent_event_fast_path_accepts_live_agent_event_date_index(tmp_path: Pat
     assert responses["agent_events"] == ["assistant_final_closeout"]
     assert responses["result_count"] == 1
     assert responses["results"][0]["agent_event"] == "assistant_final_closeout"
+    assert responses["quality"]["ordered_by"] == "sqlite_session_date_rowid_desc_agent_event_fast_path"
     assert runner.calls == []
 
 
@@ -4565,9 +4581,9 @@ def test_published_tool_schema_allows_route_only_search_and_usage_neighborhood(t
     assert "without running them" in corpus_inventory_description
     assert "without maintenance" in route_rollup_description
     assert "without shard resampling" in direct_event_rollup_description
-    assert "graph route neighborhood" in graph_description
-    assert "skill, MCP, hook, tool" in graph_description
-    assert "compact bridge packet" in bridge_description
+    assert "bounded indexed graph neighborhood" in graph_description
+    assert "admission-required owner command" in graph_description
+    assert "without hidden archive work" in bridge_description
     assert tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["target"]["default"] == "all"
     goal_order_schema = tools["aoa_session_goal_lifecycles"].inputSchema["properties"]["order"]
     assert goal_order_schema["default"] == "recent"
@@ -5028,10 +5044,13 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
         per_route_limit=2,
     )
     assert agent_event_audit["artifact_type"] == "session_memory_entity_usage_audit"
-    agent_event_call = [call for call in runner.calls if call[0] == "entity-usage-audit"][-1]
-    agent_event_args = agent_event_call[1]
-    assert agent_event_args[0] == "assistant_answer"
-    assert agent_event_args[agent_event_args.index("--kind") + 1] == "agent_event"
+    assert agent_event_audit["ok"] is False
+    assert agent_event_audit["source"] == "mcp_bounded_agent_event_usage_deferred"
+    assert agent_event_audit["quality"]["direct_sqlite_fast_path"] is False
+    assert agent_event_audit["mcp_access"]["archive_command"] is None
+    assert agent_event_audit["mcp_access"]["owner_admission_required_for_expansion"] is True
+    assert " --activity foreground " in agent_event_audit["next_expansion_command"]
+    assert len([call for call in runner.calls if call[0] == "entity-usage-audit"]) == 1
 
     receipt_audit = state.session_entity_usage_audit("userpromptsubmit", kind="receipt", limit=2)
     error_audit = state.session_entity_usage_audit("test_failure", kind="error", limit=2)
@@ -5049,6 +5068,31 @@ def test_entity_usage_audit_routes_to_allowlisted_archive_command(tmp_path: Path
         "owner_route",
         "route_next_action",
     ]
+
+
+def test_agent_event_usage_audit_defers_deep_route_when_bounded_projection_is_missing(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    (state.aoa_root / "search/aoa-search.sqlite3").unlink()
+
+    audit = state.session_entity_usage_audit(
+        "assistant_answer",
+        kind="agent_event",
+        limit=2,
+        per_route_limit=2,
+        full=True,
+    )
+
+    assert audit["ok"] is False
+    assert audit["source"] == "mcp_bounded_agent_event_usage_deferred"
+    assert audit["diagnostics"] == [
+        "bounded_agent_event_projection_unavailable_deep_archive_fallback_deferred"
+    ]
+    assert audit["mcp_access"]["archive_command"] is None
+    assert audit["mcp_access"]["deep_archive_fallback_deferred"] is True
+    assert audit["mcp_access"]["owner_admission_required_for_expansion"] is True
+    assert "entity-usage-audit" in audit["next_expansion_command"]
+    assert not runner.calls
 
 
 def test_entity_usage_chain_routes_to_allowlisted_archive_command(tmp_path: Path) -> None:
@@ -6364,8 +6408,20 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
             "route_signal": "mcp:aoa_session_memory_mcp",
             "content": long_text,
         }
-        event_node = {"id": "event:session-1:000:000001", "type": "event", "title": "debug mcp"}
+        event_node = {
+            "id": "event:session-1:000:000001",
+            "type": "event",
+            "title": "debug mcp",
+            "timestamp": "2026-07-15T01:02:03Z",
+        }
         session_node = {"id": "session:session-1", "type": "session", "label": "session-1"}
+        target_route_node = {
+            "id": "route:tool:tool:exec_command",
+            "type": "tool",
+            "label": "tool:exec_command",
+            "route_layer": "tool",
+            "route_signal": "tool:exec_command",
+        }
         alias_route_node = {
             "id": "route:entity:entity:aoa_session_transport_preflight",
             "type": "entity",
@@ -6379,6 +6435,7 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
                 (route_node["id"], "mcp", json.dumps(route_node), 9),
                 (event_node["id"], "event", json.dumps(event_node), 1),
                 (session_node["id"], "session", json.dumps(session_node), 3),
+                (target_route_node["id"], "tool", json.dumps(target_route_node), 7),
                 (alias_route_node["id"], "entity", json.dumps(alias_route_node), 4),
             ],
         )
@@ -6426,6 +6483,27 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
                 event_node["id"],
                 alias_route_node["id"],
                 {"type": "mentions_route_signal", "event_id": "000001"},
+                4,
+            ),
+            (
+                "edge:target",
+                "mentions_route_signal",
+                event_node["id"],
+                target_route_node["id"],
+                {
+                    "type": "mentions_route_signal",
+                    "event_id": "000001",
+                    "segment_id": "000",
+                    "session_id": "session-1",
+                    "evidence_refs": [
+                        {
+                            "session_id": "session-1",
+                            "segment_id": "000",
+                            "event_id": "000001",
+                            "refs": {"raw": "raw:line:1", "segment": "000__initial-to-latest.md#event-000001"},
+                        }
+                    ],
+                },
                 4,
             ),
         ]
@@ -6551,6 +6629,113 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     assert alias["mcp_access"]["deep_archive_fallback_executed"] is False
     assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
+    timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp", limit=4)
+    path = state.graph_shortest_path("aoa-session-memory-mcp", "exec_command", kind="auto", max_depth=4)
+    bridge = state.graph_bridge(
+        "aoa-session-memory-mcp",
+        "exec_command",
+        source_kind="mcp",
+        target_kind="tool",
+        max_depth=4,
+        limit=4,
+    )
+    cooccurrence = state.graph_cooccurrence("aoa-session-memory-mcp", kind="mcp", limit=4)
+
+    assert timeline["ok"] is True
+    assert timeline["source"] == "mcp_sqlite_graph_timeline"
+    assert timeline["events"][0]["id"] == event_node["id"]
+    assert timeline["mcp_access"]["owner_admission_required_for_expansion"] is True
+    assert timeline["next_expansion_command"].startswith("abyss-machine resource launch ")
+    assert path["ok"] is False
+    assert path["source"] == "mcp_owner_admission_deferred"
+    assert path["path_found"] is False
+    assert path["mcp_access"]["owner_admission_required"] is True
+    assert path["mcp_access"]["archive_command"] is None
+    assert path["next_expansion_command"].startswith("abyss-machine resource launch ")
+    assert bridge["ok"] is False
+    assert bridge["source"] == "mcp_owner_admission_deferred"
+    assert bridge["mcp_access"]["owner_admission_required"] is True
+    assert bridge["mcp_access"]["archive_command"] is None
+    assert bridge["max_depth"] == 4
+    assert bridge["parameters"]["limit"] == 4
+    assert cooccurrence["ok"] is True
+    assert cooccurrence["source"] == "mcp_sqlite_graph_cooccurrence"
+    assert cooccurrence["cooccurrences"][0]["node"]["id"] == target_route_node["id"]
+    assert cooccurrence["mcp_access"]["owner_admission_required_for_expansion"] is True
+    assert cooccurrence["next_expansion_command"].startswith("abyss-machine resource launch ")
+    assert not any(
+        command in {"graph-timeline", "graph-shortest-path", "graph-bridge", "graph-cooccurrence"}
+        for command, _args in runner.calls
+    )
+
+
+def test_graph_event_sqlite_route_orders_timeline_independently_of_edge_weight(tmp_path: Path) -> None:
+    state = state_with_fixture(tmp_path)
+    graph_db = state.aoa_root / "graph/graph.sqlite3"
+    graph_db.parent.mkdir(parents=True, exist_ok=True)
+    route_id = "route:mcp:mcp:aoa_session_memory_mcp"
+    early_event_id = "event:session-1:000:000001"
+    late_event_id = "event:session-1:000:000002"
+    conn = sqlite3.connect(graph_db)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE nodes (
+                id TEXT PRIMARY KEY,
+                node_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE edges (
+                id TEXT PRIMARY KEY,
+                edge_type TEXT NOT NULL,
+                source_node TEXT NOT NULL,
+                target_node TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX idx_edges_source ON edges(source_node);
+            CREATE INDEX idx_edges_target ON edges(target_node);
+            """
+        )
+        conn.executemany(
+            "INSERT INTO nodes (id, node_type, payload_json, count) VALUES (?, ?, ?, ?)",
+            [
+                (route_id, "mcp", json.dumps({"id": route_id, "type": "mcp"}), 1),
+                (
+                    early_event_id,
+                    "event",
+                    json.dumps({"id": early_event_id, "type": "event", "timestamp": "2026-07-15T01:00:00Z"}),
+                    1,
+                ),
+                (
+                    late_event_id,
+                    "event",
+                    json.dumps({"id": late_event_id, "type": "event", "timestamp": "2026-07-15T02:00:00Z"}),
+                    1,
+                ),
+            ],
+        )
+        conn.executemany(
+            "INSERT INTO edges (id, edge_type, source_node, target_node, payload_json, count) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("edge:late", "mentions_route_signal", late_event_id, route_id, "{}", 20),
+                ("edge:early", "mentions_route_signal", early_event_id, route_id, "{}", 1),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    payload = state._graph_sqlite_event_routes(
+        {"resolved": {"start_node_ids": [route_id]}},
+        event_limit=2,
+    )
+
+    assert payload is not None
+    assert payload["ok"] is True
+    assert [event["id"] for event in payload["events"]] == [early_event_id, late_event_id]
+
 
 def test_graph_neighborhood_reports_malformed_read_model_without_deep_fallback(tmp_path: Path) -> None:
     runner = FakeRunner()
@@ -6560,20 +6745,60 @@ def test_graph_neighborhood_reports_malformed_read_model_without_deep_fallback(t
     graph_db.write_bytes(b"not a sqlite database")
 
     neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp")
+    timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp")
+    cooccurrence = state.graph_cooccurrence("aoa-session-memory-mcp", kind="mcp")
 
-    assert neighborhood["ok"] is False
-    assert neighborhood["source"] == "mcp_graph_read_model_error"
-    assert neighborhood["freshness"]["status"] == "graph_store_read_failed"
-    assert neighborhood["freshness"]["read_model"] == graph_db.as_posix()
-    assert neighborhood["diagnostics"] == ["graph_store_read_failed:DatabaseError"]
-    assert neighborhood["quality"]["deep_archive_fallback_executed"] is False
+    for payload in (neighborhood, timeline, cooccurrence):
+        assert payload["ok"] is False
+        assert payload["source"] == "mcp_graph_read_model_error"
+        assert payload["freshness"]["status"] == "graph_store_read_failed"
+        assert payload["freshness"]["read_model"] == graph_db.as_posix()
+        assert payload["diagnostics"] == ["graph_store_read_failed:DatabaseError"]
+        assert payload["quality"]["deep_archive_fallback_executed"] is False
     assert "maintenance-status" in neighborhood["next_expansion_command"]
     assert neighborhood["mcp_access"]["archive_command"] is None
     assert neighborhood["mcp_access"]["read_model_read_failed"] is True
-    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
+    assert not runner.calls
 
 
-def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path: Path) -> None:
+def test_graph_event_read_failure_does_not_become_owner_admitted_fallback(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    graph_db = state.aoa_root / "graph/graph.sqlite3"
+    bounded_graph = {
+        "ok": True,
+        "resolved": {"start_node_ids": ["route:mcp:mcp:aoa_session_memory_mcp"]},
+        "provider": {"db_path": graph_db.as_posix()},
+        "freshness": {"status": "graph_store_read_model"},
+    }
+    monkeypatch.setattr(
+        AoASessionMemoryMCPState,
+        "_graph_neighborhood_sqlite_fast_path",
+        lambda _self, **_kwargs: bounded_graph,
+    )
+    monkeypatch.setattr(
+        AoASessionMemoryMCPState,
+        "_graph_sqlite_event_routes",
+        lambda _self, _graph, **_kwargs: {"ok": False, "read_error": "OperationalError"},
+    )
+
+    timeline = state.graph_timeline("aoa-session-memory-mcp", kind="mcp")
+    cooccurrence = state.graph_cooccurrence("aoa-session-memory-mcp", kind="mcp")
+
+    for payload in (timeline, cooccurrence):
+        assert payload["ok"] is False
+        assert payload["source"] == "mcp_graph_read_model_error"
+        assert payload["diagnostics"] == ["graph_store_read_failed:OperationalError"]
+        assert "maintenance-status" in payload["next_expansion_command"]
+        assert payload["mcp_access"]["owner_admission_required"] is False
+        assert "owner_admission" not in payload["mcp_access"]
+    assert not runner.calls
+
+
+def test_graph_tools_defer_hidden_archive_work_when_bounded_store_is_unavailable(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)
 
@@ -6597,37 +6822,48 @@ def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path
     assert neighborhood["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert neighborhood["mcp_payload_policy"]["response_compacted"] is True
     assert neighborhood["mcp_access"]["response_compacted"] is True
-    assert timeline["events"][0]["type"] == "event"
+    assert timeline["ok"] is False
+    assert timeline["source"] == "mcp_bounded_graph_deferred"
+    assert timeline["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert timeline["mcp_payload_policy"]["response_compacted"] is True
-    assert path["edges"][0]["type"] == "mentions_route_signal"
+    assert path["ok"] is False
+    assert path["source"] == "mcp_owner_admission_deferred"
+    assert path["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert bridge["artifact_type"] == "session_memory_graph_bridge"
-    assert bridge["bridge"]["path_found"] is True
-    assert bridge["normalized_entities"]["source"]["kind"] == "mcp"
-    assert bridge["normalized_entities"]["target"]["kind"] == "tool"
-    assert bridge["quality"]["raw_or_segment_ref_present"] is True
-    assert bridge["freshness"]["status"] == "graph_store_stale"
-    assert "dirty_sessions" not in bridge["freshness"]
-    assert "dirty_session_ids" not in bridge["freshness"]
-    assert "internal_plan" not in bridge["freshness"]["maintenance_recommendation"]
+    assert bridge["ok"] is False
+    assert bridge["source"] == "mcp_owner_admission_deferred"
+    assert bridge["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert bridge["mcp_payload_policy"]["response_compacted"] is True
     assert "graph-bridge" in bridge["mcp_access"]["full_graph_route"]
-    assert cooccurrence["cooccurrences"][0]["node"]["type"] == "tool"
+    assert cooccurrence["ok"] is False
+    assert cooccurrence["source"] == "mcp_bounded_graph_deferred"
+    assert cooccurrence["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert graphrag["artifact_type"] == "session_memory_graphrag_packet"
+    assert graphrag["ok"] is False
+    assert graphrag["source"] == "mcp_owner_admission_deferred"
     assert explain["artifact_type"] == "session_memory_graph_explain_packet"
-    assert eval_payload["results"][0]["hybrid"]["has_raw_or_segment_refs"] is True
+    assert explain["ok"] is False
+    assert explain["source"] == "mcp_owner_admission_deferred"
+    assert eval_payload["ok"] is False
+    assert eval_payload["source"] == "mcp_owner_admission_deferred"
     assert quality["artifact_type"] == "session_memory_graph_quality_audit"
-    assert quality["samples"][0]["review_status"] == "ready_for_manual_verdict"
-    assert {call[0] for call in runner.calls} >= {
-        "graph-timeline",
-        "graph-shortest-path",
-        "graph-bridge",
-        "graph-cooccurrence",
-        "graphrag-packet",
-        "graph-explain-packet",
-        "graph-eval",
-        "graph-quality-audit",
-    }
-    assert not any(command == "graph-neighborhood" for command, _args in runner.calls)
+    assert quality["ok"] is False
+    assert quality["source"] == "mcp_owner_admission_deferred"
+    for payload in (neighborhood, timeline, path, bridge, cooccurrence, graphrag, explain, eval_payload, quality):
+        admission = payload["mcp_access"]["owner_admission"]
+        assert payload["mcp_access"]["owner_admission_required"] is True
+        assert admission["owner"] == "aoa-session-memory"
+        assert admission["activity"] == "foreground"
+        assert admission["pressure_facts_assign_importance"] is False
+        assert admission["required_host_capability"] == {
+            "command": "abyss-machine resource launch",
+            "owner_activity_flag": "--activity",
+            "activation_order": "host_capability_before_mcp_route",
+        }
+        assert payload["next_expansion_command"].startswith("abyss-machine resource launch ")
+        assert " --activity foreground " in payload["next_expansion_command"]
+        assert " -- " in payload["next_expansion_command"]
+    assert not any(command.startswith("graph-") or command == "graphrag-packet" for command, _args in runner.calls)
 
 
 def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path) -> None:
@@ -6743,15 +6979,15 @@ def test_graph_packets_are_compact_by_default_without_losing_refs(tmp_path: Path
     assert neighborhood["mcp_access"]["archive_command"] is None
     assert "graph-neighborhood" in neighborhood["mcp_access"]["full_graph_route"]
 
+    assert timeline["ok"] is False
+    assert timeline["source"] == "mcp_bounded_graph_deferred"
     assert timeline["mcp_payload_policy"]["response_compacted"] is True
-    assert len(timeline["events"]) == 8
-    assert timeline["omitted_event_count"] == 52
-    assert timeline["events"][0]["refs"]["raw"] == "raw:line:0"
+    assert timeline["mcp_access"]["deep_archive_fallback_deferred"] is True
     assert "graph-timeline" in timeline["mcp_access"]["full_graph_route"]
     assert "content" not in encoded
     assert "omitted_field_count" not in encoded
     assert len(encoded) < 14000
-    assert not any(command == "graph-neighborhood" for command, _args in runner.calls)
+    assert not any(command in {"graph-neighborhood", "graph-timeline"} for command, _args in runner.calls)
 
 
 def test_read_resource_and_server_build(tmp_path: Path) -> None:
