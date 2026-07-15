@@ -62,6 +62,8 @@ roadmap checks.
 - `test_roadmap_parity.py`: release-contour route parity.
 - `test_current_direction_routes.py`: root entrypoint direction.
 - `test_aoa_lib_env_compat.py`: shared shell env compatibility.
+- `test_llama_swap_owner_admission.py`: idempotent, fail-closed owner
+  reservation behavior for model cold loads.
 - `test_validation_command_authority.py`: lane manifest, `ci_gate.py`,
   `release_check.py`, and workflow command-authority routing.
 - `test_validation_topology.py`: validator topology docs and inventory
