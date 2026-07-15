@@ -184,6 +184,9 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
                 "service": service,
                 "state": state.get("Status", ""),
                 "mem_limit_bytes": int(host_config.get("Memory") or 0),
+                "mem_reservation_bytes": int(
+                    host_config.get("MemoryReservation") or 0
+                ),
                 "nano_cpus": int(host_config.get("NanoCpus") or 0),
             }
         )
@@ -224,11 +227,17 @@ def classify_guard(expected: dict[str, str], live: dict[str, Any] | None) -> str
         return "missing_live_container"
 
     expected_memory_bytes = parse_compose_memory_bytes(expected.get("mem_limit"))
+    expected_reservation_bytes = parse_compose_memory_bytes(
+        expected.get("mem_reservation")
+    )
     expected_nano_cpus = parse_compose_cpus_nano(expected.get("cpus"))
     memory_applied = int(live.get("mem_limit_bytes") or 0) == expected_memory_bytes
+    reservation_applied = (
+        int(live.get("mem_reservation_bytes") or 0) == expected_reservation_bytes
+    )
     cpu_applied = int(live.get("nano_cpus") or 0) == expected_nano_cpus
 
-    if memory_applied and cpu_applied:
+    if memory_applied and reservation_applied and cpu_applied:
         return "applied"
     return "staged_not_applied"
 
@@ -264,7 +273,9 @@ def build_status() -> dict[str, Any]:
     guarded_services = {
         service: fields
         for service, fields in rendered_services.items()
-        if fields.get("mem_limit") or fields.get("cpus")
+        if fields.get("mem_limit")
+        or fields.get("mem_reservation")
+        or fields.get("cpus")
     }
 
     project_name = env.get("AOA_COMPOSE_PROJECT_NAME", "abyss")
@@ -325,16 +336,20 @@ def print_text(status: dict[str, Any]) -> None:
         expected = item["expected"]
         live = item.get("live") or {}
         mem_live = live.get("mem_limit_bytes", "missing")
+        reservation_live = live.get("mem_reservation_bytes", "missing")
         cpu_live = live.get("nano_cpus", "missing")
         print(
             "- {service}: {guard_status} "
-            "(expected mem={mem_expected}, cpus={cpu_expected}; "
-            "live mem_bytes={mem_live}, nano_cpus={cpu_live})".format(
+            "(expected mem={mem_expected}, reservation={reservation_expected}, "
+            "cpus={cpu_expected}; live mem_bytes={mem_live}, "
+            "reservation_bytes={reservation_live}, nano_cpus={cpu_live})".format(
                 service=item["service"],
                 guard_status=item["guard_status"],
                 mem_expected=expected.get("mem_limit", "(none)"),
+                reservation_expected=expected.get("mem_reservation", "(none)"),
                 cpu_expected=expected.get("cpus", "(none)"),
                 mem_live=mem_live,
+                reservation_live=reservation_live,
                 cpu_live=cpu_live,
             )
         )

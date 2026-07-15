@@ -54,6 +54,7 @@ volumes:
 
         self.assertEqual(services["langchain-api"]["cpus"], "1.0")
         self.assertEqual(services["langchain-api"]["mem_limit"], "768m")
+        self.assertEqual(services["langchain-api"]["mem_reservation"], "192m")
         self.assertEqual(services["redis"]["mem_limit"], "512m")
 
     def test_classify_guard_distinguishes_staged_from_applied(self) -> None:
@@ -91,7 +92,33 @@ volumes:
         self.assertEqual(
             resource_guard_status.classify_guard(
                 expected,
-                {"mem_limit_bytes": 4294967296, "nano_cpus": 2000000000},
+                {
+                    "mem_limit_bytes": 0,
+                    "mem_reservation_bytes": 1073741824,
+                    "nano_cpus": 2000000000,
+                },
+            ),
+            "applied",
+        )
+        self.assertEqual(
+            resource_guard_status.classify_guard(
+                expected,
+                {
+                    "mem_limit_bytes": 0,
+                    "mem_reservation_bytes": 0,
+                    "nano_cpus": 2000000000,
+                },
+            ),
+            "staged_not_applied",
+        )
+        self.assertEqual(
+            resource_guard_status.classify_guard(
+                expected,
+                {
+                    "mem_limit_bytes": 4294967296,
+                    "mem_reservation_bytes": 1073741824,
+                    "nano_cpus": 2000000000,
+                },
             ),
             "staged_not_applied",
         )
