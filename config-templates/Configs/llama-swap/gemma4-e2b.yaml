@@ -1,4 +1,4 @@
-healthCheckTimeout: 120
+healthCheckTimeout: 270
 logLevel: info
 logTimeFormat: rfc3339
 logToStdout: both

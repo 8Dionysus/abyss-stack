@@ -3,12 +3,16 @@ from __future__ import annotations
 import argparse
 import importlib.util
 from pathlib import Path
+import shlex
 import unittest
 from unittest import mock
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER_PATH = ROOT / "config-templates" / "Services" / "llama-swap" / "owner_cold_load.py"
+CONFIG_PATH = ROOT / "config-templates" / "Configs" / "llama-swap" / "gemma4-e2b.yaml"
 SPEC = importlib.util.spec_from_file_location("owner_cold_load", HELPER_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"cannot import {HELPER_PATH}")
@@ -39,6 +43,7 @@ class LlamaSwapOwnerAdmissionTests(unittest.TestCase):
             "ok": True,
             "decision": "allow",
             "lease": {"id": "lease-1"},
+            "policy": {"release_after_materialization": True},
         }
         with (
             mock.patch.object(
@@ -80,6 +85,28 @@ class LlamaSwapOwnerAdmissionTests(unittest.TestCase):
                 OWNER_COLD_LOAD.reserve(reservation_args(), lambda: False)
 
         request.assert_called_once()
+
+    def test_lease_without_materialization_contract_fails_closed(self) -> None:
+        allowed_without_policy = {
+            "ok": True,
+            "decision": "allow",
+            "lease": {"id": "lease-1"},
+        }
+        with mock.patch.object(OWNER_COLD_LOAD, "admission_request", return_value=allowed_without_policy):
+            with self.assertRaisesRegex(OWNER_COLD_LOAD.AdmissionError, "lease_policy_invalid"):
+                OWNER_COLD_LOAD.reserve(reservation_args(), lambda: False)
+
+    def test_proxy_health_budget_covers_admission_and_child_readiness(self) -> None:
+        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+        command = shlex.split(config["models"]["gemma4-e2b-it"]["cmd"])
+
+        admission_wait = float(command[command.index("--admission-wait") + 1])
+        child_health_timeout = float(command[command.index("--health-timeout") + 1])
+
+        self.assertGreaterEqual(
+            float(config["healthCheckTimeout"]),
+            admission_wait + child_health_timeout + 30.0,
+        )
 
 
 if __name__ == "__main__":

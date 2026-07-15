@@ -94,6 +94,9 @@ def reserve(args: argparse.Namespace, interrupted: Callable[[], bool]) -> tuple[
             lease = response.get("lease") if isinstance(response.get("lease"), dict) else {}
             lease_id = str(lease.get("id") or "")
             if response.get("ok") is True and response.get("decision") == "allow" and lease_id:
+                policy = response.get("policy") if isinstance(response.get("policy"), dict) else {}
+                if policy.get("release_after_materialization") is not True:
+                    raise AdmissionError("lease_policy_invalid")
                 return lease_id, release_token
             reasons = response.get("denied_reasons") or response.get("blocked_reasons") or ["not_allowed"]
             last_error = f"{response.get('decision') or 'invalid'}:" + ",".join(str(item) for item in reasons)
@@ -192,6 +195,9 @@ def main() -> int:
             return 128 + forwarded_signal
         child = subprocess.Popen(command, start_new_session=True)
         wait_ready(child, args.health_url, args.health_timeout)
+        # The lease covers demand that is not yet visible in fresh host facts.
+        # Health is the owner proof that the model is resident; retaining the
+        # lease after this point would double-count the same memory.
         try:
             release(args, *lease)
             lease = None

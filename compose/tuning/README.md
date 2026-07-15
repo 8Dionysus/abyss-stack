@@ -144,6 +144,8 @@ Owner-admitted cold-load candidate for that lane:
 
 ```bash
 scripts/aoa-sync-configs
+install -D -m 0644 config-templates/Configs/llama-swap/gemma4-e2b.yaml "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/llama-swap/gemma4-e2b.yaml"
+install -D -m 0644 config-templates/Services/llama-swap/owner_cold_load.py "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/llama-swap/owner_cold_load.py"
 export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml,compose/tuning/llamacpp.gemma4-e2b.llama-swap.yml
 scripts/aoa-render-config --preset intel-federation >/dev/null
 scripts/aoa-up --preset intel-federation
