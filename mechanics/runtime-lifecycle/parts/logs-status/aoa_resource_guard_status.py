@@ -8,6 +8,7 @@ import re
 import shlex
 import subprocess
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -183,22 +184,60 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
                 "service": service,
                 "state": state.get("Status", ""),
                 "mem_limit_bytes": int(host_config.get("Memory") or 0),
+                "mem_reservation_bytes": int(
+                    host_config.get("MemoryReservation") or 0
+                ),
                 "nano_cpus": int(host_config.get("NanoCpus") or 0),
             }
         )
     return sorted(selected, key=lambda item: (item["service"], item["name"]))
 
 
+def parse_compose_memory_bytes(value: str | None) -> int:
+    if not value:
+        return 0
+
+    match = re.fullmatch(
+        r"([0-9]+(?:\.[0-9]+)?)\s*([kmgt]?)(?:i?b)?",
+        value.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        raise ValueError(f"unsupported compose memory value: {value!r}")
+
+    amount = Decimal(match.group(1))
+    exponent = {"": 0, "k": 1, "m": 2, "g": 3, "t": 4}[match.group(2).lower()]
+    return int(amount * (1024**exponent))
+
+
+def parse_compose_cpus_nano(value: str | None) -> int:
+    if not value:
+        return 0
+    try:
+        amount = Decimal(value.strip())
+    except InvalidOperation as exc:
+        raise ValueError(f"unsupported compose cpu value: {value!r}") from exc
+    if amount < 0:
+        raise ValueError(f"compose cpu value must not be negative: {value!r}")
+    return int(amount * 1_000_000_000)
+
+
 def classify_guard(expected: dict[str, str], live: dict[str, Any] | None) -> str:
     if live is None:
         return "missing_live_container"
 
-    memory_needed = bool(expected.get("mem_limit"))
-    cpu_needed = bool(expected.get("cpus"))
-    memory_applied = not memory_needed or int(live.get("mem_limit_bytes") or 0) > 0
-    cpu_applied = not cpu_needed or int(live.get("nano_cpus") or 0) > 0
+    expected_memory_bytes = parse_compose_memory_bytes(expected.get("mem_limit"))
+    expected_reservation_bytes = parse_compose_memory_bytes(
+        expected.get("mem_reservation")
+    )
+    expected_nano_cpus = parse_compose_cpus_nano(expected.get("cpus"))
+    memory_applied = int(live.get("mem_limit_bytes") or 0) == expected_memory_bytes
+    reservation_applied = (
+        int(live.get("mem_reservation_bytes") or 0) == expected_reservation_bytes
+    )
+    cpu_applied = int(live.get("nano_cpus") or 0) == expected_nano_cpus
 
-    if memory_applied and cpu_applied:
+    if memory_applied and reservation_applied and cpu_applied:
         return "applied"
     return "staged_not_applied"
 
@@ -234,7 +273,9 @@ def build_status() -> dict[str, Any]:
     guarded_services = {
         service: fields
         for service, fields in rendered_services.items()
-        if fields.get("mem_limit") or fields.get("cpus")
+        if fields.get("mem_limit")
+        or fields.get("mem_reservation")
+        or fields.get("cpus")
     }
 
     project_name = env.get("AOA_COMPOSE_PROJECT_NAME", "abyss")
@@ -295,16 +336,20 @@ def print_text(status: dict[str, Any]) -> None:
         expected = item["expected"]
         live = item.get("live") or {}
         mem_live = live.get("mem_limit_bytes", "missing")
+        reservation_live = live.get("mem_reservation_bytes", "missing")
         cpu_live = live.get("nano_cpus", "missing")
         print(
             "- {service}: {guard_status} "
-            "(expected mem={mem_expected}, cpus={cpu_expected}; "
-            "live mem_bytes={mem_live}, nano_cpus={cpu_live})".format(
+            "(expected mem={mem_expected}, reservation={reservation_expected}, "
+            "cpus={cpu_expected}; live mem_bytes={mem_live}, "
+            "reservation_bytes={reservation_live}, nano_cpus={cpu_live})".format(
                 service=item["service"],
                 guard_status=item["guard_status"],
                 mem_expected=expected.get("mem_limit", "(none)"),
+                reservation_expected=expected.get("mem_reservation", "(none)"),
                 cpu_expected=expected.get("cpus", "(none)"),
                 mem_live=mem_live,
+                reservation_live=reservation_live,
                 cpu_live=cpu_live,
             )
         )

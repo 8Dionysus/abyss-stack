@@ -95,8 +95,9 @@ They are intentionally additive:
 - `storage.intel-285h.resource-guard` bounds Postgres, Redis, Qdrant, and
   Neo4j for this workstation class while keeping the `substrate` service
   selection unchanged
-- `intel-worker.thin-host` caps the promoted OVMS embeddings seam and
-  `langchain-api` without changing the selected worker lane
+- `intel-worker.thin-host` gives the promoted OVMS embeddings seam a soft
+  reclaim reservation plus bounded CPU/threading without a hard memory ceiling;
+  it still caps `langchain-api` without changing the selected worker lane
 - `federation.thin-host` caps the advisory `route-api` facade when the
   `federation` profile is selected
 - `observability.thin-host` shortens Prometheus retention, lowers cAdvisor
