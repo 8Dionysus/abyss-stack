@@ -6552,6 +6552,27 @@ def test_graph_neighborhood_uses_sqlite_fast_path_for_exact_route_node(tmp_path:
     assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
 
 
+def test_graph_neighborhood_reports_malformed_read_model_without_deep_fallback(tmp_path: Path) -> None:
+    runner = FakeRunner()
+    state = state_with_fixture(tmp_path, runner)
+    graph_db = state.aoa_root / "graph/graph.sqlite3"
+    graph_db.parent.mkdir(parents=True, exist_ok=True)
+    graph_db.write_bytes(b"not a sqlite database")
+
+    neighborhood = state.graph_neighborhood("aoa-session-memory-mcp", kind="mcp")
+
+    assert neighborhood["ok"] is False
+    assert neighborhood["source"] == "mcp_graph_read_model_error"
+    assert neighborhood["freshness"]["status"] == "graph_store_read_failed"
+    assert neighborhood["freshness"]["read_model"] == graph_db.as_posix()
+    assert neighborhood["diagnostics"] == ["graph_store_read_failed:DatabaseError"]
+    assert neighborhood["quality"]["deep_archive_fallback_executed"] is False
+    assert "maintenance-status" in neighborhood["next_expansion_command"]
+    assert neighborhood["mcp_access"]["archive_command"] is None
+    assert neighborhood["mcp_access"]["read_model_read_failed"] is True
+    assert not any(call[0] == "graph-neighborhood" for call in runner.calls)
+
+
 def test_graph_and_graphrag_tools_route_to_allowlisted_archive_commands(tmp_path: Path) -> None:
     runner = FakeRunner()
     state = state_with_fixture(tmp_path, runner)

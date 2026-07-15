@@ -1575,6 +1575,8 @@ def _compact_graph_freshness(freshness: Any) -> dict[str, Any]:
         key: freshness.get(key)
         for key in (
             "status",
+            "checked",
+            "read_model",
             "warning",
             "graph_source",
             "graph_generated_at",
@@ -7207,6 +7209,59 @@ class AoASessionMemoryMCPState:
             "authority_boundary": self.authority_boundary(),
         }
 
+    def _graph_neighborhood_read_error_payload(
+        self,
+        *,
+        anchor: str,
+        kind: str,
+        depth: int,
+        limit: int,
+        edge_limit: int,
+        full_route: str,
+        db_path: Path,
+        reason: str,
+    ) -> dict[str, Any]:
+        maintenance_route = self._archive_command_line("maintenance-status", [])
+        payload = self._graph_neighborhood_deferred_payload(
+            anchor=anchor,
+            requested_kind=kind,
+            kind=kind,
+            depth=depth,
+            limit=limit,
+            edge_limit=edge_limit,
+            full_route=full_route,
+        )
+        payload.update(
+            {
+                "source": "mcp_graph_read_model_error",
+                "freshness": {
+                    "status": "graph_store_read_failed",
+                    "checked": True,
+                    "read_model": db_path.as_posix(),
+                },
+                "quality": {
+                    "route": "generated_graph_read_model",
+                    "direct_sqlite_fast_path": False,
+                    "deep_archive_fallback_executed": False,
+                },
+                "diagnostics": [f"graph_store_read_failed:{reason}"],
+                "next_expansion_command": maintenance_route,
+                "next_expansion_reason": (
+                    "Inspect generated graph health before retrying the bounded read or requesting "
+                    "owner-admitted deep expansion."
+                ),
+            }
+        )
+        payload["mcp_access"].update(
+            {
+                "read_model": db_path.as_posix(),
+                "read_model_read_failed": True,
+                "maintenance_status_route": maintenance_route,
+                "authority_boundary": "MCP reports the generated read-model failure; graph repair remains outside MCP.",
+            }
+        )
+        return payload
+
     def _graph_neighborhood_node_candidates(self, *, anchor: str, kind: str) -> list[str]:
         if anchor.startswith("route:") or anchor.startswith("event:") or anchor.startswith("session:") or anchor.startswith("segment:"):
             return [anchor]
@@ -7472,7 +7527,16 @@ class AoASessionMemoryMCPState:
             conn.execute("PRAGMA query_only = ON")
             conn.execute("PRAGMA busy_timeout = 500")
             if not self._sqlite_table_exists(conn, "nodes") or not self._sqlite_table_exists(conn, "edges"):
-                return None
+                return self._graph_neighborhood_read_error_payload(
+                    anchor=anchor,
+                    kind=kind,
+                    depth=depth,
+                    limit=limit,
+                    edge_limit=edge_limit,
+                    full_route=full_route,
+                    db_path=db_path,
+                    reason="missing_required_schema",
+                )
 
             def start_rows_for(node_ids: list[str]) -> list[sqlite3.Row]:
                 if not node_ids:
@@ -7583,8 +7647,17 @@ class AoASessionMemoryMCPState:
                 node_ids=selected_node_ids,
                 edge_ids=[str(row["id"]) for row in selected_edge_rows],
             )
-        except (OSError, sqlite3.Error):
-            return None
+        except (OSError, sqlite3.Error) as exc:
+            return self._graph_neighborhood_read_error_payload(
+                anchor=anchor,
+                kind=kind,
+                depth=depth,
+                limit=limit,
+                edge_limit=edge_limit,
+                full_route=full_route,
+                db_path=db_path,
+                reason=exc.__class__.__name__,
+            )
         finally:
             if conn is not None:
                 conn.close()
