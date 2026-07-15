@@ -85,7 +85,9 @@ more:
   Intel-aware preset when the current task needs that bounded Spark lane.
   This lane disables OpenAI literal-completions in `langchain-api` because
   the Gemma 4 chat-template path validates through chat-completions, while
-  the completions shortcut returned empty text during exact-reply smoke.
+  the completions shortcut returned empty text during exact-reply smoke. Native
+  idle sleep owns memory release, with a 4 GiB soft reclaim reservation and no
+  private hard memory ceiling.
 - Ollama and LiteLLM are retained fallback/control surfaces, not the default
   path.
 - Alternate llama sidecars and Intel text overlays are lab or promotion

@@ -78,11 +78,12 @@ They are intentionally additive:
 - `gemma4-e2b.intel-285h.vulkan` is the candidate text-only Gemma 4
   E2B lane for the Intel-aware stack; it keeps chat/jobs on `llama.cpp`
   Vulkan, keeps OVMS as the embeddings seam when used with `intel-worker`,
-  uses one parallel slot, disables OpenAI literal-completions for the
-  Gemma chat-template path, and points at a host-provided GGUF through
-  `AOA_GEMMA4_E2B_MODEL_HOST_PATH`; after 600 idle seconds it uses the
-  native `llama.cpp` sleep path so the model and KV cache can be released
-  without turning health probes into wake requests
+  uses one parallel slot and a 4 GiB soft reclaim reservation without a hard
+  memory ceiling, disables OpenAI literal-completions for the Gemma chat-template
+  path, and points at a host-provided GGUF through
+  `AOA_GEMMA4_E2B_MODEL_HOST_PATH`; after 600 idle seconds it uses the native
+  `llama.cpp` sleep path so the model and KV cache can be released without
+  turning health probes into wake requests
 - `gemma4-e2b.llama-swap` is an optional second overlay for the same model
   lane. It puts a lightweight request proxy in the stable `llama-cpp` service,
   reserves the measured cold-load demand through the unprivileged

@@ -20,7 +20,9 @@ services:
     devices:
       - /dev/dri:/dev/dri
     cpus: "4.0"
-    mem_limit: "8g"
+    # Explicit unlimited values clear hard caps inherited from earlier tuning
+    # overlays; native idle sleep owns release for this important lane.
+    mem_limit: "0"
     mem_reservation: "4g"
     environment:
       LLAMA_ARG_ALIAS: "gemma4-e2b-it"

@@ -1,6 +1,6 @@
 {
   "schema": "abyss_stack_service_selection_policy_v1",
-  "updated_at": "2026-07-14",
+  "updated_at": "2026-07-15",
   "host_class": "intel-core-ultra-9-285h",
   "current_runtime_shape": {
     "preset": "intel-full",
@@ -70,7 +70,7 @@
       "posture": "selected_now",
       "tier": "primary_text_lane",
       "resource_guard": "compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml",
-      "decision": "current Gemma 4 E2B text lane; do not force Gemma 4 through OVMS"
+      "decision": "current Gemma 4 E2B text lane uses native idle sleep and soft reclaim protection without a hard memory ceiling; do not force Gemma 4 through OVMS"
     },
     {
       "name": "ovms",
