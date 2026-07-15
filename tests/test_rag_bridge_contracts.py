@@ -77,13 +77,16 @@ class RagBridgeContractsTests(unittest.TestCase):
                 self.assertRegex(volume, r":ro[,]")
         self.assertTrue(any("/Logs/rag-api:/app/logs:Z" in volume for volume in volumes))
 
-    def test_rerank_api_is_lazy_bounded_and_host_cache_routed(self) -> None:
+    def test_rerank_api_is_lazy_owner_managed_and_host_cache_routed(self) -> None:
         rerank = module_services("45-rerank-api.yml")["rerank-api"]
         env = rerank.get("environment", {})
         volumes = rerank.get("volumes", [])
 
         self.assertIn("AOA_RERANK_IDLE_UNLOAD_SEC", env)
         self.assertEqual(env.get("AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD"), "${AOA_RERANK_EXIT_AFTER_IDLE_UNLOAD:-true}")
+        self.assertNotIn("mem_limit", rerank)
+        self.assertNotIn("mem_reservation", rerank)
+        self.assertNotIn("cpus", rerank)
         self.assertTrue(any("/srv/abyss-machine/cache/ai/qwen3-reranker" in volume for volume in volumes))
         self.assertTrue(any("/srv/abyss-machine/cache/ai/openvino/qwen3-reranker" in volume for volume in volumes))
 

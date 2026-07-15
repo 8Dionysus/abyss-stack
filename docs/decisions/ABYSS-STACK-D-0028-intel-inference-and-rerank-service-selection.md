@@ -47,7 +47,13 @@ The wrapper loads lazily and unloads after an idle window so reranking remains
 available without making another multi-GB model permanently resident. Since
 the Python/OpenVINO allocator may retain released pages, the wrapper is allowed
 to exit after idle unload and let the container restart policy bring back a
-clean lightweight API.
+clean lightweight API. The atomic module does not impose hard memory or CPU
+ceilings. On the reviewed GPU path, OpenVINO device mappings are charged to the
+container memory cgroup as shared memory; a `4 GiB` `memory.max` killed the
+owner workload while cgroup swap headroom remained. Lazy load plus owner-aware
+idle exit is the resource guard for this service. A constrained-host ceiling,
+if one is ever justified, belongs in an explicit measured tuning experiment,
+not in the normal reranker module.
 
 Host warm TTS and dictation remain protected machine capabilities. The stack
 `qwen-tts` helper stays a stack tools service, not the replacement for the host
@@ -75,6 +81,8 @@ The route avoids unsupported or weakly proven moves:
 - The lean Intel shape is easier to inspect and reproduce.
 - Reranking becomes a stack-owned localhost API without changing the embedding
   service.
+- An active rerank request may transiently use more than `4 GiB`; admission must
+  account for that cold-load demand instead of relying on a kill boundary.
 - Helper tools, n8n, and dashboards remain opt-in and can be capped by explicit
   thin-host overlays.
 - There are now more explicit profiles and overlays to validate.

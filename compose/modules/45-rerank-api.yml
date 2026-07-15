@@ -29,9 +29,6 @@ services:
       - /dev/dri:/dev/dri
     ports:
       - "127.0.0.1:${AOA_RERANK_HOST_PORT:-5405}:5405"
-    mem_limit: "${AOA_RERANK_MEM_LIMIT:-4g}"
-    mem_reservation: "${AOA_RERANK_MEM_RESERVATION:-1g}"
-    cpus: "${AOA_RERANK_CPUS:-2.0}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5405/health', timeout=2).read()"]
       interval: 10s
