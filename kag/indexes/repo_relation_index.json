@@ -10221,7 +10221,7 @@
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:9146e4e1f0a92c5bd46bfe98"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8b0e25c1a8b7d0d2bd5b36ad","id":"aoa:abyss-stack:relation:ef97a8f095d8562745a98b5c","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:9ce48b4f94b504b530cade5f","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:a3340da397fa7587e79030aa"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8e6437c1265983d3f7daca87","id":"aoa:abyss-stack:relation:1109741bc3f0c15d73c8d683","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:a7bc2fb565582e26dac4df2f","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:05b5b63b15573583444c7f98"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8e6437c1265983d3f7daca87","id":"aoa:abyss-stack:relation:194e15eb89570fda908e7752","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:d77a823bc0a835d2530cbd32","trust_ref":"deterministic"},
-    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:5245cbb765362bb3473de8e7"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8eaf111fc0d02fc039e71609","id":"aoa:abyss-stack:relation:9df5692e913069cb42e5c4d7","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:c6f548ab96fc3e6a3cf98150","trust_ref":"deterministic"},
+    {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:4e518ad1f0b06546a39dee58"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8eaf111fc0d02fc039e71609","id":"aoa:abyss-stack:relation:c2d3eaf9a754dcfcda8a87c9","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:c6f548ab96fc3e6a3cf98150","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:8a00f02bfb7c715a9b3ad924"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:8ee62dc0212de3b365b96731","id":"aoa:abyss-stack:relation:2b963b8b79dcc88a203545b4","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:bda033eb516b7fb15fe0c002","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:80b532c1cc27b6febca2a944"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:96b4e848ea9622dd4a94f556","id":"aoa:abyss-stack:relation:a7bd6e907ea3c0546837b4f9","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:6c5aa3ed5f11011c57725380","trust_ref":"deterministic"},
     {"confidence":1.0,"evidence_anchor_ids":["aoa:abyss-stack:anchor:1b88cf75960348a67c5a3bac"],"evidence_class":"deterministic","from_id":"aoa:abyss-stack:entity:96b4e848ea9622dd4a94f556","id":"aoa:abyss-stack:relation:b2f6018abfc5f93dd9a75e00","provenance_ref":"deterministic","relation_kind":"references","temporal_ref":"current","to_id":"aoa:abyss-stack:anchor:6c5aa3ed5f11011c57725380","trust_ref":"deterministic"},
@@ -11970,7 +11970,7 @@
   ],
   "index_identity": {
     "artifact_kind": "repository_relation_index",
-    "content_digest": "bb138ea7a1682daf1ba5430ee838d35444fe2d8402a2f74c5a343e789ecc7ba9",
+    "content_digest": "343285b9a313032b8432b27357c6b2cd5e27014f0ed60562d921f2b98cb9ebb3",
     "index_kind": "relation",
     "local_id": "index:repo-local:relations",
     "schema_ref": "aoa-kag:schemas/repo-local-kag-repository-index.schema.json"
@@ -12056,7 +12056,7 @@
   },
   "schema_version": "aoa-repo-local-kag-repository-index-v2",
   "source_index": {
-    "content_digest": "795e4b2a98f1dd9cb8fcca381d302d17eb92e683db817c99cd3a75ff43517412",
+    "content_digest": "d0a0785320c8899dd87dbc43ca2ea023dc0d0c7a15b02a2c1ce753d5d94d5000",
     "local_id": "index:repo-local:source-surfaces",
     "path": "kag/indexes/source_surface_index.json"
   },
