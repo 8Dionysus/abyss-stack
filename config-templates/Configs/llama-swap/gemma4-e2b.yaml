@@ -1,0 +1,70 @@
+healthCheckTimeout: 270
+logLevel: info
+logTimeFormat: rfc3339
+logToStdout: both
+metricsMaxInMemory: 0
+captureBuffer: 0
+performance:
+  disabled: true
+startPort: 15450
+sendLoadingState: false
+includeAliasesInList: false
+globalTTL: 0
+unloadTimeout: 30
+ui:
+  activity:
+    session_id: []
+apiKeys: []
+
+models:
+  gemma4-e2b-it:
+    name: Gemma 4 E2B IT
+    cmd: >
+      /usr/bin/python3 /opt/owner-cold-load.py
+      --socket /run/abyss-machine/resource/admission.sock
+      --owner abyss-stack
+      --workload-id llama-swap/gemma4-e2b-it
+      --activity foreground
+      --class heavy
+      --kind ai
+      --latency interactive
+      --memory-demand-mib 2560
+      --estimate-source measured-llama-swap-cgroup-growth
+      --estimate-confidence high
+      --health-url http://127.0.0.1:${PORT}/health
+      --health-timeout 120
+      --admission-wait 120
+      --
+      /usr/local/bin/llama-server
+      --host 127.0.0.1
+      --port ${PORT}
+      --offline
+      --no-webui
+      --no-slots
+      --model /models/gemma4-e2b-it.gguf
+      --alias gemma4-e2b-it
+      --ctx-size 4096
+      --threads 4
+      --threads-batch 4
+      --threads-http 2
+      --batch-size 128
+      --ubatch-size 64
+      --parallel 1
+      --device Vulkan0
+      --n-gpu-layers 99
+      --flash-attn auto
+      --cache-type-k f16
+      --cache-type-v f16
+      --no-cache-prompt
+      --cache-reuse 0
+      --cache-ram 0
+      --fit on
+      --fit-target 1024
+      --no-warmup
+      --jinja
+      --reasoning off
+      --reasoning-format none
+    proxy: http://127.0.0.1:${PORT}
+    ttl: 600
+    unloadTimeout: 30
+    checkEndpoint: /health

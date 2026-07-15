@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE_DIR = REPO_ROOT / "compose" / "modules"
 PROFILE_DIR = REPO_ROOT / "compose" / "profiles"
 PRESET_DIR = REPO_ROOT / "compose" / "presets"
+TUNING_DIR = REPO_ROOT / "compose" / "tuning"
 
 
 def uncommented_lines(path: Path) -> list[str]:
@@ -58,6 +59,18 @@ def resolved_modules(*profiles: str, preset: str | None = None) -> list[str]:
 
 
 class ComposeContractsTests(unittest.TestCase):
+    def test_llama_swap_candidate_is_owner_admitted_and_removes_inherited_caps(self) -> None:
+        service = load_compose(TUNING_DIR / "llamacpp.gemma4-e2b.llama-swap.yml")["services"]["llama-cpp"]
+
+        self.assertEqual(service.get("cpus"), "0")
+        self.assertEqual(service.get("mem_limit"), "0")
+        self.assertEqual(service.get("mem_reservation"), "0")
+        self.assertIn("@sha256:", service.get("image", ""))
+        self.assertEqual(service.get("labels", {}).get("aoa.tuning.owner_admission"), "required")
+        self.assertTrue(
+            any("AOA_RESOURCE_ADMISSION_DIR" in str(volume) and str(volume).endswith(":ro") for volume in service.get("volumes", []))
+        )
+
     def test_all_compose_modules_parse_as_service_maps(self) -> None:
         for path in sorted(MODULE_DIR.glob("*.yml")):
             with self.subTest(module=path.name):

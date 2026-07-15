@@ -18,6 +18,7 @@ Current source-managed service trees:
 - `docs-api/`
 - `langchain-api/`
 - `litellm/`
+- `llama-swap/`
 - `qwen3-tts-api/`
 - `rag-api/`
 - `rerank-api/`

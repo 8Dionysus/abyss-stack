@@ -23,6 +23,19 @@ def run_aoa_lib(script: str) -> str:
 
 
 class AoaLibEnvCompatTests(unittest.TestCase):
+    def test_resource_admission_dir_tracks_runtime_uid_and_allows_override(self) -> None:
+        default = run_aoa_lib(
+            "unset AOA_RESOURCE_ADMISSION_DIR; export AOA_RUNTIME_UID=4242; "
+            "source scripts/aoa-lib.sh; printf '%s' \"$AOA_RESOURCE_ADMISSION_DIR\""
+        )
+        explicit = run_aoa_lib(
+            "export AOA_RUNTIME_UID=4242; export AOA_RESOURCE_ADMISSION_DIR=/private/admission; "
+            "source scripts/aoa-lib.sh; printf '%s' \"$AOA_RESOURCE_ADMISSION_DIR\""
+        )
+
+        self.assertEqual(default, "/run/user/4242/abyss-machine/resource")
+        self.assertEqual(explicit, "/private/admission")
+
     def test_compat_no_op_offload_true_maps_to_op_offload_zero(self) -> None:
         output = run_aoa_lib(
             "unset AOA_LLAMACPP_OP_OFFLOAD; export AOA_LLAMACPP_NO_OP_OFFLOAD=1; source scripts/aoa-lib.sh; printf '%s' \"$AOA_LLAMACPP_OP_OFFLOAD\""

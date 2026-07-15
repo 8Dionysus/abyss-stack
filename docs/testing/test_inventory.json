@@ -24,6 +24,7 @@
         "tests/test_aoa_lib_env_compat.py",
         "tests/test_branch_policy_validator_module.py",
         "tests/test_compose_contracts.py",
+        "tests/test_llama_swap_owner_admission.py",
         "tests/test_current_direction_routes.py",
         "tests/test_decision_records.py",
         "tests/test_decision_surface_validator_module.py",

@@ -20,6 +20,7 @@ tree through the bootstrap route in [AGENTS](AGENTS.md#bootstrap-route).
 - `Configs/monitoring/`
 - `Configs/tts/`
 - `Configs/ollama/`
+- `Configs/llama-swap/`
 - `Configs/tos-graph/`
 - `Configs/rag/`
 - `Services/docs-api/`
@@ -27,6 +28,7 @@ tree through the bootstrap route in [AGENTS](AGENTS.md#bootstrap-route).
 - `Services/babelvox-tts-api/`
 - `Services/langchain-api/`
 - `Services/litellm/`
+- `Services/llama-swap/`
 - `Services/qwen3-tts-api/`
 - `Services/rag-api/`
 - `Services/rerank-api/`

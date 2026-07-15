@@ -131,6 +131,29 @@ class LlamacppPilotTests(unittest.TestCase):
         self.assertNotIn("other_metric", payload)
         self.assertNotIn("llamacpp:requests_deferred", payload)
 
+    def test_llama_swap_snapshot_does_not_probe_model_only_endpoints(self) -> None:
+        def get_json(url: str, *, timeout_s: float):
+            self.assertEqual(timeout_s, 2.0)
+            if url.endswith("/running"):
+                return 200, {"running": []}
+            if url.endswith("/v1/models"):
+                return 200, {"data": [{"id": "gemma4-e2b-it", "status": "unloaded"}]}
+            self.fail(f"unexpected JSON probe: {url}")
+
+        def get_text(url: str, *, timeout_s: float):
+            self.assertEqual(timeout_s, 2.0)
+            self.assertTrue(url.endswith("/health"))
+            return 200, "OK"
+
+        with patch.object(self.module, "http_get_json", side_effect=get_json):
+            with patch.object(self.module, "http_get_text", side_effect=get_text):
+                probes = self.module.llamacpp_snapshot_probes(2.0)
+
+        self.assertEqual(probes["runtime_kind"], "llama-swap")
+        self.assertTrue(probes["proxy"]["model_endpoints_skipped_while_cold"])
+        self.assertIsNone(probes["metrics_status"])
+        self.assertIsNone(probes["slots_status"])
+
     def test_summarize_llama_logs_counts_cache_signatures(self) -> None:
         summary = self.module.summarize_llama_logs(
             "\n".join(

@@ -56,6 +56,7 @@ pwsh -File scripts/aoa.ps1 up -Overlay compose/tuning/llamacpp.cpu.yml --profile
 - `llamacpp.intel-285h.kv-iq4nl-lab.yml`
 - `llamacpp.intel-285h.vulkan-lab.yml`
 - `llamacpp.gemma4-e2b.intel-285h.vulkan.yml`
+- `llamacpp.gemma4-e2b.llama-swap.yml`
 - `intel-text.ovms-gpu-lab.yml`
 - `intel-text.ovms-qwen3-settings.yml`
 - `storage.intel-285h.resource-guard.yml`
@@ -82,6 +83,13 @@ They are intentionally additive:
   `AOA_GEMMA4_E2B_MODEL_HOST_PATH`; after 600 idle seconds it uses the
   native `llama.cpp` sleep path so the model and KV cache can be released
   without turning health probes into wake requests
+- `gemma4-e2b.llama-swap` is an optional second overlay for the same model
+  lane. It puts a lightweight request proxy in the stable `llama-cpp` service,
+  reserves the measured cold-load demand through the unprivileged
+  `abyss-machine` owner-admission socket, starts the model only for a real
+  request, and unloads it after 600 idle seconds. It removes the inherited
+  CPU and memory caps instead of replacing them with another static ceiling;
+  background callers must retain their own owner-aware launch gate
 - `intel-text.ovms-gpu-lab` is a standalone OVMS text-generation sidecar harness for explicit model-card-driven Intel text screening, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
 - `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
 - `storage.intel-285h.resource-guard` bounds Postgres, Redis, Qdrant, and
@@ -131,6 +139,21 @@ export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.gemma4-e2b.intel-285h.vul
 scripts/aoa-render-config --preset intel-federation >/dev/null
 scripts/aoa-up --preset intel-federation
 ```
+
+Owner-admitted cold-load candidate for that lane:
+
+```bash
+scripts/aoa-sync-configs
+install -D -m 0644 config-templates/Configs/llama-swap/gemma4-e2b.yaml "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/llama-swap/gemma4-e2b.yaml"
+install -D -m 0644 config-templates/Services/llama-swap/owner_cold_load.py "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/llama-swap/owner_cold_load.py"
+export AOA_EXTRA_COMPOSE_FILES=compose/tuning/llamacpp.gemma4-e2b.intel-285h.vulkan.yml,compose/tuning/llamacpp.gemma4-e2b.llama-swap.yml
+scripts/aoa-render-config --preset intel-federation >/dev/null
+scripts/aoa-up --preset intel-federation
+```
+
+The admission service must already be active. Remove the second overlay and
+recreate only `llama-cpp` to roll back to native `llama.cpp` sleep; the model,
+port, alias, and `langchain-api` route do not change.
 
 Thin-host full-stack example:
 
