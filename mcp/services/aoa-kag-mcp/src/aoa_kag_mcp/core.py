@@ -131,6 +131,17 @@ class AoAKagMCPState:
             None,
         )
 
+    def repo_local_index(self, repo: str) -> dict[str, Any] | None:
+        provider = self.provider(repo)
+        if provider is None:
+            raise KeyError(f"unknown KAG owner: {repo}")
+        packet = provider.get("repo_local_index")
+        if isinstance(packet, dict):
+            return packet
+        indexes = self.provider_map().get("provider_repo_local_indexes")
+        fallback = indexes.get(repo) if isinstance(indexes, dict) else None
+        return fallback if isinstance(fallback, dict) else None
+
     def _rooted_surfaces(self) -> list[dict[str, Any]]:
         surfaces: list[dict[str, Any]] = []
         if self.readiness_exists():
@@ -169,13 +180,7 @@ class AoAKagMCPState:
         return (self.workspace_root / repo).resolve()
 
     def source_index_path(self, repo: str) -> Path | None:
-        provider = self.provider(repo)
-        if provider is None:
-            raise KeyError(f"unknown KAG owner: {repo}")
-        packet = provider.get("repo_local_index")
-        if not isinstance(packet, dict):
-            indexes = self.provider_map().get("provider_repo_local_indexes")
-            packet = indexes.get(repo) if isinstance(indexes, dict) else None
+        packet = self.repo_local_index(repo)
         ref = (
             str(packet.get("source_index_ref") or "")
             if isinstance(packet, dict)
@@ -184,6 +189,30 @@ class AoAKagMCPState:
         if not ref:
             return None
         return _provider_child_path(self.provider_root(repo), ref)
+
+    def canonical_family_path(self, repo: str) -> Path | None:
+        source_index = self.source_index_path(repo)
+        if source_index is not None and source_index.is_file():
+            return source_index
+
+        packet = self.repo_local_index(repo)
+        portable_family = (
+            packet.get("portable_family")
+            if isinstance(packet, dict)
+            else None
+        )
+        manifest_ref = (
+            str(portable_family.get("manifest_ref") or "")
+            if (
+                isinstance(packet, dict)
+                and packet.get("family_storage") == "v3-portable-shards"
+                and isinstance(portable_family, dict)
+            )
+            else ""
+        )
+        if manifest_ref:
+            return _provider_child_path(self.provider_root(repo), manifest_ref)
+        return source_index
 
     def provider_manifest(self, repo: str) -> dict[str, Any] | None:
         provider = self.provider(repo)

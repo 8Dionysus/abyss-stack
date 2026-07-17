@@ -79,6 +79,28 @@ def _state(root: Path) -> AoAKagMCPState:
     )
 
 
+def _use_portable_family(state: AoAKagMCPState) -> Path:
+    provider_map = state.provider_map()
+    packet = provider_map["providers"][0]["repo_local_index"]
+    packet["family_storage"] = "v3-portable-shards"
+    packet["portable_family"] = {
+        "manifest_ref": "kag/indexes/index_family.manifest.json",
+    }
+    _write_json(state.provider_map_path, provider_map)
+    source_index = state.source_index_path("repo-a")
+    assert source_index is not None
+    source_index.unlink()
+    manifest = source_index.with_name("index_family.manifest.json")
+    _write_json(
+        manifest,
+        {
+            "schema_version": "aoa-repo-local-kag-family-v3",
+            "family_identity": {"content_digest": "portable-fixture-digest"},
+        },
+    )
+    return manifest
+
+
 def test_state_resolves_canonical_owner_surfaces(tmp_path: Path) -> None:
     state = _state(tmp_path)
 
@@ -102,6 +124,16 @@ def test_state_resolves_canonical_owner_surfaces(tmp_path: Path) -> None:
     }
 
 
+def test_state_resolves_portable_family_identity(tmp_path: Path) -> None:
+    state = _state(tmp_path)
+    manifest = _use_portable_family(state)
+
+    assert state.canonical_family_path("repo-a") == manifest.resolve()
+    assert CanonicalRepoKag(state).owner_digest("repo-a") == (
+        "portable-fixture-digest"
+    )
+
+
 def test_state_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
     state = _state(tmp_path)
     provider_map = state.provider_map()
@@ -112,6 +144,21 @@ def test_state_keeps_reads_inside_provider_root(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="escapes provider root"):
         state.source_index_path("repo-a")
+
+
+def test_state_keeps_portable_manifest_inside_provider_root(tmp_path: Path) -> None:
+    state = _state(tmp_path)
+    provider_map = state.provider_map()
+    packet = provider_map["providers"][0]["repo_local_index"]
+    packet["family_storage"] = "v3-portable-shards"
+    packet["portable_family"] = {"manifest_ref": "../../outside.json"}
+    _write_json(state.provider_map_path, provider_map)
+    source_index = state.source_index_path("repo-a")
+    assert source_index is not None
+    source_index.unlink()
+
+    with pytest.raises(ValueError, match="escapes provider root"):
+        state.canonical_family_path("repo-a")
 
 
 def test_canonical_query_module_is_loaded_from_owner_root(
@@ -136,6 +183,29 @@ def test_canonical_query_module_is_loaded_from_owner_root(
     module = CanonicalRepoKag(state)._query_module()
 
     assert module.MARKER == "owner-root"
+
+
+def test_canonical_query_loads_portable_family_without_v2_monolith(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _use_portable_family(state)
+    query_path = state.aoa_kag_root / "scripts" / "query_repo_local_kag.py"
+    query_path.parent.mkdir(parents=True, exist_ok=True)
+    query_path.write_text(
+        "class RepoKagQuery:\n"
+        "    def __init__(self, source_index, family):\n"
+        "        self.source_index = source_index\n"
+        "    def discover(self):\n"
+        "        return {'storage': self.source_index['storage']}\n"
+        "def load_family(repo_root):\n"
+        "    return {'storage': 'portable-v3'}, {}\n",
+        encoding="utf-8",
+    )
+
+    assert CanonicalRepoKag(state).discover_owner("repo-a") == {
+        "storage": "portable-v3"
+    }
 
 
 def test_server_exposes_compact_read_only_kag_surface(tmp_path: Path) -> None:

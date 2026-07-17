@@ -70,15 +70,15 @@ class CanonicalRepoKag:
             self._loader = module
             return self._loader
 
-    def _source_path(self, repo: str) -> Path | None:
-        path = self.state.source_index_path(repo)
+    def _family_path(self, repo: str) -> Path | None:
+        path = self.state.canonical_family_path(repo)
         return path if path and path.is_file() else None
 
     def _query(self, repo: str) -> Any:
-        source_path = self._source_path(repo)
-        if source_path is None:
-            raise RuntimeError(f"canonical source index is unavailable for {repo}")
-        stat = source_path.stat()
+        family_path = self._family_path(repo)
+        if family_path is None:
+            raise RuntimeError(f"canonical KAG family is unavailable for {repo}")
+        stat = family_path.stat()
         identity = (stat.st_mtime_ns, stat.st_size)
         with self._lock:
             cached = self._cache.get(repo)
@@ -103,11 +103,15 @@ class CanonicalRepoKag:
         )
 
     def owner_digest(self, repo: str) -> str | None:
-        path = self.state.source_index_path(repo)
+        path = self.state.canonical_family_path(repo)
         if path is None or not path.is_file():
             return None
         payload = json.loads(path.read_text(encoding="utf-8"))
-        identity = payload.get("index_identity") if isinstance(payload, dict) else None
+        identity = (
+            payload.get("index_identity") or payload.get("family_identity")
+            if isinstance(payload, dict)
+            else None
+        )
         if not isinstance(identity, dict):
             return None
         value = identity.get("content_digest")

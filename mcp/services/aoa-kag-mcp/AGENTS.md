@@ -7,8 +7,8 @@ nearer card narrows the lane.
 
 ## Role
 
-`aoa-kag-mcp` is the read-only agent access plane over canonical repo-local KAG
-records and stack-owned runtime projections.
+`aoa-kag-mcp` is the thin read-only MCP access plane over canonical repo-local
+KAG records and stack-owned runtime projections.
 
 Its public behavior is the compact `discover`, `search`, `read`, `traverse`,
 and `explain` application protocol. Results preserve owner identity, source
@@ -24,9 +24,10 @@ tests, and `aoa-kag/kag/LOCAL_SUBTREE_PROTOCOL.md` before changing behavior.
 
 Repo-local `kag/` homes own canonical repository records. `aoa-kag` owns the
 common schemas, qualified identity, retrieval semantics, federation,
-provenance, freshness, and generated handoff. `kag-seam` owns runtime adapters
-and mutable projection state. This package owns MCP mapping, resources,
-transports, CLI, service validation, and focused contract tests.
+provenance, freshness, generated provider map, and source-return handoff.
+`kag-seam` owns runtime adapters and mutable projection state. This package
+owns MCP mapping, resources, transports, CLI, service validation, and focused
+contract tests.
 
 ## Validation
 
