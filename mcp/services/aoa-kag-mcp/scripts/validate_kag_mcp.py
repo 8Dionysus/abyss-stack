@@ -14,6 +14,7 @@ SRC = SERVICE_ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from aoa_kag_mcp.canonical import CanonicalRepoKag  # noqa: E402
 from aoa_kag_mcp.core import AoAKagMCPState  # noqa: E402
 from aoa_kag_mcp.server import build_server  # noqa: E402
 
@@ -146,6 +147,34 @@ def _validate_server_contract(state: AoAKagMCPState) -> tuple[int, int]:
     return len(tools), len(resources)
 
 
+def _validate_portable_canonical_read(state: AoAKagMCPState) -> str:
+    providers = sorted(
+        state.providers(),
+        key=lambda provider: provider.get("repo") != "aoa-kag",
+    )
+    canonical = CanonicalRepoKag(state)
+    for provider in providers:
+        repo = str(provider.get("repo") or "")
+        packet = provider.get("repo_local_index")
+        if (
+            not repo
+            or not isinstance(packet, dict)
+            or packet.get("family_storage") != "v3-portable-shards"
+        ):
+            continue
+        family_path = state.canonical_family_path(repo)
+        if family_path is None or not family_path.is_file():
+            continue
+        discovery = canonical.discover_owner(repo)
+        digest = canonical.owner_digest(repo)
+        if not isinstance(discovery, dict) or not digest:
+            raise SystemExit(
+                f"aoa-kag MCP canonical portable read failed for {repo}"
+            )
+        return repo
+    raise SystemExit("aoa-kag MCP found no readable portable KAG provider")
+
+
 def main() -> None:
     required = (
         "AGENTS.md",
@@ -167,6 +196,7 @@ def main() -> None:
     state = AoAKagMCPState.discover()
     provider_count = _validate_owner_contract(state)
     tool_count, resource_count = _validate_server_contract(state)
+    canonical_owner = _validate_portable_canonical_read(state)
     print(
         json.dumps(
             {
@@ -175,6 +205,7 @@ def main() -> None:
                 "tool_count": tool_count,
                 "resource_count": resource_count,
                 "prompt_count": 0,
+                "canonical_portable_owner": canonical_owner,
             },
             indent=2,
         )

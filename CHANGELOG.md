@@ -68,6 +68,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- `aoa-kag-mcp` canonical fallback now resolves portable-v3 family manifests
+  when the logical v2 source-index path is intentionally absent, and service
+  validation performs a real canonical portable read instead of checking only
+  the static five-tool and nine-resource ABI.
 - Session-memory MCP graph reads now keep neighborhood, timeline, and
   cooccurrence work on bounded indexed SQLite reads, while path, bridge,
   GraphRAG, explanation, evaluation, quality audit, and unresolved expansion

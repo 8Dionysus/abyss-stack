@@ -31,6 +31,10 @@ Runtime projections accelerate retrieval. Canonical repo-local queries remain
 available when a projection is absent, stale, damaged, or incomplete, and the
 result reports the route actually used.
 
+Canonical fallback reads the tracked portable-v3 family manifest and bounded
+JSONL shards directly; the seven v2 monolith paths remain logical compatibility
+coordinates and are not required to exist in Git.
+
 The current protocol uses five static tools and nine resource shapes. New
 record kinds and owner-specific domain catalogs enter through capabilities and
 data instead of adding tool names.
