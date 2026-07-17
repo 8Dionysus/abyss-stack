@@ -100,13 +100,15 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
         )
         self.assertEqual(errors, [])
 
-    def test_repo_self_indexes_are_outside_authored_text_surface(self) -> None:
+    def test_repo_self_index_families_are_outside_authored_text_surface(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             indexes = repo_root / "kag" / "indexes"
             indexes.mkdir(parents=True)
             source_index = indexes / "source_surface_index.json"
             repository_index = indexes / "repo_event_index.json"
+            family_manifest = indexes / "index_family.manifest.json"
+            source_shard = indexes / "shards" / "source" / "00.jsonl"
             owner_index = indexes / "provider_readiness_index.json"
             authored_doc = repo_root / "docs" / "ROUTE.md"
             authored_doc.parent.mkdir(parents=True)
@@ -118,6 +120,12 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
                 '{"schema_version":"aoa-repo-local-kag-repository-index-v2"}\n',
                 encoding="utf-8",
             )
+            family_manifest.write_text(
+                '{"schema_version":"aoa-portable-index-family-v3"}\n',
+                encoding="utf-8",
+            )
+            source_shard.parent.mkdir(parents=True)
+            source_shard.write_text('{"record_id":"source:fixture"}\n', encoding="utf-8")
             owner_index.write_text(
                 '{"schema_version":"aoa-local-kag-record-v1"}\n',
                 encoding="utf-8",
@@ -128,6 +136,8 @@ class SourceTopologyValidatorModulesTests(unittest.TestCase):
 
         self.assertNotIn(source_index, paths)
         self.assertNotIn(repository_index, paths)
+        self.assertNotIn(family_manifest, paths)
+        self.assertNotIn(source_shard, paths)
         self.assertIn(owner_index, paths)
         self.assertIn(authored_doc, paths)
 
