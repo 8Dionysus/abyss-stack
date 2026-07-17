@@ -1,0 +1,6768 @@
+{
+  "budgets": {
+    "changed_generated_bytes_max": 1048576,
+    "exceedance_route": "kag/receipts/index_family_budget/<family-digest>.json",
+    "global_tracked_bytes_max": 50331648,
+    "tracked_bytes_max": 24117248
+  },
+  "compatibility": {
+    "assembly": "deterministic-on-demand",
+    "files": [
+      {
+        "content_digest": "0ade7c20bd10fb9200a2440f563a587407d0f2d3edf6b8bd5deb475fde39fbe4",
+        "kind": "source",
+        "path": "kag/indexes/source_surface_index.json",
+        "records": 1339,
+        "schema_version": "aoa-repo-local-kag-index-v2"
+      },
+      {
+        "content_digest": "662e267c1d99b2a20f8aa2235aa48c083a012655ebf71ab6f8658755cc71a128",
+        "kind": "artifact",
+        "path": "kag/indexes/repo_artifact_index.json",
+        "records": 1339,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      },
+      {
+        "content_digest": "a8e37350497af7b37eff7fdc69759abee17c502b6cfb0a7bd9606ff06940005b",
+        "kind": "anchor",
+        "path": "kag/indexes/repo_anchor_index.json",
+        "records": 15349,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      },
+      {
+        "content_digest": "d69c083425c3f9136153589c613daa9b3fdf92e1ab0a7e1f12e179bb4d0fafb7",
+        "kind": "entity",
+        "path": "kag/indexes/repo_entity_index.json",
+        "records": 6530,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      },
+      {
+        "content_digest": "e5f30632301847479890bfcf7580dd42e9da8512456ccbc2b8153ce9b9d7c244",
+        "kind": "event",
+        "path": "kag/indexes/repo_event_index.json",
+        "records": 801,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      },
+      {
+        "content_digest": "19402cf40b48fe0e201903d982ab4425cbcf9eca9c1db77c9887918a53447739",
+        "kind": "assertion",
+        "path": "kag/indexes/repo_assertion_index.json",
+        "records": 2878,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      },
+      {
+        "content_digest": "06767ab106df1c672c36ad970e399c403a6f01b82d944af7402f8dced4ae99a7",
+        "kind": "relation",
+        "path": "kag/indexes/repo_relation_index.json",
+        "records": 12001,
+        "schema_version": "aoa-repo-local-kag-repository-index-v2"
+      }
+    ],
+    "view": "aoa-repo-local-kag-v2"
+  },
+  "family_identity": {
+    "artifact_kind": "repo_local_kag_portable_family",
+    "content_digest": "53e50e284ae34d84c5ff20b5da190cf52d012c0a8dc1c9b48a4db105d280d547",
+    "local_id": "family:repo-local:portable-record-corpus",
+    "schema_ref": "aoa-kag:schemas/repo-local-kag-family-manifest.schema.json",
+    "source_snapshot": "sha256:0ade7c20bd10fb9200a2440f563a587407d0f2d3edf6b8bd5deb475fde39fbe4"
+  },
+  "normalization": {
+    "anchor_defaults": {
+      "evidence_class": "deterministic",
+      "provenance_ref": "deterministic",
+      "temporal_ref": "current",
+      "trust_ref": "deterministic"
+    },
+    "canonical_record_classes": [
+      "source",
+      "anchor",
+      "event"
+    ],
+    "chunking": {
+      "chunk_target_bytes": 65536,
+      "chunkable_fields": {
+        "anchor": [
+          "outbound_refs"
+        ],
+        "event": [
+          "anchor_ids",
+          "changes",
+          "evidence_refs",
+          "object_ids",
+          "source_record_ids"
+        ]
+      },
+      "strategy": "oversize-list-content-chunks"
+    },
+    "derived_compatibility_classes": [
+      "artifact",
+      "entity",
+      "assertion",
+      "relation"
+    ]
+  },
+  "partitioning": {
+    "algorithm": "sha256-record-key-adaptive-prefix",
+    "hard_max_shard_bytes": 196608,
+    "max_record_bytes": 131072,
+    "merge_policy": "never-automatic",
+    "ranges": {
+      "anchor": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "0a",
+        "0b",
+        "0c",
+        "0d",
+        "0e",
+        "0f",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "1a",
+        "1b",
+        "1c",
+        "1d",
+        "1e",
+        "1f",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "2a",
+        "2b",
+        "2c",
+        "2d",
+        "2e",
+        "2f",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "3a",
+        "3b",
+        "3c",
+        "3d",
+        "3e",
+        "3f",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "4a",
+        "4b",
+        "4c",
+        "4d",
+        "4e",
+        "4f",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "5a",
+        "5b",
+        "5c",
+        "5d",
+        "5e",
+        "5f",
+        "60",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "6a",
+        "6b",
+        "6c",
+        "6d",
+        "6e",
+        "6f",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "7a",
+        "7b",
+        "7c",
+        "7d",
+        "7e",
+        "7f",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "8a",
+        "8b",
+        "8c",
+        "8d",
+        "8e",
+        "8f",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "9e",
+        "9f",
+        "a0",
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6",
+        "a7",
+        "a8",
+        "a9",
+        "aa",
+        "ab",
+        "ac",
+        "ad",
+        "ae",
+        "af",
+        "b0",
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5",
+        "b6",
+        "b7",
+        "b8",
+        "b9",
+        "ba",
+        "bb",
+        "bc",
+        "bd",
+        "be",
+        "bf",
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "ca",
+        "cb",
+        "cc",
+        "cd",
+        "ce",
+        "cf",
+        "d0",
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5",
+        "d6",
+        "d7",
+        "d8",
+        "d9",
+        "da",
+        "db",
+        "dc",
+        "dd",
+        "de",
+        "df",
+        "e0",
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7",
+        "e8",
+        "e9",
+        "ea",
+        "eb",
+        "ec",
+        "ed",
+        "ee",
+        "ef",
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "fa",
+        "fb",
+        "fc",
+        "fd",
+        "fe",
+        "ff"
+      ],
+      "event": [
+        "6",
+        "a",
+        "d",
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "0a",
+        "0b",
+        "0c",
+        "0d",
+        "0e",
+        "0f",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "1a",
+        "1b",
+        "1c",
+        "1d",
+        "1e",
+        "1f",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "2a",
+        "2b",
+        "2c",
+        "2d",
+        "2e",
+        "2f",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "3a",
+        "3b",
+        "3c",
+        "3d",
+        "3e",
+        "3f",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "4a",
+        "4b",
+        "4c",
+        "4d",
+        "4e",
+        "4f",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "5a",
+        "5b",
+        "5c",
+        "5d",
+        "5e",
+        "5f",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "7a",
+        "7b",
+        "7c",
+        "7d",
+        "7e",
+        "7f",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "8a",
+        "8b",
+        "8c",
+        "8d",
+        "8e",
+        "8f",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "9e",
+        "9f",
+        "b0",
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5",
+        "b6",
+        "b7",
+        "b8",
+        "b9",
+        "ba",
+        "bb",
+        "bc",
+        "bd",
+        "be",
+        "bf",
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "ca",
+        "cb",
+        "cc",
+        "cd",
+        "ce",
+        "cf",
+        "e0",
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7",
+        "e8",
+        "e9",
+        "ea",
+        "eb",
+        "ec",
+        "ed",
+        "ee",
+        "ef",
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "fa",
+        "fb",
+        "fc",
+        "fd",
+        "fe",
+        "ff"
+      ],
+      "source": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "0a",
+        "0b",
+        "0c",
+        "0d",
+        "0e",
+        "0f",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "1a",
+        "1b",
+        "1c",
+        "1d",
+        "1e",
+        "1f",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "2a",
+        "2b",
+        "2c",
+        "2d",
+        "2e",
+        "2f",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "3a",
+        "3b",
+        "3c",
+        "3d",
+        "3e",
+        "3f",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "4a",
+        "4b",
+        "4c",
+        "4d",
+        "4e",
+        "4f",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "5a",
+        "5b",
+        "5c",
+        "5d",
+        "5e",
+        "5f",
+        "60",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "6a",
+        "6b",
+        "6c",
+        "6d",
+        "6e",
+        "6f",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "7a",
+        "7b",
+        "7c",
+        "7d",
+        "7e",
+        "7f",
+        "80",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "8a",
+        "8b",
+        "8c",
+        "8d",
+        "8e",
+        "8f",
+        "90",
+        "91",
+        "92",
+        "93",
+        "94",
+        "95",
+        "96",
+        "97",
+        "98",
+        "99",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "9e",
+        "9f",
+        "a0",
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6",
+        "a7",
+        "a8",
+        "a9",
+        "aa",
+        "ab",
+        "ac",
+        "ad",
+        "ae",
+        "af",
+        "b0",
+        "b1",
+        "b2",
+        "b3",
+        "b4",
+        "b5",
+        "b6",
+        "b7",
+        "b8",
+        "b9",
+        "ba",
+        "bb",
+        "bc",
+        "bd",
+        "be",
+        "bf",
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "ca",
+        "cb",
+        "cc",
+        "cd",
+        "ce",
+        "cf",
+        "d0",
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5",
+        "d6",
+        "d7",
+        "d8",
+        "d9",
+        "da",
+        "db",
+        "dc",
+        "dd",
+        "de",
+        "df",
+        "e0",
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6",
+        "e7",
+        "e8",
+        "e9",
+        "ea",
+        "eb",
+        "ec",
+        "ed",
+        "ee",
+        "ef",
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "fa",
+        "fb",
+        "fc",
+        "fd",
+        "fe",
+        "ff"
+      ]
+    },
+    "split_policy": "prefix-split-only",
+    "target_shard_bytes": 131072
+  },
+  "repo": {
+    "git_ref": "git-index-source-tree",
+    "name": "abyss-stack",
+    "namespace": "aoa:abyss-stack",
+    "owner_type": "runtime_source",
+    "root": "."
+  },
+  "schema_version": "aoa-repo-local-kag-family-manifest-v3",
+  "shards": [
+    {
+      "bytes": 72827,
+      "digest": "sha256:e40db92afceab905276bcd81d529050bcb1d622daadf6a89e68fff4a0fb4b65a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/00.jsonl",
+      "range": "00",
+      "records": 64
+    },
+    {
+      "bytes": 48388,
+      "digest": "sha256:b215cb73e5302acfdbc48b685a825c34ea8c2336ef98bfc935925dd5980ba596",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/01.jsonl",
+      "range": "01",
+      "records": 61
+    },
+    {
+      "bytes": 60905,
+      "digest": "sha256:7ea06d49b1e9e5d5b8e6d44e45ee00ed542c65fcc5124af6b7d857fd396b7324",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/02.jsonl",
+      "range": "02",
+      "records": 65
+    },
+    {
+      "bytes": 70269,
+      "digest": "sha256:0f4fe733edee53047c038bd94cd490c70d4011b787b7391818cb2780ffda6090",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/03.jsonl",
+      "range": "03",
+      "records": 71
+    },
+    {
+      "bytes": 61218,
+      "digest": "sha256:c4bd158593258e8ba1e98722860ae448c7322c3b2063cc650e34f642d6a8696e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/04.jsonl",
+      "range": "04",
+      "records": 60
+    },
+    {
+      "bytes": 99593,
+      "digest": "sha256:ff38402d94815a8426b700f55545ba97a00cd886db9b7279e116d416cc1ccce2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/05.jsonl",
+      "range": "05",
+      "records": 59
+    },
+    {
+      "bytes": 55232,
+      "digest": "sha256:edd95cad8843c60b0b3e6fca0567b56d8c4e238cd13140d1fdd0d05ad812a6e7",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/06.jsonl",
+      "range": "06",
+      "records": 50
+    },
+    {
+      "bytes": 54662,
+      "digest": "sha256:1552d874b7cd6f4c5f5411fb6c69e0b553f3637123c0a7c02e13e62e23d69e47",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/07.jsonl",
+      "range": "07",
+      "records": 59
+    },
+    {
+      "bytes": 72852,
+      "digest": "sha256:94ec83b24e75c690c77d6d259e1076b80c3a462e8ef899e90c9705b97ac4ee6c",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/08.jsonl",
+      "range": "08",
+      "records": 73
+    },
+    {
+      "bytes": 53161,
+      "digest": "sha256:6b9ef5b01e5f223f88adffb2ca23fa7b89db1f212b70d2afb7bcce36ddd27b99",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/09.jsonl",
+      "range": "09",
+      "records": 57
+    },
+    {
+      "bytes": 59310,
+      "digest": "sha256:bb0767f852a6563bfb0956c26c4d16d35e3d61f800c15c07b46d493346ed0ced",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0a.jsonl",
+      "range": "0a",
+      "records": 51
+    },
+    {
+      "bytes": 69818,
+      "digest": "sha256:53f94e7f3cc466164317d76854d8c5fdf8321dd4875dee6328e06961fb0562f7",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0b.jsonl",
+      "range": "0b",
+      "records": 60
+    },
+    {
+      "bytes": 62249,
+      "digest": "sha256:eae0ac691688f9ee2b3448d8ae4fbdc390614ad6cdcf4b4ddbafa3861c3f254d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0c.jsonl",
+      "range": "0c",
+      "records": 68
+    },
+    {
+      "bytes": 52694,
+      "digest": "sha256:084af1aba9e8261e5a8f1b7779b5b5c2aa5b59609a6a371d1749b9ef37ed9470",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0d.jsonl",
+      "range": "0d",
+      "records": 61
+    },
+    {
+      "bytes": 65160,
+      "digest": "sha256:039c2e8d15c248a52512655b4e053479f6e2e77c959462872e40d25b122eee4a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0e.jsonl",
+      "range": "0e",
+      "records": 70
+    },
+    {
+      "bytes": 46326,
+      "digest": "sha256:e0d158b4aaa79b7774dfba728004b197cbd61d100b83ae9a96f4be86b554b834",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/0f.jsonl",
+      "range": "0f",
+      "records": 54
+    },
+    {
+      "bytes": 58014,
+      "digest": "sha256:ae1bb4a1dfbc42c64e400cad3453839f48456fe836ecf262583fa37aca975cdb",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/10.jsonl",
+      "range": "10",
+      "records": 51
+    },
+    {
+      "bytes": 66327,
+      "digest": "sha256:e627a2a47f8e2710e05ae795bb979ca5dcab1af424ab135a25160798d08a1127",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/11.jsonl",
+      "range": "11",
+      "records": 65
+    },
+    {
+      "bytes": 69650,
+      "digest": "sha256:9305506e7375e503e770e1d5fdf5b4ea45f97b8140a8f19d7976f30fd22d7bc6",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/12.jsonl",
+      "range": "12",
+      "records": 68
+    },
+    {
+      "bytes": 107541,
+      "digest": "sha256:f65286810f0b74bd4dc00f266e5ec858710c056c41f9700ef58e88003a775683",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/13.jsonl",
+      "range": "13",
+      "records": 71
+    },
+    {
+      "bytes": 63083,
+      "digest": "sha256:ab3ecd9912f50aa77753a636e0a89ba70bae97aa268f5760fcfe9094b1778df2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/14.jsonl",
+      "range": "14",
+      "records": 59
+    },
+    {
+      "bytes": 42743,
+      "digest": "sha256:767256cbc1003863a276d26fb82c0a779745b6115ddcea94a958e81f5851724f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/15.jsonl",
+      "range": "15",
+      "records": 54
+    },
+    {
+      "bytes": 75837,
+      "digest": "sha256:f342cc85e919ec9f10bdcec2dc9ed10b62c388040d6244e1d85fe394a058f7c4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/16.jsonl",
+      "range": "16",
+      "records": 61
+    },
+    {
+      "bytes": 52481,
+      "digest": "sha256:0ad8722f31db7936becf9ea46bf298efb15374bf064c2a11b5dbfa91dfe1a4c9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/17.jsonl",
+      "range": "17",
+      "records": 57
+    },
+    {
+      "bytes": 80166,
+      "digest": "sha256:f08494b1d7a7f326a3be74d46fce067955a90736383b4c51e71fd974c2abbcda",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/18.jsonl",
+      "range": "18",
+      "records": 61
+    },
+    {
+      "bytes": 60126,
+      "digest": "sha256:b30c0cadd9ca0a6e796a16288cbdba7d5eab15e3336370c1b097bcae8b705ddb",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/19.jsonl",
+      "range": "19",
+      "records": 64
+    },
+    {
+      "bytes": 40388,
+      "digest": "sha256:adc7d8d61f78dfb06df9963c54550a5e1600c5e73bb9314d4f115db9e5c665ef",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1a.jsonl",
+      "range": "1a",
+      "records": 49
+    },
+    {
+      "bytes": 51794,
+      "digest": "sha256:c2980145a41d549ce90cc7650a5a5e9291ffdf08a4cebe4d405f3747ab829de0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1b.jsonl",
+      "range": "1b",
+      "records": 60
+    },
+    {
+      "bytes": 57348,
+      "digest": "sha256:cb364d6cb82c10741cabbaf988f4e7ea813aea01f53bc51911c9eac2a9429d5d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1c.jsonl",
+      "range": "1c",
+      "records": 57
+    },
+    {
+      "bytes": 60987,
+      "digest": "sha256:7b88ee7a3c31573a63bf99598e6a31238f77ff348e8ea63be514a23050c39169",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1d.jsonl",
+      "range": "1d",
+      "records": 65
+    },
+    {
+      "bytes": 46415,
+      "digest": "sha256:237676e82f76fe949dacb37747c30cc8c1043062783294d21b7c2be11399e743",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1e.jsonl",
+      "range": "1e",
+      "records": 44
+    },
+    {
+      "bytes": 60482,
+      "digest": "sha256:606dfedba26bb9355e593e9a2926265673f82621684ff543c98d562e125738ab",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/1f.jsonl",
+      "range": "1f",
+      "records": 69
+    },
+    {
+      "bytes": 52650,
+      "digest": "sha256:a3ea5c63765cfc43f40c928ed42b43f0c897089418a9b2faa5611eb706da99ec",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/20.jsonl",
+      "range": "20",
+      "records": 56
+    },
+    {
+      "bytes": 49047,
+      "digest": "sha256:760232e41bbf4bcc611dd1a5bc956d1e0e12c5ce85049ef3a4098bd81d08a669",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/21.jsonl",
+      "range": "21",
+      "records": 62
+    },
+    {
+      "bytes": 83075,
+      "digest": "sha256:cd9d3639c6b892283f7888be2349900d66ae30356e88659737a7ca9ad09c56fe",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/22.jsonl",
+      "range": "22",
+      "records": 58
+    },
+    {
+      "bytes": 57112,
+      "digest": "sha256:e0cf6febc6ddfcc55d37296dfe56b554cc25bc0fdf7c5d6396bc34c73df4547f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/23.jsonl",
+      "range": "23",
+      "records": 58
+    },
+    {
+      "bytes": 52922,
+      "digest": "sha256:b98111fb0f6c7435a3a5c658d72b7e529ed9e0335480763ae00f762fdc868281",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/24.jsonl",
+      "range": "24",
+      "records": 64
+    },
+    {
+      "bytes": 79641,
+      "digest": "sha256:5053f4f0090981ebefb0161e758f6b19f8b6c685066bd27b16e86e998fe09011",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/25.jsonl",
+      "range": "25",
+      "records": 67
+    },
+    {
+      "bytes": 72023,
+      "digest": "sha256:c083ae034e274749db34ab538658e04437020536f41e0bf4f7bf7ef5ba9aecd6",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/26.jsonl",
+      "range": "26",
+      "records": 58
+    },
+    {
+      "bytes": 68043,
+      "digest": "sha256:8e0c03395cbe0d3502104ac1409e39214c822658a37904daa869f3a552020d64",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/27.jsonl",
+      "range": "27",
+      "records": 66
+    },
+    {
+      "bytes": 36472,
+      "digest": "sha256:591feaed99b96ad033c6b9277395fda1dc69e62a8f9aa918c540193d438efbac",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/28.jsonl",
+      "range": "28",
+      "records": 47
+    },
+    {
+      "bytes": 60645,
+      "digest": "sha256:19ebab190a911d31b145a7a992584fa0f7408203cb337248a9e37b19a8a607bb",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/29.jsonl",
+      "range": "29",
+      "records": 64
+    },
+    {
+      "bytes": 44152,
+      "digest": "sha256:ec24de4aa59eca7c387425d590151ac48184951bf6c652b147e5c52dc22fa6ee",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2a.jsonl",
+      "range": "2a",
+      "records": 56
+    },
+    {
+      "bytes": 43760,
+      "digest": "sha256:ae2a7d8d90c9306dbb5db437cb717baecbcb61898007244f1d172bf104ce2fcf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2b.jsonl",
+      "range": "2b",
+      "records": 54
+    },
+    {
+      "bytes": 63517,
+      "digest": "sha256:47028d84dc065e605f243dee0341bbe2e0cd963393172d3ab4601d6d03bae1ef",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2c.jsonl",
+      "range": "2c",
+      "records": 68
+    },
+    {
+      "bytes": 51556,
+      "digest": "sha256:2078ad5bb5bc6dec87f04bd2801db4a06e32c193b5090080104e9aa16fd56dbe",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2d.jsonl",
+      "range": "2d",
+      "records": 50
+    },
+    {
+      "bytes": 61005,
+      "digest": "sha256:a081338dfeefc94acf61372936c15b560668b9c5a2afc2efe11811244e7a3e5e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2e.jsonl",
+      "range": "2e",
+      "records": 67
+    },
+    {
+      "bytes": 72221,
+      "digest": "sha256:dda01b3c393d11323d85b033280f0736528120ddeec54c41dc521c2871fea195",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/2f.jsonl",
+      "range": "2f",
+      "records": 64
+    },
+    {
+      "bytes": 69355,
+      "digest": "sha256:382856bc2e3d37fd9d90fc08c5cbb7538c62d81a191a8c0fd60a44a1e68fdd11",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/30.jsonl",
+      "range": "30",
+      "records": 63
+    },
+    {
+      "bytes": 53107,
+      "digest": "sha256:593beecb7ba66b7d1ab163fbe973b14df6168c917afabc5a53f46e2ef1be98b5",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/31.jsonl",
+      "range": "31",
+      "records": 49
+    },
+    {
+      "bytes": 81386,
+      "digest": "sha256:2045f7641d599c9be4ba2e0f8fa79dd3e338fc1c68472e15a2cb3a277f966bcf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/32.jsonl",
+      "range": "32",
+      "records": 63
+    },
+    {
+      "bytes": 64641,
+      "digest": "sha256:0fb946cde05c86c578f921b8d4ec77119712e88ee2f65d44f3f949cc338ab2d7",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/33.jsonl",
+      "range": "33",
+      "records": 65
+    },
+    {
+      "bytes": 57597,
+      "digest": "sha256:58e0d4ab442fd01f95aa9378f6622f64ec4bffb592836a2d6b3a53a0f5f6a521",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/34.jsonl",
+      "range": "34",
+      "records": 52
+    },
+    {
+      "bytes": 74299,
+      "digest": "sha256:2d48d76df5bc3b306118abc800cc9db0a561db2a2c6beadf7e9cc2cf04d9e171",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/35.jsonl",
+      "range": "35",
+      "records": 70
+    },
+    {
+      "bytes": 48380,
+      "digest": "sha256:4c21cf0af6b520d08092afd1bb8839f7febeb29cc634c3d99a709b363b65d2d6",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/36.jsonl",
+      "range": "36",
+      "records": 55
+    },
+    {
+      "bytes": 63590,
+      "digest": "sha256:f6f1b4037a4d9b3fb10e9671f85fe3c14905f94c6a0edfff38b2d3185f9f1411",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/37.jsonl",
+      "range": "37",
+      "records": 57
+    },
+    {
+      "bytes": 48495,
+      "digest": "sha256:e829696d844f06f6ff4dfb4d743e07e974e490e747e5ab26cf2714da0f04335f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/38.jsonl",
+      "range": "38",
+      "records": 49
+    },
+    {
+      "bytes": 62406,
+      "digest": "sha256:42a7346813cc94a9d01fb03ee758c03c35a6c7269f6533691dea2267e9a90a2d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/39.jsonl",
+      "range": "39",
+      "records": 64
+    },
+    {
+      "bytes": 112489,
+      "digest": "sha256:b1df4fceec36239dc115faa350aca1b40bd7fda9ada854a4807143e26d222382",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3a.jsonl",
+      "range": "3a",
+      "records": 73
+    },
+    {
+      "bytes": 80874,
+      "digest": "sha256:02b8009f2c6214f0cb0f004c8c1075697fdb29984b4b3aef81a6f7fd3266e87a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3b.jsonl",
+      "range": "3b",
+      "records": 63
+    },
+    {
+      "bytes": 65161,
+      "digest": "sha256:aacdad518f7d08ea7d4547ab3c7bf3ad78dfd862c4efcd8cc0ca09ba0c754b6b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3c.jsonl",
+      "range": "3c",
+      "records": 55
+    },
+    {
+      "bytes": 36056,
+      "digest": "sha256:d3bec02f4b5368985d63725bd8caa9a423ac9657741658efee188b781f7aa9d2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3d.jsonl",
+      "range": "3d",
+      "records": 51
+    },
+    {
+      "bytes": 46882,
+      "digest": "sha256:5bab1d864c541c9ed693d68a4f571674ece02c6ca5882236787eb94b3d03e188",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3e.jsonl",
+      "range": "3e",
+      "records": 55
+    },
+    {
+      "bytes": 59029,
+      "digest": "sha256:02c43630f7cd23916f321240ed683a997e63749dff13202192c59abdfdd9f331",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/3f.jsonl",
+      "range": "3f",
+      "records": 58
+    },
+    {
+      "bytes": 61085,
+      "digest": "sha256:9b4b3aa44d50deea2b3005dd7ead3ad3c9c8bfb3c5a70ee8cc8c8e2938d91c15",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/40.jsonl",
+      "range": "40",
+      "records": 65
+    },
+    {
+      "bytes": 50362,
+      "digest": "sha256:4320e33c7b08f7b5eaa06d7f36c33e06a39c9c9acc89660059e1ce86a72b49f3",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/41.jsonl",
+      "range": "41",
+      "records": 54
+    },
+    {
+      "bytes": 49783,
+      "digest": "sha256:2351ed2d28a10c2eac7c255daee0cc6bcd28383526a04e61de0badbf1ef87b62",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/42.jsonl",
+      "range": "42",
+      "records": 52
+    },
+    {
+      "bytes": 60862,
+      "digest": "sha256:1ea8aff06ca3db39f72540b74535ab81c313c67f11a5e15761c960f59ef3f12a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/43.jsonl",
+      "range": "43",
+      "records": 57
+    },
+    {
+      "bytes": 78911,
+      "digest": "sha256:63bca34c6f777484a9499dc7aa2e53e6a5faf3496be2ac9396125439e5d25cd2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/44.jsonl",
+      "range": "44",
+      "records": 74
+    },
+    {
+      "bytes": 52166,
+      "digest": "sha256:46403d31a8b871710cea9625d110b117029c48eaec6780ba7944751cf5095d02",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/45.jsonl",
+      "range": "45",
+      "records": 43
+    },
+    {
+      "bytes": 68127,
+      "digest": "sha256:00c5ee43a7e2fdce425dd3aecfb6d40a0486cca14168b7dbdb110c99bb42d7df",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/46.jsonl",
+      "range": "46",
+      "records": 72
+    },
+    {
+      "bytes": 42178,
+      "digest": "sha256:3b210aa06131f31821343f73d6b21ef159606ff7258477e1f1a739499c4fe438",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/47.jsonl",
+      "range": "47",
+      "records": 54
+    },
+    {
+      "bytes": 67004,
+      "digest": "sha256:b4055486c2bda064718ebae70f3bbdf1abe152d7fdb218e9ff08c456a45e3fed",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/48.jsonl",
+      "range": "48",
+      "records": 63
+    },
+    {
+      "bytes": 54964,
+      "digest": "sha256:4403668bdfcd923bd5a34547efc8bdfadcb4c099a2eede0a2ec236bfa6c7ef93",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/49.jsonl",
+      "range": "49",
+      "records": 63
+    },
+    {
+      "bytes": 41303,
+      "digest": "sha256:e9873ac189f59c6049f94f6e9658fc7b3fbec99d1bcc3fd5537565b876b2ce61",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4a.jsonl",
+      "range": "4a",
+      "records": 48
+    },
+    {
+      "bytes": 61154,
+      "digest": "sha256:e038d8ab99f1f4149008c177fafc7eb1705ae6316ecb52a60c672ec0317150cf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4b.jsonl",
+      "range": "4b",
+      "records": 65
+    },
+    {
+      "bytes": 48257,
+      "digest": "sha256:1169533c31971a74bf9dd862b043c4a433afb16ab59efdf4bb0d472880bc4fbd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4c.jsonl",
+      "range": "4c",
+      "records": 46
+    },
+    {
+      "bytes": 57162,
+      "digest": "sha256:bb1549320a5b3abb73ca54ab9e2f20447b2a190025d1574cf0cc03428e4fe074",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4d.jsonl",
+      "range": "4d",
+      "records": 65
+    },
+    {
+      "bytes": 57398,
+      "digest": "sha256:0197c837f212101c0b3bf1ff01f0a5ba43027b192cb0dbe9fe16e6c96279edaa",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4e.jsonl",
+      "range": "4e",
+      "records": 65
+    },
+    {
+      "bytes": 59563,
+      "digest": "sha256:884b2ca11c8bf49cbf3a4582e7a872f781e58617a27f94a6c8be339245bfabc3",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/4f.jsonl",
+      "range": "4f",
+      "records": 54
+    },
+    {
+      "bytes": 63899,
+      "digest": "sha256:45393d905f92ea63edb5d41ce3c1f7cc75407dc791eb942abcf8f06bd2cce0bf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/50.jsonl",
+      "range": "50",
+      "records": 68
+    },
+    {
+      "bytes": 69917,
+      "digest": "sha256:431220cadfb20bf5e8a88e599c25ddabb73e78c7129ffac6468da868d3246fcd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/51.jsonl",
+      "range": "51",
+      "records": 65
+    },
+    {
+      "bytes": 58164,
+      "digest": "sha256:5b8cb90f39c3aa4484a3bfbb2aaea3907813d554ae7e73dd22f804d9d396f14f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/52.jsonl",
+      "range": "52",
+      "records": 62
+    },
+    {
+      "bytes": 83661,
+      "digest": "sha256:a546d43f57814bcc5b5599c7d284b50d325d474584370966bfea788827ce1607",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/53.jsonl",
+      "range": "53",
+      "records": 58
+    },
+    {
+      "bytes": 64800,
+      "digest": "sha256:904a237708893978266c5e222edc8596ff7a0e673ebed3c02330824ebb6a7902",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/54.jsonl",
+      "range": "54",
+      "records": 59
+    },
+    {
+      "bytes": 82527,
+      "digest": "sha256:12bc3f16cbf53fe88dba30b8467156a09857fedc490483d49033c352831858dc",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/55.jsonl",
+      "range": "55",
+      "records": 70
+    },
+    {
+      "bytes": 75092,
+      "digest": "sha256:899e46180ac0e86c7e78a8b674dc07d48a7650a3145f9ff3907d95582012c401",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/56.jsonl",
+      "range": "56",
+      "records": 61
+    },
+    {
+      "bytes": 48572,
+      "digest": "sha256:c74e0d53da1d561bc4e551d20d12b8ac1e837988d044a98002fdb53717b0dd27",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/57.jsonl",
+      "range": "57",
+      "records": 51
+    },
+    {
+      "bytes": 35966,
+      "digest": "sha256:07e631b05c00b76f9d0ba023c6dd3e0f26061a0359118bc89c2e81bb6006aa5e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/58.jsonl",
+      "range": "58",
+      "records": 55
+    },
+    {
+      "bytes": 50762,
+      "digest": "sha256:97115bb6173f3f6b3b77c46afad43a8a3c9e87af3d39aaa1759c220c91dc8bd9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/59.jsonl",
+      "range": "59",
+      "records": 44
+    },
+    {
+      "bytes": 70025,
+      "digest": "sha256:2a0b21648be56809abc2662908a0ac9766248ee0e4ba666b058a035528b3a336",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5a.jsonl",
+      "range": "5a",
+      "records": 63
+    },
+    {
+      "bytes": 46937,
+      "digest": "sha256:038935590974371773b90a153e2c82d2d0bd7acacd453a440156f62546aeabfa",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5b.jsonl",
+      "range": "5b",
+      "records": 46
+    },
+    {
+      "bytes": 85903,
+      "digest": "sha256:2ef8d6e2f3a09365eff3b276456c0af511b6e500c2e63f8c70601438a9cb3e51",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5c.jsonl",
+      "range": "5c",
+      "records": 70
+    },
+    {
+      "bytes": 61047,
+      "digest": "sha256:9a44443c2b82eb1dde7f1820c83b91190c7aae4fe6322ac4453690e6964969db",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5d.jsonl",
+      "range": "5d",
+      "records": 58
+    },
+    {
+      "bytes": 46915,
+      "digest": "sha256:5bb35e38dd655745d47eb85aad47ee5ff8ed454cb194e9e7fb3caa12e575f167",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5e.jsonl",
+      "range": "5e",
+      "records": 50
+    },
+    {
+      "bytes": 65780,
+      "digest": "sha256:4025f6121bd2e0aa6cca83cb49aa9a2503ab624680e1d972e64e64244f9296f6",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/5f.jsonl",
+      "range": "5f",
+      "records": 66
+    },
+    {
+      "bytes": 63506,
+      "digest": "sha256:85b3e9e531f6e1c80dac68a9f6e645b318bfa2ac81f19886dc4fd74f5a6779f4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/60.jsonl",
+      "range": "60",
+      "records": 66
+    },
+    {
+      "bytes": 51219,
+      "digest": "sha256:c9c9524d0e3a6b62ec8d713e8720b25aa3557997fca208bcf3addbddff5496e2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/61.jsonl",
+      "range": "61",
+      "records": 58
+    },
+    {
+      "bytes": 64741,
+      "digest": "sha256:aa17360ec96eb45f99cda48674f25632be53a6c07aba3c5ae8fbbc69ca7e9958",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/62.jsonl",
+      "range": "62",
+      "records": 66
+    },
+    {
+      "bytes": 66848,
+      "digest": "sha256:50c066cf31ff0bdf9c8b9ef646f450d1a487b8ab5ae384b1686998ebabf5f8f8",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/63.jsonl",
+      "range": "63",
+      "records": 68
+    },
+    {
+      "bytes": 55378,
+      "digest": "sha256:976503b505a3f3a352a0af55c3d88fc5de13817c4a4d29e237d8602e1ae8cbd5",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/64.jsonl",
+      "range": "64",
+      "records": 59
+    },
+    {
+      "bytes": 43374,
+      "digest": "sha256:704ef681fdc78b5eb80402485171b931421e04a0d61caa1bcacca9e7691952fd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/65.jsonl",
+      "range": "65",
+      "records": 52
+    },
+    {
+      "bytes": 40407,
+      "digest": "sha256:dfce9c378689651b23f484f17ca159709688c57b8b276aa58e378b31ff5231ef",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/66.jsonl",
+      "range": "66",
+      "records": 62
+    },
+    {
+      "bytes": 65823,
+      "digest": "sha256:adc7260e6ad2163f38b745cdf31b256f61b0b963d797b6e89e6e31b4bf0893b9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/67.jsonl",
+      "range": "67",
+      "records": 66
+    },
+    {
+      "bytes": 50717,
+      "digest": "sha256:a32548a4dd9bd7ea2ef61cbf56b432e02b3c7c2458295c125d94c9f1f6aa8caa",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/68.jsonl",
+      "range": "68",
+      "records": 58
+    },
+    {
+      "bytes": 72249,
+      "digest": "sha256:2b79df88c0b96be929e3c279bb3c0c5febb39ab66c6bf17b447422c69b97e310",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/69.jsonl",
+      "range": "69",
+      "records": 57
+    },
+    {
+      "bytes": 98195,
+      "digest": "sha256:b3bb7153f222033e39e3c27e3d2c71e75945b2778ec45170676b0a893835b9c1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6a.jsonl",
+      "range": "6a",
+      "records": 70
+    },
+    {
+      "bytes": 71766,
+      "digest": "sha256:67e7821f2bd88302fd2b3017ea1847496f7e0fb7f05d703cd3582498a9dd917e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6b.jsonl",
+      "range": "6b",
+      "records": 75
+    },
+    {
+      "bytes": 44243,
+      "digest": "sha256:9aead98f19f57f971272dd75b23ca9793ea8b3b6bfc9b49ae833aa5f07f53ee8",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6c.jsonl",
+      "range": "6c",
+      "records": 55
+    },
+    {
+      "bytes": 86649,
+      "digest": "sha256:97d2504d354974dd3e497a5c970d1eadb4265e9826e51718bf0a19f1970279fa",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6d.jsonl",
+      "range": "6d",
+      "records": 76
+    },
+    {
+      "bytes": 64534,
+      "digest": "sha256:7831a26838ebbd13d89337bef75a769de2e26c435b7cf64ea5a95825db7105fe",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6e.jsonl",
+      "range": "6e",
+      "records": 57
+    },
+    {
+      "bytes": 80395,
+      "digest": "sha256:b24fcc9379dff028ed69a06ca0ece9afd5f18729b3b1d94adeb4bf5ab887c53e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/6f.jsonl",
+      "range": "6f",
+      "records": 68
+    },
+    {
+      "bytes": 69735,
+      "digest": "sha256:e1eaed43c8784a82b51afb6e43ed1eb4259bf0269e961c0a74b8a28f9e20ec38",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/70.jsonl",
+      "range": "70",
+      "records": 73
+    },
+    {
+      "bytes": 51614,
+      "digest": "sha256:69530b234ac7605a46326fa2029221871cd13ccf9ad37cf90fc5b3dfd0f9b265",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/71.jsonl",
+      "range": "71",
+      "records": 47
+    },
+    {
+      "bytes": 47557,
+      "digest": "sha256:5a23fa34f1be359dc39873f66c7c42a32cbaa3c51a7cdbf73d93e0eaa6a3fc02",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/72.jsonl",
+      "range": "72",
+      "records": 62
+    },
+    {
+      "bytes": 52578,
+      "digest": "sha256:f07c39dead7a71e5b4c2a03d8e2888b8ec4869e39b1c8c5971921ed98b332291",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/73.jsonl",
+      "range": "73",
+      "records": 60
+    },
+    {
+      "bytes": 53041,
+      "digest": "sha256:9e69a8139fd112396782628e445776ff06ec0cc2e00aea6bd2c638bd638a519e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/74.jsonl",
+      "range": "74",
+      "records": 59
+    },
+    {
+      "bytes": 43235,
+      "digest": "sha256:3aeab38ff2f018f4c4ffc0af9c55f916efdae19e87494dcc6eed83f8dcec322b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/75.jsonl",
+      "range": "75",
+      "records": 50
+    },
+    {
+      "bytes": 114433,
+      "digest": "sha256:050116a7e11444fa24cdfc6b5aa80b16ef178ad39ebd2820f4f97ce00891de6d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/76.jsonl",
+      "range": "76",
+      "records": 62
+    },
+    {
+      "bytes": 68297,
+      "digest": "sha256:042c46bace474f080981b38e2d4979133b075aa3971baefde7407d23562b92f2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/77.jsonl",
+      "range": "77",
+      "records": 74
+    },
+    {
+      "bytes": 53547,
+      "digest": "sha256:02a7aad1a712aecaa5fecde92bf399eb17639153ec9c3c8f41a1daf240182a3e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/78.jsonl",
+      "range": "78",
+      "records": 61
+    },
+    {
+      "bytes": 54018,
+      "digest": "sha256:0427b1e16f05b59dba8123c1839f9404b5317b4c81fd97715a3434b4faa16e59",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/79.jsonl",
+      "range": "79",
+      "records": 56
+    },
+    {
+      "bytes": 62931,
+      "digest": "sha256:b83c18a3ad8066bd91a9d08211daca75c25aec5fb12ad01a82d10acc09ab49a1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7a.jsonl",
+      "range": "7a",
+      "records": 62
+    },
+    {
+      "bytes": 59947,
+      "digest": "sha256:bfb5e22e7a9cf3100a4f036821d0a7938a1848b3139d5087dc3c9969303cf9ba",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7b.jsonl",
+      "range": "7b",
+      "records": 58
+    },
+    {
+      "bytes": 43962,
+      "digest": "sha256:e99465be0fb777dc11fca92e4cdd8501985b3f1088cb41783811a56d2f4e87c0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7c.jsonl",
+      "range": "7c",
+      "records": 51
+    },
+    {
+      "bytes": 69749,
+      "digest": "sha256:8b9b3bfb83673db69408651c556ebbbab81f72bf6d2680fdfaab13e2d443b7d7",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7d.jsonl",
+      "range": "7d",
+      "records": 65
+    },
+    {
+      "bytes": 55939,
+      "digest": "sha256:426345c220555023fb09046f75881f1010c4235efeb780f5168ca051fec98f7d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7e.jsonl",
+      "range": "7e",
+      "records": 55
+    },
+    {
+      "bytes": 53400,
+      "digest": "sha256:f26bed45f8d892b1a9be8b2030679c24dce6ca8779f728683c322beb90b2e33d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/7f.jsonl",
+      "range": "7f",
+      "records": 64
+    },
+    {
+      "bytes": 58669,
+      "digest": "sha256:8b7a6081d9cf6da0702d0247b7d39993ecc58671df5cf4032f58faa8b2dc1211",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/80.jsonl",
+      "range": "80",
+      "records": 62
+    },
+    {
+      "bytes": 85351,
+      "digest": "sha256:816da74fa1e9b9de607f83f96d5fe6950bafd302af69516b328f905ba7b29849",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/81.jsonl",
+      "range": "81",
+      "records": 56
+    },
+    {
+      "bytes": 65050,
+      "digest": "sha256:1ee5cca5b52ec89dc1bd22b4c65a4961b79e424f7fc5a96ec409b1969a0ff201",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/82.jsonl",
+      "range": "82",
+      "records": 55
+    },
+    {
+      "bytes": 65612,
+      "digest": "sha256:5c30596e36811d5d18b1f2e091e29be771733733a81a3ee64de29640d44af86c",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/83.jsonl",
+      "range": "83",
+      "records": 57
+    },
+    {
+      "bytes": 74776,
+      "digest": "sha256:06ccb594c6cb77fa5a3ea384dccd27a1565842a1b1d505991e348c5648faba63",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/84.jsonl",
+      "range": "84",
+      "records": 54
+    },
+    {
+      "bytes": 58250,
+      "digest": "sha256:3d4632350a1f9743e4d7d7aff6f5617a977d8b4e9d0da07fec8dc7f7078dc326",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/85.jsonl",
+      "range": "85",
+      "records": 58
+    },
+    {
+      "bytes": 70380,
+      "digest": "sha256:025d07560d1c4ccdc3687059ce5add2ea048aed64af357d9a0ad82b487175d40",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/86.jsonl",
+      "range": "86",
+      "records": 65
+    },
+    {
+      "bytes": 38256,
+      "digest": "sha256:39c2bd83228c0bf16e448224910cccb6e9b8e1d034814cb2fd798650b4842cf2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/87.jsonl",
+      "range": "87",
+      "records": 46
+    },
+    {
+      "bytes": 43976,
+      "digest": "sha256:b78999758195ecc2fc8de3e5750b8859d137c0601c5a5f7667a5eefb7887f409",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/88.jsonl",
+      "range": "88",
+      "records": 57
+    },
+    {
+      "bytes": 50838,
+      "digest": "sha256:faf970676e1506868d3762dcc4bcab9ef25a579a661359f1e9410d91e9716484",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/89.jsonl",
+      "range": "89",
+      "records": 53
+    },
+    {
+      "bytes": 77326,
+      "digest": "sha256:1ef39e3ecbf117a15a06fdb20adce0277f1f471fb90a37c886c6464d16562894",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8a.jsonl",
+      "range": "8a",
+      "records": 49
+    },
+    {
+      "bytes": 88446,
+      "digest": "sha256:088a3462fe7594903bf3d81fe78d711cd1a5efea3f9b52d8ee594b0c186bbafe",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8b.jsonl",
+      "range": "8b",
+      "records": 73
+    },
+    {
+      "bytes": 63233,
+      "digest": "sha256:0fee209ddb8152383623f566451ebb8af034a1ca2f71e48f3e773ba5feb61a63",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8c.jsonl",
+      "range": "8c",
+      "records": 72
+    },
+    {
+      "bytes": 49663,
+      "digest": "sha256:f58cb201c85ee69bafc0afa6ea2b0a951fcb8cb687b15013df358bf861c816db",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8d.jsonl",
+      "range": "8d",
+      "records": 51
+    },
+    {
+      "bytes": 48488,
+      "digest": "sha256:3b4cbb3cda2875c7e90939b85cc21420f30f99c68ed03b1b4f89b7fcc76eb3db",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8e.jsonl",
+      "range": "8e",
+      "records": 59
+    },
+    {
+      "bytes": 64823,
+      "digest": "sha256:5d0087694b6b78116a16c20dc2d07019539b6e6a385485baae3649e34b1a2cc4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/8f.jsonl",
+      "range": "8f",
+      "records": 69
+    },
+    {
+      "bytes": 54357,
+      "digest": "sha256:fc97be89f3f304f041122264bdb2ae83d6c94a6d04dfc04f8b27129c283eecae",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/90.jsonl",
+      "range": "90",
+      "records": 64
+    },
+    {
+      "bytes": 57451,
+      "digest": "sha256:807144cb557755b3272bcd62113e13bdb8da7b60ccfaecb7ae167bb288d209a9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/91.jsonl",
+      "range": "91",
+      "records": 67
+    },
+    {
+      "bytes": 45714,
+      "digest": "sha256:3545d4a0c804d0fc1bca27b031f2835f1b6f4320bc4e2ad27ea9e4c63f7dbd83",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/92.jsonl",
+      "range": "92",
+      "records": 58
+    },
+    {
+      "bytes": 65108,
+      "digest": "sha256:c510a4d428092637a9ead922525edb677399a54b7d3154b023ff60c98953bbce",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/93.jsonl",
+      "range": "93",
+      "records": 67
+    },
+    {
+      "bytes": 73039,
+      "digest": "sha256:31b65c8cde37bd9f2e4c341000a0822704dcc7f6612a32b3546c190561f3dd0d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/94.jsonl",
+      "range": "94",
+      "records": 50
+    },
+    {
+      "bytes": 53424,
+      "digest": "sha256:ee9db9ecb702c2cd1c1a639993d4abad827a7ccd004511f888e4e11a90c5af19",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/95.jsonl",
+      "range": "95",
+      "records": 62
+    },
+    {
+      "bytes": 52992,
+      "digest": "sha256:1ce525f4226947276cae17c8d3eb42f8d91ee4b26795e3740bca9ac7b264676e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/96.jsonl",
+      "range": "96",
+      "records": 51
+    },
+    {
+      "bytes": 49721,
+      "digest": "sha256:154d2adcec62454a393cfc743fb4e059622332546d9a1052e2dceb09aae81580",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/97.jsonl",
+      "range": "97",
+      "records": 57
+    },
+    {
+      "bytes": 53359,
+      "digest": "sha256:f35f88bb831c570b9cad1722b96dec2b843d5973670a45013b2612383aca460e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/98.jsonl",
+      "range": "98",
+      "records": 58
+    },
+    {
+      "bytes": 56503,
+      "digest": "sha256:03c4093a8bf726fb576b891a41f8cf92e4404adcb3a2ecb069654df47776b5f1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/99.jsonl",
+      "range": "99",
+      "records": 62
+    },
+    {
+      "bytes": 49649,
+      "digest": "sha256:a4eec3d1d302f996c2bf85f95a722836cc0413399e15c250cc0a411baae1e6af",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9a.jsonl",
+      "range": "9a",
+      "records": 54
+    },
+    {
+      "bytes": 76663,
+      "digest": "sha256:09c8f67cb75a909aad2ceeae4162f9a8137ba2cf818787ec22f18f8ab4497a45",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9b.jsonl",
+      "range": "9b",
+      "records": 70
+    },
+    {
+      "bytes": 47102,
+      "digest": "sha256:f3eaef41a4e24f933c3ec912459c8c16388644874526a5a37c6d0474251a3fa1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9c.jsonl",
+      "range": "9c",
+      "records": 57
+    },
+    {
+      "bytes": 59204,
+      "digest": "sha256:ae56862994c4f3fa203a6d2bf2bd3f54d912ccb8495a613f86d9b0d4f5ad2db5",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9d.jsonl",
+      "range": "9d",
+      "records": 57
+    },
+    {
+      "bytes": 61688,
+      "digest": "sha256:92a421ed9fddae61d678b375394b9578c5708da5c8e9929dfa497f7521b231c1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9e.jsonl",
+      "range": "9e",
+      "records": 59
+    },
+    {
+      "bytes": 46865,
+      "digest": "sha256:7e0db36b47655ed3f6851b5e89685d58e3fa72ed931c6ec845893e3fef5220e9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/9f.jsonl",
+      "range": "9f",
+      "records": 55
+    },
+    {
+      "bytes": 47939,
+      "digest": "sha256:1ba80e23e6db6737f16ba558c27eae42e3f02356fca21be529b6f4fe7f718d52",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a0.jsonl",
+      "range": "a0",
+      "records": 54
+    },
+    {
+      "bytes": 73779,
+      "digest": "sha256:5687cbf17af5a3ed8428ffb9cb7a56b3e8dd68e8cad4fc746f35baf8c95b918e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a1.jsonl",
+      "range": "a1",
+      "records": 63
+    },
+    {
+      "bytes": 82176,
+      "digest": "sha256:a02fbb7bcbd6294cc80eca1ab453f757b98ab6decb275b1aaf0dbe6ef362947b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a2.jsonl",
+      "range": "a2",
+      "records": 69
+    },
+    {
+      "bytes": 53070,
+      "digest": "sha256:2af00fc5875ee49d520a56460437b52fab6aa540a2e01bc0ea91109f412350f4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a3.jsonl",
+      "range": "a3",
+      "records": 55
+    },
+    {
+      "bytes": 72434,
+      "digest": "sha256:3c0d5e5b6ffbf54a1f6ed3a94e071a37ebeb5127ac7d2ba0e4f004b77cf73e5f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a4.jsonl",
+      "range": "a4",
+      "records": 53
+    },
+    {
+      "bytes": 61595,
+      "digest": "sha256:c26c0e0d483f8950b614515a39b4fbd9f2c3c59642c47443b5a79f1caaa9afb8",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a5.jsonl",
+      "range": "a5",
+      "records": 67
+    },
+    {
+      "bytes": 68650,
+      "digest": "sha256:8a9d3e4399203370f83baf9a85d40c9e69d13650b2084076a70f0edb943f50d0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a6.jsonl",
+      "range": "a6",
+      "records": 63
+    },
+    {
+      "bytes": 61984,
+      "digest": "sha256:9dc668e4b80a5c305c2cdb8e9e0be3c1ec7d263cc823670032367dc5601c771b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a7.jsonl",
+      "range": "a7",
+      "records": 71
+    },
+    {
+      "bytes": 58967,
+      "digest": "sha256:f365cf680fdcfd97e7c5133b274b6de992262a3916ac0c3326e7c271eea11ed1",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a8.jsonl",
+      "range": "a8",
+      "records": 67
+    },
+    {
+      "bytes": 62222,
+      "digest": "sha256:d05450d2072e90bdf47ae431f7fbccf5f4bcdb5e6b7e62ccf11348e757006123",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/a9.jsonl",
+      "range": "a9",
+      "records": 62
+    },
+    {
+      "bytes": 59158,
+      "digest": "sha256:db6518701c81f86448ca879076a6cc1e32aecf8b0500ed557a2d3ed0ac936bcd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/aa.jsonl",
+      "range": "aa",
+      "records": 68
+    },
+    {
+      "bytes": 45955,
+      "digest": "sha256:6bf63c05c8c512d7bf475c71fe9a94304fe405ea6d1fa13d64e43a0da10a08c3",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ab.jsonl",
+      "range": "ab",
+      "records": 49
+    },
+    {
+      "bytes": 49013,
+      "digest": "sha256:d3fb992a19cd27a5879fa6eb70c9c6190b7cbf676965ebe81b8b7c1153c32533",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ac.jsonl",
+      "range": "ac",
+      "records": 51
+    },
+    {
+      "bytes": 78059,
+      "digest": "sha256:40ff1f798a9cea6e6f931ed48419682c229e16f600f789aa31fc28075b5c3b3d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ad.jsonl",
+      "range": "ad",
+      "records": 80
+    },
+    {
+      "bytes": 75387,
+      "digest": "sha256:3ee82f7eeed25fcd748eeeecc415bc4263422c2ea6ed3c146e74b3ecae2fcfd6",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ae.jsonl",
+      "range": "ae",
+      "records": 69
+    },
+    {
+      "bytes": 72532,
+      "digest": "sha256:2bbc4f6d6209417aeedb5917a21185576415263e18f1498ab5afdcf41c4a067f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/af.jsonl",
+      "range": "af",
+      "records": 63
+    },
+    {
+      "bytes": 67921,
+      "digest": "sha256:fe73bf58f654d28311733a85cc3ebb1cc4d4fcffc5659518a3de98bb166ab6a4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b0.jsonl",
+      "range": "b0",
+      "records": 58
+    },
+    {
+      "bytes": 50909,
+      "digest": "sha256:793f109904f516b2d8530db8c6dd42f5e6f59e3402af717d87f72b19231156bb",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b1.jsonl",
+      "range": "b1",
+      "records": 59
+    },
+    {
+      "bytes": 57127,
+      "digest": "sha256:d11c3905b1a5f0ace1ad70ab7e0e1a59fa4ed45e46c78fdd3abff9380f4c3c1d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b2.jsonl",
+      "range": "b2",
+      "records": 63
+    },
+    {
+      "bytes": 44855,
+      "digest": "sha256:381543dc1c02b927f44f9be63ebfad61b8cc1959a532f3f08a3fdb541cc299ed",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b3.jsonl",
+      "range": "b3",
+      "records": 56
+    },
+    {
+      "bytes": 68565,
+      "digest": "sha256:16e992be20d211af9bc678e9995af6cdc9c342ad52ef122e40f53b340dd18b04",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b4.jsonl",
+      "range": "b4",
+      "records": 70
+    },
+    {
+      "bytes": 46020,
+      "digest": "sha256:acf29ac56bd5362bdb033eee2a51c59213ad2066498a00c55c1627e04f1f642a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b5.jsonl",
+      "range": "b5",
+      "records": 50
+    },
+    {
+      "bytes": 75834,
+      "digest": "sha256:727b4276c771c9eeb119a7c743284939817487f74c719bedb9d3c5711942f26b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b6.jsonl",
+      "range": "b6",
+      "records": 59
+    },
+    {
+      "bytes": 68139,
+      "digest": "sha256:56172fe35c3421cbfd9019924bc208b060c5d03e96275838970422afd9a15f4e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b7.jsonl",
+      "range": "b7",
+      "records": 68
+    },
+    {
+      "bytes": 94853,
+      "digest": "sha256:92e005204538b06fd1fa151292f245f75222706c2459498561b0991b7dbff88e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b8.jsonl",
+      "range": "b8",
+      "records": 58
+    },
+    {
+      "bytes": 56236,
+      "digest": "sha256:9fe8622bb7385fba3621fb7f6db0c35687f68c514439486a46e1a6989120a7f4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/b9.jsonl",
+      "range": "b9",
+      "records": 60
+    },
+    {
+      "bytes": 62145,
+      "digest": "sha256:320049141f9242380c596b871899c755b020a77ef0d7f702996d19266166a200",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ba.jsonl",
+      "range": "ba",
+      "records": 67
+    },
+    {
+      "bytes": 60873,
+      "digest": "sha256:1f4f4c1c8558c86ad5127e685a45bf306238799c5c2f5bd68c7ccbf93aa48991",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/bb.jsonl",
+      "range": "bb",
+      "records": 71
+    },
+    {
+      "bytes": 49471,
+      "digest": "sha256:9f4ddaae80716683a0894ab556c02725d91a2a2846089015afd403f810b0b74b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/bc.jsonl",
+      "range": "bc",
+      "records": 49
+    },
+    {
+      "bytes": 49978,
+      "digest": "sha256:5b584307439c4202f601198740ffb411fe4c95862f41d7406f859e0b8c90f6cc",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/bd.jsonl",
+      "range": "bd",
+      "records": 54
+    },
+    {
+      "bytes": 92826,
+      "digest": "sha256:41f1e6f26857323de62f6bd5c5563241e7930e0085e514e05e8d059f63a08513",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/be.jsonl",
+      "range": "be",
+      "records": 62
+    },
+    {
+      "bytes": 58593,
+      "digest": "sha256:90d3582847e8d1a690729154a0e9b9db9a27aeeaf5ffd0245b022190bdf02bb9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/bf.jsonl",
+      "range": "bf",
+      "records": 62
+    },
+    {
+      "bytes": 54065,
+      "digest": "sha256:febfd6885c276f7f976ab57cd6cf443b741a69aa02bd3aa3617376b6d387fd9f",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c0.jsonl",
+      "range": "c0",
+      "records": 55
+    },
+    {
+      "bytes": 74970,
+      "digest": "sha256:db97351bb734df3c98d320a3490d6f54257e24dbcc87f571cfa7f3946be83680",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c1.jsonl",
+      "range": "c1",
+      "records": 63
+    },
+    {
+      "bytes": 72159,
+      "digest": "sha256:075f0ca450d8fe160e9528fbd44e1623862f36710f7c338ce584ded7f9de0f97",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c2.jsonl",
+      "range": "c2",
+      "records": 61
+    },
+    {
+      "bytes": 44091,
+      "digest": "sha256:0a0b9fce3c06c7dacef2a61dd188e21c2ed4af25b32a42c5aee4b8d8b266189c",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c3.jsonl",
+      "range": "c3",
+      "records": 46
+    },
+    {
+      "bytes": 40835,
+      "digest": "sha256:acdb5a5f5b72c969372c016b184c51a129cce78afdb343f6c35a920c5da3ca7c",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c4.jsonl",
+      "range": "c4",
+      "records": 55
+    },
+    {
+      "bytes": 80454,
+      "digest": "sha256:379001f68541f1b641854c4571a8f22f3159f9f9552d9d06a08b90f4bce81c1a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c5.jsonl",
+      "range": "c5",
+      "records": 68
+    },
+    {
+      "bytes": 55951,
+      "digest": "sha256:6a5239fdff95059bf4f13ab3e3f6c07f2dabc7272f4fb560813081ffce0afb60",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c6.jsonl",
+      "range": "c6",
+      "records": 63
+    },
+    {
+      "bytes": 52069,
+      "digest": "sha256:66a011c3e55cf6073012b733a42f3f30fb5921c10c8f095d87ad7308308c94f0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c7.jsonl",
+      "range": "c7",
+      "records": 63
+    },
+    {
+      "bytes": 80113,
+      "digest": "sha256:41fa0141e8f7769963a78181c84ea45edeadb98fb3c9f43344fd17fa3e668065",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c8.jsonl",
+      "range": "c8",
+      "records": 76
+    },
+    {
+      "bytes": 71106,
+      "digest": "sha256:e7325e3e57d58113dd9a03b242ff20c4059b772690a99c94d59c63e4b74ea1ef",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/c9.jsonl",
+      "range": "c9",
+      "records": 59
+    },
+    {
+      "bytes": 69391,
+      "digest": "sha256:7ecaab0116c548f9130fd85394d71f0d2d77f777a11fc531afc1a86efc4ae983",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ca.jsonl",
+      "range": "ca",
+      "records": 69
+    },
+    {
+      "bytes": 44330,
+      "digest": "sha256:99caf4067b845fa9df987bc0f616191950449704a766164d0594d1016c1244d9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/cb.jsonl",
+      "range": "cb",
+      "records": 51
+    },
+    {
+      "bytes": 58040,
+      "digest": "sha256:06630c04db1213173201a18f3b2835e042da8958cc582f30e36d479e2370e0dc",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/cc.jsonl",
+      "range": "cc",
+      "records": 62
+    },
+    {
+      "bytes": 54846,
+      "digest": "sha256:d5f77105ab19a4feca10cde8259d9a002fb381de95aa8baf2f070ea260cfdb07",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/cd.jsonl",
+      "range": "cd",
+      "records": 62
+    },
+    {
+      "bytes": 47024,
+      "digest": "sha256:cc69dc78775482ea68962450daead0b4834a10bf92dd77e025c9cccf54a17b82",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ce.jsonl",
+      "range": "ce",
+      "records": 58
+    },
+    {
+      "bytes": 70886,
+      "digest": "sha256:8a4e6aebd1e09b77f53abff51381af6316ab88cd8e6c406e8a3e9af8f97292de",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/cf.jsonl",
+      "range": "cf",
+      "records": 66
+    },
+    {
+      "bytes": 44166,
+      "digest": "sha256:33fb04ff4e2e26e48c796130fdebdcf8dedd829e2eec8e677a4c73ca27a2b59e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d0.jsonl",
+      "range": "d0",
+      "records": 47
+    },
+    {
+      "bytes": 57380,
+      "digest": "sha256:d5d61f2809349a3a6fbf1a02e793e8645cddfc33e88fc0321c7ed4bfc0fe49b0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d1.jsonl",
+      "range": "d1",
+      "records": 64
+    },
+    {
+      "bytes": 40148,
+      "digest": "sha256:000a715bf93ca5ca891829e7d185e64992c24e341a26c57f4070e49885720123",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d2.jsonl",
+      "range": "d2",
+      "records": 45
+    },
+    {
+      "bytes": 58021,
+      "digest": "sha256:40ca8d8de6368113d07594d31b693a8e5b85962496fe4456f23deb48fed8a8ed",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d3.jsonl",
+      "range": "d3",
+      "records": 69
+    },
+    {
+      "bytes": 82383,
+      "digest": "sha256:9f65d863d4ec1a498444b39e441c884754ca9e20686482085b94443c8d4b0845",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d4.jsonl",
+      "range": "d4",
+      "records": 65
+    },
+    {
+      "bytes": 59232,
+      "digest": "sha256:961375f283cb5f5742ca71047813a7811cec5042591c3939ceea431554de3a0a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d5.jsonl",
+      "range": "d5",
+      "records": 59
+    },
+    {
+      "bytes": 70414,
+      "digest": "sha256:1b0730fad88ad01d9ad4fa5f6e0c129423333bb385f4fdd6fdb8d34c8689ebee",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d6.jsonl",
+      "range": "d6",
+      "records": 60
+    },
+    {
+      "bytes": 67808,
+      "digest": "sha256:9860d637de6b16eab0a8049d5e3c90d59e0ce3e896e1f678322f5d556890264e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d7.jsonl",
+      "range": "d7",
+      "records": 77
+    },
+    {
+      "bytes": 62587,
+      "digest": "sha256:5f92cd0c4fed892a7e77ff55cefbad4406dbd21073d2a723169b649f559fcc65",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d8.jsonl",
+      "range": "d8",
+      "records": 57
+    },
+    {
+      "bytes": 45618,
+      "digest": "sha256:2133a81637d54c57358ebe3a80d5c0134e9bb00a65b9be83e9d9da5e6d9f2066",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/d9.jsonl",
+      "range": "d9",
+      "records": 57
+    },
+    {
+      "bytes": 54909,
+      "digest": "sha256:7632ceb39f3286b0ccb063ec738c66c278227bfa7b59d8a9a3659214524ce886",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/da.jsonl",
+      "range": "da",
+      "records": 59
+    },
+    {
+      "bytes": 59312,
+      "digest": "sha256:5d333994f945a8b227cd08f8b05e56c5a993156e4adf34d57b84608a23106aaf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/db.jsonl",
+      "range": "db",
+      "records": 61
+    },
+    {
+      "bytes": 73377,
+      "digest": "sha256:782ac623aaead90ae3768f044ce4eceb99815f12492b151961426d4514434715",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/dc.jsonl",
+      "range": "dc",
+      "records": 76
+    },
+    {
+      "bytes": 57012,
+      "digest": "sha256:f389fa30a6602f2c1080aa5b113cc90a663e68928c8ae7797147f38ff17e5cb0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/dd.jsonl",
+      "range": "dd",
+      "records": 64
+    },
+    {
+      "bytes": 57122,
+      "digest": "sha256:17e5c2cc0270e39b8ba855f01461e4cb6fb91dfbacd6d69efd9cde03693a24f2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/de.jsonl",
+      "range": "de",
+      "records": 50
+    },
+    {
+      "bytes": 62377,
+      "digest": "sha256:b8d4c97981a4010d2aa34a6027d79f99a104d029cd8cfaae43d0e87770772b7e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/df.jsonl",
+      "range": "df",
+      "records": 66
+    },
+    {
+      "bytes": 46749,
+      "digest": "sha256:17349adf52e00fea0d8e831fd36491f7aba5cad3b09e2b534c3e0b2d6e09a4cd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e0.jsonl",
+      "range": "e0",
+      "records": 46
+    },
+    {
+      "bytes": 47717,
+      "digest": "sha256:2487560c3ae5c52c426b1815d5c68e369841e90c12626db6f0f616d11cea3c23",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e1.jsonl",
+      "range": "e1",
+      "records": 47
+    },
+    {
+      "bytes": 63888,
+      "digest": "sha256:d97a87d51f1cc27654bb00ecdf9746efad54041bbdc2683c8692ba36c89db040",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e2.jsonl",
+      "range": "e2",
+      "records": 63
+    },
+    {
+      "bytes": 58586,
+      "digest": "sha256:7f926ffb69b5cbe6577a5dd6a2eceaa3381c9ebbb2eb6c7f7a433ebb4baf144e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e3.jsonl",
+      "range": "e3",
+      "records": 63
+    },
+    {
+      "bytes": 43433,
+      "digest": "sha256:a4ef3924f6b8faa3ffbd2cbe9b80917eade6597f9cd49b27197de516d892c11b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e4.jsonl",
+      "range": "e4",
+      "records": 55
+    },
+    {
+      "bytes": 67802,
+      "digest": "sha256:5c752eb21ba5abd74824efca1df66c2f25e2925306bbe7d86670b60c1c9f5812",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e5.jsonl",
+      "range": "e5",
+      "records": 58
+    },
+    {
+      "bytes": 65458,
+      "digest": "sha256:17047331e4a53aeed6c83d4d2b3d67b89ae208ea8e5edf3d51a2f052f7610502",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e6.jsonl",
+      "range": "e6",
+      "records": 57
+    },
+    {
+      "bytes": 62916,
+      "digest": "sha256:18588ce00c0413ac144ce54aa1ebd7a571db60dd527527ae00e7eafa3ee779fa",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e7.jsonl",
+      "range": "e7",
+      "records": 58
+    },
+    {
+      "bytes": 63927,
+      "digest": "sha256:201e00b8775aa7ccf9a5d4089c0237b176f2c37c60dedde47827077d46057bcd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e8.jsonl",
+      "range": "e8",
+      "records": 52
+    },
+    {
+      "bytes": 61048,
+      "digest": "sha256:acf62edf0ca67913b3a6b1467f9c78dbece0e9f05d583c58ef0c1394399b5bfb",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/e9.jsonl",
+      "range": "e9",
+      "records": 62
+    },
+    {
+      "bytes": 79012,
+      "digest": "sha256:3353b7f91e4e9b27cf87f512a52ad28ecf594009c7d69224aa78b07cb0f97cec",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ea.jsonl",
+      "range": "ea",
+      "records": 64
+    },
+    {
+      "bytes": 62444,
+      "digest": "sha256:54498c14cb2a07852d383bc88323d83360e619d4f78707437ce8644aa682535d",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/eb.jsonl",
+      "range": "eb",
+      "records": 62
+    },
+    {
+      "bytes": 54857,
+      "digest": "sha256:754ebc7edd82df995b20e600995a0cfb40163bca1d21255518c705e7d7dbca76",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ec.jsonl",
+      "range": "ec",
+      "records": 59
+    },
+    {
+      "bytes": 82655,
+      "digest": "sha256:c3d9c8782e23499c70746438ce530e59b4a544ac675dabe28f7b82fc8eba6521",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ed.jsonl",
+      "range": "ed",
+      "records": 66
+    },
+    {
+      "bytes": 61804,
+      "digest": "sha256:32be8278ac4663bd0ac7b8c9b74349c7ba1b926a23f119c4b36d3c7968160f72",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ee.jsonl",
+      "range": "ee",
+      "records": 66
+    },
+    {
+      "bytes": 48241,
+      "digest": "sha256:2f9eedfd2e523fb5a34b7056ffbd72b66736c137c2b38dfdfa7131122b048c0b",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ef.jsonl",
+      "range": "ef",
+      "records": 46
+    },
+    {
+      "bytes": 59788,
+      "digest": "sha256:c9ff6f0893ef43961d7999500392724d80fa2299281b1b68ad2f561fac49c2a5",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f0.jsonl",
+      "range": "f0",
+      "records": 59
+    },
+    {
+      "bytes": 68047,
+      "digest": "sha256:f2bbb34e7c38cf7011dfd3f6301901c1f6c844ecbef547fd498a4fb4790803af",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f1.jsonl",
+      "range": "f1",
+      "records": 57
+    },
+    {
+      "bytes": 93675,
+      "digest": "sha256:ed5092a8cda4afc8be72ee11ba73f3014052559a8378ebda060d9ec18051aabd",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f2.jsonl",
+      "range": "f2",
+      "records": 73
+    },
+    {
+      "bytes": 53253,
+      "digest": "sha256:5936e5165c50b8e734f6531417bb3e7968f433ad20eb49834fcad14735cc7921",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f3.jsonl",
+      "range": "f3",
+      "records": 55
+    },
+    {
+      "bytes": 48249,
+      "digest": "sha256:66b5a086f27801b70b393c747bbe2211d25bed5dd0a3cf5eb72aa729a76b41e4",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f4.jsonl",
+      "range": "f4",
+      "records": 61
+    },
+    {
+      "bytes": 54008,
+      "digest": "sha256:ef1b5921c449b8367194ccde136d584852aa6d022e6d800d165da4aae2039a3a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f5.jsonl",
+      "range": "f5",
+      "records": 60
+    },
+    {
+      "bytes": 55035,
+      "digest": "sha256:47843b9055fbf731288f2e3c16632e731197a0e70b0c376ee9bd897dc54402c9",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f6.jsonl",
+      "range": "f6",
+      "records": 57
+    },
+    {
+      "bytes": 49397,
+      "digest": "sha256:87926f5d366aad2c9cd5bf48edeb7d78ab80315218a3031ef821ca0f62a7760a",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f7.jsonl",
+      "range": "f7",
+      "records": 50
+    },
+    {
+      "bytes": 74184,
+      "digest": "sha256:18ffae4be66ef31ba58c375ad5a837d848a37f03f32969269fdbd81afb29c3ce",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f8.jsonl",
+      "range": "f8",
+      "records": 70
+    },
+    {
+      "bytes": 59066,
+      "digest": "sha256:d0ea861e657d50184d7a88e26ba4b8218589b2695b6bfd39dc51422a8252b717",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/f9.jsonl",
+      "range": "f9",
+      "records": 58
+    },
+    {
+      "bytes": 45975,
+      "digest": "sha256:0aa946b844177caa18664a53417ee235f58bb0e4b303dca0b625f2170c2e29cf",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/fa.jsonl",
+      "range": "fa",
+      "records": 54
+    },
+    {
+      "bytes": 60228,
+      "digest": "sha256:c9c3b44c9dcf37a171cce2e9cb5c4b0c6e1852c05173d3fe1cbc78c7f64b69af",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/fb.jsonl",
+      "range": "fb",
+      "records": 57
+    },
+    {
+      "bytes": 49252,
+      "digest": "sha256:e0be43dd5c6d02294c184b96092374ede761dc5d0d4a7a8bf7c0970354efc3df",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/fc.jsonl",
+      "range": "fc",
+      "records": 51
+    },
+    {
+      "bytes": 41847,
+      "digest": "sha256:43662fa345fb77eb4d5e211c5ff62c3bc8a6dcc5b3e80255e0e9ce22284df90e",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/fd.jsonl",
+      "range": "fd",
+      "records": 48
+    },
+    {
+      "bytes": 48984,
+      "digest": "sha256:604f9144bef003977ab9905f4bb92601e6d79ab6173e5d3b0f1a58b784a0f9b2",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/fe.jsonl",
+      "range": "fe",
+      "records": 57
+    },
+    {
+      "bytes": 63166,
+      "digest": "sha256:16c6d1ea90d145e4b030fc74f822bf551c2a67d2ea54c1e7374de84cf531d8e0",
+      "kind": "anchor",
+      "path": "kag/indexes/shards/anchor/ff.jsonl",
+      "range": "ff",
+      "records": 54
+    },
+    {
+      "bytes": 119329,
+      "digest": "sha256:82594ce0128f30d51d882b966ce893600d18548a425d19430ed912692c391ecf",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/6.jsonl",
+      "range": "6",
+      "records": 46
+    },
+    {
+      "bytes": 81410,
+      "digest": "sha256:b4dc193fb6b2520238784c40c1c8f3070ac5c0c3ddb885304f9933554f8d23b5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/a.jsonl",
+      "range": "a",
+      "records": 44
+    },
+    {
+      "bytes": 97989,
+      "digest": "sha256:869523260d9fcdb171563866f2d6f9b413b2e6f3998d7d1f5bb8ed2a3b5ce991",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/d.jsonl",
+      "range": "d",
+      "records": 51
+    },
+    {
+      "bytes": 17796,
+      "digest": "sha256:158138e924bdf2628450887e98dff0947facce7d98928cd3a44ae8ba8b89d95b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/00.jsonl",
+      "range": "00",
+      "records": 2
+    },
+    {
+      "bytes": 2205,
+      "digest": "sha256:c9f4ef51bc4972ff54cd8adb3deb7a450db64442418bf5e72b433d5f1cddbade",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/01.jsonl",
+      "range": "01",
+      "records": 3
+    },
+    {
+      "bytes": 108520,
+      "digest": "sha256:95ae7413b9f30ef8fe640f4136bdc121895f57ba73fe2a6da1b972d9300dd75d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/02.jsonl",
+      "range": "02",
+      "records": 3
+    },
+    {
+      "bytes": 7201,
+      "digest": "sha256:1634e41450833d733c36e39eaf815c2d9f13c950b6c4f7fb0d88e7efd3ce6eaf",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/03.jsonl",
+      "range": "03",
+      "records": 4
+    },
+    {
+      "bytes": 6813,
+      "digest": "sha256:95cf23395794afa850a666e8347c69ad45c2f8d423815a089bcaf38e7472ab13",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/04.jsonl",
+      "range": "04",
+      "records": 7
+    },
+    {
+      "bytes": 8813,
+      "digest": "sha256:274cb43893d4ea5a6e41d0ea8fe60bd9b48ceaf26d210b6b60e23bddf4b02611",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/05.jsonl",
+      "range": "05",
+      "records": 4
+    },
+    {
+      "bytes": 4637,
+      "digest": "sha256:34d396a78e4bf816a24effbb8de3113ced7fd45ed4445c8f28b8d3b5ce3bd047",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/06.jsonl",
+      "range": "06",
+      "records": 4
+    },
+    {
+      "bytes": 1555,
+      "digest": "sha256:f5699ff935cbe83221c150a4fb097cf29b030f89e8f5932817f53fbbc00c0c9f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/07.jsonl",
+      "range": "07",
+      "records": 1
+    },
+    {
+      "bytes": 3706,
+      "digest": "sha256:726945cc5734a6bd68bf4586a23cce8ae5dee6d2f192034d182e3ac9285c470d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/09.jsonl",
+      "range": "09",
+      "records": 3
+    },
+    {
+      "bytes": 6100,
+      "digest": "sha256:4e5bdf42097673ca18385cf274fba13507e84f6f8e1c21ea175d3a037386b34c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/0a.jsonl",
+      "range": "0a",
+      "records": 3
+    },
+    {
+      "bytes": 33875,
+      "digest": "sha256:1123c2750e358f3bd262259db15af106de7415d072ff7bc8a24a8d4004dd2658",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/0b.jsonl",
+      "range": "0b",
+      "records": 6
+    },
+    {
+      "bytes": 2710,
+      "digest": "sha256:6c9e4ad0ea1251fb825c8afdb1a7062b8a48c448287dfd2a4f44ca2c7be76c39",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/0c.jsonl",
+      "range": "0c",
+      "records": 3
+    },
+    {
+      "bytes": 5113,
+      "digest": "sha256:38ca88b17477191188973a85eb0f491ff43ab6f4eab952d777646001955ba440",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/0d.jsonl",
+      "range": "0d",
+      "records": 2
+    },
+    {
+      "bytes": 6235,
+      "digest": "sha256:e219eb85e421e359d922e3dd4c223fea6623695e21ead445530244e3cb8d1b47",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/0e.jsonl",
+      "range": "0e",
+      "records": 1
+    },
+    {
+      "bytes": 9324,
+      "digest": "sha256:7183c72babc040044da614396b2e7b6f82587c6a58e8a2668a6e8fafe161537c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/10.jsonl",
+      "range": "10",
+      "records": 3
+    },
+    {
+      "bytes": 6141,
+      "digest": "sha256:59065e29c37c002be30787f8c00980f970251505224f3b963a3957412633a0ae",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/11.jsonl",
+      "range": "11",
+      "records": 6
+    },
+    {
+      "bytes": 41107,
+      "digest": "sha256:21f463e9d280fbe2244b3e9380184660fd84096a16400a46ad50e5ecf1b94520",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/12.jsonl",
+      "range": "12",
+      "records": 4
+    },
+    {
+      "bytes": 11572,
+      "digest": "sha256:7c8ac5520dfc8259298b21f2530d012b7d3187f825a776c2fa3b52e831b31367",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/13.jsonl",
+      "range": "13",
+      "records": 4
+    },
+    {
+      "bytes": 918,
+      "digest": "sha256:c597c882c1b0af7cbe87f67af5cfea2da798f38427b61024ce9feee688a4e123",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/14.jsonl",
+      "range": "14",
+      "records": 1
+    },
+    {
+      "bytes": 13442,
+      "digest": "sha256:95d91d2654cc239f1e98f662fb14bf5dcbf2610b8ae0874e184bde576e702c25",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/15.jsonl",
+      "range": "15",
+      "records": 3
+    },
+    {
+      "bytes": 32354,
+      "digest": "sha256:fe2c4b9c84d18d4cc57038d8927f61a8b27a44b516ae7db273db0d6a9a686d13",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/16.jsonl",
+      "range": "16",
+      "records": 4
+    },
+    {
+      "bytes": 6789,
+      "digest": "sha256:1654bd067819f5f68e04120b6f8060215873a7b921955fd4c2ad01e5b17254a8",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/17.jsonl",
+      "range": "17",
+      "records": 2
+    },
+    {
+      "bytes": 5166,
+      "digest": "sha256:44684e82390722e1541f54d03eadd3d681202c0689cd45268923a501b02b4dfd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/18.jsonl",
+      "range": "18",
+      "records": 2
+    },
+    {
+      "bytes": 766,
+      "digest": "sha256:fa372c661f5b894cd2cdf3a16517f29e6c69d43ed4225d089b07fabe6c325615",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/19.jsonl",
+      "range": "19",
+      "records": 1
+    },
+    {
+      "bytes": 14384,
+      "digest": "sha256:185e32a36ac102aa4cd2150a1ed499226134254c1601346c838e81afff6b36fe",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1a.jsonl",
+      "range": "1a",
+      "records": 3
+    },
+    {
+      "bytes": 9313,
+      "digest": "sha256:3d61860d174500b675186175568badbb73290274e5c5f13a120129096722faa5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1b.jsonl",
+      "range": "1b",
+      "records": 4
+    },
+    {
+      "bytes": 5237,
+      "digest": "sha256:791cee8334a9d891d617e476ed156b5904b745486635099fa7a29eb470ebf697",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1c.jsonl",
+      "range": "1c",
+      "records": 4
+    },
+    {
+      "bytes": 4007,
+      "digest": "sha256:69f9627dd98ee545c87793cb82111f10405b0c2fdc46729e30961d71aa61f5c9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1d.jsonl",
+      "range": "1d",
+      "records": 4
+    },
+    {
+      "bytes": 2168,
+      "digest": "sha256:4acd91822acc791c305da291eaa65ee553d905a9bea3bb94d0b5e13cfa0b0287",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1e.jsonl",
+      "range": "1e",
+      "records": 2
+    },
+    {
+      "bytes": 2202,
+      "digest": "sha256:7d8ad83ca50db13ee913f63c30dee7b4d5d8429f665ecf3fbfa736d51a78267f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/1f.jsonl",
+      "range": "1f",
+      "records": 1
+    },
+    {
+      "bytes": 74252,
+      "digest": "sha256:80c542e7d52c39b4f816512f6aee78de1d6cb0090af3e910552464aa775a7240",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/20.jsonl",
+      "range": "20",
+      "records": 6
+    },
+    {
+      "bytes": 6288,
+      "digest": "sha256:a6b8094e84387b4c11cec258db1f3a88f87b47e25a56cf24e02a65fb05660ece",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/21.jsonl",
+      "range": "21",
+      "records": 4
+    },
+    {
+      "bytes": 1700,
+      "digest": "sha256:c46c23f002b55bd02ccad880027da3dccbec468cdbcfdfb6242acd82906a8e99",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/22.jsonl",
+      "range": "22",
+      "records": 2
+    },
+    {
+      "bytes": 12653,
+      "digest": "sha256:03ff92873b6fd6166055f41ff7883c76c9c78bfe63a6ba2e26bdfffd3cff28be",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/23.jsonl",
+      "range": "23",
+      "records": 4
+    },
+    {
+      "bytes": 3129,
+      "digest": "sha256:6eeb3e2d02249729ab7054da0b5a5a0bfaf21fdfac4a720fbf53f45b2afba22a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/24.jsonl",
+      "range": "24",
+      "records": 3
+    },
+    {
+      "bytes": 7799,
+      "digest": "sha256:5120df1b94ae4ee2af5dc00a34b52b325e7cddb83e6d41b0540829433f27c68c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/25.jsonl",
+      "range": "25",
+      "records": 4
+    },
+    {
+      "bytes": 17300,
+      "digest": "sha256:ad7c1eff753f7f52fb4feac54b3cd66b3f3cf36de10155e15d7247eeef11cfd9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/26.jsonl",
+      "range": "26",
+      "records": 2
+    },
+    {
+      "bytes": 9319,
+      "digest": "sha256:9dff67d4d62b1a52df986a95d955a7db181e7c084ed8773c06bc81c1267886ff",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/27.jsonl",
+      "range": "27",
+      "records": 3
+    },
+    {
+      "bytes": 8149,
+      "digest": "sha256:13d5977e960fc5704e8c5721cf47706b6b586f3d240b7002b3b53affadeca3d0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/28.jsonl",
+      "range": "28",
+      "records": 2
+    },
+    {
+      "bytes": 2612,
+      "digest": "sha256:39a9fdc89db5a3009a33762ecbdc2a719818108a7336f56030e4ec35b533ed7d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/29.jsonl",
+      "range": "29",
+      "records": 2
+    },
+    {
+      "bytes": 20370,
+      "digest": "sha256:04b7a7ff8b72f82399c7381066e99b544b0aea90b07e470f12e69083f41dae96",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2a.jsonl",
+      "range": "2a",
+      "records": 6
+    },
+    {
+      "bytes": 1648,
+      "digest": "sha256:36bf8a81566a5a92f0dca2a1a768f6ece63974f49d755a28996f25b9a518752c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2b.jsonl",
+      "range": "2b",
+      "records": 2
+    },
+    {
+      "bytes": 8690,
+      "digest": "sha256:96e078bc4841018902e49de995726b0ec7b005534167efde9f45d37c58fec052",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2c.jsonl",
+      "range": "2c",
+      "records": 2
+    },
+    {
+      "bytes": 4325,
+      "digest": "sha256:324d3ae05ca948b8dd384960ef1ac6e197551aa0308cfad5c6e16c69a0ff8faf",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2d.jsonl",
+      "range": "2d",
+      "records": 3
+    },
+    {
+      "bytes": 757,
+      "digest": "sha256:a5bd783c570513f7c8caa533e4169cbf7c4f0db578a3db95a5024910891c050b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2e.jsonl",
+      "range": "2e",
+      "records": 1
+    },
+    {
+      "bytes": 2406,
+      "digest": "sha256:fccaf56eb918ff3a792077583c76a380e3d672b116fcc4623b1be82789260e83",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/2f.jsonl",
+      "range": "2f",
+      "records": 3
+    },
+    {
+      "bytes": 17558,
+      "digest": "sha256:42c5ea7cd906e361b3ae3a05bdfa9ce2da6447ae415c16c3b3b99910a74824c8",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/30.jsonl",
+      "range": "30",
+      "records": 2
+    },
+    {
+      "bytes": 2988,
+      "digest": "sha256:7f2b349f2c4831f1c4874be988255de1ec3f893c4a204409ce6704b662ebb411",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/31.jsonl",
+      "range": "31",
+      "records": 4
+    },
+    {
+      "bytes": 2578,
+      "digest": "sha256:76105d045b2797babb7a495e79c59fee3ea4df1691f1667d35fc8698a8866ada",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/32.jsonl",
+      "range": "32",
+      "records": 3
+    },
+    {
+      "bytes": 7140,
+      "digest": "sha256:d617e5386e536972ae7e7031c3d19e6269a854300d35b45019af7153835f11a5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/33.jsonl",
+      "range": "33",
+      "records": 4
+    },
+    {
+      "bytes": 3041,
+      "digest": "sha256:e4dce4bdf33ab82d0d148a3a59bc394bc59fd0945da0d1d6f21515f8941c8793",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/34.jsonl",
+      "range": "34",
+      "records": 3
+    },
+    {
+      "bytes": 5931,
+      "digest": "sha256:f568880f85db96ffbc7149ee610375bd903608d8fa32c98cc475df527035ef9d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/35.jsonl",
+      "range": "35",
+      "records": 4
+    },
+    {
+      "bytes": 5192,
+      "digest": "sha256:0ef38d666199ae688c903d2d87290eb3bfef6f566a39935ee97adf2bd3e81283",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/36.jsonl",
+      "range": "36",
+      "records": 3
+    },
+    {
+      "bytes": 6673,
+      "digest": "sha256:537af17f674d3c3fc874efadceae5380fedb49c2a9f3729a67cf13a382a37414",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/37.jsonl",
+      "range": "37",
+      "records": 5
+    },
+    {
+      "bytes": 16297,
+      "digest": "sha256:4245bf2bbed99318a6858e2c659a163e80eb2abbbab28b8935d62bd99b3d4465",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/38.jsonl",
+      "range": "38",
+      "records": 4
+    },
+    {
+      "bytes": 27615,
+      "digest": "sha256:c5962479903c7dbe7431bfd9d30be69bc180970141b8b7a71a03b9e9145b5dd6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/39.jsonl",
+      "range": "39",
+      "records": 5
+    },
+    {
+      "bytes": 35657,
+      "digest": "sha256:4ba42c62c4168e484fb184fe7cb7683451653883e33ad4474c115f5a3e55190d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3a.jsonl",
+      "range": "3a",
+      "records": 5
+    },
+    {
+      "bytes": 1528,
+      "digest": "sha256:505da51a5f5f3be4f172ec1820718d707773187ce4fe7081df23da25e575a03c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3b.jsonl",
+      "range": "3b",
+      "records": 2
+    },
+    {
+      "bytes": 3204,
+      "digest": "sha256:e84040c75c6b39ed3288ca0370f1225812a9a8dc7448a52e2bb370ec515c83ce",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3c.jsonl",
+      "range": "3c",
+      "records": 2
+    },
+    {
+      "bytes": 27992,
+      "digest": "sha256:9fdddc454a92acbc0fb9aa52c2666d95c449778566ce7464228400554d4a903b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3d.jsonl",
+      "range": "3d",
+      "records": 2
+    },
+    {
+      "bytes": 5340,
+      "digest": "sha256:8a61b60951cb0e5dc0861368ca23e7e8996c9606673e77b320ec748857607616",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3e.jsonl",
+      "range": "3e",
+      "records": 3
+    },
+    {
+      "bytes": 4232,
+      "digest": "sha256:5107f8b1b3a28e73eacadc48f6c66196e99d47e728b053e2357e234b6b9e7de0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/3f.jsonl",
+      "range": "3f",
+      "records": 4
+    },
+    {
+      "bytes": 20901,
+      "digest": "sha256:c7dd9f548bde9db3179b673895810a638b6d0dac18e0db6597efc866a4217915",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/40.jsonl",
+      "range": "40",
+      "records": 7
+    },
+    {
+      "bytes": 5006,
+      "digest": "sha256:c567c85d3d2d695875b0fb3599155fc855cd318f0b9ef73664a9aaecc3f81c87",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/41.jsonl",
+      "range": "41",
+      "records": 2
+    },
+    {
+      "bytes": 4874,
+      "digest": "sha256:bcecef9fd2ec747ed6e5b9a55803ceaccdbc84543dc88d094f0d3415198da373",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/42.jsonl",
+      "range": "42",
+      "records": 4
+    },
+    {
+      "bytes": 3042,
+      "digest": "sha256:330918f38377826698b751523899627fe2d8a5e472a9c110880c0293ac8ebd6a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/43.jsonl",
+      "range": "43",
+      "records": 2
+    },
+    {
+      "bytes": 3748,
+      "digest": "sha256:63ad2e9b96e9bdf100a17c47b49089ce3a4c77a71339fa751a6fe00e10929182",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/44.jsonl",
+      "range": "44",
+      "records": 4
+    },
+    {
+      "bytes": 905,
+      "digest": "sha256:9505d7ca698087ee924bb5fdfa9221ed3e5e7b75140ef031ae844cb05f3eac4c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/45.jsonl",
+      "range": "45",
+      "records": 1
+    },
+    {
+      "bytes": 1476,
+      "digest": "sha256:51c0875531940026f507853c68b468da55a9ab6dd5b6e245605565bb39f6104f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/46.jsonl",
+      "range": "46",
+      "records": 2
+    },
+    {
+      "bytes": 8813,
+      "digest": "sha256:204449d6ec0198ad2e8598deab4f8870dfd63213dfc76efac0b2d05ed52d8481",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/47.jsonl",
+      "range": "47",
+      "records": 3
+    },
+    {
+      "bytes": 4148,
+      "digest": "sha256:04dc7a0692a241c6aefbf556ad0acb0d1277a87f941c159e35b1184030ce9449",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/48.jsonl",
+      "range": "48",
+      "records": 2
+    },
+    {
+      "bytes": 4051,
+      "digest": "sha256:b5f4a6cb37dd8043d3e713290d4b457c8898bc9fa9aae8cd307f00b9c02890d0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/49.jsonl",
+      "range": "49",
+      "records": 4
+    },
+    {
+      "bytes": 9388,
+      "digest": "sha256:528bb7dc5f7fcb2c8357c3831b88e3cc9760bf00d911cf19147689df052d6b98",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4a.jsonl",
+      "range": "4a",
+      "records": 5
+    },
+    {
+      "bytes": 74443,
+      "digest": "sha256:b8fad726bcbc0fcbbcf8f40055b8e6b917cbd028fa6ae83fd87b02769bed7d0e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4b.jsonl",
+      "range": "4b",
+      "records": 3
+    },
+    {
+      "bytes": 6975,
+      "digest": "sha256:1f17ed797cacef1a46f5a0575ad24b4968a08c2dd8a37bb988453e0e5c6f9c8a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4c.jsonl",
+      "range": "4c",
+      "records": 6
+    },
+    {
+      "bytes": 751,
+      "digest": "sha256:ecc134a8f9e6f5a9675f99c345da43bafc013d80d46bb23b5f5819925fbc9465",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4d.jsonl",
+      "range": "4d",
+      "records": 1
+    },
+    {
+      "bytes": 1774,
+      "digest": "sha256:badb05a69ad8fe43d99596791da40164f2eff77741c1a62e81914a12676ee410",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4e.jsonl",
+      "range": "4e",
+      "records": 2
+    },
+    {
+      "bytes": 7261,
+      "digest": "sha256:5dd4c12a5fcb21c8b8edfa77e86d66deba2a053e94b03a4b0d2627a9a06862d9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/4f.jsonl",
+      "range": "4f",
+      "records": 4
+    },
+    {
+      "bytes": 22131,
+      "digest": "sha256:f2ee8f341ba99c959eae73cce16580cf3a7cc4d7bb16739a85497dff0204dd38",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/50.jsonl",
+      "range": "50",
+      "records": 3
+    },
+    {
+      "bytes": 1459,
+      "digest": "sha256:502049bac20f2eb03b88f4193666dde5ff5dfac63ceda8c41767da9bdd1c80e0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/51.jsonl",
+      "range": "51",
+      "records": 2
+    },
+    {
+      "bytes": 35221,
+      "digest": "sha256:c4351355b51f3cf61ffa239ecf67b0b00f77d396d72387e8729b92bd633278e7",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/52.jsonl",
+      "range": "52",
+      "records": 4
+    },
+    {
+      "bytes": 2198,
+      "digest": "sha256:296388db671dec017408b5fad329a1767e3b4b44bb8f4811d3d3bd065a669838",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/53.jsonl",
+      "range": "53",
+      "records": 3
+    },
+    {
+      "bytes": 1432,
+      "digest": "sha256:3b07d5836349f74cac1b034c0c8c5a5ec34a4cfd22e58822873fc472e1758934",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/54.jsonl",
+      "range": "54",
+      "records": 2
+    },
+    {
+      "bytes": 8952,
+      "digest": "sha256:8bb7b98d7f41fde35f7391ecd9bc0886b0a20ffea6907d78aec7ebbe8b30e118",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/55.jsonl",
+      "range": "55",
+      "records": 3
+    },
+    {
+      "bytes": 723,
+      "digest": "sha256:14fc004b331281d5d59fe13750a5f6b253b289b13440c302380533093202e911",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/56.jsonl",
+      "range": "56",
+      "records": 1
+    },
+    {
+      "bytes": 3073,
+      "digest": "sha256:e40eebdb62fbfe2c46a3f5f95a35d307e9cc67468259a9d54f8ca01b31f90dde",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/57.jsonl",
+      "range": "57",
+      "records": 4
+    },
+    {
+      "bytes": 25099,
+      "digest": "sha256:ff5f56166712fa8602bf17cb6d0a175349a706c30138abbe841494bece8b5b81",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/58.jsonl",
+      "range": "58",
+      "records": 6
+    },
+    {
+      "bytes": 20200,
+      "digest": "sha256:778934e684eb88233df2bc06e83aeb995a570cec5d21fc04e6c70ffb562ecf2b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/59.jsonl",
+      "range": "59",
+      "records": 5
+    },
+    {
+      "bytes": 1506,
+      "digest": "sha256:fc387a98dcc1750c6d17796e7a4e6d04359f58205fe2301d8dec820ca7371cdd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5a.jsonl",
+      "range": "5a",
+      "records": 1
+    },
+    {
+      "bytes": 4081,
+      "digest": "sha256:17afd98e6635f7ee1957dbb8322dd413d0f356115104711cadc9cdb22ffc76fd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5b.jsonl",
+      "range": "5b",
+      "records": 2
+    },
+    {
+      "bytes": 10434,
+      "digest": "sha256:fc858126af82a1c73e9a24e2c01935b5388142b56eb46d38045bd2ece736f8d2",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5c.jsonl",
+      "range": "5c",
+      "records": 3
+    },
+    {
+      "bytes": 3805,
+      "digest": "sha256:54bc9af76b8a2e8c5b8563b110121fec752eda0509fc74b95fcef81ec8645ee1",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5d.jsonl",
+      "range": "5d",
+      "records": 5
+    },
+    {
+      "bytes": 14926,
+      "digest": "sha256:3e621c4a4539f4d9388f79a696259eb5bbecee135212fc0d1fc5e5b3cb802be3",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5e.jsonl",
+      "range": "5e",
+      "records": 3
+    },
+    {
+      "bytes": 3049,
+      "digest": "sha256:6237f7bc2932c6d95ac2e5e4858d1122435912f571e08849d41a13ce7b696169",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/5f.jsonl",
+      "range": "5f",
+      "records": 2
+    },
+    {
+      "bytes": 3179,
+      "digest": "sha256:c1182eb32d2bcc9929a47e30e07ca744b7b1d2ee7832e643788422cc7849c67b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/70.jsonl",
+      "range": "70",
+      "records": 3
+    },
+    {
+      "bytes": 4777,
+      "digest": "sha256:72d845c5891d19920968fa937da6b4d60fded4c1b8f1e97a33b0bf1653f26e52",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/71.jsonl",
+      "range": "71",
+      "records": 2
+    },
+    {
+      "bytes": 11508,
+      "digest": "sha256:1e127fd0b58161cd3ec4ae81cd6f9d79cf43f06d9025b4a79984a1259e483283",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/72.jsonl",
+      "range": "72",
+      "records": 3
+    },
+    {
+      "bytes": 15458,
+      "digest": "sha256:382bef20ce934203e8a0af92758e515b1b991c07778eae428d3540c1c5a44216",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/73.jsonl",
+      "range": "73",
+      "records": 5
+    },
+    {
+      "bytes": 26050,
+      "digest": "sha256:b97448cca7c672b84fef6e84be8bd276e741bea35ca622cd7c9d6dc5aa784bcf",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/74.jsonl",
+      "range": "74",
+      "records": 6
+    },
+    {
+      "bytes": 21323,
+      "digest": "sha256:b2ab280fe981790ff58177716b88e9f5a5f0ab47846e80b850fc11bb96b06d18",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/75.jsonl",
+      "range": "75",
+      "records": 6
+    },
+    {
+      "bytes": 8659,
+      "digest": "sha256:afbad016ef236fc9959e66baee56ef314930db724a780e1ce5528670963e7d26",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/76.jsonl",
+      "range": "76",
+      "records": 1
+    },
+    {
+      "bytes": 5970,
+      "digest": "sha256:40c948d56557f026f45c5bcf89a7dbc7dc664e8a23c6799061ed963f9b29fc30",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/77.jsonl",
+      "range": "77",
+      "records": 4
+    },
+    {
+      "bytes": 769,
+      "digest": "sha256:3146634744593b10bc73fcff354ba34cd2f188de7a638b00d31a5f1031b4cef8",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/78.jsonl",
+      "range": "78",
+      "records": 1
+    },
+    {
+      "bytes": 3293,
+      "digest": "sha256:ffb3e2a04f5c6fb19452a218ceb27e7ad7fd41c9e2b273ddfe2bdcbaaa6dd43f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/79.jsonl",
+      "range": "79",
+      "records": 3
+    },
+    {
+      "bytes": 720,
+      "digest": "sha256:4fbc61f58bde485b893f814fdf7c05d2c61d07e7481ce127795c581b7900701a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7a.jsonl",
+      "range": "7a",
+      "records": 1
+    },
+    {
+      "bytes": 3795,
+      "digest": "sha256:49937afefd38266a937513c1f150332b3468e00ded5d5f584f5f7613f45c101d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7b.jsonl",
+      "range": "7b",
+      "records": 4
+    },
+    {
+      "bytes": 20678,
+      "digest": "sha256:ba6e375981287231f28b0f7fa159faa4d16be15317a44e067c6bf05617299a84",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7c.jsonl",
+      "range": "7c",
+      "records": 4
+    },
+    {
+      "bytes": 1292,
+      "digest": "sha256:49932f057c9440d2b92e36d5c546551f6ff8266cf546ad0d173d043cd0944ee9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7d.jsonl",
+      "range": "7d",
+      "records": 1
+    },
+    {
+      "bytes": 7274,
+      "digest": "sha256:65ec708a14f149b7aa9a58ebf493b12c28fc88f603cfc79cd80fed284370aaee",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7e.jsonl",
+      "range": "7e",
+      "records": 3
+    },
+    {
+      "bytes": 4697,
+      "digest": "sha256:a43e4201dcd82e5ac6ae453e82f1e11fdaa9ab75d40ee368c93858931014cdfa",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/7f.jsonl",
+      "range": "7f",
+      "records": 4
+    },
+    {
+      "bytes": 8773,
+      "digest": "sha256:7cfe0d307604b694bcaf0c541cfc32b04c7a00b2743dda4f616b4c4fed8a479e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/80.jsonl",
+      "range": "80",
+      "records": 3
+    },
+    {
+      "bytes": 7145,
+      "digest": "sha256:0a6ea188110c5de182b6111b2a1502a81cb7fd42707defd4f2ed30817292a34a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/81.jsonl",
+      "range": "81",
+      "records": 6
+    },
+    {
+      "bytes": 1460,
+      "digest": "sha256:b276458043d14c8f90b02ece19b4e4c77f916faa062126569d84295be11f9e5e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/82.jsonl",
+      "range": "82",
+      "records": 1
+    },
+    {
+      "bytes": 735,
+      "digest": "sha256:fccf608ccfd548589c54a325d5ee603905a8ce877cb4c1b0a8f920a6a781c0fd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/83.jsonl",
+      "range": "83",
+      "records": 1
+    },
+    {
+      "bytes": 39222,
+      "digest": "sha256:f9aab78b2f9123e49dfb274b1afb78262fb204ed276c4dec14ac0769f7b369a6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/84.jsonl",
+      "range": "84",
+      "records": 5
+    },
+    {
+      "bytes": 746,
+      "digest": "sha256:b6f7f0582deeb160f0df1f9ba259fa4378cec57e0cd71a40f247f601cac7fcb4",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/85.jsonl",
+      "range": "85",
+      "records": 1
+    },
+    {
+      "bytes": 2377,
+      "digest": "sha256:52b842c7194761916a4f60fba1c5904caceb7d3974ff5cf0deb4c9be8b98947c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/86.jsonl",
+      "range": "86",
+      "records": 3
+    },
+    {
+      "bytes": 746,
+      "digest": "sha256:8f6ddee64832850bce10ababa81196000ae87f9df743812f2f85fa1ff16b00ad",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/87.jsonl",
+      "range": "87",
+      "records": 1
+    },
+    {
+      "bytes": 34420,
+      "digest": "sha256:143ac5aedfa5366222a0a1b944a10e1e928a4d466549a1c78eb506155d790187",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/88.jsonl",
+      "range": "88",
+      "records": 2
+    },
+    {
+      "bytes": 2867,
+      "digest": "sha256:bb8ba7de6c7dfffd7b275a409cb3b38cdf9f4f5f072ad91016d6c0f08a1f2688",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/89.jsonl",
+      "range": "89",
+      "records": 3
+    },
+    {
+      "bytes": 4438,
+      "digest": "sha256:21cb9864c8b06c4981825e326ab01084d43edc66055c739ff25b121a99fe1dac",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8a.jsonl",
+      "range": "8a",
+      "records": 3
+    },
+    {
+      "bytes": 4552,
+      "digest": "sha256:afa191c4f7b51df3bb8c0cd0b479fb0f9cf11ae171c2649517ab9eac7b21d8e5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8b.jsonl",
+      "range": "8b",
+      "records": 3
+    },
+    {
+      "bytes": 11327,
+      "digest": "sha256:9f0c3ad88cbda42678a2d377c021f6c667401381fe4a49dad263a8631a0dc1a3",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8c.jsonl",
+      "range": "8c",
+      "records": 4
+    },
+    {
+      "bytes": 19449,
+      "digest": "sha256:91d5514ff6da41297469c99dc9bafc8475c9b92a5afb17294b3fbe723fffd711",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8d.jsonl",
+      "range": "8d",
+      "records": 4
+    },
+    {
+      "bytes": 8843,
+      "digest": "sha256:b5b210849929588e683cbbeec92bc4bc6eda97a6e4fb97480c0ba164ff9313c0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8e.jsonl",
+      "range": "8e",
+      "records": 2
+    },
+    {
+      "bytes": 1637,
+      "digest": "sha256:59afb303763b3afd5a7f387603b854ac798d05da6b81acd3b71b59d5377e564f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/8f.jsonl",
+      "range": "8f",
+      "records": 2
+    },
+    {
+      "bytes": 12769,
+      "digest": "sha256:c936db1f8e062ea69bb565a916f3e6756388abfaeeee8cb21513fd0426d46dae",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/90.jsonl",
+      "range": "90",
+      "records": 3
+    },
+    {
+      "bytes": 12897,
+      "digest": "sha256:3cbc6331aadb494cd9b0fd913313a4b8654cd64ba243159ad82688c7ff84ea62",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/91.jsonl",
+      "range": "91",
+      "records": 3
+    },
+    {
+      "bytes": 5744,
+      "digest": "sha256:9675097e2e34194953581b8fb06f853fc336f699304a9bec85b81747d35aaf12",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/92.jsonl",
+      "range": "92",
+      "records": 6
+    },
+    {
+      "bytes": 2851,
+      "digest": "sha256:1c851a2f34ee5c5bffc7a9cd013c841bcdeab26fc9644d0211c5629c616fa827",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/93.jsonl",
+      "range": "93",
+      "records": 3
+    },
+    {
+      "bytes": 1554,
+      "digest": "sha256:5012a2de21c5526533fd5e333f35799f31775b8baf16ef57abd13923c1951bb0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/94.jsonl",
+      "range": "94",
+      "records": 2
+    },
+    {
+      "bytes": 5115,
+      "digest": "sha256:2080c1263c522d1f72f60a10ada04f8faea0724ecce04b8ea0c0f5ba78303cf3",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/95.jsonl",
+      "range": "95",
+      "records": 3
+    },
+    {
+      "bytes": 2839,
+      "digest": "sha256:9db9348fa61174e7b14765665bac3d70e3578b84c11bca5ee96ef209e0e1c0b1",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/96.jsonl",
+      "range": "96",
+      "records": 2
+    },
+    {
+      "bytes": 5251,
+      "digest": "sha256:a77101a14b6da069893d00a7c08f783ed14a44e50318d7e1ff9c86ed2b17bafb",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/97.jsonl",
+      "range": "97",
+      "records": 3
+    },
+    {
+      "bytes": 3326,
+      "digest": "sha256:3e12fc1ba83f993478385f9777f9b186c455c64425e5da37a88bf2f3ccf83db6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/98.jsonl",
+      "range": "98",
+      "records": 2
+    },
+    {
+      "bytes": 3081,
+      "digest": "sha256:3b58391b767e88b2433ac8c074c730045e149b29ef7e4b4420adf2303cd435e6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/99.jsonl",
+      "range": "99",
+      "records": 2
+    },
+    {
+      "bytes": 45212,
+      "digest": "sha256:fa5eb9eb965f5caa61ed7a6b416c56d2868c45011e106cfff61f50f4af39b9b2",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9a.jsonl",
+      "range": "9a",
+      "records": 6
+    },
+    {
+      "bytes": 3267,
+      "digest": "sha256:cee49cf5078189750b566f70a426f0f7e99c6a9cd17e3a45b8869530a4786dab",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9b.jsonl",
+      "range": "9b",
+      "records": 3
+    },
+    {
+      "bytes": 1913,
+      "digest": "sha256:849c9096f78f10393b0007513b425286fbbeb5e7af4f24ffe982bd6682c363a9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9c.jsonl",
+      "range": "9c",
+      "records": 1
+    },
+    {
+      "bytes": 20467,
+      "digest": "sha256:2fa5f51da7519acc7b53c29c67d30cd65c45dec043028a63859db9f72c47164f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9d.jsonl",
+      "range": "9d",
+      "records": 10
+    },
+    {
+      "bytes": 11042,
+      "digest": "sha256:f5eff91922c71f532a1a238823a00a5f64a345691fea5bd2decd98bdaaa00fa5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9e.jsonl",
+      "range": "9e",
+      "records": 2
+    },
+    {
+      "bytes": 5711,
+      "digest": "sha256:fabd19329b92596f369c5e625620f8e8e11da3ef810e65c4c9050d4be50774c7",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/9f.jsonl",
+      "range": "9f",
+      "records": 4
+    },
+    {
+      "bytes": 9385,
+      "digest": "sha256:db188a9163752fe1b4a84a81fa4c6871564bbcf261d1edd619a55aba48b2e7c4",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b0.jsonl",
+      "range": "b0",
+      "records": 4
+    },
+    {
+      "bytes": 8756,
+      "digest": "sha256:c32f2fb9bdefa4a7cebee4670264a546941e794e9b981aa818efd4ae9a48c949",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b1.jsonl",
+      "range": "b1",
+      "records": 5
+    },
+    {
+      "bytes": 14431,
+      "digest": "sha256:7e2a945b127bdbc90c4f8a8f557231869c718d4998fba6ac76b3a153fd0f06d5",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b2.jsonl",
+      "range": "b2",
+      "records": 3
+    },
+    {
+      "bytes": 14605,
+      "digest": "sha256:8ca7444a54e7af9e83a4d5f98a16bd8a5687cc8197aa08ebbec99088a59c9818",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b3.jsonl",
+      "range": "b3",
+      "records": 5
+    },
+    {
+      "bytes": 23810,
+      "digest": "sha256:b7c2103119ef4194ac576e12dd9e50705790ba1a8715f2037087a8395fabd9e6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b4.jsonl",
+      "range": "b4",
+      "records": 5
+    },
+    {
+      "bytes": 3283,
+      "digest": "sha256:2c32c65d5c49b6eaa6112aaf2d8534cef658dcf78533526e32df868a758d09d2",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b6.jsonl",
+      "range": "b6",
+      "records": 2
+    },
+    {
+      "bytes": 2515,
+      "digest": "sha256:27e559dac02b417b8745070f87db414585e6908938f074a933d24833837e636a",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b7.jsonl",
+      "range": "b7",
+      "records": 3
+    },
+    {
+      "bytes": 1450,
+      "digest": "sha256:b884b55b55350be1d9a6bd10414131183e27ebd2f24f2bc49a2c6c8ba5b2525f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b8.jsonl",
+      "range": "b8",
+      "records": 2
+    },
+    {
+      "bytes": 20067,
+      "digest": "sha256:cacc905dcbb50ca26bbc32daaa4552af75605980096f207288a5b78dcd3986e1",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/b9.jsonl",
+      "range": "b9",
+      "records": 6
+    },
+    {
+      "bytes": 2675,
+      "digest": "sha256:c16a5238c5f8e94888e3c11d846cdaa70b1714855755b11ab7dff49ecab59549",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ba.jsonl",
+      "range": "ba",
+      "records": 2
+    },
+    {
+      "bytes": 20424,
+      "digest": "sha256:e98633a35cf8ec3df417a9fd8b7ea1a5ebab9ed6b3510bb6f890a019db6f39a7",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/bb.jsonl",
+      "range": "bb",
+      "records": 2
+    },
+    {
+      "bytes": 2222,
+      "digest": "sha256:08d2091e2ae2e19018166469e26228716936db92b44bc5a20a2540366416d27d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/bc.jsonl",
+      "range": "bc",
+      "records": 3
+    },
+    {
+      "bytes": 2174,
+      "digest": "sha256:0f6ff7c52eca393e13d69883bc77738cb2276271648e0bc05cea4100b88612c0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/bd.jsonl",
+      "range": "bd",
+      "records": 3
+    },
+    {
+      "bytes": 16727,
+      "digest": "sha256:7d4b8c9b1d829c3a3c0da7e28c2b15c5ce0b93cdc08f43c178aa91619fb3eae9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/be.jsonl",
+      "range": "be",
+      "records": 5
+    },
+    {
+      "bytes": 3093,
+      "digest": "sha256:99d7be0ea972e6d3856d2d36b5a488b036f6a427e80b12ce0da0801ed72e1068",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/bf.jsonl",
+      "range": "bf",
+      "records": 3
+    },
+    {
+      "bytes": 1495,
+      "digest": "sha256:79eac8745ae922cc3b65dcfe0ebb512776bd1b416666612ede67aeaf8bac0f85",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c0.jsonl",
+      "range": "c0",
+      "records": 2
+    },
+    {
+      "bytes": 4392,
+      "digest": "sha256:36325780e1b1ddd8dc08dcd6e4f446fb57df0d6a82307713760d649498f31e20",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c1.jsonl",
+      "range": "c1",
+      "records": 3
+    },
+    {
+      "bytes": 9176,
+      "digest": "sha256:bdeafbde8b8c73eb635bea79717e26841696a4e11cd37f1f74ecbf67fbba379d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c2.jsonl",
+      "range": "c2",
+      "records": 2
+    },
+    {
+      "bytes": 2524,
+      "digest": "sha256:7e062a98885dbc0509e3be8f4aa92fe2581b00b013c0195242a634cfd65310fb",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c3.jsonl",
+      "range": "c3",
+      "records": 3
+    },
+    {
+      "bytes": 12213,
+      "digest": "sha256:83ec87eac683975a813c0cbfdd3ea9f6d5f2ae2a700d2626ad088b2870057a79",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c4.jsonl",
+      "range": "c4",
+      "records": 4
+    },
+    {
+      "bytes": 27410,
+      "digest": "sha256:3cfd0d6796da08347b139d046e3f3ba60ac1e9505f90a310a3f7fca4a2f9db31",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c5.jsonl",
+      "range": "c5",
+      "records": 6
+    },
+    {
+      "bytes": 1513,
+      "digest": "sha256:8107583ca41e1d7989f9740d7c8d8629c36c8bb8432b7a2340ccd4d11693b9f4",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c6.jsonl",
+      "range": "c6",
+      "records": 2
+    },
+    {
+      "bytes": 5651,
+      "digest": "sha256:0a8de5f1d5e8dc2f58fdc6926df0ae505861ad27040faab9de0ad6f371caf288",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c7.jsonl",
+      "range": "c7",
+      "records": 4
+    },
+    {
+      "bytes": 2886,
+      "digest": "sha256:aa1981442cf881dea1bbed219244d1ab0a8719e9b7f8bc3bc03b51b99e790190",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c8.jsonl",
+      "range": "c8",
+      "records": 2
+    },
+    {
+      "bytes": 3303,
+      "digest": "sha256:1e25037ada9c47dfec9bee953d0f770a52d9a4ce3aab3066c4695350a21a30b4",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/c9.jsonl",
+      "range": "c9",
+      "records": 2
+    },
+    {
+      "bytes": 4799,
+      "digest": "sha256:f5acfad2b96013ea647d6458f279b113a2bf9478ae0fda7834c8e775eb642a6d",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ca.jsonl",
+      "range": "ca",
+      "records": 2
+    },
+    {
+      "bytes": 33114,
+      "digest": "sha256:74546dba07130ca240105c023dc8610bbc35b7a1ef1ab5db1479e9b4507db7ed",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/cb.jsonl",
+      "range": "cb",
+      "records": 3
+    },
+    {
+      "bytes": 759,
+      "digest": "sha256:57127871625170179f715c50a991de64e9fcf4fe2c47154cfd0f6cc08acaf648",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/cc.jsonl",
+      "range": "cc",
+      "records": 1
+    },
+    {
+      "bytes": 25966,
+      "digest": "sha256:c4187972de801d0a119f8bb26c5e7aaa28f65663141bdd4c0c1e2174e31ba32e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/cd.jsonl",
+      "range": "cd",
+      "records": 4
+    },
+    {
+      "bytes": 2811,
+      "digest": "sha256:b07d264b7060ea8fe3e96c9484514b666276a2c961efd3cb2213baa8c48981a0",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ce.jsonl",
+      "range": "ce",
+      "records": 3
+    },
+    {
+      "bytes": 5965,
+      "digest": "sha256:38aaf5c5e1ca358232a93c216bf711084b8119a7e8ef183bc5563c044ba5a88e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/cf.jsonl",
+      "range": "cf",
+      "records": 3
+    },
+    {
+      "bytes": 5719,
+      "digest": "sha256:cfa21d4dbc4e835b4c503a8a75735bf76e8a82559e54c142faf233907f756428",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e0.jsonl",
+      "range": "e0",
+      "records": 7
+    },
+    {
+      "bytes": 902,
+      "digest": "sha256:aa4f7e00f0dcefec67ad33e6ecbd1f0286bd34899220b7d828029d77d1042c3b",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e1.jsonl",
+      "range": "e1",
+      "records": 1
+    },
+    {
+      "bytes": 11132,
+      "digest": "sha256:45dfaf9d638f8a605b33da16494045a74a346fc0081a6951fd9b6f8dbe80df74",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e2.jsonl",
+      "range": "e2",
+      "records": 7
+    },
+    {
+      "bytes": 19804,
+      "digest": "sha256:88c7b58279322a7e73a75ea2120775b6e568a9e9923195ff684b3f17dbaa3399",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e3.jsonl",
+      "range": "e3",
+      "records": 3
+    },
+    {
+      "bytes": 7534,
+      "digest": "sha256:475c98a47df04f3d33070473fffc09dc11119270a0865fc21245e3bee1a17b66",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e4.jsonl",
+      "range": "e4",
+      "records": 7
+    },
+    {
+      "bytes": 30310,
+      "digest": "sha256:0b03dc925cf0fde13071aee78058807b4929586dcdaf8be78d8883a4cdb06af9",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e5.jsonl",
+      "range": "e5",
+      "records": 5
+    },
+    {
+      "bytes": 12407,
+      "digest": "sha256:0bfe93a84274898e373fc240f399ae9e3213d712cbcbbada21bc40bd357369a3",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e6.jsonl",
+      "range": "e6",
+      "records": 2
+    },
+    {
+      "bytes": 10886,
+      "digest": "sha256:3cc0a1b48433f6a79c198bef0c05a7ebf8fe5a1e8ad1cbba5b45d24e105d1f61",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e8.jsonl",
+      "range": "e8",
+      "records": 6
+    },
+    {
+      "bytes": 25550,
+      "digest": "sha256:30e5cf0c4cd629f47ba261ae9684a4919ae3427bef36e5256e952e5183c35a86",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/e9.jsonl",
+      "range": "e9",
+      "records": 5
+    },
+    {
+      "bytes": 10592,
+      "digest": "sha256:c8c569ce01161562014003ba980e99181483abceb1ddffb6280e69b2128b7233",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ea.jsonl",
+      "range": "ea",
+      "records": 4
+    },
+    {
+      "bytes": 11054,
+      "digest": "sha256:7ec36bc963cff70bf29bc0fb6d26792aa7c62ef06801198e5a6decb090c31e50",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/eb.jsonl",
+      "range": "eb",
+      "records": 2
+    },
+    {
+      "bytes": 1453,
+      "digest": "sha256:c3c14a7124a3932d5cad032020ee6f853506eadb269272c08ac3916f77dd192e",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ec.jsonl",
+      "range": "ec",
+      "records": 2
+    },
+    {
+      "bytes": 6737,
+      "digest": "sha256:0693b44ffa7784a121f805fc87447c566c32acf5d8b5e5be7c4ac8a9ddf98298",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ed.jsonl",
+      "range": "ed",
+      "records": 5
+    },
+    {
+      "bytes": 1977,
+      "digest": "sha256:cc6d1ff9f1ec6b3caaa1f0a3bdf0513cadd1c7e33e1f2fbb67805ac8c97dfae8",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ee.jsonl",
+      "range": "ee",
+      "records": 2
+    },
+    {
+      "bytes": 726,
+      "digest": "sha256:e01868721867a9f688cf1b24dc36734841c8221b9a5a1a6b0000e8fe1a07e447",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ef.jsonl",
+      "range": "ef",
+      "records": 1
+    },
+    {
+      "bytes": 8913,
+      "digest": "sha256:19616b6c70f184b3695f1f593273f77a60bda7f79b593744101a9cfb354098bd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f0.jsonl",
+      "range": "f0",
+      "records": 5
+    },
+    {
+      "bytes": 16167,
+      "digest": "sha256:6f9d80579393905b4b174d252a0d209279fc94ab05628ca2d91e9ec1e6e5395c",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f1.jsonl",
+      "range": "f1",
+      "records": 6
+    },
+    {
+      "bytes": 4279,
+      "digest": "sha256:46263449243bcdc96c42a54af6099aa2fe89fa889c74277c79d3f697cf57050f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f2.jsonl",
+      "range": "f2",
+      "records": 2
+    },
+    {
+      "bytes": 7748,
+      "digest": "sha256:fcffaa5d55c1806de2bd0d2ac9c732648903c0d52d46d1a7d89b718833a5e618",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f3.jsonl",
+      "range": "f3",
+      "records": 4
+    },
+    {
+      "bytes": 1065,
+      "digest": "sha256:966478facb6a902a6d1fe39935d9e7311a9b8faf7063a41ab945af0fba6528c1",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f4.jsonl",
+      "range": "f4",
+      "records": 1
+    },
+    {
+      "bytes": 2830,
+      "digest": "sha256:08e8c7494127df85b56ab83f686149631e8c7c83447203b2abcbac4bbced0efa",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f5.jsonl",
+      "range": "f5",
+      "records": 2
+    },
+    {
+      "bytes": 9886,
+      "digest": "sha256:e66c074fc301ff6adf5117b6bc0c90404787be29a38e071d156badf711ac1848",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f6.jsonl",
+      "range": "f6",
+      "records": 4
+    },
+    {
+      "bytes": 22916,
+      "digest": "sha256:0e29ddc981a920a920503b56cf1430c3c750869959b65c0c76c7da11d310061f",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f7.jsonl",
+      "range": "f7",
+      "records": 9
+    },
+    {
+      "bytes": 1939,
+      "digest": "sha256:60ff46bea7e79a073f7d7759c12ce6749e618fcbf18ae210d01bf168239f1ffd",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f8.jsonl",
+      "range": "f8",
+      "records": 2
+    },
+    {
+      "bytes": 4431,
+      "digest": "sha256:b27cf8450fc6f7e32c303f5262e7c7696199a46b870362c83b06d4735bf915d6",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/f9.jsonl",
+      "range": "f9",
+      "records": 5
+    },
+    {
+      "bytes": 5445,
+      "digest": "sha256:9b60716157ed699183f4c23ed0ec94b505e03c0a142f13246b2baa846cf9dd61",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/fa.jsonl",
+      "range": "fa",
+      "records": 3
+    },
+    {
+      "bytes": 2395,
+      "digest": "sha256:c8efc1a194af9d2003c42be56d6fe02bc0a2646d65e8e773d32977dcfd36ffbb",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/fb.jsonl",
+      "range": "fb",
+      "records": 3
+    },
+    {
+      "bytes": 36595,
+      "digest": "sha256:67ca0dfa71ddd76c47a3d8d89e4a1abcf9207c95bde1d3b3b366c47b16441b94",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/fd.jsonl",
+      "range": "fd",
+      "records": 1
+    },
+    {
+      "bytes": 4194,
+      "digest": "sha256:822be9ebd3923c29599a6e0578592802cd656588f7dcee9c2648359c2a985349",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/fe.jsonl",
+      "range": "fe",
+      "records": 2
+    },
+    {
+      "bytes": 3805,
+      "digest": "sha256:60b92f7a3681ead8b6287fcef5dae1f86405382824b16803b1b24c07bd1d23a3",
+      "kind": "event",
+      "path": "kag/indexes/shards/event/ff.jsonl",
+      "range": "ff",
+      "records": 4
+    },
+    {
+      "bytes": 17960,
+      "digest": "sha256:54c1191d1b0cdd8814d7a3e03a4838f531917b5f47cb0858bd8550f1916a97b7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/00.jsonl",
+      "range": "00",
+      "records": 7
+    },
+    {
+      "bytes": 10025,
+      "digest": "sha256:f0d01213391855b0f8c9899483a5c2bc9d506a2b83df6d4ebac932b8231d5d7e",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/01.jsonl",
+      "range": "01",
+      "records": 3
+    },
+    {
+      "bytes": 16190,
+      "digest": "sha256:86e66510a3ac40d95e5701319e4ebc893dfe8d8bbe759188e9ebdea847b7f916",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/02.jsonl",
+      "range": "02",
+      "records": 6
+    },
+    {
+      "bytes": 35736,
+      "digest": "sha256:7b5a343b93a4e2d02823adde5b64bef5603cc78f49250e8cfd01bbebf02c4d2c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/03.jsonl",
+      "range": "03",
+      "records": 14
+    },
+    {
+      "bytes": 7090,
+      "digest": "sha256:3bb9e9089e100381706277bd4358c1df46c1f3526c25f9c28619c4e14e2e04c6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/04.jsonl",
+      "range": "04",
+      "records": 3
+    },
+    {
+      "bytes": 13131,
+      "digest": "sha256:9027b817734587d3b68466d4baeeef1a4113b3f24273a7924a56e694b49853fe",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/05.jsonl",
+      "range": "05",
+      "records": 5
+    },
+    {
+      "bytes": 14588,
+      "digest": "sha256:f6a95b157cc0090696dbd4895b2e2108db2095a93dd7943cb919d150ed489ab2",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/06.jsonl",
+      "range": "06",
+      "records": 6
+    },
+    {
+      "bytes": 20895,
+      "digest": "sha256:8404723a8db1393e46723ecd1d6758e0594c5ac0019db8e2f6d3edc41283549b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/07.jsonl",
+      "range": "07",
+      "records": 8
+    },
+    {
+      "bytes": 16626,
+      "digest": "sha256:c5e6778c26bbba7aff335ac9f2b6f9d79de3b34d0b6184d5d7a6369a69a8ddcc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/08.jsonl",
+      "range": "08",
+      "records": 6
+    },
+    {
+      "bytes": 15232,
+      "digest": "sha256:098c2c5fc9d05a95a1a42dbf0aa4ee3f7ad0401617e3282889f3ca65a923f1eb",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/09.jsonl",
+      "range": "09",
+      "records": 6
+    },
+    {
+      "bytes": 20477,
+      "digest": "sha256:57412020b1ccf84886ed2bd1c91950e7212b6dd003fa68cc960f24d08a6a516f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0a.jsonl",
+      "range": "0a",
+      "records": 9
+    },
+    {
+      "bytes": 19787,
+      "digest": "sha256:49e88d7b5c930a4008efaf89b2bd087a3bd7085e96fd6b723d2cc3b9da15f4eb",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0b.jsonl",
+      "range": "0b",
+      "records": 8
+    },
+    {
+      "bytes": 6607,
+      "digest": "sha256:7806081f9cbe564a1a495e241c01ca8bb8a488712bb4e948bde91ea327b1733b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0c.jsonl",
+      "range": "0c",
+      "records": 3
+    },
+    {
+      "bytes": 13921,
+      "digest": "sha256:ada2c777e3ceedec24ad821c3ba75c663d6d6444ee7c5157ba9cadea333f1c60",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0d.jsonl",
+      "range": "0d",
+      "records": 5
+    },
+    {
+      "bytes": 7605,
+      "digest": "sha256:36d8716a9657086f1943499049fa2430556f6047289af07e35f2e9337a31fdc7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0e.jsonl",
+      "range": "0e",
+      "records": 3
+    },
+    {
+      "bytes": 12309,
+      "digest": "sha256:5dfd578f0b4a615a1276cc08263488409ba7cd5e89da214596428840fc51421b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/0f.jsonl",
+      "range": "0f",
+      "records": 5
+    },
+    {
+      "bytes": 7205,
+      "digest": "sha256:315f206ecb521b15d4d0ea9896da357d66cfca765bae429bb639e570f2835fbb",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/10.jsonl",
+      "range": "10",
+      "records": 3
+    },
+    {
+      "bytes": 9974,
+      "digest": "sha256:a6d37bc1fa80989f2bad450f9416497312fd7a3043fc2e8d2f0348c0e1c7f478",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/11.jsonl",
+      "range": "11",
+      "records": 3
+    },
+    {
+      "bytes": 20489,
+      "digest": "sha256:230152e8dc3469fec186f1e0cd4676cefb06223f6889b9a9b26fd6795e17b858",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/12.jsonl",
+      "range": "12",
+      "records": 7
+    },
+    {
+      "bytes": 11243,
+      "digest": "sha256:8483b5ea00f8ea3b42088bd90c8551a20640b8c3b2d0c8f12ddea435cc04318f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/13.jsonl",
+      "range": "13",
+      "records": 4
+    },
+    {
+      "bytes": 15643,
+      "digest": "sha256:76092c7fdd7bcbf7638cc579f42d64bc9f239fde58f015eca0fc989a6f1d3b23",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/14.jsonl",
+      "range": "14",
+      "records": 6
+    },
+    {
+      "bytes": 25822,
+      "digest": "sha256:95276ad514e555dc0b6a0eccd3036b70be55b5358d86ff035c1363f5620b7cbf",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/15.jsonl",
+      "range": "15",
+      "records": 9
+    },
+    {
+      "bytes": 12322,
+      "digest": "sha256:47b3bec7d54fac895c7e5d3cb5927458e6ce7d5f0a56b750a877ccc683e61c65",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/16.jsonl",
+      "range": "16",
+      "records": 5
+    },
+    {
+      "bytes": 12632,
+      "digest": "sha256:07ea2f7be31e07b58c1e98385eac970ad18b5ccec6a79baf285a1392199919fe",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/17.jsonl",
+      "range": "17",
+      "records": 5
+    },
+    {
+      "bytes": 15773,
+      "digest": "sha256:5bf2dfe3e5203847b7477680cc1a72e2cf003e6468ddd833ec54c186a92b9439",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/18.jsonl",
+      "range": "18",
+      "records": 6
+    },
+    {
+      "bytes": 15068,
+      "digest": "sha256:c43c3e55df1d1593556bcb4676c510205b0207bf24a5573d3bcfb7c48d7545bd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/19.jsonl",
+      "range": "19",
+      "records": 6
+    },
+    {
+      "bytes": 14184,
+      "digest": "sha256:e460961bb22e545398c70ba6549d5c254ef71f8bb82c7ac03053ab16ffa7444a",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1a.jsonl",
+      "range": "1a",
+      "records": 6
+    },
+    {
+      "bytes": 12801,
+      "digest": "sha256:e1058fc3eed01a4f49a4b9b99fb321ec1fc8bedaa41362343fffd97db2a95aed",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1b.jsonl",
+      "range": "1b",
+      "records": 5
+    },
+    {
+      "bytes": 13839,
+      "digest": "sha256:dbe5b5685ae313b5dea609974fadb9e57033864bf7ac5be64e9d12a886fd5a90",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1c.jsonl",
+      "range": "1c",
+      "records": 6
+    },
+    {
+      "bytes": 21186,
+      "digest": "sha256:dffcc0cdf5cdf198267075cebab6b94c18ad38231c862710a2265c22d8444c71",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1d.jsonl",
+      "range": "1d",
+      "records": 7
+    },
+    {
+      "bytes": 6112,
+      "digest": "sha256:2554ddcad47d0be3c17061f56fb9cce42c970bb3b86f684ce457bfde369e4ce0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1e.jsonl",
+      "range": "1e",
+      "records": 2
+    },
+    {
+      "bytes": 6972,
+      "digest": "sha256:0b0c8ef41e69f03df8a645b43be7d17c4f3067c58ebc52d696d62b806a9ba2df",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/1f.jsonl",
+      "range": "1f",
+      "records": 3
+    },
+    {
+      "bytes": 26250,
+      "digest": "sha256:1c96a1feb9a3e81dfb85f980811b88c1d1b72a3c89a542a2a1c96ceb6094f907",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/20.jsonl",
+      "range": "20",
+      "records": 8
+    },
+    {
+      "bytes": 9516,
+      "digest": "sha256:2325a3b86604ec97fcdf4ff88f6f0f3ece60e523ba402c1eabdff483adce465d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/21.jsonl",
+      "range": "21",
+      "records": 4
+    },
+    {
+      "bytes": 9099,
+      "digest": "sha256:f62947790d8e00e1fd58749eb066a4d9a38436cba9905b3be3c4990ad388d04c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/22.jsonl",
+      "range": "22",
+      "records": 4
+    },
+    {
+      "bytes": 4960,
+      "digest": "sha256:c025f4a524a0505ceb1577e2fa38de087dbb2a61428390277bbd48308f08c2a2",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/23.jsonl",
+      "range": "23",
+      "records": 2
+    },
+    {
+      "bytes": 4802,
+      "digest": "sha256:051289ca67a3f6b3b5ea80fcc2c52030cd963c177602aeba8119d0ef704f0af7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/24.jsonl",
+      "range": "24",
+      "records": 2
+    },
+    {
+      "bytes": 27910,
+      "digest": "sha256:f5898f56376fef691a61acf837a5697bc0454b7f8e61fd49f8644af6f7de0b47",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/25.jsonl",
+      "range": "25",
+      "records": 7
+    },
+    {
+      "bytes": 10141,
+      "digest": "sha256:2984b530da96a7d7c9b5d0b78e77fb1f5c43fd00f089dcc2329d31a136890c62",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/26.jsonl",
+      "range": "26",
+      "records": 4
+    },
+    {
+      "bytes": 23473,
+      "digest": "sha256:5bcd43a241d5c812b1f713de050e3c836a66ff87eecb9506be1dbc5a5905a9e4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/27.jsonl",
+      "range": "27",
+      "records": 9
+    },
+    {
+      "bytes": 11149,
+      "digest": "sha256:1c789756a8c6b2df0e508aea77303c368f03b23d7c8b98436924ea386b464bc1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/28.jsonl",
+      "range": "28",
+      "records": 5
+    },
+    {
+      "bytes": 13507,
+      "digest": "sha256:828975c9cf870c10368cf106c44e42a071b15833abe396ac19dcfd48051b502f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/29.jsonl",
+      "range": "29",
+      "records": 5
+    },
+    {
+      "bytes": 24003,
+      "digest": "sha256:118d45d1945fc40baaf95705664b652ac013c9c7233ce6d2075ed395af266702",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2a.jsonl",
+      "range": "2a",
+      "records": 8
+    },
+    {
+      "bytes": 8496,
+      "digest": "sha256:92f20d3bc0fd48ce841a98e72968ff965f35393c291e2003825fe6320507097b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2b.jsonl",
+      "range": "2b",
+      "records": 3
+    },
+    {
+      "bytes": 14650,
+      "digest": "sha256:e29204a75d0b52aa2849cb43f1ffed0d2a23cfa3f8d22b8a33dcb651eec7727e",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2c.jsonl",
+      "range": "2c",
+      "records": 6
+    },
+    {
+      "bytes": 13610,
+      "digest": "sha256:c381d0bd27f2d3855f4d8b32a2cd8b1866ab498ea52999e53c44c39fe9020789",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2d.jsonl",
+      "range": "2d",
+      "records": 5
+    },
+    {
+      "bytes": 15371,
+      "digest": "sha256:2ac11fe4086001067b339abab8fda781ed6746e8f54208af3581f52b4daf794d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2e.jsonl",
+      "range": "2e",
+      "records": 5
+    },
+    {
+      "bytes": 11528,
+      "digest": "sha256:74a8c606b424056122d1f9a8eda2bf5a789602ccd572684cc724006adb8daa36",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/2f.jsonl",
+      "range": "2f",
+      "records": 5
+    },
+    {
+      "bytes": 16463,
+      "digest": "sha256:0977141422d42803457a60da7c821e25fc36681ba73132d67a41597b8d56f8b5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/30.jsonl",
+      "range": "30",
+      "records": 6
+    },
+    {
+      "bytes": 19193,
+      "digest": "sha256:aa9c30e0b9d29330767c70a14628291738cbb1baf736d3b802580e9a154a98c7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/31.jsonl",
+      "range": "31",
+      "records": 8
+    },
+    {
+      "bytes": 10447,
+      "digest": "sha256:d5aa1db22598c25407eb1db35990a4984e2ca60ce5b9859f82f673ccfb751ba3",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/32.jsonl",
+      "range": "32",
+      "records": 4
+    },
+    {
+      "bytes": 20945,
+      "digest": "sha256:c55e9727a9dd03bd6baf4411642600c761627be27766333ae697fa5c3c89368d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/33.jsonl",
+      "range": "33",
+      "records": 5
+    },
+    {
+      "bytes": 6098,
+      "digest": "sha256:ce23ffe953f51d05794de974ba426d1db589d6cde01109121613c6c7c1a34b19",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/34.jsonl",
+      "range": "34",
+      "records": 2
+    },
+    {
+      "bytes": 18512,
+      "digest": "sha256:4746aa1827c9d79f8d6d7c4c884a3b62f82f35fcc6ca2db4233abc92e197896e",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/35.jsonl",
+      "range": "35",
+      "records": 7
+    },
+    {
+      "bytes": 12692,
+      "digest": "sha256:d49c69eda50e5253f9d92e0cbb68d93437d2aa0d449c3b4845fdfd4f3e3c3bf4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/36.jsonl",
+      "range": "36",
+      "records": 5
+    },
+    {
+      "bytes": 9359,
+      "digest": "sha256:808675da137cc36b149130ed4093dfa2eacf4834d898c21adb45c65d1210f387",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/37.jsonl",
+      "range": "37",
+      "records": 4
+    },
+    {
+      "bytes": 8437,
+      "digest": "sha256:6df0795c058011c5ae6f2a7e2a146253bd7810f82cdf5b2df027b76776b0ad2d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/38.jsonl",
+      "range": "38",
+      "records": 3
+    },
+    {
+      "bytes": 15237,
+      "digest": "sha256:1b301b42cf03b39252eafff96c3756ff11239c0fa67cfa645e07be3a064d6b04",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/39.jsonl",
+      "range": "39",
+      "records": 6
+    },
+    {
+      "bytes": 9660,
+      "digest": "sha256:750bcb65ac7b2510a7f4e07a14a436bdb894320eb8c0e2599d8ef74658d23818",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3a.jsonl",
+      "range": "3a",
+      "records": 4
+    },
+    {
+      "bytes": 12881,
+      "digest": "sha256:a9fa25a63b61a0773b3d2a277c81ad5b22bf890a44fcfe6c0ab3d01baec9f2d2",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3b.jsonl",
+      "range": "3b",
+      "records": 5
+    },
+    {
+      "bytes": 15981,
+      "digest": "sha256:8a352c65ea14795791749a90c81d64bc6a24af3f92295b38c7c051d083764a4c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3c.jsonl",
+      "range": "3c",
+      "records": 6
+    },
+    {
+      "bytes": 2410,
+      "digest": "sha256:84d124b84935d0a98cb491133e4d30318aaf2bde441ac2ffbdd899af379cd889",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3d.jsonl",
+      "range": "3d",
+      "records": 1
+    },
+    {
+      "bytes": 24768,
+      "digest": "sha256:e96e17c8510bd388d69519dcdc9aa1aaad49ad696fa40b17790deec2a36c6269",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3e.jsonl",
+      "range": "3e",
+      "records": 9
+    },
+    {
+      "bytes": 10405,
+      "digest": "sha256:a23a46496825cae28564a0f4fd692a02badef849ee08fff5afa401fe1e70efec",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/3f.jsonl",
+      "range": "3f",
+      "records": 4
+    },
+    {
+      "bytes": 13889,
+      "digest": "sha256:9ff088652767ddb3524e930e4f86b74d1d9a4826a966c4b84f241b664c500cbc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/40.jsonl",
+      "range": "40",
+      "records": 6
+    },
+    {
+      "bytes": 13944,
+      "digest": "sha256:0be72060e61e3df11ad0e21d26105382a57ad878d84dbb41fe0ef31fb7ac87fd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/41.jsonl",
+      "range": "41",
+      "records": 5
+    },
+    {
+      "bytes": 15146,
+      "digest": "sha256:3b4c0768a0f6ca5906bea278bfc33c82c02e29e6c1772e2dadfe89ab14e67ded",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/42.jsonl",
+      "range": "42",
+      "records": 6
+    },
+    {
+      "bytes": 10436,
+      "digest": "sha256:47d6d5e0ae4c961d60f91b1a068bc22637df581b4ba6a6e0f344661a635d1f17",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/43.jsonl",
+      "range": "43",
+      "records": 4
+    },
+    {
+      "bytes": 14671,
+      "digest": "sha256:bbb2130dba2de46d0cb01f868b36e0e48622e00c8dcf4e325c1e6da5c8883eed",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/44.jsonl",
+      "range": "44",
+      "records": 6
+    },
+    {
+      "bytes": 28379,
+      "digest": "sha256:88bbbad77f073e98fcf7b93bd43acb02146bc9a771e1cac9ba48a48a6a85425c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/45.jsonl",
+      "range": "45",
+      "records": 10
+    },
+    {
+      "bytes": 4742,
+      "digest": "sha256:71361a5fa263716cc1cde17d1ba439f1fa5f28e77263da9391fe553882d3f1de",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/46.jsonl",
+      "range": "46",
+      "records": 2
+    },
+    {
+      "bytes": 12180,
+      "digest": "sha256:20dc158b618f565175df0a3e16ad2bde3f6f843fed074b72bc4d7aa71b40c558",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/47.jsonl",
+      "range": "47",
+      "records": 5
+    },
+    {
+      "bytes": 25819,
+      "digest": "sha256:4a5f2a97050adc43ef913c5a628c77ea474142cdfc7c9340fc2c7be828c4a438",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/48.jsonl",
+      "range": "48",
+      "records": 10
+    },
+    {
+      "bytes": 20341,
+      "digest": "sha256:edeb96dcaf6a8277083b6d2099240eb939ba8e877a0ea2c215aed4c1643f46f6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/49.jsonl",
+      "range": "49",
+      "records": 8
+    },
+    {
+      "bytes": 10806,
+      "digest": "sha256:0663bccbebe99aa973f18c3894f755cad371b0d46704be9e6591add60df69ab2",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4a.jsonl",
+      "range": "4a",
+      "records": 4
+    },
+    {
+      "bytes": 26919,
+      "digest": "sha256:bd28280a6a724b6c26890130689c8f5bcb645a6b1c451eeb0681902d3ce0c3d0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4b.jsonl",
+      "range": "4b",
+      "records": 10
+    },
+    {
+      "bytes": 7558,
+      "digest": "sha256:894274475bd527fd464d898420fd39b04bccea1e55b9d46f5a22b988b8778e33",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4c.jsonl",
+      "range": "4c",
+      "records": 3
+    },
+    {
+      "bytes": 6726,
+      "digest": "sha256:cbd4b40dd7d4a9fc4e3d6e241d2186e8a25c4ff2fff8b818d87d880044c268a6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4d.jsonl",
+      "range": "4d",
+      "records": 3
+    },
+    {
+      "bytes": 7262,
+      "digest": "sha256:132638e2608b087561625a73e10c09dba81c56f75dc7c694b2178f979c29f500",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4e.jsonl",
+      "range": "4e",
+      "records": 3
+    },
+    {
+      "bytes": 23739,
+      "digest": "sha256:c8f7297fda1817eac1c9626c083aba9fed7b5be2c150e18b8b4213473556ef70",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/4f.jsonl",
+      "range": "4f",
+      "records": 9
+    },
+    {
+      "bytes": 16763,
+      "digest": "sha256:6a12fc6cf59f43dffb638a0827397c700b0bf61affd5ee128ed24bcf619b1f0e",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/50.jsonl",
+      "range": "50",
+      "records": 7
+    },
+    {
+      "bytes": 16043,
+      "digest": "sha256:851aa0a05f44b6b4eb12f9617541d23075254ba826006cffe8f9dde3ea2e82b6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/51.jsonl",
+      "range": "51",
+      "records": 6
+    },
+    {
+      "bytes": 14763,
+      "digest": "sha256:5e30159199efbe12e73a9da68bc9d120051b77b5c40ae4052a2549c87efe3111",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/52.jsonl",
+      "range": "52",
+      "records": 6
+    },
+    {
+      "bytes": 17724,
+      "digest": "sha256:b41210ef6dbee642a826de95c00e8a20448612c64ec2e67646c74fa00bc4f12f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/53.jsonl",
+      "range": "53",
+      "records": 7
+    },
+    {
+      "bytes": 17019,
+      "digest": "sha256:eeb5827e45f19c82ccf67084ec581b7ae797d21a22aa96a6f9a01a0c7c96da3f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/54.jsonl",
+      "range": "54",
+      "records": 6
+    },
+    {
+      "bytes": 25148,
+      "digest": "sha256:55e15487263f9ad3f31fdc5343cae260a6d262c3bf326c59647892d25b798cf1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/55.jsonl",
+      "range": "55",
+      "records": 8
+    },
+    {
+      "bytes": 2122,
+      "digest": "sha256:d5fd04fdc62f0fe99eef1dc4f2c913adc7820b6df805799d5c62f32a230274a1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/56.jsonl",
+      "range": "56",
+      "records": 1
+    },
+    {
+      "bytes": 20409,
+      "digest": "sha256:cdd66a916fab564362e209e3e095ced273c36f7453b5d8f2ce11436ce383dae0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/57.jsonl",
+      "range": "57",
+      "records": 8
+    },
+    {
+      "bytes": 21296,
+      "digest": "sha256:5f95f9666f10a28e705630291360984c03fa131d39bbac20d3592eb8b696af91",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/58.jsonl",
+      "range": "58",
+      "records": 7
+    },
+    {
+      "bytes": 10074,
+      "digest": "sha256:2069e8b1ebbd9898b14fab1957b9a9b5607bdb6d9f4a700f27d4f3ceba413fb1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/59.jsonl",
+      "range": "59",
+      "records": 4
+    },
+    {
+      "bytes": 9411,
+      "digest": "sha256:8fec5630c04519efb2f673237e7bcff05f80a384687c847d86cae16436d694e5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5a.jsonl",
+      "range": "5a",
+      "records": 4
+    },
+    {
+      "bytes": 14333,
+      "digest": "sha256:04b8b26c28ca0b520ca97c42ae51083e7df862b62b0e3b9d1f0cdc8f56f33340",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5b.jsonl",
+      "range": "5b",
+      "records": 5
+    },
+    {
+      "bytes": 21427,
+      "digest": "sha256:53cbd4a3bb0c89da9110f56ada482a0a4dc07998b5f841a88aca326b3e2683e1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5c.jsonl",
+      "range": "5c",
+      "records": 8
+    },
+    {
+      "bytes": 22154,
+      "digest": "sha256:6c503d0813f4e91f7146a25181a6a175cb060a7be136e5dc727a4f5d7a5d2b58",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5d.jsonl",
+      "range": "5d",
+      "records": 8
+    },
+    {
+      "bytes": 11350,
+      "digest": "sha256:263eeaf101054dcd3d4d95ad4c80773f3677cff1ced1c983b59c90a6ccb6f639",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5e.jsonl",
+      "range": "5e",
+      "records": 5
+    },
+    {
+      "bytes": 13112,
+      "digest": "sha256:46b0fea245f88296866d28fd41312520cc66af8fdc5d84f32fc0c995e8a4838b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/5f.jsonl",
+      "range": "5f",
+      "records": 5
+    },
+    {
+      "bytes": 4582,
+      "digest": "sha256:b8acccfebf924843b5d0bfc109ea0741c8e8e23bbfd03437b69e3ea7b8293c05",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/60.jsonl",
+      "range": "60",
+      "records": 2
+    },
+    {
+      "bytes": 12643,
+      "digest": "sha256:8fae6688239e5d84be5b957fb4cf67d5b9485e88663fa5c3a8b1231140d1c118",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/61.jsonl",
+      "range": "61",
+      "records": 5
+    },
+    {
+      "bytes": 19474,
+      "digest": "sha256:3b4c8b7ffbd4e1ec8c21d1f5b2ab54e150464025bc4b249cae49511e6ce08407",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/62.jsonl",
+      "range": "62",
+      "records": 8
+    },
+    {
+      "bytes": 15203,
+      "digest": "sha256:972f80f145f955ad70f1387307ea91c240351dab5fc037d0b561f7e2fb6c18d7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/63.jsonl",
+      "range": "63",
+      "records": 6
+    },
+    {
+      "bytes": 16148,
+      "digest": "sha256:e0e83566065fefd3351ed0e663008ee84b30aafa2c14e21de1797461dff1e587",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/64.jsonl",
+      "range": "64",
+      "records": 6
+    },
+    {
+      "bytes": 27886,
+      "digest": "sha256:0b23863e42805b02050afb9f958d9518468e5dc28bf6e6b6482dc32f31229810",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/65.jsonl",
+      "range": "65",
+      "records": 9
+    },
+    {
+      "bytes": 10193,
+      "digest": "sha256:7e0e1f60e0a7a3f7a476b6b44406b559a1fa5c03e04f3aee170ace4da74c9322",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/66.jsonl",
+      "range": "66",
+      "records": 4
+    },
+    {
+      "bytes": 15383,
+      "digest": "sha256:c1076bd9d11c60116416567ac15cd6a371885ce3f38b279405cc56f09452b78d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/67.jsonl",
+      "range": "67",
+      "records": 6
+    },
+    {
+      "bytes": 8682,
+      "digest": "sha256:f9b7bc164c3f51365dc7b02ea5b11236572de7e1e27f2dabee627d6080a686c1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/68.jsonl",
+      "range": "68",
+      "records": 3
+    },
+    {
+      "bytes": 23983,
+      "digest": "sha256:66a7c2fba365de16b3f88aac7bea2812488f9967d234739ce350b546d7407500",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/69.jsonl",
+      "range": "69",
+      "records": 9
+    },
+    {
+      "bytes": 9546,
+      "digest": "sha256:3467825c9ab42813b17b724cdbd4f7457c58c080117acf084ac68f92367102ed",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6a.jsonl",
+      "range": "6a",
+      "records": 4
+    },
+    {
+      "bytes": 13772,
+      "digest": "sha256:e613f98ee074f811a47b34df5aae635a3304f1f68472eb249f4eebd6c72b4ff7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6b.jsonl",
+      "range": "6b",
+      "records": 5
+    },
+    {
+      "bytes": 12427,
+      "digest": "sha256:427288b3df993cd4ce12ebf157e65d237eeb0d474790f88ebc33944112ebd735",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6c.jsonl",
+      "range": "6c",
+      "records": 5
+    },
+    {
+      "bytes": 2372,
+      "digest": "sha256:450ac8d6130efe4fbf4c717dbc9b3641334cf38c8b14975306ccdd7a1e67d9fd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6d.jsonl",
+      "range": "6d",
+      "records": 1
+    },
+    {
+      "bytes": 12712,
+      "digest": "sha256:02f314978ffd10b5fbcd3771bbf491a3d7ae6e4d83819631ff6b86abf2e77512",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6e.jsonl",
+      "range": "6e",
+      "records": 5
+    },
+    {
+      "bytes": 16369,
+      "digest": "sha256:a6075b303486651b4f22e26c662d9f51eb6f73a1bd325433ed5ffb3acf8dd708",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/6f.jsonl",
+      "range": "6f",
+      "records": 6
+    },
+    {
+      "bytes": 19289,
+      "digest": "sha256:de17f46554ff914948f22397d1f9eccac1a9979e8b7d307d1396769d7f75cffd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/70.jsonl",
+      "range": "70",
+      "records": 6
+    },
+    {
+      "bytes": 9327,
+      "digest": "sha256:282ea92f3f0d55144f29bebdd5f58e99e04b7256e75157843456c0988e66e71b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/71.jsonl",
+      "range": "71",
+      "records": 4
+    },
+    {
+      "bytes": 15653,
+      "digest": "sha256:a08e787cd1db68bf515b0886daebe02b4c57815c314c8280c213724308db4f20",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/72.jsonl",
+      "range": "72",
+      "records": 6
+    },
+    {
+      "bytes": 8621,
+      "digest": "sha256:a55c12bc7ca63cf38fefbb5f896f90193cf18db6b44f1503f909622aca152b81",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/73.jsonl",
+      "range": "73",
+      "records": 3
+    },
+    {
+      "bytes": 17356,
+      "digest": "sha256:43c6ad016f7915f33ea919be668ec897de6c58c8f38899d4d174ae9baf2505ab",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/74.jsonl",
+      "range": "74",
+      "records": 7
+    },
+    {
+      "bytes": 7161,
+      "digest": "sha256:8e271326072f16c7864a74177ad08e56e8a899d9a14f7fc004ef9468bb481fbf",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/76.jsonl",
+      "range": "76",
+      "records": 3
+    },
+    {
+      "bytes": 16239,
+      "digest": "sha256:fe4013c18f3999e89e99cc448e0f4ecddb79103fd255efdf6cc79ca21ca57a3c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/77.jsonl",
+      "range": "77",
+      "records": 6
+    },
+    {
+      "bytes": 19168,
+      "digest": "sha256:1d7389c285c283834963039cfd7413680922746a82a8a3497608f1334c95f807",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/78.jsonl",
+      "range": "78",
+      "records": 6
+    },
+    {
+      "bytes": 16141,
+      "digest": "sha256:20c0f1e699703ad7082d9669861cd8d2d97063ba581a6d1dea0dc7f4bc0481f6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/79.jsonl",
+      "range": "79",
+      "records": 6
+    },
+    {
+      "bytes": 6600,
+      "digest": "sha256:64248b39dfefd1d1ab8d224140e6cbad5309b6d35872dde833f0227d6d8e2513",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7a.jsonl",
+      "range": "7a",
+      "records": 2
+    },
+    {
+      "bytes": 15650,
+      "digest": "sha256:86c15999d0ae146196da0cab9b84bef0211c86e69714ee7cee1ff10232f9976b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7b.jsonl",
+      "range": "7b",
+      "records": 6
+    },
+    {
+      "bytes": 8673,
+      "digest": "sha256:8aee612adf6e417c02523e819befac86b82f3fecac9e3d3b240a1593bfabf36c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7c.jsonl",
+      "range": "7c",
+      "records": 3
+    },
+    {
+      "bytes": 8969,
+      "digest": "sha256:e08e4cab29fbac49814edd542efd19d7252c124d163b47a6ce3cb5e239289107",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7d.jsonl",
+      "range": "7d",
+      "records": 3
+    },
+    {
+      "bytes": 11358,
+      "digest": "sha256:c06316c7855f23a3656386841d4111f20080b4941961dee39a7cdc69a840160c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7e.jsonl",
+      "range": "7e",
+      "records": 5
+    },
+    {
+      "bytes": 19705,
+      "digest": "sha256:671219b65f497608b4fc9d1c703fc259f3bb4a285852e3e5278ba462e2dfc653",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/7f.jsonl",
+      "range": "7f",
+      "records": 6
+    },
+    {
+      "bytes": 15201,
+      "digest": "sha256:2a29765337d06fa2e101598dfaab677478c07de57fc72133db0b4e7d785273a0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/80.jsonl",
+      "range": "80",
+      "records": 5
+    },
+    {
+      "bytes": 4474,
+      "digest": "sha256:5981495ccc74efa5f1d58abaeebeb52e9989440ea265a0ada094e5e755c713e4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/81.jsonl",
+      "range": "81",
+      "records": 2
+    },
+    {
+      "bytes": 7686,
+      "digest": "sha256:aad35adcb5e2c64c5e909c3ebe9cdc580f1ba88b7b4ffcda2994456a61e861f5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/82.jsonl",
+      "range": "82",
+      "records": 3
+    },
+    {
+      "bytes": 7034,
+      "digest": "sha256:b68efab6460e8b110f4e356f5de8cd20d12288e453cd190d3892ebfb9ba7f2d0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/83.jsonl",
+      "range": "83",
+      "records": 3
+    },
+    {
+      "bytes": 9315,
+      "digest": "sha256:579a42cd73cd67d27dd9be8e74b9e57b42188bfca1570abc4ebdd02116f8b4c6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/84.jsonl",
+      "range": "84",
+      "records": 4
+    },
+    {
+      "bytes": 17372,
+      "digest": "sha256:dc20130624b71918eb6420b0a0d8905d8a657687ebca5ade5b71c72f60d338dc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/85.jsonl",
+      "range": "85",
+      "records": 7
+    },
+    {
+      "bytes": 9577,
+      "digest": "sha256:6a793e90d1700c6343b0bea19fb6cff344c02c6825b09f9002dc3bd412af2b87",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/86.jsonl",
+      "range": "86",
+      "records": 4
+    },
+    {
+      "bytes": 17489,
+      "digest": "sha256:5bd07393dbfda207d75f74b43e13dcbf8b741c9cf20603816afdd5c043d3013b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/87.jsonl",
+      "range": "87",
+      "records": 6
+    },
+    {
+      "bytes": 15717,
+      "digest": "sha256:64508f770c22be39ac9375eb0f06924c5782310809d45469f3297eeef07bb1e0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/88.jsonl",
+      "range": "88",
+      "records": 5
+    },
+    {
+      "bytes": 24024,
+      "digest": "sha256:bd9db225c313f5001ac78e5bb92b57203a82ec258b8377f3b1683afca23781e0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/89.jsonl",
+      "range": "89",
+      "records": 8
+    },
+    {
+      "bytes": 6840,
+      "digest": "sha256:07e0bb75e5015765d5a58ab004e4f30af32f3fffd9d48dcac5781babb29a6445",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8a.jsonl",
+      "range": "8a",
+      "records": 3
+    },
+    {
+      "bytes": 4486,
+      "digest": "sha256:ca02f04f477dea7c6a83883b086fe85efa8cf5fcf95687afdd941e843dac4893",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8b.jsonl",
+      "range": "8b",
+      "records": 2
+    },
+    {
+      "bytes": 11900,
+      "digest": "sha256:dc71df83e5c5a37b915795c4dfc13ddf93270713a273717bffedc0f3c63cab8d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8c.jsonl",
+      "range": "8c",
+      "records": 5
+    },
+    {
+      "bytes": 2430,
+      "digest": "sha256:6d6e7bc4b985704c19631a21c1cd954566a35fb7c14a5204ebfc8771896337d8",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8d.jsonl",
+      "range": "8d",
+      "records": 1
+    },
+    {
+      "bytes": 21008,
+      "digest": "sha256:6f2ae6bc5a3197a2f47280805c38958da3f7d6f2495331079ecd3fdd19401f6f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8e.jsonl",
+      "range": "8e",
+      "records": 9
+    },
+    {
+      "bytes": 18840,
+      "digest": "sha256:bdf282175d4a3823b654c446d376f2a86e5e8fce17c141c42425ef3719e02ecd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/8f.jsonl",
+      "range": "8f",
+      "records": 7
+    },
+    {
+      "bytes": 17464,
+      "digest": "sha256:66383c39dc23d6f836f67383a04e8b5bc5ffb72271b5e5e65d4041b4d48e6593",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/90.jsonl",
+      "range": "90",
+      "records": 6
+    },
+    {
+      "bytes": 13783,
+      "digest": "sha256:7b3070e668d5ca33b2a600d082ac6dba754bf3cb079d2a8e895f99bc75bfa22c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/91.jsonl",
+      "range": "91",
+      "records": 6
+    },
+    {
+      "bytes": 14613,
+      "digest": "sha256:6612da9a830b65aa2d332b48c499078e3d2f70f3b7c05d81b030fcfb492de3db",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/92.jsonl",
+      "range": "92",
+      "records": 5
+    },
+    {
+      "bytes": 16560,
+      "digest": "sha256:14b8bf20f3ed459a2dd5484dea3d5988e71e7ccd057609d14c11324ab0fa0fb6",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/93.jsonl",
+      "range": "93",
+      "records": 6
+    },
+    {
+      "bytes": 18151,
+      "digest": "sha256:f716f64db4babb282bfcc4771fe1170fe65689183b19e0a342be0bde51e474f0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/94.jsonl",
+      "range": "94",
+      "records": 7
+    },
+    {
+      "bytes": 14592,
+      "digest": "sha256:e6c033e987b36ea6dc58ef87ba6387d0239ea8e8edff5ae7698acc04d5cdf69f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/95.jsonl",
+      "range": "95",
+      "records": 5
+    },
+    {
+      "bytes": 16610,
+      "digest": "sha256:1da6e80421c620ef44914461cd4ac2cfecbb4f75e3720621a0fc3ce0f8084105",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/97.jsonl",
+      "range": "97",
+      "records": 7
+    },
+    {
+      "bytes": 7512,
+      "digest": "sha256:2ac56234765c07b711b8d47919e94f5641f0551c41124da5993b58470cbd578b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/98.jsonl",
+      "range": "98",
+      "records": 3
+    },
+    {
+      "bytes": 4461,
+      "digest": "sha256:f109c0e6f2b6843f1de448be8a64b1392028385c105e15b6644e242422c8253f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/99.jsonl",
+      "range": "99",
+      "records": 2
+    },
+    {
+      "bytes": 13733,
+      "digest": "sha256:26992484082ab006298c519c0fb58d81bd77b7e43d20b5016b367e6139252360",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/9a.jsonl",
+      "range": "9a",
+      "records": 6
+    },
+    {
+      "bytes": 13913,
+      "digest": "sha256:e40c8dd9050f55515614e3f82b700010599362b3dad5656d6b442cc1a969d17c",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/9b.jsonl",
+      "range": "9b",
+      "records": 6
+    },
+    {
+      "bytes": 2618,
+      "digest": "sha256:a71e18ffe68e47827d2612d5523dbd06bdb290040e490a4d3bc5ab110615e419",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/9d.jsonl",
+      "range": "9d",
+      "records": 1
+    },
+    {
+      "bytes": 28655,
+      "digest": "sha256:21cb9f0f49da720dfefb02bf0140c563bf9053fabb53110fd28b8cfa359e0350",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/9e.jsonl",
+      "range": "9e",
+      "records": 11
+    },
+    {
+      "bytes": 11064,
+      "digest": "sha256:d258c3b2b1f8d64758895b9c5bc09bad7c068e65c8036ec4003b7696c45d08be",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/9f.jsonl",
+      "range": "9f",
+      "records": 4
+    },
+    {
+      "bytes": 10770,
+      "digest": "sha256:7f268c84bdc35bad1a57ca8860a3c861eedc31fb44e69b4ce261a1bb76d91bba",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a0.jsonl",
+      "range": "a0",
+      "records": 4
+    },
+    {
+      "bytes": 30706,
+      "digest": "sha256:eda522ba006613cbfe588d69d7ad640766991cd74e3e835148103642f94982a3",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a1.jsonl",
+      "range": "a1",
+      "records": 12
+    },
+    {
+      "bytes": 11095,
+      "digest": "sha256:1f99a36165754600dbdcdc70bb451c432963feab2f932c4ee207f0783c92d220",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a2.jsonl",
+      "range": "a2",
+      "records": 4
+    },
+    {
+      "bytes": 9528,
+      "digest": "sha256:0884fe5933526a3c7dc89c283ab1bb7bb3dd5f6b1de0881eaa24db0fdfa9af70",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a3.jsonl",
+      "range": "a3",
+      "records": 3
+    },
+    {
+      "bytes": 16128,
+      "digest": "sha256:07e87267e3ab40189d270f56e410bac61bca92785f5ec2ffd4287dc088a681ab",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a4.jsonl",
+      "range": "a4",
+      "records": 4
+    },
+    {
+      "bytes": 12278,
+      "digest": "sha256:1c47c82747950e855774b34ad2abbbda88cc78bd7c7f46cddfaa60bd26e4c643",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a5.jsonl",
+      "range": "a5",
+      "records": 5
+    },
+    {
+      "bytes": 8306,
+      "digest": "sha256:6249c25c0ce488aee27395177e7eab9b2646a7eb6ce19836a28d01fa8d92d1a8",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a6.jsonl",
+      "range": "a6",
+      "records": 3
+    },
+    {
+      "bytes": 9243,
+      "digest": "sha256:2bd9469027a5446b1996aa7e90e253980b5bb79c4d0a7be7ff67cf8ec7896022",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a7.jsonl",
+      "range": "a7",
+      "records": 4
+    },
+    {
+      "bytes": 22032,
+      "digest": "sha256:ff349aaec0151adcee4abe62df9eac6e92c0fd86511d9faf9d6c206dd4054ff3",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a8.jsonl",
+      "range": "a8",
+      "records": 8
+    },
+    {
+      "bytes": 12303,
+      "digest": "sha256:8bc394093e13f6588f6c0e1de957474f59a3d8ad6179dbfd4a9406046fc76bf4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/a9.jsonl",
+      "range": "a9",
+      "records": 5
+    },
+    {
+      "bytes": 23565,
+      "digest": "sha256:40c76cb35bc6a534316c0fc8f3c3bb10cf9b03ae2fad76bab177b799f492df1b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/aa.jsonl",
+      "range": "aa",
+      "records": 9
+    },
+    {
+      "bytes": 15132,
+      "digest": "sha256:1b74c72abd0d8d08cb4a824e93e46208d690249e3541becc4fea3942faaf8fca",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ab.jsonl",
+      "range": "ab",
+      "records": 5
+    },
+    {
+      "bytes": 7254,
+      "digest": "sha256:09d7e6c287cf7147cc5eb009269bb133c01cf2771cb86846afbb42f515cc2c85",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ac.jsonl",
+      "range": "ac",
+      "records": 3
+    },
+    {
+      "bytes": 14185,
+      "digest": "sha256:9a240ba301eea0028f33192f92fd95716d0613ae05552f9f83cf63992db5a3bc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ad.jsonl",
+      "range": "ad",
+      "records": 5
+    },
+    {
+      "bytes": 14470,
+      "digest": "sha256:73039fd840a2766864b10190bca84056fa03703497a4bbec79ec587e4dde468f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ae.jsonl",
+      "range": "ae",
+      "records": 5
+    },
+    {
+      "bytes": 20443,
+      "digest": "sha256:c2209166ac9d1302a1d6d41b173a108aefd7e05b75b9cfc66d1269bd0d935e44",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/af.jsonl",
+      "range": "af",
+      "records": 8
+    },
+    {
+      "bytes": 7178,
+      "digest": "sha256:f514752ed78c8fdbf0fb1d4fdb7804a394b5be9e287992411649e98e264e9753",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b0.jsonl",
+      "range": "b0",
+      "records": 3
+    },
+    {
+      "bytes": 8491,
+      "digest": "sha256:3daf8a7522a4aec0d42c519808ce2ec893cff7f452d03bb596c31a1043501648",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b1.jsonl",
+      "range": "b1",
+      "records": 3
+    },
+    {
+      "bytes": 15322,
+      "digest": "sha256:1963b5dc763d2ac7e5aaf15a4b92b56df65b09c75b6cd5eeb1bdb9bbd71da10b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b2.jsonl",
+      "range": "b2",
+      "records": 6
+    },
+    {
+      "bytes": 9688,
+      "digest": "sha256:25beda32287b11156ee6e5baac427d437bcc70a2262200417056a2a51f996f02",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b3.jsonl",
+      "range": "b3",
+      "records": 4
+    },
+    {
+      "bytes": 4861,
+      "digest": "sha256:175f96c38689dd6de5dd578cffa71ce91968b0a98c502495f0a47a624ff85bf0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b4.jsonl",
+      "range": "b4",
+      "records": 2
+    },
+    {
+      "bytes": 11535,
+      "digest": "sha256:753f3d9c4cdf1998ddfe82e1487bcc626a1399a7d033d9220e8e5d05e21d58f1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b5.jsonl",
+      "range": "b5",
+      "records": 5
+    },
+    {
+      "bytes": 4807,
+      "digest": "sha256:c2264fcd0f7751457bc2e2ca5733ab7534aeb93088b91249401c49aba3bf59d1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b6.jsonl",
+      "range": "b6",
+      "records": 2
+    },
+    {
+      "bytes": 4725,
+      "digest": "sha256:8a418368d2ecc676cf8841f24b0b50379eb2c29e361fee1b1e2594fb525131d1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b7.jsonl",
+      "range": "b7",
+      "records": 2
+    },
+    {
+      "bytes": 16064,
+      "digest": "sha256:48a46c4e2356f6ae9b6a581346f839f1935c776ceabbb437e964f379c9c3296a",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b8.jsonl",
+      "range": "b8",
+      "records": 6
+    },
+    {
+      "bytes": 10980,
+      "digest": "sha256:a6637a316f65b960723e9e8705b0246f9e9312e24357fdff06ccf6ffc04095e4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/b9.jsonl",
+      "range": "b9",
+      "records": 4
+    },
+    {
+      "bytes": 37112,
+      "digest": "sha256:ad4e823cc3d97d9faf6ccacb2292fd0e33a5c122c6303ecb4a91cc0e1be39108",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ba.jsonl",
+      "range": "ba",
+      "records": 9
+    },
+    {
+      "bytes": 9283,
+      "digest": "sha256:9100bafac9a26b2f4d980a297399b005d863894f166db03e1b7b862c89835da5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/bb.jsonl",
+      "range": "bb",
+      "records": 4
+    },
+    {
+      "bytes": 17294,
+      "digest": "sha256:f1c5853c659d21c78cdf7910e48de090bcea82e5945121b73d073209c0b7e6e5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/bc.jsonl",
+      "range": "bc",
+      "records": 6
+    },
+    {
+      "bytes": 13971,
+      "digest": "sha256:6462730ba54983fd47a6f59a1c9ea531eefea43397beedb3a06d7f966b67f85f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/bd.jsonl",
+      "range": "bd",
+      "records": 6
+    },
+    {
+      "bytes": 16868,
+      "digest": "sha256:8a72e251e59b977c130312d05786561ade5e96714b3efc00ca1a7b0970115201",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/be.jsonl",
+      "range": "be",
+      "records": 7
+    },
+    {
+      "bytes": 21655,
+      "digest": "sha256:5398845f6f9f66275508126bef0460af57fe62802ef1dbe41b51b6784c84891a",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/bf.jsonl",
+      "range": "bf",
+      "records": 9
+    },
+    {
+      "bytes": 19561,
+      "digest": "sha256:058d47de906411ccefaa691c0ed188291516e8d36feda61ecb3ee8b98c3c2c75",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c0.jsonl",
+      "range": "c0",
+      "records": 7
+    },
+    {
+      "bytes": 18063,
+      "digest": "sha256:9c7c8cb8a64ba38e96adc174f05ba329ce132e92c6844248791445b62ebd1cc1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c1.jsonl",
+      "range": "c1",
+      "records": 6
+    },
+    {
+      "bytes": 18602,
+      "digest": "sha256:6b3d9102af088f2d61139d91b612e985ca278eabe1b3d7a466fa8a2a1d40be68",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c2.jsonl",
+      "range": "c2",
+      "records": 7
+    },
+    {
+      "bytes": 5071,
+      "digest": "sha256:d78365ebab14eb8660c720f8f496fd4275e8aea4dad7b7db948ad8c1256cfa74",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c3.jsonl",
+      "range": "c3",
+      "records": 2
+    },
+    {
+      "bytes": 18028,
+      "digest": "sha256:7ce99fa3e74f159a6bd4906ca0ba6222ebaedff44c5b57d730ff7d672d53e2df",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c4.jsonl",
+      "range": "c4",
+      "records": 7
+    },
+    {
+      "bytes": 17299,
+      "digest": "sha256:e990032b0ea66df2a1beb1ac14960e78798f6d44412bc9e1af8e02de5e0d7e3a",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c5.jsonl",
+      "range": "c5",
+      "records": 7
+    },
+    {
+      "bytes": 7197,
+      "digest": "sha256:05dbc3a2be68badd62205075b5be65ef9ff4c4cfb6329d5fc7a830da1571e3b7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c6.jsonl",
+      "range": "c6",
+      "records": 3
+    },
+    {
+      "bytes": 14455,
+      "digest": "sha256:e3d1e0588835de4eed9f959f39718e5c52314d5437a184270797a8ab7b9f8a3f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c7.jsonl",
+      "range": "c7",
+      "records": 5
+    },
+    {
+      "bytes": 11545,
+      "digest": "sha256:5f7e198be98683abd09f85b7ab5076c547dea71112bbdce6b378e38b7aca6a41",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c8.jsonl",
+      "range": "c8",
+      "records": 5
+    },
+    {
+      "bytes": 19890,
+      "digest": "sha256:1c3c36c1380227e5e1245c9b391b65fdd97b79520f855016b9cfdd4c1a922fc9",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/c9.jsonl",
+      "range": "c9",
+      "records": 7
+    },
+    {
+      "bytes": 21467,
+      "digest": "sha256:c372fdf0551c923e0e6cfdc9a8a30a8bdbfd5e31afe8888213568257b3b453f5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ca.jsonl",
+      "range": "ca",
+      "records": 7
+    },
+    {
+      "bytes": 7280,
+      "digest": "sha256:d8a3885a0fd38eed74a91cf465b19010d244689bb3311c92cd86834c083e87d0",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/cb.jsonl",
+      "range": "cb",
+      "records": 3
+    },
+    {
+      "bytes": 14809,
+      "digest": "sha256:9a74d437c46f6bc2747d88fbd9c5a5a423da3d1648a80dca1038adc04f19ea63",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/cc.jsonl",
+      "range": "cc",
+      "records": 6
+    },
+    {
+      "bytes": 8098,
+      "digest": "sha256:5b8a52a15a9b7eff703b69f3993ad3a7739b6677d99979c54f50ec6a57e2fabf",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/cd.jsonl",
+      "range": "cd",
+      "records": 3
+    },
+    {
+      "bytes": 6949,
+      "digest": "sha256:5cdb642c36a05014080c32bec86446e468bc783fa96d1c632bae0cbbb23d4256",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ce.jsonl",
+      "range": "ce",
+      "records": 3
+    },
+    {
+      "bytes": 4634,
+      "digest": "sha256:bb76df141a4934254a1ce18da69e2f4bc4e40e8e134a3dee504e02837c83aaa7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/cf.jsonl",
+      "range": "cf",
+      "records": 2
+    },
+    {
+      "bytes": 19588,
+      "digest": "sha256:c8f8b9e43fa5fbe749feb1fba66ad425919416d7678d2b9398c4e26890b1ce80",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d0.jsonl",
+      "range": "d0",
+      "records": 8
+    },
+    {
+      "bytes": 16950,
+      "digest": "sha256:54567fac2586a206d982208734e3c5eef65127f20104cddc3ec3904c0c844e73",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d1.jsonl",
+      "range": "d1",
+      "records": 7
+    },
+    {
+      "bytes": 9475,
+      "digest": "sha256:2306ed7576adc51d636f8720ccd888a9f064315a180fe80408264c4956bebdca",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d2.jsonl",
+      "range": "d2",
+      "records": 4
+    },
+    {
+      "bytes": 14792,
+      "digest": "sha256:0a2c73603e3af53b5445718bb4a539bedc5df19b9515466d33204dc8f246e545",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d3.jsonl",
+      "range": "d3",
+      "records": 6
+    },
+    {
+      "bytes": 9767,
+      "digest": "sha256:1b933bafebc009f0c523b37a84cef4b54c9b675f2f17551c00df4375fad341e2",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d4.jsonl",
+      "range": "d4",
+      "records": 3
+    },
+    {
+      "bytes": 9706,
+      "digest": "sha256:2705b5eb8b64187693fcad8e54df2c7538ee674bffb6f498ac9af3b8865bca47",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d5.jsonl",
+      "range": "d5",
+      "records": 4
+    },
+    {
+      "bytes": 2312,
+      "digest": "sha256:2d7e27a9b337d508a54185f6ad34b29691c29e231d7e80f537de931e54d3acc8",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d6.jsonl",
+      "range": "d6",
+      "records": 1
+    },
+    {
+      "bytes": 28013,
+      "digest": "sha256:92be0a8c08f777d73d51b5d8e3fdb63171f8c5e148f485f56c6f48c12186bcbb",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d7.jsonl",
+      "range": "d7",
+      "records": 12
+    },
+    {
+      "bytes": 25363,
+      "digest": "sha256:f1fe86e1df110adf17290863b7ebda6d37c175702a89986a86ef0fefd38c85c8",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d8.jsonl",
+      "range": "d8",
+      "records": 9
+    },
+    {
+      "bytes": 10955,
+      "digest": "sha256:0808da9d43b794f08ddec8fa2992e535a84baa01678ddd75038b88d621e767c5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/d9.jsonl",
+      "range": "d9",
+      "records": 4
+    },
+    {
+      "bytes": 9355,
+      "digest": "sha256:fe9b6543f1e60bba1259a1e4533278222534826f7a218ab8dc4ef518f6130ebd",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/da.jsonl",
+      "range": "da",
+      "records": 4
+    },
+    {
+      "bytes": 12286,
+      "digest": "sha256:fe51789ee5ede1f849462c1f889207cae7918fdeac08c636c684057042412eea",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/db.jsonl",
+      "range": "db",
+      "records": 5
+    },
+    {
+      "bytes": 13896,
+      "digest": "sha256:25e78d7c1beea428ac9df29403a3448b94d49d20983c68dff877f8a921d46283",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/dc.jsonl",
+      "range": "dc",
+      "records": 6
+    },
+    {
+      "bytes": 16504,
+      "digest": "sha256:cbabc1d381b3d1a15c741eb0c7281a0f191b12e7c4f105a66bfee85f6e847728",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/dd.jsonl",
+      "range": "dd",
+      "records": 7
+    },
+    {
+      "bytes": 8724,
+      "digest": "sha256:a642b38007c181266872f8a3670bcfc432c69a56e15d5f58b2ca350b279a0523",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/de.jsonl",
+      "range": "de",
+      "records": 3
+    },
+    {
+      "bytes": 13801,
+      "digest": "sha256:e43fa0d3e13d64413992a0ba67881725353b9fe69882e1ed20e70b1332ffed9b",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/df.jsonl",
+      "range": "df",
+      "records": 5
+    },
+    {
+      "bytes": 15952,
+      "digest": "sha256:52dcad0d8387b9e14540bf36a5f430c9e07a9a0c3edb7e0a83c643cf88c235f9",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e0.jsonl",
+      "range": "e0",
+      "records": 6
+    },
+    {
+      "bytes": 16281,
+      "digest": "sha256:2ec96978902b9c5b2cc0bf3ced5bfdd66576dfb9e4d8653ac74d9022eaf71063",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e1.jsonl",
+      "range": "e1",
+      "records": 6
+    },
+    {
+      "bytes": 15898,
+      "digest": "sha256:6b2e6fc393d8f62aebddaffd34a44434c8e5d3c1edef6f6b7b15093de76c03be",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e2.jsonl",
+      "range": "e2",
+      "records": 6
+    },
+    {
+      "bytes": 4747,
+      "digest": "sha256:da6cd7fbd88fd53baf1bafa36aac360b384e1ee433b927b92a6423e059379c93",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e3.jsonl",
+      "range": "e3",
+      "records": 2
+    },
+    {
+      "bytes": 7600,
+      "digest": "sha256:57e25647e12e266014c27d5b9a6fdcb33608e8af8538162ac4fa88d255c6da51",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e4.jsonl",
+      "range": "e4",
+      "records": 3
+    },
+    {
+      "bytes": 16165,
+      "digest": "sha256:b6d341f357c8245cf2cab2244bea642980ade45ae9a00a4e6c1a4c6edd4f4066",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e5.jsonl",
+      "range": "e5",
+      "records": 6
+    },
+    {
+      "bytes": 14904,
+      "digest": "sha256:8bc6ae8dc467da02a5d08a0f708b7ab55409c11122f5502c42bde2222453ad75",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e6.jsonl",
+      "range": "e6",
+      "records": 6
+    },
+    {
+      "bytes": 6757,
+      "digest": "sha256:8d66cb26bc87f3a3ff90230b90ef87e2e9f9a569a311876321a04211a99454cc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e7.jsonl",
+      "range": "e7",
+      "records": 3
+    },
+    {
+      "bytes": 6119,
+      "digest": "sha256:7227b828a8809d4a6b45e296acccb8a4d75482bfd03db1ba367870bec102c290",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e8.jsonl",
+      "range": "e8",
+      "records": 2
+    },
+    {
+      "bytes": 12920,
+      "digest": "sha256:04ab0e92141f590689ddd9517c01428a5eacbc78fb8234e57e1c8447ed7b37b5",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/e9.jsonl",
+      "range": "e9",
+      "records": 5
+    },
+    {
+      "bytes": 25287,
+      "digest": "sha256:e6d2e10f1d7eed0064ffe2bed3313bb16658eb28e30c646e370bc8538b283e8d",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ea.jsonl",
+      "range": "ea",
+      "records": 9
+    },
+    {
+      "bytes": 27517,
+      "digest": "sha256:2a0fdb5fa9161289d7b142d50ece60328e39373484b8d8979b5375462519de75",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/eb.jsonl",
+      "range": "eb",
+      "records": 10
+    },
+    {
+      "bytes": 7650,
+      "digest": "sha256:95499cbbf470a812c5d72881a39d3101d63ea8f1699fe5b3cf9881546993976f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ec.jsonl",
+      "range": "ec",
+      "records": 3
+    },
+    {
+      "bytes": 21281,
+      "digest": "sha256:938c5b6caeba7a3c3da6a6c590f207af64fe9f505c84910ae0a627c50820bbdc",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ed.jsonl",
+      "range": "ed",
+      "records": 8
+    },
+    {
+      "bytes": 7781,
+      "digest": "sha256:5ca8eb70a75cad3742aaca3d66edea3bf7506500a707839e626d4f8dcfe3b77f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ee.jsonl",
+      "range": "ee",
+      "records": 2
+    },
+    {
+      "bytes": 10491,
+      "digest": "sha256:be6f76b25080e0fec06e3758b8246477b625400fd11f8d93feb3514d29ad66f1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ef.jsonl",
+      "range": "ef",
+      "records": 4
+    },
+    {
+      "bytes": 13414,
+      "digest": "sha256:715e25ea2c3a5da2cae6d11e6168fafb06c928a63cf4fb7cc01d0630f0b017ec",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f0.jsonl",
+      "range": "f0",
+      "records": 5
+    },
+    {
+      "bytes": 18670,
+      "digest": "sha256:f088822efe6e60068c37e3fc5e99cd9e815a3d1f9800d3a6c49d61a5626e813f",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f1.jsonl",
+      "range": "f1",
+      "records": 7
+    },
+    {
+      "bytes": 10393,
+      "digest": "sha256:deaf3c023f70a642d6006dc1d1b85c1f1c1e2326fbbeebff6c82f197dd71e8e8",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f2.jsonl",
+      "range": "f2",
+      "records": 4
+    },
+    {
+      "bytes": 2403,
+      "digest": "sha256:b3bb36645fd7d5efb86a96412c89125a8cb0af3eeb20197072e5541655bae228",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f3.jsonl",
+      "range": "f3",
+      "records": 1
+    },
+    {
+      "bytes": 14664,
+      "digest": "sha256:e787d13417c0fe4ceec0419a271188cbfe739ff2d91447a87b2f78758adecac4",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f4.jsonl",
+      "range": "f4",
+      "records": 6
+    },
+    {
+      "bytes": 15238,
+      "digest": "sha256:9267d7e9999ceff4275eea452d508a0ee17442e5549c2145e9baaa39851fa0b1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f5.jsonl",
+      "range": "f5",
+      "records": 6
+    },
+    {
+      "bytes": 15673,
+      "digest": "sha256:ae307ab9c2a5e41982fe907ce3235043a0de48d6dd5e27a5c1a5fe679f34dee7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f6.jsonl",
+      "range": "f6",
+      "records": 6
+    },
+    {
+      "bytes": 8918,
+      "digest": "sha256:a9cb03119cf99127cb91fa6d9a381a6fc7864cb18b586a77c842f524e8b90ea7",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f7.jsonl",
+      "range": "f7",
+      "records": 4
+    },
+    {
+      "bytes": 8651,
+      "digest": "sha256:8d545e8f052360aeaf5c97fee6b9a14bcf80722b7726f64179845f1251eac741",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f8.jsonl",
+      "range": "f8",
+      "records": 3
+    },
+    {
+      "bytes": 16355,
+      "digest": "sha256:fa5abcf9e7b1916f931c2d82c4705da8615d540e5fd1b819d6750d04ca6a3443",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/f9.jsonl",
+      "range": "f9",
+      "records": 7
+    },
+    {
+      "bytes": 9859,
+      "digest": "sha256:fa31476b1bd4b08b1fa8087f84a171df3a22f2e5a5c6b98b0826c04b33dbea23",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/fa.jsonl",
+      "range": "fa",
+      "records": 4
+    },
+    {
+      "bytes": 15644,
+      "digest": "sha256:83cc809070e71168431ed8679542bf125b3adacfa708a2645ba60e955d243f63",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/fb.jsonl",
+      "range": "fb",
+      "records": 6
+    },
+    {
+      "bytes": 22122,
+      "digest": "sha256:08cd0ca727b7f07888b6dd3436029b1a359bc36029a32e524f757ea1e9553646",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/fc.jsonl",
+      "range": "fc",
+      "records": 9
+    },
+    {
+      "bytes": 19397,
+      "digest": "sha256:593511728e548f216b84adc5e7755c3bdda025e5aaa5e0095805b427b57ac1d1",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/fd.jsonl",
+      "range": "fd",
+      "records": 8
+    },
+    {
+      "bytes": 23345,
+      "digest": "sha256:7f395269b7a6665f68f8659d9ec67c5a12b7a249989656c001b0287db9ecad59",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/fe.jsonl",
+      "range": "fe",
+      "records": 8
+    },
+    {
+      "bytes": 14115,
+      "digest": "sha256:994e5df5571dcc58ab2800d93583f76f70b33d49b91fcae86213d560e75d3b08",
+      "kind": "source",
+      "path": "kag/indexes/shards/source/ff.jsonl",
+      "range": "ff",
+      "records": 6
+    }
+  ],
+  "source_index_header": {
+    "classification_summary": {
+      "artifact_kind": {
+        "config": 185,
+        "dependency_manifest": 11,
+        "directory_marker": 4,
+        "document": 528,
+        "generated_readmodel": 16,
+        "index": 1,
+        "license": 1,
+        "manifest": 12,
+        "mechanics_surface": 16,
+        "owner_metadata": 3,
+        "package_manifest": 1,
+        "projection": 1,
+        "receipt": 6,
+        "schema": 71,
+        "script": 143,
+        "security": 2,
+        "service_unit": 47,
+        "source_code": 122,
+        "symlink": 30,
+        "test": 94,
+        "text_artifact": 25,
+        "validator": 20
+      },
+      "command_role": {
+        "builder": 7,
+        "lane_entrypoint": 7,
+        "none": 1082,
+        "script": 129,
+        "test": 94,
+        "validator": 20
+      },
+      "document_role": {
+        "agents": 50,
+        "boundary": 12,
+        "changelog": 1,
+        "decision": 86,
+        "design": 12,
+        "design_agents": 1,
+        "mechanics_doc": 138,
+        "none": 802,
+        "parts": 10,
+        "provenance": 10,
+        "readme": 157,
+        "roadmap": 11,
+        "testing_doc": 1,
+        "unknown_document": 45,
+        "validation_doc": 3
+      },
+      "mechanics_role": {
+        "legacy": 136,
+        "mechanic_package": 83,
+        "mechanic_part": 133,
+        "none": 786,
+        "part_doc": 126,
+        "part_schema": 38,
+        "part_script": 1,
+        "part_test": 36
+      },
+      "primary_kind": {
+        "artifact": 137,
+        "command": 257,
+        "document": 537,
+        "surface": 408
+      },
+      "surface_state": {
+        "authored_source": 1172,
+        "generated_readmodel": 22,
+        "legacy": 139,
+        "receipt": 6
+      }
+    },
+    "coverage_summary": {
+      "command_count": 257,
+      "document_count": 537,
+      "generated_count": 22,
+      "heading_count": 3194,
+      "mechanics_count": 553,
+      "record_count": 1339,
+      "schema_count": 71,
+      "script_count": 143,
+      "test_count": 94,
+      "unknown_count": 0,
+      "validator_count": 20
+    },
+    "index_identity": {
+      "artifact_kind": "source_surface_index",
+      "content_digest": "0ade7c20bd10fb9200a2440f563a587407d0f2d3edf6b8bd5deb475fde39fbe4",
+      "local_id": "index:repo-local:source-surfaces",
+      "schema_ref": "aoa-kag:schemas/repo-local-kag-index.schema.json"
+    },
+    "registry_output": {
+      "consumer": "aoa-kag",
+      "resource_shape": [
+        "repo-local-source-surface-index",
+        "repo-local-document-records",
+        "repo-local-mechanics-records",
+        "repo-local-command-records"
+      ],
+      "stable_fields": [
+        "identity.id",
+        "identity.path",
+        "identity.content_hash",
+        "artifact_kind",
+        "surface_state",
+        "document_role",
+        "mechanics_role",
+        "command_role",
+        "abi",
+        "signs.digest",
+        "provenance.source_refs",
+        "refs.heading_refs"
+      ]
+    },
+    "repo": {
+      "git_ref": "git-index-source-tree",
+      "name": "abyss-stack",
+      "namespace": "aoa:abyss-stack",
+      "owner_type": "runtime_source",
+      "root": "."
+    },
+    "schema_version": "aoa-repo-local-kag-index-v2",
+    "toolchain": {
+      "baseline_tools": [
+        "git",
+        "rg",
+        "fd",
+        "jq",
+        "python",
+        "sqlite3",
+        "sha256sum",
+        "file",
+        "stat"
+      ],
+      "capability_lanes": [
+        {
+          "lane": "code-structure",
+          "status": "planned",
+          "tools": [
+            "ctags",
+            "tree-sitter",
+            "SCIP"
+          ]
+        },
+        {
+          "lane": "material-inventory",
+          "status": "planned",
+          "tools": [
+            "Syft",
+            "SPDX",
+            "CycloneDX"
+          ]
+        },
+        {
+          "lane": "signing-attestation",
+          "status": "planned",
+          "tools": [
+            "SLSA",
+            "in-toto",
+            "Cosign",
+            "GitHub artifact attestations"
+          ]
+        },
+        {
+          "lane": "static-findings",
+          "status": "planned",
+          "tools": [
+            "Semgrep",
+            "SARIF"
+          ]
+        },
+        {
+          "lane": "document-conversion",
+          "status": "planned",
+          "tools": [
+            "Docling",
+            "MarkItDown",
+            "Unstructured"
+          ]
+        }
+      ]
+    }
+  },
+  "summary": {
+    "anchor_records": 15349,
+    "canonical_records": 17489,
+    "event_records": 801,
+    "shard_bytes": 21516770,
+    "shards": 715,
+    "source_records": 1339,
+    "tracked_bytes": 21708342
+  }
+}
