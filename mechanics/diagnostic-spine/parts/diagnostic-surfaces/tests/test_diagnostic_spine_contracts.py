@@ -108,7 +108,9 @@ class DiagnosticSpineContractTests(unittest.TestCase):
         self.assertIn("`repair_handoff_v1`", spine_doc)
         self.assertIn("`reviewed_diagnosis_ref_v1`", spine_doc)
         self.assertIn("`mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json`", spine_doc)
-        self.assertIn(".agents/skills/abyss-self-diagnostic-spine", spine_doc)
+        self.assertIn("`skills/abyss-self-diagnostic-spine`", spine_doc)
+        self.assertIn("OS user profile", spine_doc)
+        self.assertIn("not duplicated under `.agents/skills`", spine_doc)
         self.assertIn("A strong diagnostic spine gives the system self-location before self-assertion.", spine_doc)
 
     def test_generated_diagnostic_surface_catalog_stays_aligned(self) -> None:

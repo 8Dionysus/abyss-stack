@@ -9,6 +9,9 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- `skills/abyss-self-diagnostic-spine` is now the admitted owner package for
+  stack runtime diagnosis, with an explicit procedure contract and
+  OS-user-profile exposure instead of a second repo-local copy.
 - An explicit Gemma 4 E2B `llama-swap` tuning candidate now admits measured
   cold loads through the private `abyss-machine` owner socket, keeps proxy
   history bounded to zero, releases the model after idle, removes inherited
@@ -79,10 +82,9 @@ Tracking starts with the community-docs baseline for this repository.
   launch` admission instead of starting hidden archive scans. Exact agent-event
   usage audits now use their existing indexed read model and defer broad
   consequence expansion through the same owner-admitted route.
-- The repo-local `abyss-self-diagnostic-spine` overlay now carries valid
-  trigger metadata and the current canonical `aoa-skills` source path, while
-  the skill-projection validator rejects missing descriptions, stale canonical
-  routes, and legacy top-level frontmatter before Codex startup.
+- The diagnostic skill now resolves its exact `abyss-stack` owner package from
+  the same-bundle OS source receipt, while the shared skill-projection
+  validator no longer treats a repo-local diagnostic directory as canonical.
 - `aoa-session-memory-mcp` now publishes and validates exact closed-world
   read-only annotations for every tool, allowing Codex approval policy to
   distinguish evidence reads from side-effecting MCP calls without a per-tool

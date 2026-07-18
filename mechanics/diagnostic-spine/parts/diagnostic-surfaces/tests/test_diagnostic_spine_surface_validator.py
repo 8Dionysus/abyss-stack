@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validators import agent_skill_projection
 from scripts.validators import diagnostic_spine
 
 
@@ -40,21 +39,23 @@ class DiagnosticSpineSurfaceValidatorTests(unittest.TestCase):
                 repo_root / relative_path,
                 (REPO_ROOT / relative_path).read_text(encoding="utf-8"),
             )
-        write_text(
-            repo_root / ".agents" / "skills" / "abyss-self-diagnostic-spine" / "SKILL.md",
-            "# stub\n",
-        )
+        for relative_path in (
+            diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PATH,
+            diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_CONTRACT_PATH,
+            diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PROCEDURE_PATH,
+            diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH,
+            diagnostic_spine.SKILL_HOME_MANIFEST_PATH,
+        ):
+            write_text(
+                repo_root / relative_path,
+                (REPO_ROOT / relative_path).read_text(encoding="utf-8"),
+            )
 
     def validate_surface(self, repo_root: Path) -> list[str]:
         errors: list[str] = []
         diagnostic_spine.validate_diagnostic_spine_contracts(
             errors,
             root=repo_root,
-            overlay_skill_surfaces=agent_skill_projection.DIAGNOSTIC_OVERLAY_SKILL_SURFACES,
-            overlay_skill_validator=lambda **kwargs: agent_skill_projection.validate_overlay_skill_surface(
-                root=repo_root,
-                **kwargs,
-            ),
         )
         return errors
 
@@ -63,11 +64,6 @@ class DiagnosticSpineSurfaceValidatorTests(unittest.TestCase):
         diagnostic_spine.validate_diagnostic_spine_contracts(
             errors,
             root=REPO_ROOT,
-            overlay_skill_surfaces=agent_skill_projection.DIAGNOSTIC_OVERLAY_SKILL_SURFACES,
-            overlay_skill_validator=lambda **kwargs: agent_skill_projection.validate_overlay_skill_surface(
-                root=REPO_ROOT,
-                **kwargs,
-            ),
         )
         self.assertEqual(errors, [])
 
@@ -136,13 +132,13 @@ class DiagnosticSpineSurfaceValidatorTests(unittest.TestCase):
 
         self.assertTrue(any("diagnostic session example must use a supported exit_class" in error for error in errors))
 
-    def test_missing_local_overlay_skill_fails(self) -> None:
+    def test_missing_owner_skill_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir) / "abyss-stack"
             self.write_valid_surface(repo_root)
-            (repo_root / ".agents" / "skills" / "abyss-self-diagnostic-spine" / "SKILL.md").unlink()
+            (repo_root / diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PATH).unlink()
             errors = self.validate_surface(repo_root)
 
         self.assertTrue(
-            any(".agents/skills/abyss-self-diagnostic-spine" in error for error in errors)
+            any("skills/abyss-self-diagnostic-spine/SKILL.md" in error for error in errors)
         )

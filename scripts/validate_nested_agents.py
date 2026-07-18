@@ -78,15 +78,17 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'python scripts/validate_decision_records.py',
     ),
     '.agents/skills/AGENTS.md': (
-        'repo-local skill install and overlay surface',
+        'transitional repo-local projection of shared skills',
         'aoa-skills',
-        'local overlays thin',
+        'Canonical',
+        'root `skills/`',
         'python scripts/validate_nested_agents.py',
     ),
     '.agents/AGENTS.md': (
-        'repo-local agent install and overlay surfaces',
+        'transitional repo-local agent projections',
         '.agents/README.md',
         'canonical skill law',
+        'stack-owned canonical packages under `skills/`',
         'python scripts/validate_nested_agents.py',
     ),
     'scripts/AGENTS.md': (
@@ -259,6 +261,14 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'selected_now',
         'unknown, not zero',
         'python scripts/validate_local_stats_port.py',
+    ),
+    'skills/AGENTS.md': (
+        'canonical home for agent procedures',
+        'belongs to `abyss-stack`',
+        'OS user profile',
+        'session traces',
+        'techniques as optional provenance',
+        'manual positive, negative, owner-return, and coexistence pass',
     ),
     '.agents/spark/AGENTS.md': (
         'fast-loop lane',

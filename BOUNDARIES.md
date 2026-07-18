@@ -23,13 +23,15 @@ This file names what belongs in `abyss-stack` and what must stay elsewhere.
 - runtime benchmark policies, schemas, normalized manifests, and raw runtime evidence
 - platform-adaptation policies and bounded public-safe/private tuning records
 - runtime-facing return policy, context rebuild posture, and return-event logging
+- canonical agent procedures whose applicability, tool binding, typed output,
+  and termination are owned by this runtime
 
 ## Belongs elsewhere
 
 - AoA ecosystem-level meaning in `Agents-of-Abyss`
 - ToS knowledge architecture meaning in `Tree-of-Sophia`
 - reusable techniques in `aoa-techniques`
-- bounded execution workflows in `aoa-skills`
+- shared bounded execution workflows and skill-system doctrine in `aoa-skills`
 - proof surfaces in `aoa-evals`
 - portable verdict logic for runtime benchmark meaning in `aoa-evals`
 - routing truth in `aoa-routing`

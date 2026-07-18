@@ -15,11 +15,14 @@ Its job is to keep the runtime body explicit, modular, reviewable, and recoverab
 - lifecycle operations
 - runbook and recovery posture
 - infrastructure helper services
+- owner skill packages for stack-owned runtime procedures
 
 ## It does not own
 
 - ecosystem-level doctrine for AoA as a whole
-- authored meaning from `aoa-techniques`, `aoa-skills`, `aoa-evals`, `aoa-routing`, `aoa-memo`, `aoa-agents`, `aoa-playbooks`, or `aoa-kag`
+- shared or sibling-authored meaning from `aoa-techniques`, `aoa-skills`,
+  `aoa-evals`, `aoa-routing`, `aoa-memo`, `aoa-agents`, `aoa-playbooks`, or
+  `aoa-kag`
 - the primary authored corpus of Tree of Sophia
 
 ## Core rule

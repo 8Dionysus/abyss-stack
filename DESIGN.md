@@ -31,8 +31,8 @@ A healthy `abyss-stack` looks like a working runtime map:
   secrets, models, logs, or private captures
 - an explicit deployed runtime root under `/srv/AbyssOS/abyss-stack`
 - clear districts for compose modules, config templates, env examples, systemd
-  units, scripts, mechanics, MCP access planes, local memo and stats ports,
-  docs, tests, and local agent overlays
+  units, scripts, mechanics, MCP access planes, owner skill packages, local
+  memo and stats ports, docs, tests, and local agent overlays
 - profile and preset surfaces that make service selection visible
 - mechanic packages that describe runtime moves as packages and parts, not as a
   flat pile of historical files
@@ -70,6 +70,9 @@ The runtime body has these organs:
   through storage-neutral application ports
 - **MCP access planes**: stdio or authenticated host-local adapters that expose
   bounded live or derived context while keeping owner-layer authority intact
+- **owner skill home**: canonical procedures for stack-owned runtime
+  capabilities, exposed once through the OS user profile while shared skill
+  doctrine remains in `aoa-skills`
 - **local memo port**: runtime-side memory candidates, receipts, exports, and
   local notes that route durable review to `aoa-memo`
 - **local stats port**: runtime-owned statistical questions whose definitions

@@ -178,17 +178,17 @@ That winner replaced an older fallback overlay only after:
 because it did not beat the bounded contract-plus-latency read of the current
 CPU-safe path.
 
-## Repo-local overlay skill posture
+## Skill exposure posture
 
-The current repo-local `abyss-*` overlay skill surface is:
+The stack-owned diagnostic procedure is canonical at:
 
-- `.agents/skills/abyss-self-diagnostic-spine`
-- `.agents/skills/abyss-safe-infra-change`
-- `.agents/skills/abyss-sanitized-share`
+- `skills/abyss-self-diagnostic-spine`
 
-Those overlays exist to keep local repo posture explicit and reviewable.
-They do not replace the wider shared `aoa-*` install set, and they should stay
-visible enough that repository validation catches drift.
+It is exposed once through the OS user profile and is not duplicated under
+`.agents/skills`. The remaining shared `abyss-*` procedures stay in the
+transitional `.agents/skills` projection until their owner homes and global OS
+replacements have been admitted and manually proven. Repository validation
+keeps both boundaries visible.
 
 ## Boundary to preserve
 

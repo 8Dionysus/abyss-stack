@@ -11,7 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DIAGNOSTIC_SURFACE_ROOT = (
     Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces"
 )
-OVERLAY_ROOT = REPO_ROOT
 
 
 def write_text(path: Path, text: str) -> None:
@@ -48,39 +47,39 @@ def write_valid_surface(repo_root: Path) -> None:
     ):
         copy_current_surface(relative_path, into=repo_root)
 
-    write_text(
-        repo_root / ".agents" / "skills" / "abyss-self-diagnostic-spine" / "SKILL.md",
-        "# stub\n",
-    )
-
-
-def validate_overlay_skill_surface(
-    *,
-    errors: list[str],
-    skill_path: Path,
-    description: str,
-    expected_target: str | None = None,
-) -> None:
-    del expected_target
-    if not (OVERLAY_ROOT / skill_path / "SKILL.md").is_file():
-        errors.append(f"{skill_path.as_posix()} must be installed as a {description}")
+    for relative_path in (
+        diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PATH,
+        diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_CONTRACT_PATH,
+        diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PROCEDURE_PATH,
+        diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH,
+        diagnostic_spine.SKILL_HOME_MANIFEST_PATH,
+    ):
+        copy_current_surface(relative_path, into=repo_root)
 
 
 def run_validator(repo_root: Path) -> list[str]:
-    global OVERLAY_ROOT
     errors: list[str] = []
-    OVERLAY_ROOT = repo_root
     diagnostic_spine.validate_diagnostic_spine_contracts(
         errors,
         root=repo_root,
-        overlay_skill_surfaces=((Path(".agents") / "skills" / "abyss-self-diagnostic-spine", "local overlay surface", None),),
-        overlay_skill_validator=validate_overlay_skill_surface,
     )
     return errors
 
 
 def test_current_repo_diagnostic_spine_module_passes() -> None:
     assert run_validator(REPO_ROOT) == []
+
+
+def test_missing_owner_skill_fails(tmp_path: Path) -> None:
+    write_valid_surface(tmp_path)
+    (tmp_path / diagnostic_spine.DIAGNOSTIC_OWNER_SKILL_PATH).unlink()
+
+    errors = run_validator(tmp_path)
+
+    assert (
+        "missing required file: skills/abyss-self-diagnostic-spine/SKILL.md"
+        in errors
+    )
 
 
 def test_catalog_surface_order_drift_fails(tmp_path: Path) -> None:

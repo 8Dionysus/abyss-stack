@@ -1,0 +1,25 @@
+{
+  "schema_version": "aoa_skill_home_port_v2",
+  "contract_ref": "aoa-skills:schemas/skill-home-port.schema.json",
+  "owner_repo": "abyss-stack",
+  "owner_ref": "AGENTS.md",
+  "bundles": [
+    {
+      "name": "abyss-self-diagnostic-spine",
+      "path": "skills/abyss-self-diagnostic-spine",
+      "version": "0.2.1",
+      "lifecycle": "admitted",
+      "visibility": "advertised",
+      "admission_ref": "docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md"
+    }
+  ],
+  "exposure": {
+    "runtime": "codex",
+    "scope": "user",
+    "profile": "os-user-default",
+    "mode": "profile-selected",
+    "skills": [
+      "abyss-self-diagnostic-spine"
+    ]
+  }
+}

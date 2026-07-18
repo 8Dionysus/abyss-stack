@@ -1,0 +1,108 @@
+schema_version: aoa-owner-skill-contract-v1
+identity:
+  name: abyss-self-diagnostic-spine
+  owner: abyss-stack
+  canonical_source: skills/abyss-self-diagnostic-spine
+  version: 0.2.1
+  lifecycle: admitted
+  health: active
+purpose: Produce or review one owner-typed Abyss runtime diagnosis without acquiring repair authority.
+applicability:
+  use_when:
+    - A concrete Abyss preset, profile, truth goal, diagnostic packet, or last-good comparison needs owner evidence.
+    - Multi-axis runtime drift and freshness must be reviewed before a diagnosis or repair handoff.
+  do_not_use_when:
+    - The task is generic health explanation, artifact trust, source-authority mapping, live-session mining, repair, restart, or approval.
+    - No Abyss runtime evidence or owner packet is required.
+  ambiguous_when:
+    - A stored packet may be sufficient but its freshness for the requested truth goal is not established.
+operations:
+  observe:
+    freedom: deterministic-owner-tool
+    effects: [read-only]
+  capture:
+    freedom: low
+    effects: [explicit-owner-local-write]
+  review:
+    freedom: bounded-judgment
+    effects: [read-only]
+abi:
+  inputs:
+    required:
+      - operation
+      - target
+      - truth_goal
+      - freshness_intent
+      - effect_authority
+    conditional:
+      observe:
+        - owner_cli_available
+      capture:
+        - owner_cli_available
+        - exact_write_intent
+        - exact_destination_or_promotion
+      review:
+        - diagnostic_session_ref
+  outputs:
+    type: abyss-diagnostic-result
+    required:
+      - operation
+      - target
+      - owner_source
+      - observation_source
+      - schema_verdict
+      - freshness
+      - axes
+      - drifts
+      - unknowns
+      - exit_class
+      - actual_effects
+      - skipped_checks
+      - handoff
+      - claim_limit
+tool_requirements:
+  owner_cli: scripts/aoa-diagnose
+  packet_schema: mechanics/diagnostic-spine/parts/diagnostic-surfaces/schemas/diagnostic_session.schema.json
+  owner_contract: mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md
+  owner_route_card: mechanics/diagnostic-spine/AGENTS.md
+  owner_mechanic_card: mechanics/diagnostic-spine/README.md
+verification:
+  - Resolve the owner package from its canonical home or same-bundle source receipt; never use workspace discovery when the owner root is known.
+  - Treat exit codes 0, 1, and 2 as typed diagnostic outcomes when standalone owner-CLI stdout is JSON with the required diagnostic_session_v1 shape.
+  - Independently validate externally supplied review packets against the owner schema; for owner-CLI output report the narrower owner_cli_shape_checked verdict and ground every claim in returned fields.
+  - Compare actual filesystem effects with the selected operation; observe and review must make no writes.
+  - Preserve source_authored, deployed, trial_proven, and live_available as distinct truth axes.
+termination:
+  success: Stop after one schema-checked packet and one bounded review.
+  blocked: Stop when owner source, target, truth goal, required packet, tool binding, freshness, or effect authority is unavailable.
+  failure: Stop on invalid output, unexpected effects, selector or discovery widening, a host-rejected command wrapper, or owner-tool failure without a typed packet; distinguish attempted from executed effects.
+relations:
+  primary-capability-parent: projects.abyss.diagnose-runtime
+  invokes: [tool.abyss.aoa-diagnose]
+  produces: [diagnostic-session-v1, abyss-diagnostic-result]
+  composes-with: [aoa-session-recovery, aoa-knowledge-stewardship]
+  hands-off-to: [aoa-session-recovery, abyss-stack runtime-repair, inspected stronger owner]
+  conflicts-with: [silent-repair, packet-as-approval, generated-as-authority, hidden-anchor-promotion]
+trust:
+  source_authority: true
+  repair_authority: false
+  proof_authority: false
+  public_safe_default: true
+provenance:
+  legacy_baseline: aoa-skills@94e5d0e:skills/project/abyss/abyss-self-diagnostic-spine/SKILL.md
+  techniques_runtime_dependency: false
+recheck:
+  after:
+    - material owner CLI or schema change
+    - material Codex host or model change
+    - global catalog or source-return change
+    - diagnostic or recovery workflow change
+  manual_cases:
+    - natural positive
+    - generic health negative
+    - existing fresh packet
+    - stale packet
+    - read-only observation
+    - explicit bounded capture
+    - invalid output
+    - recovery coexistence
