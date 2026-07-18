@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 16728685,
+  "allowed_tracked_bytes": 21847116,
+  "approved_by": "repository-owner",
+  "base_ref": "44ebcc90ef17a76887645251fc9bc082eccb8aa4",
+  "changed_generated_bytes": 16728685,
+  "changed_generated_files": 300,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "7b571d4ca6601a61318062a47961222503e7fbca6a9a97f14e889c3e25042ae5",
+  "reason": "Admit the owner-home diagnostic skill contract and procedure, retire the duplicate overlay, and align owner decisions, docs, and existing validation routes; the reviewed source changes distribute anchors across content-addressed shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta",
+  "tracked_bytes": 21847116,
+  "tracked_bytes_max": 24117248
+}
