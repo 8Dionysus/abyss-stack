@@ -67,7 +67,10 @@ The runtime body has these organs:
   consume or mirror surfaces without stealing their authority
 - **runtime knowledge projections**: manifest-bound exact, lexical, vector,
   and graph read models built from owner-qualified KAG records and consumed
-  through storage-neutral application ports
+  through storage-neutral application ports; signed tiered owner families are
+  first admitted through the machine trust plane, hydrated into a local
+  content-addressed cache, and activated only as complete matching owner or
+  OS-composition state
 - **MCP access planes**: stdio or authenticated host-local adapters that expose
   bounded live or derived context while keeping owner-layer authority intact
 - **owner skill home**: canonical procedures for stack-owned runtime
@@ -116,6 +119,10 @@ what was not checked, and what surface owns the next decision.
   user-scoped systemd unless a specific operation proves otherwise.
 - **Portable mirror, private state.** GitHub should be enough to bootstrap; it
   should not contain secrets, heavy models, local databases, logs, or captures.
+- **Content identity before location.** Runtime KAG materialization is bound to
+  owner, corpus, release, and distribution digests. Mirrors, pack layout, and
+  cache paths are replaceable delivery coordinates rather than knowledge
+  identity.
 - **Mechanics are packages.** Runtime moves belong in named packages with parts,
   provenance, landing notes, and validation paths.
 - **Seams are subordinate.** Federation routes may support sibling truth, but

@@ -185,6 +185,10 @@
 
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
 
+## artifact trust/source-runtime boundary
+
+- [ABYSS-STACK-D-0081 Tiered KAG Runtime Materialization](../ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md) (`docs/decisions/ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md`)
+
 ## atomic cutover
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)

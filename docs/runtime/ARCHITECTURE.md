@@ -19,8 +19,18 @@ Persistent state and retrieval substrate:
 - Qdrant
 - Neo4j
 
-Repo-self KAG projection binds SQLite/FTS, Qdrant, and Neo4j to one verified
-`aoa-kag` bundle identity. Runtime files and receipts live under
+Repo-self KAG distribution first admits signed, exact-commit owner-family
+releases through the `abyss-machine` trust gate. The stack materializer
+verifies direct or packed objects into a local content-addressed cache, keeps
+candidate/current/last-good owner state separate, and activates an OS
+composition only when all 24 owner states match. SQLite/FTS, Qdrant, and Neo4j
+remain replaceable projections bound to the admitted corpus and projection
+identities. Ordinary owner changes replace only that owner's SQLite/FTS rows
+and Qdrant collection plus Neo4j owner and touching owner-pair slices.
+Unchanged owner slices are reused, distribution-only relocation does not
+invalidate semantic projection identity, and a coordinated rollback refuses
+to mix exact, vector, and graph last-good generations. Runtime files and
+receipts live under
 `Knowledge/kag/repo-self/`; canonical records remain in repository-owned
 `/kag` homes.
 

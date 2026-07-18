@@ -13,7 +13,7 @@ from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Protocol, Sequence
+from typing import Any, Iterator, Mapping, Protocol, Sequence
 from urllib.parse import quote, unquote, urlparse
 
 from . import exact, graph, vector
@@ -116,6 +116,7 @@ class RuntimeConfig:
     runtime_root: Path
     sqlite_path: Path
     current_path: Path
+    distribution_path: Path
     qdrant_url: str
     qdrant_alias: str
     embedding_url: str
@@ -143,6 +144,7 @@ class RuntimeConfig:
             runtime_root=runtime_root,
             sqlite_path=runtime_root / "exact" / "repo-self.sqlite3",
             current_path=runtime_root / "current.json",
+            distribution_path=runtime_root / "distribution" / "current.json",
             qdrant_url=os.environ.get("AOA_KAG_QDRANT_URL", "http://127.0.0.1:6333"),
             qdrant_alias=os.environ.get("AOA_KAG_QDRANT_ALIAS", vector.DEFAULT_ALIAS),
             embedding_url=os.environ.get(
@@ -300,8 +302,89 @@ class KagApplication:
         except (OSError, UnicodeError, json.JSONDecodeError, RuntimeError):
             return {}
 
+    def _distribution(self) -> dict[str, Any]:
+        if not self.config.distribution_path.is_file():
+            return {
+                "state": "legacy_git_full",
+                "composition_identity": None,
+                "owners": [],
+                "summary": {
+                    "active_owner_count": 0,
+                    "candidate_owner_count": 0,
+                    "composition_active": False,
+                },
+                "degradation": [],
+            }
+        try:
+            payload = _json_file(self.config.distribution_path)
+        except (OSError, UnicodeError, json.JSONDecodeError, RuntimeError):
+            return {
+                "state": "digest_mismatch",
+                "composition_identity": None,
+                "owners": [],
+                "summary": {
+                    "active_owner_count": 0,
+                    "candidate_owner_count": 0,
+                    "composition_active": False,
+                },
+                "degradation": [
+                    {
+                        "target": "tiered-distribution-state",
+                        "state": "digest_mismatch",
+                        "fallback": "last-good-projection-or-git-hot",
+                    }
+                ],
+            }
+        if (
+            payload.get("schema_version")
+            != "abyss-stack-kag-tiered-distribution-current-v1"
+        ):
+            return {
+                "state": "digest_mismatch",
+                "composition_identity": None,
+                "owners": [],
+                "summary": {
+                    "active_owner_count": 0,
+                    "candidate_owner_count": 0,
+                    "composition_active": False,
+                },
+                "degradation": [
+                    {
+                        "target": "tiered-distribution-state",
+                        "state": "digest_mismatch",
+                        "fallback": "last-good-projection-or-git-hot",
+                    }
+                ],
+            }
+        return {
+            "state": str(payload.get("state") or "rebuild_required"),
+            "updated_at": payload.get("updated_at"),
+            "composition_identity": payload.get("composition_identity"),
+            "owners": (
+                payload.get("owners")
+                if isinstance(payload.get("owners"), list)
+                else []
+            ),
+            "candidates": (
+                payload.get("candidates")
+                if isinstance(payload.get("candidates"), list)
+                else []
+            ),
+            "summary": (
+                payload.get("summary")
+                if isinstance(payload.get("summary"), dict)
+                else {}
+            ),
+            "degradation": (
+                payload.get("degradation")
+                if isinstance(payload.get("degradation"), list)
+                else []
+            ),
+        }
+
     def _projection(self) -> dict[str, Any]:
         current = self._current()
+        distribution = self._distribution()
         identity = current.get("projection_identity")
         digest = (
             str(identity.get("content_digest") or "")
@@ -344,7 +427,55 @@ class KagApplication:
             ),
             "updated_at": current.get("updated_at"),
             "targets": target_states,
+            "distribution": distribution,
         }
+
+    @staticmethod
+    def _distribution_degradation(
+        projection: Mapping[str, Any],
+    ) -> list[dict[str, Any]]:
+        distribution = projection.get("distribution")
+        if not isinstance(distribution, Mapping):
+            return []
+        state = str(distribution.get("state") or "")
+        if state in {"", "complete", "git_hot_complete", "legacy_git_full"}:
+            return []
+        rows = distribution.get("degradation")
+        if isinstance(rows, list):
+            normalized = [dict(item) for item in rows if isinstance(item, Mapping)]
+            if normalized:
+                return normalized
+        return [
+            {
+                "target": "tiered-distribution",
+                "state": state,
+                "fallback": "last-good-projection-or-git-hot",
+            }
+        ]
+
+    @staticmethod
+    def _owner_distribution_identity(
+        projection: Mapping[str, Any],
+        owner: str,
+    ) -> dict[str, Any] | None:
+        distribution = projection.get("distribution")
+        owners = (
+            distribution.get("owners")
+            if isinstance(distribution, Mapping)
+            else None
+        )
+        if not isinstance(owners, list):
+            return None
+        for item in owners:
+            if isinstance(item, Mapping) and item.get("owner") == owner:
+                return {
+                    "corpus_digest": item.get("corpus_digest"),
+                    "distribution_digest": item.get("distribution_digest"),
+                    "release_digest": item.get("release_digest"),
+                    "source_ref": item.get("source_ref"),
+                    "delivery_state": item.get("delivery_state"),
+                }
+        return None
 
     def _owner_freshness(
         self,
@@ -543,6 +674,8 @@ class KagApplication:
                 "aoa-kag://projections/{digest}",
             ],
             "projection": projection,
+            "distribution": projection["distribution"],
+            "degradation": self._distribution_degradation(projection),
         }
         if detail == "full":
             payload["kinds"] = {
@@ -791,22 +924,40 @@ class KagApplication:
                 headers=_client_headers("AOA_KAG_EMBEDDING_API_KEY"),
                 timeout=self.config.http_timeout,
             )
-            points, latency = vector.search(
-                query,
-                qdrant=qdrant,
-                embeddings=embeddings,
-                profile=profile,
-                alias=self.config.qdrant_alias,
-                repo=owner,
-                node_class=record_class,
-                kind=kind,
-                document_role=document_role,
-                surface_state=surface_state,
-                path=path,
-                access_scopes=self.access_scopes,
-                offset=0,
-                limit=offset + limit + 16,
+            owner_collections = vector_result.get("owner_collections")
+            owner_scoped = (
+                vector_result.get("storage_mode") == "owner_slices"
+                and isinstance(owner_collections, dict)
             )
+            search_arguments = {
+                "qdrant": qdrant,
+                "embeddings": embeddings,
+                "profile": profile,
+                "repo": owner,
+                "node_class": record_class,
+                "kind": kind,
+                "document_role": document_role,
+                "surface_state": surface_state,
+                "path": path,
+                "access_scopes": self.access_scopes,
+                "offset": 0,
+                "limit": offset + limit + 16,
+            }
+            if owner_scoped:
+                points, latency = vector.search_owner_slices(
+                    query,
+                    owner_collections={
+                        str(repo): str(collection)
+                        for repo, collection in owner_collections.items()
+                    },
+                    **search_arguments,
+                )
+            else:
+                points, latency = vector.search(
+                    query,
+                    alias=self.config.qdrant_alias,
+                    **search_arguments,
+                )
             hits = []
             for point in points:
                 payload = point.get("payload")
@@ -839,7 +990,14 @@ class KagApplication:
                 )
             )
             hits = self._distinct_record_hits(hits)[offset : offset + limit]
-            routes.append({"adapter": "qdrant-vector", "latency_ms": latency})
+            routes.append(
+                {
+                    "adapter": (
+                        "qdrant-owner-slices" if owner_scoped else "qdrant-vector"
+                    ),
+                    "latency_ms": latency,
+                }
+            )
             return hits, routes
         raise ValueError(f"unsupported runtime document strategy: {strategy}")
 
@@ -1016,6 +1174,21 @@ class KagApplication:
             "resources": links,
             "detail": detail,
         }
+        distribution_identity = self._owner_distribution_identity(
+            projection, owner
+        )
+        if distribution_identity is not None:
+            result["corpus_identity"] = {
+                "content_digest": distribution_identity["corpus_digest"],
+                "source_ref": distribution_identity["source_ref"],
+            }
+            result["distribution_identity"] = {
+                "content_digest": distribution_identity[
+                    "distribution_digest"
+                ],
+                "release_digest": distribution_identity["release_digest"],
+                "delivery_state": distribution_identity["delivery_state"],
+            }
         inspection = _content_inspection(
             {
                 "label": hit.get("label"),
@@ -1086,7 +1259,7 @@ class KagApplication:
         used_strategy = (
             self._auto_strategy(query, projection) if strategy == "auto" else strategy
         )
-        degradation: list[dict[str, Any]] = []
+        degradation = self._distribution_degradation(projection)
         if (
             used_strategy in {"exact", "lexical", "hybrid", "graph"}
             and projection["targets"]["exact"]["state"] == "mismatched"
@@ -1382,6 +1555,7 @@ class KagApplication:
                 "degradation": degradation,
             },
             "projection": projection,
+            "distribution": projection["distribution"],
             "result_ids": [item["qualified_id"] for item in normalized],
         }
         trace_id = self._trace(trace_payload)
@@ -1421,7 +1595,7 @@ class KagApplication:
         projection = self._projection()
         payload: Any = None
         route = "runtime-exact"
-        degradation: list[dict[str, Any]] = []
+        degradation = self._distribution_degradation(projection)
         if resource_class == "owners" and len(parts) == 2 and parts[1] == "manifest":
             payload = (
                 self.canonical.owner_manifest(parts[0]) if self.canonical else None
@@ -1608,6 +1782,7 @@ class KagApplication:
             "trace_id": trace_id,
             "route": {"adapter": route, "degradation": degradation},
             "projection": projection,
+            "distribution": projection["distribution"],
             "resource": {"uri": uri, "detail": detail, "payload": payload},
             "resources": {"evidence": _resource_uri("evidence", trace_id)},
         }
@@ -1666,7 +1841,7 @@ class KagApplication:
         request_digest = _request_digest(request)
         offset = _decode_cursor(cursor, request_digest)
         projection = self._projection()
-        degradation: list[dict[str, Any]] = []
+        degradation = self._distribution_degradation(projection)
         routes: list[dict[str, Any]] = []
         raw_hits: list[dict[str, Any]] = []
         owner_freshness = self._owner_freshness(owner) if owner else {"state": "mixed"}
@@ -1689,9 +1864,20 @@ class KagApplication:
             graph_projection = graph.Neo4jProjection(
                 graph_client, self.config.neo4j_database
             )
+            graph_result = (
+                ((self._current().get("targets") or {}).get("graph") or {}).get(
+                    "result"
+                )
+                or {}
+            )
+            owner_scoped = (
+                isinstance(graph_result, dict)
+                and graph_result.get("storage_mode") == "owner_slices"
+            )
             raw_hits, latency = graph.traverse(
                 graph=graph_projection,
                 projection=projection["digest"],
+                owner_slice_state=graph_result if owner_scoped else None,
                 source_ids=source_ids,
                 direction=direction,
                 relation_kinds=relation_kinds,
@@ -1701,7 +1887,14 @@ class KagApplication:
                 offset=offset,
                 limit=limit + 1,
             )
-            routes.append({"adapter": "neo4j-graph", "latency_ms": latency})
+            routes.append(
+                {
+                    "adapter": (
+                        "neo4j-owner-slices" if owner_scoped else "neo4j-graph"
+                    ),
+                    "latency_ms": latency,
+                }
+            )
         except (RuntimeError, OSError) as exc:
             seed_owners = {self._record_owner(item) for item in source_ids}
             seed_owners.discard(None)
@@ -1906,6 +2099,7 @@ class KagApplication:
             "request": request,
             "route": {"adapters": routes, "degradation": degradation},
             "projection": projection,
+            "distribution": projection["distribution"],
             "evidence_paths": [
                 item.get("evidence_path")
                 for item in normalized

@@ -147,3 +147,7 @@
 ## 2026-07-17
 
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
+
+## 2026-07-18
+
+- [ABYSS-STACK-D-0081 Tiered KAG Runtime Materialization](../ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md) (`docs/decisions/ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md`)

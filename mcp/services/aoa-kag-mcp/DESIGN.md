@@ -3,24 +3,34 @@
 ## System Flow
 
 1. Each repository publishes its canonical repo-self family under `kag/`.
-2. `aoa-kag` validates owner identity, composes the federation bundle, and
-   publishes the MCP capability and result contracts.
-3. `abyss-stack` materializes exact, vector, and graph projections from that
-   verified bundle.
-4. The `kag-seam` application port composes canonical and runtime adapters into
+2. `aoa-kag` validates owner identity, publishes content-addressed owner-family
+   releases, composes the 24-owner federation identity, and publishes the MCP
+   capability and result contracts.
+3. `abyss-machine` verifies signatures, provenance, lifecycle, access policy,
+   and subject-store identity for owner releases and OS compositions.
+4. `abyss-stack` hydrates admitted objects into a local CAS, activates only
+   complete matching owner/composition state, and materializes exact, vector,
+   and graph projections as owner-local exact updates, Qdrant owner
+   collections, and Neo4j owner/owner-pair slices.
+5. The `kag-seam` application port composes canonical and runtime adapters into
    storage-neutral KAG operations.
-5. `aoa-kag-mcp` maps those operations to MCP tools and `aoa-kag://` resources.
+6. `aoa-kag-mcp` maps those operations to MCP tools and `aoa-kag://` resources.
 
 ## Application Port
 
 The public behavior is `discover`, `search`, `read`, `traverse`, and `explain`.
 Storage names stay behind the port. Every response states the strategy and
-adapters actually used, projection identity, freshness, degradation, and
-evidence links.
+adapters actually used, corpus/distribution/release identity, projection
+identity, freshness, degradation, and evidence links.
 
 Canonical repo-local reads are the source-grounded fallback. Runtime SQLite,
 Qdrant, and Neo4j are replaceable projections. A backend outage changes route
 quality and capability state rather than the MCP tool ABI.
+
+Owner-family hydration and prefetch are explicit materializer operations.
+Selective hydration remains candidate state until the complete release is
+present and verified. MCP does not discover mirrors, fetch unbounded packs,
+activate compositions, or promote runtime state during a read.
 
 ## Context Shape
 

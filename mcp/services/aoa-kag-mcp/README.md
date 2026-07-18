@@ -10,7 +10,7 @@ across OS Abyss.
 | service owner | `abyss-stack` |
 | canonical records | each repository's `kag/` home |
 | common contract | `aoa-kag` schemas, federation, provenance, and provider map |
-| runtime reads | `kag-seam` application port over SQLite/FTS, Qdrant, and Neo4j |
+| runtime reads | `kag-seam` application port over trust-admitted tiered owner state, owner-local SQLite/FTS updates, Qdrant owner collections, and Neo4j owner/owner-pair slices |
 | transports | portable stdio and authenticated host-local Streamable HTTP |
 
 ## Agent Surface
@@ -24,12 +24,14 @@ across OS Abyss.
 | `kag_explain` | inspect the route, adapters, degradation, projection, and evidence for a trace |
 
 Results preserve qualified owner identity, source anchors, provenance, trust,
-freshness, access, projection identity, and resource links. Detail levels and
-cursor pagination keep context bounded.
+freshness, access, corpus identity, distribution/release identity, projection
+identity, degradation, and resource links. Detail levels and cursor pagination
+keep context bounded.
 
 Runtime projections accelerate retrieval. Canonical repo-local queries remain
-available when a projection is absent, stale, damaged, or incomplete, and the
-result reports the route actually used.
+available when a projection or tiered owner family is absent, stale, damaged,
+partial, unavailable, or incomplete, and the result reports the route actually
+used. MCP never performs an unbounded artifact download inside a request.
 
 Canonical fallback reads the tracked portable-v3 family manifest and bounded
 JSONL shards directly; the seven v2 monolith paths remain logical compatibility

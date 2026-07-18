@@ -63,6 +63,7 @@
         "scripts/aoa-install-systemd",
         "scripts/aoa-internal-probes",
         "scripts/aoa-kag-runtime-eval",
+        "scripts/aoa-kag-runtime-family",
         "scripts/aoa-kag-runtime-projection",
         "scripts/aoa-langgraph-pilot",
         "scripts/aoa-lib.sh",

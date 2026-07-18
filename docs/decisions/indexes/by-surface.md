@@ -366,6 +366,10 @@
 
 - [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
 
+## runtime/storage/federation
+
+- [ABYSS-STACK-D-0081 Tiered KAG Runtime Materialization](../ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md) (`docs/decisions/ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md`)
+
 ## runtime/topology
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)

@@ -4,15 +4,16 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from .bundle import RetrievalBundle, canonical_json, sha256_file
 
 
-SCHEMA_VERSION = "abyss-stack-repo-self-kag-sqlite-v4"
+SCHEMA_VERSION = "abyss-stack-repo-self-kag-sqlite-v5"
 
 
 def _batches(
@@ -182,14 +183,27 @@ def _create_schema(connection: sqlite3.Connection) -> None:
     )
 
 
-def _owner_rows(bundle: RetrievalBundle) -> Iterator[Sequence[Any]]:
+def _owner_rows(
+    bundle: RetrievalBundle,
+    affected_owners: set[str] | None = None,
+) -> Iterator[Sequence[Any]]:
     for record in bundle.records("owners"):
         repo = record["repo"]
+        if affected_owners is not None and str(repo["name"]) not in affected_owners:
+            continue
         yield (str(repo["name"]), str(repo["namespace"]), canonical_json(record))
 
 
-def _relation_rows(bundle: RetrievalBundle) -> Iterator[Sequence[Any]]:
+def _relation_rows(
+    bundle: RetrievalBundle,
+    affected_owners: set[str] | None = None,
+) -> Iterator[Sequence[Any]]:
     for record in bundle.records("relations"):
+        if affected_owners is not None and not {
+            str(record["source_repo"]),
+            str(record["target_repo"]),
+        }.intersection(affected_owners):
+            continue
         yield (
             str(record["id"]),
             str(record["relation_kind"]),
@@ -209,11 +223,22 @@ def _relation_rows(bundle: RetrievalBundle) -> Iterator[Sequence[Any]]:
 
 def _record_rows(
     bundle: RetrievalBundle,
+    affected_owners: set[str] | None = None,
 ) -> Iterator[Sequence[Any]]:
     for key in ("nodes", "relations"):
         for record in bundle.records(key):
             relation = key == "relations"
             repo = str(record["source_repo"] if relation else record["repo"])
+            involved_owners = (
+                {str(record["source_repo"]), str(record["target_repo"])}
+                if relation
+                else {repo}
+            )
+            if (
+                affected_owners is not None
+                and not involved_owners.intersection(affected_owners)
+            ):
+                continue
             namespace = str(record.get("namespace") or f"aoa:{repo}")
             node_class = "relation" if relation else str(record["node_class"])
             kind = str(record["relation_kind"] if relation else record["kind"])
@@ -237,8 +262,20 @@ def _record_rows(
             yield row
 
 
-def _external_rows(bundle: RetrievalBundle) -> Iterator[Sequence[Any]]:
+def _external_rows(
+    bundle: RetrievalBundle,
+    affected_owners: set[str] | None = None,
+) -> Iterator[Sequence[Any]]:
     for record in bundle.records("external_references"):
+        involved_owners = {
+            str(record["source_repo"]),
+            str(record.get("target_repo") or ""),
+        }
+        if (
+            affected_owners is not None
+            and not involved_owners.intersection(affected_owners)
+        ):
+            continue
         identifier = hashlib.sha256(canonical_json(record).encode("utf-8")).hexdigest()
         yield (
             identifier,
@@ -253,8 +290,11 @@ def _external_rows(bundle: RetrievalBundle) -> Iterator[Sequence[Any]]:
 
 def _document_rows(
     bundle: RetrievalBundle,
+    affected_owners: set[str] | None = None,
 ) -> Iterator[Sequence[Any]]:
     for record in bundle.records("documents"):
+        if affected_owners is not None and str(record["repo"]) not in affected_owners:
+            continue
         locator = record["locator"]
         metadata = {key: value for key, value in record.items() if key != "text"}
         row = (
@@ -281,6 +321,151 @@ def _document_rows(
         yield row
 
 
+def _metadata(bundle: RetrievalBundle) -> dict[str, str]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "bundle_digest": bundle.bundle_digest,
+        "projection_digest": bundle.projection_digest,
+        "federation_digest": bundle.federation_digest,
+        "embedding_profile": canonical_json(bundle.manifest["embedding_profile"]),
+        "retrieval_profile": canonical_json(bundle.manifest["retrieval_profile"]),
+        "canonical_inputs": canonical_json(bundle.manifest["canonical_inputs"]),
+    }
+
+
+def _last_good_path(destination: Path) -> Path:
+    return destination.with_name(
+        f"{destination.stem}.last-good{destination.suffix}"
+    )
+
+
+def _preserve_last_good(destination: Path) -> Path | None:
+    if not destination.is_file():
+        return None
+    last_good = _last_good_path(destination)
+    temporary = last_good.with_name(f".{last_good.name}.tmp-{os.getpid()}")
+    temporary.unlink(missing_ok=True)
+    try:
+        shutil.copy2(destination, temporary)
+        with temporary.open("rb") as handle:
+            os.fsync(handle.fileno())
+        os.replace(temporary, last_good)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return last_good
+
+
+def _canonical_inputs_by_owner(
+    inputs: object,
+) -> dict[str, Mapping[str, Any]]:
+    if not isinstance(inputs, list):
+        raise RuntimeError("retrieval canonical inputs must be an array")
+    result: dict[str, Mapping[str, Any]] = {}
+    for item in inputs:
+        if not isinstance(item, Mapping):
+            raise RuntimeError("retrieval canonical input must be an object")
+        repo = item.get("repo")
+        if not isinstance(repo, Mapping) or not isinstance(repo.get("name"), str):
+            raise RuntimeError("retrieval canonical input owner is missing")
+        owner = str(repo["name"])
+        if owner in result:
+            raise RuntimeError(f"duplicate retrieval canonical input owner: {owner}")
+        result[owner] = item
+    return result
+
+
+def _semantic_canonical_input(value: Mapping[str, Any]) -> dict[str, Any]:
+    semantic = dict(value)
+    semantic.pop("distribution_identity", None)
+    return semantic
+
+
+def _placeholders(values: set[str]) -> tuple[str, tuple[str, ...]]:
+    ordered = tuple(sorted(values))
+    return ",".join("?" for _ in ordered), ordered
+
+
+def _delete_fts_rows(
+    connection: sqlite3.Connection,
+    *,
+    table: str,
+    rows: Sequence[Sequence[Any]],
+) -> None:
+    if not rows:
+        return
+    columns = {
+        "records_fts": (
+            "repo",
+            "node_class",
+            "kind",
+            "path",
+            "label",
+            "document_role",
+            "surface_state",
+            "search_text",
+        ),
+        "documents_fts": (
+            "repo",
+            "node_class",
+            "kind",
+            "path",
+            "label",
+            "document_role",
+            "surface_state",
+            "text",
+        ),
+    }[table]
+    connection.executemany(
+        f"INSERT INTO {table}({table},rowid,{','.join(columns)}) "
+        f"VALUES ('delete',?,{','.join('?' for _ in columns)})",
+        rows,
+    )
+
+
+def _insert_fts_rows(
+    connection: sqlite3.Connection,
+    *,
+    table: str,
+    content_table: str,
+    owners: set[str],
+) -> int:
+    placeholders, values = _placeholders(owners)
+    columns = {
+        "records_fts": (
+            "repo",
+            "node_class",
+            "kind",
+            "path",
+            "label",
+            "document_role",
+            "surface_state",
+            "search_text",
+        ),
+        "documents_fts": (
+            "repo",
+            "node_class",
+            "kind",
+            "path",
+            "label",
+            "document_role",
+            "surface_state",
+            "text",
+        ),
+    }[table]
+    rows = connection.execute(
+        f"SELECT rowid,{','.join(columns)} FROM {content_table} "
+        f"WHERE repo IN ({placeholders}) ORDER BY rowid",
+        values,
+    ).fetchall()
+    if rows:
+        connection.executemany(
+            f"INSERT INTO {table}(rowid,{','.join(columns)}) "
+            f"VALUES ({','.join('?' for _ in range(len(columns) + 1))})",
+            rows,
+        )
+    return len(rows)
+
+
 def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -289,13 +474,7 @@ def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
     connection = sqlite3.connect(temporary)
     try:
         _create_schema(connection)
-        metadata = {
-            "schema_version": SCHEMA_VERSION,
-            "bundle_digest": bundle.bundle_digest,
-            "projection_digest": bundle.projection_digest,
-            "federation_digest": bundle.federation_digest,
-            "embedding_profile": canonical_json(bundle.manifest["embedding_profile"]),
-        }
+        metadata = _metadata(bundle)
         connection.executemany(
             "INSERT INTO metadata(key, value) VALUES (?, ?)",
             sorted(metadata.items()),
@@ -354,6 +533,7 @@ def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
 
     with temporary.open("rb") as handle:
         os.fsync(handle.fileno())
+    last_good = _preserve_last_good(destination)
     os.replace(temporary, destination)
     digest, size = sha256_file(destination)
     return {
@@ -362,6 +542,305 @@ def materialize(bundle: RetrievalBundle, destination: Path) -> dict[str, Any]:
         "sha256": digest,
         "bytes": size,
         "counts": counts,
+        "last_good_path": str(last_good) if last_good else "",
+    }
+
+
+def materialize_affected_owners(
+    bundle: RetrievalBundle,
+    destination: Path,
+    *,
+    affected_owners: Sequence[str],
+) -> dict[str, Any]:
+    """Atomically advance only changed owner slices of an existing projection.
+
+    Relations and external references touching an affected owner are refreshed
+    with that owner. Unaffected owner rows are copied byte-for-byte from the
+    last-good SQLite projection and are never read from the new retrieval
+    bundle.
+    """
+
+    destination = destination.resolve()
+    selected = {str(item) for item in affected_owners if str(item)}
+    if not selected:
+        raise ValueError("affected_owners must contain at least one owner")
+    if not destination.is_file():
+        raise RuntimeError("owner-incremental materialization requires last-good SQLite")
+
+    temporary = destination.with_name(f".{destination.name}.tmp-{os.getpid()}")
+    temporary.unlink(missing_ok=True)
+    shutil.copy2(destination, temporary)
+    connection = sqlite3.connect(temporary)
+    removed: dict[str, int] = {}
+    inserted: dict[str, int] = {}
+    try:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        metadata = dict(connection.execute("SELECT key, value FROM metadata"))
+        if metadata.get("schema_version") != SCHEMA_VERSION:
+            raise RuntimeError(
+                "owner-incremental materialization requires the current SQLite schema"
+            )
+        try:
+            previous_inputs = json.loads(metadata["canonical_inputs"])
+            previous_embedding = json.loads(metadata["embedding_profile"])
+            previous_retrieval = json.loads(metadata["retrieval_profile"])
+        except (KeyError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                "last-good SQLite projection lacks incremental identity metadata"
+            ) from exc
+        current_inputs = bundle.manifest.get("canonical_inputs")
+        previous_by_owner = _canonical_inputs_by_owner(previous_inputs)
+        current_by_owner = _canonical_inputs_by_owner(current_inputs)
+        if set(previous_by_owner) != set(current_by_owner):
+            raise RuntimeError(
+                "owner membership changed; a full projection materialization is required"
+            )
+        unknown = sorted(selected - set(current_by_owner))
+        if unknown:
+            raise RuntimeError(
+                "affected owners are absent from the retrieval bundle: "
+                + ", ".join(unknown)
+            )
+        changed = {
+            owner
+            for owner in current_by_owner
+            if _semantic_canonical_input(previous_by_owner[owner])
+            != _semantic_canonical_input(current_by_owner[owner])
+        }
+        missing = sorted(changed - selected)
+        if missing:
+            raise RuntimeError(
+                "affected owner set omits changed canonical inputs: "
+                + ", ".join(missing)
+            )
+        if previous_embedding != bundle.manifest.get("embedding_profile"):
+            raise RuntimeError(
+                "embedding profile changed; a full projection materialization is required"
+            )
+        if previous_retrieval != bundle.manifest.get("retrieval_profile"):
+            raise RuntimeError(
+                "retrieval profile changed; a full projection materialization is required"
+            )
+
+        placeholders, owner_values = _placeholders(selected)
+        relation_condition = (
+            f"source_repo IN ({placeholders}) OR target_repo IN ({placeholders})"
+        )
+        doubled_values = (*owner_values, *owner_values)
+        record_rows = connection.execute(
+            "SELECT r.rowid,r.repo,r.node_class,r.kind,r.path,r.label,"
+            "r.document_role,r.surface_state,r.search_text "
+            "FROM records AS r WHERE "
+            f"r.repo IN ({placeholders}) OR EXISTS ("
+            "SELECT 1 FROM relations AS rel WHERE rel.id=r.id AND ("
+            f"{relation_condition})) ORDER BY r.rowid",
+            (*owner_values, *doubled_values),
+        ).fetchall()
+        document_rows = connection.execute(
+            "SELECT rowid,repo,node_class,kind,path,label,document_role,"
+            f"surface_state,text FROM documents WHERE repo IN ({placeholders}) "
+            "ORDER BY rowid",
+            owner_values,
+        ).fetchall()
+        _delete_fts_rows(
+            connection,
+            table="records_fts",
+            rows=record_rows,
+        )
+        _delete_fts_rows(
+            connection,
+            table="documents_fts",
+            rows=document_rows,
+        )
+
+        removed["records"] = connection.execute(
+            "DELETE FROM records WHERE "
+            f"repo IN ({placeholders}) OR id IN ("
+            "SELECT id FROM relations WHERE "
+            f"{relation_condition})",
+            (*owner_values, *doubled_values),
+        ).rowcount
+        removed["relations"] = connection.execute(
+            f"DELETE FROM relations WHERE {relation_condition}",
+            doubled_values,
+        ).rowcount
+        removed["external_references"] = connection.execute(
+            "DELETE FROM external_references WHERE "
+            f"source_repo IN ({placeholders}) OR target_repo IN ({placeholders})",
+            doubled_values,
+        ).rowcount
+        removed["documents"] = connection.execute(
+            f"DELETE FROM documents WHERE repo IN ({placeholders})",
+            owner_values,
+        ).rowcount
+        removed["owners"] = connection.execute(
+            f"DELETE FROM owners WHERE repo IN ({placeholders})",
+            owner_values,
+        ).rowcount
+
+        inserted["owners"] = _insert_many(
+            connection,
+            "INSERT INTO owners(repo, namespace, payload_json) VALUES (?, ?, ?)",
+            _owner_rows(bundle, selected),
+        )
+        inserted["records"] = _insert_many(
+            connection,
+            "INSERT INTO records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            _record_rows(bundle, selected),
+        )
+        inserted["relations"] = _insert_many(
+            connection,
+            "INSERT INTO relations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            _relation_rows(bundle, selected),
+        )
+        inserted["external_references"] = _insert_many(
+            connection,
+            "INSERT INTO external_references VALUES (?, ?, ?, ?, ?, ?, ?)",
+            _external_rows(bundle, selected),
+        )
+        inserted["documents"] = _insert_many(
+            connection,
+            "INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            _document_rows(bundle, selected),
+        )
+        inserted["records_fts"] = _insert_fts_rows(
+            connection,
+            table="records_fts",
+            content_table="records",
+            owners=selected,
+        )
+        inserted["documents_fts"] = _insert_fts_rows(
+            connection,
+            table="documents_fts",
+            content_table="documents",
+            owners=selected,
+        )
+
+        connection.executemany(
+            "INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)",
+            sorted(_metadata(bundle).items()),
+        )
+        counts = {
+            key: int(connection.execute(f"SELECT count(*) FROM {key}").fetchone()[0])
+            for key in (
+                "owners",
+                "nodes",
+                "relations",
+                "records",
+                "records_fts",
+                "external_references",
+                "documents",
+                "documents_fts",
+            )
+        }
+        if counts["documents"] != counts["documents_fts"]:
+            raise RuntimeError("SQLite FTS document count mismatch")
+        if counts["records"] != counts["records_fts"]:
+            raise RuntimeError("SQLite FTS record count mismatch")
+        expected = {
+            key: int(bundle.manifest["files"][key]["record_count"])
+            for key in (
+                "owners",
+                "nodes",
+                "relations",
+                "external_references",
+                "documents",
+            )
+        }
+        expected["records"] = expected["nodes"] + expected["relations"]
+        for key in ("owners", "nodes", "relations", "records", "external_references", "documents"):
+            if counts[key] != expected[key]:
+                raise RuntimeError(
+                    f"SQLite owner-incremental count mismatch for {key}: "
+                    f"{counts[key]} != {expected[key]}"
+                )
+        connection.commit()
+        integrity = connection.execute("PRAGMA integrity_check").fetchone()
+        if not integrity or integrity[0] != "ok":
+            raise RuntimeError(f"SQLite integrity check failed: {integrity}")
+    except Exception:
+        connection.close()
+        temporary.unlink(missing_ok=True)
+        raise
+    connection.close()
+
+    with temporary.open("rb") as handle:
+        os.fsync(handle.fileno())
+    last_good = _preserve_last_good(destination)
+    os.replace(temporary, destination)
+    digest, size = sha256_file(destination)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "path": str(destination),
+        "sha256": digest,
+        "bytes": size,
+        "counts": {
+            key: value
+            for key, value in counts.items()
+            if key not in {"records_fts", "documents_fts"}
+        },
+        "update_mode": "owner_incremental",
+        "affected_owners": sorted(selected),
+        "changed_canonical_inputs": sorted(changed),
+        "cross_owner_relations": "bounded_recomputed",
+        "rows_removed": removed,
+        "rows_inserted": inserted,
+        "last_good_path": str(last_good) if last_good else "",
+    }
+
+
+def rollback_candidate(destination: Path) -> dict[str, Any]:
+    destination = destination.resolve()
+    last_good = _last_good_path(destination)
+    if not destination.is_file() or not last_good.is_file():
+        raise RuntimeError("SQLite projection has no last-good rollback target")
+    connection = sqlite3.connect(
+        f"file:{last_good}?mode=ro&immutable=1",
+        uri=True,
+    )
+    try:
+        integrity = connection.execute("PRAGMA integrity_check").fetchone()
+        metadata = dict(connection.execute("SELECT key, value FROM metadata"))
+    finally:
+        connection.close()
+    if not integrity or integrity[0] != "ok":
+        raise RuntimeError(f"SQLite rollback integrity check failed: {integrity}")
+    return {
+        "path": last_good,
+        "projection_digest": metadata.get("projection_digest", ""),
+        "bundle_digest": metadata.get("bundle_digest", ""),
+        "federation_digest": metadata.get("federation_digest", ""),
+    }
+
+
+def rollback(destination: Path) -> dict[str, Any]:
+    destination = destination.resolve()
+    prepared = rollback_candidate(destination)
+    last_good = prepared["path"]
+    temporary = destination.with_name(f".{destination.name}.rollback-{os.getpid()}")
+    current_backup = destination.with_name(
+        f".{destination.name}.rollback-current-{os.getpid()}"
+    )
+    temporary.unlink(missing_ok=True)
+    current_backup.unlink(missing_ok=True)
+    try:
+        shutil.copy2(last_good, temporary)
+        shutil.copy2(destination, current_backup)
+        os.replace(temporary, destination)
+        os.replace(current_backup, last_good)
+    finally:
+        temporary.unlink(missing_ok=True)
+        current_backup.unlink(missing_ok=True)
+    digest, size = sha256_file(destination)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "path": str(destination),
+        "sha256": digest,
+        "bytes": size,
+        "last_good_path": str(last_good),
+        "projection_digest": prepared["projection_digest"],
+        "bundle_digest": prepared["bundle_digest"],
+        "federation_digest": prepared["federation_digest"],
     }
 
 
