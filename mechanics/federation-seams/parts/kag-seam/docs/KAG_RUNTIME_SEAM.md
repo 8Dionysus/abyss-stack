@@ -2,13 +2,28 @@
 
 ## Role
 
-The KAG runtime seam turns the verified repo-self projection bundle from
-`aoa-kag` into local search and graph stores. Every result remains traceable to
-the owner-qualified records and source anchors carried by that bundle.
+The KAG runtime seam turns machine-admitted content-addressed owner families
+and the verified repo-self projection bundle from `aoa-kag` into local search
+and graph stores. Every result remains traceable to the owner-qualified
+records, exact source ref, corpus identity, distribution identity, and source
+anchors carried by those inputs.
 
 ## Input
 
-The bundle contains:
+The tiered distribution input consists of:
+
+- an immutable owner-family release bound to one exact `commit:<hex>` source
+  ref;
+- separate corpus and distribution manifests;
+- direct content-addressed shard objects or deterministic bounded transport
+  packs with exact ranges;
+- a portable offline-complete bundle manifest;
+- an `abyss-machine` trust-gate packet whose admitted subject-store root is the
+  family root consumed by this seam;
+- an optional signed OS composition containing exactly 24 verified owner
+  release, corpus, and distribution digests.
+
+The projection bundle contains:
 
 - `manifest.json`, binding canonical owner inputs, projection identities,
   embedding profile, counts, and file digests;
@@ -27,22 +42,71 @@ projection identity.
 
 ```text
 ${AOA_STACK_ROOT}/Knowledge/kag/repo-self/
-  exact/repo-self.sqlite3
+  cas/objects/sha256/<prefix>/<digest>
+  distribution/
+    owners/<owner>/
+      candidate.json
+      current.json
+      last-good.json
+      receipts/
+    composition/
+      current.json
+      last-good.json
+    current.json
+  exact/
+    repo-self.sqlite3
+    repo-self.last-good.sqlite3
+  vector/
+    owner-slices.json
+    owner-slices.last-good.json
+  graph/
+    owner-slices.json
+    owner-slices.last-good.json
   receipts/<projection-digest>/<target>.json
   current.json
 ```
 
-The target adapters are:
+`scripts/aoa-kag-runtime-family` owns the CAS and `distribution/` subtree. It
+accepts only a supported public KAG access policy, an admitted lifecycle, an
+exact source ref, verified release signatures, matching inner manifests, and a
+matching machine-admitted subject-store root. It verifies bytes again before
+placing them in the local CAS.
+
+Selective owner/kind/hash-range hydration is allowed, but a partial selection
+stays in `candidate.json`. Only a complete release can become
+`owners/<owner>/current.json`. A composition can become current only when all
+24 owner current states are complete, their exact identities match the signed
+composition, and their CAS objects remain present and byte-valid.
+
+Changing only distribution coordinates does not invalidate semantic
+projections. A changed owner corpus emits owner-local projection impact with a
+bounded cross-owner relation recomputation obligation. Projection refresh is a
+separate visible operation; the materializer does not mutate SQLite, Qdrant,
+or Neo4j as a hidden hydration side effect.
+
+The promoted target adapters are owner-scoped:
 
 | Target | Runtime output | Function |
 |---|---|---|
-| `exact` | SQLite plus FTS5 | owner, node, relation, artifact, anchor, filter, and BM25 reads |
-| `vector` | versioned Qdrant collection and `aoa_kag_repo_self_current` alias | semantic and hybrid retrieval |
-| `graph` | versioned Neo4j owner/node/relation subgraph and current marker | hierarchy, cross-repo, and multi-hop traversal |
+| `exact` | SQLite plus FTS5 and one last-good database | owner-local transactional row/FTS refresh plus artifact, anchor, filter, and BM25 reads |
+| `vector` | content-addressed Qdrant collection per owner plus current/last-good state maps | bounded owner fan-out for semantic and hybrid retrieval |
+| `graph` | immutable Neo4j owner-node slices and directional owner-pair relation/reference slices plus current/last-good state maps | hierarchy, cross-repo, and multi-hop traversal constrained to active slice digests |
 
 Each adapter completes and verifies its new version before switching its
-current pointer. One previous remote projection remains available for rollback;
-older managed projections are reclaimed.
+current pointer. The exact adapter copies the last-good database, replaces only
+rows and FTS entries belonging to affected owners, and refreshes relations or
+external references touching those owners. Unaffected owner rows remain
+byte-identical. The vector adapter embeds only affected owner documents, reuses
+unchanged owner collections, embeds the query once, fans it out across the
+bounded selected owner collections, and merges the global top-k. The graph
+adapter writes only affected owner slices and directional owner-pair slices
+touching them; traversal admits only the owner, relation, and reference slice
+digests named by current state.
+
+Exact, vector, and graph each retain one last-good state. Coordinated rollback
+first verifies that all three last-good targets name the same projection,
+bundle, and federation identities. It refuses mixed generations, then switches
+all three targets and writes one rollback receipt.
 
 SQLite FTS indexes owner, node class, kind, path, label, and text so scoped BM25
 queries stay inside their selected corpus. Qdrant indexes the matching owner,
@@ -66,23 +130,89 @@ operations to consumers.
 
 The application selects exact, lexical, semantic, hybrid, graph, or composed
 routes from current projection state. Each response records the requested and
-used strategy, adapter timings, projection identity, degradation, provenance,
-source anchors, and owner-return resources. Canonical repo-local queries remain
-available as the source-grounded fallback for absent, stale, incomplete, or
-damaged runtime state.
+used strategy, adapter timings, corpus/distribution/release identity when an
+owner state exists, projection identity, degradation, provenance, source
+anchors, and owner-return resources. Canonical repo-local queries remain
+available as the source-grounded fallback for absent, stale, incomplete,
+unavailable, or damaged runtime state.
 
 Public bounds are ten results per page, graph depth four, and 4096 source-text
 characters in a full read. Backend calls and SQLite execution have explicit
 timeouts, while trace evidence remains in a bounded in-process cache.
 
-## Operation
+## Tiered Family Operation
+
+Hydrate a complete trust-admitted owner release:
+
+```bash
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  hydrate-owner \
+  --family-root /path/to/verified-owner-subject-store \
+  --trust-gate /path/to/owner-trust-gate.json \
+  --owner owner-name
+```
+
+Hydrate a bounded candidate selection:
+
+```bash
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  hydrate-owner \
+  --family-root /path/to/verified-owner-subject-store \
+  --trust-gate /path/to/owner-trust-gate.json \
+  --owner owner-name \
+  --kind anchor \
+  --range-prefix 0a
+```
+
+Activate a signed 24-owner composition only after every exact owner release is
+current:
+
+```bash
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  activate-composition \
+  --composition-root /path/to/verified-composition-subject-store \
+  --trust-gate /path/to/composition-trust-gate.json
+```
+
+Inspect state or roll one owner back to its verified last-good family:
+
+```bash
+scripts/aoa-kag-runtime-family --stack-root "${AOA_STACK_ROOT}" status
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  rollback-owner \
+  --owner owner-name
+```
+
+These commands do not discover remote locations or perform network fetches.
+The operator or artifact lifecycle supplies the already admitted subject
+store. A corrupt local object, wrong owner, wrong source ref, wrong access
+policy, revoked lifecycle, invalid signature state, or mismatched trust root
+fails closed.
+
+## Projection Operation
 
 Build the bundle with `aoa-kag`, then materialize selected targets:
 
 ```bash
 scripts/aoa-kag-runtime-projection \
   --bundle-dir /path/to/repo-self-bundle \
-  --target all
+  --target all \
+  --owner-scoped
+```
+
+The first owner-scoped run bootstraps every owner. For a later owner-local
+corpus change, advance only the owners named by the verified change impact:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all \
+  --owner-scoped \
+  --affected-owner aoa-kag
 ```
 
 Verify the active projections against the same bundle:
@@ -91,8 +221,24 @@ Verify the active projections against the same bundle:
 scripts/aoa-kag-runtime-projection \
   --bundle-dir /path/to/repo-self-bundle \
   --target all \
+  --owner-scoped \
   --check
 ```
+
+Return all three targets to their mutually matching last-good projection:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --target all \
+  --owner-scoped \
+  --rollback
+```
+
+An affected-owner update is rejected when another owner's semantic canonical
+input also changed, when owner membership or the embedding profile changed, or
+when no full bootstrap exists. Distribution-only relocation may change delivery
+identity while retaining the logical projection identity and therefore does
+not force a semantic rebuild.
 
 Measure the active retrieval routes:
 
@@ -118,8 +264,13 @@ metrics, and output handles.
 ## Ownership
 
 Each repository owns its canonical `/kag` records. `aoa-kag` owns their common
-language, builders, federation, and retrieval bundle. `abyss-stack` owns the
-mutable runtime stores, cutover, retention, and receipts described here.
+language, builders, corpus/distribution identity, federation, release
+manifests, and retrieval bundle. `abyss-machine` owns artifact signing,
+verification, promotion, subject-store admission, retention, and revocation.
+`abyss-stack` owns the local CAS, mutable owner/composition state, projections,
+cutover, last-good rollback coordinates, and runtime receipts described here.
+`aoa-kag-mcp` remains a read-only access plane and does not hydrate, promote,
+sign, revoke, or mutate any of those surfaces.
 
 The existing `aoa-kag` and `tos-source` mirrors remain the advisory-only
 inspection route for `/kag/*` and the source-owned `Tree-of-Sophia` handoff:

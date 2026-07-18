@@ -9,6 +9,14 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- Tiered KAG runtime materialization now admits exact-commit owner-family
+  releases and 24-owner compositions through the `abyss-machine` trust gate,
+  verifies direct or packed objects into a local content-addressed cache,
+  preserves candidate/current/last-good state, advances exact rows, Qdrant
+  owner collections, and Neo4j owner/owner-pair slices selectively, coordinates
+  last-good rollback across all three projections, and exposes explicit
+  delivery identity and degradation through the existing five-operation MCP
+  ABI.
 - `skills/abyss-self-diagnostic-spine` is now the admitted owner package for
   stack runtime diagnosis, with an explicit procedure contract and
   OS-user-profile exposure instead of a second repo-local copy.

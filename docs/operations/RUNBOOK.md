@@ -45,6 +45,8 @@ aoa-export-runtime-evidence-selection --input-file /tmp/runtime-evidence-selecti
 aoa-export-artifact-hook-candidate --input-file /tmp/artifact-hook.json --write
 aoa-a2a-return-closeout-dry-run --input-file /tmp/reviewed-closeout-request.json --write
 scripts/aoa-rpg-runtime-projection --check
+scripts/aoa-kag-runtime-family --stack-root "${AOA_STACK_ROOT}" status
+scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all --owner-scoped --check
 scripts/tos-up
 scripts/aoa-tos-graph
 scripts/aoa-governed-run audit <run-id>
@@ -70,6 +72,70 @@ aoa-render-config --preset agent-full --write /tmp/abyss.rendered.yml
 ```
 
 Treat rendered output as potentially secret-bearing.
+
+For the tiered repo-self KAG runtime, first inspect admitted owner and
+composition state:
+
+```bash
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  status
+```
+
+Bootstrap all exact, vector, and graph owner projections from one verified
+retrieval bundle:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --stack-root "${AOA_STACK_ROOT}" \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all \
+  --owner-scoped
+```
+
+For an ordinary owner change, use only the affected owners emitted by the
+verified KAG change receipt or materializer impact:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --stack-root "${AOA_STACK_ROOT}" \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all \
+  --owner-scoped \
+  --affected-owner aoa-kag
+```
+
+The command fails when the affected set omits another semantic owner change,
+when membership or embedding identity requires a full bootstrap, or when the
+last-good state needed for an incremental update is absent. Do not widen the
+set by guesswork; return to the owner change receipt or rebuild all owners.
+
+Verify current owner-scoped state:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --stack-root "${AOA_STACK_ROOT}" \
+  --bundle-dir /path/to/repo-self-bundle \
+  --target all \
+  --owner-scoped \
+  --check
+```
+
+When an activated generation is bad, roll exact, vector, and graph back
+together:
+
+```bash
+scripts/aoa-kag-runtime-projection \
+  --stack-root "${AOA_STACK_ROOT}" \
+  --target all \
+  --owner-scoped \
+  --rollback
+```
+
+Rollback first verifies that every target's last-good state has the same
+projection, bundle, and federation identities. A refusal is an identity
+split requiring investigation, not permission to roll targets back
+independently.
 
 For private host-facts capture during local incident work:
 
@@ -267,13 +333,46 @@ curl -X POST http://127.0.0.1:5402/kag/query-mode \
   -d '{"mode":"global_search"}'
 ```
 
-For repo-self KAG runtime projection and parity:
+For trust-admitted tiered owner-family hydration and composition status:
+
+```bash
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  hydrate-owner \
+  --family-root /path/to/verified-owner-subject-store \
+  --trust-gate /path/to/owner-trust-gate.json \
+  --owner owner-name
+
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  activate-composition \
+  --composition-root /path/to/verified-composition-subject-store \
+  --trust-gate /path/to/composition-trust-gate.json
+
+scripts/aoa-kag-runtime-family \
+  --stack-root "${AOA_STACK_ROOT}" \
+  status
+```
+
+The family root must be the exact subject-store path admitted by
+`abyss-machine`. Selective `--kind` or `--range-prefix` hydration creates
+candidate state until every object in that owner release is verified locally.
+Do not report a candidate or hot-only result as complete.
+
+For repo-self KAG runtime projection and parity after owner-family admission:
 
 ```bash
 scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all
 scripts/aoa-kag-runtime-projection --bundle-dir /path/to/repo-self-bundle --target all --check
 scripts/aoa-kag-runtime-eval
 ```
+
+If hydration or activation fails, inspect
+`${AOA_STACK_ROOT}/Knowledge/kag/repo-self/distribution/current.json` and the
+owner state under `distribution/owners/<owner>/`. Digest mismatch, revoked,
+access denied, artifact unavailable, and rebuild required are distinct
+conditions. Use `rollback-owner --owner <owner>` only when a verified
+`last-good.json` exists; it does not mutate the authored owner repository.
 
 For combined surfaces:
 

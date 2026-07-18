@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import hashlib
+import io
 import json
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -21,9 +24,14 @@ sys.path.insert(0, str(PART_ROOT))
 
 from kag_runtime import exact, graph, vector  # noqa: E402
 from kag_runtime.application import KagApplication, RuntimeConfig  # noqa: E402
-from kag_runtime.bundle import RetrievalBundle, canonical_json  # noqa: E402
+from kag_runtime.bundle import (  # noqa: E402
+    RetrievalBundle,
+    canonical_json,
+    write_json_atomic,
+)
 from kag_runtime.transport import HttpJsonError, JsonHttpClient  # noqa: E402
 import aoa_kag_runtime_eval as runtime_eval  # noqa: E402
+import aoa_kag_runtime_projection as runtime_projection  # noqa: E402
 
 
 def _digest(value: str) -> str:
@@ -267,6 +275,19 @@ def write_bundle(root: Path) -> RetrievalBundle:
             {
                 "repo": owners[0]["repo"],
                 "source_index_digest": owners[0]["source_index_digest"],
+                "family_digests": owners[0]["family_digests"],
+                "corpus_identity": {
+                    "content_digest": "sha256:" + _digest("corpus")
+                },
+                "distribution_identity": {
+                    "content_digest": "sha256:" + _digest("distribution"),
+                    "delivery_state": "complete",
+                    "complete": True,
+                    "manifest_schema": (
+                        "aoa-repo-local-kag-distribution-manifest-v1"
+                    ),
+                    "routes": {"local_cas": 1},
+                },
             }
         ],
         "projection_lanes": ["exact", "lexical", "vector", "hybrid", "graph"],
@@ -304,6 +325,154 @@ def write_bundle(root: Path) -> RetrievalBundle:
         encoding="utf-8",
     )
     return RetrievalBundle.open(root)
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+
+def _replace_fixture(value: Any, replacement: str) -> Any:
+    if isinstance(value, str):
+        return value.replace("fixture", replacement).replace("Fixture", replacement.title())
+    if isinstance(value, list):
+        return [_replace_fixture(item, replacement) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _replace_fixture(item, replacement)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _finalize_bundle(
+    root: Path,
+    manifest: dict[str, Any],
+    records: dict[str, list[dict[str, Any]]],
+) -> RetrievalBundle:
+    manifest["files"] = {
+        key: _write_jsonl(root / f"{key}.jsonl", value)
+        for key, value in records.items()
+    }
+    manifest["summary"]["owner_count"] = len(records["owners"])
+    manifest["summary"]["document_count"] = len(records["documents"])
+    manifest["summary"]["text_bytes"] = sum(
+        len(str(item["text"]).encode("utf-8")) for item in records["documents"]
+    )
+    manifest["federation_summary"].update(
+        {
+            "owner_count": len(records["owners"]),
+            "node_count": len(records["nodes"]),
+            "relation_count": len(records["relations"]),
+            "external_reference_count": len(records["external_references"]),
+        }
+    )
+    manifest["bundle_identity"]["content_digest"] = "0" * 64
+    manifest["bundle_identity"]["content_digest"] = hashlib.sha256(
+        canonical_json(manifest).encode("utf-8")
+    ).hexdigest()
+    (root / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return RetrievalBundle.open(root)
+
+
+def write_two_owner_bundle(root: Path) -> RetrievalBundle:
+    bundle = write_bundle(root)
+    manifest = copy.deepcopy(bundle.manifest)
+    records = {
+        key: _read_jsonl(bundle.path(key))
+        for key in ("owners", "nodes", "relations", "external_references", "documents")
+    }
+    for key in records:
+        records[key].extend(
+            _replace_fixture(copy.deepcopy(records[key]), "fixture-b")
+        )
+    second_owner = records["owners"][1]
+    second_owner["source_index_digest"] = _digest("source-b")
+    second_owner["repo"]["git_ref"] = "INDEX-B"
+    records["documents"][1][
+        "vector_point_id"
+    ] = "00000000-0000-0000-0000-000000000002"
+    manifest["canonical_inputs"] = [
+        {
+            "repo": copy.deepcopy(item["repo"]),
+            "source_index_digest": item["source_index_digest"],
+            "family_digests": copy.deepcopy(item["family_digests"]),
+            "corpus_identity": {
+                "content_digest": "sha256:"
+                + _digest(f"corpus:{item['repo']['name']}")
+            },
+            "distribution_identity": {
+                "content_digest": "sha256:"
+                + _digest(f"distribution:{item['repo']['name']}"),
+                "delivery_state": "complete",
+                "complete": True,
+                "manifest_schema": (
+                    "aoa-repo-local-kag-distribution-manifest-v1"
+                ),
+                "routes": {"local_cas": 1},
+            },
+        }
+        for item in records["owners"]
+    ]
+    manifest["projection_identity"]["content_digest"] = _digest("projection-two")
+    manifest["federation_identity"]["content_digest"] = _digest("federation-two")
+    return _finalize_bundle(root, manifest, records)
+
+
+def write_changed_owner_bundle(
+    source: RetrievalBundle,
+    root: Path,
+    *,
+    owner: str,
+    marker: str,
+) -> RetrievalBundle:
+    shutil.copytree(source.root, root)
+    manifest = copy.deepcopy(source.manifest)
+    records = {
+        key: _read_jsonl(root / f"{key}.jsonl")
+        for key in ("owners", "nodes", "relations", "external_references", "documents")
+    }
+    for item in records["owners"]:
+        if item["repo"]["name"] == owner:
+            item["source_index_digest"] = _digest(f"{owner}:{marker}")
+    for item in records["nodes"]:
+        if item["repo"] == owner:
+            item["search_text"] = f"{item['search_text']} {marker}"
+    for item in records["relations"]:
+        if owner in {item["source_repo"], item["target_repo"]}:
+            item["search_text"] = f"{item['search_text']} {marker}"
+    for item in records["external_references"]:
+        if owner in {item["source_repo"], item.get("target_repo")}:
+            item["target_ref"] = f"{item['target_ref']}?version={marker}"
+    for item in records["documents"]:
+        if item["repo"] == owner:
+            item["text"] = f"# Changed owner\n{marker}\n"
+            item["text_digest"] = hashlib.sha256(
+                item["text"].encode("utf-8")
+            ).hexdigest()
+            item["version_id"] = f"{item['version_id']}:{marker}"
+    for item in manifest["canonical_inputs"]:
+        if item["repo"]["name"] == owner:
+            item["source_index_digest"] = _digest(f"{owner}:{marker}")
+            item["corpus_identity"]["content_digest"] = (
+                "sha256:" + _digest(f"corpus:{owner}:{marker}")
+            )
+            item["distribution_identity"]["content_digest"] = (
+                "sha256:" + _digest(f"distribution:{owner}:{marker}")
+            )
+    manifest["projection_identity"]["content_digest"] = _digest(
+        f"projection:{owner}:{marker}"
+    )
+    manifest["federation_identity"]["content_digest"] = _digest(
+        f"federation:{owner}:{marker}"
+    )
+    return _finalize_bundle(root, manifest, records)
 
 
 class FakeEmbeddings:
@@ -458,13 +627,33 @@ class FakeGraph:
         }
         self.stale_nodes = 0
         self.cleanup_limits: list[int] = []
+        self.slice_owners: set[tuple[str, str]] = set()
+        self.slice_nodes: set[tuple[str, str]] = set()
+        self.slice_relations: set[tuple[str, str]] = set()
+        self.slice_external: set[tuple[str, str]] = set()
 
     def execute(
         self, statement: str, parameters: dict[str, Any] | None = None
     ) -> list[list[Any]]:
         values = parameters or {}
         rows = values.get("rows", [])
-        if "UNWIND" in statement and "AOA_KAG_EXTERNAL_REFERENCE" in statement:
+        if "UNWIND" in statement and "AOA_KAG_EXTERNAL_REFERENCE_SLICE" in statement:
+            self.slice_external.update(
+                (str(row["slice_digest"]), str(row["id"])) for row in rows
+            )
+        elif "UNWIND" in statement and "AOA_KAG_RELATION_SLICE" in statement:
+            self.slice_relations.update(
+                (str(row["slice_digest"]), str(row["id"])) for row in rows
+            )
+        elif "UNWIND" in statement and "MERGE (o:AoAKagOwnerSlice" in statement:
+            self.slice_owners.update(
+                (str(row["slice_digest"]), str(row["repo"])) for row in rows
+            )
+        elif "UNWIND" in statement and "MERGE (n:AoAKagNodeSlice" in statement:
+            self.slice_nodes.update(
+                (str(row["slice_digest"]), str(row["id"])) for row in rows
+            )
+        elif "UNWIND" in statement and "AOA_KAG_EXTERNAL_REFERENCE" in statement:
             self.counts["external_references"] += len(rows)
         elif "UNWIND" in statement and "AOA_KAG_RELATION" in statement:
             self.counts["relations"] += len(rows)
@@ -504,6 +693,19 @@ class FakeGraph:
         if "p.current_digest" in statement:
             self.observed_channels.append(str(parameters.get("channel") or ""))
             return self.current
+        slices = set(parameters.get("slices", []))
+        if "AoAKagOwnerSlice" in statement:
+            return sum(slice_digest in slices for slice_digest, _ in self.slice_owners)
+        if "AoAKagNodeSlice" in statement:
+            return sum(slice_digest in slices for slice_digest, _ in self.slice_nodes)
+        if "AOA_KAG_EXTERNAL_REFERENCE_SLICE" in statement:
+            return sum(
+                slice_digest in slices for slice_digest, _ in self.slice_external
+            )
+        if "AOA_KAG_RELATION_SLICE" in statement:
+            return sum(
+                slice_digest in slices for slice_digest, _ in self.slice_relations
+            )
         if "AoAKagOwner" in statement:
             return self.counts["owners"]
         if "AoAKagNode" in statement:
@@ -564,6 +766,117 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             ["path", "repo", "node_class", "kind", "start_line", "chunk_index", "id"],
         )
         self.assertEqual(objects, {"nodes": "view"})
+
+    def test_sqlite_owner_incremental_update_reuses_unaffected_owner_slice(
+        self,
+    ) -> None:
+        first = write_two_owner_bundle(self.root / "two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "two-owner-next",
+            owner="fixture",
+            marker="changed-owner-marker",
+        )
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(first, destination)
+        before = sqlite3.connect(destination)
+        try:
+            unaffected_before = before.execute(
+                "SELECT payload_json FROM records WHERE repo='fixture-b' ORDER BY id"
+            ).fetchall()
+        finally:
+            before.close()
+
+        result = exact.materialize_affected_owners(
+            second,
+            destination,
+            affected_owners=["fixture"],
+        )
+        exact.check(second, destination)
+
+        after = sqlite3.connect(destination)
+        try:
+            unaffected_after = after.execute(
+                "SELECT payload_json FROM records WHERE repo='fixture-b' ORDER BY id"
+            ).fetchall()
+            changed_document = after.execute(
+                "SELECT d.id FROM documents_fts "
+                "JOIN documents d ON d.rowid=documents_fts.rowid "
+                "WHERE documents_fts MATCH 'changed AND owner AND marker'"
+            ).fetchone()
+            old_document = after.execute(
+                "SELECT d.id FROM documents_fts "
+                "JOIN documents d ON d.rowid=documents_fts.rowid "
+                "WHERE documents_fts MATCH 'evidence' AND d.repo='fixture'"
+            ).fetchone()
+        finally:
+            after.close()
+
+        self.assertEqual(result["update_mode"], "owner_incremental")
+        self.assertEqual(result["affected_owners"], ["fixture"])
+        self.assertEqual(result["changed_canonical_inputs"], ["fixture"])
+        self.assertEqual(unaffected_before, unaffected_after)
+        self.assertEqual(
+            changed_document[0],
+            "aoa:fixture:retrieval-document:intro",
+        )
+        self.assertIsNone(old_document)
+        self.assertEqual(result["rows_inserted"]["owners"], 1)
+
+    def test_sqlite_owner_incremental_update_rejects_omitted_changed_owner(
+        self,
+    ) -> None:
+        first = write_two_owner_bundle(self.root / "two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "two-owner-next",
+            owner="fixture",
+            marker="changed-owner-marker",
+        )
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(first, destination)
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "omits changed canonical inputs",
+        ):
+            exact.materialize_affected_owners(
+                second,
+                destination,
+                affected_owners=["fixture-b"],
+            )
+
+    def test_sqlite_owner_incremental_update_preserves_and_rolls_back_last_good(
+        self,
+    ) -> None:
+        first = write_two_owner_bundle(self.root / "rollback-two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "rollback-two-owner-next",
+            owner="fixture",
+            marker="rollback-owner-marker",
+        )
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(first, destination)
+        advanced = exact.materialize_affected_owners(
+            second,
+            destination,
+            affected_owners=["fixture"],
+        )
+        self.assertTrue(Path(advanced["last_good_path"]).is_file())
+
+        rolled_back = exact.rollback(destination)
+        checked = exact.check(first, destination)
+
+        self.assertEqual(
+            rolled_back["projection_digest"],
+            first.projection_digest,
+        )
+        self.assertEqual(
+            checked["counts"]["documents"],
+            first.manifest["files"]["documents"]["record_count"],
+        )
+        self.assertTrue(Path(rolled_back["last_good_path"]).is_file())
 
     def test_sqlite_record_index_covers_every_base_record_class(self) -> None:
         destination = self.root / "runtime" / "repo-self.sqlite3"
@@ -714,6 +1027,83 @@ class KagRuntimeProjectionTests(unittest.TestCase):
                     "reason": "OperationalError",
                 }
             ],
+        )
+
+    def test_tiered_distribution_identity_and_degradation_reach_mcp_results(
+        self,
+    ) -> None:
+        destination = self.root / "runtime" / "repo-self.sqlite3"
+        exact.materialize(self.bundle, destination)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=destination,
+        )
+        write_json_atomic(
+            config.distribution_path,
+            {
+                "schema_version": (
+                    "abyss-stack-kag-tiered-distribution-current-v1"
+                ),
+                "updated_at": "2026-07-18T00:00:00Z",
+                "state": "hot_only",
+                "composition_identity": None,
+                "owners": [
+                    {
+                        "owner": "fixture",
+                        "source_ref": "commit:" + ("a" * 40),
+                        "release_digest": "sha256:" + ("b" * 64),
+                        "corpus_digest": "sha256:" + ("c" * 64),
+                        "distribution_digest": "sha256:" + ("d" * 64),
+                        "delivery_state": "complete",
+                    }
+                ],
+                "candidates": [],
+                "summary": {
+                    "active_owner_count": 1,
+                    "candidate_owner_count": 0,
+                    "composition_active": False,
+                },
+                "degradation": [
+                    {
+                        "target": "tiered-distribution",
+                        "state": "hot_only",
+                        "fallback": "last-good-projection-or-git-hot",
+                    }
+                ],
+            },
+        )
+        application = KagApplication(config=config)
+
+        discovered = application.discover(detail="full")
+        result = application.search(
+            "README.md",
+            strategy="exact",
+            owner="fixture",
+            record_class="artifact",
+        )
+
+        self.assertEqual(discovered["distribution"]["state"], "hot_only")
+        self.assertEqual(
+            discovered["degradation"][0]["target"], "tiered-distribution"
+        )
+        self.assertEqual(result["status"], "degraded")
+        self.assertIn(
+            {
+                "target": "tiered-distribution",
+                "state": "hot_only",
+                "fallback": "last-good-projection-or-git-hot",
+            },
+            result["route"]["degradation"],
+        )
+        self.assertEqual(
+            result["results"][0]["corpus_identity"]["content_digest"],
+            "sha256:" + ("c" * 64),
+        )
+        self.assertEqual(
+            result["results"][0]["distribution_identity"][
+                "content_digest"
+            ],
+            "sha256:" + ("d" * 64),
         )
 
     def test_self_described_exact_projection_reports_missing_runtime_state(
@@ -947,6 +1337,61 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(hit["path"], "README.md")
         self.assertEqual(hit["record"]["id"], hit["qualified_id"])
 
+    def test_application_routes_graph_reads_through_owner_slices(self) -> None:
+        sqlite_path = self.root / "repo-self.sqlite3"
+        exact.materialize(self.bundle, sqlite_path)
+        config = replace(
+            RuntimeConfig.discover(stack_root=self.root),
+            sqlite_path=sqlite_path,
+        )
+        config.current_path.parent.mkdir(parents=True)
+        graph_result = {
+            "storage_mode": "owner_slices",
+            "owner_slices": {"fixture": "owner-slice-a"},
+            "relation_slices": ["relation-slice-a"],
+        }
+        config.current_path.write_text(
+            json.dumps(
+                {
+                    "projection_identity": {
+                        "content_digest": self.bundle.projection_digest
+                    },
+                    "targets": {
+                        "graph": {
+                            "status": "current",
+                            "result": graph_result,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        application = KagApplication(config=config)
+        with (
+            mock.patch(
+                "kag_runtime.application._neo4j_headers",
+                return_value={},
+            ),
+            mock.patch.object(
+                graph,
+                "traverse",
+                return_value=([], 1.0),
+            ) as traversal,
+        ):
+            result = application.traverse(
+                ["aoa:fixture:artifact:readme"],
+                owner="fixture",
+            )
+
+        self.assertEqual(
+            traversal.call_args.kwargs["owner_slice_state"],
+            graph_result,
+        )
+        self.assertEqual(
+            result["route"]["adapters"][0]["adapter"],
+            "neo4j-owner-slices",
+        )
+
     def test_qdrant_projection_uses_bundle_point_identity_and_alias(self) -> None:
         qdrant = FakeQdrant()
         result = vector.materialize(
@@ -1159,6 +1604,155 @@ class KagRuntimeProjectionTests(unittest.TestCase):
         self.assertEqual(qdrant.points[0]["vector"], [0.6, 0.8, 0.0])
         self.assertEqual(qdrant.points[1]["vector"], [0.6, 0.8, 0.0])
 
+    def test_qdrant_owner_slices_update_only_affected_owner_collection(
+        self,
+    ) -> None:
+        first = write_two_owner_bundle(self.root / "vector-two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "vector-two-owner-next",
+            owner="fixture",
+            marker="vector-owner-marker",
+        )
+        state_path = self.root / "runtime" / "vector" / "owner-slices.json"
+        qdrant = FakeQdrant()
+        initial_embeddings = AdaptiveEmbeddings(max_batch_size=2)
+        initial = vector.materialize_owner_slices(
+            first,
+            qdrant=qdrant,
+            embeddings=initial_embeddings,
+            state_path=state_path,
+            batch_size=2,
+        )
+        unaffected_collection = initial["owner_collections"]["fixture-b"]
+        affected_collection = initial["owner_collections"]["fixture"]
+        initial_point_writes = len(qdrant.points)
+
+        changed_embeddings = AdaptiveEmbeddings(max_batch_size=2)
+        advanced = vector.materialize_owner_slices(
+            second,
+            qdrant=qdrant,
+            embeddings=changed_embeddings,
+            state_path=state_path,
+            affected_owners=["fixture"],
+            batch_size=2,
+        )
+        checked = vector.check_owner_slices(
+            second,
+            qdrant=qdrant,
+            state_path=state_path,
+        )
+        rolled_back = vector.rollback_owner_slices(
+            qdrant=qdrant,
+            state_path=state_path,
+        )
+        rollback_checked = vector.check_owner_slices(
+            first,
+            qdrant=qdrant,
+            state_path=state_path,
+        )
+
+        self.assertEqual(initial["owner_count"], 2)
+        self.assertEqual(advanced["changed_owners"], ["fixture"])
+        self.assertEqual(advanced["reused_owner_slices"], ["fixture-b"])
+        self.assertEqual(
+            advanced["owner_collections"]["fixture-b"],
+            unaffected_collection,
+        )
+        self.assertNotEqual(
+            advanced["owner_collections"]["fixture"],
+            affected_collection,
+        )
+        self.assertEqual(changed_embeddings.texts, ["# Changed owner\nvector-owner-marker\n"])
+        self.assertEqual(len(qdrant.points), initial_point_writes + 1)
+        self.assertEqual(checked["point_count"], 2)
+        self.assertEqual(
+            rolled_back["projection_digest"],
+            first.projection_digest,
+        )
+        self.assertEqual(
+            rollback_checked["owner_collections"]["fixture"],
+            affected_collection,
+        )
+
+    def test_qdrant_owner_slice_search_embeds_once_across_owner_fanout(
+        self,
+    ) -> None:
+        bundle = write_two_owner_bundle(self.root / "vector-search-two-owner")
+        state_path = self.root / "runtime" / "vector" / "owner-slices.json"
+        qdrant = FakeQdrant()
+        vector.materialize_owner_slices(
+            bundle,
+            qdrant=qdrant,
+            embeddings=AdaptiveEmbeddings(max_batch_size=2),
+            state_path=state_path,
+            batch_size=2,
+        )
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        embeddings = AdaptiveEmbeddings(max_batch_size=2)
+
+        points, _ = vector.search_owner_slices(
+            "repository evidence",
+            qdrant=qdrant,
+            embeddings=embeddings,
+            profile=state["embedding_profile"],
+            owner_collections={
+                owner: packet["collection"]
+                for owner, packet in state["owners"].items()
+            },
+            limit=10,
+        )
+
+        self.assertEqual(len(points), 2)
+        self.assertEqual(len(embeddings.texts), 1)
+        self.assertEqual(len(qdrant.queries), 2)
+
+    def test_application_routes_semantic_reads_through_owner_slices(self) -> None:
+        state_path = self.root / "runtime" / "vector" / "owner-slices.json"
+        qdrant = FakeQdrant()
+        vector_result = vector.materialize_owner_slices(
+            self.bundle,
+            qdrant=qdrant,
+            embeddings=FakeEmbeddings(),
+            state_path=state_path,
+        )
+        config = RuntimeConfig.discover(stack_root=self.root)
+        config.current_path.parent.mkdir(parents=True)
+        config.current_path.write_text(
+            json.dumps(
+                {
+                    "projection_identity": {
+                        "content_digest": self.bundle.projection_digest
+                    },
+                    "targets": {
+                        "vector": {
+                            "status": "current",
+                            "result": vector_result,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        application = KagApplication(config=config)
+
+        with mock.patch(
+            "kag_runtime.application.JsonHttpClient",
+            side_effect=[qdrant, FakeEmbeddings()],
+        ):
+            result = application.search(
+                "repository evidence",
+                strategy="semantic",
+                owner="fixture",
+            )
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(
+            result["route"]["adapters"][0]["adapter"],
+            "qdrant-owner-slices",
+        )
+        self.assertEqual(result["results"][0]["owner"]["repo"], "fixture")
+
     def test_qdrant_projection_bounds_dense_changed_embedding_batches(self) -> None:
         source = next(self.bundle.records("documents"))
         documents = []
@@ -1299,6 +1893,135 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             all(channel == graph.DEFAULT_CHANNEL for channel in fake.observed_channels)
         )
 
+    def test_neo4j_owner_slices_update_only_affected_owner_and_relation_slices(
+        self,
+    ) -> None:
+        first = write_two_owner_bundle(self.root / "graph-two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "graph-two-owner-next",
+            owner="fixture",
+            marker="graph-owner-marker",
+        )
+        state_path = self.root / "runtime" / "graph" / "owner-slices.json"
+        fake = FakeGraph()
+        initial = graph.materialize_owner_slices(
+            first,
+            graph=fake,
+            state_path=state_path,
+            batch_size=2,
+        )
+        initial_relations = set(initial["relation_slices"])
+
+        advanced = graph.materialize_owner_slices(
+            second,
+            graph=fake,
+            state_path=state_path,
+            affected_owners=["fixture"],
+            batch_size=2,
+        )
+        checked = graph.check_owner_slices(
+            second,
+            graph=fake,
+            state_path=state_path,
+        )
+        rolled_back = graph.rollback_owner_slices(
+            graph=fake,
+            state_path=state_path,
+        )
+        rollback_checked = graph.check_owner_slices(
+            first,
+            graph=fake,
+            state_path=state_path,
+        )
+
+        self.assertEqual(initial["counts"]["owners"], 2)
+        self.assertEqual(advanced["changed_owners"], ["fixture"])
+        self.assertEqual(advanced["reused_owner_slices"], ["fixture-b"])
+        self.assertEqual(
+            advanced["owner_slices"]["fixture-b"],
+            initial["owner_slices"]["fixture-b"],
+        )
+        self.assertNotEqual(
+            advanced["owner_slices"]["fixture"],
+            initial["owner_slices"]["fixture"],
+        )
+        self.assertEqual(
+            len(initial_relations.intersection(advanced["relation_slices"])),
+            1,
+        )
+        self.assertEqual(checked["counts"]["nodes"], 10)
+        self.assertTrue(
+            (
+                state_path.parent
+                / "owner-slices.last-good.json"
+            ).is_file()
+        )
+        self.assertEqual(
+            rolled_back["projection_digest"],
+            first.projection_digest,
+        )
+        self.assertEqual(
+            rollback_checked["owner_slices"]["fixture"],
+            initial["owner_slices"]["fixture"],
+        )
+
+    def test_neo4j_owner_slice_traversal_is_bounded_to_active_slices(self) -> None:
+        class TraversalGraph:
+            def __init__(self) -> None:
+                self.statement = ""
+                self.parameters: dict[str, Any] = {}
+
+            def execute(
+                self,
+                statement: str,
+                parameters: dict[str, Any] | None = None,
+            ) -> list[list[Any]]:
+                self.statement = statement
+                self.parameters = parameters or {}
+                return [
+                    [
+                        "aoa:fixture:artifact:readme",
+                        "aoa:fixture:anchor:intro",
+                        "fixture",
+                        "aoa:fixture",
+                        "anchor",
+                        "markdown_heading",
+                        ["source:readme"],
+                        ["aoa:fixture:anchor:intro"],
+                        "public",
+                        1,
+                        [],
+                        [
+                            {
+                                "id": "aoa:fixture:relation:contains",
+                                "evidence_anchor_ids": [
+                                    "aoa:fixture:anchor:intro"
+                                ],
+                            }
+                        ],
+                    ]
+                ]
+
+        fake = TraversalGraph()
+        hits, _ = graph.traverse(
+            graph=fake,  # type: ignore[arg-type]
+            projection=self.bundle.projection_digest,
+            owner_slice_state={
+                "storage_mode": "owner_slices",
+                "owner_slices": {"fixture": "owner-slice-a"},
+                "relation_slices": ["relation-slice-a"],
+            },
+            source_ids=["aoa:fixture:artifact:readme"],
+            max_depth=2,
+        )
+
+        self.assertIn("AoAKagNodeSlice", fake.statement)
+        self.assertIn("AOA_KAG_RELATION_SLICE", fake.statement)
+        self.assertEqual(fake.parameters["owner_slices"], ["owner-slice-a"])
+        self.assertEqual(fake.parameters["relation_slices"], ["relation-slice-a"])
+        self.assertEqual(hits[0]["id"], "aoa:fixture:anchor:intro")
+
     def test_http_client_wraps_remote_disconnect(self) -> None:
         client = JsonHttpClient("http://example.test")
         with mock.patch(
@@ -1333,6 +2056,146 @@ class KagRuntimeProjectionTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+
+    def test_root_command_executes_owner_incremental_exact_update(self) -> None:
+        first = write_two_owner_bundle(self.root / "command-two-owner")
+        second = write_changed_owner_bundle(
+            first,
+            self.root / "command-two-owner-next",
+            owner="fixture",
+            marker="command-owner-marker",
+        )
+        stack_root = self.root / "stack"
+        command = REPO_ROOT / "scripts" / "aoa-kag-runtime-projection"
+        base_args = [
+            sys.executable,
+            str(command),
+            "--stack-root",
+            str(stack_root),
+            "--target",
+            "exact",
+        ]
+        initial = subprocess.run(
+            [*base_args, "--bundle-dir", str(first.root)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(initial.returncode, 0, msg=initial.stderr)
+        advanced = subprocess.run(
+            [
+                *base_args,
+                "--bundle-dir",
+                str(second.root),
+                "--affected-owner",
+                "fixture",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(advanced.returncode, 0, msg=advanced.stderr)
+        report = json.loads(advanced.stdout[advanced.stdout.index("{") :])
+        self.assertEqual(
+            report["targets"]["exact"]["update_mode"],
+            "owner_incremental",
+        )
+        current = json.loads(
+            (
+                stack_root / "Knowledge" / "kag" / "repo-self" / "current.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            current["targets"]["exact"]["result"]["affected_owners"],
+            ["fixture"],
+        )
+
+    def test_root_command_coordinates_matching_projection_rollback(self) -> None:
+        stack_root = self.root / "stack"
+        identity = {
+            "projection_digest": _digest("rollback-projection"),
+            "bundle_digest": _digest("rollback-bundle"),
+            "federation_digest": _digest("rollback-federation"),
+        }
+        exact_result = {**identity, "schema_version": exact.SCHEMA_VERSION}
+        vector_result = {
+            **identity,
+            "schema_version": vector.OWNER_SLICE_SCHEMA_VERSION,
+            "storage_mode": "owner_slices",
+        }
+        graph_result = {
+            **identity,
+            "schema_version": graph.OWNER_SLICE_SCHEMA_VERSION,
+            "storage_mode": "owner_slices",
+        }
+
+        with (
+            mock.patch.object(
+                runtime_projection.exact,
+                "rollback_candidate",
+                return_value=identity,
+            ),
+            mock.patch.object(
+                runtime_projection.vector,
+                "owner_slice_rollback_candidate",
+                return_value=identity,
+            ),
+            mock.patch.object(
+                runtime_projection.graph,
+                "owner_slice_rollback_candidate",
+                return_value=identity,
+            ),
+            mock.patch.object(
+                runtime_projection.exact,
+                "rollback",
+                return_value=exact_result,
+            ),
+            mock.patch.object(
+                runtime_projection.vector,
+                "rollback_owner_slices",
+                return_value=vector_result,
+            ),
+            mock.patch.object(
+                runtime_projection.graph,
+                "rollback_owner_slices",
+                return_value=graph_result,
+            ),
+            mock.patch.object(
+                runtime_projection,
+                "_neo4j_headers",
+                return_value={},
+            ),
+            mock.patch.object(runtime_projection, "JsonHttpClient"),
+            mock.patch.object(runtime_projection.graph, "Neo4jProjection"),
+        ):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = runtime_projection.main(
+                    [
+                        "--stack-root",
+                        str(stack_root),
+                        "--target",
+                        "all",
+                        "--owner-scoped",
+                        "--rollback",
+                    ]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            json.loads(output.getvalue())["schema_version"],
+            "abyss-stack-repo-self-kag-projection-rollback-receipt-v1",
+        )
+        current = json.loads(
+            (
+                stack_root / "Knowledge" / "kag" / "repo-self" / "current.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            current["projection_identity"]["content_digest"],
+            identity["projection_digest"],
+        )
+        self.assertEqual(set(current["targets"]), {"exact", "vector", "graph"})
 
     def test_retrieval_eval_config_has_unique_semantic_cases(self) -> None:
         config = runtime_eval.load_config(runtime_eval.DEFAULT_CASES_PATH)

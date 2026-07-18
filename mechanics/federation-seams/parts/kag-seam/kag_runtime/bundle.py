@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -18,6 +19,7 @@ EXPECTED_FILES = {
     "external_references": "external_references.jsonl",
     "documents": "documents.jsonl",
 }
+_DIGEST_URI_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class BundleError(RuntimeError):
@@ -252,11 +254,60 @@ class RetrievalBundle:
             raise BundleError("retrieval bundle contains unresolved references")
         if len(self.manifest.get("canonical_inputs", [])) != files["owners"]["record_count"]:
             raise BundleError("canonical input count disagrees with owner count")
+        owners: set[str] = set()
+        for index, raw_input in enumerate(self.manifest.get("canonical_inputs", [])):
+            canonical_input = _object(raw_input, f"canonical_inputs[{index}]")
+            repo = _object(
+                canonical_input.get("repo"),
+                f"canonical_inputs[{index}].repo",
+            )
+            owner = repo.get("name")
+            if not isinstance(owner, str) or not owner or owner in owners:
+                raise BundleError("canonical input owners must be unique and non-empty")
+            owners.add(owner)
+            corpus = _object(
+                canonical_input.get("corpus_identity"),
+                f"canonical_inputs[{index}].corpus_identity",
+            )
+            distribution = _object(
+                canonical_input.get("distribution_identity"),
+                f"canonical_inputs[{index}].distribution_identity",
+            )
+            for label, identity in (
+                ("corpus", corpus),
+                ("distribution", distribution),
+            ):
+                if _DIGEST_URI_RE.fullmatch(
+                    str(identity.get("content_digest") or "")
+                ) is None:
+                    raise BundleError(
+                        f"canonical input {owner} {label} identity is invalid"
+                    )
+            state = distribution.get("delivery_state")
+            if not isinstance(state, str) or not state:
+                raise BundleError(
+                    f"canonical input {owner} delivery state is missing"
+                )
+            if not isinstance(distribution.get("complete"), bool):
+                raise BundleError(
+                    f"canonical input {owner} completeness is missing"
+                )
+            routes = distribution.get("routes")
+            if not isinstance(routes, dict) or any(
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < 0
+                for value in routes.values()
+            ):
+                raise BundleError(
+                    f"canonical input {owner} delivery routes are invalid"
+                )
 
         return {
             "schema_version": BUNDLE_SCHEMA_VERSION,
             "bundle_digest": self.bundle_digest,
             "projection_digest": self.projection_digest,
             "federation_digest": self.federation_digest,
+            "owners": sorted(owners),
             "files": files,
         }

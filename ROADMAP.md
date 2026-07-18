@@ -161,11 +161,16 @@ The current direction is:
 ## Horizon: Federation Consumption
 
 - Current posture:
-  memo, eval, playbook, KAG, RPG runtime, and ToS graph seams are bounded and
-  opt-in.
+  memo, eval, playbook, RPG runtime, and ToS graph seams are bounded and
+  opt-in. The KAG seam additionally has a source-owned tiered-family
+  materializer that admits machine-verified owner releases into a local CAS,
+  keeps partial hydration as candidate state, and preserves the five-operation
+  MCP read boundary.
 - Next honest move:
-  decide seam by seam which advisory surfaces become live runtime inputs, with
-  explicit source-owner and compatibility boundaries.
+  prove shadow publication, five-owner canary externalization, selective
+  projection refresh, and a verified 24-owner composition before treating the
+  new KAG distribution route as the only live path. Continue deciding other
+  seams one by one with explicit source-owner and compatibility boundaries.
 - Guardrail:
   federation consumption does not transfer AoA, ToS, skill, memo, eval,
   playbook, routing, KAG, stats, or agent authority into `abyss-stack`.

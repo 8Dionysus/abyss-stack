@@ -153,7 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Materialize verified OS Abyss repo-self KAG runtime projections."
     )
-    parser.add_argument("--bundle-dir", type=Path, required=True)
+    parser.add_argument("--bundle-dir", type=Path)
     parser.add_argument("--stack-root", type=Path, default=DEFAULT_STACK_ROOT)
     parser.add_argument(
         "--target",
@@ -163,6 +163,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--sqlite-path", type=Path)
+    parser.add_argument(
+        "--affected-owner",
+        action="append",
+        default=[],
+        help=(
+            "Advance only these owner slices plus touching cross-owner relations. "
+            "May be repeated; currently enforced for the exact target."
+        ),
+    )
+    parser.add_argument(
+        "--owner-scoped",
+        action="store_true",
+        help=(
+            "Use owner-addressed runtime projection slices. Without "
+            "--affected-owner this bootstraps every owner."
+        ),
+    )
+    parser.add_argument(
+        "--rollback",
+        action="store_true",
+        help=(
+            "Atomically return exact, vector, and graph owner-scoped targets "
+            "to their mutually matching last-good projection."
+        ),
+    )
     parser.add_argument(
         "--embedding-url",
         default=os.environ.get("AOA_KAG_EMBEDDING_URL", "http://127.0.0.1:5403"),
@@ -197,14 +222,135 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     selected = _targets(args.target)
-    bundle = RetrievalBundle.open(args.bundle_dir)
-    verification = bundle.verify()
+    affected_owners = sorted(
+        {str(item).strip() for item in args.affected_owner if str(item).strip()}
+    )
+    if args.rollback:
+        if set(selected) != set(TARGETS) or not args.owner_scoped:
+            raise SystemExit(
+                "--rollback requires --owner-scoped and --target all"
+            )
+        if args.check or affected_owners:
+            raise SystemExit(
+                "--rollback cannot be combined with --check or --affected-owner"
+            )
+    if affected_owners and not args.owner_scoped and any(
+        target in {"vector", "graph"} for target in selected
+    ):
+        raise SystemExit(
+            "--affected-owner requires --owner-scoped for vector or graph"
+        )
     runtime_root = args.stack_root.resolve() / "Knowledge" / "kag" / "repo-self"
     sqlite_path = (
         args.sqlite_path.resolve()
         if args.sqlite_path
         else runtime_root / "exact" / "repo-self.sqlite3"
     )
+    if args.rollback:
+        qdrant = JsonHttpClient(
+            args.qdrant_url,
+            headers=_client_headers("AOA_KAG_QDRANT_API_KEY"),
+            timeout=args.http_timeout,
+        )
+        graph_client = JsonHttpClient(
+            args.neo4j_url,
+            headers=_neo4j_headers(args.stack_root.resolve()),
+            timeout=args.http_timeout,
+        )
+        graph_projection = graph.Neo4jProjection(
+            graph_client,
+            args.neo4j_database,
+            args.graph_channel,
+        )
+        vector_state_path = runtime_root / "vector" / "owner-slices.json"
+        graph_state_path = runtime_root / "graph" / "owner-slices.json"
+        exact_candidate = exact.rollback_candidate(sqlite_path)
+        vector_candidate = vector.owner_slice_rollback_candidate(
+            qdrant=qdrant,
+            state_path=vector_state_path,
+        )
+        graph_candidate = graph.owner_slice_rollback_candidate(
+            graph=graph_projection,
+            state_path=graph_state_path,
+        )
+        identities = {
+            (
+                str(candidate["projection_digest"]),
+                str(candidate["bundle_digest"]),
+                str(candidate["federation_digest"]),
+            )
+            for candidate in (
+                exact_candidate,
+                vector_candidate,
+                graph_candidate,
+            )
+        }
+        if len(identities) != 1:
+            raise SystemExit(
+                "last-good exact/vector/graph identities do not match; "
+                "rollback refused"
+            )
+        projection_digest, bundle_digest, federation_digest = identities.pop()
+        results = {
+            "exact": exact.rollback(sqlite_path),
+            "vector": vector.rollback_owner_slices(
+                qdrant=qdrant,
+                state_path=vector_state_path,
+            ),
+            "graph": graph.rollback_owner_slices(
+                graph=graph_projection,
+                state_path=graph_state_path,
+            ),
+        }
+        completed_at = _now()
+        receipt = {
+            "schema_version": (
+                "abyss-stack-repo-self-kag-projection-rollback-receipt-v1"
+            ),
+            "completed_at": completed_at,
+            "projection_identity": {
+                "local_id": "projection:os-abyss:repo-self-retrieval",
+                "content_digest": projection_digest,
+            },
+            "bundle_identity": {
+                "local_id": "bundle:os-abyss:repo-self-retrieval",
+                "content_digest": bundle_digest,
+            },
+            "federation_identity": {
+                "local_id": "projection:os-abyss:repo-self-federation",
+                "content_digest": federation_digest,
+            },
+            "targets": results,
+        }
+        receipt_path = (
+            runtime_root / "receipts" / projection_digest / "rollback.json"
+        )
+        write_json_atomic(receipt_path, receipt)
+        write_json_atomic(
+            runtime_root / "current.json",
+            {
+                "schema_version": "abyss-stack-repo-self-kag-current-v1",
+                "updated_at": completed_at,
+                "bundle_identity": receipt["bundle_identity"],
+                "projection_identity": receipt["projection_identity"],
+                "federation_identity": receipt["federation_identity"],
+                "targets": {
+                    target: {
+                        "status": "current",
+                        "completed_at": completed_at,
+                        "result": result,
+                        "rollback_receipt": str(receipt_path),
+                    }
+                    for target, result in results.items()
+                },
+            },
+        )
+        print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    if args.bundle_dir is None:
+        raise SystemExit("--bundle-dir is required unless --rollback is used")
+    bundle = RetrievalBundle.open(args.bundle_dir)
+    verification = bundle.verify()
     reports: dict[str, Any] = {"bundle": verification, "targets": {}}
 
     for target in selected:
@@ -214,7 +360,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = (
                 exact.check(bundle, sqlite_path)
                 if args.check
-                else exact.materialize(bundle, sqlite_path)
+                else (
+                    exact.materialize_affected_owners(
+                        bundle,
+                        sqlite_path,
+                        affected_owners=affected_owners,
+                    )
+                    if affected_owners
+                    else exact.materialize(bundle, sqlite_path)
+                )
             )
         elif target == "vector":
             qdrant = JsonHttpClient(
@@ -222,7 +376,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 headers=_client_headers("AOA_KAG_QDRANT_API_KEY"),
                 timeout=args.http_timeout,
             )
-            if args.check:
+            owner_state_path = runtime_root / "vector" / "owner-slices.json"
+            if args.check and args.owner_scoped:
+                result = vector.check_owner_slices(
+                    bundle,
+                    qdrant=qdrant,
+                    state_path=owner_state_path,
+                )
+            elif args.check:
                 result = vector.check(bundle, qdrant=qdrant, alias=args.qdrant_alias)
             else:
                 embeddings = JsonHttpClient(
@@ -230,13 +391,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                     headers=_client_headers("AOA_KAG_EMBEDDING_API_KEY"),
                     timeout=args.http_timeout,
                 )
-                result = vector.materialize(
-                    bundle,
-                    qdrant=qdrant,
-                    embeddings=embeddings,
-                    alias=args.qdrant_alias,
-                    batch_size=args.vector_batch_size,
-                    progress=_vector_progress,
+                result = (
+                    vector.materialize_owner_slices(
+                        bundle,
+                        qdrant=qdrant,
+                        embeddings=embeddings,
+                        state_path=owner_state_path,
+                        affected_owners=affected_owners,
+                        batch_size=args.vector_batch_size,
+                        progress=_vector_progress,
+                    )
+                    if args.owner_scoped
+                    else vector.materialize(
+                        bundle,
+                        qdrant=qdrant,
+                        embeddings=embeddings,
+                        alias=args.qdrant_alias,
+                        batch_size=args.vector_batch_size,
+                        progress=_vector_progress,
+                    )
                 )
         else:
             neo4j = JsonHttpClient(
@@ -249,14 +422,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.neo4j_database,
                 args.graph_channel,
             )
-            if args.check:
-                result = graph.check(bundle, graph=graph_projection)
-            else:
-                result = graph.materialize(
+            owner_state_path = runtime_root / "graph" / "owner-slices.json"
+            if args.check and args.owner_scoped:
+                result = graph.check_owner_slices(
                     bundle,
                     graph=graph_projection,
-                    batch_size=args.graph_batch_size,
-                    progress=_graph_progress,
+                    state_path=owner_state_path,
+                )
+            elif args.check:
+                result = graph.check(bundle, graph=graph_projection)
+            else:
+                result = (
+                    graph.materialize_owner_slices(
+                        bundle,
+                        graph=graph_projection,
+                        state_path=owner_state_path,
+                        affected_owners=affected_owners,
+                        batch_size=args.graph_batch_size,
+                        progress=_graph_progress,
+                    )
+                    if args.owner_scoped
+                    else graph.materialize(
+                        bundle,
+                        graph=graph_projection,
+                        batch_size=args.graph_batch_size,
+                        progress=_graph_progress,
+                    )
                 )
         reports["targets"][target] = result
         if not args.check:

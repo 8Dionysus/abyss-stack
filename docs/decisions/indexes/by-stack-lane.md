@@ -237,6 +237,10 @@
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
 
+## runtime lane/federation lane/MCP lane
+
+- [ABYSS-STACK-D-0081 Tiered KAG Runtime Materialization](../ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md) (`docs/decisions/ABYSS-STACK-D-0081-tiered-kag-runtime-materialization.md`)
+
 ## runtime mirror
 
 - [ABYSS-STACK-D-0064 Federation Effective Runtime Inputs](../ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md) (`docs/decisions/ABYSS-STACK-D-0064-federation-effective-runtime-inputs.md`)
