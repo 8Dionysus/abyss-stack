@@ -143,22 +143,6 @@ def _is_executable_source_path(path: Path) -> bool:
     )
 
 
-def _overlay_skill_surface_validator(
-    *,
-    errors: list[str],
-    skill_path: Path,
-    description: str,
-    expected_target: str | None = None,
-) -> None:
-    agent_skill_projection.validate_overlay_skill_surface(
-        errors=errors,
-        root=ROOT,
-        skill_path=skill_path,
-        description=description,
-        expected_target=expected_target,
-    )
-
-
 def _run_source_validators(errors: list[str]) -> None:
     profile_topology.validate_profiles(errors, root=ROOT)
     profile_topology.validate_presets(errors, root=ROOT)
@@ -336,8 +320,6 @@ def _run_source_validators(errors: list[str]) -> None:
     diagnostic_spine.validate_diagnostic_spine_contracts(
         errors,
         root=ROOT,
-        overlay_skill_surfaces=agent_skill_projection.DIAGNOSTIC_OVERLAY_SKILL_SURFACES,
-        overlay_skill_validator=_overlay_skill_surface_validator,
     )
     service_selection.validate_service_selection_policy(
         errors,

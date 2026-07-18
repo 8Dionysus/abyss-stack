@@ -247,6 +247,10 @@
 
 - [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
 
+## effect boundary
+
+- [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
+
 ## entry contract
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
@@ -299,13 +303,17 @@
 
 - [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
 
-## overlay skill
-
-- [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
-
 ## overlay skill install
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
+
+## owner skill package
+
+- [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
+
+## owner source return
+
+- [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
 ## owner-qualified provenance
 
@@ -348,6 +356,10 @@
 ## provider freshness
 
 - [ABYSS-STACK-D-0075 AoA KAG MCP Access Plane](../ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0075-aoa-kag-mcp-access-plane.md`)
+
+## read-only diagnosis
+
+- [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
 ## release governance
 
@@ -421,6 +433,7 @@
 ## skill projection
 
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
+- [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
 ## source freshness
 

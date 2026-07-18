@@ -1,0 +1,4 @@
+interface:
+  display_name: "Abyss Self-Diagnostic Spine"
+  short_description: "Diagnose Abyss runtime state through its owner"
+  default_prompt: "Use $abyss-self-diagnostic-spine to produce and review one read-only Abyss runtime diagnosis."

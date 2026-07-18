@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 79,
-  "edge_count": 1753,
+  "decision_count": 80,
+  "edge_count": 1779,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 708,
-    "DATED": 79,
-    "GUARDED_BY": 209,
-    "HAS_STATUS": 79,
-    "HAS_SURFACE_CLASS": 195,
-    "IN_STACK_LANE": 160,
-    "NEXT_DECISION": 78,
-    "OWNED_BY_SURFACE": 84,
-    "OWNS_DECISION": 79,
+    "CITES_SOURCE_SURFACE": 718,
+    "DATED": 80,
+    "GUARDED_BY": 213,
+    "HAS_STATUS": 80,
+    "HAS_SURFACE_CLASS": 198,
+    "IN_STACK_LANE": 163,
+    "NEXT_DECISION": 79,
+    "OWNED_BY_SURFACE": 85,
+    "OWNS_DECISION": 80,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 80
+    "UNDER_MECHANIC_PARENT": 81
   },
   "edges": [
     {
@@ -4518,6 +4518,16 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0050",
+      "target": "source_surface:skills/abyss-self-diagnostic-spine/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0050",
+      "target": "source_surface:skills/port.manifest.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0050",
       "target": "source_surface:tests/test_diagnostic_spine_validator_module.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -4533,7 +4543,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0050",
-      "target": "guard_family:overlay%20skill",
+      "target": "guard_family:owner%20skill%20package",
       "type": "GUARDED_BY"
     },
     {
@@ -4543,7 +4553,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0050",
-      "target": "status:accepted",
+      "target": "status:amended",
       "type": "HAS_STATUS"
     },
     {
@@ -5968,11 +5978,6 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0062",
-      "target": "source_surface:.agents/skills/abyss-self-diagnostic-spine/SKILL.md",
-      "type": "CITES_SOURCE_SURFACE"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0062",
       "target": "source_surface:mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -5989,6 +5994,11 @@
     {
       "source": "decision:ABYSS-STACK-D-0062",
       "target": "source_surface:scripts/validators/diagnostic_spine.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0062",
+      "target": "source_surface:skills/abyss-self-diagnostic-spine/SKILL.md",
       "type": "CITES_SOURCE_SURFACE"
     },
     {
@@ -6023,7 +6033,7 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0062",
-      "target": "status:accepted",
+      "target": "status:amended",
       "type": "HAS_STATUS"
     },
     {
@@ -8378,12 +8388,127 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0079",
+      "target": "decision:ABYSS-STACK-D-0080",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0079",
       "target": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0079",
       "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:scripts/aoa-diagnose",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:scripts/validators/diagnostic_spine.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:skills/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:skills/abyss-self-diagnostic-spine/SKILL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:skills/abyss-self-diagnostic-spine/references/contract.yaml",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "source_surface:skills/port.manifest.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "date:2026-07-17",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "guard_family:effect%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "guard_family:owner%20source%20return",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "guard_family:read-only%20diagnosis",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "guard_family:skill%20projection",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "surface_class:agent%20skill%20projection",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "surface_class:owner%20skill%20home",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "surface_class:source/derived%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "stack_lane:agent%20surface",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "stack_lane:diagnostics",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "stack_lane:source%20checkout",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "owner_surface:skills/abyss-self-diagnostic-spine/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0080",
+      "target": "mechanic_parent:diagnostic-spine",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -8780,21 +8905,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0079",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0080",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 763,
+  "node_count": 779,
   "node_type_counts": {
-    "date": 21,
-    "decision": 79,
-    "guard_family": 86,
+    "date": 22,
+    "decision": 80,
+    "guard_family": 89,
     "mechanic_parent": 10,
-    "owner_surface": 41,
+    "owner_surface": 42,
     "repo": 1,
-    "source_surface": 428,
-    "stack_lane": 29,
-    "status": 2,
-    "surface_class": 66
+    "source_surface": 434,
+    "stack_lane": 30,
+    "status": 3,
+    "surface_class": 68
   },
   "nodes": [
     {
@@ -8900,6 +9030,11 @@
     {
       "id": "date:2026-07-14",
       "label": "2026-07-14",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-07-17",
+      "label": "2026-07-17",
       "type": "date"
     },
     {
@@ -9397,8 +9532,8 @@
       "id": "decision:ABYSS-STACK-D-0050",
       "label": "ABYSS-STACK-D-0050",
       "path": "docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md",
-      "posture": "accepted ninth validator-module split",
-      "status": "accepted",
+      "posture": "amended ninth validator-module split",
+      "status": "amended",
       "title": "ABYSS-STACK-D-0050 Diagnostic Spine Validator Module",
       "type": "decision"
     },
@@ -9517,8 +9652,8 @@
       "id": "decision:ABYSS-STACK-D-0062",
       "label": "ABYSS-STACK-D-0062",
       "path": "docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md",
-      "posture": "accepted twenty-first validator-module split",
-      "status": "accepted",
+      "posture": "amended validator-module split",
+      "status": "amended",
       "title": "ABYSS-STACK-D-0062 Agent Skill Projection Validator Module",
       "type": "decision"
     },
@@ -9693,6 +9828,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-17",
+      "id": "decision:ABYSS-STACK-D-0080",
+      "label": "ABYSS-STACK-D-0080",
+      "path": "docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md",
+      "posture": "accepted owner-skill admission",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0080 Diagnostic Skill Owner Home",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -9798,6 +9943,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:effect%20boundary",
+      "label": "effect boundary",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:entry%20contract",
       "label": "entry contract",
       "type": "guard_family"
@@ -9873,13 +10023,18 @@
       "type": "guard_family"
     },
     {
-      "id": "guard_family:overlay%20skill",
-      "label": "overlay skill",
+      "id": "guard_family:overlay%20skill%20install",
+      "label": "overlay skill install",
       "type": "guard_family"
     },
     {
-      "id": "guard_family:overlay%20skill%20install",
-      "label": "overlay skill install",
+      "id": "guard_family:owner%20skill%20package",
+      "label": "owner skill package",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:owner%20source%20return",
+      "label": "owner source return",
       "type": "guard_family"
     },
     {
@@ -9950,6 +10105,11 @@
     {
       "id": "guard_family:read-only%20access%20plane",
       "label": "read-only access plane",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:read-only%20diagnosis",
+      "label": "read-only diagnosis",
       "type": "guard_family"
     },
     {
@@ -10378,6 +10538,11 @@
       "type": "owner_surface"
     },
     {
+      "id": "owner_surface:skills/abyss-self-diagnostic-spine/",
+      "label": "skills/abyss-self-diagnostic-spine/",
+      "type": "owner_surface"
+    },
+    {
       "id": "repo:abyss-stack",
       "label": "abyss-stack",
       "role": "decision_record_owner",
@@ -10396,11 +10561,6 @@
     {
       "id": "source_surface:.agents/skills/AGENTS.md",
       "label": ".agents/skills/AGENTS.md",
-      "type": "source_surface"
-    },
-    {
-      "id": "source_surface:.agents/skills/abyss-self-diagnostic-spine/SKILL.md",
-      "label": ".agents/skills/abyss-self-diagnostic-spine/SKILL.md",
       "type": "source_surface"
     },
     {
@@ -10946,6 +11106,11 @@
     {
       "id": "source_surface:docs/README.md",
       "label": "docs/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md",
+      "label": "docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md",
       "type": "source_surface"
     },
     {
@@ -12104,6 +12269,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:scripts/aoa-diagnose",
+      "label": "scripts/aoa-diagnose",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:scripts/aoa-kag-runtime-eval",
       "label": "scripts/aoa-kag-runtime-eval",
       "type": "source_surface"
@@ -12286,6 +12456,31 @@
     {
       "id": "source_surface:scripts/validators/sync_parity.py",
       "label": "scripts/validators/sync_parity.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:skills/AGENTS.md",
+      "label": "skills/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:skills/abyss-self-diagnostic-spine/",
+      "label": "skills/abyss-self-diagnostic-spine/",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:skills/abyss-self-diagnostic-spine/SKILL.md",
+      "label": "skills/abyss-self-diagnostic-spine/SKILL.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:skills/abyss-self-diagnostic-spine/references/contract.yaml",
+      "label": "skills/abyss-self-diagnostic-spine/references/contract.yaml",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:skills/port.manifest.json",
+      "label": "skills/port.manifest.json",
       "type": "source_surface"
     },
     {
@@ -12554,6 +12749,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:diagnostics",
+      "label": "diagnostics",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:docs%20and%20routes",
       "label": "docs and routes",
       "type": "stack_lane"
@@ -12671,6 +12871,11 @@
     {
       "id": "status:accepted",
       "label": "accepted",
+      "type": "status"
+    },
+    {
+      "id": "status:amended",
+      "label": "amended",
       "type": "status"
     },
     {
@@ -12864,6 +13069,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:owner%20skill%20home",
+      "label": "owner skill home",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:owner-local%20stats%20ports",
       "label": "owner-local stats ports",
       "type": "surface_class"
@@ -12976,6 +13186,11 @@
     {
       "id": "surface_class:source%20topology",
       "label": "source topology",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:source/derived%20boundary",
+      "label": "source/derived boundary",
       "type": "surface_class"
     },
     {

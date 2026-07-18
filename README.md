@@ -47,6 +47,7 @@ Read only what matches your entry need.
 | Local worker and model trials | [mechanics/inference-pilots](mechanics/inference-pilots/README.md), [LOCAL_AI_TRIALS](mechanics/inference-pilots/parts/local-trials/docs/LOCAL_AI_TRIALS.md), [LLAMACPP_PILOT](mechanics/inference-pilots/parts/llamacpp-pilot/docs/LLAMACPP_PILOT.md), [MODEL_PROFILES](mechanics/machine-fit/parts/inference-tuning/docs/MODEL_PROFILES.md) |
 | Runtime federation seams | [mechanics/federation-seams](mechanics/federation-seams/README.md), [MEMO_RUNTIME_SEAM](mechanics/federation-seams/parts/memo-seam/docs/MEMO_RUNTIME_SEAM.md), [EVAL_RUNTIME_SEAM](mechanics/federation-seams/parts/eval-seam/docs/EVAL_RUNTIME_SEAM.md), [PLAYBOOK_RUNTIME_SEAM](mechanics/federation-seams/parts/playbook-seam/docs/PLAYBOOK_RUNTIME_SEAM.md), [KAG_RUNTIME_SEAM](mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md) |
 | Diagnostics and repair posture | [mechanics/diagnostic-spine](mechanics/diagnostic-spine/README.md), [DIAGNOSTIC_SPINE](mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md), [diagnostic surface catalog](mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surface_catalog.min.json), [scripts/aoa-diagnose](scripts/aoa-diagnose), [mechanics/runtime-repair](mechanics/runtime-repair/README.md) |
+| Stack-owned agent procedure | [skills route card](skills/AGENTS.md), [skill home manifest](skills/port.manifest.json), then the named owner bundle |
 
 ## Route Modes
 
@@ -174,6 +175,7 @@ storage.
 | [kag](kag/README.md) | source-linked provider records and repository indexes |
 | [stats](stats/README.md) | runtime-owned statistical questions using the shared `aoa-stats` grammar |
 | [scripts](scripts/README.md) | stable operator wrappers and repository validators |
+| [skills](skills/AGENTS.md) | canonical agent procedures for stack-owned runtime capabilities |
 | [systemd](systemd/README.md) | user-unit source skeletons and managed working-service adapters |
 | [tests](tests/README.md) | repository-level tests and validation routes |
 | [.agents](.agents/README.md) | repo-local agent overlays and fast-loop lanes |

@@ -263,16 +263,15 @@ mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/diagnostic_surfac
 
 The runtime diagnostic spine may cite or hand off toward:
 
-- `aoa-session-self-diagnose`
-- `aoa-session-self-repair`
+- `aoa-session-recovery` in its explicit `diagnose` or `repair` mode
 - `aoa-session-progression-lift`
-- `aoa-quest-harvest`
+- `aoa-session-harvest` in its explicit promotion mode
 
-Skill canon remains in `aoa-skills`.
-Any local overlay should stay thin, repo-relative, and sourced from that
-canonical skill surface.
-The repo-local install surface for this pass is
-`.agents/skills/abyss-self-diagnostic-spine`.
+The owner-specific diagnostic procedure lives at
+`skills/abyss-self-diagnostic-spine`. Shared skill-system doctrine and
+composition remain in `aoa-skills`. The admitted owner bundle is exposed once
+through the OS user profile; it is not duplicated under `.agents/skills`.
+Every handoff remains conditional on an available target binding.
 
 But the runtime spine must not absorb those owner surfaces.
 
@@ -289,7 +288,8 @@ A small honest first pass would be:
 1. land this note
 2. land `diagnostic_target_v1` and `diagnostic_session_v1` schemas
 3. add one quest draft
-4. install one thin local Codex-facing overlay skill at `.agents/skills/abyss-self-diagnostic-spine`, sourced from `aoa-skills`
+4. admit the owner package at `skills/abyss-self-diagnostic-spine` and expose
+   it once through the OS user profile
 5. postpone real mutation or orchestration code until the read model proves useful
 
 ## Guardrails

@@ -29,7 +29,9 @@ It is not the system design. Read `DESIGN.md` for the intended runtime form and
 8. `docs/runtime/ARCHITECTURE.md`
 9. `mechanics/README.md`
 10. The nearest local `AGENTS.md`, README, and validation notes for every touched
-   path
+    path
+11. `skills/AGENTS.md` and `skills/port.manifest.json` when changing an owner
+    skill package
 
 Use `docs/legacy/AGENTS_ROOT_REFERENCE.md` only when the short card is not enough.
 
@@ -112,6 +114,8 @@ This repository owns:
   as `memo/`, when they preserve sibling-owner authority
 - runtime-owned statistical questions under `stats/`, using the shared
   `aoa-stats` grammar without moving runtime meaning into the central organ
+- owner skill packages under `skills/` when the procedure binds stack-owned
+  runtime evidence and tools; global exposure remains an OS profile concern
 
 It does not own:
 

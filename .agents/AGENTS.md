@@ -5,8 +5,8 @@ first.
 
 ## Scope
 
-This directory owns repo-local agent install and overlay surfaces that need to
-ship with the `abyss-stack` source checkout.
+This directory owns transitional repo-local agent projections and model lanes
+that need to ship with the `abyss-stack` source checkout.
 
 ## Read Before Editing
 
@@ -20,6 +20,7 @@ ship with the `abyss-stack` source checkout.
 ## Directory Contract
 
 - Keep canonical skill law in the owning skill repository.
+- Keep stack-owned canonical packages under `skills/`, not in this projection.
 - Keep local overlays thin, portable, and explicit about the canonical upstream.
 - Keep agent model lanes under `.agents/<lane>/`, not as top-level runtime
   districts.

@@ -19,7 +19,8 @@ roadmap checks.
   routes, playbook allowlists, and route-api bridge language.
 - `test_agent_skill_projection_validator_module.py`: focused agent skill
   projection contracts for `.agents/skills` symlinks, checkout-safe target
-  files, local overlays, and diagnostic overlay installs.
+  files, and rejection of local canonical directories in the transitional
+  projection.
 - `test_rag_bridge_contracts.py`: RAG/rerank profile contracts, source/read-only
   mounts, manifest shape, and machine bridge JSON boundary.
 - `test_schema_contracts.py`: active JSON Schema meta-validation, schema
@@ -31,7 +32,8 @@ roadmap checks.
   runtime routes.
 - `test_federation_required_files_validator_module.py`: federation template requirements.
 - `test_diagnostic_spine_validator_module.py`: focused diagnostic-spine
-  validator module contracts for catalog refs and repair handoff posture.
+  validator module contracts for catalog refs, repair handoff posture, and the
+  canonical owner skill package.
 - `test_runtime_hygiene_validator_module.py`: focused runtime-lifecycle
   status-readout validator contracts for cache/usage posture.
 - `test_machine_fit_validator_module.py`: focused machine-fit validator

@@ -196,17 +196,16 @@
       "paths": [
         "scripts/validators/agent_skill_projection.py"
       ],
-      "protects": "repo-local .agents/skills projection, sibling aoa-skills symlink targets, checkout-safe target files, local overlay directories, and diagnostic overlay skill install posture",
+      "protects": "transitional repo-local .agents/skills projection, sibling aoa-skills symlink targets, and checkout-safe target files",
       "owner_surface": ".agents/skills/AGENTS.md",
       "layer": "agent/skill-projection",
       "lane": "source-fast/release",
       "mode": "blocking-owner-module",
       "callers": [
         "scripts/validate_stack.py",
-        "tests/test_agent_skill_projection_validator_module.py",
-        "scripts/validators/diagnostic_spine.py"
+        "tests/test_agent_skill_projection_validator_module.py"
       ],
-      "failure_route": "Fix .agents/skills symlink projection, checkout-safe target files, local overlay directories, diagnostic overlay skill installs, or agent_skill_projection module contract.",
+      "failure_route": "Fix the transitional .agents/skills symlink projection, checkout-safe target files, or agent_skill_projection module contract.",
       "status": "active"
     },
     {
@@ -304,7 +303,7 @@
       "paths": [
         "scripts/validators/diagnostic_spine.py"
       ],
-      "protects": "diagnostic surface route docs, schemas, examples, generated catalog validation refs, and repo-local diagnostic overlay skill posture",
+      "protects": "diagnostic surface route docs, schemas, examples, generated catalog validation refs, and the canonical diagnostic owner skill package",
       "owner_surface": "mechanics/diagnostic-spine/parts/diagnostic-surfaces/",
       "layer": "diagnostic/runtime read-model",
       "lane": "source-fast/generated/release",
@@ -314,7 +313,7 @@
         "tests/test_diagnostic_spine_validator_module.py",
         "mechanics/diagnostic-spine/parts/diagnostic-surfaces/tests/test_diagnostic_spine_surface_validator.py"
       ],
-      "failure_route": "Fix diagnostic docs, schemas, examples, generated catalog refs, overlay skill posture, or diagnostic_spine module contract.",
+      "failure_route": "Fix diagnostic docs, schemas, examples, generated catalog refs, canonical owner skill package, or diagnostic_spine module contract.",
       "status": "active"
     },
     {

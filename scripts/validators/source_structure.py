@@ -422,6 +422,8 @@ REQUIRED_FILE_PATHS = tuple(
         "scripts/README.md",
         "scripts/validate_local_stats_port.py",
         "scripts/validate_decision_records.py",
+        "skills/AGENTS.md",
+        "skills/port.manifest.json",
         "stats/AGENTS.md",
         "stats/README.md",
         "stats/port.manifest.json",

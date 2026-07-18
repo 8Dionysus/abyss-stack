@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 import json
 from pathlib import Path
 from typing import Any
-
-OverlaySkillSurface = tuple[Path, str, str | None]
-OverlaySkillValidator = Callable[..., None]
 
 DIAGNOSTIC_SPINE_DOC_ROOT = (
     Path("mechanics") / "diagnostic-spine" / "parts" / "diagnostic-surfaces" / "docs"
@@ -68,6 +65,18 @@ DIAGNOSTIC_CATALOG_REF = (
     "mechanics/diagnostic-spine/parts/diagnostic-surfaces/generated/"
     "diagnostic_surface_catalog.min.json"
 )
+DIAGNOSTIC_OWNER_SKILL_ROOT = Path("skills") / "abyss-self-diagnostic-spine"
+DIAGNOSTIC_OWNER_SKILL_PATH = DIAGNOSTIC_OWNER_SKILL_ROOT / "SKILL.md"
+DIAGNOSTIC_OWNER_SKILL_CONTRACT_PATH = (
+    DIAGNOSTIC_OWNER_SKILL_ROOT / "references" / "contract.yaml"
+)
+DIAGNOSTIC_OWNER_SKILL_PROCEDURE_PATH = (
+    DIAGNOSTIC_OWNER_SKILL_ROOT / "references" / "diagnose.md"
+)
+DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH = (
+    DIAGNOSTIC_OWNER_SKILL_ROOT / "agents" / "openai.yaml"
+)
+SKILL_HOME_MANIFEST_PATH = Path("skills") / "port.manifest.json"
 DIAGNOSTIC_AUTHORITY_REF = (
     "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"
 )
@@ -151,8 +160,6 @@ def validate_diagnostic_spine_contracts(
     errors: list[str],
     *,
     root: Path,
-    overlay_skill_surfaces: Sequence[OverlaySkillSurface],
-    overlay_skill_validator: OverlaySkillValidator,
 ) -> None:
     readme = read_required_text(errors, root=root, relative_path=Path("README.md"))
     require_snippets(
@@ -183,8 +190,8 @@ def validate_diagnostic_spine_contracts(
             "`diagnostic_anchor_ref_v1`",
             "`repair_handoff_v1`",
             "`reviewed_diagnosis_ref_v1`",
-            "Skill canon remains in `aoa-skills`.",
-            ".agents/skills/abyss-self-diagnostic-spine",
+            "`skills/abyss-self-diagnostic-spine`",
+            "OS user profile",
             "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest",
             "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest --write-last-good-ref",
             "scripts/aoa-diagnose --preset intel-full --truth-goal live_available --write-latest --write-reviewed-diagnosis-ref",
@@ -217,13 +224,119 @@ def validate_diagnostic_spine_contracts(
     validate_diagnostic_schemas(errors, root=root)
     validate_diagnostic_examples(errors, root=root)
     validate_diagnostic_surface_catalog(errors, root=root)
+    validate_diagnostic_owner_skill(errors, root=root)
 
-    for skill_path, description, expected_target in overlay_skill_surfaces:
-        overlay_skill_validator(
-            errors=errors,
-            skill_path=skill_path,
-            description=description,
-            expected_target=expected_target,
+
+def validate_diagnostic_owner_skill(errors: list[str], *, root: Path) -> None:
+    skill = read_required_text(
+        errors,
+        root=root,
+        relative_path=DIAGNOSTIC_OWNER_SKILL_PATH,
+    )
+    require_snippets(
+        errors,
+        text=skill,
+        path_label=DIAGNOSTIC_OWNER_SKILL_PATH.as_posix(),
+        snippets=(
+            "name: abyss-self-diagnostic-spine",
+            "Produce, capture, or review one owner-typed Abyss runtime diagnosis",
+            ".aoa-skill-source.json",
+            "owner_repo=abyss-stack",
+            "source_path=skills/abyss-self-diagnostic-spine",
+            "version=0.2.1",
+            "Select exactly one operation: `observe`, `capture`, or `review`.",
+            "Do not load a shared recovery procedure before the owner packet",
+            "Stop after one packet and one review.",
+        ),
+    )
+
+    contract = read_required_text(
+        errors,
+        root=root,
+        relative_path=DIAGNOSTIC_OWNER_SKILL_CONTRACT_PATH,
+    )
+    require_snippets(
+        errors,
+        text=contract,
+        path_label=DIAGNOSTIC_OWNER_SKILL_CONTRACT_PATH.as_posix(),
+        snippets=(
+            "owner: abyss-stack",
+            "canonical_source: skills/abyss-self-diagnostic-spine",
+            "version: 0.2.1",
+            "lifecycle: admitted",
+            "health: active",
+            "owner_cli: scripts/aoa-diagnose",
+            "techniques_runtime_dependency: false",
+        ),
+    )
+
+    procedure = read_required_text(
+        errors,
+        root=root,
+        relative_path=DIAGNOSTIC_OWNER_SKILL_PROCEDURE_PATH,
+    )
+    require_snippets(
+        errors,
+        text=procedure,
+        path_label=DIAGNOSTIC_OWNER_SKILL_PROCEDURE_PATH.as_posix(),
+        snippets=(
+            "## Review an existing packet",
+            "## Observe current state",
+            "## Capture an owner artifact",
+            "## Review and hand off",
+            "scripts/aoa-diagnose <one preset/profile selection> --truth-goal <goal>",
+        ),
+    )
+
+    interface = read_required_text(
+        errors,
+        root=root,
+        relative_path=DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH,
+    )
+    require_snippets(
+        errors,
+        text=interface,
+        path_label=DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH.as_posix(),
+        snippets=(
+            'display_name: "Abyss Self-Diagnostic Spine"',
+            'default_prompt: "Use $abyss-self-diagnostic-spine',
+        ),
+    )
+
+    manifest = read_required_json(
+        errors,
+        root=root,
+        relative_path=SKILL_HOME_MANIFEST_PATH,
+    )
+    if not manifest:
+        return
+    if manifest.get("schema_version") != "aoa_skill_home_port_v2":
+        errors.append("skills/port.manifest.json must use aoa_skill_home_port_v2")
+    if manifest.get("owner_repo") != "abyss-stack":
+        errors.append("skills/port.manifest.json must declare owner_repo abyss-stack")
+    bundles = manifest.get("bundles")
+    expected_bundle = {
+        "name": "abyss-self-diagnostic-spine",
+        "path": "skills/abyss-self-diagnostic-spine",
+        "version": "0.2.1",
+        "lifecycle": "admitted",
+        "visibility": "advertised",
+        "admission_ref": "docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md",
+    }
+    if bundles != [expected_bundle]:
+        errors.append(
+            "skills/port.manifest.json must expose the admitted "
+            "abyss-self-diagnostic-spine 0.2.1 owner bundle"
+        )
+    exposure = manifest.get("exposure")
+    if not isinstance(exposure, dict) or exposure.get("scope") != "user":
+        errors.append("skills/port.manifest.json must use user-scoped exposure")
+    elif exposure.get("profile") != "os-user-default" or exposure.get("skills") != [
+        "abyss-self-diagnostic-spine"
+    ]:
+        errors.append(
+            "skills/port.manifest.json must expose abyss-self-diagnostic-spine "
+            "once through os-user-default"
         )
 
 
