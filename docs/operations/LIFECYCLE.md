@@ -118,6 +118,17 @@ Its expected deployed location is:
 It assumes the deployed runtime tree exists under:
 - `/srv/AbyssOS/abyss-stack/Configs`
 
+The unit delegates its cgroup and leaves container teardown to the explicit
+`aoa-down` route. A launcher failure or stop timeout therefore cannot remove
+rootless Podman port helpers while the corresponding containers remain alive.
+Persistent observability services use bind state under
+`/srv/AbyssOS/abyss-stack/Services/monitoring/`; layout installation must run
+before an observability start so Podman can apply each mount's private `:Z`
+SELinux label during container creation.
+`aoa-install-systemd` links the source-managed
+`99-runtime-lifecycle.conf` after distribution-wide user-service drop-ins so
+the effective live unit preserves that boundary.
+
 Keep the checked-in unit skeleton generic. Host-local runtime choice belongs in
 a drop-in written by `scripts/aoa-install-systemd --preset <name>` or
 `--profile <name>`; add `--restart-now` when an already-active unit must pick

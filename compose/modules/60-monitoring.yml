@@ -10,7 +10,7 @@ services:
       - "127.0.0.1:9090:9090"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z"
-      - "prometheus_data:/prometheus:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/prometheus:/prometheus:Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro,Z"
     restart: unless-stopped
     depends_on:
@@ -44,7 +44,7 @@ services:
       - "127.0.0.1:9093:9093"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z"
-      - "alertmanager_data:/alertmanager:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/alertmanager:/alertmanager:Z"
     restart: unless-stopped
 
   loki:
@@ -61,7 +61,7 @@ services:
       AOA_LOKI_INGESTION_BURST_SIZE_MB: "${AOA_LOKI_INGESTION_BURST_SIZE_MB:-8}"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/loki/loki.yml:/etc/loki/loki.yml:ro,Z"
-      - "loki_data:/loki:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/loki:/loki:Z"
     restart: unless-stopped
 
   tempo:
@@ -76,7 +76,7 @@ services:
       - "4318"
     volumes:
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro,Z"
-      - "tempo_data:/var/tempo:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/tempo:/var/tempo:Z"
     restart: unless-stopped
 
   alloy:
@@ -99,7 +99,7 @@ services:
       - "${AOA_PODMAN_CONTAINERS_ROOT}:/var/lib/containers:ro"
       - "/var/log/journal:/var/log/journal:ro"
       - "/run/log/journal:/run/log/journal:ro"
-      - "alloy_data:/var/lib/alloy/data:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/alloy:/var/lib/alloy/data:Z"
     restart: unless-stopped
     depends_on:
       - loki
@@ -115,18 +115,10 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_METRICS_ENABLED: "true"
     volumes:
-      - "grafana_data:/var/lib/grafana:Z"
+      - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Services/monitoring/grafana:/var/lib/grafana:Z"
       - "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}/Configs/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro,Z"
     restart: unless-stopped
     depends_on:
       - prometheus
       - loki
       - tempo
-
-volumes:
-  prometheus_data: {}
-  alertmanager_data: {}
-  loki_data: {}
-  tempo_data: {}
-  alloy_data: {}
-  grafana_data: {}
