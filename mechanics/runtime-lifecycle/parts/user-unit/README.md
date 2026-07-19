@@ -6,6 +6,12 @@ allowlist at `systemd/user/managed-units.txt`, and `scripts/aoa-install-systemd`
 
 User units must point at runtime paths, not the source checkout.
 
+The installer also links the source-managed
+`podman-compose-abyss.service.d/99-runtime-lifecycle.conf`. Its late ordering
+keeps the stack's delegated cgroup, explicit teardown, and non-abort stop
+contract effective even when the distribution ships a global user-service
+drop-in. Other host-local drop-ins remain untouched.
+
 `aoa-install-systemd --preset <name>`, `--profile <name>`, and
 `--overlay <compose-file>` write a small runtime-selection drop-in next to the
 linked unit. Add `--restart-now` when the unit is already active and the new

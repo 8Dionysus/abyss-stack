@@ -16,6 +16,13 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
   Configs/
   Secrets/
   Services/
+    monitoring/
+      prometheus/
+      alertmanager/
+      loki/
+      tempo/
+      alloy/
+      grafana/
   Models/
   Knowledge/
     federation/
@@ -57,6 +64,10 @@ Expected live structure under `/srv/AbyssOS/abyss-stack`:
 - `Configs/` — deployed stack repo material such as compose modules, profiles, scripts, docs, config templates, and runtime config files bootstrapped from those templates
 - `Secrets/` — real env files, API keys, and secret-bearing runtime material
 - `Services/` — persistent state for databases and runtime services, plus source-managed build contexts and service-local inputs for lightweight helper services such as `langchain-api`, `litellm`, `docs-api`, `route-api`, `rerank-api`, `tos-graph`, `qwen3-tts-api`, `babelvox-tts-api`, and `tts_router`
+- `Services/monitoring/` — explicit bind-mounted Prometheus, Alertmanager,
+  Loki, Tempo, Alloy, and Grafana state. These paths keep persistence under the
+  stack owner and carry private SELinux relabeling through the rendered Podman
+  mount contract.
 - `Models/` — local model weights and related serving artifacts
 - `Knowledge/` — local knowledge corpora; verified repo-self KAG CAS objects,
   candidate/current/last-good distribution state, exact/vector/graph

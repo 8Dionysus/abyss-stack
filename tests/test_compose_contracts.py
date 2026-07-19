@@ -12,6 +12,22 @@ MODULE_DIR = REPO_ROOT / "compose" / "modules"
 PROFILE_DIR = REPO_ROOT / "compose" / "profiles"
 PRESET_DIR = REPO_ROOT / "compose" / "presets"
 TUNING_DIR = REPO_ROOT / "compose" / "tuning"
+LAYOUT_INSTALL = (
+    REPO_ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "layout-install"
+    / "aoa_install_layout.sh"
+)
+LAYOUT_CHECK = (
+    REPO_ROOT
+    / "mechanics"
+    / "runtime-lifecycle"
+    / "parts"
+    / "layout-install"
+    / "aoa_check_layout.sh"
+)
 
 
 def uncommented_lines(path: Path) -> list[str]:
@@ -59,6 +75,56 @@ def resolved_modules(*profiles: str, preset: str | None = None) -> list[str]:
 
 
 class ComposeContractsTests(unittest.TestCase):
+    def test_monitoring_state_uses_explicit_stack_bind_mounts(self) -> None:
+        module_path = MODULE_DIR / "60-monitoring.yml"
+        services = load_compose(module_path)["services"]
+        expected_mounts = {
+            "prometheus": ("prometheus", "/prometheus"),
+            "alertmanager": ("alertmanager", "/alertmanager"),
+            "loki": ("loki", "/loki"),
+            "tempo": ("tempo", "/var/tempo"),
+            "alloy": ("alloy", "/var/lib/alloy/data"),
+            "grafana": ("grafana", "/var/lib/grafana"),
+        }
+
+        for service_name, (state_dir, container_path) in expected_mounts.items():
+            with self.subTest(service=service_name):
+                expected = (
+                    "${AOA_STACK_ROOT:-/srv/AbyssOS/abyss-stack}"
+                    f"/Services/monitoring/{state_dir}:{container_path}:Z"
+                )
+                self.assertIn(expected, services[service_name].get("volumes", []))
+
+        source = module_path.read_text(encoding="utf-8")
+        self.assertNotIn("\nvolumes:\n", source)
+        for named_volume in (
+            "prometheus_data:",
+            "alertmanager_data:",
+            "loki_data:",
+            "tempo_data:",
+            "alloy_data:",
+            "grafana_data:",
+        ):
+            self.assertNotIn(named_volume, source)
+
+    def test_monitoring_bind_state_is_owned_by_runtime_layout(self) -> None:
+        install_source = LAYOUT_INSTALL.read_text(encoding="utf-8")
+        check_source = LAYOUT_CHECK.read_text(encoding="utf-8")
+
+        for state_dir in (
+            "prometheus",
+            "alertmanager",
+            "loki",
+            "tempo",
+            "alloy",
+            "grafana",
+        ):
+            expected = f'"${{AOA_STACK_ROOT}}/Services/monitoring/{state_dir}"'
+            with self.subTest(state_dir=state_dir):
+                self.assertIn(expected, install_source)
+                self.assertIn(expected, check_source)
+        self.assertIn('has_module "60-monitoring.yml"', check_source)
+
     def test_llama_swap_candidate_is_owner_admitted_and_removes_inherited_caps(self) -> None:
         service = load_compose(TUNING_DIR / "llamacpp.gemma4-e2b.llama-swap.yml")["services"]["llama-cpp"]
 

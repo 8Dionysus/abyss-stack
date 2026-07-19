@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 81,
-  "edge_count": 1800,
+  "decision_count": 82,
+  "edge_count": 1822,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 730,
-    "DATED": 81,
-    "GUARDED_BY": 214,
-    "HAS_STATUS": 81,
-    "HAS_SURFACE_CLASS": 199,
-    "IN_STACK_LANE": 164,
-    "NEXT_DECISION": 80,
-    "OWNED_BY_SURFACE": 86,
-    "OWNS_DECISION": 81,
+    "CITES_SOURCE_SURFACE": 738,
+    "DATED": 82,
+    "GUARDED_BY": 217,
+    "HAS_STATUS": 82,
+    "HAS_SURFACE_CLASS": 202,
+    "IN_STACK_LANE": 166,
+    "NEXT_DECISION": 81,
+    "OWNED_BY_SURFACE": 87,
+    "OWNS_DECISION": 82,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 82
+    "UNDER_MECHANIC_PARENT": 83
   },
   "edges": [
     {
@@ -8603,12 +8603,117 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0081",
+      "target": "decision:ABYSS-STACK-D-0082",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0081",
       "target": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0081",
       "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:compose/modules/60-monitoring.yml",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:docs/operations/LIFECYCLE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:docs/runtime/STORAGE_LAYOUT.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/layout-install/aoa_check_layout.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/layout-install/aoa_install_layout.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:mechanics/runtime-lifecycle/parts/user-unit/aoa_install_systemd.sh",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:systemd/user/podman-compose-abyss.service",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "source_surface:systemd/user/podman-compose-abyss.service.d/99-runtime-lifecycle.conf",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "date:2026-07-18",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "guard_family:SELinux%20mount%20labeling",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "guard_family:explicit%20teardown",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "guard_family:host%20ingress",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "surface_class:host%20ingress",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "surface_class:runtime%20storage",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "stack_lane:operations%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "stack_lane:runtime%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "owner_surface:mechanics/runtime-lifecycle/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
+      "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -9015,21 +9120,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0081",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0082",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 788,
+  "node_count": 799,
   "node_type_counts": {
     "date": 23,
-    "decision": 81,
-    "guard_family": 90,
+    "decision": 82,
+    "guard_family": 93,
     "mechanic_parent": 10,
-    "owner_surface": 42,
+    "owner_surface": 43,
     "repo": 1,
-    "source_surface": 438,
-    "stack_lane": 31,
+    "source_surface": 439,
+    "stack_lane": 33,
     "status": 3,
-    "surface_class": 69
+    "surface_class": 72
   },
   "nodes": [
     {
@@ -9958,6 +10068,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-18",
+      "id": "decision:ABYSS-STACK-D-0082",
+      "label": "ABYSS-STACK-D-0082",
+      "path": "docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md",
+      "posture": "accepted repair rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -9965,6 +10085,11 @@
     {
       "id": "guard_family:RPG%20runtime%20projection",
       "label": "RPG runtime projection",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:SELinux%20mount%20labeling",
+      "label": "SELinux mount labeling",
       "type": "guard_family"
     },
     {
@@ -10078,6 +10203,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:explicit%20teardown",
+      "label": "explicit teardown",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:export%20candidate",
       "label": "export candidate",
       "type": "guard_family"
@@ -10110,6 +10240,11 @@
     {
       "id": "guard_family:host%20evidence%20posture",
       "label": "host evidence posture",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:host%20ingress",
+      "label": "host ingress",
       "type": "guard_family"
     },
     {
@@ -10530,6 +10665,11 @@
     {
       "id": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
       "label": "mechanics/federation-seams/parts/kag-seam/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/runtime-lifecycle/",
+      "label": "mechanics/runtime-lifecycle/",
       "type": "owner_surface"
     },
     {
@@ -12699,6 +12839,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:systemd/user/podman-compose-abyss.service.d/99-runtime-lifecycle.conf",
+      "label": "systemd/user/podman-compose-abyss.service.d/99-runtime-lifecycle.conf",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:tests/README.md",
       "label": "tests/README.md",
       "type": "source_surface"
@@ -12934,6 +13079,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:operations%20lane",
+      "label": "operations lane",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:operator%20command",
       "label": "operator command",
       "type": "stack_lane"
@@ -12961,6 +13111,11 @@
     {
       "id": "stack_lane:runtime%20knowledge",
       "label": "runtime knowledge",
+      "type": "stack_lane"
+    },
+    {
+      "id": "stack_lane:runtime%20lane",
+      "label": "runtime lane",
       "type": "stack_lane"
     },
     {
@@ -13179,6 +13334,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:host%20ingress",
+      "label": "host ingress",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:inference%20pilot",
       "label": "inference pilot",
       "type": "surface_class"
@@ -13186,6 +13346,11 @@
     {
       "id": "surface_class:legacy/provenance",
       "label": "legacy/provenance",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:lifecycle",
+      "label": "lifecycle",
       "type": "surface_class"
     },
     {
@@ -13311,6 +13476,11 @@
     {
       "id": "surface_class:runtime%20routes",
       "label": "runtime routes",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:runtime%20storage",
+      "label": "runtime storage",
       "type": "surface_class"
     },
     {

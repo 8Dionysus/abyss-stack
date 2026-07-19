@@ -27,6 +27,12 @@ mkdir -p \
   "${AOA_STACK_ROOT}/Services/n8n" \
   "${AOA_STACK_ROOT}/Services/litellm" \
   "${AOA_STACK_ROOT}/Services/aoa-browser/ms-playwright" \
+  "${AOA_STACK_ROOT}/Services/monitoring/prometheus" \
+  "${AOA_STACK_ROOT}/Services/monitoring/alertmanager" \
+  "${AOA_STACK_ROOT}/Services/monitoring/loki" \
+  "${AOA_STACK_ROOT}/Services/monitoring/tempo" \
+  "${AOA_STACK_ROOT}/Services/monitoring/alloy" \
+  "${AOA_STACK_ROOT}/Services/monitoring/grafana" \
   "${AOA_STACK_ROOT}/Models" \
   "${AOA_STACK_ROOT}/Knowledge" \
   "${AOA_STACK_ROOT}/Knowledge/federation" \

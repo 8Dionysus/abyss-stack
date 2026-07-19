@@ -319,6 +319,8 @@ unit_target_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user"
 unit_target="${unit_target_dir}/podman-compose-abyss.service"
 selection_dropin_dir="${unit_target_dir}/podman-compose-abyss.service.d"
 selection_dropin="${selection_dropin_dir}/20-runtime-selection.conf"
+runtime_lifecycle_dropin_source="${AOA_CONFIGS_ROOT}/systemd/user/podman-compose-abyss.service.d/99-runtime-lifecycle.conf"
+runtime_lifecycle_dropin="${selection_dropin_dir}/99-runtime-lifecycle.conf"
 backup_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
 [[ -f "$unit_source" ]] || aoa_die "unit source not found: $unit_source"
@@ -406,6 +408,37 @@ aoa_link_user_unit() {
   aoa_note "unit linked: ${target_path}"
 }
 
+aoa_link_runtime_lifecycle_dropin() {
+  local backup_path
+  local previous_target
+
+  if [[ ! -f "$runtime_lifecycle_dropin_source" ]]; then
+    aoa_note "runtime lifecycle drop-in source not present; leaving host drop-ins unchanged"
+    return 0
+  fi
+
+  mkdir -p "$selection_dropin_dir"
+  if [[ -e "$runtime_lifecycle_dropin" || -L "$runtime_lifecycle_dropin" ]]; then
+    if [[ -L "$runtime_lifecycle_dropin" ]]; then
+      previous_target="$(readlink "$runtime_lifecycle_dropin" || true)"
+      if [[ "$previous_target" == "$runtime_lifecycle_dropin_source" ]]; then
+        aoa_note "runtime lifecycle drop-in already linked: ${runtime_lifecycle_dropin}"
+        return 0
+      fi
+      aoa_note "relinking runtime lifecycle drop-in: ${runtime_lifecycle_dropin} (was ${previous_target})"
+    elif [[ -d "$runtime_lifecycle_dropin" ]]; then
+      aoa_die "runtime lifecycle drop-in target must not be a directory: ${runtime_lifecycle_dropin}"
+    else
+      backup_path="${runtime_lifecycle_dropin}.pre-abyss-stack-${backup_stamp}"
+      cp -a -- "$runtime_lifecycle_dropin" "$backup_path"
+      aoa_note "backup existing runtime lifecycle drop-in: ${backup_path}"
+    fi
+  fi
+
+  ln -sfn "$runtime_lifecycle_dropin_source" "$runtime_lifecycle_dropin"
+  aoa_note "runtime lifecycle drop-in linked: ${runtime_lifecycle_dropin}"
+}
+
 if ((link_all_user_units)); then
   [[ -f "$unit_manifest" ]] || aoa_die "managed user-unit manifest not found: ${unit_manifest}"
   while IFS= read -r unit_name || [[ -n "$unit_name" ]]; do
@@ -418,6 +451,7 @@ if ((link_all_user_units)); then
 else
   aoa_link_user_unit "podman-compose-abyss.service"
 fi
+aoa_link_runtime_lifecycle_dropin
 
 if ((selection_set || overlay_set)); then
   mkdir -p "$selection_dropin_dir"

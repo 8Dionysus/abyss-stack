@@ -68,6 +68,11 @@ justify promotion.
 Alertmanager, cAdvisor, Loki, Tempo, and Alloy. Loki stays internal-only so
 LogQL arrives through Grafana; Alloy exposes a localhost-only OTLP ingest
 surface for traces and forwards them to Tempo.
+Persistent observability state uses explicit bind directories under
+`${AOA_STACK_ROOT}/Services/monitoring/` with private SELinux relabeling.
+Do not replace those mounts with Podman Compose named volumes: the supported
+rootless compose path must preserve the `:Z` relabel contract at container
+creation time.
 
 ## Presets
 

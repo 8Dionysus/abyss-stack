@@ -136,6 +136,16 @@ for path in "${required_dirs[@]}"; do
   check_dir "$path"
 done
 
+if ((selection_metadata_ready)) && has_module "60-monitoring.yml"; then
+  aoa_note "selected runtime includes 60-monitoring.yml; checking persistent observability state"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/prometheus"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/alertmanager"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/loki"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/tempo"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/alloy"
+  check_dir "${AOA_STACK_ROOT}/Services/monitoring/grafana"
+fi
+
 if ((ignore_secrets)); then
   aoa_note "skip secret file checks on this pass"
 else

@@ -28,6 +28,17 @@ The checked-in unit defaults to the conservative `substrate` profile. Host-local
 drop-ins should carry richer runtime selection rather than editing the source
 skeleton for one machine.
 
+The stack runner delegates its runtime cgroup and uses `KillMode=process`.
+`aoa-down` remains the explicit owner of container teardown; a failed or timed
+out launcher must not make systemd sweep still-healthy rootless Podman port
+helpers from the unit cgroup while their containers continue running.
+`TimeoutStopFailureMode=terminate` also keeps a stop timeout from escalating
+into the distribution-wide abort policy.
+The same settings live in the source-managed late drop-in at
+`podman-compose-abyss.service.d/99-runtime-lifecycle.conf`; the installer links
+it next to the live unit so a distribution-wide user-service drop-in cannot
+override this stack-specific lifecycle boundary.
+
 Prefer the installer route when you need a durable runtime selection:
 
 Use the installer route in [AGENTS](AGENTS.md#install-routes).

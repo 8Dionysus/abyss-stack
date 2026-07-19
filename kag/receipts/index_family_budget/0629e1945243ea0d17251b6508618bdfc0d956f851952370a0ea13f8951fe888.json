@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 15336632,
+  "allowed_tracked_bytes": 22268930,
+  "approved_by": "repository-owner",
+  "base_ref": "a9b51763b8a5b20fb1254d169033c7cccb8df8d0",
+  "changed_generated_bytes": 15336632,
+  "changed_generated_files": 257,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "0629e1945243ea0d17251b6508618bdfc0d956f851952370a0ea13f8951fe888",
+  "reason": "Admit the reviewed observability bind-state and Podman ingress lifecycle repair; the new decision, docs, unit contract, layout mechanics, and regression tests redistribute deterministic anchors across content-addressed shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta",
+  "tracked_bytes": 22268930,
+  "tracked_bytes_max": 24117248
+}

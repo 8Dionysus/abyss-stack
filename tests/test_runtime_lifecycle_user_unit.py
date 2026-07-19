@@ -22,6 +22,8 @@ STATS_PATH_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.path"
 STATS_SERVICE_UNIT = REPO_ROOT / "systemd" / "user" / "aoa-stats-live-refresh.service"
 MCP_HTTP_TEMPLATE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http@.service"
 MCP_HTTP_BUNDLE = REPO_ROOT / "systemd" / "user" / "aoa-mcp-http.service"
+STACK_RUNTIME_UNIT = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service"
+STACK_RUNTIME_DROPIN = REPO_ROOT / "systemd" / "user" / "podman-compose-abyss.service.d" / "99-runtime-lifecycle.conf"
 GEMMA_DIGEST_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-gemma4-spark-digest.service"
 STORAGE_MONITOR_UNIT = REPO_ROOT / "systemd" / "user" / "abyss-storage-monitor.service"
 MANAGED_USER_UNITS = REPO_ROOT / "systemd" / "user" / "managed-units.txt"
@@ -118,6 +120,74 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+
+    def test_stack_launcher_preserves_container_runtime_helpers(self) -> None:
+        unit = STACK_RUNTIME_UNIT.read_text(encoding="utf-8")
+        dropin = STACK_RUNTIME_DROPIN.read_text(encoding="utf-8")
+
+        self.assertIn("Delegate=yes", unit)
+        self.assertIn("KillMode=process", unit)
+        self.assertIn("TimeoutStopFailureMode=terminate", unit)
+        self.assertIn(
+            "ExecStop=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-down",
+            unit,
+        )
+        self.assertIn("Delegate=yes", dropin)
+        self.assertIn("KillMode=process", dropin)
+        self.assertIn("TimeoutStopFailureMode=terminate", dropin)
+
+    def test_installer_links_source_managed_runtime_lifecycle_dropin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            configs = root / "Configs"
+            unit_source = configs / "systemd" / "user"
+            unit_source.mkdir(parents=True)
+            (unit_source / "podman-compose-abyss.service").write_text(
+                "[Service]\nType=oneshot\nExecStart=/usr/bin/true\n",
+                encoding="utf-8",
+            )
+            dropin_source = unit_source / "podman-compose-abyss.service.d"
+            dropin_source.mkdir()
+            lifecycle_source = dropin_source / "99-runtime-lifecycle.conf"
+            lifecycle_source.write_text(
+                "[Service]\nKillMode=process\nTimeoutStopFailureMode=terminate\n",
+                encoding="utf-8",
+            )
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            systemctl.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(root / "stack"),
+                    "AOA_CONFIGS_ROOT": str(configs),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD)],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            lifecycle_target = (
+                root
+                / "xdg-config"
+                / "systemd"
+                / "user"
+                / "podman-compose-abyss.service.d"
+                / "99-runtime-lifecycle.conf"
+            )
+            self.assertEqual(os.readlink(lifecycle_target), str(lifecycle_source))
 
     def test_gemma_digest_reserves_background_model_wake(self) -> None:
         unit = GEMMA_DIGEST_UNIT.read_text(encoding="utf-8")
