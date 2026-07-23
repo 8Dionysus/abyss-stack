@@ -31,7 +31,8 @@ tos-foundation-lab/
 │   ├── MANUAL_REVIEW_PROTOCOL.md
 │   └── RESOURCE_GATE.md
 ├── examples/
-│   └── tos-foundation-suite.v1.json
+│   ├── tos-foundation-suite.v1.json
+│   └── tos-structure-vlm-selection.v1.json
 ├── schemas/
 │   ├── experiment-suite.schema.json
 │   ├── human-gold-review-manifest.schema.json
@@ -41,6 +42,7 @@ tos-foundation-lab/
 │   ├── run-receipt.schema.json
 │   ├── runtime-manifest.schema.json
 │   ├── source-visible-model-inspection.schema.json
+│   ├── structure-vlm-selection.schema.json
 │   ├── translation-lab-readiness.schema.json
 │   ├── translation-source-human-review.schema.json
 │   ├── translation-source-manifest.schema.json
@@ -49,6 +51,8 @@ tos-foundation-lab/
 ├── tests/
 │   └── test_tos_foundation_lab.py
 ├── canonical_graph.py
+├── docling_structure.py
+├── docling_structure_bridge.py
 ├── granite_embedding_bridge.py
 ├── granite_retrieval.py
 ├── human_gold_review.py
@@ -64,8 +68,11 @@ tos-foundation-lab/
 ├── paddle_ocr.py
 ├── paddle_ocr_bridge.py
 ├── paddle_ocr_runtime.py
+├── paddle_vl_structure.py
+├── paddle_vl_structure_bridge.py
 ├── runtime_manifest.py
 ├── semantic_retrieval.py
+├── structure_runtime.py
 ├── tesseract_ocr.py
 ├── tesseract_runtime.py
 ├── translation_source.py
@@ -111,6 +118,78 @@ scripts/aoa-tos-foundation-lab execute-native-structure RUN_ROOT \
 The command deliberately closes at `awaiting-manual-review`. Empty output,
 OCR contamination, wrong reading order, and text-quality errors remain real
 results; no automatic status turns native extraction into transcription.
+
+Structure B and C have separate acquisition, runtime, and execution
+boundaries. B freezes a CPU-only Docling 2.115.0 closure, the exact Heron
+revision, and the existing Tesseract runtime. The acquisition rejects CUDA,
+NVIDIA, and Triton packages and requires the exact local CPU Torch pair.
+During execution, each sampled PDF page is first probed independently for a
+programmatic text layer. Docling preserves that layer when it exists and may
+invoke full-page Tesseract only when it does not. Exact EPUB XHTML member
+bytes go through the deterministic HTML bridge. Tables, code, formulas,
+pictures, external plugins, and remote services remain disabled:
+
+PDF OCR language is resolved only through the tracked corpus graph:
+`item.manifest.json` `embodiment_ref` → edition
+`embodies_expression_refs` → expression `language`. The run records those
+evidence paths and the BCP 47-to-Tesseract mapping in its private source map.
+Filename, recognized text, and item-ID substrings are not language authority;
+missing, mixed, unresolved, or unsupported language metadata fails closed.
+
+```bash
+scripts/aoa-tos-foundation-lab freeze-docling-structure-acquisition \
+  --wheel-cache CACHED_CPU_ONLY_DOCLING_CLOSURE \
+  --model-dir CACHED_EXACT_HERON_REVISION \
+  --output CACHED_DOCLING_ACQUISITION_RECEIPT \
+  --owner-receipt OWNER_ACQUISITION_RECEIPT
+
+scripts/aoa-tos-foundation-lab materialize-docling-structure-runtime \
+  --acquisition-receipt CACHED_DOCLING_ACQUISITION_RECEIPT \
+  --owner-receipt OWNER_RUNTIME_BUILD_RECEIPT
+
+scripts/aoa-tos-foundation-lab execute-docling-structure RUN_ROOT \
+  --tree-repo-root /srv/AbyssOS/Tree-of-Sophia \
+  --sample-plan TRACKED_STRUCTURE_SAMPLE_PLAN \
+  --runtime-manifest /srv/abyss-machine/runtimes/tree-of-sophia-foundation-lab/docling-2.115.0-heron-8f39ad3-cpu/runtime-manifest.json
+```
+
+C is not a disguised replacement for the full 36-unit comparison. Its input
+is the separately frozen output-blind twelve-page visual selection: two hard
+and two deterministic-random pages per witness. The local diagnostic uses
+PaddleOCR-VL 1.6 and PP-DocLayoutV3 on CPU. The official Intel GPU route is a
+separate unadmitted feasibility lane because its exact compatibility with
+this host has not been demonstrated. The C acquisition also freezes the exact
+PaddleX `ocr` extra distributions missing from the already verified general
+OCR base. It rejects accelerator packages. Materialization copies that base
+into a new runtime identity before the offline hash-locked install and
+re-verifies the original base afterward; it never mutates or silently upgrades
+the prior runtime:
+
+```bash
+scripts/aoa-tos-foundation-lab freeze-paddle-vl-structure-acquisition \
+  --wheel-cache CACHED_EXACT_PADDLEX_OCR_EXTRA_WHEELS \
+  --vl-model-dir CACHED_EXACT_PADDLEOCR_VL_1_6_REVISION \
+  --layout-model-dir CACHED_EXACT_PP_DOCLAYOUT_V3_REVISION \
+  --output CACHED_PADDLE_VL_ACQUISITION_RECEIPT \
+  --owner-receipt OWNER_ACQUISITION_RECEIPT
+
+scripts/aoa-tos-foundation-lab materialize-paddle-vl-structure-runtime \
+  --acquisition-receipt CACHED_PADDLE_VL_ACQUISITION_RECEIPT \
+  --owner-receipt OWNER_RUNTIME_BUILD_RECEIPT
+
+scripts/aoa-tos-foundation-lab execute-paddle-vl-structure RUN_ROOT \
+  --visual-plan TRACKED_OCR_VISUAL_PLAN \
+  --render-manifest PRIVATE_FROZEN_RENDER_MANIFEST \
+  --selection mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-structure-vlm-selection.v1.json \
+  --runtime-manifest /srv/abyss-machine/runtimes/tree-of-sophia-foundation-lab/paddleocr-vl-1.6-structure-ocr-cpu/runtime-manifest.json
+```
+
+Repeated `--sample-id` is diagnostic-only in both challengers and must name an
+already frozen unit. It cannot be reported as the complete variant. Both
+runners retain ordered blocks, raw engine output, source-anchor projection,
+timing, runtime identity, and failure evidence, then stop at
+`awaiting-manual-review`; structural F1, reading-order error, and human repair
+cost remain unavailable until the real source-visible outline exists.
 
 `manual-review-receipt.schema.json` requires a real human identity and an
 explicit human-presence attestation. Source-visible inspection performed by a

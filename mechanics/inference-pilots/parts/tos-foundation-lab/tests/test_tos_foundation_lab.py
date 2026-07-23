@@ -160,6 +160,30 @@ assert PADDLE_OCR_SPEC and PADDLE_OCR_SPEC.loader
 paddle_ocr = importlib.util.module_from_spec(PADDLE_OCR_SPEC)
 PADDLE_OCR_SPEC.loader.exec_module(paddle_ocr)
 
+STRUCTURE_RUNTIME_MODULE_PATH = PART_ROOT / "structure_runtime.py"
+STRUCTURE_RUNTIME_SPEC = importlib.util.spec_from_file_location(
+    "structure_runtime_test", STRUCTURE_RUNTIME_MODULE_PATH
+)
+assert STRUCTURE_RUNTIME_SPEC and STRUCTURE_RUNTIME_SPEC.loader
+structure_runtime = importlib.util.module_from_spec(STRUCTURE_RUNTIME_SPEC)
+STRUCTURE_RUNTIME_SPEC.loader.exec_module(structure_runtime)
+
+DOCLING_STRUCTURE_MODULE_PATH = PART_ROOT / "docling_structure.py"
+DOCLING_STRUCTURE_SPEC = importlib.util.spec_from_file_location(
+    "docling_structure_test", DOCLING_STRUCTURE_MODULE_PATH
+)
+assert DOCLING_STRUCTURE_SPEC and DOCLING_STRUCTURE_SPEC.loader
+docling_structure = importlib.util.module_from_spec(DOCLING_STRUCTURE_SPEC)
+DOCLING_STRUCTURE_SPEC.loader.exec_module(docling_structure)
+
+PADDLE_VL_STRUCTURE_MODULE_PATH = PART_ROOT / "paddle_vl_structure.py"
+PADDLE_VL_STRUCTURE_SPEC = importlib.util.spec_from_file_location(
+    "paddle_vl_structure_test", PADDLE_VL_STRUCTURE_MODULE_PATH
+)
+assert PADDLE_VL_STRUCTURE_SPEC and PADDLE_VL_STRUCTURE_SPEC.loader
+paddle_vl_structure = importlib.util.module_from_spec(PADDLE_VL_STRUCTURE_SPEC)
+PADDLE_VL_STRUCTURE_SPEC.loader.exec_module(paddle_vl_structure)
+
 TRANSLATION_SOURCE_MODULE_PATH = PART_ROOT / "translation_source.py"
 TRANSLATION_SOURCE_SPEC = importlib.util.spec_from_file_location(
     "translation_source_test", TRANSLATION_SOURCE_MODULE_PATH
@@ -381,6 +405,35 @@ def test_preflight_blocks_missing_software_and_storage_denial() -> None:
         "candidate-installation",
         "storage-owner-preflight",
     } <= failed
+
+
+def test_preflight_storage_denial_really_retains_receipt_on_stdout(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    receipt = {
+        "decision": "blocked",
+        "storage_preflight": {"allowed": False, "reason": "timeout"},
+    }
+    monkeypatch.setattr(lab, "build_preflight_receipt", lambda *args, **kwargs: receipt)
+    with tempfile.TemporaryDirectory() as temporary:
+        output = Path(temporary) / "must-not-exist.json"
+        result = lab.main(
+            [
+                "preflight",
+                "--experiment",
+                "tos-ocr-foundation-v1",
+                "--variant",
+                "A",
+                "--output",
+                output.as_posix(),
+            ]
+        )
+        captured = capsys.readouterr()
+        assert result == 1
+        assert json.loads(captured.out) == receipt
+        assert "storage owner denied the write" in captured.err
+        assert not output.exists()
 
 
 def test_verified_runtime_admission_satisfies_requires_setup_gate() -> None:
@@ -2976,3 +3029,311 @@ def test_awaiting_manual_review_is_a_valid_non_promoted_run_status() -> None:
         receipt["status"] = "awaiting-manual-review"
         receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
         assert lab.verify_run(run_root) == []
+
+
+def test_structure_vlm_selection_is_frozen_balanced_and_hash_derived() -> None:
+    selection = json.loads(lab.STRUCTURE_VLM_SELECTION_PATH.read_text(encoding="utf-8"))
+    assert lab.schema_issues(selection, lab.STRUCTURE_VLM_SELECTION_SCHEMA_PATH) == []
+    assert selection["frozen_before_variant_outputs"] is True
+    assert selection["quality_gate"]["formal_quality_metrics_allowed"] is False
+    seed = selection["selection_law"]["random_seed"]
+    for group_id in (
+        "ocr-antonovsky-2007",
+        "ocr-mysl-1996",
+        "ocr-naumann-1893",
+    ):
+        rows = [row for row in selection["samples"] if row["group_id"] == group_id]
+        assert [row["lane"] for row in rows].count("hard") == 2
+        assert [row["lane"] for row in rows].count("random") == 2
+        for row in rows:
+            if row["lane"] == "random":
+                expected = hashlib.sha256(
+                    f"{seed}|{group_id}|{row['sample_id']}".encode()
+                ).hexdigest()
+                assert row["selection_score"] == expected
+
+
+def test_structure_runtime_principal_revisions_and_digests_are_exact() -> None:
+    assert structure_runtime.PADDLE_RUNTIME_ID == (
+        "paddleocr-vl-1.6-structure-ocr-cpu"
+    )
+    assert paddle_vl_structure.EXPECTED_RUNTIME_ID == structure_runtime.PADDLE_RUNTIME_ID
+    assert structure_runtime.DOC_VERSION == "2.115.0"
+    assert structure_runtime.DOC_TORCH_VERSION == "2.10.0+cpu"
+    assert structure_runtime.DOC_TORCHVISION_VERSION == "0.25.0+cpu"
+    assert structure_runtime.DOC_BUILD_BACKEND_ARTIFACTS == {
+        "setuptools-83.0.0-py3-none-any.whl": (
+            "29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3"
+        ),
+        "wheel-0.47.0-py3-none-any.whl": (
+            "212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced"
+        ),
+    }
+    assert structure_runtime.DOC_FORBIDDEN_ACCELERATOR_DISTRIBUTIONS == (
+        "cuda-",
+        "nvidia-",
+        "triton",
+    )
+    assert structure_runtime.PADDLE_FORBIDDEN_ACCELERATOR_DISTRIBUTIONS == (
+        "cuda-",
+        "nvidia-",
+        "triton",
+    )
+    assert structure_runtime.PADDLE_OCR_EXTRA_REQUIRED_DISTRIBUTIONS == (
+        "beautifulsoup4",
+        "einops",
+        "ftfy",
+        "jinja2",
+        "latex2mathml",
+        "lxml",
+        "openpyxl",
+        "premailer",
+        "regex",
+        "scikit-learn",
+        "scipy",
+        "sentencepiece",
+        "tiktoken",
+        "tokenizers",
+    )
+    assert structure_runtime.DOC_WHEEL_SHA256 == (
+        "1a3d9bdf2f82610e97085a1a1b53cf259d1bd7aff97651ff2decc3b2b105123c"
+    )
+    assert structure_runtime.HERON_REVISION == (
+        "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8"
+    )
+    assert structure_runtime.PADDLE_VL_REVISION == (
+        "66317acc4c9fc17bd154591ce650735cd2855f3e"
+    )
+    assert structure_runtime.PADDLE_LAYOUT_REVISION == (
+        "7b48a7566925fa464281f930c58eee04fe2c862a"
+    )
+
+
+def _write_structure_test_wheel(root: Path, distribution: str) -> None:
+    wheel_name = distribution.replace("-", "_")
+    wheel = root / f"{wheel_name}-1.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr(
+            f"{wheel_name}-1.0.dist-info/METADATA",
+            f"Metadata-Version: 2.4\nName: {distribution}\nVersion: 1.0\n",
+        )
+
+
+def test_paddle_structure_extra_closure_fails_closed() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        wheel_root = Path(temporary)
+        for distribution in structure_runtime.PADDLE_OCR_EXTRA_REQUIRED_DISTRIBUTIONS:
+            _write_structure_test_wheel(wheel_root, distribution)
+        rows = structure_runtime._paddle_extra_closure(wheel_root)
+        assert {row["distribution"] for row in rows} == set(
+            structure_runtime.PADDLE_OCR_EXTRA_REQUIRED_DISTRIBUTIONS
+        )
+
+        _write_structure_test_wheel(wheel_root, "nvidia-cublas-cu12")
+        with pytest.raises(
+            structure_runtime.StructureRuntimeError,
+            match="accelerator distributions",
+        ):
+            structure_runtime._paddle_extra_closure(wheel_root)
+
+
+def test_paddle_vl_structure_configuration_is_local_cpu_and_quality_blocked() -> None:
+    assert paddle_vl_structure.RETAIN_EVIDENCE_DECISION == "retain"
+    assert paddle_vl_structure.CONFIGURATION == {
+        "pipeline_version": "v1.6",
+        "device": "cpu",
+        "use_doc_orientation_classify": False,
+        "use_doc_unwarping": False,
+        "use_layout_detection": True,
+        "use_chart_recognition": False,
+        "use_seal_recognition": False,
+        "use_ocr_for_image_block": False,
+        "format_block_content": True,
+        "merge_layout_blocks": True,
+        "markdown_ignore_labels": [],
+        "use_queues": False,
+        "max_pixels": 1003520,
+        "max_new_tokens": 4096,
+        "temperature": 0.0,
+    }
+
+
+def test_docling_structure_configuration_is_offline_cpu_and_quality_blocked() -> None:
+    assert docling_structure.CONFIGURATION == {
+        "docling_version": "2.115.0",
+        "layout_repository": "docling-project/docling-layout-heron",
+        "layout_revision": "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8",
+        "device": "cpu",
+        "threads": 4,
+        "enable_remote_services": False,
+        "allow_external_plugins": False,
+        "do_table_structure": False,
+        "do_code_enrichment": False,
+        "do_formula_enrichment": False,
+        "do_picture_classification": False,
+        "do_picture_description": False,
+        "do_chart_extraction": False,
+        "generate_page_images": False,
+        "generate_picture_images": False,
+        "generate_table_images": False,
+        "native_text_min_non_whitespace": 1,
+        "tesseract_force_full_page_ocr": True,
+        "document_timeout_seconds": 600.0,
+    }
+
+
+def test_docling_structure_resolves_ocr_language_from_tracked_corpus_graph(
+    tmp_path: Path,
+) -> None:
+    tree = tmp_path / "tree"
+    manifest_path = (
+        tree
+        / "ToS/source-witnesses/collections/nietzsche/items/operator/item.manifest.json"
+    )
+    edition_path = tree / "ToS/source-witnesses/collections/nietzsche/edition.json"
+    expression_path = (
+        tree / "ToS/source-witnesses/works/zarathustra/expressions/ru/expression.json"
+    )
+    item_ref = "tos.item.nietzsche.mysl.operator-pdf"
+    edition_ref = "tos.edition.nietzsche.mysl-1996"
+    expression_ref = "tos.expression.nietzsche.zarathustra.ru-mysl-1996"
+    manifests = {
+        item_ref: (
+            {"item_id": item_ref, "embodiment_ref": edition_ref},
+            manifest_path,
+        )
+    }
+    editions = {
+        edition_ref: (
+            {
+                "record_type": "edition",
+                "record_id": edition_ref,
+                "embodies_expression_refs": [expression_ref],
+            },
+            edition_path,
+        )
+    }
+    expressions = {
+        expression_ref: (
+            {
+                "record_type": "expression",
+                "record_id": expression_ref,
+                "language": "ru",
+            },
+            expression_path,
+        )
+    }
+
+    language, evidence = docling_structure._ocr_language_for_group(
+        {"item_ref": item_ref},
+        manifests,
+        editions,
+        expressions,
+        tree,
+    )
+
+    assert language == "rus"
+    assert evidence == {
+        "resolution_method": (
+            "item-manifest-embodiment-to-edition-expression-language"
+        ),
+        "item_ref": item_ref,
+        "item_manifest_ref": manifest_path.relative_to(tree).as_posix(),
+        "embodiment_ref": edition_ref,
+        "edition_record_ref": edition_path.relative_to(tree).as_posix(),
+        "expression_refs": [expression_ref],
+        "expression_record_refs": [expression_path.relative_to(tree).as_posix()],
+        "bcp47_language": "ru",
+        "tesseract_language": "rus",
+    }
+
+
+def test_docling_structure_rejects_ambiguous_edition_language(tmp_path: Path) -> None:
+    tree = tmp_path / "tree"
+    item_ref = "tos.item.mixed"
+    edition_ref = "tos.edition.mixed"
+    expression_refs = ["tos.expression.de", "tos.expression.ru"]
+    manifests = {
+        item_ref: (
+            {"item_id": item_ref, "embodiment_ref": edition_ref},
+            tree / "ToS/source-witnesses/item.manifest.json",
+        )
+    }
+    editions = {
+        edition_ref: (
+            {
+                "record_type": "edition",
+                "record_id": edition_ref,
+                "embodies_expression_refs": expression_refs,
+            },
+            tree / "ToS/source-witnesses/edition.json",
+        )
+    }
+    expressions = {
+        expression_ref: (
+            {
+                "record_type": "expression",
+                "record_id": expression_ref,
+                "language": language,
+            },
+            tree / f"ToS/source-witnesses/{language}/expression.json",
+        )
+        for expression_ref, language in zip(expression_refs, ("de", "ru"), strict=True)
+    }
+
+    with pytest.raises(
+        docling_structure.DoclingStructureError,
+        match="absent or ambiguous",
+    ):
+        docling_structure._ocr_language_for_group(
+            {"item_ref": item_ref},
+            manifests,
+            editions,
+            expressions,
+            tree,
+        )
+
+
+def test_docling_structure_preparation_failure_closes_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    receipt_path = run_root / "run.receipt.json"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "status": "prepared",
+                "retention_decision": "pending",
+                "artifact_refs": [],
+                "errors": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        docling_structure,
+        "_execute_docling_structure",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            docling_structure.DoclingStructureError("preparation failed")
+        ),
+    )
+
+    with pytest.raises(
+        docling_structure.DoclingStructureError,
+        match="preparation failed",
+    ):
+        docling_structure.execute_docling_structure(
+            run_root,
+            tmp_path / "tree",
+            tmp_path / "sample-plan.json",
+            tmp_path / "runtime-manifest.json",
+            invocation=["test"],
+        )
+
+    closed = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert closed["status"] == "failed"
+    assert closed["retention_decision"] == "retain"
+    assert closed["errors"] == ["preparation failed"]
+    assert closed["finished_at_utc"]

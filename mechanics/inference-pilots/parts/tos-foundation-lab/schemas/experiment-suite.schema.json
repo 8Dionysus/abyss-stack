@@ -194,6 +194,7 @@
         "version_posture": {"type": "string", "minLength": 1},
         "runtime": {"type": ["string", "null"]},
         "model": {"type": ["string", "null"]},
+        "selection_ref": {"type": "string", "minLength": 1},
         "install_status": {"enum": ["available", "requires-setup", "human-input", "reference-only"]},
         "required_commands": {
           "type": "array",

@@ -96,6 +96,20 @@ from paddle_ocr_runtime import (
     build_paddle_ocr_runtime,
     freeze_paddle_ocr_acquisition,
 )
+from structure_runtime import (
+    DOC_RUNTIME_ROOT,
+    PADDLE_RUNTIME_ROOT,
+    StructureRuntimeError,
+    build_docling_runtime,
+    build_paddle_vl_runtime,
+    freeze_docling_acquisition,
+    freeze_paddle_vl_acquisition,
+)
+from paddle_vl_structure import (
+    PaddleVlStructureError,
+    execute_paddle_vl_structure,
+)
+from docling_structure import DoclingStructureError, execute_docling_structure
 
 
 SUITE_PATH = PART_ROOT / "examples" / "tos-foundation-suite.v1.json"
@@ -114,6 +128,12 @@ TRANSLATION_SOURCE_REVIEW_SCHEMA_PATH = (
     PART_ROOT / "schemas" / "translation-source-review-manifest.schema.json"
 )
 RUNTIME_MANIFEST_SCHEMA_PATH = PART_ROOT / "schemas" / "runtime-manifest.schema.json"
+STRUCTURE_VLM_SELECTION_PATH = (
+    PART_ROOT / "examples" / "tos-structure-vlm-selection.v1.json"
+)
+STRUCTURE_VLM_SELECTION_SCHEMA_PATH = (
+    PART_ROOT / "schemas" / "structure-vlm-selection.schema.json"
+)
 
 RUN_ID_RE = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 VERSION_ARGUMENTS = {
@@ -233,6 +253,46 @@ def validate_suite() -> list[str]:
     suite = load_suite()
     issues = schema_issues(suite, SUITE_SCHEMA_PATH)
     issues.extend(semantic_suite_issues(suite))
+    selection = load_json(STRUCTURE_VLM_SELECTION_PATH)
+    issues.extend(
+        f"{STRUCTURE_VLM_SELECTION_PATH.relative_to(REPO_ROOT)}: {issue}"
+        for issue in schema_issues(selection, STRUCTURE_VLM_SELECTION_SCHEMA_PATH)
+    )
+    selected_ids = [
+        row.get("sample_id")
+        for row in selection.get("samples", [])
+        if isinstance(row, dict)
+    ]
+    if len(selected_ids) != len(set(selected_ids)):
+        issues.append("structure VLM selection sample IDs must be unique")
+    for group_id in (
+        "ocr-antonovsky-2007",
+        "ocr-mysl-1996",
+        "ocr-naumann-1893",
+    ):
+        group_rows = [
+            row
+            for row in selection.get("samples", [])
+            if isinstance(row, dict) and row.get("group_id") == group_id
+        ]
+        for lane in ("hard", "random"):
+            lane_count = sum(row.get("lane") == lane for row in group_rows)
+            if lane_count != 2:
+                issues.append(
+                    f"structure VLM selection requires exactly two {lane} rows for {group_id}"
+                )
+    seed = selection.get("selection_law", {}).get("random_seed")
+    if isinstance(seed, str):
+        for row in selection.get("samples", []):
+            if not isinstance(row, dict) or row.get("lane") != "random":
+                continue
+            expected = hashlib.sha256(
+                f"{seed}|{row.get('group_id')}|{row.get('sample_id')}".encode("utf-8")
+            ).hexdigest()
+            if row.get("selection_score") != expected:
+                issues.append(
+                    f"structure VLM random score drift for {row.get('sample_id')}"
+                )
     for schema_path in (
         RUN_SCHEMA_PATH,
         REVIEW_SCHEMA_PATH,
@@ -246,6 +306,7 @@ def validate_suite() -> list[str]:
         HUMAN_REVIEW_SCHEMA_PATH,
         READINESS_SCHEMA_PATH,
         RUNTIME_MANIFEST_SCHEMA_PATH,
+        STRUCTURE_VLM_SELECTION_SCHEMA_PATH,
     ):
         try:
             Draft202012Validator.check_schema(load_json(schema_path))
@@ -1184,6 +1245,62 @@ def main(argv: list[str] | None = None) -> int:
         "--owner-receipt", type=Path, action="append", default=[]
     )
 
+    freeze_docling_structure_parser = subparsers.add_parser(
+        "freeze-docling-structure-acquisition",
+        help="verify Structure B's cached wheel/model closure and emit its exact lock",
+    )
+    freeze_docling_structure_parser.add_argument("--wheel-cache", type=Path, required=True)
+    freeze_docling_structure_parser.add_argument("--model-dir", type=Path, required=True)
+    freeze_docling_structure_parser.add_argument("--output", type=Path, required=True)
+    freeze_docling_structure_parser.add_argument(
+        "--owner-receipt", type=Path, action="append", default=[]
+    )
+
+    docling_structure_runtime_parser = subparsers.add_parser(
+        "materialize-docling-structure-runtime",
+        help="build Structure B's exact offline Docling/Heron/Tesseract runtime",
+    )
+    docling_structure_runtime_parser.add_argument(
+        "--acquisition-receipt", type=Path, required=True
+    )
+    docling_structure_runtime_parser.add_argument(
+        "--runtime-root", type=Path, default=DOC_RUNTIME_ROOT
+    )
+    docling_structure_runtime_parser.add_argument(
+        "--python", type=Path, default=Path("/usr/bin/python3.12")
+    )
+    docling_structure_runtime_parser.add_argument(
+        "--owner-receipt", type=Path, action="append", default=[]
+    )
+
+    freeze_paddle_structure_parser = subparsers.add_parser(
+        "freeze-paddle-vl-structure-acquisition",
+        help="verify Structure C's OCR-extra wheels, base runtime, and pinned models",
+    )
+    freeze_paddle_structure_parser.add_argument("--wheel-cache", type=Path, required=True)
+    freeze_paddle_structure_parser.add_argument("--vl-model-dir", type=Path, required=True)
+    freeze_paddle_structure_parser.add_argument(
+        "--layout-model-dir", type=Path, required=True
+    )
+    freeze_paddle_structure_parser.add_argument("--output", type=Path, required=True)
+    freeze_paddle_structure_parser.add_argument(
+        "--owner-receipt", type=Path, action="append", default=[]
+    )
+
+    paddle_structure_runtime_parser = subparsers.add_parser(
+        "materialize-paddle-vl-structure-runtime",
+        help="build Structure C's exact CPU runtime from the verified OCR base and VLM models",
+    )
+    paddle_structure_runtime_parser.add_argument(
+        "--acquisition-receipt", type=Path, required=True
+    )
+    paddle_structure_runtime_parser.add_argument(
+        "--runtime-root", type=Path, default=PADDLE_RUNTIME_ROOT
+    )
+    paddle_structure_runtime_parser.add_argument(
+        "--owner-receipt", type=Path, action="append", default=[]
+    )
+
     tesseract_parser = subparsers.add_parser(
         "execute-tesseract-ocr",
         help="execute prepared OCR A over the shared frozen visual packet",
@@ -1245,6 +1362,37 @@ def main(argv: list[str] | None = None) -> int:
     structure_parser.add_argument("run_root", type=Path)
     structure_parser.add_argument("--tree-repo-root", type=Path, required=True)
     structure_parser.add_argument("--sample-plan", type=Path, required=True)
+
+    docling_structure_parser = subparsers.add_parser(
+        "execute-docling-structure",
+        help="execute prepared Structure B through the exact offline Docling runtime",
+    )
+    docling_structure_parser.add_argument("run_root", type=Path)
+    docling_structure_parser.add_argument("--tree-repo-root", type=Path, required=True)
+    docling_structure_parser.add_argument("--sample-plan", type=Path, required=True)
+    docling_structure_parser.add_argument("--runtime-manifest", type=Path, required=True)
+    docling_structure_parser.add_argument(
+        "--sample-id",
+        action="append",
+        dest="sample_ids",
+        help="execute only this already frozen sample as a diagnostic; repeat if needed",
+    )
+
+    paddle_vl_structure_parser = subparsers.add_parser(
+        "execute-paddle-vl-structure",
+        help="execute prepared Structure C over the output-blind frozen visual selection",
+    )
+    paddle_vl_structure_parser.add_argument("run_root", type=Path)
+    paddle_vl_structure_parser.add_argument("--visual-plan", type=Path, required=True)
+    paddle_vl_structure_parser.add_argument("--render-manifest", type=Path, required=True)
+    paddle_vl_structure_parser.add_argument("--selection", type=Path, required=True)
+    paddle_vl_structure_parser.add_argument("--runtime-manifest", type=Path, required=True)
+    paddle_vl_structure_parser.add_argument(
+        "--sample-id",
+        action="append",
+        dest="sample_ids",
+        help="execute only this already frozen sample as a diagnostic; repeat if needed",
+    )
 
     retrieval_parser = subparsers.add_parser(
         "execute-lexical-retrieval",
@@ -1538,6 +1686,54 @@ def main(argv: list[str] | None = None) -> int:
             print("[boundary] runtime fixity and synthetic smoke are not OCR quality")
             return 0
 
+        if args.command == "freeze-docling-structure-acquisition":
+            receipt = freeze_docling_acquisition(
+                args.wheel_cache,
+                args.model_dir,
+                args.output,
+                owner_receipt_refs=args.owner_receipt,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+            )
+            print(json.dumps(receipt, ensure_ascii=False, indent=2))
+            print("[boundary] acquisition fixity is not structure quality")
+            return 0
+
+        if args.command == "materialize-docling-structure-runtime":
+            manifest = build_docling_runtime(
+                args.acquisition_receipt,
+                runtime_root=args.runtime_root,
+                python_command=args.python,
+                owner_receipt_refs=args.owner_receipt,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+            )
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+            print("[boundary] runtime fixity and import smoke are not structure quality")
+            return 0
+
+        if args.command == "freeze-paddle-vl-structure-acquisition":
+            receipt = freeze_paddle_vl_acquisition(
+                args.wheel_cache,
+                args.vl_model_dir,
+                args.layout_model_dir,
+                args.output,
+                owner_receipt_refs=args.owner_receipt,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+            )
+            print(json.dumps(receipt, ensure_ascii=False, indent=2))
+            print("[boundary] acquisition fixity is not structure quality")
+            return 0
+
+        if args.command == "materialize-paddle-vl-structure-runtime":
+            manifest = build_paddle_vl_runtime(
+                args.acquisition_receipt,
+                runtime_root=args.runtime_root,
+                owner_receipt_refs=args.owner_receipt,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+            )
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+            print("[boundary] runtime fixity and import smoke are not structure quality")
+            return 0
+
         if args.command == "execute-tesseract-ocr":
             metrics = execute_tesseract_ocr(
                 args.run_root,
@@ -1614,6 +1810,39 @@ def main(argv: list[str] | None = None) -> int:
                 raise LaboratoryError("executed run packet is invalid: " + "; ".join(issues))
             print(json.dumps(metrics, ensure_ascii=False, indent=2))
             print("[boundary] native extraction is awaiting source-visible manual review")
+            return 0
+
+        if args.command == "execute-docling-structure":
+            metrics = execute_docling_structure(
+                args.run_root,
+                args.tree_repo_root,
+                args.sample_plan,
+                args.runtime_manifest,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+                selected_sample_ids=args.sample_ids,
+            )
+            issues = verify_run(args.run_root)
+            if issues:
+                raise LaboratoryError("executed run packet is invalid: " + "; ".join(issues))
+            print(json.dumps(metrics, ensure_ascii=False, indent=2))
+            print("[boundary] Structure B remains blocked from quality claims until real human review")
+            return 0
+
+        if args.command == "execute-paddle-vl-structure":
+            metrics = execute_paddle_vl_structure(
+                args.run_root,
+                args.visual_plan,
+                args.render_manifest,
+                args.selection,
+                args.runtime_manifest,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+                selected_sample_ids=args.sample_ids,
+            )
+            issues = verify_run(args.run_root)
+            if issues:
+                raise LaboratoryError("executed run packet is invalid: " + "; ".join(issues))
+            print(json.dumps(metrics, ensure_ascii=False, indent=2))
+            print("[boundary] Structure C remains blocked from quality claims until real human review")
             return 0
 
         if args.command == "execute-lexical-retrieval":
@@ -1730,11 +1959,13 @@ def main(argv: list[str] | None = None) -> int:
                 variant,
                 runtime_manifest_path=args.runtime_manifest,
             )
+            rendered_receipt = json.dumps(receipt, ensure_ascii=False, indent=2)
             if args.output:
                 if receipt["storage_preflight"].get("allowed") is not True:
+                    print(rendered_receipt)
                     raise LaboratoryError("storage owner denied the write; blocked receipt remains on stdout only")
                 write_json(args.output, receipt)
-            print(json.dumps(receipt, ensure_ascii=False, indent=2))
+            print(rendered_receipt)
             return 0 if receipt["decision"] in {"ready", "awaiting-human-input"} else 2
 
         if args.command == "prepare":
@@ -1773,6 +2004,9 @@ def main(argv: list[str] | None = None) -> int:
         TesseractRuntimeError,
         KrakenPartyRuntimeError,
         PaddleOcrRuntimeError,
+        StructureRuntimeError,
+        DoclingStructureError,
+        PaddleVlStructureError,
     ) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 1
