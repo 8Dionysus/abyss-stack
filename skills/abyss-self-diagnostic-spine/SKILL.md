@@ -25,10 +25,11 @@ Use the skill directory reported by the host as the bundle root.
 3. Require `schema_version` to be `aoa_skill_source_receipt_v1` or
    `aoa_skill_source_receipt_v2`,
    `name=abyss-self-diagnostic-spine`, `owner_repo=abyss-stack`,
-   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.2`.
+   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.3`.
    For v2 also require non-empty `digest`, `source_fingerprint`,
-   `source_fingerprint_scope`, and `prompt_description_sha256`; preserve
-   `capability_graph_hash` when present.
+   `source_fingerprint_scope`, and `prompt_description_sha256`. When
+   `capability_graph_hash` is present, require it to be a non-empty string and
+   preserve it.
 4. Follow the exact `owner_root` and `source_path` from that receipt. Require
    the owner contract to repeat the same identity, version, and admitted
    lifecycle.

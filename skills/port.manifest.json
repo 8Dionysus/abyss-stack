@@ -7,7 +7,7 @@
     {
       "name": "abyss-self-diagnostic-spine",
       "path": "skills/abyss-self-diagnostic-spine",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "lifecycle": "admitted",
       "visibility": "advertised",
       "admission_ref": "docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md"
