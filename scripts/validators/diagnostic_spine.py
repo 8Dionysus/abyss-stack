@@ -243,7 +243,7 @@ def validate_diagnostic_owner_skill(errors: list[str], *, root: Path) -> None:
             ".aoa-skill-source.json",
             "owner_repo=abyss-stack",
             "source_path=skills/abyss-self-diagnostic-spine",
-            "version=0.2.2",
+            "version=0.2.3",
             "Select exactly one operation: `observe`, `capture`, or `review`.",
             "Do not load a shared recovery procedure before the owner packet",
             "Stop after one packet and one review.",
@@ -262,7 +262,7 @@ def validate_diagnostic_owner_skill(errors: list[str], *, root: Path) -> None:
         snippets=(
             "owner: abyss-stack",
             "canonical_source: skills/abyss-self-diagnostic-spine",
-            "version: 0.2.2",
+            "version: 0.2.3",
             "lifecycle: admitted",
             "health: active",
             "owner_cli: scripts/aoa-diagnose",
@@ -318,7 +318,7 @@ def validate_diagnostic_owner_skill(errors: list[str], *, root: Path) -> None:
     expected_bundle = {
         "name": "abyss-self-diagnostic-spine",
         "path": "skills/abyss-self-diagnostic-spine",
-        "version": "0.2.2",
+        "version": "0.2.3",
         "lifecycle": "admitted",
         "visibility": "advertised",
         "admission_ref": "docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md",
@@ -326,7 +326,7 @@ def validate_diagnostic_owner_skill(errors: list[str], *, root: Path) -> None:
     if bundles != [expected_bundle]:
         errors.append(
             "skills/port.manifest.json must expose the admitted "
-            "abyss-self-diagnostic-spine 0.2.2 owner bundle"
+            "abyss-self-diagnostic-spine 0.2.3 owner bundle"
         )
     exposure = manifest.get("exposure")
     if not isinstance(exposure, dict) or exposure.get("scope") != "user":
