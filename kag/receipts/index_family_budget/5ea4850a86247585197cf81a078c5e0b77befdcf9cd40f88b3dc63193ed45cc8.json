@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 1807259,
+  "allowed_tracked_bytes": 22302872,
+  "approved_by": "repository-owner",
+  "base_ref": "38856c1e4da1e6e0e40d2b76d8aaf828a7ef4b10",
+  "changed_generated_bytes": 1807259,
+  "changed_generated_files": 29,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "5ea4850a86247585197cf81a078c5e0b77befdcf9cd40f88b3dc63193ed45cc8",
+  "reason": "Admit canonical clean provider-root precedence and its regression coverage; the source identity update redistributes deterministic anchors across content-addressed shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta",
+  "tracked_bytes": 22302872,
+  "tracked_bytes_max": 24117248
+}
