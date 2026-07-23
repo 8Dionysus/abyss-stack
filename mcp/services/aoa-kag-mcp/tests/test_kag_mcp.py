@@ -124,6 +124,60 @@ def test_state_resolves_canonical_owner_surfaces(tmp_path: Path) -> None:
     }
 
 
+def test_state_prefers_clean_pinned_provider_checkout(tmp_path: Path) -> None:
+    state = _state(tmp_path)
+    canonical_owner = state.aoa_kag_root / ".deps" / "repo-a"
+    _write_json(
+        canonical_owner / "kag" / "manifest.json",
+        {"schema_version": "aoa_repo_kag_manifest_v1", "repo": "repo-a"},
+    )
+    _write_json(
+        canonical_owner / "kag" / "indexes" / "source_surface_index.json",
+        {
+            "schema_version": "aoa-repo-local-kag-index-v1",
+            "index_identity": {"content_digest": "pinned-fixture-digest"},
+            "records": [],
+        },
+    )
+
+    refreshed = AoAKagMCPState.discover(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+    )
+
+    assert refreshed.provider_root("repo-a") == canonical_owner.resolve()
+    assert CanonicalRepoKag(refreshed).owner_digest("repo-a") == (
+        "pinned-fixture-digest"
+    )
+
+
+def test_state_honors_explicit_canonical_provider_root(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    canonical_root = tmp_path / "provider-cache"
+    canonical_owner = canonical_root / "repo-a"
+    _write_json(
+        canonical_owner / "kag" / "indexes" / "source_surface_index.json",
+        {
+            "schema_version": "aoa-repo-local-kag-index-v1",
+            "index_identity": {"content_digest": "explicit-fixture-digest"},
+            "records": [],
+        },
+    )
+
+    refreshed = AoAKagMCPState.discover(
+        workspace_root=state.workspace_root,
+        aoa_kag_root=state.aoa_kag_root,
+        canonical_provider_root=canonical_root,
+    )
+
+    assert refreshed.provider_root("repo-a") == canonical_owner.resolve()
+    assert CanonicalRepoKag(refreshed).owner_digest("repo-a") == (
+        "explicit-fixture-digest"
+    )
+
+
 def test_state_resolves_portable_family_identity(tmp_path: Path) -> None:
     state = _state(tmp_path)
     manifest = _use_portable_family(state)

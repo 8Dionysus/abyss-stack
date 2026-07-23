@@ -44,6 +44,7 @@ class AoAKagMCPState:
 
     workspace_root: Path
     aoa_kag_root: Path
+    canonical_provider_root: Path | None
     provider_map_path: Path
     readiness_path: Path
     coverage_path: Path
@@ -53,6 +54,7 @@ class AoAKagMCPState:
         cls,
         workspace_root: str | Path | None = None,
         aoa_kag_root: str | Path | None = None,
+        canonical_provider_root: str | Path | None = None,
         provider_map_path: str | Path | None = None,
         readiness_path: str | Path | None = None,
         coverage_path: str | Path | None = None,
@@ -71,6 +73,20 @@ class AoAKagMCPState:
         ).expanduser()
         if not kag_root.is_absolute():
             kag_root = workspace / kag_root
+
+        canonical_root_value = canonical_provider_root or os.environ.get(
+            "AOA_KAG_CANONICAL_PROVIDER_ROOT"
+        )
+        if canonical_root_value:
+            canonical_root = Path(canonical_root_value).expanduser()
+            if not canonical_root.is_absolute():
+                canonical_root = kag_root / canonical_root
+            canonical_root = canonical_root.resolve()
+        else:
+            default_canonical_root = (kag_root / ".deps").resolve()
+            canonical_root = (
+                default_canonical_root if default_canonical_root.is_dir() else None
+            )
 
         provider_map = Path(
             provider_map_path
@@ -99,6 +115,7 @@ class AoAKagMCPState:
         return cls(
             workspace_root=workspace,
             aoa_kag_root=kag_root.resolve(),
+            canonical_provider_root=canonical_root,
             provider_map_path=provider_map.resolve(),
             readiness_path=readiness.resolve(),
             coverage_path=coverage.resolve(),
@@ -154,6 +171,11 @@ class AoAKagMCPState:
             raise KeyError(f"unknown KAG owner: {repo}")
         if repo == "aoa-kag":
             return self.aoa_kag_root
+
+        if self.canonical_provider_root is not None:
+            canonical_root = _provider_child_path(self.canonical_provider_root, repo)
+            if canonical_root.is_dir():
+                return canonical_root
 
         for surface in self._rooted_surfaces():
             if surface.get("provider_status") != "provider_ready":
