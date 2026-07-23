@@ -151,6 +151,34 @@ volumes:
                 "mem_limit_bytes": 268435456,
                 "mem_reservation_bytes": 67108864,
                 "mem_swap_limit_bytes": 134217728,
+                "mem_swap_limit_known": True,
+            },
+        )
+
+    def test_live_cgroup_resources_keep_cpu_and_memory_when_swap_is_unavailable(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = Path(raw_root)
+            scope = root / "test.scope"
+            scope.mkdir()
+            (scope / "cpu.max").write_text("max 100000\n", encoding="utf-8")
+            (scope / "memory.max").write_text("max\n", encoding="utf-8")
+            (scope / "memory.low").write_text("67108864\n", encoding="utf-8")
+
+            resources = resource_guard_status.read_live_cgroup_resources(
+                "/test.scope",
+                cgroup_root=root,
+            )
+
+        self.assertEqual(
+            resources,
+            {
+                "nano_cpus": 0,
+                "mem_limit_bytes": 0,
+                "mem_reservation_bytes": 67108864,
+                "mem_swap_limit_bytes": None,
+                "mem_swap_limit_known": False,
             },
         )
 

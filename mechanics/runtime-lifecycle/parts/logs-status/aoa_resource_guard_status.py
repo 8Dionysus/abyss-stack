@@ -170,7 +170,7 @@ def read_live_cgroup_resources(
     cgroup_path: str,
     *,
     cgroup_root: Path = CGROUP_ROOT,
-) -> dict[str, int] | None:
+) -> dict[str, int | bool | None] | None:
     if not cgroup_path:
         return None
 
@@ -187,13 +187,20 @@ def read_live_cgroup_resources(
         memory_limits = [
             parse_cgroup_max((group / "memory.max").read_text()) for group in groups
         ]
-        swap_limits = [
-            parse_cgroup_max((group / "memory.swap.max").read_text())
-            for group in groups
-        ]
         reservation = int((groups[-1] / "memory.low").read_text().strip())
     except (IndexError, OSError, ValueError):
         return None
+
+    swap_limits: list[int | None] = []
+    swap_limit_known = True
+    for group in groups:
+        try:
+            swap_limits.append(
+                parse_cgroup_max((group / "memory.swap.max").read_text())
+            )
+        except (IndexError, OSError, ValueError):
+            swap_limit_known = False
+            break
 
     finite_cpu = [value for value in cpu_limits if value is not None]
     finite_memory = [value for value in memory_limits if value is not None]
@@ -202,7 +209,10 @@ def read_live_cgroup_resources(
         "nano_cpus": min(finite_cpu) if finite_cpu else 0,
         "mem_limit_bytes": min(finite_memory) if finite_memory else 0,
         "mem_reservation_bytes": reservation,
-        "mem_swap_limit_bytes": min(finite_swap) if finite_swap else 0,
+        "mem_swap_limit_bytes": (min(finite_swap) if finite_swap else 0)
+        if swap_limit_known
+        else None,
+        "mem_swap_limit_known": swap_limit_known,
     }
 
 
@@ -250,6 +260,7 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
             "mem_reservation_bytes": int(host_config.get("MemoryReservation") or 0),
             "nano_cpus": int(host_config.get("NanoCpus") or 0),
             "mem_swap_limit_bytes": configured_memory_swap,
+            "mem_swap_limit_known": True,
         }
         cgroup_path = str(state.get("CgroupPath", ""))
         live_resources = (
