@@ -83,11 +83,21 @@ The route avoids unsupported or weakly proven moves:
   service.
 - An active rerank request may transiently use more than `4 GiB`; admission must
   account for that cold-load demand instead of relying on a kill boundary.
-- Helper tools, n8n, and dashboards remain opt-in and can be capped by explicit
-  thin-host overlays.
+- Helper tools, n8n, and dashboards remain opt-in; thin-host overlays preserve
+  owner-native budgets and soft reservations without hard cgroup ceilings.
 - There are now more explicit profiles and overlays to validate.
 - The reranker wrapper remains a bridge until a better OVMS-compatible artifact
   or another reviewed serving route replaces it.
+
+## 2026-07 Resource Posture Amendment
+
+Live cgroup evidence showed that broad thin-host CPU quotas throttled useful
+services while cores were available, and a collector repeatedly reached its
+private memory ceiling without a host OOM. Persistent selected services now
+follow the same owner rule already accepted for reranking and OVMS: keep
+service-native budgets, soft reclaim reservations, health, and reversible
+lifecycle controls, but clear hard CPU and memory ceilings. Static ceilings
+remain valid only for an explicit measured lab or disposable workload.
 
 ## Source surfaces
 

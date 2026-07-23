@@ -4,8 +4,8 @@ services:
     platform: linux/amd64
     container_name: llama-cpp
     restart: unless-stopped
-    cpus: "${AOA_LLAMACPP_CPUS:-4.0}"
-    mem_limit: "${AOA_LLAMACPP_MEM_LIMIT:-12g}"
+    cpus: "${AOA_LLAMACPP_CPUS:-0}"
+    mem_limit: "${AOA_LLAMACPP_MEM_LIMIT:-0}"
     mem_reservation: "${AOA_LLAMACPP_MEM_RESERVATION:-8g}"
     environment:
       LLAMA_ARG_MODEL: /models/qwen3.5-9b.gguf

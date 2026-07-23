@@ -60,6 +60,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Changed
 
+- Thin-host service overlays now preserve service-native budgets and soft
+  reclaim reservations while clearing hard cgroup CPU and memory ceilings from
+  persistent owner services; explicit measured lab and disposable workloads
+  remain the only routes for static ceilings.
 - The Gemma 4 E2B `llama.cpp` lane now keeps its 4 GiB soft reclaim
   reservation but leaves residency release to native idle sleep instead of an
   8 GiB hard memory ceiling.

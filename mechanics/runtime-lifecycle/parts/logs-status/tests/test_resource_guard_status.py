@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -121,6 +122,49 @@ volumes:
                 },
             ),
             "staged_not_applied",
+        )
+
+    def test_live_cgroup_resources_use_effective_parent_and_child_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = Path(raw_root)
+            scope = root / "test.scope"
+            child = scope / "container"
+            child.mkdir(parents=True)
+            (scope / "cpu.max").write_text("max 100000\n", encoding="utf-8")
+            (scope / "memory.max").write_text("max\n", encoding="utf-8")
+            (scope / "memory.swap.max").write_text("max\n", encoding="utf-8")
+            (scope / "memory.low").write_text("0\n", encoding="utf-8")
+            (child / "cpu.max").write_text("50000 100000\n", encoding="utf-8")
+            (child / "memory.max").write_text("268435456\n", encoding="utf-8")
+            (child / "memory.swap.max").write_text("134217728\n", encoding="utf-8")
+            (child / "memory.low").write_text("67108864\n", encoding="utf-8")
+
+            resources = resource_guard_status.read_live_cgroup_resources(
+                "/test.scope",
+                cgroup_root=root,
+            )
+
+        self.assertEqual(
+            resources,
+            {
+                "nano_cpus": 500000000,
+                "mem_limit_bytes": 268435456,
+                "mem_reservation_bytes": 67108864,
+                "mem_swap_limit_bytes": 134217728,
+            },
+        )
+
+    def test_classify_guard_fails_closed_when_live_resources_are_unknown(self) -> None:
+        self.assertEqual(
+            resource_guard_status.classify_guard(
+                {"cpus": "0", "mem_limit": "0"},
+                {
+                    "resource_state_known": False,
+                    "mem_limit_bytes": 0,
+                    "nano_cpus": 0,
+                },
+            ),
+            "live_resource_unknown",
         )
 
     def test_summary_exposes_flat_counts_for_gate_scripts(self) -> None:

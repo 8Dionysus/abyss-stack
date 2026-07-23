@@ -1,12 +1,12 @@
-# Candidate low-cadence observability guard for a workstation host.
+# Candidate low-cadence elastic observability posture for a workstation host.
 # Use only with the `observability` profile or presets that include it.
 services:
   prometheus:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_PROMETHEUS_CPUS:-0.75}"
-    mem_limit: "${AOA_PROMETHEUS_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_PROMETHEUS_MEM_RESERVATION:-192m}"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -21,8 +21,8 @@ services:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_CADVISOR_CPUS:-0.5}"
-    mem_limit: "${AOA_CADVISOR_MEM_LIMIT:-256m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_CADVISOR_MEM_RESERVATION:-64m}"
     command:
       - "--housekeeping_interval=${AOA_CADVISOR_HOUSEKEEPING_INTERVAL:-30s}"
@@ -36,16 +36,16 @@ services:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_ALERTMANAGER_CPUS:-0.25}"
-    mem_limit: "${AOA_ALERTMANAGER_MEM_LIMIT:-128m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_ALERTMANAGER_MEM_RESERVATION:-64m}"
 
   loki:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_LOKI_CPUS:-0.75}"
-    mem_limit: "${AOA_LOKI_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_LOKI_MEM_RESERVATION:-192m}"
     environment:
       AOA_LOKI_RETENTION_PERIOD: "${AOA_LOKI_RETENTION_PERIOD:-48h}"
@@ -56,24 +56,24 @@ services:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_TEMPO_CPUS:-0.5}"
-    mem_limit: "${AOA_TEMPO_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_TEMPO_MEM_RESERVATION:-128m}"
 
   alloy:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_ALLOY_CPUS:-0.5}"
-    mem_limit: "${AOA_ALLOY_MEM_LIMIT:-256m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_ALLOY_MEM_RESERVATION:-96m}"
 
   grafana:
     labels:
       aoa.tuning.overlay: "observability.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_GRAFANA_CPUS:-0.75}"
-    mem_limit: "${AOA_GRAFANA_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_GRAFANA_MEM_RESERVATION:-192m}"
     environment:
       GF_ANALYTICS_REPORTING_ENABLED: "false"

@@ -1,5 +1,10 @@
 # Service Optimization Research - 2026-05-16
 
+> **2026-07 correction:** live cgroup evidence rejected the broad container-cap
+> conclusion below for persistent owner services. Thin-host overlays now keep
+> service-native budgets and soft reclaim reservations but clear hard CPU and
+> memory ceilings. The original analysis remains here as dated history.
+
 This note records the current abyss-stack service selection and tuning posture
 for the Intel Core Ultra 9 285H workstation. It is an operator research packet,
 not a promotion of every selected service to always-resident status.

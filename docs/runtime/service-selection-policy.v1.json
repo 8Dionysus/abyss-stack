@@ -124,7 +124,7 @@
       "posture": "selected_now",
       "tier": "explicit_tools",
       "resource_guard": "compose/tuning/tools.thin-host.yml",
-      "decision": "keep bounded HTTP speech surface when tools are selected; host TTS remains protected warm route"
+      "decision": "keep owner-elastic HTTP speech surface when tools are selected; host TTS remains protected warm route"
     },
     {
       "name": "tts-router",
@@ -133,7 +133,7 @@
       "posture": "selected_now",
       "tier": "explicit_tools",
       "resource_guard": "compose/tuning/tools.thin-host.yml",
-      "decision": "keep bounded speech router when tools are selected"
+      "decision": "keep owner-elastic speech router when tools are selected"
     },
     {
       "name": "docs-api",
@@ -142,7 +142,7 @@
       "posture": "selected_now",
       "tier": "explicit_tools",
       "resource_guard": "compose/tuning/tools.thin-host.yml",
-      "decision": "keep bounded helper when tools are selected"
+      "decision": "keep owner-elastic helper when tools are selected"
     },
     {
       "name": "aoa-browser",
@@ -151,7 +151,7 @@
       "posture": "selected_now",
       "tier": "explicit_tools",
       "resource_guard": "compose/tuning/tools.thin-host.yml",
-      "decision": "keep bounded browser helper when tools are selected"
+      "decision": "keep owner-elastic browser helper when tools are selected"
     },
     {
       "name": "prometheus",
@@ -160,7 +160,7 @@
       "posture": "selected_now",
       "tier": "explicit_observability",
       "resource_guard": "compose/tuning/observability.thin-host.yml",
-      "decision": "keep for diagnostics with short retention and bounded query pressure"
+      "decision": "keep for diagnostics with short retention and service-native query concurrency"
     },
     {
       "name": "grafana",
@@ -169,7 +169,7 @@
       "posture": "selected_now",
       "tier": "explicit_observability",
       "resource_guard": "compose/tuning/observability.thin-host.yml",
-      "decision": "keep dashboard service bounded when observability is selected"
+      "decision": "keep owner-elastic dashboard service when observability is selected"
     },
     {
       "name": "alertmanager",
@@ -178,7 +178,7 @@
       "posture": "selected_now",
       "tier": "explicit_observability",
       "resource_guard": "compose/tuning/observability.thin-host.yml",
-      "decision": "keep bounded alert routing when observability is selected"
+      "decision": "keep owner-elastic alert routing when observability is selected"
     },
     {
       "name": "cadvisor",
@@ -187,7 +187,7 @@
       "posture": "selected_now",
       "tier": "explicit_observability",
       "resource_guard": "compose/tuning/observability.thin-host.yml",
-      "decision": "keep bounded container metrics with lower sampling cadence"
+      "decision": "keep owner-elastic container metrics with lower sampling cadence"
     },
     {
       "name": "loki",
@@ -205,7 +205,7 @@
       "posture": "selected_now",
       "tier": "explicit_observability",
       "resource_guard": "compose/tuning/observability.thin-host.yml",
-      "decision": "keep bounded trace backend for W3C trace-context, OTLP spans, and metric/log/span joins when observability is selected"
+      "decision": "keep owner-elastic trace backend for W3C trace-context, OTLP spans, and metric/log/span joins when observability is selected"
     },
     {
       "name": "alloy",

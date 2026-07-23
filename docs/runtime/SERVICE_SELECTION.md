@@ -139,17 +139,18 @@ optimization technique.
 ## Resource Guard Overlays
 
 Use tuning overlays when the selected service set is correct but the machine
-needs bounded CPU, memory, retention, or sampling posture:
+needs owner-native budgets, soft reclaim reservations, retention, or sampling
+posture:
 
 | Overlay | Use With | Purpose |
 |---|---|---|
-| `compose/tuning/storage.intel-285h.resource-guard.yml` | `substrate` or presets containing it | caps Postgres, Redis, Qdrant, and Neo4j without changing the storage base |
-| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | protects OVMS embeddings with a soft reservation and bounded CPU/threading while leaving its memory ceiling owner-managed; caps `langchain-api` without changing the worker lane |
-| `compose/tuning/federation.thin-host.yml` | `federation` | caps advisory `route-api` without changing federation surfaces |
-| `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards, PromQL, and LogQL available with shorter retention, lower cAdvisor cadence, and bounded Loki/Alloy resources |
-| `compose/tuning/tools.thin-host.yml` | `tools`, `agent-tools`, `intel-tools`, full presets | caps speech/browser helpers when selected |
-| `compose/tuning/workflows.thin-host.yml` | `workflows` | caps n8n and task runners while keeping workflows opt-in |
-| `compose/tuning/rag.thin-host.yml` | `rag` | caps `rag-api` and keeps RAG embedding batches conservative |
+| `compose/tuning/storage.intel-285h.resource-guard.yml` | `substrate` or presets containing it | keeps database-native budgets and soft reclaim reservations without private CPU or memory ceilings |
+| `compose/tuning/intel-worker.thin-host.yml` | `intel-worker` or presets containing it | keeps OVMS and `langchain-api` elastic while preserving soft reclaim protection and owner-native thread tuning |
+| `compose/tuning/federation.thin-host.yml` | `federation` | keeps advisory `route-api` soft-reserved without changing federation surfaces |
+| `compose/tuning/observability.thin-host.yml` | `observability`, `agent-observability`, `intel-observability`, full presets | keeps dashboards, PromQL, and LogQL available with shorter retention, lower cAdvisor cadence, and elastic collector services |
+| `compose/tuning/tools.thin-host.yml` | `tools`, `agent-tools`, `intel-tools`, full presets | keeps speech/browser helpers soft-reserved and owner-managed when selected |
+| `compose/tuning/workflows.thin-host.yml` | `workflows` | keeps n8n owner-native concurrency and V8 budgets while workflows remain opt-in |
+| `compose/tuning/rag.thin-host.yml` | `rag` | keeps `rag-api` elastic and RAG embedding batches conservative |
 
 Do not apply a helper overlay to a preset that does not select the matching
 services; use the profile-specific overlay with the profile that owns those
@@ -161,6 +162,13 @@ private swap allowance while physical memory remained available. The worker
 overlay therefore keeps `mem_reservation` as best-effort reclaim protection and
 uses OVMS health, config reload, embedding parity, and rollback as its lifecycle
 boundary instead of imposing `mem_limit`.
+
+The same owner rule applies to the persistent thin-host services. Their
+overlays intentionally render `cpus: "0"` and `mem_limit: "0"` to clear
+inherited cgroup ceilings while retaining soft reservations and service-native
+budgets. A static ceiling is valid only in a separate measured lab or an
+explicitly disposable workload, never as the normal orchestration mechanism
+for a selected owner service.
 
 Persist host-local overlay choices through `scripts/aoa-install-systemd` instead
 of editing the source unit skeleton or relying on a shell export. The live
