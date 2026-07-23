@@ -69,6 +69,7 @@
         "scripts/aoa-lib.sh",
         "scripts/aoa-llamacpp-pilot",
         "scripts/aoa-local-ai-trials",
+        "scripts/aoa-tos-foundation-lab",
         "scripts/aoa-logs",
         "scripts/aoa-long-horizon-pilot",
         "scripts/aoa-machine-bridge",

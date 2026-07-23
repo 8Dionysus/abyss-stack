@@ -1,0 +1,288 @@
+{
+  "schema_version": "tos_foundation_experiment_suite_v1",
+  "suite_id": "tree-of-sophia-foundation-laboratory-v1",
+  "suite_status": "frozen",
+  "owner_boundaries": {
+    "source_truth": "Tree-of-Sophia",
+    "runtime_truth": "abyss-stack",
+    "host_policy": "abyss-machine",
+    "manual_truth": "source-visible human review"
+  },
+  "artifact_roots": {
+    "durable": "/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab",
+    "cache": "/srv/abyss-machine/cache/ai/tree-of-sophia-foundation-lab",
+    "runtime": "/srv/abyss-machine/runtimes/tree-of-sophia-foundation-lab",
+    "temporary": "/srv/abyss-machine/tmp/tree-of-sophia-foundation-lab"
+  },
+  "machine_fit_ref": "Tree-of-Sophia:ToS/research-packets/foundation-laboratory-2026-07/MACHINE_FIT.md",
+  "experiments": [
+    {
+      "experiment_id": "tos-ocr-foundation-v1",
+      "family": "ocr",
+      "status": "frozen",
+      "research_question": "Which OCR route preserves exact German and Russian text, punctuation, reading order, and durable page anchors at the lowest combined machine and human-correction cost?",
+      "source_refs": [
+        "tos.item.friedrich-nietzsche.also-sprach-zarathustra.de-naumann-1893.internet-archive-image-container-pdf",
+        "tos.item.friedrich-nietzsche.also-sprach-zarathustra.ru-antonovsky-cultural-revolution-2007.operator-pdf",
+        "tos.item.friedrich-nietzsche.works-in-two-volumes-volume-2-mysl-1996.operator-pdf"
+      ],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/ocr-visual-samples.json",
+      "preconditions": [
+        "visual OCR projection frozen before variant output inspection",
+        "one shared 300 DPI Poppler render manifest and all PNG digests frozen before any variant output",
+        "embedded ABBYY and automatic EPUB OCR reference witnesses remain sealed until all independent outputs and digests are frozen",
+        "source payload fixity and rights posture verified",
+        "formal CER, WER, correction-time, and quality-winner claims remain blocked until five double-checked human transcriptions per source exist; exploratory output is allowed"
+      ],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "heavy", "thermal_workload_kind": "ai", "estimated_output_bytes": 8589934592, "expected_download_bytes": 8589934592, "timeout_seconds": 14400, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "classical OCR baseline", "method": "Tesseract consumes the shared frozen PNG pages directly with language-specific deu or rus data; OCRmyPDF is retained only as a secondary searchable-PDF packaging route", "implementation": "Tesseract 5.5.2; OCRmyPDF 17.8.1 is an optional post-retention packaging route, not part of recognition A", "version_posture": "Fedora 44 tesseract 5.5.2-1.fc44 and tesseract-langpack-deu/rus 4.1.0-12.fc44 are frozen; RPM, traineddata, runner, and render digests are required at execution. PyPI OCRmyPDF 17.8.1 remains frozen but cannot block or alter the primary recognition run", "runtime": "host-managed isolated CPU command lane", "model": "Fedora tessdata_fast deu.traineddata and rus.traineddata from 4.1.0-12.fc44", "install_status": "requires-setup", "required_commands": ["tesseract"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://github.com/tesseract-ocr/tesseract/releases/tag/5.5.2", "human_input_required": false, "network_required": false, "expected_download_bytes": 536870912, "estimated_output_bytes": 2147483648, "expected_artifacts": ["shared page-image manifest", "hOCR and TSV", "plain diplomatic draft", "per-page timing", "OCR confidence", "runtime and traineddata digests"]},
+        {"label": "B", "comparison_role": "current trainable historical-document recognizer", "method": "Kraken baseline segmentation followed by the multilingual Party page-wise recognizer with language conditioning over the same frozen pages", "implementation": "Kraken 7.0.2 plus Party commit c2589b1b515ed690f883c6afaef6c01ce29bf72d", "version_posture": "Kraken PyPI wheel SHA-256 5882392e9e4ffdb69bf582483ce0d238017d0e8ad61b0ada38b97d2504e9bb21, Party commit c2589b1b515ed690f883c6afaef6c01ce29bf72d, Lightning 2.6.1 security pin, and model version DOI 10.5281/zenodo.20642057 are frozen; local model SHA-256 is required after admission", "runtime": "host-managed isolated Python 3.12 CPU lane", "model": "Pretrained multilingual Party base model v4, Zenodo 10.5281/zenodo.20642057, 518329816 bytes, source MD5 cf165e67061d492b72f600a6a72b7c61", "install_status": "requires-setup", "required_commands": ["kraken", "party"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://zenodo.org/records/20642057", "human_input_required": false, "network_required": false, "expected_download_bytes": 3221225472, "estimated_output_bytes": 3221225472, "expected_artifacts": ["page segmentation", "ALTO recognition output", "plain diplomatic draft", "model and package provenance", "per-page timing", "language-conditioning receipt"]},
+        {"label": "C", "comparison_role": "independent multilingual pipeline challenger", "method": "PaddleOCR 3.7.0 general OCR consumes the shared frozen pages through the CPU paddle_static engine with MKLDNN disabled, batch size 1, four threads, explicit text_det_limit_side_len=960 and text_det_limit_type=max, shared PP-OCRv5_server_det, and language-specific latin_PP-OCRv5_mobile_rec for German or eslav_PP-OCRv5_mobile_rec for Russian; orientation classification and document unwarping remain disabled", "implementation": "PaddleOCR 3.7.0 plus PaddleX 3.7.2 and PaddlePaddle CPU 3.3.1", "version_posture": "PyPI paddleocr 3.7.0 wheel SHA-256 c0f0a81ad4112727f30c6fcf986ac0ef6a120d31ee0991a01fae0357ee32d338, PaddleX 3.7.2 wheel SHA-256 f1678bf650bbaccfd8f0d4e49d0ae631b4685c829fdae6e802ccd90d4fcb9a7f, paddlepaddle 3.3.1 cp312 wheel SHA-256 9016fc497213e1101261684321fbb31ef5960019ef39cb07ded27bc70e2a9858, PP-OCRv5_server_det archive SHA-256 22a33e0ba6a21425ea4192da03bf4395c9a0c67902bd924b7328fc859073045d, latin_PP-OCRv5_mobile_rec archive SHA-256 b23105a6a1ea38e32a97c5a0ddc7e8a9bbf541d8e47421e2c99e9ccabe29509c, and eslav_PP-OCRv5_mobile_rec archive SHA-256 b9f70da0ca2bbc4d4cb7ba406a2d023061178437d6a930f07c8ca18c6c591839 are frozen; the exact wheel closure, extracted model inventories, runner, bridge, render digests, and explicit 960/max detector-resize request are required after one-candidate admission", "runtime": "host-managed isolated Python 3.12 CPU lane using paddle_static with MKLDNN disabled", "model": "PP-OCRv5_server_det plus latin_PP-OCRv5_mobile_rec and eslav_PP-OCRv5_mobile_rec; PP-OCRv6 is excluded from the main comparison because its 3.7.0 release does not cover Russian", "install_status": "requires-setup", "required_commands": ["python", "paddleocr"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://github.com/PaddlePaddle/PaddleOCR/releases/tag/v3.7.0", "human_input_required": false, "network_required": false, "expected_download_bytes": 3221225472, "estimated_output_bytes": 4294967296, "expected_artifacts": ["detected text polygons", "recognized text and confidence", "plain diplomatic draft", "model and package provenance", "per-page timing"]}
+      ],
+      "metrics": [
+        {"metric_id": "cer", "dimension": "quality", "method": "character edit distance against double-checked diplomatic gold", "unit": "ratio"},
+        {"metric_id": "reading-order-error", "dimension": "quality", "method": "manual ordered-block comparison", "unit": "errors_per_page"},
+        {"metric_id": "pages-per-minute", "dimension": "speed", "method": "measured wall time excluding setup", "unit": "pages_per_minute"},
+        {"metric_id": "peak-rss", "dimension": "machine-cost", "method": "peak resident memory sampling", "unit": "bytes"},
+        {"metric_id": "correction-time", "dimension": "human-cost", "method": "reviewer correction timer", "unit": "minutes_per_page"},
+        {"metric_id": "anchor-survival", "dimension": "traceability", "method": "manual source-region resolution check", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 6, "hard_sample_count": 6, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "after-independent-drafts-frozen",
+      "stop_conditions": ["source digest mismatch", "storage or temperature gate denies execution", "variant emits restricted content outside local artifact root", "systematic page omission detected"],
+      "promotion_conditions": ["all gold and hard samples manually reviewed", "CER recomputed manually on at least one sample", "no silent omissions", "human correction cost recorded", "exact model and runtime revisions retained"]
+    },
+    {
+      "experiment_id": "tos-structure-recovery-v1",
+      "family": "structure",
+      "status": "frozen",
+      "research_question": "Which extraction route best recovers headings, sections, page boundaries, reading order, tables of contents, and stable anchors across vector PDF, ABBYY PDF, and OCR-derived EPUB?",
+      "source_refs": [
+        "tos.item.friedrich-nietzsche.also-sprach-zarathustra.de-naumann-1893.internet-archive-cornell-auto-epub",
+        "tos.item.friedrich-nietzsche.also-sprach-zarathustra.ru-antonovsky-cultural-revolution-2007.operator-pdf",
+        "tos.item.friedrich-nietzsche.works-in-two-volumes-volume-2-mysl-1996.operator-pdf"
+      ],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/sample-plan.json",
+      "preconditions": ["source containers pass fixity", "manual structural outline exists for sampled units", "native text absence or presence recorded independently"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "indexing", "estimated_output_bytes": 4294967296, "expected_download_bytes": 6442450944, "timeout_seconds": 10800, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "native deterministic baseline", "method": "Poppler PDF extraction plus EPUB ZIP/XHTML parsing with explicit page/container anchors", "implementation": "poppler-utils plus Python standard library/lxml", "version_posture": "host package versions captured", "runtime": "native commands", "model": null, "install_status": "available", "required_commands": ["pdftotext", "pdfinfo", "python"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://poppler.freedesktop.org/", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 1073741824, "expected_artifacts": ["container inventory", "native text", "structural tree", "anchor map", "warnings"]},
+        {"label": "B", "comparison_role": "document pipeline baseline", "method": "Docling PDF/EPUB conversion with layout and reading-order output", "implementation": "Docling", "version_posture": "exact package and model revisions frozen", "runtime": "isolated Python runtime", "model": "Docling layout/OCR components", "install_status": "requires-setup", "required_commands": ["docling"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://github.com/docling-project/docling", "human_input_required": false, "network_required": false, "expected_download_bytes": 4294967296, "estimated_output_bytes": 2147483648, "expected_artifacts": ["Docling document JSON", "Markdown", "layout blocks", "anchor map", "timing"]},
+        {"label": "C", "comparison_role": "vision document parser challenger", "method": "PaddleOCR structure/VL pipeline over rendered pages", "implementation": "PaddleOCR 3.x document parsing", "version_posture": "exact model and pipeline digests frozen", "runtime": "isolated accelerator-aware runtime", "model": "current PP-Structure or document VLM", "install_status": "requires-setup", "required_commands": ["paddleocr"], "required_services": [], "required_devices": ["CPU", "GPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://github.com/PaddlePaddle/PaddleOCR", "human_input_required": false, "network_required": false, "expected_download_bytes": 6442450944, "estimated_output_bytes": 4294967296, "expected_artifacts": ["document blocks", "reading order", "render coordinates", "anchor map", "timing"]}
+      ],
+      "metrics": [
+        {"metric_id": "structural-f1", "dimension": "quality", "method": "manual element and boundary match", "unit": "f1"},
+        {"metric_id": "reading-order-error", "dimension": "quality", "method": "manual sequence edit comparison", "unit": "errors_per_unit"},
+        {"metric_id": "units-per-minute", "dimension": "speed", "method": "measured end-to-end wall time", "unit": "units_per_minute"},
+        {"metric_id": "artifact-bytes", "dimension": "machine-cost", "method": "sum of generated artifact sizes", "unit": "bytes"},
+        {"metric_id": "repair-minutes", "dimension": "human-cost", "method": "manual structural repair timer", "unit": "minutes_per_unit"},
+        {"metric_id": "anchor-resolution", "dimension": "traceability", "method": "resolve derived node to source page/region", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 6, "hard_sample_count": 6, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["source digest mismatch", "page or section loss", "anchor map cannot resolve to source", "resource gate denial"],
+      "promotion_conditions": ["manual outline comparison complete", "page and section boundaries survive", "failure cases retained", "correction time lower than or justified against native baseline"]
+    },
+    {
+      "experiment_id": "tos-alignment-foundation-v1",
+      "family": "alignment",
+      "status": "frozen",
+      "research_question": "Which alignment route produces reviewable German-Russian sentence and phrase links without hiding edition differences, omissions, or uncertain many-to-many correspondences?",
+      "source_refs": ["tos.expression.friedrich-nietzsche.also-sprach-zarathustra.de-naumann-1893", "tos.expression.friedrich-nietzsche.also-sprach-zarathustra.ru-antonovsky-cultural-revolution"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/translation-samples.json",
+      "preconditions": ["both source texts independently fixed and anchored", "edition mismatches marked", "manual alignment gold exists for hard fragments"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "ai", "estimated_output_bytes": 1073741824, "expected_download_bytes": 2147483648, "timeout_seconds": 7200, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "manual alignment gold", "method": "human sentence and phrase alignment with explicit null and many-to-many links", "implementation": "ToS manual alignment packet", "version_posture": "reviewer and packet version recorded", "runtime": null, "model": null, "install_status": "human-input", "required_commands": [], "required_services": [], "required_devices": ["none"], "license_status": "not-applicable", "license_ref": null, "human_input_required": true, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 10485760, "expected_artifacts": ["manual sentence links", "phrase links", "uncertainty notes", "review receipt"]},
+        {"label": "B", "comparison_role": "embedding alignment baseline", "method": "Vecalign-style multilingual sentence alignment", "implementation": "Vecalign or maintained equivalent", "version_posture": "exact source revision and embedding model required", "runtime": "isolated Python runtime", "model": "multilingual sentence embedding candidate", "install_status": "requires-setup", "required_commands": ["python"], "required_services": [], "required_devices": ["CPU"], "license_status": "pending-review", "license_ref": "https://github.com/thompsonb/vecalign", "human_input_required": false, "network_required": false, "expected_download_bytes": 2147483648, "estimated_output_bytes": 536870912, "expected_artifacts": ["candidate sentence links", "scores", "null links", "timing", "model provenance"]},
+        {"label": "C", "comparison_role": "LLM-assisted many-to-many challenger", "method": "local LLM proposes sentence and phrase links with abstention and evidence spans", "implementation": "existing abyss-stack local text lane", "version_posture": "endpoint model alias and container digest captured", "runtime": "llama.cpp or OpenVINO local service", "model": "resident Gemma/Qwen selected by frozen run card", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["candidate links", "evidence spans", "abstentions", "prompt receipt", "timing"]}
+      ],
+      "metrics": [
+        {"metric_id": "alignment-f1", "dimension": "quality", "method": "link match against manually reviewed gold", "unit": "f1"},
+        {"metric_id": "catastrophic-link-rate", "dimension": "quality", "method": "manual wrong-passage link count", "unit": "ratio"},
+        {"metric_id": "fragments-per-minute", "dimension": "speed", "method": "wall time per aligned fragment", "unit": "fragments_per_minute"},
+        {"metric_id": "peak-rss", "dimension": "machine-cost", "method": "peak resident memory", "unit": "bytes"},
+        {"metric_id": "correction-minutes", "dimension": "human-cost", "method": "manual link correction timer", "unit": "minutes_per_fragment"},
+        {"metric_id": "anchored-link-rate", "dimension": "traceability", "method": "links with resolvable anchors on both sides", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["unanchored output", "systematic one-to-one forcing", "edition mismatch treated as translation omission", "resource gate denial"],
+      "promotion_conditions": ["null and many-to-many links preserved", "hard fragments reviewed", "correction cost recorded", "no hidden normalization of source text"]
+    },
+    {
+      "experiment_id": "tos-translation-foundation-v1",
+      "family": "translation",
+      "status": "frozen",
+      "research_question": "How do real human-only, blind local AI-only, and staged AI-plus-human translation lanes differ in semantic fidelity, ambiguity, etymological discipline, rhythm, and correction cost before and after a recognized witness is revealed?",
+      "source_refs": ["tos.expression.friedrich-nietzsche.also-sprach-zarathustra.de-naumann-1893", "tos.expression.friedrich-nietzsche.also-sprach-zarathustra.ru-antonovsky-cultural-revolution"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/translation-samples.json",
+      "preconditions": ["at least thirty stratified German fragments frozen", "German transcription and anchors manually accepted", "recognized Russian translation sealed", "dictionary and etymology source list rights-checked"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "heavy", "thermal_workload_kind": "ai", "estimated_output_bytes": 1073741824, "expected_download_bytes": 0, "timeout_seconds": 14400, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "human-only independent translation", "method": "real human translation from German with dictionaries but no AI and no revealed recognized translation", "implementation": "human translation packet", "version_posture": "translator identity and frozen draft version recorded", "runtime": null, "model": null, "install_status": "human-input", "required_commands": [], "required_services": [], "required_devices": ["none"], "license_status": "not-applicable", "license_ref": null, "human_input_required": true, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 10485760, "expected_artifacts": ["human draft", "lexical notes", "alternatives", "spoken-rhythm notes", "review receipt"]},
+        {"label": "B", "comparison_role": "blind AI-only translation", "method": "local model translates from source packet without recognized translation and cites no etymology unless external evidence is supplied", "implementation": "resident abyss-stack Gemma/Qwen lane", "version_posture": "model file/container digest, prompt, seed, and decoding frozen", "runtime": "llama.cpp Vulkan or OpenVINO local service", "model": "resident Gemma/Qwen selected by run card", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["AI draft", "alternatives", "prompt and response receipt", "abstentions", "timing"]},
+        {"label": "C", "comparison_role": "staged AI-plus-human translation", "method": "human reviews AI alternatives before reference reveal, then records every accepted or rejected post-reveal change", "implementation": "ToS mixed translation packet using resident local model", "version_posture": "human and model contributions separately versioned", "runtime": "local model plus human review interface", "model": "same frozen model family as B unless comparison card says otherwise", "install_status": "human-input", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": true, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["pre-reveal mixed draft", "post-reveal changes", "rejected variants", "rationale", "review receipt"]}
+      ],
+      "metrics": [
+        {"metric_id": "semantic-fidelity", "dimension": "quality", "method": "blind human rubric over meaning, ambiguity, metaphor, syntax, and omissions", "unit": "ordinal_score"},
+        {"metric_id": "term-consistency", "dimension": "quality", "method": "manual repeated-form correspondence audit", "unit": "ratio"},
+        {"metric_id": "fragments-per-minute", "dimension": "speed", "method": "generation or drafting wall time", "unit": "fragments_per_minute"},
+        {"metric_id": "runtime-seconds", "dimension": "machine-cost", "method": "measured model runtime", "unit": "seconds"},
+        {"metric_id": "human-minutes", "dimension": "human-cost", "method": "drafting, correction, and rationale timer", "unit": "minutes_per_fragment"},
+        {"metric_id": "explained-decisions", "dimension": "traceability", "method": "material choices with source/lexical rationale", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "after-independent-drafts-frozen",
+      "stop_conditions": ["recognized translation leaks before independent freeze", "human-only lane contains generated text", "invented etymology presented as evidence", "source ambiguity silently removed", "resource gate denial"],
+      "promotion_conditions": ["real human contribution exists where claimed", "post-reveal influence recorded", "alternatives and rejected choices preserved", "etymology claims cite reviewed sources", "spoken-rhythm and repeated-sign behavior reviewed"]
+    },
+    {
+      "experiment_id": "tos-semantic-annotation-v1",
+      "family": "semantic-annotation",
+      "status": "frozen",
+      "research_question": "Does model assistance improve annotation speed without increasing automation bias, unsupported sign promotion, concept flattening, or loss of competing readings?",
+      "source_refs": ["tos.work.friedrich-nietzsche.also-sprach-zarathustra"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/semantic-samples.json",
+      "preconditions": ["Tree semantic-samples plan status is ready with 30/30 accepted source units and 15/15 double-checked human gold units", "exactly 20 content-bearing tasks are frozen before outputs: 10 random and 10 hard", "annotation ladder and sign schema frozen", "source occurrences anchored", "candidate labels hidden from assisted lanes where needed", "review rubric frozen"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "indexing", "estimated_output_bytes": 1073741824, "expected_download_bytes": 2147483648, "timeout_seconds": 10800, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "native manual ToS baseline", "method": "manual source-near occurrence, lemma, sign-candidate, and claim packets", "implementation": "Tree of Sophia contracts", "version_posture": "contract and reviewer versions recorded", "runtime": null, "model": null, "install_status": "human-input", "required_commands": [], "required_services": [], "required_devices": ["none"], "license_status": "not-applicable", "license_ref": null, "human_input_required": true, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 10485760, "expected_artifacts": ["manual annotations", "accepted and rejected sign candidates", "counterreadings", "review receipts"]},
+        {"label": "B", "comparison_role": "annotation UI without recommender", "method": "INCEpTION or CATMA annotation with no model suggestion", "implementation": "one frozen annotation platform", "version_posture": "exact application version and project export captured", "runtime": "isolated local application", "model": null, "install_status": "requires-setup", "required_commands": ["java"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://inception-project.github.io/", "human_input_required": true, "network_required": false, "expected_download_bytes": 2147483648, "estimated_output_bytes": 536870912, "expected_artifacts": ["annotation project export", "manual annotations", "timing", "review receipts"]},
+        {"label": "C", "comparison_role": "same UI with local LLM recommender", "method": "same annotation UI plus local recommender suggestions that can be accepted, rejected, or ignored", "implementation": "frozen annotation platform plus resident local model", "version_posture": "UI, recommender, prompt, and model digests captured", "runtime": "local annotation application and local model service", "model": "resident Gemma/Qwen", "install_status": "requires-setup", "required_commands": ["java", "curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "https://inception-project.github.io/", "human_input_required": true, "network_required": false, "expected_download_bytes": 2147483648, "estimated_output_bytes": 536870912, "expected_artifacts": ["suggestions", "accept/reject log", "final annotations", "timing", "review receipts"]}
+      ],
+      "metrics": [
+        {"metric_id": "annotation-agreement", "dimension": "quality", "method": "human agreement with adjudicated gold and disagreement preservation", "unit": "f1_and_disagreement_count"},
+        {"metric_id": "unsupported-promotion-rate", "dimension": "quality", "method": "manual count of signs or claims lacking evidence", "unit": "ratio"},
+        {"metric_id": "annotations-per-minute", "dimension": "speed", "method": "active annotation time", "unit": "annotations_per_minute"},
+        {"metric_id": "runtime-seconds", "dimension": "machine-cost", "method": "service and model runtime", "unit": "seconds"},
+        {"metric_id": "adjudication-minutes", "dimension": "human-cost", "method": "annotation plus adjudication timer", "unit": "minutes_per_sample"},
+        {"metric_id": "anchored-claim-rate", "dimension": "traceability", "method": "claims resolving to exact occurrences", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["suggestions cannot be distinguished from accepted annotations", "source anchors are lost", "competing reading is overwritten", "resource gate denial"],
+      "promotion_conditions": ["accept/reject history preserved", "manual adjudication complete", "bias and correction time reported", "no automatic sign promotion"]
+    },
+    {
+      "experiment_id": "tos-retrieval-foundation-v1",
+      "family": "retrieval",
+      "status": "frozen",
+      "research_question": "Which explainable lexical, resident multilingual semantic, or independent challenger route retrieves exact, paraphrased, cross-lingual, noisy, and hard-negative philosophical passages with the best traceability and correction cost?",
+      "source_refs": ["tos.work.friedrich-nietzsche.also-sprach-zarathustra", "tos.collection.friedrich-nietzsche.works-in-two-volumes-volume-2-mysl-1996"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/retrieval-queries.json",
+      "preconditions": ["query set and hard negatives frozen", "indexed text resolves to source anchors", "source and translation language recorded", "relevance judgments not derived from system scores"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "indexing", "estimated_output_bytes": 2147483648, "expected_download_bytes": 0, "timeout_seconds": 10800, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "explainable lexical baseline", "method": "SQLite FTS5 over exact, normalized, lemma, phrase, section, page, language, edition, translation, and sign-candidate fields", "implementation": "SQLite FTS5", "version_posture": "SQLite version and index builder revision captured", "runtime": "native command", "model": null, "install_status": "available", "required_commands": ["sqlite3"], "required_services": [], "required_devices": ["CPU"], "license_status": "not-applicable", "license_ref": "https://sqlite.org/fts5.html", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["rebuildable FTS index", "query results", "query plan", "timing", "source anchors"]},
+        {"label": "B", "comparison_role": "resident semantic and rerank route", "method": "Qwen3 embedding through OVMS, Qdrant retrieval, and resident Qwen reranker", "implementation": "abyss-stack rag-api/OVMS/Qdrant/rerank-api", "version_posture": "container, model, collection, and configuration revisions captured", "runtime": "resident OpenVINO services", "model": "Qwen3-Embedding-0.6B-int8 plus Qwen3-Reranker-0.6B", "install_status": "available", "required_commands": ["curl"], "required_services": ["ovms", "qdrant", "rag-api", "rerank-api"], "required_devices": ["GPU"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-reranker-0.6b-openvino.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 1073741824, "expected_artifacts": ["isolated collection manifest", "embeddings receipt", "ranked results", "rerank scores", "timing", "source anchors"]},
+        {"label": "C", "comparison_role": "independent multilingual text challenger", "method": "Granite Embedding 311M Multilingual R2 official INT8 OpenVINO export with shared query/passage encoding, CLS pooling, L2 normalization, and cosine ranking", "implementation": "isolated OpenVINO CPU lane with a local vector projection", "version_posture": "model repository revision 44399559930365213510b1ee2eb15ded83374f0e was frozen before installation or output; local file and runner digests required", "runtime": "host-managed isolated OpenVINO/tokenizer runtime", "model": "ibm-granite/granite-embedding-311m-multilingual-r2", "install_status": "available", "required_commands": ["python"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "Tree-of-Sophia:ToS/research-packets/foundation-laboratory-2026-07/RETRIEVAL_C_ADMISSION.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 1073741824, "expected_artifacts": ["model manifest", "isolated vector index", "ranked results", "timing", "source anchors"]}
+      ],
+      "metrics": [
+        {"metric_id": "ndcg-at-10", "dimension": "quality", "method": "manual graded relevance judgments", "unit": "score"},
+        {"metric_id": "hard-negative-error-rate", "dimension": "quality", "method": "manual false-positive count over frozen near misses", "unit": "ratio"},
+        {"metric_id": "query-latency", "dimension": "speed", "method": "warm and cold query timing", "unit": "milliseconds"},
+        {"metric_id": "index-bytes", "dimension": "machine-cost", "method": "isolated index size", "unit": "bytes"},
+        {"metric_id": "judgment-minutes", "dimension": "human-cost", "method": "relevance adjudication timer", "unit": "minutes_per_query"},
+        {"metric_id": "anchor-resolution", "dimension": "traceability", "method": "result-to-source anchor resolution", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["index becomes sole text authority", "result cannot resolve to source", "restricted text leaves localhost", "resource gate denial"],
+      "promotion_conditions": ["frozen query set fully judged", "hard negatives inspected", "metrics manually recomputed for at least one query", "index rebuild and deletion paths proven"]
+    },
+    {
+      "experiment_id": "tos-graph-projection-v1",
+      "family": "graph",
+      "status": "frozen",
+      "research_question": "Which canonical-record, Neo4j, or RDF/Oxigraph projection best preserves typed bibliographic, textual, provenance, and interpretive claim layers, including competing claims and source-traceable edges?",
+      "source_refs": ["tos.work.friedrich-nietzsche.also-sprach-zarathustra"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/graph-claims.jsonl",
+      "preconditions": ["canonical claims and evidence anchors frozen", "graph layers and allowed relation types declared", "no projection-only identity", "competing claims retained"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "indexing", "estimated_output_bytes": 2147483648, "expected_download_bytes": 1073741824, "timeout_seconds": 7200, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "canonical claim-record baseline", "method": "typed JSON/JSONL claims queried without graph database", "implementation": "Tree of Sophia canonical claim records", "version_posture": "contract and claim digests captured", "runtime": "native Python/jq", "model": null, "install_status": "available", "required_commands": ["jq", "python"], "required_services": [], "required_devices": ["CPU"], "license_status": "not-applicable", "license_ref": null, "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 104857600, "expected_artifacts": ["canonical records", "query results", "edge trace report", "timing"]},
+        {"label": "B", "comparison_role": "property-graph projection", "method": "Neo4j projection with claim nodes and evidence-preserving relationships", "implementation": "resident abyss-stack Neo4j isolated database or labels", "version_posture": "server image digest and import revision captured", "runtime": "Neo4j", "model": null, "install_status": "available", "required_commands": ["curl"], "required_services": ["abyss_neo4j_1"], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://neo4j.com/licensing/", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 1073741824, "expected_artifacts": ["import manifest", "Cypher queries", "query results", "edge trace report", "timing"]},
+        {"label": "C", "comparison_role": "RDF provenance projection", "method": "RDF projection with explicit claim resources, one named graph per claim, and claim provenance", "implementation": "PyOxigraph 0.5.9 disk Store", "version_posture": "PyOxigraph 0.5.9 runtime manifest, wheel digest, source revision, runner digest, bridge digest, mapping digest, and canonical N-Quads digest captured", "runtime": "/srv/abyss-machine/runtimes/tree-of-sophia-foundation-lab/pyoxigraph-0.5.9", "model": null, "install_status": "available", "required_commands": ["python"], "required_services": [], "required_devices": ["CPU"], "license_status": "verified-for-bounded-research", "license_ref": "https://github.com/oxigraph/oxigraph", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 1073741824, "expected_artifacts": ["canonical N-Quads datasets", "SPARQL query catalog", "query results", "edge trace report", "store lifecycle receipt", "runtime receipt", "timing"]}
+      ],
+      "metrics": [
+        {"metric_id": "query-answer-correctness", "dimension": "quality", "method": "manual answer comparison over frozen graph questions", "unit": "ratio"},
+        {"metric_id": "competing-claim-survival", "dimension": "quality", "method": "manual preservation check", "unit": "ratio"},
+        {"metric_id": "query-latency", "dimension": "speed", "method": "warm and cold query timing", "unit": "milliseconds"},
+        {"metric_id": "store-bytes", "dimension": "machine-cost", "method": "isolated store size", "unit": "bytes"},
+        {"metric_id": "trace-review-minutes", "dimension": "human-cost", "method": "time to audit sampled edges", "unit": "minutes_per_edge"},
+        {"metric_id": "traceable-edge-rate", "dimension": "traceability", "method": "edge resolves to claim, maker, time, method, anchors, and review", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["projection invents identity or edge", "interpretive and bibliographic layers collapse", "edge loses claim/evidence path", "resource gate denial"],
+      "promotion_conditions": ["all frozen graph questions answered and reviewed", "competing claims survive", "projection rebuild is deterministic", "every sampled edge traces to source evidence"]
+    },
+    {
+      "experiment_id": "tos-llm-assistance-v1",
+      "family": "llm-assistance",
+      "status": "frozen",
+      "research_question": "Which resident small/workhorse model or one admitted current challenger best proposes source-grounded structure, alignment, translation alternatives, and sign candidates while abstaining instead of inventing evidence?",
+      "source_refs": ["tos.work.friedrich-nietzsche.also-sprach-zarathustra"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/llm-tasks.json",
+      "preconditions": ["Tree llm-tasks plan status is ready with 30/30 accepted source units and 15/15 double-checked human gold units", "exactly 20 content-bearing tasks are frozen before outputs: 10 random and 10 hard", "task prompts and expected evidence format frozen", "source snippets rights-cleared for local processing", "model outputs cannot write ToS source or canon", "manual rubric frozen"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "heavy", "thermal_workload_kind": "ai", "estimated_output_bytes": 1073741824, "expected_download_bytes": 6442450944, "timeout_seconds": 10800, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "resident smallest model", "method": "Gemma4 E2B local llama.cpp lane", "implementation": "abyss-stack llama-cpp", "version_posture": "container digest, GGUF checksum, prompt, and decoding captured", "runtime": "llama.cpp Vulkan", "model": "gemma4-e2b-it GGUF", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/gemma4-e2b-gguf-llamacpp.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["prompt packets", "raw responses", "structured candidates", "timing", "abstentions"]},
+        {"label": "B", "comparison_role": "resident workhorse comparison", "method": "existing OpenVINO Qwen 4B or 8B lane selected by current machine-fit", "implementation": "abyss-stack OVMS text lab", "version_posture": "container and OpenVINO model digests captured", "runtime": "OVMS/OpenVINO GPU or CPU", "model": "Qwen3 4B/8B INT4 OpenVINO", "install_status": "available", "required_commands": ["curl"], "required_services": ["ovms"], "required_devices": ["GPU"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/model-cards/qwen3-openvino-family.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 536870912, "expected_artifacts": ["prompt packets", "raw responses", "structured candidates", "timing", "abstentions"]},
+        {"label": "C", "comparison_role": "one current 4B-class challenger", "method": "one freshest machine-fit challenger admitted only after license, size, storage, and retention review", "implementation": "llama.cpp Vulkan, OpenVINO, or SYCL according to candidate card", "version_posture": "exact source, quantization, digest, runtime, and configuration frozen", "runtime": "isolated candidate lane", "model": "candidate selected from current research matrix", "install_status": "requires-setup", "required_commands": ["curl"], "required_services": [], "required_devices": ["CPU", "GPU"], "license_status": "pending-review", "license_ref": "Tree-of-Sophia:ToS/research-packets/foundation-laboratory-2026-07/DECISION_MATRIX.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 6442450944, "estimated_output_bytes": 536870912, "expected_artifacts": ["candidate card", "download checksum", "prompt packets", "raw responses", "timing", "retention decision"]}
+      ],
+      "metrics": [
+        {"metric_id": "source-grounded-accuracy", "dimension": "quality", "method": "manual claim and anchor verification", "unit": "ratio"},
+        {"metric_id": "hallucinated-link-rate", "dimension": "quality", "method": "manual unsupported relation count", "unit": "ratio"},
+        {"metric_id": "tokens-per-second", "dimension": "speed", "method": "runtime-reported or measured generation throughput", "unit": "tokens_per_second"},
+        {"metric_id": "peak-memory", "dimension": "machine-cost", "method": "process/container memory sampling", "unit": "bytes"},
+        {"metric_id": "correction-minutes", "dimension": "human-cost", "method": "manual correction and rejection timer", "unit": "minutes_per_task"},
+        {"metric_id": "evidence-completeness", "dimension": "traceability", "method": "candidate outputs with resolvable evidence anchors", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["model outputs written into ToS without review", "source or recognized translation sent off-host", "systematic fabricated anchors", "resource gate denial"],
+      "promotion_conditions": ["all tasks manually judged", "abstention behavior reported", "failure outputs retained", "challenger improves task value after correction cost, not only raw speed"]
+    },
+    {
+      "experiment_id": "tos-golden-kernel-transfer-v1",
+      "family": "golden-kernel-transfer",
+      "status": "frozen",
+      "research_question": "Do reviewed Zarathustra contracts and examples reduce annotation time and error on other Nietzsche texts without imposing Zarathustra-specific signs or interpretations where the evidence does not support them?",
+      "source_refs": ["tos.work.friedrich-nietzsche.also-sprach-zarathustra", "tos.collection.friedrich-nietzsche.works-in-two-volumes-volume-2-mysl-1996"],
+      "sample_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/transfer-samples.json",
+      "preconditions": ["transfer plan exists and its kernel evidence gate is satisfied", "at least 20 content-bearing transfer excerpts are frozen before results; title-page scouting units are ineligible", "all kernel examples used by C are human-accepted sign or translation packets", "Zarathustra-specific categories explicitly marked", "same target units, task, model revision, runtime, prompt shell, and decoding used across variants", "target manual gold and error rubric frozen and hidden until all variant outputs freeze"],
+      "rights_gate": {"source_rights_required": true, "network_allowed": false, "restricted_content_output": "local-only"},
+      "resource_gates": {"minimum_srv_free_bytes": 21474836480, "minimum_available_memory_bytes": 8589934592, "maximum_load_1m": 8, "thermal_owner": "abyss-machine", "thermal_workload_class": "medium", "thermal_workload_kind": "indexing", "estimated_output_bytes": 1073741824, "expected_download_bytes": 0, "timeout_seconds": 10800, "temperature_telemetry_required": true},
+      "variants": [
+        {"label": "A", "comparison_role": "no golden kernel", "method": "agent receives only task instructions and target excerpt", "implementation": "resident frozen local model lane", "version_posture": "same model, prompt shell, and decoding across variants", "runtime": "resident local model service", "model": "frozen winner or baseline from tos-llm-assistance-v1", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 268435456, "expected_artifacts": ["raw proposals", "anchors", "timing", "prompt receipt"]},
+        {"label": "B", "comparison_role": "contracts and format examples only", "method": "agent receives corpus/sign/claim contracts and neutral format examples but no Zarathustra semantic packets", "implementation": "resident frozen local model lane", "version_posture": "same model and decoding as A and C", "runtime": "resident local model service", "model": "same as A", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 268435456, "expected_artifacts": ["raw proposals", "anchors", "timing", "prompt receipt"]},
+        {"label": "C", "comparison_role": "reviewed Zarathustra golden-kernel examples", "method": "agent receives the same contracts plus reviewed Zarathustra sign, translation, and claim packets with explicit non-transfer warnings", "implementation": "resident frozen local model lane", "version_posture": "same model and decoding as A and B; context packet digest captured", "runtime": "resident local model service", "model": "same as A", "install_status": "available", "required_commands": ["curl"], "required_services": ["llama-cpp"], "required_devices": ["Vulkan"], "license_status": "verified-for-bounded-research", "license_ref": "mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md", "human_input_required": false, "network_required": false, "expected_download_bytes": 0, "estimated_output_bytes": 268435456, "expected_artifacts": ["raw proposals", "anchors", "timing", "prompt and context receipt", "category-transfer warnings"]}
+      ],
+      "metrics": [
+        {"metric_id": "annotation-accuracy", "dimension": "quality", "method": "manual comparison with target-text gold", "unit": "f1"},
+        {"metric_id": "zarathustra-overfit-rate", "dimension": "quality", "method": "manual unsupported imported-category count", "unit": "ratio"},
+        {"metric_id": "hallucinated-relation-rate", "dimension": "quality", "method": "manual count of proposed relations without support in the target text", "unit": "ratio"},
+        {"metric_id": "reusable-sign-utility", "dimension": "quality", "method": "human-accepted reused-sign proposals that reduce correction without suppressing target-specific signs", "unit": "ratio"},
+        {"metric_id": "tasks-per-minute", "dimension": "speed", "method": "end-to-end task timing", "unit": "tasks_per_minute"},
+        {"metric_id": "prompt-tokens", "dimension": "machine-cost", "method": "runtime token accounting", "unit": "tokens"},
+        {"metric_id": "correction-minutes", "dimension": "human-cost", "method": "manual repair and rejection timer", "unit": "minutes_per_task"},
+        {"metric_id": "traceable-proposal-rate", "dimension": "traceability", "method": "proposals resolving to target anchors", "unit": "ratio"}
+      ],
+      "manual_review_protocol": {"source_visible": true, "blind_variant_labels": true, "gold_double_check": true, "random_sample_count": 10, "hard_sample_count": 10, "allow_uncertain": true, "allow_abstain": true, "error_ledger_required": true, "human_acceptance_required": true},
+      "reference_witness_reveal_stage": "not-applicable",
+      "stop_conditions": ["variant identity exposed to reviewer", "target excerpts differ across variants", "Zarathustra category imported without target evidence", "resource gate denial"],
+      "promotion_conditions": ["same model and task conditions proven", "accuracy and correction time both reported", "overfit risk explicitly measured", "negative transfer preserved as a first-class result"]
+    }
+  ]
+}

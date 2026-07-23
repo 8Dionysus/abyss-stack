@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/translation-lab-readiness.schema.json",
+  "title": "Tree of Sophia translation laboratory readiness receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at_utc",
+    "experiment_id",
+    "plan",
+    "reference_register",
+    "source_interface",
+    "human_review",
+    "gates",
+    "translation_lanes",
+    "allowed_next_actions",
+    "prohibited_actions",
+    "decision",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": { "const": "tos_translation_lab_readiness_v1" },
+    "generated_at_utc": { "type": "string", "format": "date-time" },
+    "experiment_id": { "const": "tos-translation-foundation-v1" },
+    "plan": { "$ref": "#/$defs/fileEvidence" },
+    "reference_register": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "sha256",
+        "entry_count",
+        "required_category_count",
+        "content_admitted_entries",
+        "human_bibliographic_reviews",
+        "human_rights_reviews",
+        "permission_requests_sent",
+        "research_only"
+      ],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "entry_count": { "type": "integer", "minimum": 9 },
+        "required_category_count": { "const": 9 },
+        "content_admitted_entries": { "const": 0 },
+        "human_bibliographic_reviews": { "const": 0 },
+        "human_rights_reviews": { "const": 0 },
+        "permission_requests_sent": { "const": 0 },
+        "research_only": { "const": true }
+      }
+    },
+    "source_interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_ref",
+        "manifest_sha256",
+        "page_set_sha256",
+        "review_unit_count",
+        "fixity_verified",
+        "comparator_sealed"
+      ],
+      "properties": {
+        "manifest_ref": { "type": "string", "minLength": 1 },
+        "manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "page_set_sha256": { "$ref": "#/$defs/sha256" },
+        "review_unit_count": { "const": 30 },
+        "fixity_verified": { "const": true },
+        "comparator_sealed": { "const": true }
+      }
+    },
+    "human_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_output_ref",
+        "review_output_sha256",
+        "record_count",
+        "pass_1_complete",
+        "pass_2_complete",
+        "accepted_source_units",
+        "non_accepted_source_units",
+        "all_units_double_checked"
+      ],
+      "properties": {
+        "review_output_ref": { "type": ["string", "null"] },
+        "review_output_sha256": {
+          "anyOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "record_count": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "pass_1_complete": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "pass_2_complete": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "accepted_source_units": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "non_accepted_source_units": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "all_units_double_checked": { "type": "boolean" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_interface_fixity",
+        "reference_register_research",
+        "real_human_pass_1",
+        "independent_real_human_pass_2",
+        "source_acceptance",
+        "comparator_blindness",
+        "pre_draft_analysis",
+        "blocked_reasons"
+      ],
+      "properties": {
+        "source_interface_fixity": { "$ref": "#/$defs/gateState" },
+        "reference_register_research": { "$ref": "#/$defs/gateState" },
+        "real_human_pass_1": { "$ref": "#/$defs/gateState" },
+        "independent_real_human_pass_2": { "$ref": "#/$defs/gateState" },
+        "source_acceptance": { "$ref": "#/$defs/gateState" },
+        "comparator_blindness": { "$ref": "#/$defs/gateState" },
+        "pre_draft_analysis": { "$ref": "#/$defs/gateState" },
+        "blocked_reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "translation_lanes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["human_pre_draft_analysis", "ai_pre_draft_analysis", "ai_alternative_pre_draft_analysis", "human_only", "ai_only", "ai_alternatives", "ai_human", "recognized_comparator"],
+      "properties": {
+        "human_pre_draft_analysis": { "$ref": "#/$defs/lane" },
+        "ai_pre_draft_analysis": { "$ref": "#/$defs/lane" },
+        "ai_alternative_pre_draft_analysis": { "$ref": "#/$defs/lane" },
+        "human_only": { "$ref": "#/$defs/lane" },
+        "ai_only": { "$ref": "#/$defs/lane" },
+        "ai_alternatives": { "$ref": "#/$defs/lane" },
+        "ai_human": { "$ref": "#/$defs/lane" },
+        "recognized_comparator": { "$ref": "#/$defs/lane" }
+      }
+    },
+    "allowed_next_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "prohibited_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "decision": {
+      "enum": [
+        "blocked",
+        "ready-for-independent-source-grounded-pre-draft-analysis",
+        "ready-for-independent-source-grounded-lanes"
+      ]
+    },
+    "authority_boundary": { "type": "string", "minLength": 40 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fileEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "gateState": { "enum": ["pass", "blocked"] },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reasons"],
+      "properties": {
+        "state": {
+          "enum": ["blocked", "ready", "sealed"]
+        },
+        "reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

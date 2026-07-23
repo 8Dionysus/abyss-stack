@@ -17,6 +17,8 @@ benchmark, model card, or winner-promotion surfaces.
 - model profile and card routing
 - runtime winner-promotion posture
 - bounded local-worker deployment support
+- resource-gated Tree of Sophia OCR, structure, translation, semantic,
+  retrieval, graph, and golden-kernel transfer experiments
 
 ### Stronger owner split
 
@@ -56,7 +58,9 @@ reviewable local-worker path.
 Current source surfaces stay in package-local `parts/` routes, root
 `scripts/` wrappers, `compose/tuning/`,
 `mechanics/machine-fit/parts/inference-tuning/docs/model-cards/`, package
-benchmark surfaces under `mechanics/inference-pilots/parts/local-trials/`, and
-package tests under `mechanics/inference-pilots/parts/`. Archived pilot
+benchmark surfaces under `mechanics/inference-pilots/parts/local-trials/`, the
+Tree of Sophia A/B/C suite under
+`mechanics/inference-pilots/parts/tos-foundation-lab/`, and package tests under
+`mechanics/inference-pilots/parts/`. Archived pilot
 surfaces now stay under `legacy/` with quiet root bridge commands for operator
 compatibility.

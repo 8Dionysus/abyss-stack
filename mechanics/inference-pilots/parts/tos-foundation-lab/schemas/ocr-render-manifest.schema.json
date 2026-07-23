@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/ocr-render-manifest.schema.json",
+  "title": "Tree of Sophia shared OCR render manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "render_id",
+    "experiment_id",
+    "status",
+    "created_at_utc",
+    "sample_plan_ref",
+    "sample_plan_sha256",
+    "renderer",
+    "renderer_version",
+    "render_specification",
+    "artifact_root",
+    "source_files",
+    "renders",
+    "render_set_sha256",
+    "sample_count",
+    "total_png_bytes",
+    "reference_witness_state",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {"const": "tos_ocr_render_manifest_v1"},
+    "render_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "experiment_id": {"const": "tos-ocr-foundation-v1"},
+    "status": {"const": "frozen"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "sample_plan_ref": {"type": "string", "minLength": 1},
+    "sample_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "renderer": {"const": "poppler-pdftoppm"},
+    "renderer_version": {"const": "26.01.0"},
+    "render_specification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolution_dpi",
+        "output_format",
+        "color_space",
+        "full_page",
+        "preserve_source_orientation",
+        "preprocessing",
+        "command_template"
+      ],
+      "properties": {
+        "resolution_dpi": {"const": 300},
+        "output_format": {"const": "png"},
+        "color_space": {"const": "rgb"},
+        "full_page": {"const": true},
+        "preserve_source_orientation": {"const": true},
+        "preprocessing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["crop", "deskew", "denoise", "threshold", "contrast_adjustment"],
+          "properties": {
+            "crop": {"const": false},
+            "deskew": {"const": false},
+            "denoise": {"const": false},
+            "threshold": {"const": false},
+            "contrast_adjustment": {"const": false}
+          }
+        },
+        "command_template": {
+          "const": "pdftoppm -f PAGE -l PAGE -singlefile -r 300 -png INPUT OUTPUT_PREFIX"
+        }
+      }
+    },
+    "artifact_root": {
+      "type": "string",
+      "pattern": "^/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab/"
+    },
+    "source_files": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/sourceFile"}
+    },
+    "renders": {
+      "type": "array",
+      "minItems": 36,
+      "maxItems": 36,
+      "items": {"$ref": "#/$defs/render"}
+    },
+    "render_set_sha256": {"$ref": "#/$defs/sha256"},
+    "sample_count": {"const": 36},
+    "total_png_bytes": {"type": "integer", "minimum": 1},
+    "reference_witness_state": {"const": "sealed-not-consulted"},
+    "authority_boundary": {
+      "const": "frozen shared pixels and mechanical provenance only; no OCR, source-text, or quality verdict"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group_id", "item_ref", "file_ref", "file_sha256", "language", "local_path"],
+      "properties": {
+        "group_id": {"type": "string", "minLength": 1},
+        "item_ref": {"type": "string", "minLength": 1},
+        "file_ref": {"type": "string", "minLength": 1},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "language": {"enum": ["de", "ru"]},
+        "local_path": {"type": "string", "minLength": 1}
+      }
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "group_id",
+        "item_ref",
+        "file_ref",
+        "source_file_sha256",
+        "anchor_ref",
+        "language",
+        "page",
+        "difficulty",
+        "gold_candidate",
+        "png_ref",
+        "png_sha256",
+        "png_bytes",
+        "width_pixels",
+        "height_pixels",
+        "bit_depth",
+        "png_color_type",
+        "color_space",
+        "elapsed_seconds",
+        "stderr_sha256"
+      ],
+      "properties": {
+        "sample_id": {"type": "string", "minLength": 1},
+        "group_id": {"type": "string", "minLength": 1},
+        "item_ref": {"type": "string", "minLength": 1},
+        "file_ref": {"type": "string", "minLength": 1},
+        "source_file_sha256": {"$ref": "#/$defs/sha256"},
+        "anchor_ref": {"type": "string", "minLength": 1},
+        "language": {"enum": ["de", "ru"]},
+        "page": {"type": "integer", "minimum": 1},
+        "difficulty": {"enum": ["ordinary", "hard", "adversarial"]},
+        "gold_candidate": {"type": "boolean"},
+        "png_ref": {"type": "string", "pattern": "^pages/[a-z0-9-]+\\.png$"},
+        "png_sha256": {"$ref": "#/$defs/sha256"},
+        "png_bytes": {"type": "integer", "minimum": 1},
+        "width_pixels": {"type": "integer", "minimum": 1},
+        "height_pixels": {"type": "integer", "minimum": 1},
+        "bit_depth": {"const": 8},
+        "png_color_type": {"const": 2},
+        "color_space": {"const": "rgb"},
+        "elapsed_seconds": {"type": "number", "minimum": 0},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

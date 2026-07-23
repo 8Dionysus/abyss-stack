@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/translation-source-human-review.schema.json",
+  "title": "Tree of Sophia translation source human review row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "review_unit_id",
+    "context_anchor_ref",
+    "template_status",
+    "source_pages",
+    "v1_candidate_visible",
+    "recognized_comparator_visible",
+    "pass_1",
+    "pass_2",
+    "source_acceptance",
+    "questions",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "tos_translation_source_human_review_template_v2",
+        "tos_translation_source_human_review_v2"
+      ]
+    },
+    "packet_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "review_unit_id": {
+      "type": "string",
+      "pattern": "^tos-translation-source-review-v2-[0-9]{3}$"
+    },
+    "context_anchor_ref": {
+      "type": "string",
+      "pattern": "^tos\\.anchor\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "template_status": {
+      "enum": [
+        "awaiting-real-human-input",
+        "human-review-in-progress",
+        "completed-human-review"
+      ]
+    },
+    "source_pages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous", "current", "next"],
+      "properties": {
+        "previous": { "$ref": "#/$defs/pageRef" },
+        "current": { "$ref": "#/$defs/pageRef" },
+        "next": { "$ref": "#/$defs/pageRef" }
+      }
+    },
+    "v1_candidate_visible": { "const": false },
+    "recognized_comparator_visible": { "const": false },
+    "pass_1": { "$ref": "#/$defs/pass1" },
+    "pass_2": { "$ref": "#/$defs/pass2" },
+    "source_acceptance": {
+      "type": ["string", "null"],
+      "enum": ["accept", "accept-with-limits", "reject", "uncertain", "defer", null]
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "authority_boundary": { "type": "string", "minLength": 20 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source_acceptance": {
+            "enum": ["accept", "accept-with-limits", "reject", "uncertain", "defer"]
+          }
+        },
+        "required": ["source_acceptance"]
+      },
+      "then": {
+        "properties": {
+          "schema_version": { "const": "tos_translation_source_human_review_v2" },
+          "template_status": { "const": "completed-human-review" },
+          "pass_1": {
+            "properties": { "performed_by_real_human": { "const": true } }
+          },
+          "pass_2": {
+            "properties": {
+              "performed_by_real_human": { "const": true },
+              "punctuation_case_orthography_checked": { "const": true },
+              "boundary_checked": { "const": true },
+              "lineation_and_page_furniture_checked": { "const": true }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "pageRef": {
+      "type": "string",
+      "pattern": "^pages/pdf-page-[0-9]{4}\\.png$"
+    },
+    "nullableText": {
+      "type": ["string", "null"]
+    },
+    "nullableDate": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "nullableBoolean": {
+      "type": ["boolean", "null"]
+    },
+    "nullableDecision": {
+      "type": ["string", "null"],
+      "enum": ["accept", "accept-with-limits", "reject", "uncertain", "defer", null]
+    },
+    "pass1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performed_by_real_human",
+        "reviewer_ref",
+        "reviewed_at_utc",
+        "layout_role",
+        "begins_on_previous_page",
+        "continues_on_next_page",
+        "boundary_start_note",
+        "boundary_end_note",
+        "diplomatic_transcription",
+        "uncertain_glyphs",
+        "decision",
+        "notes"
+      ],
+      "properties": {
+        "performed_by_real_human": { "type": "boolean" },
+        "reviewer_ref": { "$ref": "#/$defs/nullableText" },
+        "reviewed_at_utc": { "$ref": "#/$defs/nullableDate" },
+        "layout_role": {
+          "type": ["string", "null"],
+          "enum": ["heading", "section-marker", "prose", "quotation", "continuation", "page-furniture", "mixed", null]
+        },
+        "begins_on_previous_page": { "$ref": "#/$defs/nullableBoolean" },
+        "continues_on_next_page": { "$ref": "#/$defs/nullableBoolean" },
+        "boundary_start_note": { "$ref": "#/$defs/nullableText" },
+        "boundary_end_note": { "$ref": "#/$defs/nullableText" },
+        "diplomatic_transcription": { "$ref": "#/$defs/nullableText" },
+        "uncertain_glyphs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "decision": { "$ref": "#/$defs/nullableDecision" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "pass2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performed_by_real_human",
+        "reviewer_ref",
+        "reviewed_at_utc",
+        "independent_diplomatic_transcription",
+        "punctuation_case_orthography_checked",
+        "boundary_checked",
+        "lineation_and_page_furniture_checked",
+        "decision",
+        "disagreements_with_pass_1"
+      ],
+      "properties": {
+        "performed_by_real_human": { "type": "boolean" },
+        "reviewer_ref": { "$ref": "#/$defs/nullableText" },
+        "reviewed_at_utc": { "$ref": "#/$defs/nullableDate" },
+        "independent_diplomatic_transcription": { "$ref": "#/$defs/nullableText" },
+        "punctuation_case_orthography_checked": { "type": "boolean" },
+        "boundary_checked": { "type": "boolean" },
+        "lineation_and_page_furniture_checked": { "type": "boolean" },
+        "decision": { "$ref": "#/$defs/nullableDecision" },
+        "disagreements_with_pass_1": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

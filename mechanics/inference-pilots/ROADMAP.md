@@ -18,3 +18,12 @@
 - add package-local trial index only if builders move too
 - keep benchmark, local-trial, pilot, and promotion docs part-local as the
   package grows
+
+## Tree of Sophia foundation laboratory
+
+- freeze A/B/C methods and sample references before viewing outputs
+- begin with resident runtimes and deterministic baselines
+- admit absent OCR, document, embedding, and translation candidates one at a
+  time after license, storage, and retention gates
+- preserve failed runs and manual correction cost
+- promote only runtime methods here; return content decisions to Tree of Sophia

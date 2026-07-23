@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 82,
-  "edge_count": 1822,
+  "decision_count": 83,
+  "edge_count": 1852,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 738,
-    "DATED": 82,
-    "GUARDED_BY": 217,
-    "HAS_STATUS": 82,
-    "HAS_SURFACE_CLASS": 202,
-    "IN_STACK_LANE": 166,
-    "NEXT_DECISION": 81,
-    "OWNED_BY_SURFACE": 87,
-    "OWNS_DECISION": 82,
+    "CITES_SOURCE_SURFACE": 750,
+    "DATED": 83,
+    "GUARDED_BY": 221,
+    "HAS_STATUS": 83,
+    "HAS_SURFACE_CLASS": 206,
+    "IN_STACK_LANE": 169,
+    "NEXT_DECISION": 82,
+    "OWNED_BY_SURFACE": 88,
+    "OWNS_DECISION": 83,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 83
+    "UNDER_MECHANIC_PARENT": 85
   },
   "edges": [
     {
@@ -8708,12 +8708,157 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0082",
+      "target": "decision:ABYSS-STACK-D-0083",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0082",
       "target": "owner_surface:mechanics/runtime-lifecycle/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0082",
       "target": "mechanic_parent:runtime-lifecycle",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/EXPERIMENT_LAW.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/RESOURCE_GATE.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-foundation-suite.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:mechanics/machine-fit/parts/inference-tuning/docs/MODEL_CARDS.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "source_surface:scripts/aoa-tos-foundation-lab",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "date:2026-07-22",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "guard_family:A/B/C%20freeze",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "guard_family:manual%20review",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "guard_family:resource%20preflight",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "guard_family:source/runtime%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "surface_class:experiment%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "surface_class:host%20storage",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "surface_class:inference%20pilot",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "surface_class:source/runtime%20boundary",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "stack_lane:Tree%20of%20Sophia%20access",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "stack_lane:inference%20pilots",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "stack_lane:machine%20fit",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "owner_surface:mechanics/inference-pilots/parts/tos-foundation-lab/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "mechanic_parent:inference-pilots",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0083",
+      "target": "mechanic_parent:machine-fit",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -9125,21 +9270,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0082",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0083",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 799,
+  "node_count": 818,
   "node_type_counts": {
-    "date": 23,
-    "decision": 82,
-    "guard_family": 93,
+    "date": 24,
+    "decision": 83,
+    "guard_family": 96,
     "mechanic_parent": 10,
-    "owner_surface": 43,
+    "owner_surface": 44,
     "repo": 1,
-    "source_surface": 439,
+    "source_surface": 450,
     "stack_lane": 33,
     "status": 3,
-    "surface_class": 72
+    "surface_class": 74
   },
   "nodes": [
     {
@@ -9255,6 +9405,11 @@
     {
       "id": "date:2026-07-18",
       "label": "2026-07-18",
+      "type": "date"
+    },
+    {
+      "id": "date:2026-07-22",
+      "label": "2026-07-22",
       "type": "date"
     },
     {
@@ -10078,6 +10233,21 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-22",
+      "id": "decision:ABYSS-STACK-D-0083",
+      "label": "ABYSS-STACK-D-0083",
+      "path": "docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md",
+      "posture": "accepted laboratory-owner rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary",
+      "type": "decision"
+    },
+    {
+      "id": "guard_family:A/B/C%20freeze",
+      "label": "A/B/C freeze",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:MCP%20port%20confinement",
       "label": "MCP port confinement",
       "type": "guard_family"
@@ -10273,6 +10443,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:manual%20review",
+      "label": "manual review",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:mechanics%20topology",
       "label": "mechanics topology",
       "type": "guard_family"
@@ -10385,6 +10560,11 @@
     {
       "id": "guard_family:render%20truth",
       "label": "render truth",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:resource%20preflight",
+      "label": "resource preflight",
       "type": "guard_family"
     },
     {
@@ -10665,6 +10845,11 @@
     {
       "id": "owner_surface:mechanics/federation-seams/parts/kag-seam/",
       "label": "mechanics/federation-seams/parts/kag-seam/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mechanics/inference-pilots/parts/tos-foundation-lab/",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/",
       "type": "owner_surface"
     },
     {
@@ -12369,6 +12554,56 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/EXPERIMENT_LAW.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/EXPERIMENT_LAW.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/MANUAL_REVIEW_PROTOCOL.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/RESOURCE_GATE.md",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/docs/RESOURCE_GATE.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-foundation-suite.v1.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-foundation-suite.v1.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "label": "mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/machine-fit/",
       "label": "mechanics/machine-fit/",
       "type": "source_surface"
@@ -12581,6 +12816,11 @@
     {
       "id": "source_surface:scripts/aoa-sync-configs",
       "label": "scripts/aoa-sync-configs",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-tos-foundation-lab",
+      "label": "scripts/aoa-tos-foundation-lab",
       "type": "source_surface"
     },
     {
@@ -13279,6 +13519,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:experiment%20contract",
+      "label": "experiment contract",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:federated%20stats%20read%20contract",
       "label": "federated stats read contract",
       "type": "surface_class"
@@ -13336,6 +13581,11 @@
     {
       "id": "surface_class:host%20ingress",
       "label": "host ingress",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:host%20storage",
+      "label": "host storage",
       "type": "surface_class"
     },
     {

@@ -89,6 +89,7 @@
 - [ABYSS-STACK-D-0004 Machine Bridge Under Machine Fit](../ABYSS-STACK-D-0004-machine-bridge-under-machine-fit.md) (`docs/decisions/ABYSS-STACK-D-0004-machine-bridge-under-machine-fit.md`)
 - [ABYSS-STACK-D-0022 Machine Evidence Freshness Gates](../ABYSS-STACK-D-0022-machine-evidence-freshness-gates.md) (`docs/decisions/ABYSS-STACK-D-0022-machine-evidence-freshness-gates.md`)
 - [ABYSS-STACK-D-0036 Abyss Machine MCP Access Plane](../ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0036-abyss-machine-mcp-access-plane.md`)
+- [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
 ## inference pilots
 
@@ -96,6 +97,7 @@
 - [ABYSS-STACK-D-0007 Inference Pilot Compatibility Gates](../ABYSS-STACK-D-0007-inference-pilot-compatibility-gates.md) (`docs/decisions/ABYSS-STACK-D-0007-inference-pilot-compatibility-gates.md`)
 - [ABYSS-STACK-D-0028 Intel Inference And Rerank Service Selection](../ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md) (`docs/decisions/ABYSS-STACK-D-0028-intel-inference-and-rerank-service-selection.md`)
 - [ABYSS-STACK-D-0029 BabelVox TTS Experimental Lane](../ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md) (`docs/decisions/ABYSS-STACK-D-0029-babelvox-tts-experimental-lane.md`)
+- [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
 ## service selection
 
@@ -193,6 +195,7 @@
 
 - [ABYSS-STACK-D-0069 ToS Corpus MCP Access Plane](../ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0069-tos-corpus-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
+- [ABYSS-STACK-D-0083 Tree of Sophia Foundation Laboratory Boundary](../ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md) (`docs/decisions/ABYSS-STACK-D-0083-tree-of-sophia-foundation-laboratory-boundary.md`)
 
 ## agent surface
 

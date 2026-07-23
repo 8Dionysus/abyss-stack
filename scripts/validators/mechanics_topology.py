@@ -67,6 +67,7 @@ MECHANIC_PACKAGE_PARTS = {
         "qwen-routes",
         "langgraph-pilot",
         "local-trials",
+        "tos-foundation-lab",
         "promotion-loop",
         "quiet-bridge-commands",
         "agon-dry-run-handoff",
