@@ -22,9 +22,13 @@ Use the skill directory reported by the host as the bundle root.
 1. When it is `<owner-root>/skills/abyss-self-diagnostic-spine/`, require the
    adjacent owner root to be an `abyss-stack` source checkout and use it.
 2. Otherwise read only `.aoa-skill-source.json` beside this `SKILL.md`.
-3. Require `schema_version=aoa_skill_source_receipt_v1`,
+3. Require `schema_version` to be `aoa_skill_source_receipt_v1` or
+   `aoa_skill_source_receipt_v2`,
    `name=abyss-self-diagnostic-spine`, `owner_repo=abyss-stack`,
-   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.1`.
+   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.2`.
+   For v2 also require non-empty `digest`, `source_fingerprint`,
+   `source_fingerprint_scope`, and `prompt_description_sha256`; preserve
+   `capability_graph_hash` when present.
 4. Follow the exact `owner_root` and `source_path` from that receipt. Require
    the owner contract to repeat the same identity, version, and admitted
    lifecycle.
@@ -32,8 +36,9 @@ Use the skill directory reported by the host as the bundle root.
    ambiguous, or version-stale. Do not search sibling repositories for a
    plausible copy.
 
-The receipt is a machine-local source locator, not proof of owner acceptance,
-current runtime health, or successful execution.
+Report the receipt schema and v2 identity dimensions when present. The receipt
+is a machine-local source locator and package identity record, not proof of
+owner acceptance, current runtime health, or successful execution.
 
 After an installed copy resolves the canonical bundle, switch the bundle root
 to that exact owner directory. Do not reread its `SKILL.md` and do not read
