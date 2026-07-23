@@ -151,6 +151,7 @@ class ComposeContractsTests(unittest.TestCase):
 
     def test_ovms_uses_soft_reclaim_protection_without_a_hard_memory_cap(self) -> None:
         service = load_compose(TUNING_DIR / "intel-worker.thin-host.yml")["services"]["ovms"]
+        self.assertEqual(service.get("cpus"), "0")
         self.assertNotIn("mem_limit", service)
         self.assertEqual(service.get("mem_reservation"), "${AOA_OVMS_MEM_RESERVATION:-1g}")
 
@@ -159,9 +160,52 @@ class ComposeContractsTests(unittest.TestCase):
             TUNING_DIR / "llamacpp.gemma4-e2b.intel-285h.vulkan.yml"
         )["services"]["llama-cpp"]
 
+        self.assertEqual(service.get("cpus"), "0")
         self.assertEqual(service.get("mem_limit"), "0")
         self.assertEqual(service.get("mem_reservation"), "4g")
         self.assertEqual(service.get("command"), ["--sleep-idle-seconds", "600"])
+
+    def test_thin_host_services_clear_hard_cgroup_ceilings(self) -> None:
+        overlay_services = {
+            "storage.intel-285h.resource-guard.yml": ("neo4j", "qdrant", "postgres", "redis"),
+            "intel-worker.thin-host.yml": ("langchain-api",),
+            "federation.thin-host.yml": ("route-api",),
+            "observability.thin-host.yml": (
+                "prometheus",
+                "cadvisor",
+                "alertmanager",
+                "loki",
+                "tempo",
+                "alloy",
+                "grafana",
+            ),
+            "tools.thin-host.yml": ("qwen-tts", "tts-router", "docs-api", "aoa-browser"),
+            "workflows.thin-host.yml": ("n8n", "n8n-task-runners"),
+            "rag.thin-host.yml": ("rag-api",),
+        }
+
+        for overlay, service_names in overlay_services.items():
+            services = load_compose(TUNING_DIR / overlay)["services"]
+            for service_name in service_names:
+                with self.subTest(overlay=overlay, service=service_name):
+                    service = services[service_name]
+                    self.assertEqual(service.get("cpus"), "0")
+                    self.assertEqual(service.get("mem_limit"), "0")
+                    self.assertIn("mem_reservation", service)
+
+    def test_default_owner_services_are_elastic(self) -> None:
+        cases = (
+            ("32-llamacpp-inference.yml", "llama-cpp"),
+            ("46-rag-api.yml", "rag-api"),
+            ("53-babelvox-tts.yml", "babelvox-tts"),
+        )
+
+        for module, service_name in cases:
+            with self.subTest(module=module, service=service_name):
+                service = load_compose(MODULE_DIR / module)["services"][service_name]
+                self.assertTrue(str(service.get("cpus", "")).endswith(":-0}"))
+                self.assertTrue(str(service.get("mem_limit", "")).endswith(":-0}"))
+                self.assertIn("mem_reservation", service)
 
     def test_host_published_ports_are_loopback_bound(self) -> None:
         for path in sorted(MODULE_DIR.glob("*.yml")):

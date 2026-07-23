@@ -305,10 +305,20 @@ PY
 aoa_note "resource guard status before apply: ${pre_guard_status:-unknown} staged=${staged_count}"
 aoa_note "service selection before apply: ${pre_service_selection:-unknown}"
 
-if [[ "$pre_guard_status" == "applied" ]]; then
-  aoa_note "resource guards already applied; no runtime action needed"
-  exit 0
-fi
+case "$pre_guard_status" in
+  applied)
+    aoa_note "resource guards already applied; no runtime action needed"
+    exit 0
+    ;;
+  staged_not_applied|missing_live_container)
+    ;;
+  live_resource_unknown)
+    aoa_die "live cgroup resource state is unknown; refusing to ${method} the stack"
+    ;;
+  *)
+    aoa_die "unexpected resource guard status ${pre_guard_status:-unknown}; refusing to ${method} the stack"
+    ;;
+esac
 
 game_guard_active="$(read_game_guard_active)"
 

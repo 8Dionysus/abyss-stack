@@ -20,6 +20,9 @@ resource overlays. The command records pre-apply status under
 or restart while `abyss-machine processes game-guard --json` is active unless
 `--force` is passed, and rechecks `aoa-status --resource-guards` after the apply
 action.
+An unreadable live cgroup fact fails closed as `live_resource_unknown`; the
+apply route does not turn missing evidence into permission to recreate the
+stack.
 It also captures pre/post `podman stats --no-stream` and memory/PSI snapshots in
 the same directory so the operator can compare the tuned live state without
 reconstructing evidence from scrollback. The apply route also captures

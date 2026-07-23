@@ -1,14 +1,14 @@
-# Candidate storage resource guard for the Intel Core Ultra 9 285H host class.
-# This overlay bounds persistent substrate services without changing which
-# services are selected by a profile or preset.
+# Candidate storage resource posture for the Intel Core Ultra 9 285H host class.
+# Keep soft reclaim reservations and service-native budgets without private
+# CPU or memory ceilings.
 services:
   neo4j:
     labels:
       aoa.tuning.overlay: "storage.intel-285h.resource-guard"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_NEO4J_CPUS:-2.0}"
-    mem_limit: "${AOA_NEO4J_MEM_LIMIT:-1536m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_NEO4J_MEM_RESERVATION:-768m}"
     environment:
       NEO4J_server_memory_heap_initial__size: "${AOA_NEO4J_HEAP_INITIAL:-409m}"
@@ -21,8 +21,8 @@ services:
       aoa.tuning.overlay: "storage.intel-285h.resource-guard"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_QDRANT_CPUS:-2.0}"
-    mem_limit: "${AOA_QDRANT_MEM_LIMIT:-1536m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_QDRANT_MEM_RESERVATION:-512m}"
     command: ["./qdrant", "--disable-telemetry"]
 
@@ -31,8 +31,8 @@ services:
       aoa.tuning.overlay: "storage.intel-285h.resource-guard"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_POSTGRES_CPUS:-1.5}"
-    mem_limit: "${AOA_POSTGRES_MEM_LIMIT:-768m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_POSTGRES_MEM_RESERVATION:-256m}"
     command:
       - "postgres"
@@ -52,8 +52,8 @@ services:
       aoa.tuning.overlay: "storage.intel-285h.resource-guard"
       aoa.tuning.host_class: "intel-core-ultra-9-285h"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_REDIS_CPUS:-0.5}"
-    mem_limit: "${AOA_REDIS_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_REDIS_MEM_RESERVATION:-128m}"
     command:
       - "redis-server"

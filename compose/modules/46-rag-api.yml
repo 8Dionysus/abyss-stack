@@ -39,9 +39,9 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${AOA_RAG_API_HOST_PORT:-5406}:5406"
-    mem_limit: "${AOA_RAG_API_MEM_LIMIT:-768m}"
+    mem_limit: "${AOA_RAG_API_MEM_LIMIT:-0}"
     mem_reservation: "${AOA_RAG_API_MEM_RESERVATION:-128m}"
-    cpus: "${AOA_RAG_API_CPUS:-1.0}"
+    cpus: "${AOA_RAG_API_CPUS:-0}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5406/health', timeout=5).read()"]
       interval: 10s

@@ -19,7 +19,7 @@ services:
       - label=disable
     devices:
       - /dev/dri:/dev/dri
-    cpus: "4.0"
+    cpus: "0"
     # Explicit unlimited values clear hard caps inherited from earlier tuning
     # overlays; native idle sleep owns release for this important lane.
     mem_limit: "0"

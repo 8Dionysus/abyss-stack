@@ -93,24 +93,28 @@ They are intentionally additive:
   background callers must retain their own owner-aware launch gate
 - `intel-text.ovms-gpu-lab` is a standalone OVMS text-generation sidecar harness for explicit model-card-driven Intel text screening, uses a conservative single-sequence GPU posture, and exposes a separate `langchain-api` on `5404`
 - `intel-text.ovms-qwen3-settings` layers the official `Qwen3` OVMS settings over that harness: `tool_parser=hermes3`, `reasoning_parser=qwen3`, `cache_size=2`, `LC_OPENAI_LITERAL_COMPLETIONS=false`, and `chat_template_kwargs.enable_thinking=false`
-- `storage.intel-285h.resource-guard` bounds Postgres, Redis, Qdrant, and
-  Neo4j for this workstation class while keeping the `substrate` service
-  selection unchanged
-- `intel-worker.thin-host` gives the promoted OVMS embeddings seam a soft
-  reclaim reservation plus bounded CPU/threading without a hard memory ceiling;
-  it still caps `langchain-api` without changing the selected worker lane
-- `federation.thin-host` caps the advisory `route-api` facade when the
-  `federation` profile is selected
+- `storage.intel-285h.resource-guard` keeps service-native database budgets and
+  soft reclaim reservations without private cgroup CPU or memory ceilings
+- `intel-worker.thin-host` gives the promoted OVMS embeddings seam soft reclaim
+  protection and owner-native thread tuning while keeping both worker services
+  CPU- and memory-elastic
+- `federation.thin-host` keeps the advisory `route-api` facade soft-reserved
+  without a private cgroup ceiling
 - `observability.thin-host` shortens Prometheus retention, lowers cAdvisor
-  sampling/event retention, caps dashboard services, and bounds Loki plus Alloy
-  for explicit observability runs
-- `tools.thin-host` caps helper services when the `tools` layer is selected;
-  it does not make speech/browser helpers resident
-- `workflows.thin-host` caps n8n and external task runners for explicit
-  workflow runs; it does not add workflows to current presets
-- `rag.thin-host` caps the lightweight RAG orchestration API and keeps
+  sampling/event retention, and keeps dashboard/log services soft-reserved and
+  elastic for explicit observability runs
+- `tools.thin-host` keeps helper services soft-reserved when the `tools` layer
+  is selected; it does not make speech/browser helpers resident
+- `workflows.thin-host` keeps n8n owner-native concurrency and V8 budgets for
+  explicit workflow runs without a container kill boundary
+- `rag.thin-host` keeps the lightweight RAG orchestration API elastic and keeps
   embedding batch size conservative so ingestion does not become a new memory
   pressure source
+
+The thin-host overlays use `cpus: "0"` and `mem_limit: "0"` intentionally.
+Those values clear inherited cgroup ceilings while `mem_reservation` remains a
+soft reclaim signal. Static ceilings belong only in an explicit measured lab
+or disposable-workload experiment, not in the persistent owner runtime.
 
 Example on Linux:
 

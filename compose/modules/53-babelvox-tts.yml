@@ -39,9 +39,9 @@ services:
       - /dev/accel:/dev/accel
     ports:
       - "127.0.0.1:${AOA_BABELVOX_TTS_HOST_PORT:-5102}:5102"
-    mem_limit: "${AOA_BABELVOX_TTS_MEM_LIMIT:-8g}"
+    mem_limit: "${AOA_BABELVOX_TTS_MEM_LIMIT:-0}"
     mem_reservation: "${AOA_BABELVOX_TTS_MEM_RESERVATION:-1g}"
-    cpus: "${AOA_BABELVOX_TTS_CPUS:-4.0}"
+    cpus: "${AOA_BABELVOX_TTS_CPUS:-0}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5102/health', timeout=2).read()"]
       interval: 10s

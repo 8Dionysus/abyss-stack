@@ -15,6 +15,7 @@ from typing import Any
 
 SOURCE_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_STACK_ROOT = Path("/srv/AbyssOS/abyss-stack")
+CGROUP_ROOT = Path("/sys/fs/cgroup")
 
 
 def run_command(
@@ -151,6 +152,70 @@ def render_compose_config(env: dict[str, str]) -> tuple[str, str]:
     return result.stdout, result.stderr
 
 
+def parse_cgroup_max(value: str) -> int | None:
+    token = value.strip().split(maxsplit=1)[0]
+    if token == "max":
+        return None
+    return int(token)
+
+
+def parse_cgroup_cpu_max(value: str) -> int | None:
+    quota, period = value.strip().split()
+    if quota == "max":
+        return None
+    return int(Decimal(quota) * 1_000_000_000 / Decimal(period))
+
+
+def read_live_cgroup_resources(
+    cgroup_path: str,
+    *,
+    cgroup_root: Path = CGROUP_ROOT,
+) -> dict[str, int | bool | None] | None:
+    if not cgroup_path:
+        return None
+
+    scope = cgroup_root / cgroup_path.lstrip("/")
+    groups = [scope]
+    child = scope / "container"
+    if child.is_dir():
+        groups.append(child)
+
+    try:
+        cpu_limits = [
+            parse_cgroup_cpu_max((group / "cpu.max").read_text()) for group in groups
+        ]
+        memory_limits = [
+            parse_cgroup_max((group / "memory.max").read_text()) for group in groups
+        ]
+        reservation = int((groups[-1] / "memory.low").read_text().strip())
+    except (IndexError, OSError, ValueError):
+        return None
+
+    swap_limits: list[int | None] = []
+    swap_limit_known = True
+    for group in groups:
+        try:
+            swap_limits.append(
+                parse_cgroup_max((group / "memory.swap.max").read_text())
+            )
+        except (IndexError, OSError, ValueError):
+            swap_limit_known = False
+            break
+
+    finite_cpu = [value for value in cpu_limits if value is not None]
+    finite_memory = [value for value in memory_limits if value is not None]
+    finite_swap = [value for value in swap_limits if value is not None]
+    return {
+        "nano_cpus": min(finite_cpu) if finite_cpu else 0,
+        "mem_limit_bytes": min(finite_memory) if finite_memory else 0,
+        "mem_reservation_bytes": reservation,
+        "mem_swap_limit_bytes": (min(finite_swap) if finite_swap else 0)
+        if swap_limit_known
+        else None,
+        "mem_swap_limit_known": swap_limit_known,
+    }
+
+
 def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
     ps = run_command(["podman", "ps", "-a", "--format", "{{.ID}}"])
     if ps.returncode != 0:
@@ -178,16 +243,47 @@ def inspect_compose_containers(project_name: str) -> list[dict[str, Any]]:
         )
         host_config = container.get("HostConfig") or {}
         state = container.get("State") or {}
+        state_status = str(state.get("Status", ""))
+        configured_memory = int(host_config.get("Memory") or 0)
+        configured_memory_swap_total = int(host_config.get("MemorySwap") or 0)
+        if configured_memory_swap_total < 0:
+            configured_memory_swap = 0
+        elif configured_memory:
+            configured_memory_swap = max(
+                configured_memory_swap_total - configured_memory,
+                0,
+            )
+        else:
+            configured_memory_swap = configured_memory_swap_total
+        configured_resources = {
+            "mem_limit_bytes": configured_memory,
+            "mem_reservation_bytes": int(host_config.get("MemoryReservation") or 0),
+            "nano_cpus": int(host_config.get("NanoCpus") or 0),
+            "mem_swap_limit_bytes": configured_memory_swap,
+            "mem_swap_limit_known": True,
+        }
+        cgroup_path = str(state.get("CgroupPath", ""))
+        live_resources = (
+            read_live_cgroup_resources(cgroup_path)
+            if state_status == "running"
+            else configured_resources
+        )
+        resource_state_known = live_resources is not None
+        effective_resources = live_resources or configured_resources
         selected.append(
             {
                 "name": container.get("Name", "").lstrip("/"),
                 "service": service,
-                "state": state.get("Status", ""),
-                "mem_limit_bytes": int(host_config.get("Memory") or 0),
-                "mem_reservation_bytes": int(
-                    host_config.get("MemoryReservation") or 0
+                "state": state_status,
+                "cgroup_path": cgroup_path,
+                "resource_source": (
+                    "cgroup_v2"
+                    if state_status == "running" and resource_state_known
+                    else "inspect_config"
                 ),
-                "nano_cpus": int(host_config.get("NanoCpus") or 0),
+                "resource_state_known": resource_state_known,
+                "configured": configured_resources,
+                **effective_resources,
             }
         )
     return sorted(selected, key=lambda item: (item["service"], item["name"]))
@@ -225,6 +321,8 @@ def parse_compose_cpus_nano(value: str | None) -> int:
 def classify_guard(expected: dict[str, str], live: dict[str, Any] | None) -> str:
     if live is None:
         return "missing_live_container"
+    if live.get("resource_state_known") is False:
+        return "live_resource_unknown"
 
     expected_memory_bytes = parse_compose_memory_bytes(expected.get("mem_limit"))
     expected_reservation_bytes = parse_compose_memory_bytes(
@@ -250,6 +348,8 @@ def summarize_guard_status(service_status: list[dict[str, Any]]) -> dict[str, An
 
     if counts.get("missing_live_container"):
         overall = "missing_live_container"
+    elif counts.get("live_resource_unknown"):
+        overall = "live_resource_unknown"
     elif counts.get("staged_not_applied"):
         overall = "staged_not_applied"
     else:
@@ -261,6 +361,7 @@ def summarize_guard_status(service_status: list[dict[str, Any]]) -> dict[str, An
         "applied": counts.get("applied", 0),
         "staged_not_applied": counts.get("staged_not_applied", 0),
         "missing_live_container": counts.get("missing_live_container", 0),
+        "live_resource_unknown": counts.get("live_resource_unknown", 0),
         "counts": counts,
     }
 
@@ -356,12 +457,18 @@ def print_text(status: dict[str, Any]) -> None:
 
     if summary["status"] == "staged_not_applied":
         print("")
-        print("next: restart or reload podman-compose-abyss.service in a controlled window")
+        print(
+            "next: restart or reload podman-compose-abyss.service in a controlled window"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect staged and live compose resource guards.")
-    parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+    parser = argparse.ArgumentParser(
+        description="Inspect staged and live compose resource guards."
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Print machine-readable JSON."
+    )
     args = parser.parse_args(argv)
 
     try:

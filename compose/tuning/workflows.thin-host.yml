@@ -1,12 +1,12 @@
-# Candidate workflow automation guard for explicit n8n runs.
+# Candidate owner-native workflow posture for explicit n8n runs.
 # Use only with the `workflows` profile.
 services:
   n8n:
     labels:
       aoa.tuning.overlay: "workflows.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_N8N_CPUS:-1.0}"
-    mem_limit: "${AOA_N8N_MEM_LIMIT:-1024m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_N8N_MEM_RESERVATION:-256m}"
     environment:
       NODE_OPTIONS: "${AOA_N8N_NODE_OPTIONS:---max-old-space-size=512}"
@@ -18,8 +18,8 @@ services:
     labels:
       aoa.tuning.overlay: "workflows.thin-host"
       aoa.tuning.posture: "candidate"
-    cpus: "${AOA_N8N_RUNNERS_CPUS:-1.0}"
-    mem_limit: "${AOA_N8N_RUNNERS_MEM_LIMIT:-512m}"
+    cpus: "0"
+    mem_limit: "0"
     mem_reservation: "${AOA_N8N_RUNNERS_MEM_RESERVATION:-128m}"
     environment:
       NODE_OPTIONS: "${AOA_N8N_RUNNERS_NODE_OPTIONS:---max-old-space-size=384}"
