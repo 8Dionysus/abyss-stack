@@ -34,6 +34,8 @@ tos-foundation-lab/
 │   └── tos-foundation-suite.v1.json
 ├── schemas/
 │   ├── experiment-suite.schema.json
+│   ├── human-gold-review-manifest.schema.json
+│   ├── human-gold-review-record.schema.json
 │   ├── manual-review-receipt.schema.json
 │   ├── ocr-render-manifest.schema.json
 │   ├── run-receipt.schema.json
@@ -49,6 +51,7 @@ tos-foundation-lab/
 ├── canonical_graph.py
 ├── granite_embedding_bridge.py
 ├── granite_retrieval.py
+├── human_gold_review.py
 ├── kraken_party_ocr.py
 ├── kraken_party_runtime.py
 ├── lexical_retrieval.py
@@ -113,6 +116,43 @@ results; no automatic status turns native extraction into transcription.
 explicit human-presence attestation. Source-visible inspection performed by a
 model goes instead to `model_inspection_refs` under the separate advisory
 schema; it can find candidate defects but can never authorize promotion.
+
+The 15-page diplomatic gold has its own blind source interface. It consumes
+the tracked `gold-status.json`, the frozen visual projection, and the exact
+36-page OCR render manifest. For each of the 15 preselected candidates it
+re-renders the previous/current/next source pages at 300 DPI and requires the
+center page to remain byte-identical to the frozen OCR contestant input:
+
+```bash
+scripts/aoa-tos-foundation-lab materialize-human-gold-review \
+  --tree-repo-root /srv/AbyssOS/Tree-of-Sophia \
+  --gold-status /srv/AbyssOS/Tree-of-Sophia/ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/gold-status.json \
+  --visual-plan /srv/AbyssOS/Tree-of-Sophia/ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/ocr-visual-samples.json \
+  --render-manifest /srv/AbyssOS/Tree-of-Sophia/ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/local-content/ocr/renders/render-manifest.v1.json \
+  --packet-id zarathustra-human-gold-review-v1-YYYYMMDD
+```
+
+The two local HTML workbooks export drafts only. Pass 1 independently
+transcribes the center page and records layout, reading order, uncertainty,
+source ambiguity, and human time. Pass 2 re-transcribes from the source with
+pass 1 hidden, requires a distinct human identity, and checks punctuation,
+case, hyphenation, page boundaries, lineation, reading order, furniture, and
+uncertain glyphs. The JSONL template remains blank until actual human work is
+merged and adjudicated.
+
+The gate deliberately exits `2` for the blank template:
+
+```bash
+scripts/aoa-tos-foundation-lab gate-human-gold-review \
+  --manifest PRIVATE_HUMAN_GOLD_PACKET/human-gold-review-manifest.json \
+  --human-review-output OPTIONAL_COMPLETED_TWO_PASS_GOLD.jsonl
+```
+
+Only 15 ordered, independently double-checked and explicitly adjudicated
+records open manual OCR/structure metric adjudication. The gate verifies
+identity, attestations, ordering, digests, and declared completion; it cannot
+judge whether a human transcription is actually correct. Real source-visible
+inspection remains the authority.
 
 Translation begins with a distinct pre-draft source stage, not with a model.
 It verifies the exact 30 German EPUB members, preserves the full automatic

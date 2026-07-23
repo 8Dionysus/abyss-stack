@@ -38,6 +38,14 @@ from ocr_render import (
     materialize_ocr_render,
     verify_render_manifest,
 )
+from human_gold_review import (
+    DEFAULT_SHARED_ROOT as DEFAULT_HUMAN_GOLD_ROOT,
+    MANIFEST_SCHEMA_PATH as HUMAN_GOLD_MANIFEST_SCHEMA_PATH,
+    RECORD_SCHEMA_PATH as HUMAN_GOLD_RECORD_SCHEMA_PATH,
+    inspect_human_gold_readiness,
+    materialize_human_gold_review,
+    verify_human_gold_review_manifest,
+)
 from translation_source import (
     DEFAULT_SHARED_ROOT as DEFAULT_TRANSLATION_SOURCE_ROOT,
     TranslationSourceError,
@@ -230,6 +238,8 @@ def validate_suite() -> list[str]:
         REVIEW_SCHEMA_PATH,
         MODEL_INSPECTION_SCHEMA_PATH,
         OCR_RENDER_SCHEMA_PATH,
+        HUMAN_GOLD_MANIFEST_SCHEMA_PATH,
+        HUMAN_GOLD_RECORD_SCHEMA_PATH,
         TRANSLATION_SOURCE_SCHEMA_PATH,
         TRANSLATION_SOURCE_INSPECTION_SCHEMA_PATH,
         TRANSLATION_SOURCE_REVIEW_SCHEMA_PATH,
@@ -1018,6 +1028,38 @@ def main(argv: list[str] | None = None) -> int:
     )
     verify_render_parser.add_argument("manifest", type=Path)
 
+    human_gold_parser = subparsers.add_parser(
+        "materialize-human-gold-review",
+        help="render blind page triplets and blank interfaces for the 15-page human gold set",
+    )
+    human_gold_parser.add_argument("--tree-repo-root", type=Path, required=True)
+    human_gold_parser.add_argument("--gold-status", type=Path, required=True)
+    human_gold_parser.add_argument("--visual-plan", type=Path, required=True)
+    human_gold_parser.add_argument("--render-manifest", type=Path, required=True)
+    human_gold_parser.add_argument("--packet-id", required=True)
+    human_gold_parser.add_argument(
+        "--shared-root", type=Path, default=DEFAULT_HUMAN_GOLD_ROOT
+    )
+    human_gold_parser.add_argument(
+        "--pdftoppm", type=Path, default=Path("/usr/bin/pdftoppm")
+    )
+    human_gold_parser.add_argument(
+        "--pdfinfo", type=Path, default=Path("/usr/bin/pdfinfo")
+    )
+
+    verify_human_gold_parser = subparsers.add_parser(
+        "verify-human-gold-review",
+        help="verify the 15-page blind review packet and its blank human stop line",
+    )
+    verify_human_gold_parser.add_argument("manifest", type=Path)
+
+    gate_human_gold_parser = subparsers.add_parser(
+        "gate-human-gold-review",
+        help="keep OCR and structure quality claims blocked until 15 pages have two human passes",
+    )
+    gate_human_gold_parser.add_argument("--manifest", type=Path, required=True)
+    gate_human_gold_parser.add_argument("--human-review-output", type=Path)
+
     translation_source_parser = subparsers.add_parser(
         "materialize-translation-source",
         help="freeze the German source-review packet before any translation lane",
@@ -1300,6 +1342,49 @@ def main(argv: list[str] | None = None) -> int:
             )
             print("[boundary] render fixity is not OCR quality")
             return 0
+
+        if args.command == "materialize-human-gold-review":
+            manifest = materialize_human_gold_review(
+                args.tree_repo_root,
+                args.gold_status,
+                args.visual_plan,
+                args.render_manifest,
+                args.packet_id,
+                shared_root=args.shared_root,
+                pdftoppm=args.pdftoppm,
+                pdfinfo=args.pdfinfo,
+                invocation=[sys.argv[0], *(argv if argv is not None else sys.argv[1:])],
+            )
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+            print(
+                "[boundary] source triplets and blank forms are not human "
+                "transcription, OCR quality, structure quality, or gold"
+            )
+            return 0
+
+        if args.command == "verify-human-gold-review":
+            manifest = verify_human_gold_review_manifest(args.manifest)
+            print(
+                f"[ok] verified {len(manifest['units'])} blind gold candidates and "
+                f"{manifest['context_render']['unique_page_count']} context pages"
+            )
+            print(
+                "[boundary] packet fixity is not human review or content correctness"
+            )
+            return 0
+
+        if args.command == "gate-human-gold-review":
+            readiness = inspect_human_gold_readiness(
+                args.manifest, args.human_review_output
+            )
+            print(json.dumps(readiness, ensure_ascii=False, indent=2))
+            print(
+                "[boundary] readiness verifies declared evidence shape only; it "
+                "cannot inspect or attest transcription correctness"
+            )
+            return 0 if readiness["decision"] == (
+                "ready-for-manual-metric-adjudication"
+            ) else 2
 
         if args.command == "materialize-translation-source":
             manifest = materialize_translation_source(

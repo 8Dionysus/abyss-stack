@@ -6,6 +6,7 @@ import io
 import json
 import os
 import signal
+import struct
 import tarfile
 import tempfile
 import zipfile
@@ -174,6 +175,14 @@ TRANSLATION_SOURCE_REVIEW_SPEC = importlib.util.spec_from_file_location(
 assert TRANSLATION_SOURCE_REVIEW_SPEC and TRANSLATION_SOURCE_REVIEW_SPEC.loader
 translation_source_review = importlib.util.module_from_spec(TRANSLATION_SOURCE_REVIEW_SPEC)
 TRANSLATION_SOURCE_REVIEW_SPEC.loader.exec_module(translation_source_review)
+
+HUMAN_GOLD_REVIEW_MODULE_PATH = PART_ROOT / "human_gold_review.py"
+HUMAN_GOLD_REVIEW_SPEC = importlib.util.spec_from_file_location(
+    "human_gold_review_test", HUMAN_GOLD_REVIEW_MODULE_PATH
+)
+assert HUMAN_GOLD_REVIEW_SPEC and HUMAN_GOLD_REVIEW_SPEC.loader
+human_gold_review = importlib.util.module_from_spec(HUMAN_GOLD_REVIEW_SPEC)
+HUMAN_GOLD_REVIEW_SPEC.loader.exec_module(human_gold_review)
 
 
 def thermal_owner(
@@ -1555,6 +1564,460 @@ def test_translation_source_model_inspection_closes_over_frozen_packet(
         translation_source.verify_translation_source_inspection(
             inspection_path, manifest_path
         )
+
+
+def _synthetic_png(width: int = 100, height: int = 200) -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + struct.pack(">I", 13)
+        + b"IHDR"
+        + struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+        + b"\x00\x00\x00\x00"
+    )
+
+
+def _human_gold_review_fixture(tmp_path: Path) -> dict[str, object]:
+    tree = tmp_path / "tree"
+    contracts = tree / "ToS/contracts"
+    contracts.mkdir(parents=True)
+    permissive_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+    }
+    (contracts / "manual-gold-status.schema.json").write_text(
+        json.dumps(permissive_schema), encoding="utf-8"
+    )
+    (contracts / "ocr-visual-sample-plan.schema.json").write_text(
+        json.dumps(permissive_schema), encoding="utf-8"
+    )
+
+    gold_root = tree / "ToS/source-witnesses/test/gold"
+    gold_root.mkdir(parents=True)
+    source_root = tree / "ToS/source-witnesses/test/payload"
+    source_root.mkdir(parents=True)
+    frozen_root = tmp_path / "frozen"
+    pages_root = frozen_root / "pages"
+    pages_root.mkdir(parents=True)
+    png_bytes = _synthetic_png()
+    png_sha256 = hashlib.sha256(png_bytes).hexdigest()
+
+    gold_units: list[dict[str, object]] = []
+    visual_groups: list[dict[str, object]] = []
+    source_files: list[dict[str, object]] = []
+    renders: list[dict[str, object]] = []
+    for group_index, base_page in enumerate((10, 20, 30), start=1):
+        group_id = f"ocr-test-{group_index}"
+        language = "de" if group_index == 3 else "ru"
+        source_path = source_root / f"group-{group_index}.pdf"
+        source_path.write_bytes(f"synthetic-pdf-{group_index}".encode("ascii"))
+        source_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        item_ref = f"tos.item.synthetic.group-{group_index}"
+        file_ref = f"tos.file.sha256.{source_sha256}"
+        source_files.append(
+            {
+                "group_id": group_id,
+                "item_ref": item_ref,
+                "file_ref": file_ref,
+                "file_sha256": source_sha256,
+                "language": language,
+                "local_path": source_path.as_posix(),
+            }
+        )
+        visual_samples: list[dict[str, object]] = []
+        for offset in range(5):
+            page = base_page + offset
+            sample_id = f"tos-sample-group-{group_index}-p{page:03d}"
+            visual_sample_id = f"tos-ocr-sample-group-{group_index}-p{page:03d}"
+            source_anchor = f"tos.anchor.synthetic.group-{group_index}-p{page:03d}"
+            visual_anchor = f"tos.anchor.synthetic.ocr-group-{group_index}-p{page:03d}"
+            gold_units.append(
+                {
+                    "sample_id": sample_id,
+                    "anchor_ref": source_anchor,
+                    "content_ref": f"local-content/gold/{sample_id}.json",
+                    "content_sha256": None,
+                    "model_draft": {
+                        "status": "not_started",
+                        "maker_ref": None,
+                        "completed_at": None,
+                        "receipt_ref": None,
+                    },
+                    "human_pass_1": {
+                        "status": "not_started",
+                        "maker_ref": None,
+                        "completed_at": None,
+                        "receipt_ref": None,
+                    },
+                    "human_pass_2": {
+                        "status": "not_started",
+                        "maker_ref": None,
+                        "completed_at": None,
+                        "receipt_ref": None,
+                    },
+                    "gold_status": "candidate",
+                }
+            )
+            visual_samples.append(
+                {
+                    "sample_id": visual_sample_id,
+                    "source_sample_id": sample_id,
+                    "anchor_ref": visual_anchor,
+                    "page": page,
+                    "strata": ["synthetic-hard-case"],
+                    "difficulty": "hard",
+                    "gold_candidate": True,
+                    "projection_change": "same_visual_unit",
+                    "projection_note": None,
+                }
+            )
+            frozen_path = pages_root / f"{visual_sample_id}.png"
+            frozen_path.write_bytes(png_bytes)
+            renders.append(
+                {
+                    "sample_id": visual_sample_id,
+                    "group_id": group_id,
+                    "item_ref": item_ref,
+                    "file_ref": file_ref,
+                    "source_file_sha256": source_sha256,
+                    "anchor_ref": visual_anchor,
+                    "language": language,
+                    "page": page,
+                    "difficulty": "hard",
+                    "gold_candidate": True,
+                    "png_ref": frozen_path.relative_to(frozen_root).as_posix(),
+                    "png_sha256": png_sha256,
+                    "png_bytes": len(png_bytes),
+                    "width_pixels": 100,
+                    "height_pixels": 200,
+                    "bit_depth": 8,
+                    "png_color_type": 2,
+                    "color_space": "rgb",
+                }
+            )
+        visual_groups.append(
+            {
+                "group_id": group_id,
+                "item_ref": item_ref,
+                "file_ref": file_ref,
+                "file_sha256": source_sha256,
+                "format": "pdf",
+                "language": language,
+                "sample_count": 5,
+                "samples": visual_samples,
+            }
+        )
+
+    gold_status = {
+        "schema_version": "tos_manual_gold_status_v1",
+        "gold_set_id": "tos.gold-set.synthetic",
+        "sample_plan_ref": "ToS/source-witnesses/test/gold/sample-plan.json",
+        "content_visibility": "local_only",
+        "truth_rule": (
+            "model_draft_is_never_human_gold_and_two_source_visible_human_passes_are_required"
+        ),
+        "units": gold_units,
+        "set_status": "candidate",
+        "status_version": 1,
+    }
+    gold_status_path = gold_root / "gold-status.json"
+    gold_status_path.write_text(json.dumps(gold_status), encoding="utf-8")
+    visual_plan = {
+        "schema_version": "tos_ocr_visual_sample_plan_v1",
+        "sample_plan_id": "tos.sample-plan.synthetic-ocr",
+        "source_groups": visual_groups,
+    }
+    visual_plan_path = gold_root / "ocr-visual-samples.json"
+    visual_plan_path.write_text(json.dumps(visual_plan), encoding="utf-8")
+    render_manifest = {
+        "schema_version": "tos_ocr_render_manifest_v1",
+        "artifact_root": frozen_root.as_posix(),
+        "render_set_sha256": "a" * 64,
+        "source_files": source_files,
+        "renders": renders,
+    }
+    render_manifest_path = gold_root / "local-content/ocr/render-manifest.json"
+    render_manifest_path.parent.mkdir(parents=True)
+    render_manifest_path.write_text(json.dumps(render_manifest), encoding="utf-8")
+    return {
+        "tree": tree,
+        "gold_status_path": gold_status_path,
+        "visual_plan_path": visual_plan_path,
+        "render_manifest_path": render_manifest_path,
+        "render_manifest": render_manifest,
+        "png_bytes": png_bytes,
+    }
+
+
+def test_human_gold_review_packet_is_blind_blank_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fixture = _human_gold_review_fixture(tmp_path)
+    render_manifest = fixture["render_manifest"]
+    assert isinstance(render_manifest, dict)
+    monkeypatch.setattr(
+        human_gold_review,
+        "verify_render_manifest",
+        lambda _path: render_manifest,
+    )
+    monkeypatch.setattr(
+        human_gold_review,
+        "_pdf_inventory",
+        lambda _command, _path: {
+            "page_count": 100,
+            "pdfinfo_version": "pdfinfo synthetic-test",
+            "encrypted": "no",
+            "page_size": "test",
+        },
+    )
+    monkeypatch.setattr(
+        human_gold_review,
+        "_pdftoppm_version",
+        lambda _command: "pdftoppm synthetic-test",
+    )
+    png_bytes = fixture["png_bytes"]
+    assert isinstance(png_bytes, bytes)
+
+    def fake_render(_command: Path, _source: Path, output: Path, _page: int) -> None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(png_bytes)
+
+    monkeypatch.setattr(human_gold_review, "_render_page", fake_render)
+    shared_root = tmp_path / "shared"
+    tree = fixture["tree"]
+    assert isinstance(tree, Path)
+    manifest = human_gold_review.materialize_human_gold_review(
+        tree,
+        fixture["gold_status_path"],
+        fixture["visual_plan_path"],
+        fixture["render_manifest_path"],
+        "synthetic-human-gold-review-v1",
+        shared_root=shared_root,
+        invocation=["synthetic-test"],
+    )
+    packet_root = shared_root / "synthetic-human-gold-review-v1"
+    manifest_path = packet_root / "human-gold-review-manifest.json"
+    template_path = packet_root / manifest["review_template"]["ref"]
+    assert manifest["status"] == "awaiting-real-human-double-check"
+    assert len(manifest["units"]) == 15
+    assert manifest["context_render"]["unique_page_count"] == 21
+    assert manifest["model_outputs_visible"] is False
+    assert human_gold_review.verify_human_gold_review_manifest(manifest_path) == manifest
+
+    blank_rows = [
+        json.loads(line) for line in template_path.read_text().splitlines()
+    ]
+    assert len(blank_rows) == 15
+    assert all(
+        row["pass_1"]["performed_by_real_human"] is False
+        and row["pass_2"]["performed_by_real_human"] is False
+        and row["adjudication"]["decision"] is None
+        and row["human_gold_status"] == "candidate"
+        for row in blank_rows
+    )
+    readiness = human_gold_review.inspect_human_gold_readiness(
+        manifest_path, template_path
+    )
+    assert readiness["decision"] == "blocked"
+    assert readiness["pass_1_complete"] == 0
+    assert readiness["pass_2_complete"] == 0
+    assert readiness["accepted_human_gold_units"] == 0
+
+    for row in blank_rows:
+        row["pass_1"].update(
+            {
+                "performed_by_real_human": True,
+                "reviewer_ref": "human:test-pass-1",
+                "reviewed_at_utc": "2026-07-23T00:00:00Z",
+                "source_visible": True,
+                "source_file_digest_verified": True,
+                "page_and_region_resolved": "yes",
+                "source_legibility": "legible",
+                "diplomatic_transcription": "Synthetic source-visible pass one.",
+                "layout_and_reading_order": "Single body region.",
+                "decision": "accept",
+                "elapsed_minutes": 1.0,
+            }
+        )
+        row["pass_2"].update(
+            {
+                "performed_by_real_human": True,
+                "reviewer_ref": "human:test-pass-2",
+                "reviewed_at_utc": "2026-07-23T01:00:00Z",
+                "source_visible": True,
+                "source_file_digest_verified": True,
+                "independent_from_pass_1_attested": True,
+                "independent_diplomatic_transcription": (
+                    "Synthetic source-visible pass two."
+                ),
+                "punctuation_and_case_checked": True,
+                "hyphenation_and_page_boundary_checked": True,
+                "lineation_and_reading_order_checked": True,
+                "page_furniture_checked": True,
+                "unresolved_glyphs_checked": True,
+                "decision": "confirm",
+                "elapsed_minutes": 1.0,
+            }
+        )
+        row["adjudication"].update(
+            {
+                "decision": "accept",
+                "diplomatic_transcription": "Synthetic adjudicated transcription.",
+                "adjudicator_ref": "human:test-adjudicator",
+                "adjudicated_at_utc": "2026-07-23T02:00:00Z",
+                "correction_minutes": 0.5,
+                "rationale": "Synthetic fixture exercises the completed gate.",
+            }
+        )
+        row["human_gold_status"] = "human-double-checked"
+    completed_path = packet_root / "completed.synthetic.jsonl"
+    completed_path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in blank_rows
+        ),
+        encoding="utf-8",
+    )
+    completed = human_gold_review.inspect_human_gold_readiness(
+        manifest_path, completed_path
+    )
+    assert completed["decision"] == "ready-for-manual-metric-adjudication"
+    assert completed["accepted_human_gold_units"] == 15
+
+    limited_rows = json.loads(json.dumps(blank_rows))
+    limited_rows[0]["pass_1"]["decision"] = "accept-with-limits"
+    limited_path = packet_root / "missing-error-ledger.synthetic.jsonl"
+    limited_path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in limited_rows
+        ),
+        encoding="utf-8",
+    )
+    limited = human_gold_review.inspect_human_gold_readiness(
+        manifest_path, limited_path
+    )
+    assert limited["decision"] == "blocked"
+    assert limited["accepted_human_gold_units"] == 14
+    limited_rows[0]["adjudication"]["error_ledger_refs"] = [
+        "error-ledger:synthetic-limit-1"
+    ]
+    limited_path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in limited_rows
+        ),
+        encoding="utf-8",
+    )
+    limited_resolved = human_gold_review.inspect_human_gold_readiness(
+        manifest_path, limited_path
+    )
+    assert limited_resolved["decision"] == "ready-for-manual-metric-adjudication"
+
+    tampered_rows = json.loads(json.dumps(blank_rows))
+    tampered_rows[0]["source_pages"]["current"] = "pages/wrong-source-page.png"
+    tampered_output = packet_root / "tampered-source-pages.synthetic.jsonl"
+    tampered_output.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in tampered_rows
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        human_gold_review.HumanGoldReviewError,
+        match="static source identity drifted",
+    ):
+        human_gold_review.inspect_human_gold_readiness(
+            manifest_path, tampered_output
+        )
+
+    pass_1_path = packet_root / manifest["pass_1_workbook"]["ref"]
+    original_workbook = pass_1_path.read_text(encoding="utf-8")
+    original_manifest = manifest_path.read_text(encoding="utf-8")
+    pass_1_path.write_text(
+        original_workbook + "\n<!-- injected OCR comparator -->\n",
+        encoding="utf-8",
+    )
+    tampered_manifest = json.loads(original_manifest)
+    tampered_manifest["pass_1_workbook"]["sha256"] = hashlib.sha256(
+        pass_1_path.read_bytes()
+    ).hexdigest()
+    tampered_manifest["pass_1_workbook"]["bytes"] = pass_1_path.stat().st_size
+    manifest_path.write_text(
+        json.dumps(tampered_manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        human_gold_review.HumanGoldReviewError,
+        match="not the deterministic blind workbook",
+    ):
+        human_gold_review.verify_human_gold_review_manifest(manifest_path)
+    pass_1_path.write_text(original_workbook, encoding="utf-8")
+    manifest_path.write_text(original_manifest, encoding="utf-8")
+    assert human_gold_review.verify_human_gold_review_manifest(manifest_path) == manifest
+
+    first_page = packet_root / manifest["pages"][0]["artifact"]["ref"]
+    first_page.write_bytes(first_page.read_bytes() + b"drift")
+    with pytest.raises(human_gold_review.HumanGoldReviewError, match="drift"):
+        human_gold_review.verify_human_gold_review_manifest(manifest_path)
+
+
+def test_cli_routes_human_gold_review_and_preserves_blocked_exit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_materialize(*args: object, **kwargs: object) -> dict[str, object]:
+        captured["materialize_args"] = args
+        captured["materialize_kwargs"] = kwargs
+        return {
+            "units": [{} for _ in range(15)],
+            "context_render": {"unique_page_count": 43},
+        }
+
+    monkeypatch.setattr(lab, "materialize_human_gold_review", fake_materialize)
+    assert (
+        lab.main(
+            [
+                "materialize-human-gold-review",
+                "--tree-repo-root",
+                str(tmp_path / "tree"),
+                "--gold-status",
+                str(tmp_path / "gold-status.json"),
+                "--visual-plan",
+                str(tmp_path / "visual-plan.json"),
+                "--render-manifest",
+                str(tmp_path / "render-manifest.json"),
+                "--packet-id",
+                "human-gold-packet-v1",
+            ]
+        )
+        == 0
+    )
+    assert captured["materialize_args"] == (
+        tmp_path / "tree",
+        tmp_path / "gold-status.json",
+        tmp_path / "visual-plan.json",
+        tmp_path / "render-manifest.json",
+        "human-gold-packet-v1",
+    )
+
+    def fake_gate(*args: object, **kwargs: object) -> dict[str, object]:
+        captured["gate_args"] = args
+        return {"decision": "blocked"}
+
+    monkeypatch.setattr(lab, "inspect_human_gold_readiness", fake_gate)
+    assert (
+        lab.main(
+            [
+                "gate-human-gold-review",
+                "--manifest",
+                str(tmp_path / "manifest.json"),
+            ]
+        )
+        == 2
+    )
+    assert captured["gate_args"] == (tmp_path / "manifest.json", None)
 
 
 def _translation_source_review_plan(
