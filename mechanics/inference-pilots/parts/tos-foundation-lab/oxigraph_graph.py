@@ -97,6 +97,25 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _verify_preflight_runtime_admission(
+    preflight: dict[str, Any],
+    runtime_manifest_path: Path,
+) -> None:
+    admission = preflight.get("runtime_admission")
+    if not isinstance(admission, dict) or admission.get("verified") is not True:
+        raise OxigraphGraphError("preflight does not contain a verified PyOxigraph runtime")
+    manifest_ref = admission.get("manifest_ref")
+    if (
+        not isinstance(manifest_ref, str)
+        or Path(manifest_ref).resolve() != runtime_manifest_path.resolve()
+    ):
+        raise OxigraphGraphError("runtime manifest differs from the preflighted admission")
+    if not runtime_manifest_path.is_file():
+        raise OxigraphGraphError("preflighted runtime manifest is unavailable")
+    if admission.get("manifest_sha256") != _sha256_file(runtime_manifest_path):
+        raise OxigraphGraphError("runtime manifest digest drift after preflight")
+
+
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -288,6 +307,7 @@ def execute_oxigraph_graph(
         raise OxigraphGraphError("Oxigraph graph runner requires prepared Graph C")
     if receipt.get("status") != "prepared" or preflight.get("decision") != "ready":
         raise OxigraphGraphError("run must be prepared from a ready preflight")
+    _verify_preflight_runtime_admission(preflight, runtime_manifest_path)
     if experiment.get("family") != "graph":
         raise OxigraphGraphError("experiment specification is not graph")
 

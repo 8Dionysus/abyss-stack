@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19884822,
+  "allowed_tracked_bytes": 24285873,
+  "approved_by": "repository-owner",
+  "base_ref": "83d64234e719f74d6fd6a84a16c1a2af14754958",
+  "changed_generated_bytes": 19884822,
+  "changed_generated_files": 352,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "b363ebf026a3f720a602264616fa758035431ce4ef963f647e5a8cf375a588e7",
+  "reason": "Harden ToS laboratory service and runtime admission gates after PR review.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24285873,
+  "tracked_bytes_max": 24117248
+}

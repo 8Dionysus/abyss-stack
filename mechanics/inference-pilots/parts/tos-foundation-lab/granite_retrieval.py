@@ -93,6 +93,25 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _verify_preflight_runtime_admission(
+    preflight: dict[str, Any],
+    runtime_manifest_path: Path,
+) -> None:
+    admission = preflight.get("runtime_admission")
+    if not isinstance(admission, dict) or admission.get("verified") is not True:
+        raise GraniteRetrievalError("preflight does not contain a verified Granite runtime")
+    manifest_ref = admission.get("manifest_ref")
+    if (
+        not isinstance(manifest_ref, str)
+        or Path(manifest_ref).resolve() != runtime_manifest_path.resolve()
+    ):
+        raise GraniteRetrievalError("runtime manifest differs from the preflighted admission")
+    if not runtime_manifest_path.is_file():
+        raise GraniteRetrievalError("preflighted runtime manifest is unavailable")
+    if admission.get("manifest_sha256") != _sha256_file(runtime_manifest_path):
+        raise GraniteRetrievalError("runtime manifest digest drift after preflight")
+
+
 def _model_fingerprint(snapshot_path: Path) -> dict[str, Any]:
     snapshot_path = snapshot_path.absolute()
     resolved_snapshot = snapshot_path.resolve()
@@ -334,6 +353,7 @@ def execute_granite_retrieval(
         raise GraniteRetrievalError("Granite runner requires prepared Retrieval C")
     if receipt.get("status") != "prepared" or preflight.get("decision") != "ready":
         raise GraniteRetrievalError("run must be prepared from a ready preflight")
+    _verify_preflight_runtime_admission(preflight, runtime_manifest_path)
     if experiment.get("family") != "retrieval":
         raise GraniteRetrievalError("experiment specification is not retrieval")
     variant = next(

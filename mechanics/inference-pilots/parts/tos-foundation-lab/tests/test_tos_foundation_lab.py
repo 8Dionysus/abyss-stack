@@ -2735,6 +2735,19 @@ def test_semantic_hit_validation_requires_anchor_and_text_digest() -> None:
         raise AssertionError("semantic result with drifted text was accepted")
 
 
+def test_semantic_variant_requires_every_execution_service() -> None:
+    experiment = lab.find_experiment(lab.load_suite(), "tos-retrieval-foundation-v1")
+    variant = lab.find_variant(experiment, "B")
+
+    assert variant["required_services"] == [
+        "ovms",
+        "qdrant",
+        "langchain-api",
+        "rag-api",
+        "rerank-api",
+    ]
+
+
 def test_granite_suite_variant_is_one_exact_independent_text_challenger() -> None:
     experiment = lab.find_experiment(lab.load_suite(), "tos-retrieval-foundation-v1")
     variant = lab.find_variant(experiment, "C")
@@ -2744,6 +2757,37 @@ def test_granite_suite_variant_is_one_exact_independent_text_challenger() -> Non
     assert variant["required_devices"] == ["CPU"]
     assert "visual" not in variant["comparison_role"]
     assert "fusion" not in variant["method"].lower()
+
+
+def test_granite_execution_requires_the_exact_preflighted_runtime() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        admitted = root / "admitted/runtime-manifest.json"
+        admitted.parent.mkdir()
+        admitted.write_text('{"runtime_id":"granite-test"}\n', encoding="utf-8")
+        preflight = {
+            "runtime_admission": {
+                "verified": True,
+                "manifest_ref": admitted.as_posix(),
+                "manifest_sha256": granite._sha256_file(admitted),
+            }
+        }
+
+        granite._verify_preflight_runtime_admission(preflight, admitted)
+
+        missing = {"runtime_admission": None}
+        with pytest.raises(granite.GraniteRetrievalError, match="verified Granite"):
+            granite._verify_preflight_runtime_admission(missing, admitted)
+
+        swapped = root / "swapped/runtime-manifest.json"
+        swapped.parent.mkdir()
+        swapped.write_text(admitted.read_text(encoding="utf-8"), encoding="utf-8")
+        with pytest.raises(granite.GraniteRetrievalError, match="differs"):
+            granite._verify_preflight_runtime_admission(preflight, swapped)
+
+        admitted.write_text('{"runtime_id":"drifted"}\n', encoding="utf-8")
+        with pytest.raises(granite.GraniteRetrievalError, match="digest drift"):
+            granite._verify_preflight_runtime_admission(preflight, admitted)
 
 
 def test_granite_normalization_is_stable_and_rejects_zero_rows() -> None:
@@ -3023,6 +3067,37 @@ def test_oxigraph_projection_row_keeps_claim_review_and_literal_typing() -> None
     assert row["review_count"] == 0
     assert row["canonical_traceable"] is True
     assert row["alternative_claim_refs"] == ["tos.claim.alternative"]
+
+
+def test_oxigraph_execution_requires_the_exact_preflighted_runtime() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        admitted = root / "admitted/runtime-manifest.json"
+        admitted.parent.mkdir()
+        admitted.write_text('{"runtime_id":"oxigraph-test"}\n', encoding="utf-8")
+        preflight = {
+            "runtime_admission": {
+                "verified": True,
+                "manifest_ref": admitted.as_posix(),
+                "manifest_sha256": oxigraph_graph._sha256_file(admitted),
+            }
+        }
+
+        oxigraph_graph._verify_preflight_runtime_admission(preflight, admitted)
+
+        missing = {"runtime_admission": None}
+        with pytest.raises(oxigraph_graph.OxigraphGraphError, match="verified PyOxigraph"):
+            oxigraph_graph._verify_preflight_runtime_admission(missing, admitted)
+
+        swapped = root / "swapped/runtime-manifest.json"
+        swapped.parent.mkdir()
+        swapped.write_text(admitted.read_text(encoding="utf-8"), encoding="utf-8")
+        with pytest.raises(oxigraph_graph.OxigraphGraphError, match="differs"):
+            oxigraph_graph._verify_preflight_runtime_admission(preflight, swapped)
+
+        admitted.write_text('{"runtime_id":"drifted"}\n', encoding="utf-8")
+        with pytest.raises(oxigraph_graph.OxigraphGraphError, match="digest drift"):
+            oxigraph_graph._verify_preflight_runtime_admission(preflight, admitted)
 
 
 def test_oxigraph_store_cleanup_is_limited_to_exact_run_local_path() -> None:
