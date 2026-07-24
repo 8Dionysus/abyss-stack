@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19862941,
+  "allowed_tracked_bytes": 24263992,
+  "approved_by": "repository-owner",
+  "base_ref": "83d64234e719f74d6fd6a84a16c1a2af14754958",
+  "changed_generated_bytes": 19862941,
+  "changed_generated_files": 352,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "fcba16358355d290313a85a190c754b8e48e8a78d40fc8cec47ea00c3f631c70",
+  "reason": "Admit the bounded Tree of Sophia foundation laboratory, its fail-closed human-review contracts, structure B/C runtime routes, and exhaustive validation coverage; the new source, schemas, tests, and route card redistribute deterministic records across portable shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24263992,
+  "tracked_bytes_max": 24117248
+}
