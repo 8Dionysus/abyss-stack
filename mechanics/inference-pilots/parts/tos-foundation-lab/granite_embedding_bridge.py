@@ -20,16 +20,35 @@ from typing import Any
 def _rounded_normalized_rows(values: Any) -> list[list[float]]:
     """Return stable unit rows while rejecting zero or non-finite vectors."""
 
-    import numpy as np
+    if isinstance(values, (str, bytes)):
+        raise ValueError("expected a two-dimensional embedding matrix")
+    try:
+        raw_rows = []
+        for source_row in values:
+            if isinstance(source_row, (str, bytes)):
+                raise TypeError
+            raw_rows.append(list(source_row))
+    except TypeError as exc:
+        raise ValueError("expected a two-dimensional embedding matrix") from exc
+    if not raw_rows:
+        raise ValueError("expected a non-empty two-dimensional embedding matrix")
+    width = len(raw_rows[0])
+    if width == 0 or any(len(row) != width for row in raw_rows):
+        raise ValueError("expected a rectangular two-dimensional embedding matrix")
 
-    matrix = np.asarray(values, dtype=np.float32)
-    if matrix.ndim != 2:
-        raise ValueError(f"expected a two-dimensional embedding matrix, got {matrix.shape}")
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    if not np.isfinite(matrix).all() or not np.isfinite(norms).all() or np.any(norms <= 0):
-        raise ValueError("embedding output contains non-finite or zero-norm rows")
-    normalized = matrix / norms
-    return [[round(float(value), 9) for value in row] for row in normalized]
+    normalized: list[list[float]] = []
+    for raw_row in raw_rows:
+        try:
+            row = [float(value) for value in raw_row]
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("embedding output contains non-numeric values") from exc
+        if not all(math.isfinite(value) for value in row):
+            raise ValueError("embedding output contains non-finite or zero-norm rows")
+        norm = math.hypot(*row)
+        if not math.isfinite(norm) or norm <= 0:
+            raise ValueError("embedding output contains non-finite or zero-norm rows")
+        normalized.append([round(value / norm, 9) for value in row])
+    return normalized
 
 
 def _io_record(port: Any) -> dict[str, Any]:

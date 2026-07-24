@@ -2723,6 +2723,10 @@ def test_granite_normalization_is_stable_and_rejects_zero_rows() -> None:
     assert rows[1] == [0.0, 1.0]
     with pytest.raises(ValueError):
         granite_bridge._rounded_normalized_rows([[0.0, 0.0]])
+    with pytest.raises(ValueError):
+        granite_bridge._rounded_normalized_rows([[1.0, float("nan")]])
+    with pytest.raises(ValueError):
+        granite_bridge._rounded_normalized_rows([1.0, 2.0])
 
 
 def test_granite_cosine_ranking_is_deterministic_and_source_visible() -> None:
