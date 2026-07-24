@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/structure-vlm-selection.schema.json",
+  "title": "Tree of Sophia output-blind structure VLM selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "selection_id",
+    "experiment_id",
+    "variant",
+    "status",
+    "frozen_at_utc",
+    "frozen_before_variant_outputs",
+    "source_plan_ref",
+    "source_plan_sha256",
+    "render_manifest_ref",
+    "render_manifest_sha256",
+    "render_set_sha256",
+    "selection_law",
+    "samples",
+    "quality_gate",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {"const": "tos_structure_vlm_selection_v1"},
+    "selection_id": {"type": "string", "minLength": 1},
+    "experiment_id": {"const": "tos-structure-recovery-v1"},
+    "variant": {"const": "C"},
+    "status": {"const": "frozen"},
+    "frozen_at_utc": {"type": "string", "format": "date-time"},
+    "frozen_before_variant_outputs": {"const": true},
+    "source_plan_ref": {"type": "string", "minLength": 1},
+    "source_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "render_manifest_ref": {
+      "type": "string",
+      "pattern": "^/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab/"
+    },
+    "render_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "render_set_sha256": {"$ref": "#/$defs/sha256"},
+    "selection_law": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "hard_count",
+        "random_count",
+        "per_source_hard_count",
+        "per_source_random_count",
+        "hard_method",
+        "random_method",
+        "random_seed",
+        "output_blind",
+        "replacement_after_output_forbidden"
+      ],
+      "properties": {
+        "sample_count": {"const": 12},
+        "hard_count": {"const": 6},
+        "random_count": {"const": 6},
+        "per_source_hard_count": {"const": 2},
+        "per_source_random_count": {"const": 2},
+        "hard_method": {"type": "string", "minLength": 1},
+        "random_method": {"type": "string", "minLength": 1},
+        "random_seed": {"type": "string", "minLength": 1},
+        "output_blind": {"const": true},
+        "replacement_after_output_forbidden": {"const": true}
+      }
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "group_id", "sample_id", "source_sample_id"],
+        "properties": {
+          "lane": {"enum": ["hard", "random"]},
+          "group_id": {
+            "enum": ["ocr-antonovsky-2007", "ocr-mysl-1996", "ocr-naumann-1893"]
+          },
+          "sample_id": {"type": "string", "minLength": 1},
+          "source_sample_id": {"type": "string", "minLength": 1},
+          "rationale": {"type": "string", "minLength": 1},
+          "selection_score": {"$ref": "#/$defs/sha256"}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"lane": {"const": "hard"}}},
+            "then": {
+              "required": ["rationale"],
+              "not": {"required": ["selection_score"]}
+            }
+          },
+          {
+            "if": {"properties": {"lane": {"const": "random"}}},
+            "then": {
+              "required": ["selection_score"],
+              "not": {"required": ["rationale"]}
+            }
+          }
+        ]
+      }
+    },
+    "quality_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanical_execution_allowed",
+        "formal_quality_metrics_allowed",
+        "human_acceptance_required",
+        "reason"
+      ],
+      "properties": {
+        "mechanical_execution_allowed": {"const": true},
+        "formal_quality_metrics_allowed": {"const": false},
+        "human_acceptance_required": {"const": true},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "authority_boundary": {
+      "const": "output-blind mechanical selection only; not source truth, quality evidence, or promotion authority"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

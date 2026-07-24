@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/experiment-suite.schema.json",
+  "title": "Tree of Sophia foundation laboratory experiment suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "suite_status",
+    "owner_boundaries",
+    "artifact_roots",
+    "machine_fit_ref",
+    "experiments"
+  ],
+  "properties": {
+    "schema_version": {"const": "tos_foundation_experiment_suite_v1"},
+    "suite_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "suite_status": {"enum": ["draft", "frozen", "superseded"]},
+    "owner_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_truth", "runtime_truth", "host_policy", "manual_truth"],
+      "properties": {
+        "source_truth": {"const": "Tree-of-Sophia"},
+        "runtime_truth": {"const": "abyss-stack"},
+        "host_policy": {"const": "abyss-machine"},
+        "manual_truth": {"const": "source-visible human review"}
+      }
+    },
+    "artifact_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durable", "cache", "runtime", "temporary"],
+      "properties": {
+        "durable": {"const": "/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab"},
+        "cache": {"const": "/srv/abyss-machine/cache/ai/tree-of-sophia-foundation-lab"},
+        "runtime": {"const": "/srv/abyss-machine/runtimes/tree-of-sophia-foundation-lab"},
+        "temporary": {"const": "/srv/abyss-machine/tmp/tree-of-sophia-foundation-lab"}
+      }
+    },
+    "machine_fit_ref": {"type": "string", "minLength": 1},
+    "experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/experiment"}
+    }
+  },
+  "$defs": {
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "family",
+        "status",
+        "research_question",
+        "source_refs",
+        "sample_plan_ref",
+        "preconditions",
+        "rights_gate",
+        "resource_gates",
+        "variants",
+        "metrics",
+        "manual_review_protocol",
+        "stop_conditions",
+        "promotion_conditions"
+      ],
+      "properties": {
+        "experiment_id": {"type": "string", "pattern": "^tos-[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$"},
+        "family": {
+          "enum": [
+            "forensics",
+            "ocr",
+            "structure",
+            "alignment",
+            "translation",
+            "semantic-annotation",
+            "retrieval",
+            "graph",
+            "llm-assistance",
+            "golden-kernel-transfer"
+          ]
+        },
+        "status": {"enum": ["planned", "frozen", "running", "awaiting-manual-review", "closed", "superseded"]},
+        "research_question": {"type": "string", "minLength": 20},
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "sample_plan_ref": {"type": "string", "minLength": 1},
+        "preconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "rights_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_rights_required", "network_allowed", "restricted_content_output"],
+          "properties": {
+            "source_rights_required": {"const": true},
+            "network_allowed": {"type": "boolean"},
+            "restricted_content_output": {"enum": ["local-only", "metadata-only", "public-safe"]}
+          }
+        },
+        "resource_gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum_srv_free_bytes",
+            "minimum_available_memory_bytes",
+            "maximum_load_1m",
+            "thermal_owner",
+            "thermal_workload_class",
+            "thermal_workload_kind",
+            "estimated_output_bytes",
+            "expected_download_bytes",
+            "timeout_seconds",
+            "temperature_telemetry_required"
+          ],
+          "properties": {
+            "minimum_srv_free_bytes": {"type": "integer", "minimum": 1073741824},
+            "minimum_available_memory_bytes": {"type": "integer", "minimum": 1073741824},
+            "maximum_load_1m": {"type": "number", "exclusiveMinimum": 0},
+            "thermal_owner": {"const": "abyss-machine"},
+            "thermal_workload_class": {
+              "enum": ["probe", "light", "interactive", "medium", "heavy", "sustained"]
+            },
+            "thermal_workload_kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+            "estimated_output_bytes": {"type": "integer", "minimum": 0},
+            "expected_download_bytes": {"type": "integer", "minimum": 0},
+            "timeout_seconds": {"type": "integer", "minimum": 1},
+            "temperature_telemetry_required": {"type": "boolean"}
+          }
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/variant"}
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 4,
+          "items": {"$ref": "#/$defs/metric"}
+        },
+        "manual_review_protocol": {"$ref": "#/$defs/manualProtocol"},
+        "reference_witness_reveal_stage": {
+          "enum": ["not-applicable", "after-independent-drafts-frozen"]
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "promotion_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "comparison_role",
+        "method",
+        "implementation",
+        "version_posture",
+        "runtime",
+        "model",
+        "install_status",
+        "required_commands",
+        "required_services",
+        "required_devices",
+        "license_status",
+        "license_ref",
+        "human_input_required",
+        "network_required",
+        "expected_download_bytes",
+        "estimated_output_bytes",
+        "expected_artifacts"
+      ],
+      "properties": {
+        "label": {"enum": ["A", "B", "C"]},
+        "comparison_role": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "minLength": 1},
+        "implementation": {"type": "string", "minLength": 1},
+        "version_posture": {"type": "string", "minLength": 1},
+        "runtime": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "selection_ref": {"type": "string", "minLength": 1},
+        "install_status": {"enum": ["available", "requires-setup", "human-input", "reference-only"]},
+        "required_commands": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9_.+-]+$"}
+        },
+        "required_services": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"}
+        },
+        "required_devices": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["CPU", "GPU", "NPU", "Vulkan", "none"]}
+        },
+        "license_status": {"enum": ["verified-for-bounded-research", "pending-review", "not-applicable"]},
+        "license_ref": {"type": ["string", "null"]},
+        "human_input_required": {"type": "boolean"},
+        "network_required": {"type": "boolean"},
+        "expected_download_bytes": {"type": "integer", "minimum": 0},
+        "estimated_output_bytes": {"type": "integer", "minimum": 0},
+        "expected_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_id", "dimension", "method", "unit"],
+      "properties": {
+        "metric_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        "dimension": {"enum": ["quality", "speed", "machine-cost", "human-cost", "traceability"]},
+        "method": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1}
+      }
+    },
+    "manualProtocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_visible",
+        "blind_variant_labels",
+        "gold_double_check",
+        "random_sample_count",
+        "hard_sample_count",
+        "allow_uncertain",
+        "allow_abstain",
+        "error_ledger_required",
+        "human_acceptance_required"
+      ],
+      "properties": {
+        "source_visible": {"const": true},
+        "blind_variant_labels": {"const": true},
+        "gold_double_check": {"const": true},
+        "random_sample_count": {"type": "integer", "minimum": 1},
+        "hard_sample_count": {"type": "integer", "minimum": 1},
+        "allow_uncertain": {"const": true},
+        "allow_abstain": {"const": true},
+        "error_ledger_required": {"const": true},
+        "human_acceptance_required": {"const": true}
+      }
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/manual-review-receipt.schema.json",
+  "title": "Tree of Sophia foundation laboratory manual review receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "review_id",
+    "run_id",
+    "sample_id",
+    "source_anchor_ref",
+    "blind_variant_label",
+    "source_visible",
+    "error_counts",
+    "severity",
+    "correction_minutes",
+    "decision",
+    "rationale",
+    "reviewer_type",
+    "reviewer_ref",
+    "human_presence_attested",
+    "reviewed_at_utc",
+    "reference_witness_visible",
+    "post_reveal_changes"
+  ],
+  "properties": {
+    "schema_version": {"const": "tos_foundation_manual_review_v1"},
+    "review_id": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "sample_id": {"type": "string", "minLength": 1},
+    "source_anchor_ref": {"type": "string", "minLength": 1},
+    "blind_variant_label": {"type": "string", "pattern": "^blind-[a-z0-9]+$"},
+    "source_visible": {"const": true},
+    "error_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["omission", "addition", "substitution", "order", "anchor", "task_specific"],
+      "properties": {
+        "omission": {"type": "integer", "minimum": 0},
+        "addition": {"type": "integer", "minimum": 0},
+        "substitution": {"type": "integer", "minimum": 0},
+        "order": {"type": "integer", "minimum": 0},
+        "anchor": {"type": "integer", "minimum": 0},
+        "task_specific": {"type": "integer", "minimum": 0}
+      }
+    },
+    "severity": {"enum": ["none", "minor", "major", "catastrophic", "uncertain"]},
+    "correction_minutes": {"type": "number", "minimum": 0},
+    "decision": {"enum": ["accept", "accept-with-limits", "reject", "uncertain", "abstain"]},
+    "rationale": {"type": "string", "minLength": 1},
+    "counterreading": {"type": ["string", "null"]},
+    "reviewer_type": {"const": "human"},
+    "reviewer_ref": {"type": "string", "minLength": 1},
+    "human_presence_attested": {"const": true},
+    "reviewed_at_utc": {"type": "string", "format": "date-time"},
+    "reference_witness_visible": {"type": "boolean"},
+    "post_reveal_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["change", "accepted", "rationale"],
+        "properties": {
+          "change": {"type": "string", "minLength": 1},
+          "accepted": {"type": "boolean"},
+          "rationale": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

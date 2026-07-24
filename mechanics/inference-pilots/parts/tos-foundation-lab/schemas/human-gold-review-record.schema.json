@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/human-gold-review-record.schema.json",
+  "title": "Tree of Sophia double-source-visible human gold review record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "sample_id",
+    "source_anchor_ref",
+    "visual_sample_id",
+    "visual_anchor_ref",
+    "source_pages",
+    "model_outputs_visible",
+    "embedded_or_reference_ocr_visible",
+    "recognized_translation_visible",
+    "pass_1",
+    "pass_2",
+    "adjudication",
+    "human_gold_status",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tos_human_gold_review_record_v1"
+    },
+    "packet_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "sample_id": {
+      "type": "string",
+      "pattern": "^tos-sample-[a-z0-9-]+$"
+    },
+    "source_anchor_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visual_sample_id": {
+      "type": "string",
+      "pattern": "^tos-ocr-sample-[a-z0-9-]+$"
+    },
+    "visual_anchor_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_pages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous", "current", "next"],
+      "properties": {
+        "previous": {"type": "string", "minLength": 1},
+        "current": {"type": "string", "minLength": 1},
+        "next": {"type": "string", "minLength": 1}
+      }
+    },
+    "model_outputs_visible": {"const": false},
+    "embedded_or_reference_ocr_visible": {"const": false},
+    "recognized_translation_visible": {"const": false},
+    "pass_1": {"$ref": "#/$defs/pass1"},
+    "pass_2": {"$ref": "#/$defs/pass2"},
+    "adjudication": {"$ref": "#/$defs/adjudication"},
+    "human_gold_status": {
+      "enum": [
+        "candidate",
+        "human-pass-1",
+        "human-double-checked",
+        "rejected",
+        "uncertain"
+      ]
+    },
+    "authority_boundary": {
+      "const": "record shape and attestations do not prove transcription correctness; acceptance requires two real source-visible human passes and explicit adjudication"
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "nullableDateTime": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "nullableMinutes": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "pass1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performed_by_real_human",
+        "reviewer_ref",
+        "reviewed_at_utc",
+        "source_visible",
+        "source_file_digest_verified",
+        "page_and_region_resolved",
+        "source_legibility",
+        "diplomatic_transcription",
+        "layout_and_reading_order",
+        "unresolved_glyphs",
+        "source_damage_or_ambiguity",
+        "decision",
+        "elapsed_minutes",
+        "notes"
+      ],
+      "properties": {
+        "performed_by_real_human": {"type": "boolean"},
+        "reviewer_ref": {"$ref": "#/$defs/nullableString"},
+        "reviewed_at_utc": {"$ref": "#/$defs/nullableDateTime"},
+        "source_visible": {"type": "boolean"},
+        "source_file_digest_verified": {"type": "boolean"},
+        "page_and_region_resolved": {
+          "type": ["string", "null"],
+          "enum": ["yes", "no", "uncertain", null]
+        },
+        "source_legibility": {
+          "type": ["string", "null"],
+          "enum": ["legible", "partly-legible", "illegible", "uncertain", null]
+        },
+        "diplomatic_transcription": {"$ref": "#/$defs/nullableString"},
+        "layout_and_reading_order": {"$ref": "#/$defs/nullableString"},
+        "unresolved_glyphs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "source_damage_or_ambiguity": {"$ref": "#/$defs/nullableString"},
+        "decision": {
+          "type": ["string", "null"],
+          "enum": ["accept", "accept-with-limits", "reject", "uncertain", "abstain", null]
+        },
+        "elapsed_minutes": {"$ref": "#/$defs/nullableMinutes"},
+        "notes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "pass2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performed_by_real_human",
+        "reviewer_ref",
+        "reviewed_at_utc",
+        "source_visible",
+        "source_file_digest_verified",
+        "independent_from_pass_1_attested",
+        "pass_1_visible_during_review",
+        "independent_diplomatic_transcription",
+        "punctuation_and_case_checked",
+        "hyphenation_and_page_boundary_checked",
+        "lineation_and_reading_order_checked",
+        "page_furniture_checked",
+        "unresolved_glyphs_checked",
+        "decision",
+        "disagreements_with_pass_1",
+        "elapsed_minutes",
+        "notes"
+      ],
+      "properties": {
+        "performed_by_real_human": {"type": "boolean"},
+        "reviewer_ref": {"$ref": "#/$defs/nullableString"},
+        "reviewed_at_utc": {"$ref": "#/$defs/nullableDateTime"},
+        "source_visible": {"type": "boolean"},
+        "source_file_digest_verified": {"type": "boolean"},
+        "independent_from_pass_1_attested": {"type": "boolean"},
+        "pass_1_visible_during_review": {"type": "boolean"},
+        "independent_diplomatic_transcription": {"$ref": "#/$defs/nullableString"},
+        "punctuation_and_case_checked": {"type": "boolean"},
+        "hyphenation_and_page_boundary_checked": {"type": "boolean"},
+        "lineation_and_reading_order_checked": {"type": "boolean"},
+        "page_furniture_checked": {"type": "boolean"},
+        "unresolved_glyphs_checked": {"type": "boolean"},
+        "decision": {
+          "type": ["string", "null"],
+          "enum": ["confirm", "revise", "reject", "uncertain", "abstain", null]
+        },
+        "disagreements_with_pass_1": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "elapsed_minutes": {"$ref": "#/$defs/nullableMinutes"},
+        "notes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "diplomatic_transcription",
+        "adjudicator_ref",
+        "adjudicated_at_utc",
+        "correction_minutes",
+        "error_ledger_refs",
+        "rationale"
+      ],
+      "properties": {
+        "decision": {
+          "type": ["string", "null"],
+          "enum": ["accept", "reject", "uncertain", null]
+        },
+        "diplomatic_transcription": {"$ref": "#/$defs/nullableString"},
+        "adjudicator_ref": {"$ref": "#/$defs/nullableString"},
+        "adjudicated_at_utc": {"$ref": "#/$defs/nullableDateTime"},
+        "correction_minutes": {"$ref": "#/$defs/nullableMinutes"},
+        "error_ledger_refs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "rationale": {"$ref": "#/$defs/nullableString"}
+      }
+    }
+  }
+}

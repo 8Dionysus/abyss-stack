@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/human-gold-review-manifest.schema.json",
+  "title": "Tree of Sophia source-visible human gold review packet manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "experiment_id",
+    "status",
+    "created_at_utc",
+    "artifact_root",
+    "tree_repo_root",
+    "content_visibility",
+    "gold_status_ref",
+    "gold_status_sha256",
+    "visual_plan_ref",
+    "visual_plan_sha256",
+    "render_manifest_ref",
+    "render_manifest_sha256",
+    "render_set_sha256",
+    "source_files",
+    "context_render",
+    "pages",
+    "page_set_sha256",
+    "units",
+    "pass_1_workbook",
+    "pass_2_workbook",
+    "review_template",
+    "model_outputs_visible",
+    "embedded_or_reference_ocr_visible",
+    "recognized_translation_visible",
+    "receipt_ref",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tos_human_gold_review_packet_manifest_v1"
+    },
+    "packet_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "experiment_id": {"const": "tos-ocr-foundation-v1"},
+    "status": {"const": "awaiting-real-human-double-check"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "artifact_root": {"type": "string", "minLength": 1},
+    "tree_repo_root": {"type": "string", "minLength": 1},
+    "content_visibility": {"const": "private-local-only"},
+    "gold_status_ref": {"type": "string", "minLength": 1},
+    "gold_status_sha256": {"$ref": "#/$defs/sha256"},
+    "visual_plan_ref": {"type": "string", "minLength": 1},
+    "visual_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "render_manifest_ref": {"type": "string", "minLength": 1},
+    "render_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "render_set_sha256": {"$ref": "#/$defs/sha256"},
+    "source_files": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "item_ref",
+          "file_ref",
+          "file_sha256",
+          "language",
+          "local_path"
+        ],
+        "properties": {
+          "group_id": {"type": "string", "minLength": 1},
+          "item_ref": {"type": "string", "minLength": 1},
+          "file_ref": {"type": "string", "minLength": 1},
+          "file_sha256": {"$ref": "#/$defs/sha256"},
+          "language": {"enum": ["de", "ru"]},
+          "local_path": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "context_render": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "tool_version", "dpi", "color_mode", "page_scope", "unique_page_count"],
+      "properties": {
+        "tool": {"const": "pdftoppm"},
+        "tool_version": {"type": "string", "minLength": 1},
+        "dpi": {"const": 300},
+        "color_mode": {"const": "rgb"},
+        "page_scope": {"const": "previous-current-next around 15 frozen gold candidates"},
+        "unique_page_count": {"type": "integer", "minimum": 15}
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 15,
+      "items": {"$ref": "#/$defs/page"}
+    },
+    "page_set_sha256": {"$ref": "#/$defs/sha256"},
+    "units": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {"$ref": "#/$defs/unit"}
+    },
+    "pass_1_workbook": {"$ref": "#/$defs/artifact"},
+    "pass_2_workbook": {"$ref": "#/$defs/artifact"},
+    "review_template": {"$ref": "#/$defs/artifact"},
+    "model_outputs_visible": {"const": false},
+    "embedded_or_reference_ocr_visible": {"const": false},
+    "recognized_translation_visible": {"const": false},
+    "receipt_ref": {"type": "string", "minLength": 1},
+    "authority_boundary": {
+      "const": "private source-visible interface and blank two-pass review template only; no human transcription, OCR quality, structure quality, or gold acceptance is implied"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256", "bytes"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "pdf_page",
+        "artifact",
+        "png_width",
+        "png_height",
+        "is_frozen_center_page",
+        "frozen_render_sha256"
+      ],
+      "properties": {
+        "group_id": {"type": "string", "minLength": 1},
+        "pdf_page": {"type": "integer", "minimum": 1},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "png_width": {"type": "integer", "minimum": 1},
+        "png_height": {"type": "integer", "minimum": 1},
+        "is_frozen_center_page": {"type": "boolean"},
+        "frozen_render_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "source_anchor_ref",
+        "content_ref",
+        "visual_sample_id",
+        "visual_anchor_ref",
+        "group_id",
+        "language",
+        "pdf_page",
+        "difficulty",
+        "strata",
+        "projection_change",
+        "projection_note",
+        "previous_page_ref",
+        "current_page_ref",
+        "next_page_ref",
+        "review_status",
+        "human_gold_status"
+      ],
+      "properties": {
+        "sample_id": {"type": "string", "pattern": "^tos-sample-[a-z0-9-]+$"},
+        "source_anchor_ref": {"type": "string", "minLength": 1},
+        "content_ref": {"type": "string", "minLength": 1},
+        "visual_sample_id": {"type": "string", "pattern": "^tos-ocr-sample-[a-z0-9-]+$"},
+        "visual_anchor_ref": {"type": "string", "minLength": 1},
+        "group_id": {"type": "string", "minLength": 1},
+        "language": {"enum": ["de", "ru"]},
+        "pdf_page": {"type": "integer", "minimum": 1},
+        "difficulty": {"enum": ["ordinary", "hard", "adversarial"]},
+        "strata": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "projection_change": {"type": "string", "minLength": 1},
+        "projection_note": {"type": ["string", "null"]},
+        "previous_page_ref": {"type": "string", "minLength": 1},
+        "current_page_ref": {"type": "string", "minLength": 1},
+        "next_page_ref": {"type": "string", "minLength": 1},
+        "review_status": {"const": "not-started"},
+        "human_gold_status": {"const": "candidate"}
+      }
+    }
+  }
+}

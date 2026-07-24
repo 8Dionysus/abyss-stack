@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack/mechanics/inference-pilots/tos-foundation-lab/translation-source-review-manifest.schema.json",
+  "title": "Tree of Sophia source-visible human review packet manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "experiment_id",
+    "status",
+    "created_at_utc",
+    "artifact_root",
+    "review_plan_ref",
+    "review_plan_sha256",
+    "source_witness",
+    "visual_witness",
+    "rights_snapshots",
+    "render",
+    "pages",
+    "page_set_sha256",
+    "units",
+    "pass_1_workbook",
+    "pass_2_workbook",
+    "review_template",
+    "recognized_comparator",
+    "lanes",
+    "receipt_ref",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {"const": "tos_translation_source_review_packet_manifest_v1"},
+    "packet_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "experiment_id": {"const": "tos-translation-foundation-v1"},
+    "status": {"const": "awaiting-real-human-source-review"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "artifact_root": {"type": "string", "pattern": "^/"},
+    "review_plan_ref": {"type": "string", "pattern": "^/"},
+    "review_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "source_witness": {"$ref": "#/$defs/sourceWitness"},
+    "visual_witness": {"$ref": "#/$defs/visualWitness"},
+    "rights_snapshots": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "object", "minProperties": 8}
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "tool_version",
+        "dpi",
+        "color_mode",
+        "format",
+        "page_scope",
+        "unique_page_count"
+      ],
+      "properties": {
+        "tool": {"const": "pdftoppm"},
+        "tool_version": {"type": "string", "minLength": 1},
+        "dpi": {"const": 180},
+        "color_mode": {"const": "rgb"},
+        "format": {"const": "png"},
+        "page_scope": {"const": "previous-current-next triplets"},
+        "unique_page_count": {"type": "integer", "minimum": 30}
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 30,
+      "items": {"$ref": "#/$defs/page"}
+    },
+    "page_set_sha256": {"$ref": "#/$defs/sha256"},
+    "units": {
+      "type": "array",
+      "minItems": 30,
+      "maxItems": 30,
+      "items": {"$ref": "#/$defs/unit"}
+    },
+    "pass_1_workbook": {
+      "allOf": [
+        {"$ref": "#/$defs/artifact"},
+        {"properties": {"ref": {"const": "review/pass-1-layout-and-transcription.html"}}}
+      ]
+    },
+    "pass_2_workbook": {
+      "allOf": [
+        {"$ref": "#/$defs/artifact"},
+        {"properties": {"ref": {"const": "review/pass-2-boundary-verification.html"}}}
+      ]
+    },
+    "review_template": {
+      "allOf": [
+        {"$ref": "#/$defs/artifact"},
+        {"properties": {"ref": {"const": "reviews/source-review-v2.template.jsonl"}}}
+      ]
+    },
+    "recognized_comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expression_ref",
+        "item_ref",
+        "visibility",
+        "content_consulted",
+        "content_emitted"
+      ],
+      "properties": {
+        "expression_ref": {"type": "string", "minLength": 1},
+        "item_ref": {"type": "string", "minLength": 1},
+        "visibility": {"const": "sealed"},
+        "content_consulted": {"const": false},
+        "content_emitted": {"const": false}
+      }
+    },
+    "lanes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["human_only", "ai_only", "ai_human"],
+      "properties": {
+        "human_only": {"const": "awaiting-real-human-source-input"},
+        "ai_only": {"const": "blocked-pending-human-source-acceptance"},
+        "ai_human": {"const": "blocked-pending-independent-drafts"}
+      }
+    },
+    "receipt_ref": {"const": "translation-source-review.receipt.json"},
+    "authority_boundary": {
+      "const": "private source-visible interface and blank review templates only; no human pass, German transcription, translation draft, or source acceptance is implied"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256", "bytes"],
+      "properties": {
+        "ref": {"type": "string", "pattern": "^[a-z0-9][a-z0-9./-]*$"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sourceWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_ref", "file_ref", "file_sha256", "role"],
+      "properties": {
+        "item_ref": {"type": "string", "minLength": 1},
+        "file_ref": {"type": "string", "minLength": 1},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "role": {"const": "automatic-ocr-derivative-not-source-truth"}
+      }
+    },
+    "visualWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_ref",
+        "file_ref",
+        "file_sha256",
+        "role",
+        "page_count"
+      ],
+      "properties": {
+        "item_ref": {"type": "string", "minLength": 1},
+        "file_ref": {"type": "string", "minLength": 1},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "role": {"const": "source-visible-scan-witness"},
+        "page_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pdf_page", "artifact", "png_width", "png_height"],
+      "properties": {
+        "pdf_page": {"type": "integer", "minimum": 1},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "png_width": {"type": "integer", "minimum": 1},
+        "png_height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_unit_id",
+        "context_anchor_ref",
+        "previous_page_ref",
+        "current_page_ref",
+        "next_page_ref",
+        "v1_candidate_visible",
+        "review_status",
+        "human_source_acceptance"
+      ],
+      "properties": {
+        "review_unit_id": {
+          "type": "string",
+          "pattern": "^tos-translation-source-review-v2-[0-9]{3}$"
+        },
+        "context_anchor_ref": {"type": "string", "minLength": 1},
+        "previous_page_ref": {"type": "string", "pattern": "^pages/pdf-page-[0-9]{4}\\.png$"},
+        "current_page_ref": {"type": "string", "pattern": "^pages/pdf-page-[0-9]{4}\\.png$"},
+        "next_page_ref": {"type": "string", "pattern": "^pages/pdf-page-[0-9]{4}\\.png$"},
+        "v1_candidate_visible": {"const": false},
+        "review_status": {"const": "not-started"},
+        "human_source_acceptance": {"const": false}
+      }
+    }
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "schema_version": "tos_structure_vlm_selection_v1",
+  "selection_id": "tos.structure-vlm-selection.zarathustra-foundation-pilot-v1",
+  "experiment_id": "tos-structure-recovery-v1",
+  "variant": "C",
+  "status": "frozen",
+  "frozen_at_utc": "2026-07-23T18:05:00Z",
+  "frozen_before_variant_outputs": true,
+  "source_plan_ref": "Tree-of-Sophia:ToS/source-witnesses/works/friedrich-nietzsche/also-sprach-zarathustra/gold-sets/foundation-pilot-v1/ocr-visual-samples.json",
+  "source_plan_sha256": "3fd111023cf2ffdbee935d771f36f314d8087677d57e9ef34a64e19e27ddae06",
+  "render_manifest_ref": "/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab/shared-inputs/tos-ocr-foundation-v1/zarathustra-foundation-pilot-v1-render-20260722/render-manifest.v1.json",
+  "render_manifest_sha256": "734e7474923ec2697a243b1e1b322c43c4e2a8b82b6336df57ab82f3bbc8fec7",
+  "render_set_sha256": "031c036b72904006d1cd1c885b843833d8dcc20b7aa25cbfb316aa49bcdbaef4",
+  "selection_law": {
+    "sample_count": 12,
+    "hard_count": 6,
+    "random_count": 6,
+    "per_source_hard_count": 2,
+    "per_source_random_count": 2,
+    "hard_method": "purposeful pre-output coverage of contents or reading order, verse or unusual lineation, and known source-layer damage",
+    "random_method": "take the first two remaining source-local samples ordered by sha256(seed + vertical-bar + group_id + vertical-bar + sample_id)",
+    "random_seed": "tos-structure-vlm-pilot-v1|2026-07-23|random-lane|frozen-before-c-output",
+    "output_blind": true,
+    "replacement_after_output_forbidden": true
+  },
+  "samples": [
+    {
+      "lane": "hard",
+      "group_id": "ocr-antonovsky-2007",
+      "sample_id": "tos-ocr-sample-antonovsky-p007",
+      "source_sample_id": "tos-sample-antonovsky-p007",
+      "rationale": "dense contents page tests hierarchy, page-number association, and reading order"
+    },
+    {
+      "lane": "hard",
+      "group_id": "ocr-antonovsky-2007",
+      "sample_id": "tos-ocr-sample-antonovsky-p300",
+      "source_sample_id": "tos-sample-antonovsky-p300",
+      "rationale": "verse-like layout tests lineation and unusual punctuation"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-antonovsky-2007",
+      "sample_id": "tos-ocr-sample-antonovsky-p330",
+      "source_sample_id": "tos-sample-antonovsky-p330",
+      "selection_score": "09b9c86aa422835dd113ef7cb271b76de5096d2ad346552b69a2fd70362c1b4d"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-antonovsky-2007",
+      "sample_id": "tos-ocr-sample-antonovsky-p012",
+      "source_sample_id": "tos-sample-antonovsky-p012",
+      "selection_score": "410c59644c63f12a788b85af97ef788d3629902f96384ea4a421a149078fef73"
+    },
+    {
+      "lane": "hard",
+      "group_id": "ocr-mysl-1996",
+      "sample_id": "tos-ocr-sample-mysl-p008",
+      "source_sample_id": "tos-sample-mysl-p008",
+      "rationale": "known corrupted ABBYY layer tests whether visual structure avoids inherited text-layer damage"
+    },
+    {
+      "lane": "hard",
+      "group_id": "ocr-mysl-1996",
+      "sample_id": "tos-ocr-sample-mysl-p166",
+      "source_sample_id": "tos-sample-mysl-p166",
+      "rationale": "song form tests refrain, indentation, punctuation, and reading order"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-mysl-1996",
+      "sample_id": "tos-ocr-sample-mysl-p001",
+      "source_sample_id": "tos-sample-mysl-p001",
+      "selection_score": "179d737f3951b878770f34e910f3729df80203c937354113f570e6f2ec06235d"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-mysl-1996",
+      "sample_id": "tos-ocr-sample-mysl-p004",
+      "source_sample_id": "tos-sample-mysl-p004",
+      "selection_score": "201f88ccb6be78b64e8745522400c4993a818f76140cf209c3a50dcbaf8d982b"
+    },
+    {
+      "lane": "hard",
+      "group_id": "ocr-naumann-1893",
+      "sample_id": "tos-ocr-sample-naumann-p048",
+      "source_sample_id": "tos-sample-naumann-page-047",
+      "rationale": "low-confidence historical contents page tests reading order and page-number association"
+    },
+    {
+      "lane": "hard",
+      "group_id": "ocr-naumann-1893",
+      "sample_id": "tos-ocr-sample-naumann-p381",
+      "source_sample_id": "tos-sample-naumann-page-380",
+      "rationale": "historical German song form tests lineation, refrain, and scan furniture"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-naumann-1893",
+      "sample_id": "tos-ocr-sample-naumann-p044",
+      "source_sample_id": "tos-sample-naumann-page-043",
+      "selection_score": "21c5b99c82eb27723918fbd770e1cf6ad745cb9758184dce407f50d2dcdb15c7"
+    },
+    {
+      "lane": "random",
+      "group_id": "ocr-naumann-1893",
+      "sample_id": "tos-ocr-sample-naumann-p060",
+      "source_sample_id": "tos-sample-naumann-page-059",
+      "selection_score": "4a2551cfb1fdbee7fe65f17eaaa142b2ffeb3014d232119fe88b5b38f40bb5bd"
+    }
+  ],
+  "quality_gate": {
+    "mechanical_execution_allowed": true,
+    "formal_quality_metrics_allowed": false,
+    "human_acceptance_required": true,
+    "reason": "double-source-visible human structural gold and correction timing are not complete"
+  },
+  "authority_boundary": "output-blind mechanical selection only; not source truth, quality evidence, or promotion authority"
+}

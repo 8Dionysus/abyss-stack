@@ -327,6 +327,13 @@ REQUIRED_AGENTS_DOCS: dict[str, tuple[str, ...]] = {
         'aoa-long-horizon-pilot',
         'mechanics/agon-runtime',
     ),
+    'mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md': (
+        'Tree of Sophia source forensics',
+        '/etc/abyss-machine/storage-policy.json',
+        'Never synthesize a missing human-only lane',
+        'Manual source-visible review owns content acceptance',
+        'tos_foundation_lab.py validate',
+    ),
     'mechanics/agon-runtime/AGENTS.md': (
         'agon-runtime',
         'dry-run kernel',
