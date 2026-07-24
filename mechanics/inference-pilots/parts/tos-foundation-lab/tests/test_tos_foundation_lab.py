@@ -2630,6 +2630,36 @@ def test_cli_translation_gate_returns_two_while_human_source_review_is_blocked(
     assert captured["kwargs"] == {"reference_register_path": references}
 
 
+def test_cli_translation_gate_returns_zero_for_emitted_ready_decision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def fake_readiness(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "decision": "ready-for-independent-source-grounded-pre-draft-analysis",
+            "gates": {"blocked_reasons": []},
+        }
+
+    monkeypatch.setattr(lab, "inspect_translation_lab_readiness", fake_readiness)
+    assert (
+        lab.main(
+            [
+                "gate-translation-lab",
+                "--tree-repo-root",
+                str(tmp_path / "tree"),
+                "--laboratory-plan",
+                str(tmp_path / "plan.json"),
+                "--reference-register",
+                str(tmp_path / "references.json"),
+                "--source-review-manifest",
+                str(tmp_path / "manifest.json"),
+                "--human-review-output",
+                str(tmp_path / "human.jsonl"),
+            ]
+        )
+        == 0
+    )
+
+
 def test_lexical_normalization_and_fts5_keep_source_anchors() -> None:
     assert lexical.normalize_text("  ÜBERMENSCH\nErde ") == "übermensch erde"
     passages = [
@@ -2882,6 +2912,13 @@ def test_neo4j_bridge_catalog_covers_only_frozen_graph_operations() -> None:
     assert "canonical_traceable" in neo4j_bridge.query_catalog()["traceability_inventory"]
     assert "subject.ref_kind = 'tos_id'" in neo4j_bridge.query_catalog()["claim_family"]
     assert "object.ref_kind = 'literal'" in neo4j_bridge.query_catalog()["claim_family"]
+
+
+def test_neo4j_variant_requires_database_and_bridge_services() -> None:
+    experiment = lab.find_experiment(lab.load_suite(), "tos-graph-projection-v1")
+    variant = lab.find_variant(experiment, "B")
+
+    assert variant["required_services"] == ["abyss_neo4j_1", "rag-api"]
 
 
 def test_neo4j_claim_family_keeps_literals_out_of_identity_refs() -> None:

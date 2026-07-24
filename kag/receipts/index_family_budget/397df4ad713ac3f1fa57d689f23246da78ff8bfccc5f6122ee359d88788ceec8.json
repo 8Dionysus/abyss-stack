@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19869493,
+  "allowed_tracked_bytes": 24270544,
+  "approved_by": "repository-owner",
+  "base_ref": "83d64234e719f74d6fd6a84a16c1a2af14754958",
+  "changed_generated_bytes": 19869493,
+  "changed_generated_files": 352,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "397df4ad713ac3f1fa57d689f23246da78ff8bfccc5f6122ee359d88788ceec8",
+  "reason": "Admit the bounded Tree of Sophia foundation laboratory and its reviewed Neo4j service-gate and translation-readiness CLI corrections; the source, tests, and route contracts redistribute deterministic records across portable shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24270544,
+  "tracked_bytes_max": 24117248
+}

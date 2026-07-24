@@ -1622,7 +1622,7 @@ def main(argv: list[str] | None = None) -> int:
                 "it is not human identity, transcription, translation, etymology, or semantic truth"
             )
             return 0 if readiness["decision"] == (
-                "ready-for-independent-source-grounded-lanes"
+                "ready-for-independent-source-grounded-pre-draft-analysis"
             ) else 2
 
         if args.command == "materialize-tesseract-runtime":
