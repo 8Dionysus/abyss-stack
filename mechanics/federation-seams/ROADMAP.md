@@ -9,6 +9,8 @@
 - keep KAG runtime projection cost, latency, retrieval quality, and retention
   measured against the bundle and receipts
 - keep route-api consumption subordinate to owner repositories
+- keep current routing ABI fields and mirror hashes fail-closed while the
+  `aoa-sdk` successor remains shadow-only
 
 ## Next candidates
 
@@ -18,6 +20,8 @@
 - add a seam summary matrix if owner routes become hard to scan from `PARTS.md`
 - split route-api specific federation checks if the service grows more
   independent from sync checks
+- admit an exact routing trust verdict and SDK producer identity only through
+  the reviewed M2/G5 runtime cutover contract
 - add stronger contract tests for owner mirror inputs only when a downstream
   runtime consumer requires them
 

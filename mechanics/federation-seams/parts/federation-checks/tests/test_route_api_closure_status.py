@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -137,6 +138,52 @@ datasources:
         root = Path(temp_dir.name)
         module = self.module
         runtime_templates = BRIDGE_CONFIG["runtime_evidence_templates"]
+        routing_root = root / "aoa-routing"
+        routing_required_files = self.make_required_files(
+            routing_root,
+            "aoa-routing",
+        )
+        routing_source_ref = "a" * 40
+        routing_subject_digest = "sha256:" + ("b" * 64)
+        routing_record_id = "routing-record-1"
+        routing_manifest = {
+            "schema": "abyss_stack_federation_mirror_manifest_v1",
+            "layer": "aoa-routing",
+            "source_git_commit": routing_source_ref,
+            "required_file_count": len(routing_required_files),
+            "required_files": routing_required_files,
+            "file_sha256": {
+                rel_path: hashlib.sha256(
+                    (routing_root / rel_path).read_bytes()
+                ).hexdigest()
+                for rel_path in routing_required_files
+            },
+            "artifact_subject_digest": routing_subject_digest,
+            "mirror_is_authority": False,
+            "trust_verdict": {
+                "ok": True,
+                "schema": "abyss_machine_artifact_trust_gate_v1",
+                "verdict": "allow",
+                "artifact_class": "thin_routing_readmodel_bundle",
+                "consumer_intent": "runtime",
+                "subject_digest": routing_subject_digest,
+                "record_id": routing_record_id,
+                "require_latest": True,
+                "latest_record_id": routing_record_id,
+                "inspected_claims": {
+                    "subject_identity": {
+                        "subject_digest_expected": routing_subject_digest,
+                        "subject_digest_matched": True,
+                    }
+                },
+                "record": {
+                    "record_id": routing_record_id,
+                    "artifact_class": "thin_routing_readmodel_bundle",
+                    "source_repo": "aoa-routing",
+                    "source_ref": routing_source_ref,
+                },
+            },
+        }
 
         return module.AppStore(
             agents=module.LayerStore(
@@ -171,20 +218,33 @@ datasources:
             routing=module.LayerStore(
                 layer="aoa-routing",
                 config_path=root / "aoa-routing.yaml",
-                mirror_root=root / "aoa-routing",
-                required_files=self.make_required_files(root / "aoa-routing", "aoa-routing"),
+                mirror_root=routing_root,
+                required_files=routing_required_files,
                 flags={"advisory_only": True, "allow_free_text_task_routing": False},
                 payloads={
-                    "router": {"router_version": "1"},
-                    "cross_repo_registry": {"version": "1"},
+                    "router": {
+                        "router_version": 1,
+                        "artifact_identity": {
+                            "owner_repo": "aoa-routing",
+                            "abi_epoch": "aoa_routing_thin_router_v1",
+                        },
+                    },
+                    "cross_repo_registry": {"registry_version": 1},
                     "surface_hints": {"version": "1"},
                     "tier_hints": {"version": "1"},
                     "recommended_paths": {"version": "1"},
                     "pairing_hints": {"version": "1"},
                     "kag_source_lift_relation_hints": {"version": "1"},
-                    "federation_entrypoints": {"version": "1"},
-                    "return_hints": {"version": "1"},
-                    "tiny_model_entrypoints": {"version": "1"},
+                    "federation_entrypoints": {
+                        "schema_version": "aoa_routing_federation_entrypoints_v2"
+                    },
+                    "return_hints": {
+                        "schema_version": "aoa_routing_return_navigation_hints_v2"
+                    },
+                    "tiny_model_entrypoints": {
+                        "schema_version": "aoa_routing_tiny_model_entrypoints_v2"
+                    },
+                    "mirror_manifest": routing_manifest,
                 },
             ),
             memo=module.LayerStore(
@@ -402,6 +462,12 @@ datasources:
         payload = self.module.health()
 
         self.assertTrue(payload["ok"])
+        self.assertTrue(payload["layer_readiness"]["aoa-routing"])
+        self.assertTrue(payload["routing_provenance"]["trust_verdict_available"])
+        self.assertEqual(
+            payload["routing_provenance"]["source_git_commit"],
+            "a" * 40,
+        )
         self.assertTrue(payload["closure_summary"]["closure_ready"])
         self.assertEqual(payload["closure_summary"]["ready_layer_count"], 7)
         self.assertEqual(payload["operator_verdict_command"], "aoa-status --autonomy --json")
@@ -413,12 +479,60 @@ datasources:
 
         payload = self.module.surface_status()
 
-        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["ok"])
         self.assertFalse(payload["closure_summary"]["closure_ready"])
         self.assertIn("aoa-playbooks", payload["closure_summary"]["degraded_layers"])
         closure = payload["layers_status"]["aoa-playbooks"]["closure_status"]
         self.assertFalse(closure["consumer_ready"])
         self.assertIn("playbook registry missing entries", closure["reasons"])
+
+    def test_routing_layer_reports_content_ready_but_not_closed_without_trust(self) -> None:
+        store = self.make_store()
+        del store.routing.payloads["mirror_manifest"]["trust_verdict"]
+        self.module.STORE = store
+
+        payload = self.module.surface_status()
+        closure = payload["layers_status"]["aoa-routing"]["closure_status"]
+
+        self.assertFalse(payload["ok"])
+        self.assertTrue(closure["mirror_ready"])
+        self.assertTrue(closure["consumer_ready"])
+        self.assertFalse(closure["provenance_ready"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertEqual(
+            closure["provenance_reasons"],
+            ["routing mirror trust verdict is unavailable"],
+        )
+        self.assertFalse(payload["routing_provenance"]["trust_verdict_available"])
+
+    def test_routing_layer_rejects_tampered_manifest_content_hash(self) -> None:
+        store = self.make_store()
+        rel_path = store.routing.required_files[0]
+        store.routing.payloads["mirror_manifest"]["file_sha256"][rel_path] = "0" * 64
+
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertTrue(closure["consumer_ready"])
+        self.assertFalse(closure["provenance_ready"])
+        self.assertIn(
+            f"routing mirror provenance content hashes do not match: {rel_path}",
+            closure["provenance_reasons"],
+        )
+
+    def test_routing_layer_rejects_unbound_trust_verdict(self) -> None:
+        store = self.make_store()
+        store.routing.payloads["mirror_manifest"]["trust_verdict"][
+            "subject_digest"
+        ] = "sha256:" + ("c" * 64)
+
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertTrue(closure["consumer_ready"])
+        self.assertFalse(closure["provenance_ready"])
+        self.assertIn(
+            "routing mirror trust verdict subject digest drifted",
+            closure["provenance_reasons"],
+        )
 
     def test_evals_layer_status_includes_bridge_managed_runtime_evidence_files(self) -> None:
         temp_dir = tempfile.TemporaryDirectory()

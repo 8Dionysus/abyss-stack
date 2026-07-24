@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +35,8 @@ BASE_RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
     "workhorse-local": "examples/runtime_evidence_selection.workhorse-local.example.json",
     "return-anchor-integrity": "examples/runtime_evidence_selection.return-anchor-integrity.example.json",
 }
+GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+SHA256_DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 @dataclass(frozen=True)
@@ -75,6 +79,12 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise RuntimeError(f"mirrored JSON must be an object: {path}")
     return payload
+
+
+def load_optional_json(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    return load_json(path)
 
 
 def require_mapping(value: Any, label: str) -> dict[str, Any]:
@@ -365,6 +375,9 @@ def load_routing_layer(config_path: Path, config: dict[str, Any], mirror_root: P
         "federation_entrypoints": load_json(mirror_root / "generated/federation_entrypoints.min.json"),
         "return_hints": load_json(mirror_root / "generated/return_navigation_hints.min.json"),
         "tiny_model_entrypoints": load_json(mirror_root / "generated/tiny_model_entrypoints.json"),
+        "mirror_manifest": load_optional_json(
+            mirror_root / "manifest/federation_mirror_manifest.json"
+        ),
     }
 
     return LayerStore(
@@ -621,6 +634,165 @@ def load_store(config_dir: Path) -> AppStore:
     )
 
 
+def routing_surface_version(
+    payload: dict[str, Any],
+    *,
+    legacy_key: str | None = None,
+) -> str | int | None:
+    for key in ("version", "schema_version", legacy_key):
+        if key is None:
+            continue
+        value = payload.get(key)
+        if isinstance(value, (str, int)) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
+    manifest = layer.payloads.get("mirror_manifest")
+    identity = layer.payloads["router"].get("artifact_identity")
+    if not isinstance(manifest, dict):
+        return {
+            "manifest_present": False,
+            "source_git_commit": None,
+            "artifact_identity": identity if isinstance(identity, dict) else None,
+            "content_hashes_present": False,
+            "trust_verdict": None,
+            "trust_verdict_available": False,
+        }
+    hashes = manifest.get("file_sha256")
+    trust_verdict = manifest.get("trust_verdict")
+    return {
+        "manifest_present": True,
+        "manifest_schema": manifest.get("schema"),
+        "source_git_commit": manifest.get("source_git_commit"),
+        "artifact_subject_digest": manifest.get("artifact_subject_digest"),
+        "artifact_identity": identity if isinstance(identity, dict) else None,
+        "content_hashes_present": isinstance(hashes, dict) and bool(hashes),
+        "required_file_count": manifest.get("required_file_count"),
+        "mirror_is_authority": manifest.get("mirror_is_authority"),
+        "trust_verdict": trust_verdict if isinstance(trust_verdict, dict) else None,
+        "trust_verdict_available": isinstance(trust_verdict, dict),
+    }
+
+
+def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
+    reasons: list[str] = []
+    manifest = layer.payloads.get("mirror_manifest")
+    if not isinstance(manifest, dict):
+        return [
+            "routing mirror provenance manifest is missing",
+            "routing mirror trust verdict is unavailable",
+        ]
+    if manifest.get("schema") != "abyss_stack_federation_mirror_manifest_v1":
+        reasons.append("routing mirror provenance manifest schema is invalid")
+    if manifest.get("layer") != "aoa-routing":
+        reasons.append("routing mirror provenance manifest layer is invalid")
+    if manifest.get("mirror_is_authority") is not False:
+        reasons.append("routing mirror provenance must deny mirror authority")
+    if manifest.get("required_file_count") != len(layer.required_files):
+        reasons.append("routing mirror provenance required-file count drifted")
+    if manifest.get("required_files") != layer.required_files:
+        reasons.append("routing mirror provenance required-file list drifted")
+
+    source_ref = manifest.get("source_git_commit")
+    if not isinstance(source_ref, str) or not GIT_OBJECT_ID_PATTERN.fullmatch(
+        source_ref
+    ):
+        reasons.append("routing mirror provenance source Git ref is unavailable")
+
+    file_hashes = manifest.get("file_sha256")
+    if not isinstance(file_hashes, dict):
+        reasons.append("routing mirror provenance content hashes are missing")
+    else:
+        if set(file_hashes) != set(layer.required_files):
+            reasons.append("routing mirror provenance content-hash set drifted")
+        else:
+            mismatched = []
+            for rel_path in layer.required_files:
+                path = layer.mirror_root / rel_path
+                if (
+                    not path.is_file()
+                    or not isinstance(file_hashes.get(rel_path), str)
+                    or file_hashes[rel_path]
+                    != hashlib.sha256(path.read_bytes()).hexdigest()
+                ):
+                    mismatched.append(rel_path)
+            if mismatched:
+                reasons.append(
+                    "routing mirror provenance content hashes do not match: "
+                    + ", ".join(mismatched)
+                )
+
+    identity = layer.payloads["router"].get("artifact_identity")
+    if not isinstance(identity, dict):
+        reasons.append("routing artifact identity is missing")
+    else:
+        if identity.get("owner_repo") != "aoa-routing":
+            reasons.append("routing artifact identity owner is invalid before G5")
+        if identity.get("abi_epoch") != "aoa_routing_thin_router_v1":
+            reasons.append("routing artifact identity ABI epoch is invalid")
+
+    trust_verdict = manifest.get("trust_verdict")
+    if not isinstance(trust_verdict, dict):
+        reasons.append("routing mirror trust verdict is unavailable")
+    else:
+        subject_digest = manifest.get("artifact_subject_digest")
+        if (
+            not isinstance(subject_digest, str)
+            or not SHA256_DIGEST_PATTERN.fullmatch(subject_digest)
+        ):
+            reasons.append("routing mirror artifact subject digest is unavailable")
+        if trust_verdict.get("schema") != "abyss_machine_artifact_trust_gate_v1":
+            reasons.append("routing mirror trust verdict schema is invalid")
+        if trust_verdict.get("ok") is not True:
+            reasons.append("routing mirror trust verdict is not ready")
+        if trust_verdict.get("verdict") not in {"allow", "warn"}:
+            reasons.append("routing mirror trust verdict does not admit the artifact")
+        if trust_verdict.get("artifact_class") != "thin_routing_readmodel_bundle":
+            reasons.append("routing mirror trust verdict artifact class is invalid")
+        if trust_verdict.get("consumer_intent") != "runtime":
+            reasons.append("routing mirror trust verdict consumer intent is invalid")
+        if trust_verdict.get("subject_digest") != subject_digest:
+            reasons.append("routing mirror trust verdict subject digest drifted")
+        if trust_verdict.get("require_latest") is not True:
+            reasons.append("routing mirror trust verdict must require the latest record")
+
+        record = trust_verdict.get("record")
+        if not isinstance(record, dict):
+            reasons.append("routing mirror trust verdict record is missing")
+        else:
+            if record.get("artifact_class") != "thin_routing_readmodel_bundle":
+                reasons.append("routing mirror trust record artifact class is invalid")
+            if record.get("source_ref") != source_ref:
+                reasons.append("routing mirror trust verdict source ref drifted")
+            if isinstance(identity, dict) and record.get("source_repo") != identity.get(
+                "owner_repo"
+            ):
+                reasons.append("routing mirror trust verdict source owner drifted")
+
+        record_id = trust_verdict.get("record_id")
+        if (
+            not isinstance(record_id, str)
+            or not record_id
+            or trust_verdict.get("latest_record_id") != record_id
+        ):
+            reasons.append("routing mirror trust verdict latest-record binding drifted")
+        inspected_claims = trust_verdict.get("inspected_claims")
+        subject_identity = (
+            inspected_claims.get("subject_identity")
+            if isinstance(inspected_claims, dict)
+            else None
+        )
+        if (
+            not isinstance(subject_identity, dict)
+            or subject_identity.get("subject_digest_expected") != subject_digest
+            or subject_identity.get("subject_digest_matched") is not True
+        ):
+            reasons.append("routing mirror trust verdict subject evidence is invalid")
+    return reasons
+
+
 def layer_status(layer: LayerStore) -> dict[str, Any]:
     files = {
         rel_path: {
@@ -653,16 +825,62 @@ def layer_status(layer: LayerStore) -> dict[str, Any]:
     else:
         if layer.layer == "aoa-routing":
             metadata = {
-                "router": {"version": layer.payloads["router"].get("router_version")},
-                "cross_repo_registry": {"version": layer.payloads["cross_repo_registry"].get("version")},
-                "surface_hints": {"version": layer.payloads["surface_hints"].get("version")},
-                "tier_hints": {"version": layer.payloads["tier_hints"].get("version")},
-                "recommended_paths": {"version": layer.payloads["recommended_paths"].get("version")},
-                "pairing_hints": {"version": layer.payloads["pairing_hints"].get("version")},
-                "kag_source_lift_relation_hints": {"version": layer.payloads["kag_source_lift_relation_hints"].get("version")},
-                "federation_entrypoints": {"version": layer.payloads["federation_entrypoints"].get("version")},
-                "return_hints": {"version": layer.payloads["return_hints"].get("version")},
-                "tiny_model_entrypoints": {"version": layer.payloads["tiny_model_entrypoints"].get("version")},
+                "router": {
+                    "version": routing_surface_version(
+                        layer.payloads["router"],
+                        legacy_key="router_version",
+                    ),
+                    "artifact_identity": layer.payloads["router"].get(
+                        "artifact_identity"
+                    ),
+                },
+                "cross_repo_registry": {
+                    "version": routing_surface_version(
+                        layer.payloads["cross_repo_registry"],
+                        legacy_key="registry_version",
+                    )
+                },
+                "surface_hints": {
+                    "version": routing_surface_version(
+                        layer.payloads["surface_hints"]
+                    )
+                },
+                "tier_hints": {
+                    "version": routing_surface_version(
+                        layer.payloads["tier_hints"]
+                    )
+                },
+                "recommended_paths": {
+                    "version": routing_surface_version(
+                        layer.payloads["recommended_paths"]
+                    )
+                },
+                "pairing_hints": {
+                    "version": routing_surface_version(
+                        layer.payloads["pairing_hints"]
+                    )
+                },
+                "kag_source_lift_relation_hints": {
+                    "version": routing_surface_version(
+                        layer.payloads["kag_source_lift_relation_hints"]
+                    )
+                },
+                "federation_entrypoints": {
+                    "version": routing_surface_version(
+                        layer.payloads["federation_entrypoints"]
+                    )
+                },
+                "return_hints": {
+                    "version": routing_surface_version(
+                        layer.payloads["return_hints"]
+                    )
+                },
+                "tiny_model_entrypoints": {
+                    "version": routing_surface_version(
+                        layer.payloads["tiny_model_entrypoints"]
+                    )
+                },
+                "mirror_provenance": routing_mirror_provenance_summary(layer),
             }
         elif layer.layer == "aoa-memo":
             metadata = {
@@ -755,15 +973,18 @@ def layer_closure_reasons(layer: LayerStore) -> list[str]:
         return reasons
 
     if layer.layer == "aoa-routing":
-        if layer.payloads["router"].get("router_version") is None:
+        if routing_surface_version(
+            layer.payloads["router"],
+            legacy_key="router_version",
+        ) is None:
             reasons.append("router version is missing")
-        if layer.payloads["surface_hints"].get("version") is None:
+        if routing_surface_version(layer.payloads["surface_hints"]) is None:
             reasons.append("surface hints version is missing")
-        if layer.payloads["federation_entrypoints"].get("version") is None:
+        if routing_surface_version(layer.payloads["federation_entrypoints"]) is None:
             reasons.append("federation entrypoints version is missing")
-        if layer.payloads["return_hints"].get("version") is None:
+        if routing_surface_version(layer.payloads["return_hints"]) is None:
             reasons.append("return hints version is missing")
-        if layer.payloads["tiny_model_entrypoints"].get("version") is None:
+        if routing_surface_version(layer.payloads["tiny_model_entrypoints"]) is None:
             reasons.append("tiny-model entrypoints version is missing")
         return reasons
 
@@ -855,12 +1076,22 @@ def layer_closure_status(
     files: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     mirror_ready = all(item["present"] for item in files.values())
-    reasons = layer_closure_reasons(layer)
-    consumer_ready = len(reasons) == 0
+    consumer_reasons = layer_closure_reasons(layer)
+    provenance_reasons = (
+        routing_mirror_provenance_reasons(layer)
+        if layer.layer == "aoa-routing"
+        else []
+    )
+    consumer_ready = len(consumer_reasons) == 0
+    provenance_ready = len(provenance_reasons) == 0
+    reasons = [*consumer_reasons, *provenance_reasons]
     return {
         "mirror_ready": mirror_ready,
         "consumer_ready": consumer_ready,
-        "closure_ready": mirror_ready and consumer_ready,
+        "provenance_ready": provenance_ready,
+        "closure_ready": mirror_ready and consumer_ready and provenance_ready,
+        "consumer_reasons": consumer_reasons,
+        "provenance_reasons": provenance_reasons,
         "reasons": reasons,
     }
 
@@ -2091,8 +2322,12 @@ def health() -> dict[str, Any]:
         store.tos_source.layer: layer_status(store.tos_source),
     }
     control_loop_summary = closure_summary(layers_status)
+    layer_readiness = {
+        layer_name: payload["closure_status"]["closure_ready"]
+        for layer_name, payload in layers_status.items()
+    }
     return {
-        "ok": True,
+        "ok": control_loop_summary["closure_ready"],
         "layers": [
             store.agents.layer,
             store.routing.layer,
@@ -2102,16 +2337,14 @@ def health() -> dict[str, Any]:
             store.kag.layer,
             store.tos_source.layer,
         ],
-        "mirror_ready": True,
-        "layer_readiness": {
-            store.agents.layer: True,
-            store.routing.layer: True,
-            store.memo.layer: True,
-            store.evals.layer: True,
-            store.playbooks.layer: True,
-            store.kag.layer: True,
-            store.tos_source.layer: True,
-        },
+        "mirror_ready": all(
+            payload["closure_status"]["mirror_ready"]
+            for payload in layers_status.values()
+        ),
+        "layer_readiness": layer_readiness,
+        "routing_provenance": layers_status[store.routing.layer][
+            "surface_metadata"
+        ]["mirror_provenance"],
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
         "memo_read_only": store.memo.flags["read_only"],
@@ -2145,8 +2378,13 @@ def surface_status() -> dict[str, Any]:
         store.kag.layer: layer_status(store.kag),
         store.tos_source.layer: layer_status(store.tos_source),
     }
+    control_loop_summary = closure_summary(layers_status)
+    layer_readiness = {
+        layer_name: payload["closure_status"]["closure_ready"]
+        for layer_name, payload in layers_status.items()
+    }
     return {
-        "ok": True,
+        "ok": control_loop_summary["closure_ready"],
         "layers": [
             store.agents.layer,
             store.routing.layer,
@@ -2156,17 +2394,15 @@ def surface_status() -> dict[str, Any]:
             store.kag.layer,
             store.tos_source.layer,
         ],
-        "mirror_ready": True,
-        "layer_readiness": {
-            store.agents.layer: True,
-            store.routing.layer: True,
-            store.memo.layer: True,
-            store.evals.layer: True,
-            store.playbooks.layer: True,
-            store.kag.layer: True,
-            store.tos_source.layer: True,
-        },
-        "closure_summary": closure_summary(layers_status),
+        "mirror_ready": all(
+            payload["closure_status"]["mirror_ready"]
+            for payload in layers_status.values()
+        ),
+        "layer_readiness": layer_readiness,
+        "routing_provenance": layers_status[store.routing.layer][
+            "surface_metadata"
+        ]["mirror_provenance"],
+        "closure_summary": control_loop_summary,
         "layers_status": layers_status,
     }
 

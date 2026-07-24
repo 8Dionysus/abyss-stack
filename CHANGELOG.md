@@ -83,6 +83,10 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Fixed
 
+- Federation routing health now accepts the stable current routing version
+  fields, verifies exact mirror-manifest hashes, and reports source,
+  artifact-identity, and subject-bound durable trust readiness instead of
+  returning an unconditional green result for stale v1 bytes.
 - `aoa-kag-mcp` canonical fallback now resolves portable-v3 family manifests
   when the logical v2 source-index path is intentionally absent, and service
   validation performs a real canonical portable read instead of checking only

@@ -105,3 +105,50 @@ def test_json_check_detects_stale_manifest_and_sync_if_stale_repairs_it(tmp_path
     assert repaired_payload["mirror_source_git_commit"] == source_commit
     assert repaired_payload["sync_recommended"] is False
     assert repaired_payload["synced"] is True
+
+
+def test_json_check_rejects_content_hash_drift_and_repairs_it(tmp_path: Path) -> None:
+    if shutil.which("rsync") is None:
+        pytest.skip("aoa-sync-federation-surfaces sync mode requires rsync")
+
+    source_root = tmp_path / "aoa-routing"
+    stack_root = tmp_path / "abyss-stack"
+    create_source_repo(source_root)
+    env = {
+        **os.environ,
+        "AOA_STACK_ROOT": str(stack_root),
+        "AOA_ROUTING_ROOT": str(source_root),
+    }
+
+    initial_sync = run_sync(["--layer", "aoa-routing"], env=env)
+    assert initial_sync.returncode == 0, initial_sync.stderr
+    mirrored_router = (
+        stack_root
+        / "Knowledge"
+        / "federation"
+        / "aoa-routing"
+        / "generated"
+        / "aoa_router.min.json"
+    )
+    mirrored_router.write_text('{"tampered":true}\n', encoding="utf-8")
+
+    invalid_check = run_sync(
+        ["--check", "--json", "--layer", "aoa-routing"],
+        env=env,
+    )
+    assert invalid_check.returncode == 1
+    invalid_payload = json.loads(invalid_check.stdout)
+    assert invalid_payload["status"] == "invalid_manifest"
+    assert invalid_payload["freshness_status"] == "invalid_manifest"
+    assert invalid_payload["sync_recommended"] is True
+
+    repaired_check = run_sync(
+        ["--check", "--json", "--sync-if-stale", "--layer", "aoa-routing"],
+        env=env,
+    )
+    assert repaired_check.returncode == 0, repaired_check.stderr
+    repaired_payload = json.loads(repaired_check.stdout)
+    assert repaired_payload["status"] == "ok"
+    assert repaired_payload["freshness_status"] == "current"
+    assert repaired_payload["synced"] is True
+    assert mirrored_router.read_text(encoding="utf-8") == "{}\n"

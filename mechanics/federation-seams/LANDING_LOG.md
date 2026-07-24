@@ -42,3 +42,12 @@ Added verified bundle ingestion and versioned SQLite/FTS, Qdrant, and Neo4j
 materializers under the KAG seam, with stable operator routing and runtime
 receipts. Focused adapter tests, stack validation, source-fast, and live Qdrant
 and Neo4j API contract probes passed.
+
+## 2026-07-24 - Routing mirror provenance readiness
+
+Corrected route-api consumption of the stable current routing version fields,
+made sync re-hash every required mirror file, and separated mirror presence,
+consumer compatibility, source/content provenance, and trust admission in
+health. The landing enabled an isolated SDK-succession G4 content dry run; it
+did not mutate the deployed mirror, admit a live trust verdict, switch the
+routing owner, or restart route-api.

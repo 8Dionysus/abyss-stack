@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18700738,
+  "allowed_tracked_bytes": 24348812,
+  "approved_by": "repository-owner",
+  "base_ref": "1deef8b6170832eddba4358effe6d7f242284b95",
+  "changed_generated_bytes": 18700738,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "4ac1b2d9de7370e534cec4a56ac97b1f5d4022c87b6a8ba66a49c823d0b5a68b",
+  "reason": "Index the accepted D-0084 routing mirror provenance and trust-readiness owner contract.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24348812,
+  "tracked_bytes_max": 24117248
+}

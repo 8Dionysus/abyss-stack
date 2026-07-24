@@ -32,8 +32,10 @@ runtime config, and route-api or advisory service state.
 
 ### Outputs
 
-Synced runtime mirrors, advisory inputs, health checks, and clear owner-boundary
-docs.
+Synced runtime mirrors, advisory inputs, provenance-aware health checks, and
+clear owner-boundary docs. Routing health distinguishes file presence,
+consumer compatibility, source/content provenance, and trust admission instead
+of collapsing them into one presence flag.
 
 ### Must not claim
 
