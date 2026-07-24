@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18705401,
+  "allowed_tracked_bytes": 24355604,
+  "approved_by": "repository-owner",
+  "base_ref": "1deef8b6170832eddba4358effe6d7f242284b95",
+  "changed_generated_bytes": 18705401,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "8e75be18808831df14b427ad56b1faffedee0029ad3ddff9ee8d8f1967f2fae4",
+  "reason": "Index the reviewed D-0084 routing trust-summary privacy boundary and current-ABI priority fix.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24355604,
+  "tracked_bytes_max": 24117248
+}

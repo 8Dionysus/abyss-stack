@@ -8,6 +8,8 @@ Current posture:
 - keep sync wrappers and federation checks package-local
 - keep route-api and advisory mirrors consuming public-safe owner surfaces
   without becoming the owner of those surfaces
+- keep routing mirror presence, ABI consumption, source/content provenance,
+  and trust admission independently visible
 - keep upstream compatibility IDs behind explicit compatibility bridges
 - keep RPG, repo-self KAG, and ToS graph projections as source-derived runtime
   read models

@@ -114,13 +114,38 @@ git_commit_for_root() {
 
 read_manifest_metadata() {
   local manifest_path="$1"
-  python3 - "$manifest_path" <<'PY'
+  local layer="$2"
+  local target_root="$3"
+  shift 3
+  python3 - "$manifest_path" "$layer" "$target_root" "$@" <<'PY'
 from pathlib import Path
+import hashlib
 import json
 import sys
 
 manifest_path = Path(sys.argv[1])
+layer = sys.argv[2]
+target_root = Path(sys.argv[3])
+required_files = list(sys.argv[4:])
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+if payload.get("schema") != "abyss_stack_federation_mirror_manifest_v1":
+    raise SystemExit("invalid federation mirror manifest schema")
+if payload.get("layer") != layer:
+    raise SystemExit("federation mirror manifest layer mismatch")
+if payload.get("mirror_is_authority") is not False:
+    raise SystemExit("federation mirror manifest must deny mirror authority")
+if payload.get("required_file_count") != len(required_files):
+    raise SystemExit("federation mirror manifest required-file count mismatch")
+if payload.get("required_files") != required_files:
+    raise SystemExit("federation mirror manifest required-file list mismatch")
+file_sha256 = payload.get("file_sha256")
+if not isinstance(file_sha256, dict) or set(file_sha256) != set(required_files):
+    raise SystemExit("federation mirror manifest content-hash set mismatch")
+for rel_path in required_files:
+    path = target_root / rel_path
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if file_sha256.get(rel_path) != actual:
+        raise SystemExit(f"federation mirror content hash mismatch: {rel_path}")
 for key in ("source_git_commit", "generated_at_utc", "refresh_command"):
     value = payload.get(key)
     if value is None:
@@ -563,7 +588,14 @@ check_layer() {
       printf 'warning: mirror manifest missing for %s: %s\n' "${layer}" "${manifest_path}" >&2
     fi
   else
-    if ! manifest_payload="$(read_manifest_metadata "$manifest_path" 2>/dev/null)"; then
+    if ! manifest_payload="$(
+      read_manifest_metadata \
+        "$manifest_path" \
+        "$layer" \
+        "$target_root" \
+        "${required_paths[@]}" \
+        2>/dev/null
+    )"; then
       status="invalid_manifest"
       freshness_status="invalid_manifest"
       sync_recommended="true"

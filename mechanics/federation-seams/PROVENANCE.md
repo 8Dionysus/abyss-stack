@@ -11,6 +11,10 @@ The refactor pattern is:
 - keep generated runtime read models under the part that builds them
 - keep upstream names that are still required for compatibility in explicit
   compatibility bridges, not active topology prose
+- keep routing mirror content, source identity, and trust posture explicit in
+  sync and route-api status instead of inferring them from file presence
+- expose only an allowlisted trust summary through health; keep full durable
+  registry records and deploy-local evidence refs behind their owner boundary
 
 ## Owner Boundary
 
@@ -32,3 +36,6 @@ repositories own the meaning of their source surfaces.
   the `aoa-kag` repo-self retrieval bundle into runtime stores.
 - [../config-projection/README.md](../config-projection/README.md) owns
   projection of config material that feeds runtime mirrors.
+- [ABYSS-STACK-D-0084](../../docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md)
+  records why current routing ABI fields and content/provenance/trust readiness
+  are separate runtime-owner checks.
