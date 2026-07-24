@@ -639,13 +639,43 @@ def routing_surface_version(
     *,
     legacy_key: str | None = None,
 ) -> str | int | None:
-    for key in ("version", "schema_version", legacy_key):
+    for key in (legacy_key, "schema_version", "version"):
         if key is None:
             continue
         value = payload.get(key)
         if isinstance(value, (str, int)) and not isinstance(value, bool):
             return value
     return None
+
+
+def routing_trust_verdict_summary(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    record = value.get("record")
+    inspected_claims = value.get("inspected_claims")
+    subject_identity = (
+        inspected_claims.get("subject_identity")
+        if isinstance(inspected_claims, dict)
+        else None
+    )
+    return {
+        "schema": value.get("schema"),
+        "ok": value.get("ok"),
+        "verdict": value.get("verdict"),
+        "artifact_class": value.get("artifact_class"),
+        "consumer_intent": value.get("consumer_intent"),
+        "subject_digest": value.get("subject_digest"),
+        "record_id": value.get("record_id"),
+        "latest_record_id": value.get("latest_record_id"),
+        "require_latest": value.get("require_latest"),
+        "source_repo": record.get("source_repo") if isinstance(record, dict) else None,
+        "source_ref": record.get("source_ref") if isinstance(record, dict) else None,
+        "subject_digest_matched": (
+            subject_identity.get("subject_digest_matched")
+            if isinstance(subject_identity, dict)
+            else None
+        ),
+    }
 
 
 def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
@@ -671,7 +701,7 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
         "content_hashes_present": isinstance(hashes, dict) and bool(hashes),
         "required_file_count": manifest.get("required_file_count"),
         "mirror_is_authority": manifest.get("mirror_is_authority"),
-        "trust_verdict": trust_verdict if isinstance(trust_verdict, dict) else None,
+        "trust_verdict": routing_trust_verdict_summary(trust_verdict),
         "trust_verdict_available": isinstance(trust_verdict, dict),
     }
 

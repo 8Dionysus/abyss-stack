@@ -472,6 +472,36 @@ datasources:
         self.assertEqual(payload["closure_summary"]["ready_layer_count"], 7)
         self.assertEqual(payload["operator_verdict_command"], "aoa-status --autonomy --json")
 
+    def test_health_sanitizes_routing_trust_record(self) -> None:
+        store = self.make_store()
+        store.routing.payloads["mirror_manifest"]["trust_verdict"]["record"][
+            "private_evidence_ref"
+        ] = "/deploy-local/registry/private.json"
+        self.module.STORE = store
+
+        payload = self.module.health()
+        trust_summary = payload["routing_provenance"]["trust_verdict"]
+
+        self.assertEqual(trust_summary["source_repo"], "aoa-routing")
+        self.assertEqual(trust_summary["record_id"], "routing-record-1")
+        self.assertNotIn("record", trust_summary)
+        self.assertNotIn("/deploy-local/registry/private.json", json.dumps(payload))
+
+    def test_routing_version_prefers_current_surface_field(self) -> None:
+        payload = {
+            "version": "legacy-v1",
+            "schema_version": "schema-v2",
+            "router_version": 3,
+        }
+
+        self.assertEqual(
+            self.module.routing_surface_version(
+                payload,
+                legacy_key="router_version",
+            ),
+            3,
+        )
+
     def test_surface_status_reports_degraded_layer_when_consumer_gap_exists(self) -> None:
         store = self.make_store()
         store.playbooks.payloads["registry"]["playbooks"] = []

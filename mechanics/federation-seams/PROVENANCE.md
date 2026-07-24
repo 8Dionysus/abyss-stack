@@ -13,6 +13,8 @@ The refactor pattern is:
   compatibility bridges, not active topology prose
 - keep routing mirror content, source identity, and trust posture explicit in
   sync and route-api status instead of inferring them from file presence
+- expose only an allowlisted trust summary through health; keep full durable
+  registry records and deploy-local evidence refs behind their owner boundary
 
 ## Owner Boundary
 

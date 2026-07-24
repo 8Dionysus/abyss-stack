@@ -58,6 +58,10 @@ Trust admission is not a free-form boolean. A present verdict must be an
 latest durable record and binds its source ref and subject digest to the
 manifest and routing artifact identity.
 
+Health exposes only an allowlisted trust summary. The runtime may inspect the
+durable record to validate bindings, but it must not return the full record or
+deploy-local evidence references through a service endpoint.
+
 Routing closure now requires four independently visible conditions:
 
 1. required mirror files are present;
@@ -95,6 +99,8 @@ and the future SDK-produced compatibility surface.
   green state when routing provenance or trust is absent.
 - Positive: a forged bare `allow` field cannot satisfy runtime closure without
   exact source, subject, and durable-record bindings.
+- Positive: route-api does not leak the complete durable registry record while
+  reporting trust readiness.
 - Tradeoff: existing deployed mirrors remain degraded until they are refreshed
   and supplied with an exact trust verdict through an operator-approved
   runtime route.
