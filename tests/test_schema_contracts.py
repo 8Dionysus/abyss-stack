@@ -45,11 +45,14 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mechanics/governed-execution/parts/runtime-contracts/schemas/runtime-governed-execution-request.schema.json"),
     Path("mechanics/inference-pilots/parts/local-trials/schemas/runtime-benchmark.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json"),
+    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-manifest.schema.json"),
+    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-record.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-render-manifest.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/runtime-manifest.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/source-visible-model-inspection.schema.json"),
+    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/structure-vlm-selection.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-lab-readiness.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-human-review.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/translation-source-manifest.schema.json"),
@@ -234,6 +237,11 @@ EXAMPLE_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
     (
         "mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-foundation-suite.v1.json",
         "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/experiment-suite.schema.json",
+        "object",
+    ),
+    (
+        "mechanics/inference-pilots/parts/tos-foundation-lab/examples/tos-structure-vlm-selection.v1.json",
+        "mechanics/inference-pilots/parts/tos-foundation-lab/schemas/structure-vlm-selection.schema.json",
         "object",
     ),
     (
