@@ -165,12 +165,16 @@ The current direction is:
   opt-in. The KAG seam additionally has a source-owned tiered-family
   materializer that admits machine-verified owner releases into a local CAS,
   keeps partial hydration as candidate state, and preserves the five-operation
-  MCP read boundary.
+  MCP read boundary. Routing has a separate reversible SDK-candidate intake
+  that can prove exact `canary_ready` posture without satisfying canonical
+  runtime closure.
 - Next honest move:
   prove shadow publication, five-owner canary externalization, selective
   projection refresh, and a verified 24-owner composition before treating the
-  new KAG distribution route as the only live path. Continue deciding other
-  seams one by one with explicit source-owner and compatibility boundaries.
+  new KAG distribution route as the only live path. For routing, collect
+  isolated and operator-reviewed live-canary evidence before proposing the
+  distinct G5 producer-authority switch. Continue deciding other seams one by
+  one with explicit source-owner and compatibility boundaries.
 - Guardrail:
   federation consumption does not transfer AoA, ToS, skill, memo, eval,
   playbook, routing, KAG, stats, or agent authority into `abyss-stack`.

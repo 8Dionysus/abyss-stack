@@ -9,6 +9,12 @@ Tracking starts with the community-docs baseline for this repository.
 
 ### Added
 
+- A fail-closed `aoa-routing-canary` runtime adapter now verifies exact
+  `aoa-sdk` subject-store bytes, latest `abyss-machine` `runtime_canary`
+  admission, source/predecessor refs, and all-false G5 authority before
+  reversible isolated or operator-authorized live-canary activation; route-api
+  exposes `canary_ready` without turning the non-canonical mirror into ordinary
+  runtime closure.
 - Tiered KAG runtime materialization now admits exact-commit owner-family
   releases and 24-owner compositions through the `abyss-machine` trust gate,
   verifies direct or packed objects into a local content-addressed cache,

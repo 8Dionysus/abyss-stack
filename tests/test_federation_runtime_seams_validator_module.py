@@ -234,3 +234,53 @@ def test_kag_runtime_seam_requires_runbook_advisory_route(tmp_path: Path) -> Non
     federation_runtime_seams.validate_kag_runtime_seam(errors, root=tmp_path)
 
     assert "docs/operations/RUNBOOK.md must mention KAG advisory seam inspection" in errors
+
+
+def test_routing_canary_runtime_seam_requires_closure_separation(
+    tmp_path: Path,
+) -> None:
+    write_text(
+        tmp_path
+        / "mechanics/federation-seams/parts/sync-wrapper/aoa_routing_canary.py",
+        "\n".join(
+            [
+                "sdk_g5_candidate_canary",
+                "--isolated",
+                "--authorized-live-canary",
+                "--rollback-root",
+                "--candidate-retain-root",
+                "canonical_switch_authorized",
+                "subject-store aggregate digest",
+            ]
+        ),
+    )
+    write_text(
+        tmp_path / "config-templates/Services/route-api/app/main.py",
+        "\n".join(
+            [
+                "ROUTING_SDK_CANARY_POSTURE",
+                "routing_sdk_canary_provenance_reasons",
+                "canary_ready",
+            ]
+        ),
+    )
+    write_text(
+        tmp_path / "mechanics/federation-seams/parts/sync-wrapper/README.md",
+        "scripts/aoa-routing-canary runtime_canary closure_ready rollback",
+    )
+    write_text(
+        tmp_path / "docs/install/DEPLOYMENT.md",
+        "scripts/aoa-routing-canary --authorized-live-canary --rollback-root",
+    )
+
+    errors: list[str] = []
+    federation_runtime_seams.validate_routing_canary_runtime_seam(
+        errors,
+        root=tmp_path,
+    )
+
+    assert any(
+        "routing SDK canary is non-canonical and cannot satisfy runtime closure"
+        in error
+        for error in errors
+    )

@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19275367,
+  "allowed_tracked_bytes": 24537682,
+  "approved_by": "repository-owner",
+  "base_ref": "fad9f951d5df531692546e92e5bcaf882b1c4c57",
+  "changed_generated_bytes": 19275367,
+  "changed_generated_files": 296,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "9a35f12d9c3193cd377020ad80c6410b97a574af776b4e962b97daee91d1e325",
+  "reason": "Index the accepted D-0085 fail-closed SDK routing canary intake, rollback contract, route-api closure separation, owner validation, and regression evidence; the reviewed source changes redistribute deterministic records across portable shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24537682,
+  "tracked_bytes_max": 24117248
+}

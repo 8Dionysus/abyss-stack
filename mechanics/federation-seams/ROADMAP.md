@@ -11,6 +11,8 @@
 - keep route-api consumption subordinate to owner repositories
 - keep current routing ABI fields and mirror hashes fail-closed while the
   `aoa-sdk` successor remains shadow-only
+- keep the exact SDK routing canary reversible and non-canonical even after its
+  subject store and `runtime_canary` trust verdict pass
 
 ## Next candidates
 
@@ -20,8 +22,8 @@
 - add a seam summary matrix if owner routes become hard to scan from `PARTS.md`
 - split route-api specific federation checks if the service grows more
   independent from sync checks
-- admit an exact routing trust verdict and SDK producer identity only through
-  the reviewed M2/G5 runtime cutover contract
+- collect isolated and operator-reviewed live canary evidence before proposing
+  any distinct G5 authority-switch contract
 - add stronger contract tests for owner mirror inputs only when a downstream
   runtime consumer requires them
 

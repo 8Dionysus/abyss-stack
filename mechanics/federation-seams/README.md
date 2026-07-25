@@ -35,7 +35,9 @@ runtime config, and route-api or advisory service state.
 Synced runtime mirrors, advisory inputs, provenance-aware health checks, and
 clear owner-boundary docs. Routing health distinguishes file presence,
 consumer compatibility, source/content provenance, and trust admission instead
-of collapsing them into one presence flag.
+of collapsing them into one presence flag. The SDK succession route additionally
+distinguishes an exact trust-admitted `canary_ready` mirror from canonical
+`closure_ready` runtime state.
 
 ### Must not claim
 

@@ -51,3 +51,13 @@ consumer compatibility, source/content provenance, and trust admission in
 health. The landing enabled an isolated SDK-succession G4 content dry run; it
 did not mutate the deployed mirror, admit a live trust verdict, switch the
 routing owner, or restart route-api.
+
+## 2026-07-25 - SDK routing canary intake
+
+Added a fail-closed adapter for an exact `aoa-sdk` routing candidate admitted
+by the `abyss-machine` `runtime_canary` trust gate. Isolated and live-canary
+activation verify the subject ledger and bytes, exact source and predecessor
+refs, latest durable record, producer admission, and all-false G5 authority
+posture. Existing targets move to an explicit rollback root; rollback restores
+the predecessor and retains the candidate. Route-api can now expose
+`canary_ready` while deliberately keeping canonical `closure_ready` false.

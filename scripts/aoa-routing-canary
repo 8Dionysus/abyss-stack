@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+from pathlib import Path
+import runpy
+import sys
+
+BACKEND = (
+    Path(__file__).resolve().parent
+    / "../mechanics/federation-seams/parts/sync-wrapper/aoa_routing_canary.py"
+).resolve()
+sys.argv[0] = str(BACKEND)
+runpy.run_path(str(BACKEND), run_name="__main__")

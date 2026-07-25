@@ -37,6 +37,20 @@ BASE_RUNTIME_EVIDENCE_TEMPLATE_SOURCE_REFS = {
 }
 GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 SHA256_DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
+ROUTING_SDK_CANARY_POSTURE = "sdk_g5_candidate_canary"
+ROUTING_G5_AUTHORITY_FLAGS = {
+    "archive_authorized",
+    "canonical_producer_switch_authorized",
+    "compatibility_window_started",
+    "live_runtime_mutation_authorized",
+    "predecessor_maintenance_only",
+    "sdk_canonical",
+}
+ROUTING_REQUIRED_TRUST_CONTROLS = {
+    "abi_signature",
+    "sbom",
+    "slsa_in_toto",
+}
 
 
 @dataclass(frozen=True)
@@ -652,6 +666,12 @@ def routing_trust_verdict_summary(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     record = value.get("record")
+    producer_admission = (
+        record.get("producer_admission") if isinstance(record, dict) else None
+    )
+    subject_store = (
+        record.get("artifact_subject_store") if isinstance(record, dict) else None
+    )
     inspected_claims = value.get("inspected_claims")
     subject_identity = (
         inspected_claims.get("subject_identity")
@@ -675,7 +695,73 @@ def routing_trust_verdict_summary(value: Any) -> dict[str, Any] | None:
             if isinstance(subject_identity, dict)
             else None
         ),
+        "subject_store_verified": (
+            subject_store.get("ok") if isinstance(subject_store, dict) else None
+        ),
+        "producer_admission": (
+            {
+                "schema": producer_admission.get("schema"),
+                "status": producer_admission.get("status"),
+                "owner_repo": producer_admission.get("owner_repo"),
+                "source_ref": producer_admission.get("source_ref"),
+                "canonical_owner_repo": producer_admission.get(
+                    "canonical_owner_repo"
+                ),
+                "canonical_predecessor_source_ref": producer_admission.get(
+                    "canonical_predecessor_source_ref"
+                ),
+                "canonical_switch_authorized": producer_admission.get(
+                    "canonical_switch_authorized"
+                ),
+                "single_canonical_owner": producer_admission.get(
+                    "single_canonical_owner"
+                ),
+                "publication_posture": producer_admission.get(
+                    "publication_posture"
+                ),
+                "g5_authority": routing_g5_authority_summary(
+                    producer_admission.get("g5_authority")
+                ),
+            }
+            if isinstance(producer_admission, dict)
+            else None
+        ),
     }
+
+
+def routing_g5_authority_summary(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        key: value.get(key)
+        for key in sorted(ROUTING_G5_AUTHORITY_FLAGS)
+    }
+
+
+def routing_producer_summary(
+    value: Any,
+    *,
+    candidate: bool,
+) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    summary = {
+        "owner_repo": value.get("owner_repo"),
+        "source_ref": value.get("source_ref"),
+    }
+    if candidate:
+        summary["canonical_switch_authorized"] = value.get(
+            "canonical_switch_authorized"
+        )
+    return summary
+
+
+def routing_is_sdk_canary(layer: LayerStore) -> bool:
+    manifest = layer.payloads.get("mirror_manifest")
+    return (
+        isinstance(manifest, dict)
+        and manifest.get("routing_producer_posture") == ROUTING_SDK_CANARY_POSTURE
+    )
 
 
 def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
@@ -684,29 +770,51 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         return {
             "manifest_present": False,
+            "routing_producer_posture": None,
             "source_git_commit": None,
             "artifact_identity": identity if isinstance(identity, dict) else None,
             "content_hashes_present": False,
             "trust_verdict": None,
             "trust_verdict_available": False,
+            "canonical_producer": None,
+            "candidate_producer": None,
+            "g5_authority": None,
         }
     hashes = manifest.get("file_sha256")
     trust_verdict = manifest.get("trust_verdict")
     return {
         "manifest_present": True,
         "manifest_schema": manifest.get("schema"),
+        "routing_producer_posture": manifest.get("routing_producer_posture"),
+        "canary_activation_mode": manifest.get("canary_activation_mode"),
+        "operator_change_ref_present": bool(manifest.get("operator_change_ref")),
         "source_git_commit": manifest.get("source_git_commit"),
         "artifact_subject_digest": manifest.get("artifact_subject_digest"),
         "artifact_identity": identity if isinstance(identity, dict) else None,
         "content_hashes_present": isinstance(hashes, dict) and bool(hashes),
         "required_file_count": manifest.get("required_file_count"),
         "mirror_is_authority": manifest.get("mirror_is_authority"),
+        "canonical_producer": (
+            routing_producer_summary(
+                manifest.get("canonical_producer"),
+                candidate=False,
+            )
+        ),
+        "candidate_producer": (
+            routing_producer_summary(
+                manifest.get("candidate_producer"),
+                candidate=True,
+            )
+        ),
+        "g5_authority": routing_g5_authority_summary(
+            manifest.get("g5_authority")
+        ),
         "trust_verdict": routing_trust_verdict_summary(trust_verdict),
         "trust_verdict_available": isinstance(trust_verdict, dict),
     }
 
 
-def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
+def routing_manifest_common_reasons(layer: LayerStore) -> list[str]:
     reasons: list[str] = []
     manifest = layer.payloads.get("mirror_manifest")
     if not isinstance(manifest, dict):
@@ -753,6 +861,15 @@ def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
                     "routing mirror provenance content hashes do not match: "
                     + ", ".join(mismatched)
                 )
+    return reasons
+
+
+def routing_canonical_provenance_reasons(layer: LayerStore) -> list[str]:
+    reasons = routing_manifest_common_reasons(layer)
+    manifest = layer.payloads.get("mirror_manifest")
+    if not isinstance(manifest, dict):
+        return reasons
+    source_ref = manifest.get("source_git_commit")
 
     identity = layer.payloads["router"].get("artifact_identity")
     if not isinstance(identity, dict):
@@ -821,6 +938,243 @@ def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
         ):
             reasons.append("routing mirror trust verdict subject evidence is invalid")
     return reasons
+
+
+def routing_sdk_canary_provenance_reasons(layer: LayerStore) -> list[str]:
+    reasons = routing_manifest_common_reasons(layer)
+    manifest = layer.payloads.get("mirror_manifest")
+    if not isinstance(manifest, dict):
+        return reasons
+    if manifest.get("routing_producer_posture") != ROUTING_SDK_CANARY_POSTURE:
+        reasons.append("routing mirror is not an SDK G5 candidate canary")
+    activation_mode = manifest.get("canary_activation_mode")
+    operator_change_ref = manifest.get("operator_change_ref")
+    if activation_mode not in {"isolated", "authorized_live_canary"}:
+        reasons.append("routing SDK canary activation mode is invalid")
+    elif activation_mode == "authorized_live_canary":
+        if not isinstance(operator_change_ref, str) or not operator_change_ref:
+            reasons.append("routing SDK live canary operator change ref is missing")
+    elif operator_change_ref is not None:
+        reasons.append("routing SDK isolated canary claims an operator change ref")
+
+    source_ref = manifest.get("source_git_commit")
+    identity = layer.payloads["router"].get("artifact_identity")
+    if not isinstance(identity, dict):
+        reasons.append("routing SDK canary artifact identity is missing")
+    else:
+        if identity.get("owner_repo") != "aoa-sdk":
+            reasons.append("routing SDK canary artifact owner is invalid")
+        if identity.get("artifact_class") != "thin_routing_readmodel_bundle":
+            reasons.append("routing SDK canary artifact class is invalid")
+        if identity.get("abi_epoch") != "aoa_routing_thin_router_v1":
+            reasons.append("routing SDK canary ABI epoch is invalid")
+
+    canonical_producer = manifest.get("canonical_producer")
+    predecessor_ref: Any = None
+    if not isinstance(canonical_producer, dict):
+        reasons.append("routing SDK canary canonical predecessor binding is missing")
+    else:
+        predecessor_ref = canonical_producer.get("source_ref")
+        if canonical_producer.get("owner_repo") != "aoa-routing":
+            reasons.append("routing SDK canary canonical predecessor owner is invalid")
+        if (
+            not isinstance(predecessor_ref, str)
+            or not GIT_OBJECT_ID_PATTERN.fullmatch(predecessor_ref)
+        ):
+            reasons.append("routing SDK canary canonical predecessor ref is invalid")
+
+    candidate_producer = manifest.get("candidate_producer")
+    if not isinstance(candidate_producer, dict):
+        reasons.append("routing SDK canary producer binding is missing")
+    else:
+        if candidate_producer.get("owner_repo") != "aoa-sdk":
+            reasons.append("routing SDK canary producer owner is invalid")
+        if candidate_producer.get("source_ref") != source_ref:
+            reasons.append("routing SDK canary producer source ref drifted")
+        if candidate_producer.get("canonical_switch_authorized") is not False:
+            reasons.append("routing SDK canary must deny canonical producer switch")
+
+    authority = manifest.get("g5_authority")
+    if not isinstance(authority, dict):
+        reasons.append("routing SDK canary G5 authority posture is missing")
+    else:
+        missing_flags = sorted(ROUTING_G5_AUTHORITY_FLAGS - set(authority))
+        if missing_flags:
+            reasons.append(
+                "routing SDK canary G5 authority flags are missing: "
+                + ", ".join(missing_flags)
+            )
+        asserted = sorted(
+            key
+            for key in ROUTING_G5_AUTHORITY_FLAGS
+            if authority.get(key) is not False
+        )
+        if asserted:
+            reasons.append(
+                "routing SDK canary asserts forbidden G5 authority: "
+                + ", ".join(asserted)
+            )
+
+    trust_verdict = manifest.get("trust_verdict")
+    if not isinstance(trust_verdict, dict):
+        reasons.append("routing SDK canary trust verdict is unavailable")
+        return reasons
+    subject_digest = manifest.get("artifact_subject_digest")
+    if (
+        not isinstance(subject_digest, str)
+        or not SHA256_DIGEST_PATTERN.fullmatch(subject_digest)
+    ):
+        reasons.append("routing SDK canary artifact subject digest is unavailable")
+    expected_trust_fields = {
+        "schema": "abyss_machine_artifact_trust_gate_v1",
+        "ok": True,
+        "artifact_class": "thin_routing_readmodel_bundle",
+        "consumer_intent": "runtime_canary",
+        "subject_digest": subject_digest,
+        "require_latest": True,
+    }
+    for key, expected in expected_trust_fields.items():
+        if trust_verdict.get(key) != expected:
+            reasons.append(f"routing SDK canary trust verdict field is invalid: {key}")
+    if trust_verdict.get("verdict") not in {"allow", "warn"}:
+        reasons.append("routing SDK canary trust verdict does not admit the artifact")
+    if trust_verdict.get("reasons") or trust_verdict.get("blockers"):
+        reasons.append("routing SDK canary trust verdict contains blockers")
+    record_id = trust_verdict.get("record_id")
+    if (
+        not isinstance(record_id, str)
+        or not record_id
+        or trust_verdict.get("latest_record_id") != record_id
+    ):
+        reasons.append("routing SDK canary latest-record binding drifted")
+
+    decision = trust_verdict.get("decision")
+    if (
+        not isinstance(decision, dict)
+        or decision.get("model") != "fail_closed_consumer_admission"
+        or decision.get("allow") is not True
+        or decision.get("consumer_intent") != "runtime_canary"
+    ):
+        reasons.append("routing SDK canary trust decision is invalid")
+
+    record = trust_verdict.get("record")
+    admission: Any = None
+    if not isinstance(record, dict):
+        reasons.append("routing SDK canary trust record is missing")
+    else:
+        expected_record_fields = {
+            "record_id": record_id,
+            "artifact_class": "thin_routing_readmodel_bundle",
+            "source_repo": "aoa-sdk",
+            "source_ref": source_ref,
+            "artifact_subjects_digest": subject_digest,
+            "lifecycle_state": "manually-verified",
+            "latest_eligible": True,
+            "terminal_state": False,
+            "verification_ok": True,
+        }
+        for key, expected in expected_record_fields.items():
+            if record.get(key) != expected:
+                reasons.append(f"routing SDK canary trust record field drifted: {key}")
+        if "abyss-stack:routing-canary" not in record.get("consumer_refs", []):
+            reasons.append("routing SDK canary trust record lacks consumer admission")
+        if set(record.get("required_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+            reasons.append("routing SDK canary trust record required controls drifted")
+        if set(record.get("verified_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+            reasons.append("routing SDK canary trust record verified controls drifted")
+        subject_store = record.get("artifact_subject_store")
+        if (
+            not isinstance(subject_store, dict)
+            or subject_store.get("required") is not True
+            or subject_store.get("ok") is not True
+            or subject_store.get("aggregate_digest") != subject_digest
+        ):
+            reasons.append("routing SDK canary exact subject store is not verified")
+        admission = record.get("producer_admission")
+
+    if not isinstance(admission, dict):
+        reasons.append("routing SDK canary producer admission is missing")
+    else:
+        expected_admission_fields = {
+            "schema": "abyss_machine_artifact_producer_admission_v1",
+            "status": "candidate_admitted",
+            "owner_repo": "aoa-sdk",
+            "source_ref": source_ref,
+            "canonical_owner_repo": "aoa-routing",
+            "canonical_predecessor_source_ref": predecessor_ref,
+            "runtime_consumer": "abyss-stack",
+            "stronger_owner": "abyss-machine",
+            "provenance_state": "sdk_g5_candidate",
+            "publication_posture": "non_publishing_canary",
+            "single_canonical_owner": True,
+            "canonical_switch_authorized": False,
+        }
+        for key, expected in expected_admission_fields.items():
+            if admission.get(key) != expected:
+                reasons.append(
+                    f"routing SDK canary producer admission field drifted: {key}"
+                )
+        if "runtime_canary" not in admission.get("allowed_consumer_intents", []):
+            reasons.append("routing SDK canary producer admission lacks runtime_canary")
+        if set(admission.get("required_controls", [])) != ROUTING_REQUIRED_TRUST_CONTROLS:
+            reasons.append("routing SDK canary producer admission controls drifted")
+        admission_authority = admission.get("g5_authority")
+        if not isinstance(admission_authority, dict) or any(
+            admission_authority.get(key) is not False
+            for key in ROUTING_G5_AUTHORITY_FLAGS
+        ):
+            reasons.append("routing SDK canary producer admission asserts G5 authority")
+
+    inspected = trust_verdict.get("inspected_claims")
+    if not isinstance(inspected, dict):
+        reasons.append("routing SDK canary inspected trust claims are missing")
+    else:
+        subject_identity = inspected.get("subject_identity")
+        registry_latest = inspected.get("registry_latest")
+        source = inspected.get("source")
+        trust_root = inspected.get("trust_root")
+        inspected_store = inspected.get("artifact_subject_store")
+        if (
+            not isinstance(subject_identity, dict)
+            or subject_identity.get("subject_digest_expected") != subject_digest
+            or subject_identity.get("subject_digest_matched") is not True
+        ):
+            reasons.append("routing SDK canary inspected subject identity is invalid")
+        if (
+            not isinstance(registry_latest, dict)
+            or registry_latest.get("required") is not True
+            or registry_latest.get("selected_record_is_latest") is not True
+        ):
+            reasons.append("routing SDK canary inspected latest-record claim is invalid")
+        if (
+            not isinstance(source, dict)
+            or source.get("source_repo_matched") is not True
+            or source.get("source_ref_matched") is not True
+            or source.get("source_ref_actual") != source_ref
+        ):
+            reasons.append("routing SDK canary inspected source claim is invalid")
+        if (
+            not isinstance(trust_root, dict)
+            or trust_root.get("trust_root_mode_actual") != "host_managed"
+            or trust_root.get("trust_root_mode_matched") is not True
+        ):
+            reasons.append("routing SDK canary inspected trust-root claim is invalid")
+        if (
+            not isinstance(inspected_store, dict)
+            or inspected_store.get("ok") is not True
+            or inspected_store.get("aggregate_digest") != subject_digest
+        ):
+            reasons.append("routing SDK canary inspected subject-store claim is invalid")
+    return reasons
+
+
+def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
+    if routing_is_sdk_canary(layer):
+        return [
+            *routing_sdk_canary_provenance_reasons(layer),
+            "routing SDK canary is non-canonical and cannot satisfy runtime closure",
+        ]
+    return routing_canonical_provenance_reasons(layer)
 
 
 def layer_status(layer: LayerStore) -> dict[str, Any]:
@@ -1112,14 +1466,33 @@ def layer_closure_status(
         if layer.layer == "aoa-routing"
         else []
     )
+    canary_posture = (
+        routing_is_sdk_canary(layer)
+        if layer.layer == "aoa-routing"
+        else False
+    )
+    canary_reasons = (
+        routing_sdk_canary_provenance_reasons(layer)
+        if canary_posture
+        else []
+    )
     consumer_ready = len(consumer_reasons) == 0
     provenance_ready = len(provenance_reasons) == 0
+    canary_ready = (
+        canary_posture
+        and mirror_ready
+        and consumer_ready
+        and len(canary_reasons) == 0
+    )
     reasons = [*consumer_reasons, *provenance_reasons]
     return {
         "mirror_ready": mirror_ready,
         "consumer_ready": consumer_ready,
         "provenance_ready": provenance_ready,
         "closure_ready": mirror_ready and consumer_ready and provenance_ready,
+        "canary_posture": canary_posture,
+        "canary_ready": canary_ready,
+        "canary_reasons": canary_reasons,
         "consumer_reasons": consumer_reasons,
         "provenance_reasons": provenance_reasons,
         "reasons": reasons,
@@ -1148,6 +1521,21 @@ def closure_summary(layers_status: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "ready_layers": sorted(ready_layers),
         "degraded_layers": sorted(degraded_layers),
         "failing_layers": sorted(failing_layers),
+    }
+
+
+def routing_canary_status_summary(
+    routing_status: dict[str, Any],
+) -> dict[str, Any]:
+    closure = routing_status["closure_status"]
+    provenance = routing_status["surface_metadata"]["mirror_provenance"]
+    return {
+        "posture": provenance.get("routing_producer_posture"),
+        "canary_posture": closure["canary_posture"],
+        "canary_ready": closure["canary_ready"],
+        "canary_reasons": closure["canary_reasons"],
+        "closure_ready": closure["closure_ready"],
+        "canonical_switch_authorized": False,
     }
 
 
@@ -2375,6 +2763,9 @@ def health() -> dict[str, Any]:
         "routing_provenance": layers_status[store.routing.layer][
             "surface_metadata"
         ]["mirror_provenance"],
+        "routing_canary": routing_canary_status_summary(
+            layers_status[store.routing.layer]
+        ),
         "thin_routing_only": store.agents.flags["thin_routing_only"],
         "advisory_only": store.routing.flags["advisory_only"],
         "memo_read_only": store.memo.flags["read_only"],
@@ -2432,6 +2823,9 @@ def surface_status() -> dict[str, Any]:
         "routing_provenance": layers_status[store.routing.layer][
             "surface_metadata"
         ]["mirror_provenance"],
+        "routing_canary": routing_canary_status_summary(
+            layers_status[store.routing.layer]
+        ),
         "closure_summary": control_loop_summary,
         "layers_status": layers_status,
     }

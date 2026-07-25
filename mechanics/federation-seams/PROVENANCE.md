@@ -13,6 +13,9 @@ The refactor pattern is:
   compatibility bridges, not active topology prose
 - keep routing mirror content, source identity, and trust posture explicit in
   sync and route-api status instead of inferring them from file presence
+- accept SDK routing candidates only through the exact `abyss-machine`
+  subject-store/trust-verdict route, with rollback and all G5 authority flags
+  still false
 - expose only an allowlisted trust summary through health; keep full durable
   registry records and deploy-local evidence refs behind their owner boundary
 
@@ -39,3 +42,6 @@ repositories own the meaning of their source surfaces.
 - [ABYSS-STACK-D-0084](../../docs/decisions/ABYSS-STACK-D-0084-routing-mirror-provenance-readiness.md)
   records why current routing ABI fields and content/provenance/trust readiness
   are separate runtime-owner checks.
+- [ABYSS-STACK-D-0085](../../docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md)
+  records why exact SDK canary readiness remains distinct from canonical
+  runtime closure.

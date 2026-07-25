@@ -20,6 +20,8 @@ Validation:
 python scripts/validate_stack.py
 scripts/aoa-rpg-runtime-projection --generated-only --check
 python -m pytest mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py -q
-python -m py_compile mechanics/federation-seams/parts/federation-checks/aoa_federated_check.py mechanics/federation-seams/parts/rpg-runtime/aoa_rpg_runtime_projection.py
+python -m pytest mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py -q
+python -m pytest mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py -q
+python -m py_compile mechanics/federation-seams/parts/federation-checks/aoa_federated_check.py mechanics/federation-seams/parts/sync-wrapper/aoa_routing_canary.py mechanics/federation-seams/parts/rpg-runtime/aoa_rpg_runtime_projection.py
 bash -n scripts/aoa-sync-federation-surfaces mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh
 ```

@@ -104,6 +104,7 @@
         "mechanics/federation-seams/parts/kag-seam/tests/test_kag_tiered_distribution.py",
         "mechanics/federation-seams/parts/rpg-runtime/tests/test_rpg_runtime_projection.py",
         "mechanics/federation-seams/parts/sync-wrapper/tests/test_sync_wrapper_freshness.py",
+        "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py",
         "mechanics/governed-execution/parts/autonomy-status/tests/test_aoa_status_autonomy.py",
         "mechanics/governed-execution/parts/candidate-exports/tests/test_runtime_eval_evidence_export.py",
         "mechanics/governed-execution/parts/governed-runner/tests/governed_runner_test_support.py",
