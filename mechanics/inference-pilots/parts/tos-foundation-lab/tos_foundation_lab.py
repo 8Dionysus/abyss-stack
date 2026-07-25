@@ -46,6 +46,10 @@ from human_gold_review import (
     materialize_human_gold_review,
     verify_human_gold_review_manifest,
 )
+from human_review_workbench import (
+    HumanReviewWorkbenchError,
+    serve_human_review_workbench,
+)
 from translation_source import (
     DEFAULT_SHARED_ROOT as DEFAULT_TRANSLATION_SOURCE_ROOT,
     TranslationSourceError,
@@ -1121,6 +1125,22 @@ def main(argv: list[str] | None = None) -> int:
     gate_human_gold_parser.add_argument("--manifest", type=Path, required=True)
     gate_human_gold_parser.add_argument("--human-review-output", type=Path)
 
+    human_review_workbench_parser = subparsers.add_parser(
+        "human-review-workbench",
+        help="open one verified private pass-1 session in the loopback human workbench",
+    )
+    human_review_workbench_parser.add_argument(
+        "--session-dir", type=Path, required=True
+    )
+    human_review_workbench_parser.add_argument(
+        "--port", type=int, default=0, help="loopback port; 0 selects a free port"
+    )
+    human_review_workbench_parser.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="ask the desktop to open the tokenized loopback URL",
+    )
+
     translation_source_parser = subparsers.add_parser(
         "materialize-translation-source",
         help="freeze the German source-review packet before any translation lane",
@@ -1533,6 +1553,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if readiness["decision"] == (
                 "ready-for-manual-metric-adjudication"
             ) else 2
+
+        if args.command == "human-review-workbench":
+            serve_human_review_workbench(
+                args.session_dir,
+                port=args.port,
+                open_browser=args.open_browser,
+            )
+            return 0
 
         if args.command == "materialize-translation-source":
             manifest = materialize_translation_source(
@@ -2007,6 +2035,7 @@ def main(argv: list[str] | None = None) -> int:
         StructureRuntimeError,
         DoclingStructureError,
         PaddleVlStructureError,
+        HumanReviewWorkbenchError,
     ) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 1

@@ -27,6 +27,11 @@ Tracking starts with the community-docs baseline for this repository.
   reversible isolated or operator-authorized live-canary activation; route-api
   exposes `canary_ready` without turning the non-canonical mirror into ordinary
   runtime closure.
+- The Tree of Sophia foundation laboratory now provides a loopback-only human
+  review workbench for its prepared Human Gold and German source packets, with
+  verified source-page routing, focused pass-1 forms, atomic autosave and
+  resume, separate friction feedback, explicit human attestation, and a
+  digest-bound frozen draft that cannot claim gold or source acceptance.
 - Tiered KAG runtime materialization now admits exact-commit owner-family
   releases and 24-owner compositions through the `abyss-machine` trust gate,
   verifies direct or packed objects into a local content-addressed cache,

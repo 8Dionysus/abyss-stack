@@ -219,6 +219,10 @@
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
+## blind review
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+
 ## bounded context
 
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
@@ -268,6 +272,10 @@
 ## diagnostic surface catalog
 
 - [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
+
+## draft freeze
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## effect boundary
 
@@ -324,6 +332,10 @@
 ## legacy metadata containment
 
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
+
+## loopback exposure
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## loopback transport security
 
@@ -533,6 +545,10 @@
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
+
+## source-visible human review
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## source/deployed parity
 

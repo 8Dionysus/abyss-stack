@@ -16,7 +16,8 @@ semantic promotion, rights clearance, model storage, or host policy.
 1. repository and `mechanics/` route cards;
 2. `mechanics/inference-pilots/AGENTS.md` and package route docs;
 3. `mechanics/machine-fit/AGENTS.md`;
-4. this part's `README.md` and `docs/EXPERIMENT_LAW.md`;
+4. this part's `README.md`, `docs/EXPERIMENT_LAW.md`, and, for human-facing
+   work, `docs/HUMAN_REVIEW_WORKBENCH.md`;
 5. `/etc/abyss-machine/AGENTS.md` and
    `/etc/abyss-machine/storage-policy.json` before any material run;
 6. the current Tree of Sophia corpus contracts and rights records for every
@@ -37,6 +38,21 @@ semantic promotion, rights clearance, model storage, or host policy.
 - Never synthesize a missing human-only lane.
 - Validators may prove schema, paths, hashes, and reproducibility only. Manual
   source-visible review owns content acceptance.
+- Treat human usability as part of evidence quality. Automate packet
+  verification, navigation, autosave, timestamps, digests, and export
+  mechanics; do not automate transcription, uncertainty, boundary, or
+  acceptance judgments that the protocol assigns to the reviewer.
+- Keep blind human lanes blind. Do not expose model candidates, prior passes,
+  recognized translations, or comparator material through the UI or its
+  public session payload.
+- Human-review workbench writes must stay inside the selected mutable review
+  session. The verified packet and Tree of Sophia source witnesses remain
+  read-only.
+- Preserve reviewer identity once a pass begins, require explicit real-human
+  attestation at freeze, and label every workbench submission as a pass draft,
+  never as gold, accepted source, translation, or canon.
+- Mechanically green workbench tests do not replace a manual browser pass over
+  the actual task flow, source visibility, resume behavior, and friction.
 - Runtime receipts may point to private local artifacts but committed examples
   and docs must stay public-safe and secret-free.
 

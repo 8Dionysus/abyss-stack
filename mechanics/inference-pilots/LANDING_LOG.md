@@ -29,3 +29,15 @@ wire IDs rather than active module topology. Moved the LangGraph pilot
 dependency manifest into `parts/langgraph-pilot/requirements.txt`.
 
 Validation followed the root source route.
+
+## 2026-07-25 - Tree of Sophia human review workbench
+
+Added a loopback-only, tokenized human review workbench to the existing Tree of
+Sophia foundation laboratory route. It verifies the immutable blind packet,
+presents one source-visible unit at a time, autosaves and resumes the first
+human pass, captures task-friction feedback separately, and freezes only a
+digest-bound pass-1 draft.
+
+The first bounded slice supports the prepared 15-page Human Gold and 30-unit
+German source-review protocols. It does not perform the independent second
+pass, adjudicate, accept source text, or promote content into Tree of Sophia.

@@ -28,6 +28,7 @@ tos-foundation-lab/
 ├── README.md
 ├── docs/
 │   ├── EXPERIMENT_LAW.md
+│   ├── HUMAN_REVIEW_WORKBENCH.md
 │   ├── MANUAL_REVIEW_PROTOCOL.md
 │   └── RESOURCE_GATE.md
 ├── examples/
@@ -49,13 +50,19 @@ tos-foundation-lab/
 │   ├── translation-source-model-inspection.schema.json
 │   └── translation-source-review-manifest.schema.json
 ├── tests/
+│   ├── test_human_review_workbench.py
 │   └── test_tos_foundation_lab.py
+├── workbench/
+│   ├── app.css
+│   ├── app.js
+│   └── index.html
 ├── canonical_graph.py
 ├── docling_structure.py
 ├── docling_structure_bridge.py
 ├── granite_embedding_bridge.py
 ├── granite_retrieval.py
 ├── human_gold_review.py
+├── human_review_workbench.py
 ├── kraken_party_ocr.py
 ├── kraken_party_runtime.py
 ├── lexical_retrieval.py
@@ -99,11 +106,25 @@ The stable wrapper is `scripts/aoa-tos-foundation-lab`.
 scripts/aoa-tos-foundation-lab validate
 scripts/aoa-tos-foundation-lab inspect --experiment tos-ocr-foundation-v1
 scripts/aoa-tos-foundation-lab preflight --experiment tos-ocr-foundation-v1 --variant A
+scripts/aoa-tos-foundation-lab human-review-workbench \
+  --session-dir PRIVATE_PREPARED_REVIEW_SESSION \
+  --open-browser
 ```
 
 `preflight` is read-only by default and emits a receipt to stdout. A later run
 must preserve that receipt next to its artifacts and repeat the gate if machine
 state is no longer current.
+
+`human-review-workbench` verifies one prepared private packet, binds only to
+loopback with a per-launch token, and opens the exact next unfinished unit in a
+human-facing browser interface. It owns navigation, page routing, autosave,
+resume, active-time observation, and draft freeze so the reviewer handles only
+source-visible judgments. The current bounded slice supports pass 1 for the
+15-page diplomatic Human Gold packet and the 30-unit German source packet.
+Its frozen output is still only one human draft: it does not perform pass 2,
+adjudicate disagreement, accept German source text, create gold, or promote
+Tree of Sophia content. See
+[`docs/HUMAN_REVIEW_WORKBENCH.md`](docs/HUMAN_REVIEW_WORKBENCH.md).
 
 The first executable bounded lane is deterministic Structure A. Prepare its
 run packet from a fresh preflight, then launch the actual work through the host
