@@ -456,6 +456,135 @@ datasources:
             compatibility_bridge=BRIDGE_CONFIG,
         )
 
+    def make_sdk_canary_store(self):
+        store = self.make_store()
+        sdk_source_ref = "d" * 40
+        predecessor_ref = "a" * 40
+        subject_digest = store.routing.payloads["mirror_manifest"][
+            "artifact_subject_digest"
+        ]
+        record_id = "routing-sdk-canary-record-1"
+        authority = {
+            "archive_authorized": False,
+            "canonical_producer_switch_authorized": False,
+            "compatibility_window_started": False,
+            "live_runtime_mutation_authorized": False,
+            "predecessor_maintenance_only": False,
+            "sdk_canonical": False,
+        }
+        admission = {
+            "schema": "abyss_machine_artifact_producer_admission_v1",
+            "status": "candidate_admitted",
+            "owner_repo": "aoa-sdk",
+            "source_ref": sdk_source_ref,
+            "canonical_owner_repo": "aoa-routing",
+            "canonical_predecessor_source_ref": predecessor_ref,
+            "runtime_consumer": "abyss-stack",
+            "stronger_owner": "abyss-machine",
+            "provenance_state": "sdk_g5_candidate",
+            "publication_posture": "non_publishing_canary",
+            "single_canonical_owner": True,
+            "canonical_switch_authorized": False,
+            "allowed_consumer_intents": ["agent", "runtime_canary"],
+            "required_controls": ["abi_signature", "sbom", "slsa_in_toto"],
+            "g5_authority": dict(authority),
+        }
+        manifest = store.routing.payloads["mirror_manifest"]
+        manifest.update(
+            {
+                "routing_producer_posture": "sdk_g5_candidate_canary",
+                "canary_activation_mode": "isolated",
+                "operator_change_ref": None,
+                "source_git_commit": sdk_source_ref,
+                "canonical_producer": {
+                    "owner_repo": "aoa-routing",
+                    "source_ref": predecessor_ref,
+                },
+                "candidate_producer": {
+                    "owner_repo": "aoa-sdk",
+                    "source_ref": sdk_source_ref,
+                    "canonical_switch_authorized": False,
+                },
+                "g5_authority": authority,
+                "trust_verdict": {
+                    "ok": True,
+                    "schema": "abyss_machine_artifact_trust_gate_v1",
+                    "verdict": "allow",
+                    "artifact_class": "thin_routing_readmodel_bundle",
+                    "consumer_intent": "runtime_canary",
+                    "subject_digest": subject_digest,
+                    "record_id": record_id,
+                    "require_latest": True,
+                    "latest_record_id": record_id,
+                    "reasons": [],
+                    "blockers": [],
+                    "decision": {
+                        "model": "fail_closed_consumer_admission",
+                        "allow": True,
+                        "consumer_intent": "runtime_canary",
+                    },
+                    "inspected_claims": {
+                        "subject_identity": {
+                            "subject_digest_expected": subject_digest,
+                            "subject_digest_matched": True,
+                        },
+                        "registry_latest": {
+                            "required": True,
+                            "selected_record_is_latest": True,
+                        },
+                        "source": {
+                            "source_repo_matched": True,
+                            "source_ref_matched": True,
+                            "source_ref_actual": sdk_source_ref,
+                        },
+                        "trust_root": {
+                            "trust_root_mode_actual": "host_managed",
+                            "trust_root_mode_matched": True,
+                        },
+                        "artifact_subject_store": {
+                            "required": True,
+                            "ok": True,
+                            "aggregate_digest": subject_digest,
+                        },
+                    },
+                    "record": {
+                        "record_id": record_id,
+                        "artifact_class": "thin_routing_readmodel_bundle",
+                        "source_repo": "aoa-sdk",
+                        "source_ref": sdk_source_ref,
+                        "artifact_subjects_digest": subject_digest,
+                        "lifecycle_state": "manually-verified",
+                        "latest_eligible": True,
+                        "terminal_state": False,
+                        "verification_ok": True,
+                        "consumer_refs": ["abyss-stack:routing-canary"],
+                        "required_controls": [
+                            "abi_signature",
+                            "sbom",
+                            "slsa_in_toto",
+                        ],
+                        "verified_controls": [
+                            "abi_signature",
+                            "sbom",
+                            "slsa_in_toto",
+                        ],
+                        "artifact_subject_store": {
+                            "required": True,
+                            "ok": True,
+                            "aggregate_digest": subject_digest,
+                        },
+                        "producer_admission": admission,
+                    },
+                },
+            }
+        )
+        store.routing.payloads["router"]["artifact_identity"] = {
+            "owner_repo": "aoa-sdk",
+            "artifact_class": "thin_routing_readmodel_bundle",
+            "abi_epoch": "aoa_routing_thin_router_v1",
+        }
+        return store
+
     def test_health_reports_closure_summary_when_all_layers_are_ready(self) -> None:
         self.module.STORE = self.make_store()
 
@@ -471,6 +600,72 @@ datasources:
         self.assertTrue(payload["closure_summary"]["closure_ready"])
         self.assertEqual(payload["closure_summary"]["ready_layer_count"], 7)
         self.assertEqual(payload["operator_verdict_command"], "aoa-status --autonomy --json")
+
+    def test_sdk_canary_is_ready_without_becoming_runtime_closure(self) -> None:
+        store = self.make_sdk_canary_store()
+        store.routing.payloads["mirror_manifest"]["candidate_producer"][
+            "private_evidence_ref"
+        ] = "/deploy-local/private-candidate.json"
+        store.routing.payloads["mirror_manifest"]["canonical_producer"][
+            "private_evidence_ref"
+        ] = "/deploy-local/private-predecessor.json"
+        self.module.STORE = store
+
+        health = self.module.health()
+        surface = self.module.surface_status()
+        routing_closure = surface["layers_status"]["aoa-routing"]["closure_status"]
+
+        self.assertFalse(health["ok"])
+        self.assertFalse(health["layer_readiness"]["aoa-routing"])
+        self.assertTrue(health["routing_canary"]["canary_ready"])
+        self.assertFalse(health["routing_canary"]["closure_ready"])
+        self.assertFalse(
+            health["routing_canary"]["canonical_switch_authorized"]
+        )
+        self.assertTrue(routing_closure["mirror_ready"])
+        self.assertTrue(routing_closure["consumer_ready"])
+        self.assertTrue(routing_closure["canary_ready"])
+        self.assertFalse(routing_closure["provenance_ready"])
+        self.assertFalse(routing_closure["closure_ready"])
+        self.assertEqual(routing_closure["canary_reasons"], [])
+        self.assertIn(
+            "routing SDK canary is non-canonical and cannot satisfy runtime closure",
+            routing_closure["provenance_reasons"],
+        )
+        self.assertNotIn("/deploy-local/private-candidate.json", json.dumps(health))
+        self.assertNotIn("/deploy-local/private-predecessor.json", json.dumps(health))
+
+    def test_sdk_canary_fails_closed_when_authority_is_asserted(self) -> None:
+        store = self.make_sdk_canary_store()
+        store.routing.payloads["mirror_manifest"]["g5_authority"][
+            "sdk_canonical"
+        ] = True
+        self.module.STORE = store
+
+        payload = self.module.surface_status()
+        closure = payload["layers_status"]["aoa-routing"]["closure_status"]
+
+        self.assertFalse(closure["canary_ready"])
+        self.assertIn(
+            "routing SDK canary asserts forbidden G5 authority: sdk_canonical",
+            closure["canary_reasons"],
+        )
+
+    def test_sdk_live_canary_requires_named_operator_change(self) -> None:
+        store = self.make_sdk_canary_store()
+        store.routing.payloads["mirror_manifest"][
+            "canary_activation_mode"
+        ] = "authorized_live_canary"
+        self.module.STORE = store
+
+        payload = self.module.surface_status()
+        closure = payload["layers_status"]["aoa-routing"]["closure_status"]
+
+        self.assertFalse(closure["canary_ready"])
+        self.assertIn(
+            "routing SDK live canary operator change ref is missing",
+            closure["canary_reasons"],
+        )
 
     def test_health_sanitizes_routing_trust_record(self) -> None:
         store = self.make_store()

@@ -42,7 +42,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck rsync zsh podman podman-compose
 
-      - name: Run release audit
+      - name: Run release audit including routing canary contract
         env:
           ABYSS_MACHINE_REPO_ROOT: ${{ runner.temp }}/abyss-machine-verifier
           AOA_STATS_ROOT: ${{ runner.temp }}/aoa-stats-validator

@@ -90,6 +90,7 @@
         "scripts/aoa-status",
         "scripts/aoa-sync-configs",
         "scripts/aoa-sync-federation-surfaces",
+        "scripts/aoa-routing-canary",
         "scripts/aoa-tos-graph",
         "scripts/aoa-up",
         "scripts/aoa-wait",
@@ -116,6 +117,33 @@
       "validation_lane": "source-fast/shellcheck/release",
       "ci_inclusion": "validate_stack checks wrapper/backend routes; shellcheck lane covers shell wrappers when available",
       "test_target": "tests/test_source_topology_validator_modules.py",
+      "disposition": "keep"
+    },
+    {
+      "family": "routing-canary-runtime-adapter",
+      "paths": [
+        "mechanics/federation-seams/parts/sync-wrapper/aoa_routing_canary.py"
+      ],
+      "organ_lane": "runtime federation consumer admission",
+      "owner_surface": "mechanics/federation-seams/parts/sync-wrapper/README.md",
+      "source_truth": [
+        "config-templates/Configs/federation/aoa-routing.yaml",
+        "abyss-machine exact trust verdict",
+        "aoa-sdk routing candidate subject store"
+      ],
+      "reads": [
+        "exact artifact subject store",
+        "exact abyss-machine trust verdict",
+        "routing required-file config"
+      ],
+      "writes": [
+        "explicit isolated target",
+        "operator-authorized live routing mirror with sibling rollback root"
+      ],
+      "side_effects": "checks are read-only; materialize and rollback require explicit mode flags and preserve displaced trees",
+      "validation_lane": "mechanics-part-local/tests/release",
+      "ci_inclusion": "default mechanics and release pytest lanes exercise isolated activation, live guard, and rollback",
+      "test_target": "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py",
       "disposition": "keep"
     },
     {

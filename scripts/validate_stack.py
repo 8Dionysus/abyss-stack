@@ -315,6 +315,10 @@ def _run_source_validators(errors: list[str]) -> None:
     )
     federation_runtime_seams.validate_playbook_runtime_seam(errors, root=ROOT)
     federation_runtime_seams.validate_kag_runtime_seam(errors, root=ROOT)
+    federation_runtime_seams.validate_routing_canary_runtime_seam(
+        errors,
+        root=ROOT,
+    )
     return_policy.validate_return_runtime_contract(errors, root=ROOT)
     runtime_hygiene.validate_runtime_hygiene_contracts(errors, root=ROOT)
     diagnostic_spine.validate_diagnostic_spine_contracts(

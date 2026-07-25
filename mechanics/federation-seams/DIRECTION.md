@@ -10,6 +10,8 @@ Current posture:
   without becoming the owner of those surfaces
 - keep routing mirror presence, ABI consumption, source/content provenance,
   and trust admission independently visible
+- keep SDK routing-candidate admission reversible and separately visible as
+  `canary_ready`, without allowing it to satisfy canonical runtime closure
 - keep upstream compatibility IDs behind explicit compatibility bridges
 - keep RPG, repo-self KAG, and ToS graph projections as source-derived runtime
   read models

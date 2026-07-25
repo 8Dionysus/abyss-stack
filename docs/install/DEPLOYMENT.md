@@ -255,6 +255,52 @@ scripts/aoa-status --autonomy
 Rendered compose truth and deployed autonomy readiness are different layers.
 `aoa-render-config` tells you what Compose sees; `aoa-status --autonomy` tells you whether the promoted `llama.cpp + LangGraph + route-api` control loop is currently coherent on the deployed path.
 
+### `scripts/aoa-routing-canary`
+
+This is not the ordinary federation sync route. It consumes an exact
+`aoa-sdk` routing candidate only after `abyss-machine` has admitted the
+specific source ref and subject digest for `runtime_canary`.
+
+Rehearse into a new isolated target first:
+
+```bash
+scripts/aoa-routing-canary materialize \
+  --isolated \
+  --subject-store /absolute/subject-store/root \
+  --trust-verdict /absolute/durable/trust-gate.json \
+  --target-root /absolute/isolated/Knowledge/federation/aoa-routing \
+  --sdk-source-ref SDK_GIT_OBJECT_ID \
+  --predecessor-source-ref AOA_ROUTING_GIT_OBJECT_ID \
+  --subject-digest sha256:SUBJECT_DIGEST
+```
+
+Run `check` with the same exact-input flags before any operator review.
+An existing target is never overwritten without a disjoint sibling
+`--rollback-root`. The live route additionally requires
+`--authorized-live-canary` and a named `--operator-change-ref`; it is valid
+only for a target ending in `Knowledge/federation/aoa-routing`.
+
+Rollback is explicit and recoverable:
+
+```bash
+scripts/aoa-routing-canary rollback \
+  --authorized-live-canary \
+  --target-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing \
+  --rollback-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing.pre-sdk-canary \
+  --candidate-retain-root /srv/AbyssOS/abyss-stack/Knowledge/federation/aoa-routing.sdk-canary-retained \
+  --sdk-source-ref SDK_GIT_OBJECT_ID \
+  --predecessor-source-ref AOA_ROUTING_GIT_OBJECT_ID \
+  --subject-digest sha256:SUBJECT_DIGEST \
+  --operator-change-ref OWNER_CHANGE_RECORD_ID
+```
+
+Rollback does not require the subject store or trust-verdict file: their
+revocation, loss, or canary corruption must not prevent predecessor restore.
+It records whether the displaced candidate identity was still inspectable.
+The command never starts route-api, never declares G5, and never turns
+`canary_ready` into ordinary `closure_ready`. Live activation and service
+restart remain separate operator-reviewed actions.
+
 ### `scripts/aoa-install-systemd`
 
 Links the user-unit skeleton into `~/.config/systemd/user/` and reloads the user daemon.

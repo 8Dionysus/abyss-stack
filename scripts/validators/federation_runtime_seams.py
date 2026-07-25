@@ -358,3 +358,83 @@ def validate_kag_runtime_seam(errors: list[str], *, root: Path) -> None:
     ):
         if snippet not in seam_doc:
             errors.append(f"mechanics/federation-seams/parts/kag-seam/docs/KAG_RUNTIME_SEAM.md must mention {snippet}")
+
+
+def validate_routing_canary_runtime_seam(
+    errors: list[str],
+    *,
+    root: Path,
+) -> None:
+    backend = (
+        root
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "sync-wrapper"
+        / "aoa_routing_canary.py"
+    ).read_text(encoding="utf-8")
+    route_api = (
+        root / "config-templates" / "Services" / "route-api" / "app" / "main.py"
+    ).read_text(encoding="utf-8")
+    seam_doc = (
+        root
+        / "mechanics"
+        / "federation-seams"
+        / "parts"
+        / "sync-wrapper"
+        / "README.md"
+    ).read_text(encoding="utf-8")
+    deployment_doc = (
+        root / "docs" / "install" / "DEPLOYMENT.md"
+    ).read_text(encoding="utf-8")
+
+    backend_snippets = (
+        "sdk_g5_candidate_canary",
+        "--isolated",
+        "--authorized-live-canary",
+        "--rollback-root",
+        "--candidate-retain-root",
+        "--operator-change-ref",
+        "canonical_switch_authorized",
+        "subject-store aggregate digest",
+    )
+    for snippet in backend_snippets:
+        if snippet not in backend:
+            errors.append(
+                "routing canary backend must preserve fail-closed activation "
+                f"contract token {snippet}"
+            )
+
+    route_api_snippets = (
+        "ROUTING_SDK_CANARY_POSTURE",
+        "routing_sdk_canary_provenance_reasons",
+        "canary_ready",
+        "routing SDK canary is non-canonical and cannot satisfy runtime closure",
+    )
+    for snippet in route_api_snippets:
+        if snippet not in route_api:
+            errors.append(
+                "route-api must preserve routing canary/closure separation "
+                f"token {snippet}"
+            )
+
+    for snippet in (
+        "scripts/aoa-routing-canary",
+        "runtime_canary",
+        "closure_ready",
+        "rollback",
+    ):
+        if snippet not in seam_doc:
+            errors.append(
+                "mechanics/federation-seams/parts/sync-wrapper/README.md must "
+                f"mention {snippet}"
+            )
+    for snippet in (
+        "scripts/aoa-routing-canary",
+        "--authorized-live-canary",
+        "--rollback-root",
+    ):
+        if snippet not in deployment_doc:
+            errors.append(
+                f"docs/install/DEPLOYMENT.md must mention routing canary token {snippet}"
+            )
