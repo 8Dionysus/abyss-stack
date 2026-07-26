@@ -877,7 +877,12 @@ def _build_read_only_harness(
     *,
     scenario_id: str,
     complete_return: bool = True,
+    conflicting_return: bool = False,
 ) -> Harness:
+    if not complete_return and conflicting_return:
+        raise AssertionError(
+            "an A2A return trial must select incomplete or conflicting input"
+        )
     sdk_root = _sdk_source_root()
     policy_path = root / "policy.yaml"
     _write_json(policy_path, SUPPORT.make_policy())
@@ -929,6 +934,10 @@ def _build_read_only_harness(
             child_result["remote_task"]["returned_artifacts"] = [
                 fixture["summon_request"]["expected_outputs"][0]
             ]
+        if conflicting_return:
+            child_result["remote_task"]["parent_task_id"] = (
+                "parent:conflicting-a2a-return"
+            )
         for artifact_kind, artifact_payload in (
             ("summon_request", fixture["summon_request"]),
             ("summon_decision", fixture["summon_decision"]),
@@ -1706,6 +1715,40 @@ def test_a2a_return_lane_fails_closed_on_an_incomplete_reviewed_return(
     assert outcome is not None
     assert outcome.execution_status == "failed"
     assert outcome.failure_codes == ("a2a_incomplete_return",)
+    assert harness.backend.prepare_calls == 0
+    assert harness.backend.resume_calls == 0
+
+
+def test_a2a_return_lane_rejects_a_conflicting_review_chain(
+    tmp_path: Path,
+) -> None:
+    harness = _build_read_only_harness(
+        tmp_path,
+        scenario_id="a2a_summon_return_checkpoint",
+        conflicting_return=True,
+    )
+    bridge = BRIDGE.AgentOSRuntimeBridge(
+        harness.state_root,
+        backend=harness.backend,
+        clock=lambda: NOW,
+    )
+    runner = AoARunner(clock=lambda: NOW, id_factory=lambda: "a2a-conflict")
+    session = runner.prepare(harness.plan)
+
+    with pytest.raises(
+        BRIDGE.AgentOSBridgeError,
+        match="do not form one reviewed parent/decision/return chain",
+    ):
+        bridge.invoke(
+            "observe_snapshot",
+            {
+                "operation": "observe_snapshot",
+                "profile": harness.plan.runtime_profile.model_dump(mode="json"),
+                "binding": harness.binding.model_dump(mode="json"),
+                "plan": harness.plan.model_dump(mode="json"),
+                "session": session.model_dump(mode="json"),
+            },
+        )
     assert harness.backend.prepare_calls == 0
     assert harness.backend.resume_calls == 0
 
