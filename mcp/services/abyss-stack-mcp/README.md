@@ -36,11 +36,17 @@ canary, and usable rollback proof. The selected compatible consumer's exact
 `registration_ref` is embedded in the activation step. Rollback requires
 usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
-those proofs into the candidate. A plan expires at the earliest of ten
-minutes, its observation/freshness envelopes, every required link, and every
-copied evidence ref; it cannot outlive its proof. Candidate planning allows at
-most 30 seconds of positive clock skew and rejects future-dated observations,
-required links, evidence refs, freshness, or deploy timestamps beyond it.
+those proofs into the candidate. A ready rollback proof must identify the
+complete last-known-good consumer registration, package, deploy revision and
+tree, unit, credential class, executable, and process identity. Its ordered
+steps first deny discovery and activation, restore that runtime floor, restore
+the consumer registration, and finally run the grounded canary. Restart plans
+also require and carry usable canary-route evidence. A plan expires at the
+earliest of ten minutes, its observation/freshness envelopes, every required
+link, and every copied evidence ref; it cannot outlive its proof. Candidate
+planning allows at most 30 seconds of positive clock skew and rejects
+future-dated observations, required links, evidence refs, freshness, or deploy
+timestamps beyond it.
 
 ## Observation input
 

@@ -590,6 +590,11 @@ class StackMCPApplication:
                 not in usable_states
             ):
                 blockers.append("rollback_not_proven")
+        if plan_kind == "restart" and (
+            self._effective_link_state(subject.canary.evidence, now)
+            not in usable_states
+        ):
+            blockers.append("canary_evidence_not_usable")
         if plan_kind == "rollback":
             if not subject.rollback.ready or self._effective_link_state(
                 subject.rollback.evidence, now
@@ -647,6 +652,8 @@ class StackMCPApplication:
         usable = [
             consumer
             for consumer in subject.consumers
+            if consumer.registration_ref
+            == subject.rollback.last_known_good_consumer_registration_ref
             if cls._effective_link_state(consumer.evidence, now)
             in {"exact", "compatible_drift"}
         ]
@@ -705,6 +712,8 @@ class StackMCPApplication:
                     subject.rollback.evidence,
                 )
             )
+        elif plan_kind == "restart":
+            links.append(subject.canary.evidence)
         return tuple(links)
 
     @staticmethod
@@ -824,15 +833,50 @@ class StackMCPApplication:
             "rollback": (
                 ("deny-discovery", subject.registry.registry_id),
                 (
-                    "restore-last-known-good",
+                    "deny-activation",
+                    f"{subject.organ_id}/{subject.policy_family}",
+                ),
+                (
+                    "verify-rollback-proof",
+                    subject.rollback.proof_ref or "missing",
+                ),
+                (
+                    "restore-exact-package",
                     subject.rollback.last_known_good_package_digest or "missing",
+                ),
+                (
+                    "restore-deployed-tree",
+                    subject.rollback.last_known_good_deploy_tree_digest or "missing",
+                ),
+                (
+                    "restore-deploy-revision",
+                    subject.rollback.last_known_good_deploy_revision or "missing",
+                ),
+                (
+                    "restore-unit",
+                    subject.rollback.last_known_good_unit_name or "missing.service",
+                ),
+                (
+                    "restore-credential-class",
+                    subject.rollback.last_known_good_credential_class or "missing",
+                ),
+                (
+                    "restore-executable",
+                    subject.rollback.last_known_good_executable_ref or "missing",
+                ),
+                (
+                    "restart-restored-process",
+                    subject.rollback.last_known_good_unit_name or "missing.service",
+                ),
+                (
+                    "verify-process-identity",
+                    subject.rollback.last_known_good_process_identity or "missing",
                 ),
                 (
                     "restore-consumer-registration",
                     (
-                        plan_consumer.registration_ref
-                        if plan_consumer is not None
-                        else "missing-rollback-consumer"
+                        subject.rollback.last_known_good_consumer_registration_ref
+                        or "missing-rollback-consumer"
                     ),
                 ),
                 ("run-grounded-canary", subject.canary.canary_route),

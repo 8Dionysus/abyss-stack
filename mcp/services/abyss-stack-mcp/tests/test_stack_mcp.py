@@ -130,7 +130,20 @@ def subject(
         "rollback": {
             "ready": True,
             "rollback_route": f"runbook://rollback/{organ_id}",
+            "last_known_good_consumer_registration_ref": (
+                f"config://codex/{organ_id}"
+            ),
             "last_known_good_package_digest": DIGEST_B,
+            "last_known_good_deploy_revision": "deploy-rev-0",
+            "last_known_good_deploy_tree_digest": DIGEST_C,
+            "last_known_good_unit_name": (
+                f"aoa-mcp-http@{organ_id}.service"
+            ),
+            "last_known_good_credential_class": credential_class,
+            "last_known_good_executable_ref": (
+                f"/srv/AbyssOS/.codex/bin/{organ_id}-mcp-server.py"
+            ),
+            "last_known_good_process_identity": f"{organ_id}-mcp/0.0.9",
             "proof_ref": f"receipt://rollback/{organ_id}",
             "evidence": evidence("rollback"),
         },
@@ -196,6 +209,12 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
     freshness["evidence_refs"] = []
     freshness["reason_codes"] = ["watermark-drift"]
     with pytest.raises(ValidationError, match="usable freshness requires"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    rollback = payload["subjects"][0]["rollback"]
+    rollback["last_known_good_process_identity"] = None
+    with pytest.raises(ValidationError, match="complete last-known-good contour"):
         RuntimeObservation.model_validate(payload)
 
 
@@ -451,8 +470,26 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     )
     plan = result["owner_payload"]["plan"]
     assert plan["plan_kind"] == "rollback"
-    assert plan["steps"][0]["exact_target"] == "abyss-private"
-    assert plan["steps"][2]["exact_target"] == "config://codex/aoa-kag"
+    assert [
+        (step["action"], step["exact_target"]) for step in plan["steps"]
+    ] == [
+        ("deny-discovery", "abyss-private"),
+        ("deny-activation", "aoa-kag/read"),
+        ("verify-rollback-proof", "receipt://rollback/aoa-kag"),
+        ("restore-exact-package", DIGEST_B),
+        ("restore-deployed-tree", DIGEST_C),
+        ("restore-deploy-revision", "deploy-rev-0"),
+        ("restore-unit", "aoa-mcp-http@aoa-kag.service"),
+        ("restore-credential-class", "aoa-kag-read"),
+        (
+            "restore-executable",
+            "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+        ),
+        ("restart-restored-process", "aoa-mcp-http@aoa-kag.service"),
+        ("verify-process-identity", "aoa-kag-mcp/0.0.9"),
+        ("restore-consumer-registration", "config://codex/aoa-kag"),
+        ("run-grounded-canary", "runbook://canary/aoa-kag"),
+    ]
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
@@ -512,6 +549,39 @@ def test_rollback_plan_requires_fresh_evidence_for_every_step(
             "aoa-kag",
             "read",
             "rollback",
+            expected_observation_digest=digest,
+        )
+
+
+def test_restart_plan_requires_and_carries_fresh_canary_evidence(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "restart",
+        expected_observation_digest=digest,
+    )
+    assert "receipt://runtime/canary" in {
+        item["evidence_ref"]
+        for item in result["owner_payload"]["plan"]["precondition_evidence"]
+    }
+
+    canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+    canary_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    canary_evidence["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="canary_evidence_not_usable"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "restart",
             expected_observation_digest=digest,
         )
 

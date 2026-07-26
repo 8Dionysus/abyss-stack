@@ -431,11 +431,33 @@ class RollbackObservation(StrictModel):
                     },
                     "then": {
                         "properties": {
+                            "last_known_good_consumer_registration_ref": {
+                                "type": "string"
+                            },
                             "last_known_good_package_digest": {"type": "string"},
+                            "last_known_good_deploy_revision": {"type": "string"},
+                            "last_known_good_deploy_tree_digest": {
+                                "type": "string"
+                            },
+                            "last_known_good_unit_name": {"type": "string"},
+                            "last_known_good_credential_class": {
+                                "type": "string"
+                            },
+                            "last_known_good_executable_ref": {"type": "string"},
+                            "last_known_good_process_identity": {
+                                "type": "string"
+                            },
                             "proof_ref": {"type": "string"},
                         },
                         "required": [
+                            "last_known_good_consumer_registration_ref",
                             "last_known_good_package_digest",
+                            "last_known_good_deploy_revision",
+                            "last_known_good_deploy_tree_digest",
+                            "last_known_good_unit_name",
+                            "last_known_good_credential_class",
+                            "last_known_good_executable_ref",
+                            "last_known_good_process_identity",
                             "proof_ref",
                         ],
                     },
@@ -445,17 +467,34 @@ class RollbackObservation(StrictModel):
     )
     ready: bool
     rollback_route: NonEmpty
+    last_known_good_consumer_registration_ref: NonEmpty | None = None
     last_known_good_package_digest: Digest | None = None
+    last_known_good_deploy_revision: NonEmpty | None = None
+    last_known_good_deploy_tree_digest: Digest | None = None
+    last_known_good_unit_name: UnitName | None = None
+    last_known_good_credential_class: Identifier | None = None
+    last_known_good_executable_ref: NonEmpty | None = None
+    last_known_good_process_identity: NonEmpty | None = None
     proof_ref: NonEmpty | None = None
     evidence: LinkEvidence
 
     @model_validator(mode="after")
     def validate_readiness(self) -> RollbackObservation:
-        if self.ready and (
-            self.last_known_good_package_digest is None or self.proof_ref is None
-        ):
+        last_known_good_contour = (
+            self.last_known_good_consumer_registration_ref,
+            self.last_known_good_package_digest,
+            self.last_known_good_deploy_revision,
+            self.last_known_good_deploy_tree_digest,
+            self.last_known_good_unit_name,
+            self.last_known_good_credential_class,
+            self.last_known_good_executable_ref,
+            self.last_known_good_process_identity,
+            self.proof_ref,
+        )
+        if self.ready and any(value is None for value in last_known_good_contour):
             raise ValueError(
-                "rollback readiness requires last-known-good identity and proof"
+                "rollback readiness requires a complete last-known-good contour "
+                "and proof"
             )
         return self
 

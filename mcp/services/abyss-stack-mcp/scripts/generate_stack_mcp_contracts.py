@@ -137,7 +137,24 @@ def observation_example() -> dict[str, Any]:
                 "rollback": {
                     "ready": True,
                     "rollback_route": "example://rollback/aoa-kag",
+                    "last_known_good_consumer_registration_ref": (
+                        "example://consumer/aoa-kag"
+                    ),
                     "last_known_good_package_digest": DIGESTS["package"],
+                    "last_known_good_deploy_revision": "deploy-example-revision",
+                    "last_known_good_deploy_tree_digest": DIGESTS["deploy"],
+                    "last_known_good_unit_name": (
+                        "aoa-mcp-http@aoa-kag.service"
+                    ),
+                    "last_known_good_credential_class": (
+                        "aoa-kag-read-example"
+                    ),
+                    "last_known_good_executable_ref": (
+                        "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py"
+                    ),
+                    "last_known_good_process_identity": (
+                        "aoa-kag-mcp/0.0.0-example"
+                    ),
                     "proof_ref": "example://rollback-proof/aoa-kag",
                     "evidence": evidence("rollback"),
                 },

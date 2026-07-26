@@ -759,7 +759,28 @@
           },
           "then": {
             "properties": {
+              "last_known_good_consumer_registration_ref": {
+                "type": "string"
+              },
+              "last_known_good_credential_class": {
+                "type": "string"
+              },
+              "last_known_good_deploy_revision": {
+                "type": "string"
+              },
+              "last_known_good_deploy_tree_digest": {
+                "type": "string"
+              },
+              "last_known_good_executable_ref": {
+                "type": "string"
+              },
               "last_known_good_package_digest": {
+                "type": "string"
+              },
+              "last_known_good_process_identity": {
+                "type": "string"
+              },
+              "last_known_good_unit_name": {
                 "type": "string"
               },
               "proof_ref": {
@@ -767,7 +788,14 @@
               }
             },
             "required": [
+              "last_known_good_consumer_registration_ref",
               "last_known_good_package_digest",
+              "last_known_good_deploy_revision",
+              "last_known_good_deploy_tree_digest",
+              "last_known_good_unit_name",
+              "last_known_good_credential_class",
+              "last_known_good_executable_ref",
+              "last_known_good_process_identity",
               "proof_ref"
             ]
           }
@@ -776,6 +804,76 @@
       "properties": {
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
+        },
+        "last_known_good_consumer_registration_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Consumer Registration Ref"
+        },
+        "last_known_good_credential_class": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Credential Class"
+        },
+        "last_known_good_deploy_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Revision"
+        },
+        "last_known_good_deploy_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Tree Digest"
+        },
+        "last_known_good_executable_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Executable Ref"
         },
         "last_known_good_package_digest": {
           "anyOf": [
@@ -789,6 +887,35 @@
           ],
           "default": null,
           "title": "Last Known Good Package Digest"
+        },
+        "last_known_good_process_identity": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Process Identity"
+        },
+        "last_known_good_unit_name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 3,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Unit Name"
         },
         "proof_ref": {
           "anyOf": [

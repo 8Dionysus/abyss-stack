@@ -206,7 +206,14 @@
           "reason_codes": [],
           "state": "exact"
         },
+        "last_known_good_consumer_registration_ref": "example://consumer/aoa-kag",
+        "last_known_good_credential_class": "aoa-kag-read-example",
+        "last_known_good_deploy_revision": "deploy-example-revision",
+        "last_known_good_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "last_known_good_executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
         "last_known_good_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "last_known_good_process_identity": "aoa-kag-mcp/0.0.0-example",
+        "last_known_good_unit_name": "aoa-mcp-http@aoa-kag.service",
         "proof_ref": "example://rollback-proof/aoa-kag",
         "ready": true,
         "rollback_route": "example://rollback/aoa-kag"
