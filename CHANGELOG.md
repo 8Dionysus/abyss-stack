@@ -20,7 +20,9 @@ Tracking starts with the community-docs baseline for this repository.
   explicit port `5433`, provisions a source-and-lock-addressed Python runtime
   from exact artifact hashes before unit activation, coordinates each
   plane's lifetime shared lock against exclusive provisioning, rechecks unit
-  state immediately before replacement, and fails activation-plan preparation
+  state immediately before replacement, installs only from a private
+  digest-matched package snapshot, rejects a combined unit-link/provision
+  transaction, and fails activation-plan preparation
   on unusable freshness, endpoint/process unreadiness, incompatible consumers,
   ungrounded canaries, or missing rollback proof. Concurrent first credential
   writes publish one atomically selected value without clobbering the winner.
@@ -31,8 +33,9 @@ Tracking starts with the community-docs baseline for this repository.
   planes cannot be activated or restarted before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
-  and secret screening covers encoded URI path segments as well as
-  userinfo/query/fragment surfaces.
+  and secret screening covers namespaced credential keys and encoded URI path
+  segments as well as userinfo/query/fragment surfaces. Existing equal
+  read/candidate bearer values fail closed instead of collapsing the contours.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

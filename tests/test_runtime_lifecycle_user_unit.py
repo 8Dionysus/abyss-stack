@@ -544,6 +544,43 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     self.assertNotIn(token, second.stdout + second.stderr)
             self.assertEqual(second.stdout.count("already provisioned"), 2)
 
+    def test_stack_mcp_auth_rejects_matching_contour_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            secret_dir.mkdir(parents=True, mode=0o700)
+            shared_token = "same-contour-token-" + ("a" * 48)
+            for name in STACK_MCP_CREDENTIAL_NAMES:
+                credential = secret_dir / name
+                credential.write_text(shared_token + "\n", encoding="utf-8")
+                credential.chmod(0o600)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "read and candidate bearer credentials must be distinct",
+                result.stderr,
+            )
+            self.assertNotIn(shared_token, result.stdout + result.stderr)
+
     def test_stack_mcp_credential_provisioning_is_user_scoped(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn(
@@ -593,6 +630,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
                 "  printf '%s\\n' \"$*\" >> \"$ABYSS_STACK_MCP_TEST_PIP_LOG\"\n"
+                "  if [[ -n \"${ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD:-}\" ]]; then\n"
+                "    printf 'VALUE = 99\\n' > "
+                "\"$ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD\"\n"
+                "  fi\n"
                 "  if [[ -n \"${ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD:-}\" ]]; then\n"
                 "    : > \"$ABYSS_STACK_MCP_TEST_ACTIVATE_DURING_BUILD\"\n"
                 "  fi\n"
@@ -675,16 +716,19 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
             self.assertTrue(
                 any(
-                    f"--require-hashes -r {lock_path}" in line
+                    "--require-hashes -r " in line
+                    and "/.source-snapshot/requirements.lock" in line
                     for line in pip_calls
                 )
             )
             self.assertTrue(
                 any(
-                    f"--no-deps --no-build-isolation {service_root}" in line
+                    "--no-deps --no-build-isolation " in line
+                    and line.endswith("/.source-snapshot")
                     for line in pip_calls
                 )
             )
+            self.assertTrue(all(str(service_root) not in line for line in pip_calls))
 
             second = subprocess.run(
                 command,
@@ -831,6 +875,35 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             activation_signal.unlink()
 
+            pip_log_before_source_race = pip_log.read_text(encoding="utf-8")
+            source_raced = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD": str(
+                        source_file
+                    ),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_raced.returncode, 0)
+            self.assertIn(
+                "package changed during runtime provisioning",
+                source_raced.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_source_race,
+            )
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+
             third = subprocess.run(
                 command,
                 cwd=REPO_ROOT,
@@ -845,6 +918,20 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 marker.read_text(encoding="utf-8").strip(),
                 first_identity,
             )
+
+    def test_stack_mcp_runtime_provision_rejects_combined_unit_linking(
+        self,
+    ) -> None:
+        result = self.run_install_systemd(
+            "--all-user-units",
+            "--provision-abyss-stack-mcp-runtime",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "link lock-aware user units in a separate transaction",
+            result.stderr,
+        )
 
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

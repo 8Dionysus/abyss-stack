@@ -170,7 +170,8 @@ Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
 `bearer_token_env_var`; the value must never be copied into `config.toml`.
 The stack MCP provision action creates distinct read and non-executing
 candidate credentials; neither credential is shared with the owner adapters or
-with the other stack contour. It does not register either service with Codex
+with the other stack contour. Existing equal values are rejected without
+printing them. It does not register either service with Codex
 and does not start a unit. Start remains a later canary decision after the
 typed runtime observation, deployed parity, and consumer contract are ready.
 The stack MCP runtime provision action builds a source-addressed virtual
@@ -185,7 +186,11 @@ reprovisioning. Each plane holds a shared runtime lock for its full lifetime;
 changed provisioning takes the exclusive lock and repeats the stopped-state
 check immediately before swapping the environment. The preceding
 `--all-user-units` link-and-reload step is required so every later start
-participates in that lock.
+participates in that lock; combining it with runtime provisioning in one
+installer invocation is rejected. Provisioning installs only from a private
+snapshot whose package and lock digests match the initial deployed tree, then
+rehashes deployed source before publishing the runtime identity and swapping
+the environment. A concurrent Configs sync therefore fails the transaction.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -413,6 +418,8 @@ Use `--provision-abyss-stack-mcp-auth` before canarying the stack-owned MCP
 read or candidate process. It creates separate read and candidate bearer
 credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
 `0600`, is idempotent, and never prints or replaces a valid existing value.
+It also compares the resulting values and fails closed if read and candidate
+would share one bearer.
 This action grants no runtime-effect authority: the candidate process only
 compiles an expiring content-addressed plan with
 `execution_authorized=false`.
@@ -431,7 +438,12 @@ to mutate the environment; stopping and later starting those units remain
 explicit operator actions. The units hold a shared lock for their whole
 process lifetime. Provisioning takes the exclusive form of that lock and
 rechecks both unit states after the build, immediately before the environment
-swap, so a concurrent start cannot cross the replacement boundary.
+swap, so a concurrent start cannot cross the replacement boundary. Do not
+combine this flag with `--all-user-units`; the installer rejects that ordering.
+The package and hash lock are copied to a private digest-matched snapshot and
+pip reads only that snapshot. The deployed tree is rehashed before the marker
+and swap, so a Configs sync racing dependency installation cannot mislabel the
+published runtime.
 The user units point only at this environment and use
 `ConditionPathExists` plus an executable `ExecCondition`, so a missing or
 unusable runtime leaves them inactive instead of entering a restart loop.

@@ -11,7 +11,8 @@
 ## Controls
 
 - a separate credential for each read and candidate process, alongside
-  separate ports, tools, scopes, and client identities;
+  separate ports, tools, scopes, and client identities, with equal bearer
+  values rejected after provisioning;
 - loopback-only HTTP with DNS-rebinding protection;
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
 - strict input and output models with unknown fields denied;
@@ -19,14 +20,18 @@
 - URI-like references reject credential-bearing userinfo and forbidden
   path/query/fragment keys before validation or response; unparseable URI-like
   values fail closed, bounded recursive decoding covers nested parameters, and
-  secret-prefix checks normalize leading whitespace;
+  credential-key tokenization catches namespaced separator/camel-case forms
+  while secret-prefix checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
-  into the managed-environment identity;
+  into the managed-environment identity and installed only from a private
+  digest-matched source snapshot;
 - fail-closed reprovisioning while either managed stack MCP plane is active,
   with a lifetime shared service lock, exclusive provision lock, and final
   stopped-state check before environment replacement;
+- unit link/reload and runtime provisioning cannot be combined in one
+  invocation, and deployed source is rehashed before the runtime marker/swap;
 - sync/deploy plans bind an expected future deployed-tree digest instead of
   reusing the pre-action observation; rollback denial binds registry ID and
   digest together;

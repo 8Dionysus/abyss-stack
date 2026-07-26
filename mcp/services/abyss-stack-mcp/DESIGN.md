@@ -59,6 +59,9 @@ Catalog results are compact and deliberately omit detailed schemas. Inspection
 loads one owner/policy subject and one view. A separate candidate process can
 compile one bounded plan against the exact observation digest. No call invokes
 an owner server or runtime lifecycle command.
+Read and candidate bearer contours are distinct values as well as distinct
+credential names: provisioning rejects a pre-existing or generated equality
+before either contour is considered usable.
 
 ## Authority
 
@@ -81,7 +84,11 @@ either plane is active or its state cannot be observed, and does not stop,
 start, or register either plane. After the units are linked and reloaded, each
 process holds a shared lock for its lifetime; changed provisioning holds the
 exclusive lock and checks stopped state both before building and immediately
-before swapping the verified environment.
+before swapping the verified environment. It builds only from a private copy
+whose source and lock digests match the initial deployed snapshot, then
+rechecks deployed source immediately before publishing the marker and swapping
+the environment. Unit link/reload and runtime provisioning are separate
+transactions so the loaded units cannot lag behind the locking contract.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence

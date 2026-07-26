@@ -29,6 +29,8 @@ The candidate process exposes only:
 The processes use different tools, default ports (`5431`, `5433`), environment
 variables, systemd credential names, scopes, and client identities. A read
 credential cannot authenticate to or enumerate the candidate process.
+Provisioning validates the two existing or newly created bearer values
+together and fails closed if they are identical.
 
 Every candidate remains `execution_authorized=false`, requires separate human
 approval before any effect, contains no free-form shell command, expires in at
@@ -91,7 +93,9 @@ fields, secret-like keys or values, shared credential classes, non-loopback
 HTTP endpoints, credentials embedded in URI userinfo/path/query/fragment references,
 encoded nested credential references, unparseable or excessively nested
 URI-like references, whitespace-only exact targets, and unsupported effect
-classes. Secret-prefix checks ignore leading whitespace. Expired observations
+classes. Credential-key screening recognizes namespaced separator and
+camel-case token sequences rather than only exact key spellings.
+Secret-prefix checks ignore leading whitespace. Expired observations
 remain visible as stale read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
@@ -129,6 +133,8 @@ scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 ```
 
+These are intentionally separate transactions; combining both flags is
+rejected so provisioning cannot run before the link-and-reload phase.
 This creates or refreshes
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, installs the exact
 `requirements.lock` closure with `--require-hashes`, verifies its dependencies,
@@ -146,6 +152,11 @@ provisioning holds the exclusive lock, checks both unit states before the
 build and again immediately before the guarded environment swap, and aborts if
 a start races the build. Linking and reloading the committed units before
 provisioning is therefore a required rollout precondition.
+The provisioner copies the deployed package into a private staged snapshot,
+requires that snapshot and its lock to match the initial digests, installs only
+from the snapshot, and rechecks the deployed tree before writing the runtime
+identity or swapping the environment. A Configs sync racing the build
+therefore aborts instead of publishing mixed or mislabelled runtime bytes.
 They execute the package installed inside that venv, not `Configs/src`.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this

@@ -437,7 +437,14 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
 
 @pytest.mark.parametrize(
     "secret_key",
-    ("apiKey", "clientSecret", "private.key", "refresh token"),
+    (
+        "apiKey",
+        "clientSecret",
+        "private.key",
+        "refresh token",
+        "github_api_key",
+        "backupClientSecretValue",
+    ),
 )
 def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
     tmp_path: Path,
@@ -471,6 +478,9 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "path",
         "encoded-path",
         "path-token",
+        "namespaced-query-key",
+        "suffixed-query-key",
+        "namespaced-path-key",
         "unparseable",
     ),
 )
@@ -538,6 +548,18 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "path-token":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/report/sk-{secret_value}"
+        )
+    elif reference_surface == "namespaced-query-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report?github_api_key={secret_value}"
+        )
+    elif reference_surface == "suffixed-query-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report?api_key_backup={secret_value}"
+        )
+    elif reference_surface == "namespaced-path-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report/github_api_key/{secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

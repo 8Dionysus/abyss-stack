@@ -60,6 +60,27 @@ class StackMCPError(ValueError):
     """Fail-closed stack MCP contract or observation error."""
 
 
+def _is_forbidden_credential_key(value: Any) -> bool:
+    text = str(value)
+    canonical = re.sub(r"[^a-z0-9]", "", text.casefold())
+    if canonical in _FORBIDDEN_KEY_CANONICAL:
+        return True
+    camel_separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    tokens = tuple(
+        token
+        for token in (
+            re.sub(r"[^a-z0-9]", "", part.casefold())
+            for part in re.split(r"[^A-Za-z0-9]+", camel_separated)
+        )
+        if token
+    )
+    return any(
+        "".join(tokens[start:stop]) in _FORBIDDEN_KEY_CANONICAL
+        for start in range(len(tokens))
+        for stop in range(start + 1, min(len(tokens), start + 3) + 1)
+    )
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     return json.dumps(
         value,
@@ -95,8 +116,7 @@ def _reject_secret_material(
 ) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
-            if normalized in _FORBIDDEN_KEY_CANONICAL:
+            if _is_forbidden_credential_key(key):
                 raise StackMCPError(f"secret-bearing key is forbidden at {path}.{key}")
             _reject_secret_material(
                 child,
@@ -163,12 +183,7 @@ def _reject_secret_material(
                         decoded_segment,
                         maxsplit=1,
                     )[0]
-                    normalized_key = re.sub(
-                        r"[^a-z0-9]",
-                        "",
-                        key_candidate.casefold(),
-                    )
-                    if normalized_key in _FORBIDDEN_KEY_CANONICAL:
+                    if _is_forbidden_credential_key(key_candidate):
                         raise StackMCPError(
                             "secret-bearing reference path is forbidden at "
                             f"{segment_path}"
@@ -190,12 +205,7 @@ def _reject_secret_material(
                         key,
                         f"{path}.{component_name}.key",
                     ):
-                        normalized = re.sub(
-                            r"[^a-z0-9]",
-                            "",
-                            decoded_key.casefold(),
-                        )
-                        if normalized in _FORBIDDEN_KEY_CANONICAL:
+                        if _is_forbidden_credential_key(decoded_key):
                             raise StackMCPError(
                                 "secret-bearing reference key is forbidden at "
                                 f"{path}.{component_name}"

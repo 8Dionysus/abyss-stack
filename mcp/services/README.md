@@ -73,7 +73,10 @@ creates or refreshes it from the deployed package and does not start a unit.
 Link and reload the managed user units first: each stack plane holds a shared
 runtime lock for its full lifetime, while changed provisioning holds the
 exclusive lock and rechecks stopped state immediately before the environment
-swap.
+swap. Unit link/reload and provisioning are separate transactions, and the
+runtime is installed only from a private digest-matched snapshot of deployed
+source and lock material. The two contour bearers are also compared and cannot
+share one value.
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The
