@@ -46,6 +46,9 @@ still synced into deployed `Configs/` with the wrappers.
   restarting those services.
 - Use `aoa-install-systemd --provision-mcp-http-auth` as the explicit,
   non-printing secret action before starting authenticated shared MCP owners.
+- Use `aoa-install-systemd --rotate-abyss-stack-mcp-auth` only as a standalone
+  stopped-unit transaction; it leaves consumer refresh and canary restart
+  explicit.
 - Use `aoa-install-systemd --system-units` only through `pkexec` or an
   equivalent privileged route, and only for the allowlisted support units under
   `systemd/system/managed-units.txt`.

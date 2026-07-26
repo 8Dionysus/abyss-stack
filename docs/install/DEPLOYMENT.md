@@ -156,6 +156,8 @@ scripts/aoa-install-systemd --all-user-units
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 scripts/aoa-install-systemd --provision-mcp-http-auth
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
+# Later standalone rotation, only with both stack MCP planes stopped:
+scripts/aoa-install-systemd --rotate-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
 ```
 
@@ -168,12 +170,31 @@ owners. The explicit provision action creates the optional host-local MCP
 bearer under `Secrets/Configs` without printing or replacing it. Shared HTTP
 Codex entries must name `AOA_MCP_HTTP_BEARER_TOKEN` through
 `bearer_token_env_var`; the value must never be copied into `config.toml`.
+
+An applying sync that includes `mcp` additionally requires a clean exact Git
+revision. After rsync it compares the complete source and deployed MCP service
+trees and each package, including modes, versions, entrypoints, and dependency
+locks. Each package entry also binds the exact source revision. Exact parity
+publishes one immutable content-addressed record under
+`${AOA_STACK_ROOT}/Logs/mcp/deployments/records/` and atomically refreshes
+`latest.json`. Drift or symlinks make the sync non-zero and issue no new exact
+receipt. This deployment manifest proves only source-to-`Configs` package
+parity; it explicitly leaves process, endpoint, registry, consumer schema,
+grounded result, acceptance, admission, and rollback unobserved.
+
 The stack MCP provision action creates distinct read and non-executing
 candidate credentials; neither credential is shared with the owner adapters or
 with the other stack contour. Existing equal values are rejected without
 printing them. It does not register either service with Codex
 and does not start a unit. Start remains a later canary decision after the
 typed runtime observation, deployed parity, and consumer contract are ready.
+Both managed stack MCP units treat loopback as locality rather than identity:
+bearer scope remains mandatory, and the unit sandbox denies non-loopback IP
+traffic while leaving the two loopback listeners available.
+Credential rotation is an explicit standalone operation. It refuses active or
+unobservable stack MCP units, changes both contour credentials and their
+digest manifest without printing values, and never restarts a process. Refresh
+the registered consumers before the subsequent sequential canary.
 The stack MCP runtime provision action builds a source-addressed virtual
 environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
 already deployed package, installs its exact hash-locked dependency closure,
@@ -429,6 +450,10 @@ credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
 `0600`, is idempotent, and never prints or replaces a valid existing value.
 It also compares the resulting values and fails closed if read and candidate
 would share one bearer.
+Use `--rotate-abyss-stack-mcp-auth` later as a standalone operation with both
+managed planes stopped. It rotates the pair and binding manifest together,
+does not print values or restart units, and requires consumer refresh before
+the next sequential canary.
 This action grants no runtime-effect authority: the candidate process only
 compiles an expiring content-addressed plan with
 `execution_authorized=false`.

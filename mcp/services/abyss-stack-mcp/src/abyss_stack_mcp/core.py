@@ -1038,9 +1038,12 @@ class StackMCPApplication:
         if view == "parity":
             return {
                 "source_revision": subject.source.revision,
+                "package_source_revision": subject.package.source_revision,
                 "package_digest": subject.package.artifact_digest,
                 "deployed_revision": subject.deploy.revision,
                 "deployed_digest": subject.deploy.tree_digest,
+                "deployment_manifest_ref": subject.deploy.manifest_ref,
+                "deployment_manifest_digest": subject.deploy.manifest_digest,
                 "link_states": self._link_states(
                     observation,
                     subject,
@@ -1191,6 +1194,11 @@ class StackMCPApplication:
                 continue
             if effective_state not in usable_states:
                 blockers.append(f"{name}_not_usable")
+        if (
+            plan_kind in {"deploy", "activate", "restart"}
+            and subject.package.source_revision != subject.source.revision
+        ):
+            blockers.append("package_source_revision_mismatch")
         if plan_kind in {"activate", "restart"}:
             if subject.policy_family in {"internal_effect", "external_effect"}:
                 blockers.append("effect_activation_contracts_absent")
@@ -1336,6 +1344,7 @@ class StackMCPApplication:
     ) -> bool:
         return bool(cls._proof_consumers(subject, now)) and (
             subject.proof.proved_source_revision == subject.source.revision
+            and subject.package.source_revision == subject.source.revision
             and subject.proof.proved_source_tree_digest
             == subject.source.tree_digest
             and subject.proof.proved_package_digest
@@ -1343,6 +1352,8 @@ class StackMCPApplication:
             and subject.proof.proved_deploy_revision == subject.deploy.revision
             and subject.proof.proved_deploy_tree_digest
             == subject.deploy.tree_digest
+            and subject.proof.proved_deploy_manifest_digest
+            == subject.deploy.manifest_digest
             and subject.proof.proved_process_identity
             == subject.process.process_identity
             and subject.proof.proved_server_schema_digest
@@ -1642,6 +1653,10 @@ class StackMCPApplication:
                 ),
             ),
             "deploy": (
+                (
+                    "verify-package-source-revision",
+                    subject.package.source_revision,
+                ),
                 ("verify-package-digest", subject.package.artifact_digest),
                 (
                     "stage-exact-package",
@@ -1734,6 +1749,20 @@ class StackMCPApplication:
                 (
                     "restore-deploy-revision",
                     subject.rollback.last_known_good_deploy_revision or "missing",
+                ),
+                (
+                    "restore-deployment-manifest",
+                    (
+                        subject.rollback.last_known_good_deploy_manifest_ref
+                        or "missing"
+                    ),
+                ),
+                (
+                    "verify-deployment-manifest-digest",
+                    (
+                        subject.rollback.last_known_good_deploy_manifest_digest
+                        or "missing"
+                    ),
                 ),
                 (
                     "restore-unit",

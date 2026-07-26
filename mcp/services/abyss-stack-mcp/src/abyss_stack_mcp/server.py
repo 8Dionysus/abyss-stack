@@ -8,6 +8,8 @@ import json
 import logging
 import os
 import re
+import uuid
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -15,6 +17,7 @@ from pydantic import Field
 
 from ._http_auth import http_auth_kwargs, transport_settings
 from .core import ObservationStore, StackMCPApplication
+from .policy import PolicyIdentity, StackPolicySeam, ToolPolicy
 
 
 LOGGER = logging.getLogger(__name__)
@@ -22,10 +25,34 @@ READ_PORT = 5431
 CANDIDATE_PORT = 5433
 AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
 AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
+PACKAGE_NAME = "abyss-stack-mcp"
+SOURCE_FALLBACK_VERSION = "0.1.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
 CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
+
+
+def _application_version() -> str:
+    try:
+        discovered = distribution(PACKAGE_NAME).metadata.get("Version")
+    except PackageNotFoundError:
+        return SOURCE_FALLBACK_VERSION
+    return (
+        discovered.strip()
+        if isinstance(discovered, str) and discovered.strip()
+        else SOURCE_FALLBACK_VERSION
+    )
+
+
+def _bind_server_info_version(mcp: Any) -> None:
+    """Keep serverInfo.version application-owned under the pinned FastMCP seam."""
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    if low_level_server is None or not hasattr(low_level_server, "version"):
+        raise RuntimeError(
+            "the pinned MCP SDK no longer exposes the server identity seam"
+        )
+    low_level_server.version = _application_version()
 
 
 def configured_policy_family() -> PolicyMode:
@@ -127,6 +154,102 @@ def _auth_kwargs(policy_family: PolicyMode) -> dict[str, Any]:
     )
 
 
+def _policy_identity(policy_family: PolicyMode) -> PolicyIdentity:
+    port, _, _, expected_scope = _contour(policy_family)
+    settings = transport_settings(port)
+    if settings.transport == "stdio":
+        return PolicyIdentity(
+            identity_id="local-os-stdio",
+            auth_mode="os_process",
+            scope=expected_scope,
+        )
+    from mcp.server.auth.middleware.auth_context import (  # type: ignore[import-not-found]
+        get_access_token,
+    )
+
+    token = get_access_token()
+    expected_client = f"abyss-stack-mcp-{policy_family}-consumer"
+    assert settings.host is not None and settings.port is not None
+    rendered_host = (
+        f"[{settings.host}]" if settings.host == "::1" else settings.host
+    )
+    expected_authority = f"http://{rendered_host}:{settings.port}"
+    if (
+        token is None
+        or token.client_id != expected_client
+        or expected_scope not in token.scopes
+        or token.resource != f"{expected_authority}/mcp"
+        or token.subject != "local-operator"
+        or not isinstance(token.claims, dict)
+        or token.claims.get("iss") != f"{expected_authority}/"
+    ):
+        return PolicyIdentity(
+            identity_id="unverified-http-caller",
+            auth_mode="bearer",
+            scope="invalid",
+        )
+    return PolicyIdentity(
+        identity_id=token.client_id,
+        auth_mode="bearer",
+        scope=expected_scope,
+    )
+
+
+def _build_policy_seam(policy_family: PolicyMode) -> StackPolicySeam:
+    _, _, _, scope = _contour(policy_family)
+    if policy_family == "read":
+        tools = (
+            ToolPolicy(
+                tool_id="stack_runtime_catalog",
+                effect_class="observe",
+                max_input_bytes=16_384,
+                max_output_bytes=262_144,
+                timeout_seconds=3.0,
+                filesystem_access="configured_observation_read",
+                network_access="none",
+                source_to_sink="runtime_observation_to_typed_result",
+            ),
+            ToolPolicy(
+                tool_id="stack_runtime_inspect",
+                effect_class="observe",
+                max_input_bytes=16_384,
+                max_output_bytes=2_200_000,
+                timeout_seconds=5.0,
+                filesystem_access="configured_observation_read",
+                network_access="none",
+                source_to_sink="runtime_observation_to_typed_result",
+            ),
+        )
+        max_in_flight = 8
+        rate_limit = 120
+    else:
+        tools = (
+            ToolPolicy(
+                tool_id="stack_prepare_runtime_plan",
+                effect_class="prepare_candidate",
+                max_input_bytes=16_384,
+                max_output_bytes=262_144,
+                timeout_seconds=5.0,
+                filesystem_access="configured_observation_read",
+                network_access="none",
+                source_to_sink=(
+                    "runtime_observation_to_nonexecuting_candidate"
+                ),
+            ),
+        )
+        max_in_flight = 2
+        rate_limit = 30
+    return StackPolicySeam(
+        owner="abyss-stack",
+        policy_family=policy_family,
+        expected_scope=scope,
+        tools=tools,
+        max_in_flight=max_in_flight,
+        rate_limit=rate_limit,
+        rate_window_seconds=60.0,
+    )
+
+
 def _run_server(server: Any, policy_family: PolicyMode) -> None:
     port, _, _, _ = _contour(policy_family)
     settings = transport_settings(port)
@@ -159,6 +282,7 @@ def build_server(
         ObservationStore(observation_path),
         policy_family=mode,
     )
+    policy = _build_policy_seam(mode)
     read_annotations = ToolAnnotations(
         readOnlyHint=True,
         destructiveHint=False,
@@ -181,26 +305,34 @@ def build_server(
         json_response=True,
         **_auth_kwargs(mode),
     )
+    _bind_server_info_version(mcp)
 
     if mode == "read":
 
         @mcp.tool(annotations=read_annotations, structured_output=True)
-        def stack_runtime_catalog(
+        async def stack_runtime_catalog(
             organ_id: str | None = None,
             policy_family: Literal["read"] | None = None,
             max_results: CatalogLimit = 32,
             byte_budget: CatalogBudget = 32_768,
         ) -> dict[str, Any]:
             """List compact runtime subjects without loading detailed schemas."""
-            return application.catalog(
-                organ_id=organ_id,
-                policy_family=policy_family,
-                max_results=max_results,
-                byte_budget=byte_budget,
+            arguments = {
+                "organ_id": organ_id,
+                "policy_family": policy_family,
+                "max_results": max_results,
+                "byte_budget": byte_budget,
+            }
+            return await policy.invoke(
+                request_id=uuid.uuid4().hex,
+                identity=_policy_identity(mode),
+                tool_id="stack_runtime_catalog",
+                arguments=arguments,
+                dispatch=lambda: application.catalog(**arguments),
             )
 
         @mcp.tool(annotations=read_annotations, structured_output=True)
-        def stack_runtime_inspect(
+        async def stack_runtime_inspect(
             organ_id: str,
             policy_family: Literal["read"] = "read",
             view: Literal[
@@ -221,15 +353,26 @@ def build_server(
             ] = "identity",
         ) -> dict[str, Any]:
             """Inspect one exact runtime subject and one bounded evidence view."""
-            return application.inspect(
-                organ_id,
-                policy_family,
-                view=view,
+            arguments = {
+                "organ_id": organ_id,
+                "policy_family": policy_family,
+                "view": view,
+            }
+            return await policy.invoke(
+                request_id=uuid.uuid4().hex,
+                identity=_policy_identity(mode),
+                tool_id="stack_runtime_inspect",
+                arguments=arguments,
+                dispatch=lambda: application.inspect(
+                    organ_id,
+                    policy_family,
+                    view=view,
+                ),
             )
     else:
 
         @mcp.tool(annotations=candidate_annotations, structured_output=True)
-        def stack_prepare_runtime_plan(
+        async def stack_prepare_runtime_plan(
             organ_id: str,
             target_policy_family: Literal[
                 "read", "candidate", "internal_effect", "external_effect"
@@ -238,11 +381,23 @@ def build_server(
             expected_observation_digest: str,
         ) -> dict[str, Any]:
             """Prepare a content-addressed candidate; never execute runtime effects."""
-            return application.prepare_plan(
-                organ_id,
-                target_policy_family,
-                plan_kind,
-                expected_observation_digest=expected_observation_digest,
+            arguments = {
+                "organ_id": organ_id,
+                "target_policy_family": target_policy_family,
+                "plan_kind": plan_kind,
+                "expected_observation_digest": expected_observation_digest,
+            }
+            return await policy.invoke(
+                request_id=uuid.uuid4().hex,
+                identity=_policy_identity(mode),
+                tool_id="stack_prepare_runtime_plan",
+                arguments=arguments,
+                dispatch=lambda: application.prepare_plan(
+                    organ_id,
+                    target_policy_family,
+                    plan_kind,
+                    expected_observation_digest=expected_observation_digest,
+                ),
             )
 
     LOGGER.info("abyss-stack MCP %s plane ready", mode)

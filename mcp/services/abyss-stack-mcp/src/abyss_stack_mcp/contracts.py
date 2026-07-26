@@ -20,6 +20,7 @@ NonEmpty = Annotated[
     Field(min_length=1, max_length=2048, pattern=r"\S"),
 ]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
+DEPLOYMENT_MANIFEST_RECORD_PREFIX = "Logs/mcp/deployments/records/"
 UnitName = Annotated[
     str,
     Field(
@@ -55,6 +56,14 @@ ObservationView = Literal[
 ]
 PlanKind = Literal["sync", "deploy", "activate", "restart", "rollback"]
 MAX_EVENT_EVIDENCE_SKEW = timedelta(seconds=30)
+
+
+def _deployment_manifest_ref(digest: str) -> str:
+    return (
+        DEPLOYMENT_MANIFEST_RECORD_PREFIX
+        + digest.removeprefix("sha256:")
+        + ".json"
+    )
 
 
 def _aware_utc(value: datetime | None) -> datetime | None:
@@ -192,6 +201,7 @@ class SourceIdentity(StrictModel):
 class PackageIdentity(StrictModel):
     name: Identifier
     version: NonEmpty
+    source_revision: NonEmpty
     artifact_digest: Digest
     expected_deploy_tree_digest: Digest
     evidence: LinkEvidence
@@ -201,6 +211,7 @@ class DeployIdentity(StrictModel):
     revision: NonEmpty
     tree_digest: Digest
     manifest_ref: NonEmpty
+    manifest_digest: Digest
     deployed_at: datetime
     evidence: LinkEvidence
 
@@ -213,6 +224,11 @@ class DeployIdentity(StrictModel):
 
     @model_validator(mode="after")
     def validate_manifest_evidence(self) -> DeployIdentity:
+        expected_ref = _deployment_manifest_ref(self.manifest_digest)
+        if self.manifest_ref != expected_ref:
+            raise ValueError(
+                "deploy manifest_ref must be the content-addressed manifest record"
+            )
         if (
             self.evidence.state in {"exact", "compatible_drift"}
             and not _contains_named_evidence(
@@ -530,6 +546,7 @@ class CentralProofObservation(StrictModel):
                             "proved_package_digest": {"type": "string"},
                             "proved_deploy_revision": {"type": "string"},
                             "proved_deploy_tree_digest": {"type": "string"},
+                            "proved_deploy_manifest_digest": {"type": "string"},
                             "proved_process_identity": {"type": "string"},
                             "proved_server_schema_digest": {"type": "string"},
                             "proved_consumer_registration_ref": {
@@ -554,6 +571,7 @@ class CentralProofObservation(StrictModel):
                             "proved_package_digest",
                             "proved_deploy_revision",
                             "proved_deploy_tree_digest",
+                            "proved_deploy_manifest_digest",
                             "proved_process_identity",
                             "proved_server_schema_digest",
                             "proved_consumer_registration_ref",
@@ -574,6 +592,7 @@ class CentralProofObservation(StrictModel):
     proved_package_digest: Digest | None = None
     proved_deploy_revision: NonEmpty | None = None
     proved_deploy_tree_digest: Digest | None = None
+    proved_deploy_manifest_digest: Digest | None = None
     proved_process_identity: NonEmpty | None = None
     proved_server_schema_digest: Digest | None = None
     proved_consumer_registration_ref: NonEmpty | None = None
@@ -596,6 +615,7 @@ class CentralProofObservation(StrictModel):
             self.proved_package_digest,
             self.proved_deploy_revision,
             self.proved_deploy_tree_digest,
+            self.proved_deploy_manifest_digest,
             self.proved_process_identity,
             self.proved_server_schema_digest,
             self.proved_consumer_registration_ref,
@@ -730,12 +750,25 @@ class RollbackProofTarget(StrictModel):
     package_digest: Digest
     deploy_revision: NonEmpty
     deploy_tree_digest: Digest
+    deploy_manifest_ref: NonEmpty
+    deploy_manifest_digest: Digest
     unit_name: UnitName
     credential_class: Identifier
     executable_ref: NonEmpty
     process_identity: NonEmpty
     canary_route: NonEmpty
     canary_ref: NonEmpty
+
+    @model_validator(mode="after")
+    def validate_manifest_identity(self) -> RollbackProofTarget:
+        if self.deploy_manifest_ref != _deployment_manifest_ref(
+            self.deploy_manifest_digest
+        ):
+            raise ValueError(
+                "rollback proof target manifest_ref must be the "
+                "content-addressed manifest record"
+            )
+        return self
 
 
 class RollbackObservation(StrictModel):
@@ -759,6 +792,12 @@ class RollbackObservation(StrictModel):
                             "last_known_good_deploy_tree_digest": {
                                 "type": "string"
                             },
+                            "last_known_good_deploy_manifest_ref": {
+                                "type": "string"
+                            },
+                            "last_known_good_deploy_manifest_digest": {
+                                "type": "string"
+                            },
                             "last_known_good_unit_name": {"type": "string"},
                             "last_known_good_credential_class": {
                                 "type": "string"
@@ -777,6 +816,8 @@ class RollbackObservation(StrictModel):
                             "last_known_good_package_digest",
                             "last_known_good_deploy_revision",
                             "last_known_good_deploy_tree_digest",
+                            "last_known_good_deploy_manifest_ref",
+                            "last_known_good_deploy_manifest_digest",
                             "last_known_good_unit_name",
                             "last_known_good_credential_class",
                             "last_known_good_executable_ref",
@@ -797,6 +838,8 @@ class RollbackObservation(StrictModel):
     last_known_good_package_digest: Digest | None = None
     last_known_good_deploy_revision: NonEmpty | None = None
     last_known_good_deploy_tree_digest: Digest | None = None
+    last_known_good_deploy_manifest_ref: NonEmpty | None = None
+    last_known_good_deploy_manifest_digest: Digest | None = None
     last_known_good_unit_name: UnitName | None = None
     last_known_good_credential_class: Identifier | None = None
     last_known_good_executable_ref: NonEmpty | None = None
@@ -814,6 +857,8 @@ class RollbackObservation(StrictModel):
             self.last_known_good_package_digest,
             self.last_known_good_deploy_revision,
             self.last_known_good_deploy_tree_digest,
+            self.last_known_good_deploy_manifest_ref,
+            self.last_known_good_deploy_manifest_digest,
             self.last_known_good_unit_name,
             self.last_known_good_credential_class,
             self.last_known_good_executable_ref,
@@ -828,6 +873,17 @@ class RollbackObservation(StrictModel):
                 "rollback readiness requires a complete last-known-good contour "
                 "and proof"
             )
+        if (
+            self.last_known_good_deploy_manifest_digest is not None
+            and self.last_known_good_deploy_manifest_ref
+            != _deployment_manifest_ref(
+                self.last_known_good_deploy_manifest_digest
+            )
+        ):
+            raise ValueError(
+                "rollback deploy manifest_ref must be the content-addressed "
+                "manifest record"
+            )
         if self.ready and not _contains_named_evidence(
             self.evidence,
             self.proof_ref,
@@ -841,6 +897,8 @@ class RollbackObservation(StrictModel):
                 self.last_known_good_package_digest,
                 self.last_known_good_deploy_revision,
                 self.last_known_good_deploy_tree_digest,
+                self.last_known_good_deploy_manifest_ref,
+                self.last_known_good_deploy_manifest_digest,
                 self.last_known_good_unit_name,
                 self.last_known_good_credential_class,
                 self.last_known_good_executable_ref,
@@ -853,6 +911,8 @@ class RollbackObservation(StrictModel):
                 self.proved_target.package_digest,
                 self.proved_target.deploy_revision,
                 self.proved_target.deploy_tree_digest,
+                self.proved_target.deploy_manifest_ref,
+                self.proved_target.deploy_manifest_digest,
                 self.proved_target.unit_name,
                 self.proved_target.credential_class,
                 self.proved_target.executable_ref,

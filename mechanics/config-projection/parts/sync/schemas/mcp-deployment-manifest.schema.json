@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss-stack.example/schemas/mcp-deployment-manifest-v1.json",
+  "title": "abyss-stack MCP deployment manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "digest_scope",
+    "provider",
+    "deployed_at",
+    "contains_secrets",
+    "source",
+    "deployment",
+    "services",
+    "parity_state",
+    "runtime_observation_state",
+    "claim_limit",
+    "manifest_id",
+    "record_ref",
+    "latest_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_mcp_deployment_manifest_v1"
+    },
+    "digest_scope": {
+      "const": "abyss_stack_mcp_deployment_body_v1"
+    },
+    "provider": {
+      "const": "abyss-stack"
+    },
+    "deployed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contains_secrets": {
+      "const": false
+    },
+    "source": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/tree"
+        },
+        {
+          "type": "object",
+          "required": [
+            "owner",
+            "revision",
+            "path"
+          ],
+          "properties": {
+            "owner": {
+              "const": "abyss-stack"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "path": {
+              "const": "mcp/services"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "deployment": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/tree"
+        },
+        {
+          "type": "object",
+          "required": [
+            "runtime_owner",
+            "path",
+            "sync_delete_mode"
+          ],
+          "properties": {
+            "runtime_owner": {
+              "const": "abyss-stack"
+            },
+            "path": {
+              "const": "Configs/mcp/services"
+            },
+            "sync_delete_mode": {
+              "type": "boolean"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/service"
+      }
+    },
+    "parity_state": {
+      "const": "exact"
+    },
+    "runtime_observation_state": {
+      "const": "not_observed"
+    },
+    "claim_limit": {
+      "type": "string",
+      "minLength": 120
+    },
+    "manifest_id": {
+      "$ref": "#/$defs/digest"
+    },
+    "record_ref": {
+      "type": "string",
+      "pattern": "^Logs/mcp/deployments/records/[0-9a-f]{64}\\.json$"
+    },
+    "latest_ref": {
+      "const": "Logs/mcp/deployments/latest.json"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "tree": {
+      "type": "object",
+      "required": [
+        "tree_digest",
+        "file_count",
+        "byte_count"
+      ],
+      "properties": {
+        "tree_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "byte_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "package_name",
+        "package_version",
+        "package_source_revision",
+        "package_artifact_kind",
+        "package_digest",
+        "dependency_lock_digest",
+        "server_entrypoints",
+        "source_path",
+        "deployed_path",
+        "source_tree",
+        "deployed_tree",
+        "parity_state"
+      ],
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$"
+        },
+        "package_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$"
+        },
+        "package_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "package_source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "package_artifact_kind": {
+          "const": "source_projection"
+        },
+        "package_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "dependency_lock_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "server_entrypoints": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 256
+          }
+        },
+        "source_path": {
+          "type": "string",
+          "pattern": "^mcp/services/[a-z0-9][a-z0-9._-]{1,127}$"
+        },
+        "deployed_path": {
+          "type": "string",
+          "pattern": "^Configs/mcp/services/[a-z0-9][a-z0-9._-]{1,127}$"
+        },
+        "source_tree": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/tree"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "deployed_tree": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/tree"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "parity_state": {
+          "const": "exact"
+        }
+      }
+    }
+  }
+}

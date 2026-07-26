@@ -14,6 +14,7 @@ SRC_ROOT = SERVICE_ROOT / "src"
 sys.path.insert(0, str(SRC_ROOT))
 
 from abyss_stack_mcp.contracts import RuntimeObservation  # noqa: E402
+from abyss_stack_mcp.policy import StackPolicySeam  # noqa: E402
 
 
 PIN_RE = re.compile(
@@ -128,6 +129,8 @@ def main() -> int:
 
     example = SERVICE_ROOT / "examples" / "runtime-observation.public.example.json"
     RuntimeObservation.model_validate(json.loads(example.read_text(encoding="utf-8")))
+    if StackPolicySeam.__module__ != "abyss_stack_mcp.policy":
+        raise SystemExit("protocol-independent stack policy seam is unavailable")
     validate_runtime_lock()
 
     required = {
@@ -136,6 +139,7 @@ def main() -> int:
             "read process",
             "candidate process",
             "execution_authorized=false",
+            "policy seam",
         ),
         "DESIGN.md": (
             "source",
@@ -154,6 +158,7 @@ def main() -> int:
             "confused deputy",
             "separate credential",
             "symlink",
+            "untrusted data",
         ),
     }
     for relative, needles in required.items():
@@ -163,7 +168,7 @@ def main() -> int:
                 raise SystemExit(f"{relative} is missing required boundary: {needle}")
 
     print(
-        "[ok] abyss-stack MCP source contracts, public example, "
+        "[ok] abyss-stack MCP source, policy, public example, "
         "and hash-locked runtime closure"
     )
     return 0

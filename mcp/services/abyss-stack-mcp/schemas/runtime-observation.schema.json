@@ -127,6 +127,9 @@
               "proved_consumer_registration_ref": {
                 "type": "string"
               },
+              "proved_deploy_manifest_digest": {
+                "type": "string"
+              },
               "proved_deploy_revision": {
                 "type": "string"
               },
@@ -157,6 +160,7 @@
               "proved_package_digest",
               "proved_deploy_revision",
               "proved_deploy_tree_digest",
+              "proved_deploy_manifest_digest",
               "proved_process_identity",
               "proved_server_schema_digest",
               "proved_consumer_registration_ref",
@@ -243,6 +247,19 @@
           ],
           "default": null,
           "title": "Proved Consumer Registration Ref"
+        },
+        "proved_deploy_manifest_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Manifest Digest"
         },
         "proved_deploy_revision": {
           "anyOf": [
@@ -455,6 +472,11 @@
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
         },
+        "manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Manifest Digest",
+          "type": "string"
+        },
         "manifest_ref": {
           "maxLength": 2048,
           "minLength": 1,
@@ -479,6 +501,7 @@
         "revision",
         "tree_digest",
         "manifest_ref",
+        "manifest_digest",
         "deployed_at",
         "evidence"
       ],
@@ -1074,6 +1097,13 @@
           "title": "Name",
           "type": "string"
         },
+        "source_revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Revision",
+          "type": "string"
+        },
         "version": {
           "maxLength": 2048,
           "minLength": 1,
@@ -1085,6 +1115,7 @@
       "required": [
         "name",
         "version",
+        "source_revision",
         "artifact_digest",
         "expected_deploy_tree_digest",
         "evidence"
@@ -1235,6 +1266,12 @@
               "last_known_good_credential_class": {
                 "type": "string"
               },
+              "last_known_good_deploy_manifest_digest": {
+                "type": "string"
+              },
+              "last_known_good_deploy_manifest_ref": {
+                "type": "string"
+              },
               "last_known_good_deploy_revision": {
                 "type": "string"
               },
@@ -1265,6 +1302,8 @@
               "last_known_good_package_digest",
               "last_known_good_deploy_revision",
               "last_known_good_deploy_tree_digest",
+              "last_known_good_deploy_manifest_ref",
+              "last_known_good_deploy_manifest_digest",
               "last_known_good_unit_name",
               "last_known_good_credential_class",
               "last_known_good_executable_ref",
@@ -1340,6 +1379,34 @@
           ],
           "default": null,
           "title": "Last Known Good Credential Class"
+        },
+        "last_known_good_deploy_manifest_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Manifest Digest"
+        },
+        "last_known_good_deploy_manifest_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Deploy Manifest Ref"
         },
         "last_known_good_deploy_revision": {
           "anyOf": [
@@ -1504,6 +1571,18 @@
           "title": "Credential Class",
           "type": "string"
         },
+        "deploy_manifest_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Deploy Manifest Digest",
+          "type": "string"
+        },
+        "deploy_manifest_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deploy Manifest Ref",
+          "type": "string"
+        },
         "deploy_revision": {
           "maxLength": 2048,
           "minLength": 1,
@@ -1548,6 +1627,8 @@
         "package_digest",
         "deploy_revision",
         "deploy_tree_digest",
+        "deploy_manifest_ref",
+        "deploy_manifest_digest",
         "unit_name",
         "credential_class",
         "executable_ref",

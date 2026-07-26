@@ -58,6 +58,16 @@ canary evidence, proof and acceptance receipts cannot predate their asserted
 event beyond the bounded clock skew, and duplicate evidence identities cannot
 disagree on `observed_at`.
 
+Before dispatch, a protocol-independent policy seam binds the transport-
+verified caller contour to one exact tool and effect class. It applies
+canonical request/result size limits, per-process concurrency and sliding-
+window rate limits, bounded dispatch deadlines, cancellation propagation,
+secret screening, and source-to-sink classification. It returns public-safe
+receipts containing only identities, decisions, policy facts, and content
+digests. Read results and candidate payloads are always untrusted data with no
+instruction authority. The seam has no runtime-effect dispatch path; future
+MCP interceptor support may call it but cannot replace it.
+
 ## Progressive surface
 
 Catalog results are compact and deliberately omit detailed schemas. Inspection

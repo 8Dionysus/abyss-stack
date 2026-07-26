@@ -29,6 +29,18 @@ The candidate process exposes only:
 The processes use different tools, default ports (`5431`, `5433`), environment
 variables, systemd credential names, scopes, and client identities. A read
 credential cannot authenticate to or enumerate the candidate process.
+Both contours publish the `abyss-stack-mcp` application version in
+`serverInfo.version`; the pinned SDK version is dependency evidence, not the
+server identity.
+Every exported primitive also crosses the package-local protocol-independent
+policy seam. The seam rechecks the authenticated contour identity and scope,
+uses an exact tool/effect allowlist, limits canonical input and output bytes,
+in-flight calls, starts per minute, and dispatch time, propagates caller
+cancellation, rejects secret-bearing inputs or results, and emits a
+secret-free allow/deny/cancel receipt containing digests rather than values.
+All returned owner/runtime text is marked `content_trust=untrusted_data` and
+`instruction_authority=none`. The candidate primitive remains
+`prepare_candidate`; its policy receipt never authorizes a runtime effect.
 Provisioning validates the two existing or newly created bearer values
 together and fails closed if they are identical. It also atomically publishes
 a non-secret digest manifest. Each managed startup receives only its own
@@ -36,6 +48,9 @@ bearer plus that manifest, verifies that the two committed digests are
 distinct, and binds its loaded bearer to the matching contour digest before
 the server can listen. Copying or rotating a credential file without
 refreshing a valid separated pair therefore fails closed on the next start.
+The lifecycle-owned rotation command changes both contour values and their
+manifest only while both managed units are observably stopped, never prints a
+value, and leaves consumer refresh plus restart to a later canary transaction.
 
 Every candidate remains `execution_authorized=false`, requires separate human
 approval before any effect, contains no free-form shell command, expires in at
@@ -45,9 +60,10 @@ an active process with an observed process identity, a ready endpoint, a
 registered consumer with the exact server schema digest and an overlapping MCP
 protocol version, a passed central-proof verdict issued by `proof_owner` and
 bound to the current source revision and source-tree digest, package, deployed
-revision and tree digest, schema, running process identity, consumer, and
-exact canary route and receipt, named acceptance-owner evidence bound to the current source
-revision and package digest, a grounded canary, and usable
+revision, tree digest, and content-addressed deployment-manifest digest, schema,
+running process identity, consumer, and exact canary route and receipt, named
+acceptance-owner evidence bound to the current source revision and package
+digest, a grounded canary, and usable
 rollback proof. Activation or restart of `internal_effect` and
 `external_effect` targets is rejected because this package does not model
 their separately required threat, approval, egress, compensation, or rollback
@@ -61,9 +77,10 @@ usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
 those proofs into the candidate. A ready rollback proof must identify the
 complete last-known-good consumer registration, package, deploy revision and
-tree, unit, credential class, executable, process identity, and canary route
-and receipt. The proof carries a second typed target that must exactly equal
-that full restoration contour before readiness is accepted. Its ordered steps
+tree, content-addressed deployment-manifest ref and digest, unit, credential
+class, executable, process identity, and canary route and receipt. The proof
+carries a second typed target that must exactly equal that full restoration
+contour before readiness is accepted. Its ordered steps
 first deny discovery and activation, restore that runtime floor, restore the
 consumer registration, and finally run the proven last-known-good canary
 rather than the current deployment's canary. Rollback planning relies on the
@@ -92,7 +109,9 @@ accepted owner decision, successful canary, and ready rollback proof also binds
 its named receipt or registration target to one contained `EvidenceRef`; for
 proof and acceptance, that same ref must be issued by the declared owner. The
 candidate copies and expiry-bounds that exact identity before any step can name
-it.
+it. A deploy manifest ref is valid only at the stack-owned immutable record path
+derived from its `sha256:` manifest digest. Package identity also names the
+source revision from which the artifact was built.
 Central proof cannot predate the canary link or evidence refs it names.
 Duplicate evidence identities with conflicting `observed_at` values are
 rejected before expiry deduplication.

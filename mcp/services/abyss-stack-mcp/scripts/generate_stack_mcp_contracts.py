@@ -30,8 +30,18 @@ DIGESTS = {
         ("registry", "e"),
         ("sync_target", "f"),
         ("deploy_target", "0"),
+        ("manifest", "1"),
+        ("rollback_manifest", "2"),
     )
 }
+
+
+def deployment_manifest_ref(digest: str) -> str:
+    return (
+        "Logs/mcp/deployments/records/"
+        + digest.removeprefix("sha256:")
+        + ".json"
+    )
 
 
 def evidence(
@@ -86,6 +96,7 @@ def observation_example() -> dict[str, Any]:
                 "package": {
                     "name": "aoa-kag-mcp",
                     "version": "0.0.0-example",
+                    "source_revision": "source-example-revision",
                     "artifact_digest": DIGESTS["package"],
                     "expected_deploy_tree_digest": DIGESTS["deploy_target"],
                     "evidence": evidence("package"),
@@ -93,9 +104,17 @@ def observation_example() -> dict[str, Any]:
                 "deploy": {
                     "revision": "deploy-example-revision",
                     "tree_digest": DIGESTS["deploy"],
-                    "manifest_ref": "example://runtime/deploy",
+                    "manifest_ref": deployment_manifest_ref(
+                        DIGESTS["manifest"]
+                    ),
+                    "manifest_digest": DIGESTS["manifest"],
                     "deployed_at": NOW.isoformat(),
-                    "evidence": evidence("deploy"),
+                    "evidence": evidence(
+                        "deploy",
+                        evidence_ref=deployment_manifest_ref(
+                            DIGESTS["manifest"]
+                        ),
+                    ),
                 },
                 "process": {
                     "unit_name": "aoa-mcp-http@aoa-kag.service",
@@ -148,6 +167,7 @@ def observation_example() -> dict[str, Any]:
                     "proved_package_digest": DIGESTS["package"],
                     "proved_deploy_revision": "deploy-example-revision",
                     "proved_deploy_tree_digest": DIGESTS["deploy"],
+                    "proved_deploy_manifest_digest": DIGESTS["manifest"],
                     "proved_process_identity": "aoa-kag-mcp/0.0.0-example",
                     "proved_server_schema_digest": DIGESTS["schema"],
                     "proved_consumer_registration_ref": (
@@ -183,6 +203,12 @@ def observation_example() -> dict[str, Any]:
                     "last_known_good_package_digest": DIGESTS["package"],
                     "last_known_good_deploy_revision": "deploy-example-revision",
                     "last_known_good_deploy_tree_digest": DIGESTS["deploy"],
+                    "last_known_good_deploy_manifest_ref": (
+                        deployment_manifest_ref(DIGESTS["rollback_manifest"])
+                    ),
+                    "last_known_good_deploy_manifest_digest": (
+                        DIGESTS["rollback_manifest"]
+                    ),
                     "last_known_good_unit_name": (
                         "aoa-mcp-http@aoa-kag.service"
                     ),
@@ -209,6 +235,10 @@ def observation_example() -> dict[str, Any]:
                         "package_digest": DIGESTS["package"],
                         "deploy_revision": "deploy-example-revision",
                         "deploy_tree_digest": DIGESTS["deploy"],
+                        "deploy_manifest_ref": deployment_manifest_ref(
+                            DIGESTS["rollback_manifest"]
+                        ),
+                        "deploy_manifest_digest": DIGESTS["rollback_manifest"],
                         "unit_name": "aoa-mcp-http@aoa-kag.service",
                         "credential_class": "aoa-kag-read-example",
                         "executable_ref": (

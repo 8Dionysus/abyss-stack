@@ -16,7 +16,20 @@
   digest manifest is loaded beside only the selected contour credential, so
   every managed startup verifies both committed digests remain distinct and
   its own loaded bearer still matches its contour before binding a listener;
+- explicit pair rotation only after both managed planes are observably stopped;
+  it replaces both bearer values and the binding manifest without printing
+  them, leaves restart and consumer refresh explicit, and any partial
+  publication fails closed at the next startup manifest check;
 - loopback-only HTTP with DNS-rebinding protection;
+- loopback is transport locality, not caller identity: HTTP dispatch is still
+  bound to the contour bearer client and exact scope; managed units deny all
+  non-loopback IP traffic;
+- a protocol-independent exact tool/effect allowlist with input/output byte
+  limits, per-process concurrency and rate limits, bounded dispatch deadlines,
+  cancellation propagation, and public-safe allow/deny/cancel receipts;
+- policy receipts contain input/output digests rather than values, mark all
+  returned content as untrusted data with no instruction authority, and never
+  authorize runtime effects;
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
 - strict input and output models with unknown fields denied;
 - secret-like material rejected before validation or response;
@@ -131,3 +144,7 @@ authority.
 A same-UID process that can read the deployed Secrets tree remains outside the
 protection offered by bearer authentication. OS-user or container isolation is
 required before any effect plane. No effect plane is admitted by this package.
+Deadline cancellation cannot terminate an already-running Python worker
+thread. Current dispatches are bounded, local, and non-effecting; an effect
+plane must use cooperatively cancellable or process-isolated handlers before
+admission.

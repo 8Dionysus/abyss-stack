@@ -13,6 +13,7 @@ link_all_user_units=0
 link_system_units=0
 provision_mcp_http_auth=0
 provision_abyss_stack_mcp_auth=0
+rotate_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
 launch_verified_abyss_stack_mcp=0
@@ -87,6 +88,9 @@ while (($#)); do
     --provision-abyss-stack-mcp-auth)
       provision_abyss_stack_mcp_auth=1
       ;;
+    --rotate-abyss-stack-mcp-auth)
+      rotate_abyss_stack_mcp_auth=1
+      ;;
     --provision-abyss-stack-mcp-runtime)
       provision_abyss_stack_mcp_runtime=1
       ;;
@@ -158,6 +162,14 @@ aoa_validate_overlay_spec "$overlay_spec"
 if ((install_mcp_http_codex_client && remove_mcp_http_codex_client)); then
   aoa_die "cannot install and remove the MCP HTTP Codex client in one transaction"
 fi
+if ((rotate_abyss_stack_mcp_auth && \
+      (provision_mcp_http_auth || provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || \
+       launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || \
+       remove_mcp_http_codex_client || enable_now || restart_now || \
+       link_all_user_units || link_system_units || selection_set || overlay_set))); then
+  aoa_die "abyss-stack MCP credential rotation must be a standalone action"
+fi
 if ((provision_abyss_stack_mcp_runtime && link_all_user_units)); then
   aoa_die "link lock-aware user units in a separate transaction before abyss-stack MCP runtime provisioning"
 fi
@@ -180,8 +192,8 @@ fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
 fi
-if ((provision_abyss_stack_mcp_auth && EUID == 0)); then
-  aoa_die "abyss-stack MCP credential provisioning must run as the target user, not root"
+if (((provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth) && EUID == 0)); then
+  aoa_die "abyss-stack MCP credential management must run as the target user, not root"
 fi
 if ((provision_abyss_stack_mcp_runtime && EUID == 0)); then
   aoa_die "abyss-stack MCP runtime provisioning must run as the target user, not root"
@@ -334,6 +346,103 @@ aoa_provision_abyss_stack_mcp_auth() {
   fi
   chmod 0600 "$abyss_stack_mcp_auth_manifest_path"
   aoa_note "refreshed abyss-stack MCP credential separation manifest"
+}
+
+aoa_require_abyss_stack_mcp_units_stopped_for_rotation() {
+  local unit=""
+  local active_state=""
+
+  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    if ! active_state="$(
+      systemctl --user show \
+        --property=ActiveState \
+        --value \
+        "$unit" 2>/dev/null
+    )"; then
+      aoa_die "cannot observe ${unit}; refusing credential rotation"
+    fi
+    case "$active_state" in
+      inactive|failed)
+        ;;
+      *)
+        aoa_die "refusing credential rotation while ${unit} is ${active_state:-unknown}"
+        ;;
+    esac
+  done
+}
+
+aoa_rotate_abyss_stack_mcp_auth() {
+  local read_path="${mcp_http_secret_dir}/${abyss_stack_mcp_read_credential_name}"
+  local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
+  local read_temp=""
+  local candidate_temp=""
+  local manifest_temp=""
+  local read_token=""
+  local candidate_token=""
+  local read_digest=""
+  local candidate_digest=""
+
+  aoa_require_abyss_stack_mcp_units_stopped_for_rotation
+  aoa_provision_abyss_stack_mcp_auth
+  read_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_read_credential_name}.rotate.XXXXXX"
+  )"
+  candidate_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_candidate_credential_name}.rotate.XXXXXX"
+  )"
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_auth_manifest_name}.rotate.XXXXXX"
+  )"
+  if ! aoa_run_isolated_python python3 \
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$read_temp" || \
+     ! aoa_run_isolated_python python3 \
+      -c 'import secrets; print(secrets.token_urlsafe(48))' > "$candidate_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to generate rotated abyss-stack MCP credentials"
+  fi
+  chmod 0600 "$read_temp" "$candidate_temp" "$manifest_temp"
+  aoa_validate_mcp_bearer_file \
+    "$read_temp" \
+    "rotated abyss-stack MCP read bearer credential"
+  aoa_validate_mcp_bearer_file \
+    "$candidate_temp" \
+    "rotated abyss-stack MCP candidate bearer credential"
+  read_token="$(<"$read_temp")"
+  candidate_token="$(<"$candidate_temp")"
+  [[ "$read_token" != "$candidate_token" ]] || {
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "rotated abyss-stack MCP credentials must be distinct"
+  }
+  read_digest="$(
+    printf '%s' "$read_token" | sha256sum | cut -d' ' -f1
+  )"
+  candidate_digest="$(
+    printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  if ! printf \
+      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
+      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to stage the rotated abyss-stack MCP auth manifest"
+  fi
+  if ! mv -f -- "$read_temp" "$read_path"; then
+    rm -f -- "$read_temp" "$candidate_temp" "$manifest_temp"
+    aoa_die "failed to publish the rotated abyss-stack MCP read credential"
+  fi
+  if ! mv -f -- "$candidate_temp" "$candidate_path"; then
+    rm -f -- "$candidate_temp" "$manifest_temp"
+    aoa_die "credential rotation stopped in a fail-closed partial state"
+  fi
+  if ! mv -f -- "$manifest_temp" "$abyss_stack_mcp_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "credential rotation stopped before manifest publication"
+  fi
+  chmod 0600 \
+    "$read_path" \
+    "$candidate_path" \
+    "$abyss_stack_mcp_auth_manifest_path"
+  aoa_note "rotated both abyss-stack MCP credentials and their digest manifest"
+  aoa_note "managed units remain stopped; refresh consumers before a canary start"
 }
 
 aoa_require_abyss_stack_mcp_units_stopped() {
@@ -1046,6 +1155,9 @@ fi
 if ((provision_abyss_stack_mcp_auth)); then
   aoa_provision_abyss_stack_mcp_auth
 fi
+if ((rotate_abyss_stack_mcp_auth)); then
+  aoa_rotate_abyss_stack_mcp_auth
+fi
 if ((provision_abyss_stack_mcp_runtime)); then
   aoa_provision_abyss_stack_mcp_runtime
 fi
@@ -1061,7 +1173,7 @@ fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || rotate_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

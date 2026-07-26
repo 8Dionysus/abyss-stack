@@ -5,10 +5,15 @@ import hashlib
 import json
 import os
 import sys
+import threading
+import time
+import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 from pydantic import ValidationError
 
 from abyss_stack_mcp.contracts import RuntimeObservation
@@ -18,7 +23,19 @@ from abyss_stack_mcp.core import (
     StackMCPApplication,
     StackMCPError,
 )
-from abyss_stack_mcp.server import _auth_kwargs, _contour, build_server
+from abyss_stack_mcp.server import (
+    SOURCE_FALLBACK_VERSION,
+    _auth_kwargs,
+    _contour,
+    _policy_identity,
+    build_server,
+)
+from abyss_stack_mcp.policy import (
+    PolicyDeniedError,
+    PolicyIdentity,
+    StackPolicySeam,
+    ToolPolicy,
+)
 
 
 NOW = datetime(2026, 7, 26, 5, 0, tzinfo=timezone.utc)
@@ -28,6 +45,16 @@ DIGEST_C = "sha256:" + "c" * 64
 DIGEST_D = "sha256:" + "d" * 64
 DIGEST_E = "sha256:" + "e" * 64
 DIGEST_F = "sha256:" + "f" * 64
+DIGEST_MANIFEST = "sha256:" + "0" * 64
+DIGEST_ROLLBACK_MANIFEST = "sha256:" + "1" * 64
+
+
+def deployment_manifest_ref(digest: str) -> str:
+    return (
+        "Logs/mcp/deployments/records/"
+        + digest.removeprefix("sha256:")
+        + ".json"
+    )
 
 
 def evidence(
@@ -86,6 +113,7 @@ def subject(
         "package": {
             "name": f"{organ_id}-mcp",
             "version": "0.1.0",
+            "source_revision": "source-rev-1",
             "artifact_digest": DIGEST_B,
             "expected_deploy_tree_digest": DIGEST_F,
             "evidence": evidence("package"),
@@ -93,9 +121,13 @@ def subject(
         "deploy": {
             "revision": "deploy-rev-1",
             "tree_digest": DIGEST_C,
-            "manifest_ref": "receipt://runtime/deploy",
+            "manifest_ref": deployment_manifest_ref(DIGEST_MANIFEST),
+            "manifest_digest": DIGEST_MANIFEST,
             "deployed_at": NOW.isoformat(),
-            "evidence": evidence("deploy"),
+            "evidence": evidence(
+                "deploy",
+                evidence_ref=deployment_manifest_ref(DIGEST_MANIFEST),
+            ),
         },
         "process": {
             "unit_name": f"aoa-mcp-http@{organ_id}.service",
@@ -147,6 +179,7 @@ def subject(
             "proved_package_digest": DIGEST_B,
             "proved_deploy_revision": "deploy-rev-1",
             "proved_deploy_tree_digest": DIGEST_C,
+            "proved_deploy_manifest_digest": DIGEST_MANIFEST,
             "proved_process_identity": f"{organ_id}-mcp/0.1.0",
             "proved_server_schema_digest": DIGEST_D,
             "proved_consumer_registration_ref": f"config://codex/{organ_id}",
@@ -178,6 +211,12 @@ def subject(
             "last_known_good_package_digest": DIGEST_B,
             "last_known_good_deploy_revision": "deploy-rev-0",
             "last_known_good_deploy_tree_digest": DIGEST_C,
+            "last_known_good_deploy_manifest_ref": (
+                deployment_manifest_ref(DIGEST_ROLLBACK_MANIFEST)
+            ),
+            "last_known_good_deploy_manifest_digest": (
+                DIGEST_ROLLBACK_MANIFEST
+            ),
             "last_known_good_unit_name": (
                 f"aoa-mcp-http@{organ_id}.service"
             ),
@@ -198,6 +237,10 @@ def subject(
                 "package_digest": DIGEST_B,
                 "deploy_revision": "deploy-rev-0",
                 "deploy_tree_digest": DIGEST_C,
+                "deploy_manifest_ref": deployment_manifest_ref(
+                    DIGEST_ROLLBACK_MANIFEST
+                ),
+                "deploy_manifest_digest": DIGEST_ROLLBACK_MANIFEST,
                 "unit_name": f"aoa-mcp-http@{organ_id}.service",
                 "credential_class": credential_class,
                 "executable_ref": (
@@ -264,6 +307,329 @@ def application(
         policy_family=policy_family,
         clock=lambda: NOW + timedelta(minutes=5),
     )
+
+
+def policy_seam(
+    *,
+    max_in_flight: int = 2,
+    rate_limit: int = 10,
+    timeout_seconds: float = 1.0,
+    max_output_bytes: int = 4096,
+) -> StackPolicySeam:
+    return StackPolicySeam(
+        owner="abyss-stack",
+        policy_family="read",
+        expected_scope="abyss-stack-mcp:read",
+        tools=(
+            ToolPolicy(
+                tool_id="stack_runtime_catalog",
+                effect_class="observe",
+                max_input_bytes=1024,
+                max_output_bytes=max_output_bytes,
+                timeout_seconds=timeout_seconds,
+                filesystem_access="configured_observation_read",
+                network_access="none",
+                source_to_sink="runtime_observation_to_typed_result",
+            ),
+        ),
+        max_in_flight=max_in_flight,
+        rate_limit=rate_limit,
+        rate_window_seconds=60,
+        clock=lambda: NOW,
+    )
+
+
+def policy_identity(scope: str = "abyss-stack-mcp:read") -> PolicyIdentity:
+    return PolicyIdentity(
+        identity_id="test-consumer",
+        auth_mode="bearer",
+        scope=scope,
+    )
+
+
+def test_policy_seam_returns_secret_safe_allow_and_deny_receipts() -> None:
+    seam = policy_seam()
+    result = asyncio.run(
+        seam.invoke(
+            request_id="request-allowed",
+            identity=policy_identity(),
+            tool_id="stack_runtime_catalog",
+            arguments={"organ_id": "aoa-kag"},
+            dispatch=lambda: {
+                "metadata": {"contract_version": "test"},
+                "owner_payload": {"entries": []},
+            },
+        )
+    )
+
+    receipt = result["metadata"]["policy_receipt"]
+    assert receipt["decision"] == "allowed"
+    assert receipt["effect_class"] == "observe"
+    assert receipt["network_access"] == "none"
+    assert receipt["runtime_effect_authorized"] is False
+    assert result["metadata"]["content_trust"] == "untrusted_data"
+    assert result["metadata"]["instruction_authority"] == "none"
+    assert receipt["input_digest"].startswith("sha256:")
+    assert receipt["output_digest"].startswith("sha256:")
+
+    secret_value = "sk-proj-" + "a" * 48
+    with pytest.raises(PolicyDeniedError) as caught:
+        asyncio.run(
+            seam.invoke(
+                request_id="request-secret",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={"query": secret_value},
+                dispatch=lambda: {},
+            )
+        )
+    assert caught.value.reason_code == "secret_material_rejected"
+    assert caught.value.receipt["decision"] == "denied"
+    assert secret_value not in str(caught.value)
+    assert secret_value not in json.dumps(caught.value.receipt)
+
+
+def test_policy_identity_does_not_treat_loopback_as_authentication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "stdio")
+    local_identity = _policy_identity("read")
+    assert local_identity.auth_mode == "os_process"
+    assert local_identity.scope == "abyss-stack-mcp:read"
+
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("AOA_MCP_HOST", "127.0.0.1")
+    monkeypatch.setenv("AOA_MCP_PORT", "5431")
+    unauthenticated = _policy_identity("read")
+    assert unauthenticated.identity_id == "unverified-http-caller"
+    assert unauthenticated.scope == "invalid"
+
+
+def test_policy_identity_binds_bearer_scope_resource_and_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mcp.server.auth.middleware import auth_context
+    from mcp.server.auth.provider import AccessToken
+
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("AOA_MCP_HOST", "127.0.0.1")
+    monkeypatch.setenv("AOA_MCP_PORT", "5431")
+    token = AccessToken(
+        token="not-serialized-by-policy",
+        client_id="abyss-stack-mcp-read-consumer",
+        scopes=["abyss-stack-mcp:read"],
+        resource="http://127.0.0.1:5431/mcp",
+        subject="local-operator",
+        claims={"iss": "http://127.0.0.1:5431/"},
+    )
+    monkeypatch.setattr(auth_context, "get_access_token", lambda: token)
+
+    identity = _policy_identity("read")
+    assert identity == PolicyIdentity(
+        identity_id="abyss-stack-mcp-read-consumer",
+        auth_mode="bearer",
+        scope="abyss-stack-mcp:read",
+    )
+
+    drifted = token.model_copy(
+        update={"resource": "http://127.0.0.1:5433/mcp"}
+    )
+    monkeypatch.setattr(auth_context, "get_access_token", lambda: drifted)
+    assert _policy_identity("read").scope == "invalid"
+
+
+@pytest.mark.parametrize(
+    ("tool_id", "scope", "expected_reason"),
+    (
+        ("unlisted_runtime_effect", "abyss-stack-mcp:read", "tool_not_allowlisted"),
+        ("stack_runtime_catalog", "wrong:scope", "identity_scope_mismatch"),
+    ),
+)
+def test_policy_seam_denies_unlisted_tools_and_wrong_identity_scope(
+    tool_id: str,
+    scope: str,
+    expected_reason: str,
+) -> None:
+    seam = policy_seam()
+
+    with pytest.raises(PolicyDeniedError) as caught:
+        asyncio.run(
+            seam.invoke(
+                request_id="request-denied",
+                identity=policy_identity(scope),
+                tool_id=tool_id,
+                arguments={},
+                dispatch=lambda: {},
+            )
+        )
+
+    assert caught.value.reason_code == expected_reason
+    assert caught.value.receipt["runtime_effect_authorized"] is False
+    assert caught.value.receipt["contains_secrets"] is False
+
+
+def test_policy_seam_turns_application_denial_into_a_bounded_receipt() -> None:
+    seam = policy_seam()
+
+    def deny_dispatch() -> dict:
+        raise StackMCPError("runtime precondition is not satisfied")
+
+    with pytest.raises(
+        PolicyDeniedError,
+        match="application_precondition_denied",
+    ) as caught:
+        asyncio.run(
+            seam.invoke(
+                request_id="request-application-denied",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=deny_dispatch,
+            )
+        )
+
+    assert caught.value.receipt["decision"] == "denied"
+    assert caught.value.receipt["reason_codes"] == [
+        "application_precondition_denied"
+    ]
+
+
+def test_policy_seam_suppresses_unexpected_application_failure_details() -> None:
+    seam = policy_seam()
+    sensitive_detail = "private-runtime-path-and-value"
+
+    def fail_dispatch() -> dict:
+        raise RuntimeError(sensitive_detail)
+
+    with pytest.raises(PolicyDeniedError, match="application_failure") as caught:
+        asyncio.run(
+            seam.invoke(
+                request_id="request-application-failure",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=fail_dispatch,
+            )
+        )
+
+    assert caught.value.receipt["reason_codes"] == ["application_failure"]
+    assert sensitive_detail not in str(caught.value)
+    assert sensitive_detail not in json.dumps(caught.value.receipt)
+
+
+def test_policy_seam_enforces_output_rate_concurrency_and_timeout_limits() -> None:
+    output_seam = policy_seam(max_output_bytes=800)
+    with pytest.raises(PolicyDeniedError, match="output_size_limit_exceeded"):
+        asyncio.run(
+            output_seam.invoke(
+                request_id="request-output",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=lambda: {"owner_payload": {"value": "x" * 1000}},
+            )
+        )
+
+    rate_seam = policy_seam(rate_limit=1)
+    asyncio.run(
+        rate_seam.invoke(
+            request_id="request-rate-first",
+            identity=policy_identity(),
+            tool_id="stack_runtime_catalog",
+            arguments={},
+            dispatch=lambda: {"owner_payload": {}},
+        )
+    )
+    with pytest.raises(PolicyDeniedError, match="rate_limit_exceeded"):
+        asyncio.run(
+            rate_seam.invoke(
+                request_id="request-rate-second",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=lambda: {"owner_payload": {}},
+            )
+        )
+
+    timeout_seam = policy_seam(timeout_seconds=0.01)
+    with pytest.raises(PolicyDeniedError, match="dispatch_timeout"):
+        asyncio.run(
+            timeout_seam.invoke(
+                request_id="request-timeout",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=lambda: time.sleep(0.05) or {"owner_payload": {}},
+            )
+        )
+
+    async def concurrency_scenario() -> None:
+        seam = policy_seam(max_in_flight=1)
+        started = threading.Event()
+        release = threading.Event()
+
+        def blocking_dispatch() -> dict:
+            started.set()
+            release.wait(timeout=2)
+            return {"owner_payload": {}}
+
+        first = asyncio.create_task(
+            seam.invoke(
+                request_id="request-concurrency-first",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=blocking_dispatch,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        with pytest.raises(
+            PolicyDeniedError,
+            match="concurrency_limit_exceeded",
+        ):
+            await seam.invoke(
+                request_id="request-concurrency-second",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=lambda: {"owner_payload": {}},
+            )
+        release.set()
+        await first
+
+    asyncio.run(concurrency_scenario())
+
+
+def test_policy_seam_propagates_cancellation_and_records_it() -> None:
+    async def cancellation_scenario() -> None:
+        seam = policy_seam()
+        started = threading.Event()
+        release = threading.Event()
+
+        def blocking_dispatch() -> dict:
+            started.set()
+            release.wait(timeout=2)
+            return {"owner_payload": {}}
+
+        task = asyncio.create_task(
+            seam.invoke(
+                request_id="request-cancelled",
+                identity=policy_identity(),
+                tool_id="stack_runtime_catalog",
+                arguments={},
+                dispatch=blocking_dispatch,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        receipt = seam.recent_receipts()[-1]
+        assert receipt["decision"] == "cancelled"
+        assert receipt["reason_codes"] == ["caller_cancelled"]
+
+    asyncio.run(cancellation_scenario())
 
 
 def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
@@ -376,11 +742,40 @@ def test_usable_named_receipts_must_match_contained_evidence(
     named_field: str,
 ) -> None:
     payload = observation(subject())
-    payload["subjects"][0][surface][named_field] = (
-        f"receipt://unbound/{surface}"
-    )
+    if surface == "deploy":
+        unbound_digest = "sha256:" + "9" * 64
+        payload["subjects"][0][surface]["manifest_digest"] = unbound_digest
+        payload["subjects"][0][surface][named_field] = (
+            deployment_manifest_ref(unbound_digest)
+        )
+    else:
+        payload["subjects"][0][surface][named_field] = (
+            f"receipt://unbound/{surface}"
+        )
 
     with pytest.raises(ValidationError, match="must match contained evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
+def test_deploy_manifest_ref_is_bound_to_manifest_digest() -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["deploy"]["manifest_ref"] = (
+        deployment_manifest_ref(DIGEST_ROLLBACK_MANIFEST)
+    )
+
+    with pytest.raises(ValidationError, match="content-addressed manifest record"):
+        RuntimeObservation.model_validate(payload)
+
+
+def test_runtime_chain_requires_package_and_manifest_identity_fields() -> None:
+    payload = observation(subject())
+    del payload["subjects"][0]["package"]["source_revision"]
+    with pytest.raises(ValidationError, match="source_revision"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    del payload["subjects"][0]["deploy"]["manifest_digest"]
+    with pytest.raises(ValidationError, match="manifest_digest"):
         RuntimeObservation.model_validate(payload)
 
 
@@ -1265,14 +1660,21 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
             (
                 ("verify-source-revision", "source-rev-1"),
                 ("verify-source-tree-digest", DIGEST_A),
-                ("preview-config-sync", "receipt://runtime/deploy"),
-                ("apply-exact-config-sync", "receipt://runtime/deploy"),
+                (
+                    "preview-config-sync",
+                    deployment_manifest_ref(DIGEST_MANIFEST),
+                ),
+                (
+                    "apply-exact-config-sync",
+                    deployment_manifest_ref(DIGEST_MANIFEST),
+                ),
                 ("compare-deployed-digest", DIGEST_E),
             ),
         ),
         (
             "deploy",
             (
+                ("verify-package-source-revision", "source-rev-1"),
                 ("verify-package-digest", DIGEST_B),
                 ("stage-exact-package", f"aoa-kag-mcp@{DIGEST_B}"),
                 ("deploy-staged-package", f"aoa-kag-mcp@{DIGEST_B}"),
@@ -1305,6 +1707,25 @@ def test_sync_and_deploy_plans_include_exact_transition_steps(
     assert tuple(
         (step["action"], step["exact_target"]) for step in plan["steps"]
     ) == expected_steps
+
+
+@pytest.mark.parametrize("plan_kind", ("deploy", "activate", "restart"))
+def test_runtime_plan_blocks_package_from_another_source_revision(
+    tmp_path: Path,
+    plan_kind: str,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["package"]["source_revision"] = "source-rev-previous"
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="package_source_revision_mismatch"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            plan_kind,
+            expected_observation_digest=digest,
+        )
 
 
 def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
@@ -1413,6 +1834,14 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
         ("restore-exact-package", DIGEST_B),
         ("restore-deployed-tree", DIGEST_C),
         ("restore-deploy-revision", "deploy-rev-0"),
+        (
+            "restore-deployment-manifest",
+            deployment_manifest_ref(DIGEST_ROLLBACK_MANIFEST),
+        ),
+        (
+            "verify-deployment-manifest-digest",
+            DIGEST_ROLLBACK_MANIFEST,
+        ),
         ("restore-unit", "aoa-mcp-http@aoa-kag.service"),
         ("restore-credential-class", "aoa-kag-read"),
         (
@@ -1560,7 +1989,7 @@ def test_rollback_relies_on_lkg_proof_when_current_canary_is_unusable(
 
     plan = result["owner_payload"]["plan"]
     assert plan["steps"][-1] == {
-        "order": 13,
+        "order": 15,
         "action": "run-grounded-canary",
         "exact_target": "runbook://canary/aoa-kag/last-known-good",
         "expected_effect": (
@@ -1669,6 +2098,7 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
         ("proved_package_digest", DIGEST_A),
         ("proved_deploy_revision", "deploy-rev-previous"),
         ("proved_deploy_tree_digest", DIGEST_A),
+        ("proved_deploy_manifest_digest", DIGEST_ROLLBACK_MANIFEST),
         ("proved_process_identity", "aoa-kag-mcp/previous-process"),
         ("proved_server_schema_digest", DIGEST_A),
         ("proved_consumer_registration_ref", "config://codex/previous"),
@@ -1732,6 +2162,7 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proved_package_digest"] = None
     proof["proved_deploy_revision"] = None
     proof["proved_deploy_tree_digest"] = None
+    proof["proved_deploy_manifest_digest"] = None
     proof["proved_process_identity"] = None
     proof["proved_server_schema_digest"] = None
     proof["proved_consumer_registration_ref"] = None
@@ -1750,6 +2181,12 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
 
     payload = observation(subject())
     payload["subjects"][0]["proof"]["proved_deploy_tree_digest"] = DIGEST_A
+    cases.append((payload, "central_proof_target_mismatch"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["proved_deploy_manifest_digest"] = (
+        DIGEST_ROLLBACK_MANIFEST
+    )
     cases.append((payload, "central_proof_target_mismatch"))
 
     payload = observation(subject())
@@ -2310,6 +2747,11 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
     candidate = build_server(path, policy_family="candidate")
+    assert read._mcp_server.create_initialization_options().server_version == "0.1.0"
+    assert (
+        candidate._mcp_server.create_initialization_options().server_version
+        == "0.1.0"
+    )
     read_tools = {tool.name for tool in asyncio.run(read.list_tools())}
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}
     assert read_tools == {"stack_runtime_catalog", "stack_runtime_inspect"}
@@ -2330,6 +2772,57 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     assert inspect_policy["const"] == "read"
     assert "proof" in inspect_views
     assert "acceptance" in inspect_views
+
+
+def test_stdio_server_round_trips_through_policy_seam(tmp_path: Path) -> None:
+    observation_path = write_observation(tmp_path / "observation.json")
+    server_script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "abyss_stack_mcp_server.py"
+    )
+
+    async def run_smoke() -> dict:
+        env = {
+            **os.environ,
+            "AOA_MCP_TRANSPORT": "stdio",
+            "ABYSS_STACK_MCP_POLICY_FAMILY": "read",
+            "ABYSS_STACK_MCP_OBSERVATION_PATH": str(observation_path),
+        }
+        env.pop("ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST", None)
+        env.pop("CREDENTIALS_DIRECTORY", None)
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=[str(server_script)],
+            cwd=str(Path(__file__).resolve().parents[4]),
+            env=env,
+        )
+        async with stdio_client(params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "stack_runtime_catalog",
+                    {"organ_id": "aoa-kag"},
+                    read_timeout_seconds=timedelta(seconds=5),
+                )
+        assert not result.isError
+        return json.loads(result.content[0].text)
+
+    payload = asyncio.run(run_smoke())
+    receipt = payload["metadata"]["policy_receipt"]
+    assert receipt["decision"] == "allowed"
+    assert receipt["auth_mode"] == "os_process"
+    assert receipt["scope"] == "abyss-stack-mcp:read"
+    assert payload["metadata"]["instruction_authority"] == "none"
+
+
+def test_server_info_fallback_version_matches_package_metadata() -> None:
+    package_root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads(
+        (package_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    assert project["project"]["version"] == SOURCE_FALLBACK_VERSION
 
 
 @pytest.mark.parametrize("view", ("proof", "acceptance"))

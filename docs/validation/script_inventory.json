@@ -264,6 +264,32 @@
       "disposition": "keep"
     },
     {
+      "family": "config-projection-mcp-deployment-manifest",
+      "paths": [
+        "mechanics/config-projection/parts/sync/scripts/mcp_deployment_manifest.py"
+      ],
+      "organ_lane": "mechanic/package-local MCP deployment provenance",
+      "owner_surface": "mechanics/config-projection/parts/sync/README.md",
+      "source_truth": [
+        "mechanics/config-projection/parts/sync/aoa_sync_configs.sh",
+        "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json",
+        "docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md"
+      ],
+      "reads": [
+        "clean abyss-stack source revision",
+        "source MCP service packages",
+        "deployed Configs MCP service packages"
+      ],
+      "writes": [
+        "content-addressed MCP deployment records and atomic latest reader under the runtime Logs tree"
+      ],
+      "side_effects": "publishes a deployment receipt only after exact source/deployed parity; never starts, registers, admits, or calls an MCP process",
+      "validation_lane": "config-projection/tests/release",
+      "ci_inclusion": "focused mechanic test plus root sync parity and release lanes",
+      "test_target": "mechanics/config-projection/parts/sync/tests/test_mcp_deployment_manifest.py",
+      "disposition": "keep"
+    },
+    {
       "family": "mcp-service-scripts",
       "paths": [
         "mcp/services/abyss-machine-mcp/scripts/abyss_machine_mcp_server.py",

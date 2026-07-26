@@ -59,7 +59,13 @@ credentials provisioned by
 `aoa-install-systemd --provision-abyss-stack-mcp-auth`. First creation uses an
 atomic no-clobber publication step, so concurrent installers keep and validate
 one winner rather than replacing each other; equal read/candidate values are
-rejected after both files are validated. Their managed Python environment
+rejected after both files are validated. Explicit rotation uses
+`aoa-install-systemd --rotate-abyss-stack-mcp-auth` as a standalone action. It
+first proves both managed planes are stopped, replaces both credentials and
+their digest manifest without printing values, leaves the units stopped, and
+requires consumer refresh before a canary start. A partial publication remains
+fail-closed because startup verifies each bearer against the final manifest.
+Their managed Python environment
 is a separate explicit action:
 `aoa-install-systemd --provision-abyss-stack-mcp-runtime`. It installs the
 artifact-hashed dependency lock, binds deployed source and lock digests into

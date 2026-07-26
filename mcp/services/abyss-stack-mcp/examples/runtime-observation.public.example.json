@@ -82,7 +82,7 @@
         "evidence": {
           "evidence_refs": [
             {
-              "evidence_ref": "example://runtime/deploy",
+              "evidence_ref": "Logs/mcp/deployments/records/1111111111111111111111111111111111111111111111111111111111111111.json",
               "expires_at": "2026-07-25T14:00:00Z",
               "observed_at": "2026-07-25T12:00:00Z",
               "owner": "abyss-stack",
@@ -94,7 +94,8 @@
           "reason_codes": [],
           "state": "exact"
         },
-        "manifest_ref": "example://runtime/deploy",
+        "manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "manifest_ref": "Logs/mcp/deployments/records/1111111111111111111111111111111111111111111111111111111111111111.json",
         "revision": "deploy-example-revision",
         "tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
@@ -169,6 +170,7 @@
         },
         "expected_deploy_tree_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
         "name": "aoa-kag-mcp",
+        "source_revision": "source-example-revision",
         "version": "0.0.0-example"
       },
       "policy_family": "read",
@@ -214,6 +216,7 @@
         "proved_canary_ref": "example://runtime/canary",
         "proved_canary_route": "example://canary-route/aoa-kag",
         "proved_consumer_registration_ref": "example://consumer/aoa-kag",
+        "proved_deploy_manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "proved_deploy_revision": "deploy-example-revision",
         "proved_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "proved_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -263,6 +266,8 @@
         "last_known_good_canary_route": "example://canary-route/aoa-kag/last-known-good",
         "last_known_good_consumer_registration_ref": "example://consumer/aoa-kag",
         "last_known_good_credential_class": "aoa-kag-read-example",
+        "last_known_good_deploy_manifest_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "last_known_good_deploy_manifest_ref": "Logs/mcp/deployments/records/2222222222222222222222222222222222222222222222222222222222222222.json",
         "last_known_good_deploy_revision": "deploy-example-revision",
         "last_known_good_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "last_known_good_executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
@@ -275,6 +280,8 @@
           "canary_route": "example://canary-route/aoa-kag/last-known-good",
           "consumer_registration_ref": "example://consumer/aoa-kag",
           "credential_class": "aoa-kag-read-example",
+          "deploy_manifest_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "deploy_manifest_ref": "Logs/mcp/deployments/records/2222222222222222222222222222222222222222222222222222222222222222.json",
           "deploy_revision": "deploy-example-revision",
           "deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",

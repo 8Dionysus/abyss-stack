@@ -13,6 +13,9 @@ DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"),
     Path("mcp/services/abyss-stack-mcp/schemas/runtime-plan-candidate.schema.json"),
+    Path(
+        "mechanics/config-projection/parts/sync/schemas/mcp-deployment-manifest.schema.json"
+    ),
     Path("schemas/workspace_decision_repo_source_posture.schema.json"),
     Path("schemas/workspace_decision_graph.schema.json"),
     Path("schemas/workspace_decision_graph_edge.schema.json"),

@@ -36,6 +36,7 @@ dry_run=0
 selected_items=()
 syncs_abyss_stack_mcp=0
 abyss_stack_mcp_projection_lock_fd=""
+source_revision=""
 
 aoa_select_sync_item() {
   local requested="$1"
@@ -126,6 +127,16 @@ if ((!dry_run && syncs_abyss_stack_mcp)); then
     "$abyss_stack_mcp_projection_lock_fd"; then
     aoa_die "abyss-stack MCP runtime provisioning holds the source projection lock"
   fi
+  command -v git >/dev/null 2>&1 || \
+    aoa_die "git is required for MCP deployment provenance"
+  command -v python3 >/dev/null 2>&1 || \
+    aoa_die "python3 is required for MCP deployment provenance"
+  source_revision="$(git -C "$SOURCE_ROOT" rev-parse --verify HEAD)"
+  [[ "$source_revision" =~ ^[0-9a-f]{40}$ ]] || \
+    aoa_die "MCP deployment requires one exact source commit"
+  if [[ -n "$(git -C "$SOURCE_ROOT" status --porcelain=v1 --untracked-files=all)" ]]; then
+    aoa_die "MCP deployment provenance requires a clean source worktree"
+  fi
 fi
 
 rsync_flags=(
@@ -162,6 +173,24 @@ done
 if ((dry_run)); then
   aoa_note "config sync preview complete; no files changed"
 else
+  if ((syncs_abyss_stack_mcp)); then
+    deployment_manifest_command=(
+      python3
+      "${MECHANIC_SCRIPT_DIR}/scripts/mcp_deployment_manifest.py"
+      --source-root
+      "${SOURCE_ROOT}"
+      --deployed-root
+      "${AOA_CONFIGS_ROOT}"
+      --output-root
+      "${AOA_STACK_ROOT}/Logs/mcp/deployments"
+      --source-revision
+      "${source_revision}"
+    )
+    if ((delete_mode)); then
+      deployment_manifest_command+=(--delete-mode)
+    fi
+    "${deployment_manifest_command[@]}"
+  fi
   aoa_note "config sync complete"
 fi
 if [[ -n "$abyss_stack_mcp_projection_lock_fd" ]]; then

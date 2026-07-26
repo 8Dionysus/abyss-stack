@@ -615,14 +615,121 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertNotIn(shared_token, result.stdout + result.stderr)
 
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential rotation intentionally rejects root",
+    )
+    def test_stack_mcp_auth_rotation_is_stopped_secret_safe_and_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            secret_dir = stack_root / "Secrets" / "Configs"
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' "
+                "\"${ABYSS_STACK_MCP_TEST_ACTIVE_STATE:-inactive}\"\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                }
+            )
+            provision = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--provision-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(provision.returncode, 0, provision.stderr)
+            before = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in STACK_MCP_CREDENTIAL_NAMES
+            }
+
+            rotate = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(rotate.returncode, 0, rotate.stderr)
+            after = {
+                name: secret_dir.joinpath(name)
+                .read_text(encoding="utf-8")
+                .removesuffix("\n")
+                for name in STACK_MCP_CREDENTIAL_NAMES
+            }
+            self.assertEqual(len(set(after.values())), 2)
+            for name in STACK_MCP_CREDENTIAL_NAMES:
+                self.assertNotEqual(before[name], after[name])
+                self.assertNotIn(after[name], rotate.stdout + rotate.stderr)
+            manifest = json.loads(
+                secret_dir.joinpath(STACK_MCP_AUTH_MANIFEST_NAME).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                manifest["read_sha256"],
+                hashlib.sha256(
+                    after["abyss-stack-mcp-read-bearer-token"].encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertEqual(
+                manifest["candidate_sha256"],
+                hashlib.sha256(
+                    after[
+                        "abyss-stack-mcp-candidate-bearer-token"
+                    ].encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertIn("managed units remain stopped", rotate.stdout)
+
+            blocked = subprocess.run(
+                ["bash", str(INSTALL_SYSTEMD), "--rotate-abyss-stack-mcp-auth"],
+                cwd=REPO_ROOT,
+                env={**env, "ABYSS_STACK_MCP_TEST_ACTIVE_STATE": "active"},
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("refusing credential rotation while", blocked.stderr)
+            for name, token in after.items():
+                self.assertEqual(
+                    secret_dir.joinpath(name)
+                    .read_text(encoding="utf-8")
+                    .removesuffix("\n"),
+                    token,
+                )
+                self.assertNotIn(token, blocked.stdout + blocked.stderr)
+
     def test_stack_mcp_credential_provisioning_is_user_scoped(self) -> None:
         installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
         self.assertIn(
-            "if ((provision_abyss_stack_mcp_auth && EUID == 0)); then",
+            "if (((provision_abyss_stack_mcp_auth || "
+            "rotate_abyss_stack_mcp_auth) && EUID == 0)); then",
             installer,
         )
         self.assertIn(
-            "abyss-stack MCP credential provisioning must run as the target user, "
+            "abyss-stack MCP credential management must run as the target user, "
             "not root",
             installer,
         )
@@ -1763,6 +1870,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn(runtime_exec_condition, unit)
             self.assertIn(runtime_verifier_condition, unit)
             self.assertIn(deployed_entrypoint, unit)
+            self.assertIn("ProtectSystem=strict", unit)
+            self.assertIn("ProtectHome=read-only", unit)
+            self.assertIn("IPAddressDeny=any", unit)
+            self.assertIn("IPAddressAllow=localhost", unit)
             self.assertNotIn(
                 "/Configs/mcp/services/abyss-stack-mcp/scripts/"
                 "abyss_stack_mcp_server.py",
