@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 17735446,
+  "allowed_tracked_bytes": 25256315,
+  "approved_by": "repository-owner",
+  "base_ref": "296db48a8d3582bf3bc97b77b9edcf3b2d3560e6",
+  "changed_generated_bytes": 17735446,
+  "changed_generated_files": 277,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "740ec540d202d930673d462ab5090f34395198aea249cf02a0661e7b4bb9a28d",
+  "reason": "Align the MCP branch KAG family and standing receipt with the current main merge-base used by repository validation without raising the budget.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25256315,
+  "tracked_bytes_max": 24117248
+}
