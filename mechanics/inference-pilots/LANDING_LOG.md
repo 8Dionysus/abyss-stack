@@ -35,7 +35,8 @@ Validation followed the root source route.
 Added a loopback-only, tokenized human review workbench to the existing Tree of
 Sophia foundation laboratory route. It verifies the immutable blind packet,
 presents one source-visible unit at a time, autosaves and resumes the first
-human pass, captures task-friction feedback separately, and freezes only a
+human pass, captures task-friction feedback and bounded private screenshots
+separately, uses human-readable edition/page labels, and freezes only a
 digest-bound pass-1 draft.
 
 The first bounded slice supports the prepared 15-page Human Gold and 30-unit

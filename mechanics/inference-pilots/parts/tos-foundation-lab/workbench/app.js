@@ -14,6 +14,13 @@ let saveInFlight = false;
 let saveAgain = false;
 let toastTimer = null;
 let lastInteractionAt = Date.now();
+let feedbackAttachments = [];
+
+const feedbackAttachmentLimits = {
+  count: 4,
+  bytesEach: 8 * 1024 * 1024,
+  bytesTotal: 12 * 1024 * 1024,
+};
 
 const elements = {
   app: document.getElementById("app"),
@@ -49,6 +56,9 @@ const elements = {
   feedbackOpen: document.getElementById("feedback-open"),
   feedbackCategory: document.getElementById("feedback-category"),
   feedbackNote: document.getElementById("feedback-note"),
+  feedbackDropzone: document.getElementById("feedback-dropzone"),
+  feedbackFileInput: document.getElementById("feedback-file-input"),
+  feedbackAttachmentList: document.getElementById("feedback-attachment-list"),
   feedbackError: document.getElementById("feedback-error"),
   feedbackSend: document.getElementById("feedback-send"),
   submitLayer: document.getElementById("submit-layer"),
@@ -182,7 +192,7 @@ function renderQueue() {
     const copy = document.createElement("span");
     copy.className = "unit-copy";
     const strong = document.createElement("strong");
-    strong.textContent = unit.unit_id;
+    strong.textContent = unit.title || unit.unit_id;
     const context = document.createElement("span");
     context.textContent = unit.context;
     copy.append(strong, context);
@@ -192,6 +202,7 @@ function renderQueue() {
     dot.setAttribute("aria-hidden", "true");
 
     button.append(number, copy, dot);
+    button.title = `Технический ID: ${unit.unit_id}`;
     button.addEventListener("click", () => navigateTo(index));
     elements.unitList.append(button);
   });
@@ -326,14 +337,22 @@ function showPage(role) {
 }
 
 function applyZoom() {
-  elements.sourcePage.style.width = `${Math.round(zoom * 100)}%`;
+  const canvasStyle = window.getComputedStyle(elements.pageCanvas);
+  const horizontalPadding =
+    Number.parseFloat(canvasStyle.paddingLeft) +
+    Number.parseFloat(canvasStyle.paddingRight);
+  const fitWidth = Math.max(1, elements.pageCanvas.clientWidth - horizontalPadding);
+  const targetWidth = `${Math.round(fitWidth * zoom)}px`;
+  elements.sourcePage.style.width = targetWidth;
+  elements.sourcePage.style.minWidth = targetWidth;
   elements.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
 }
 
 function renderCurrentUnit() {
   const unit = currentUnit();
   elements.unitContext.textContent = unit.context;
-  elements.unitHeading.textContent = unit.unit_id;
+  elements.unitHeading.textContent = unit.title || unit.unit_id;
+  elements.unitHeading.title = `Технический ID: ${unit.unit_id}`;
   elements.unitInstruction.textContent = unit.instruction;
   elements.blindNotice.textContent = view.protocol.blind_notice;
   elements.unitPosition.textContent =
@@ -539,9 +558,119 @@ async function confirmSubmit() {
   }
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result)));
+    reader.addEventListener("error", () => reject(new Error("Не удалось прочитать изображение.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderFeedbackAttachments() {
+  elements.feedbackAttachmentList.replaceChildren();
+  elements.feedbackDropzone.classList.toggle(
+    "has-attachments",
+    feedbackAttachments.length > 0,
+  );
+  feedbackAttachments.forEach((attachment, index) => {
+    const item = document.createElement("article");
+    item.className = "feedback-attachment";
+
+    const preview = document.createElement("img");
+    preview.src = attachment.dataUrl;
+    preview.alt = `Скриншот ${index + 1}`;
+
+    const copy = document.createElement("span");
+    copy.className = "feedback-attachment-copy";
+    const name = document.createElement("strong");
+    name.textContent = attachment.name;
+    const size = document.createElement("span");
+    size.textContent = `${(attachment.bytes / (1024 * 1024)).toFixed(2)} МиБ`;
+    copy.append(name, size);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "feedback-attachment-remove";
+    remove.textContent = "Удалить";
+    remove.addEventListener("click", () => {
+      feedbackAttachments.splice(index, 1);
+      renderFeedbackAttachments();
+    });
+    item.append(preview, copy, remove);
+    elements.feedbackAttachmentList.append(item);
+  });
+}
+
+function resetFeedbackAttachments() {
+  feedbackAttachments = [];
+  elements.feedbackFileInput.value = "";
+  renderFeedbackAttachments();
+}
+
+async function addFeedbackFiles(fileList) {
+  const files = [...fileList].filter((file) => file);
+  if (!files.length) return;
+  elements.feedbackError.textContent = "";
+
+  if (feedbackAttachments.length + files.length > feedbackAttachmentLimits.count) {
+    elements.feedbackError.textContent =
+      `Можно приложить не более ${feedbackAttachmentLimits.count} изображений.`;
+    return;
+  }
+  const supportedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+  const currentBytes = feedbackAttachments.reduce(
+    (total, attachment) => total + attachment.bytes,
+    0,
+  );
+  const incomingBytes = files.reduce((total, file) => total + file.size, 0);
+  const unsupported = files.find((file) => !supportedTypes.has(file.type));
+  if (unsupported) {
+    elements.feedbackError.textContent =
+      "Поддерживаются скриншоты PNG, JPEG и WebP.";
+    return;
+  }
+  const oversized = files.find((file) => file.size > feedbackAttachmentLimits.bytesEach);
+  if (oversized) {
+    elements.feedbackError.textContent =
+      "Один скриншот должен быть не больше 8 МиБ.";
+    return;
+  }
+  if (currentBytes + incomingBytes > feedbackAttachmentLimits.bytesTotal) {
+    elements.feedbackError.textContent =
+      "Общий размер скриншотов должен быть не больше 12 МиБ.";
+    return;
+  }
+
+  elements.feedbackSend.disabled = true;
+  try {
+    for (const file of files) {
+      const dataUrl = await readFileAsDataUrl(file);
+      const separator = dataUrl.indexOf(",");
+      if (separator < 0) throw new Error("Некорректное изображение из буфера обмена.");
+      feedbackAttachments.push({
+        name: file.name || `screenshot-${feedbackAttachments.length + 1}.png`,
+        mediaType: file.type,
+        bytes: file.size,
+        dataUrl,
+        dataBase64: dataUrl.slice(separator + 1),
+      });
+    }
+    renderFeedbackAttachments();
+    showToast(
+      feedbackAttachments.length === 1
+        ? "Скриншот приложен к обратной связи."
+        : `Приложено скриншотов: ${feedbackAttachments.length}.`,
+    );
+  } catch (error) {
+    elements.feedbackError.textContent = error.message;
+  } finally {
+    elements.feedbackSend.disabled = false;
+  }
+}
+
 function openFeedback() {
   elements.feedbackError.textContent = "";
-  elements.feedbackNote.value = "";
   elements.feedbackLayer.hidden = false;
   elements.feedbackNote.focus();
 }
@@ -549,8 +678,9 @@ function openFeedback() {
 async function sendFeedback() {
   const note = elements.feedbackNote.value.trim();
   elements.feedbackError.textContent = "";
-  if (!note) {
-    elements.feedbackError.textContent = "Опишите проблему или неудобство.";
+  if (!note && feedbackAttachments.length === 0) {
+    elements.feedbackError.textContent =
+      "Напишите комментарий или приложите скриншот.";
     return;
   }
   elements.feedbackSend.disabled = true;
@@ -561,10 +691,19 @@ async function sendFeedback() {
         category: elements.feedbackCategory.value,
         note,
         unit_id: currentUnit().unit_id,
+        attachments: feedbackAttachments.map((attachment) => ({
+          name: attachment.name,
+          media_type: attachment.mediaType,
+          data_base64: attachment.dataBase64,
+        })),
       }),
     });
     elements.feedbackLayer.hidden = true;
-    showToast("Обратная связь сохранена отдельно от решения по источнику.");
+    elements.feedbackNote.value = "";
+    resetFeedbackAttachments();
+    showToast(
+      "Обратная связь и скриншоты сохранены отдельно от решения по источнику.",
+    );
   } catch (error) {
     elements.feedbackError.textContent = error.message;
   } finally {
@@ -602,6 +741,12 @@ function bindEvents() {
       await document.exitFullscreen();
     }
   });
+  document.addEventListener("fullscreenchange", () => {
+    window.requestAnimationFrame(applyZoom);
+  });
+  window.addEventListener("resize", () => {
+    window.requestAnimationFrame(applyZoom);
+  });
   elements.previousUnit.addEventListener("click", () => navigateTo(currentIndex() - 1));
   elements.nextUnit.addEventListener("click", () => {
     if (currentIndex() === view.units.length - 1) {
@@ -618,6 +763,44 @@ function bindEvents() {
   elements.submitConfirm.addEventListener("click", confirmSubmit);
   elements.feedbackOpen.addEventListener("click", openFeedback);
   elements.feedbackSend.addEventListener("click", sendFeedback);
+  elements.feedbackDropzone.addEventListener("click", () => {
+    elements.feedbackFileInput.click();
+  });
+  elements.feedbackDropzone.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      elements.feedbackFileInput.click();
+    }
+  });
+  elements.feedbackFileInput.addEventListener("change", () => {
+    addFeedbackFiles(elements.feedbackFileInput.files);
+    elements.feedbackFileInput.value = "";
+  });
+  elements.feedbackLayer.addEventListener("paste", (event) => {
+    const imageFiles = [...(event.clipboardData?.items || [])]
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (imageFiles.length) {
+      event.preventDefault();
+      addFeedbackFiles(imageFiles);
+    }
+  });
+  for (const eventName of ["dragenter", "dragover"]) {
+    elements.feedbackDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.feedbackDropzone.classList.add("drag-active");
+    });
+  }
+  for (const eventName of ["dragleave", "drop"]) {
+    elements.feedbackDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.feedbackDropzone.classList.remove("drag-active");
+    });
+  }
+  elements.feedbackDropzone.addEventListener("drop", (event) => {
+    addFeedbackFiles(event.dataTransfer?.files || []);
+  });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => closeModal(button.dataset.close));
   });

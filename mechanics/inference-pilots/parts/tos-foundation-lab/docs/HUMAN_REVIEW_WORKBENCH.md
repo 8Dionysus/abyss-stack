@@ -88,6 +88,9 @@ It provides:
 - debounced atomic autosave;
 - exact resume;
 - a separate task-problem feedback channel;
+- human-readable edition and page labels while retaining technical IDs only as
+  secondary provenance;
+- screenshot feedback by clipboard paste, file selection, or drag-and-drop;
 - explicit final review and human attestation;
 - a frozen draft plus SHA-256 receipt.
 
@@ -102,6 +105,11 @@ draft is gold or accepted German.
 - Reject unexpected `Host` and cross-origin write requests.
 - Serve only page assets resolved from the verified packet manifest.
 - Write only under the declared mutable human-review session directory.
+- Keep feedback screenshots content-addressed under
+  `human-review-workbench.feedback-assets/`, owner-only, and referenced from the
+  feedback JSONL by relative path, media type, size, and digest.
+- Accept only bounded PNG, JPEG, or WebP feedback images: at most four,
+  eight MiB each, and twelve MiB in total per feedback record.
 - Hold an exclusive session lock while the Workbench is running so two local
   processes cannot overwrite the same mutable pass.
 - Use atomic replacement and owner-only file modes.
@@ -130,3 +138,9 @@ Workbench quality is checked manually as its own research surface:
 
 Speed is never allowed to erase disagreement, uncertainty, or difficult source
 material.
+
+Feedback is a first-class usability artifact, not part of the source judgment.
+The reviewer may paste a screenshot directly into the open feedback dialog;
+the note may be empty when the image carries the problem. The runtime keeps
+these private captures beside the mutable session and never serves them back as
+source pages or promotes them into Tree of Sophia.

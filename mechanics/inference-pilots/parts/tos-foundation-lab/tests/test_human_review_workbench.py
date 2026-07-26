@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import json
@@ -46,6 +47,14 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     )
 
 
+def _load_feedback(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+
 def _review_fixture(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -78,6 +87,7 @@ def _review_fixture(
         manifest_units = [
             {
                 "sample_id": unit_id,
+                "group_id": "ocr-antonovsky-2007",
                 "language": "de" if index >= 10 else "ru",
                 "pdf_page": index + 1,
                 "difficulty": "ordinary",
@@ -246,6 +256,22 @@ def test_loads_both_supported_review_protocols(
     }
     assert view["state"]["status"] == "ready"
     assert view["completion"]["completed_units"] == 0
+    assert all(unit["title"] != unit["unit_id"] for unit in view["units"])
+    if protocol_name == "gold":
+        assert view["units"][0]["title"] == (
+            "Антоновский, 2007 · PDF-страница 1"
+        )
+        page_field = next(
+            field
+            for field in view["protocol"]["fields"]
+            if field["name"] == "page_and_region_resolved"
+        )
+        assert page_field["label"] == "Показана правильная страница целиком?"
+        assert "центральная страница" in page_field["help"]
+    else:
+        assert view["units"][0]["title"] == (
+            "Naumann, 1893 · PDF-страница 2"
+        )
     public_bytes = json.dumps(view, ensure_ascii=False).encode("utf-8")
     assert b"immutable-packets" not in public_bytes
     assert b"recognized_comparator" not in public_bytes
@@ -302,6 +328,103 @@ def test_rejects_mutable_output_symlink(
     ):
         workbench.ReviewContext(
             session_dir, allowed_work_root=allowed_root
+        )
+
+
+def test_feedback_screenshot_is_content_addressed_and_private(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "gold"
+    )
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    screenshot = b"\x89PNG\r\n\x1a\n" + b"source-visible-ui-screenshot"
+
+    response = context.record_feedback(
+        {
+            "category": "interface-friction",
+            "note": "",
+            "unit_id": context.unit_ids[0],
+            "attachments": [
+                {
+                    "name": "/tmp/workbench-screen.png",
+                    "media_type": "image/png",
+                    "data_base64": base64.b64encode(screenshot).decode("ascii"),
+                }
+            ],
+        }
+    )
+
+    assert response["recorded"] is True
+    assert response["attachment_count"] == 1
+    records = _load_feedback(context.feedback_path)
+    assert records[0]["schema_version"] == (
+        "tos_human_review_workbench_feedback_v2"
+    )
+    assert records[0]["note"] == ""
+    attachment = records[0]["attachments"][0]
+    assert attachment["original_name"] == "workbench-screen.png"
+    assert attachment["sha256"] == hashlib.sha256(screenshot).hexdigest()
+    asset_path = session_dir / attachment["ref"]
+    assert asset_path.read_bytes() == screenshot
+    assert stat.S_IMODE(asset_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(context.feedback_assets_dir.stat().st_mode) == 0o700
+
+
+def test_feedback_rejects_mismatched_or_escaped_screenshot_storage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "gold"
+    )
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    with pytest.raises(
+        workbench.HumanReviewWorkbenchError,
+        match="does not match its image type",
+    ):
+        context.record_feedback(
+            {
+                "category": "technical-problem",
+                "note": "Wrong payload.",
+                "attachments": [
+                    {
+                        "name": "fake.png",
+                        "media_type": "image/png",
+                        "data_base64": base64.b64encode(b"not-an-image").decode(
+                            "ascii"
+                        ),
+                    }
+                ],
+            }
+        )
+
+    escaped = tmp_path / "escaped-feedback-assets"
+    escaped.mkdir()
+    context.feedback_assets_dir.symlink_to(escaped, target_is_directory=True)
+    with pytest.raises(
+        workbench.HumanReviewWorkbenchError,
+        match="attachment route is a symlink",
+    ):
+        context.record_feedback(
+            {
+                "category": "technical-problem",
+                "note": "Symlink route.",
+                "attachments": [
+                    {
+                        "name": "screen.png",
+                        "media_type": "image/png",
+                        "data_base64": base64.b64encode(
+                            b"\x89PNG\r\n\x1a\nscreen"
+                        ).decode("ascii"),
+                    }
+                ],
+            }
         )
 
 

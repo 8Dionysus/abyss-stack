@@ -48,6 +48,10 @@ semantic promotion, rights clearance, model storage, or host policy.
 - Human-review workbench writes must stay inside the selected mutable review
   session. The verified packet and Tree of Sophia source witnesses remain
   read-only.
+- Feedback screenshots are private mutable-session evidence: accept only
+  bounded image allowlists, store them content-addressed with owner-only modes,
+  reference them relatively from feedback JSONL, and never serve them through
+  the source-page route.
 - Preserve reviewer identity once a pass begins, require explicit real-human
   attestation at freeze, and label every workbench submission as a pass draft,
   never as gold, accepted source, translation, or canon.

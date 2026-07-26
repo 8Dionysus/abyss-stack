@@ -136,10 +136,41 @@
       </label>
       <label class="field">
         <span class="field-label">Комментарий</span>
-        <textarea id="feedback-note" rows="6"></textarea>
+        <span class="field-help">
+          Можно оставить пустым, если проблема полностью видна на скриншоте.
+        </span>
+        <textarea
+          id="feedback-note"
+          rows="5"
+          placeholder="Коротко опишите, что произошло или чего не хватает"
+        ></textarea>
       </label>
+      <div
+        id="feedback-dropzone"
+        class="feedback-dropzone"
+        role="button"
+        tabindex="0"
+        aria-label="Приложить скриншот"
+      >
+        <strong>Вставьте скриншот через Ctrl+V</strong>
+        <span>или нажмите сюда / перетащите PNG, JPEG или WebP</span>
+        <input
+          id="feedback-file-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          hidden
+        >
+      </div>
+      <div
+        id="feedback-attachment-list"
+        class="feedback-attachment-list"
+        aria-live="polite"
+      ></div>
       <p id="feedback-error" class="form-error" role="alert"></p>
-      <button id="feedback-send" class="button button-primary" type="button">Сохранить обратную связь</button>
+      <button id="feedback-send" class="button button-primary" type="button">
+        Сохранить обратную связь
+      </button>
     </section>
   </div>
 

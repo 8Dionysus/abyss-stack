@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import copy
 import fcntl
 import hashlib
@@ -10,6 +12,7 @@ import json
 import math
 import mimetypes
 import os
+import re
 import secrets
 import tempfile
 import threading
@@ -32,8 +35,11 @@ DEFAULT_HUMAN_REVIEW_ROOT = Path(
     "/srv/abyss-machine/storage/artifacts/tree-of-sophia-foundation-lab/"
     "human-review"
 )
-MAX_REQUEST_BYTES = 4 * 1024 * 1024
+MAX_REQUEST_BYTES = 18 * 1024 * 1024
 MAX_TEXT_FIELD_CHARS = 500_000
+MAX_FEEDBACK_ATTACHMENTS = 4
+MAX_FEEDBACK_ATTACHMENT_BYTES = 8 * 1024 * 1024
+MAX_FEEDBACK_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024
 AUTHORITY_BOUNDARY = (
     "one real-human pass draft only; workbench submission is not independent "
     "double-check, adjudication, source acceptance, gold, translation, or canon"
@@ -44,6 +50,54 @@ FEEDBACK_CATEGORIES = {
     "interface-friction",
     "technical-problem",
     "other",
+}
+FEEDBACK_IMAGE_EXTENSIONS = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
+
+GOLD_SOURCE_LABELS: dict[str, dict[str, str]] = {
+    "ocr-antonovsky-2007": {
+        "short": "Антоновский, 2007",
+        "full": "Перевод П. Антоновского, 2007",
+        "language": "Русский",
+    },
+    "ocr-mysl-1996": {
+        "short": "«Мысль», 1996",
+        "full": "Собрание сочинений, «Мысль», 1996",
+        "language": "Русский",
+    },
+    "ocr-naumann-1893": {
+        "short": "Naumann, 1893",
+        "full": "Немецкий оригинал, C. G. Naumann, 1893",
+        "language": "Немецкий",
+    },
+}
+
+DIFFICULTY_LABELS = {
+    "ordinary": "обычная",
+    "hard": "сложная",
+    "adversarial": "особо сложная",
+}
+
+STRATA_LABELS = {
+    "opening-and-page-boundary": "начало или граница страницы",
+    "ordinary-prose": "обычная проза",
+    "bibliographic-and-rights-front-matter": "выходные данные",
+    "dense-or-dialogic-prose": "плотный текст или диалог",
+    "song-poetry-or-unusual-punctuation": (
+        "стихотворная форма или необычная пунктуация"
+    ),
+    "late-work-and-ending": "поздняя часть или финал",
+}
+
+LAYOUT_POSTURE_LABELS = {
+    "prose-at-page-start": "проза в начале страницы",
+    "prose-at-page-end": "проза в конце страницы",
+    "prose-crosses-page-boundary": "проза через границу страниц",
+    "prose-after-heading": "проза после заголовка",
+    "ordinary-prose": "обычная проза",
 }
 
 
@@ -130,6 +184,33 @@ def _atomic_write_json(path: Path, payload: dict[str, Any], *, mode: int = 0o600
         raise
 
 
+def _atomic_write_bytes(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, mode)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if path.is_symlink():
+            raise HumanReviewWorkbenchError(
+                "feedback attachment target is a symlink"
+            )
+        os.replace(temporary_path, path)
+        directory_fd = os.open(path.parent, os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(
@@ -152,11 +233,86 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         os.fsync(handle.fileno())
 
 
+def _detected_feedback_media_type(payload: bytes) -> str | None:
+    if payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if payload.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if (
+        len(payload) >= 12
+        and payload.startswith(b"RIFF")
+        and payload[8:12] == b"WEBP"
+    ):
+        return "image/webp"
+    return None
+
+
+def _safe_original_filename(value: object, *, index: int, extension: str) -> str:
+    if not isinstance(value, str):
+        return f"screenshot-{index + 1}.{extension}"
+    leaf = value.replace("\\", "/").rsplit("/", 1)[-1]
+    leaf = "".join(character for character in leaf if ord(character) >= 32).strip()
+    if not leaf:
+        return f"screenshot-{index + 1}.{extension}"
+    return leaf[:200]
+
+
+def _source_group(
+    manifest_unit: dict[str, Any], pages: dict[str, Any]
+) -> str | None:
+    declared = manifest_unit.get("group_id")
+    if isinstance(declared, str) and declared in GOLD_SOURCE_LABELS:
+        return declared
+    current_ref = str(pages.get("current", ""))
+    for group_id in GOLD_SOURCE_LABELS:
+        if group_id in current_ref:
+            return group_id
+    return None
+
+
+def _source_labels(
+    manifest_unit: dict[str, Any], pages: dict[str, Any]
+) -> dict[str, str]:
+    group_id = _source_group(manifest_unit, pages)
+    if group_id is not None:
+        return GOLD_SOURCE_LABELS[group_id]
+    language = str(manifest_unit.get("language", "")).lower()
+    return {
+        "short": "Источник",
+        "full": "Источник",
+        "language": "Немецкий" if language == "de" else "Русский",
+    }
+
+
+def _page_number_from_ref(value: object) -> int | None:
+    match = re.search(r"(?:p|page-)(\d+)(?:\.[^.]+)?$", str(value))
+    return int(match.group(1)) if match else None
+
+
+def _human_page_label(source_short: str, value: object) -> str:
+    page_number = _page_number_from_ref(value)
+    if page_number is None:
+        return source_short
+    return f"{source_short} · PDF-страница {page_number}"
+
+
+def _humanize_known(value: object, mapping: dict[str, str]) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return mapping.get(raw, raw.replace("-", " "))
+
+
 GOLD_FIELDS: tuple[dict[str, Any], ...] = (
     {
         "name": "page_and_region_resolved",
         "kind": "choice",
-        "label": "Это нужная страница и область?",
+        "label": "Показана правильная страница целиком?",
+        "help": (
+            "«Да» — если центральная страница совпадает с заданием и видна "
+            "полностью. «Нет» — если открыта другая страница или часть страницы "
+            "обрезана."
+        ),
         "options": (
             ("yes", "Да"),
             ("no", "Нет"),
@@ -515,6 +671,9 @@ class ReviewContext:
 
         self.autosave_path = self.session_dir / "human-review-workbench.pass-1.autosave.json"
         self.feedback_path = self.session_dir / "human-review-workbench.feedback.jsonl"
+        self.feedback_assets_dir = (
+            self.session_dir / "human-review-workbench.feedback-assets"
+        )
         self.receipt_path = (
             self.session_dir / "human-review-workbench.pass-1.freeze-receipt.json"
         )
@@ -523,6 +682,7 @@ class ReviewContext:
         for path in (
             self.autosave_path,
             self.feedback_path,
+            self.feedback_assets_dir,
             self.receipt_path,
             self.draft_path,
             self.session_lock_path,
@@ -531,6 +691,10 @@ class ReviewContext:
                 raise HumanReviewWorkbenchError(
                     f"mutable review output is a symlink: {path.name}"
                 )
+        if self.feedback_assets_dir.exists() and not self.feedback_assets_dir.is_dir():
+            raise HumanReviewWorkbenchError(
+                "feedback attachment route is not a directory"
+            )
         self.state = self._load_or_initialize_state()
 
     def _build_units(self) -> list[dict[str, Any]]:
@@ -562,25 +726,43 @@ class ReviewContext:
                 )
             pages = template["source_pages"]
             if self.protocol is GOLD_PROTOCOL:
-                context = (
-                    f"{str(manifest_unit.get('language', '')).upper()} · "
-                    f"PDF {manifest_unit.get('pdf_page')} · "
-                    f"{manifest_unit.get('difficulty', '')}"
-                )
+                source = _source_labels(manifest_unit, pages)
+                pdf_page = manifest_unit.get("pdf_page", "?")
+                title = f"{source['short']} · PDF-страница {pdf_page}"
+                context_parts = [
+                    source["language"],
+                    f"PDF-страница {pdf_page}",
+                    _humanize_known(
+                        manifest_unit.get("difficulty"), DIFFICULTY_LABELS
+                    ),
+                ]
                 instruction = (
                     "Перепишите всю текущую страницу по видимому источнику. "
                     "Соседние страницы даны только для контекста."
                 )
                 strata = manifest_unit.get("strata")
                 if isinstance(strata, list) and strata:
-                    context += " · " + " / ".join(str(item) for item in strata)
+                    context_parts.append(
+                        " / ".join(
+                            _humanize_known(item, STRATA_LABELS)
+                            for item in strata
+                        )
+                    )
+                context = " · ".join(part for part in context_parts if part)
             else:
+                source = GOLD_SOURCE_LABELS["ocr-naumann-1893"]
                 plan_unit = plan_by_id.get(unit_id, {})
                 visual = plan_unit.get("visual_context", {})
+                current_pdf_page = visual.get("current_pdf_page", "?")
+                title = f"{source['short']} · PDF-страница {current_pdf_page}"
                 context = (
-                    f"DE · PDF {visual.get('current_pdf_page', '?')} · "
-                    f"{str(plan_unit.get('layout_posture', '')).replace('-', ' ')}"
+                    f"{source['language']} · PDF-страница {current_pdf_page}"
                 )
+                layout_posture = _humanize_known(
+                    plan_unit.get("layout_posture"), LAYOUT_POSTURE_LABELS
+                )
+                if layout_posture:
+                    context += f" · {layout_posture}"
                 instruction_key = str(plan_unit.get("selection_instruction", ""))
                 instruction = SELECTION_INSTRUCTIONS.get(
                     instruction_key,
@@ -591,12 +773,12 @@ class ReviewContext:
                 {
                     "index": index,
                     "unit_id": unit_id,
+                    "title": title,
                     "context": context,
                     "instruction": instruction,
                     "page_labels": {
-                        "previous": Path(str(pages["previous"])).stem,
-                        "current": Path(str(pages["current"])).stem,
-                        "next": Path(str(pages["next"])).stem,
+                        role: _human_page_label(source["short"], pages[role])
+                        for role in ("previous", "current", "next")
                     },
                 }
             )
@@ -884,29 +1066,151 @@ class ReviewContext:
             _atomic_write_json(self.autosave_path, self.state)
             return self.public_session()
 
+    def _decode_feedback_attachments(
+        self, payload: dict[str, Any]
+    ) -> list[tuple[bytes, str, str]]:
+        raw_attachments = payload.get("attachments", [])
+        if raw_attachments is None:
+            return []
+        if not isinstance(raw_attachments, list):
+            raise HumanReviewWorkbenchError(
+                "feedback attachments must be a list"
+            )
+        if len(raw_attachments) > MAX_FEEDBACK_ATTACHMENTS:
+            raise HumanReviewWorkbenchError(
+                f"feedback accepts at most {MAX_FEEDBACK_ATTACHMENTS} images"
+            )
+
+        decoded: list[tuple[bytes, str, str]] = []
+        total_bytes = 0
+        for index, item in enumerate(raw_attachments):
+            if not isinstance(item, dict):
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} is invalid"
+                )
+            media_type = item.get("media_type")
+            encoded = item.get("data_base64")
+            if media_type not in FEEDBACK_IMAGE_EXTENSIONS:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} has an unsupported image type"
+                )
+            if not isinstance(encoded, str) or not encoded:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} has no image data"
+                )
+            try:
+                image_bytes = base64.b64decode(encoded, validate=True)
+            except (ValueError, UnicodeEncodeError, binascii.Error) as exc:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} is not valid base64"
+                ) from exc
+            if not image_bytes:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} is empty"
+                )
+            if len(image_bytes) > MAX_FEEDBACK_ATTACHMENT_BYTES:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} exceeds 8 MiB"
+                )
+            detected_media_type = _detected_feedback_media_type(image_bytes)
+            if detected_media_type != media_type:
+                raise HumanReviewWorkbenchError(
+                    f"feedback attachment {index + 1} content does not match its image type"
+                )
+            total_bytes += len(image_bytes)
+            if total_bytes > MAX_FEEDBACK_ATTACHMENT_TOTAL_BYTES:
+                raise HumanReviewWorkbenchError(
+                    "feedback attachments exceed 12 MiB in total"
+                )
+            extension = FEEDBACK_IMAGE_EXTENSIONS[media_type]
+            original_name = _safe_original_filename(
+                item.get("name"), index=index, extension=extension
+            )
+            decoded.append((image_bytes, media_type, original_name))
+        return decoded
+
+    def _store_feedback_attachments(
+        self, decoded: list[tuple[bytes, str, str]]
+    ) -> list[dict[str, Any]]:
+        if not decoded:
+            return []
+        if self.feedback_assets_dir.is_symlink():
+            raise HumanReviewWorkbenchError(
+                "feedback attachment route is a symlink"
+            )
+        self.feedback_assets_dir.mkdir(mode=0o700, exist_ok=True)
+        if (
+            self.feedback_assets_dir.is_symlink()
+            or not self.feedback_assets_dir.is_dir()
+            or not _within(
+                self.feedback_assets_dir.resolve(), self.session_dir
+            )
+        ):
+            raise HumanReviewWorkbenchError(
+                "feedback attachment route escaped the review session"
+            )
+        os.chmod(self.feedback_assets_dir, 0o700)
+
+        stored: list[dict[str, Any]] = []
+        for image_bytes, media_type, original_name in decoded:
+            digest = hashlib.sha256(image_bytes).hexdigest()
+            extension = FEEDBACK_IMAGE_EXTENSIONS[media_type]
+            asset_path = self.feedback_assets_dir / f"sha256-{digest}.{extension}"
+            if asset_path.is_symlink():
+                raise HumanReviewWorkbenchError(
+                    "feedback attachment target is a symlink"
+                )
+            if asset_path.exists():
+                if (
+                    not asset_path.is_file()
+                    or _sha256_file(asset_path) != digest
+                ):
+                    raise HumanReviewWorkbenchError(
+                        "feedback attachment content-address collision"
+                    )
+                os.chmod(asset_path, 0o600)
+            else:
+                _atomic_write_bytes(asset_path, image_bytes)
+            stored.append(
+                {
+                    "attachment_id": f"sha256:{digest}",
+                    "ref": asset_path.relative_to(self.session_dir).as_posix(),
+                    "sha256": digest,
+                    "bytes": len(image_bytes),
+                    "media_type": media_type,
+                    "original_name": original_name,
+                }
+            )
+        return stored
+
     def record_feedback(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self.lock:
             category = _sanitize_string(payload.get("category"), field="category")
             note = _sanitize_string(payload.get("note"), field="note")
             unit_id = _sanitize_string(payload.get("unit_id"), field="unit_id")
-            if not category or not note or not note.strip():
-                raise HumanReviewWorkbenchError(
-                    "feedback category and note are required"
-                )
+            decoded_attachments = self._decode_feedback_attachments(payload)
+            if not category:
+                raise HumanReviewWorkbenchError("feedback category is required")
             if category not in FEEDBACK_CATEGORIES:
                 raise HumanReviewWorkbenchError("feedback category is unknown")
-            if len(note) > 10_000:
+            if note is not None and len(note) > 10_000:
                 raise HumanReviewWorkbenchError("feedback note is too long")
             if unit_id is not None and unit_id not in self.unit_ids:
                 raise HumanReviewWorkbenchError("feedback unit is unknown")
+            if (note is None or not note.strip()) and not decoded_attachments:
+                raise HumanReviewWorkbenchError(
+                    "feedback note or screenshot is required"
+                )
+            attachments = self._store_feedback_attachments(decoded_attachments)
             record = {
-                "schema_version": "tos_human_review_workbench_feedback_v1",
+                "schema_version": "tos_human_review_workbench_feedback_v2",
                 "protocol_id": self.protocol.protocol_id,
                 "packet_id": self.manifest["packet_id"],
                 "session_id": self.session.get("session_id"),
                 "unit_id": unit_id,
                 "category": category,
-                "note": note.strip(),
+                "note": note.strip() if note else "",
+                "attachments": attachments,
                 "recorded_at_utc": _utc_now(),
                 "authority_boundary": (
                     "reviewer feedback about task or interface; not a source "
@@ -914,7 +1218,11 @@ class ReviewContext:
                 ),
             }
             _append_jsonl(self.feedback_path, record)
-            return {"recorded": True, "recorded_at_utc": record["recorded_at_utc"]}
+            return {
+                "recorded": True,
+                "attachment_count": len(attachments),
+                "recorded_at_utc": record["recorded_at_utc"],
+            }
 
     def _draft_rows(
         self, state: dict[str, Any] | None = None

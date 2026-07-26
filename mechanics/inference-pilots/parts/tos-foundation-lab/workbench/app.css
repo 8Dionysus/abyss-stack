@@ -466,6 +466,7 @@ h2 {
 
 .page-canvas img {
   display: block;
+  flex: 0 0 auto;
   width: 100%;
   max-width: none;
   height: auto;
@@ -680,6 +681,100 @@ textarea:focus {
   color: var(--muted);
   background: rgba(255, 255, 255, 0.05);
   font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.feedback-dropzone {
+  display: grid;
+  gap: 5px;
+  place-items: center;
+  margin: 2px 0 14px;
+  padding: 18px;
+  border: 1px dashed rgba(217, 184, 103, 0.40);
+  border-radius: 12px;
+  outline: none;
+  color: var(--muted);
+  background: rgba(217, 184, 103, 0.035);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.feedback-dropzone strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.feedback-dropzone span {
+  font-size: 0.70rem;
+}
+
+.feedback-dropzone:hover,
+.feedback-dropzone:focus-visible,
+.feedback-dropzone.drag-active {
+  border-color: rgba(217, 184, 103, 0.78);
+  background: rgba(217, 184, 103, 0.09);
+}
+
+.feedback-dropzone.has-attachments {
+  border-style: solid;
+  border-color: rgba(127, 177, 139, 0.45);
+}
+
+.feedback-attachment-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.feedback-attachment {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.feedback-attachment img {
+  width: 68px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #0a0c0b;
+}
+
+.feedback-attachment-copy {
+  min-width: 0;
+}
+
+.feedback-attachment-copy strong,
+.feedback-attachment-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedback-attachment-copy strong {
+  color: var(--text);
+  font-size: 0.73rem;
+}
+
+.feedback-attachment-copy span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.feedback-attachment-remove {
+  padding: 6px 8px;
+  border: 0;
+  color: #dca18f;
+  background: transparent;
+  font-size: 0.68rem;
   cursor: pointer;
 }
 

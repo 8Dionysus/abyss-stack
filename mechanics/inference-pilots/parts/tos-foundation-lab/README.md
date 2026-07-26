@@ -118,8 +118,11 @@ state is no longer current.
 `human-review-workbench` verifies one prepared private packet, binds only to
 loopback with a per-launch token, and opens the exact next unfinished unit in a
 human-facing browser interface. It owns navigation, page routing, autosave,
-resume, active-time observation, and draft freeze so the reviewer handles only
-source-visible judgments. The current bounded slice supports pass 1 for the
+resume, active-time observation, human-readable edition routing, private
+screenshot feedback, and draft freeze so the reviewer handles only
+source-visible judgments. Feedback screenshots can be pasted directly from the
+clipboard and remain content-addressed inside the mutable review session. The
+current bounded slice supports pass 1 for the
 15-page diplomatic Human Gold packet and the 30-unit German source packet.
 Its frozen output is still only one human draft: it does not perform pass 2,
 adjudicate disagreement, accept German source text, create gold, or promote
