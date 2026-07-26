@@ -597,7 +597,20 @@ class StackMCPApplication:
             organ_id,
             target_policy_family,
         )
-        causal_links = self._subject_links(subject, plan_kind)
+        plan_consumer: ConsumerObservation | None = None
+        if plan_kind == "activate":
+            proof_consumers = self._proof_consumers(subject, now)
+            if proof_consumers:
+                plan_consumer = proof_consumers[0]
+        elif plan_kind == "rollback":
+            rollback_consumers = self._rollback_consumers(subject, now)
+            if rollback_consumers:
+                plan_consumer = rollback_consumers[0]
+        causal_links = self._subject_links(
+            subject,
+            plan_kind,
+            plan_consumer=plan_consumer,
+        )
         causal_evidence = (
             *subject.freshness.evidence_refs,
             *(
@@ -623,11 +636,6 @@ class StackMCPApplication:
             raise StackMCPError(
                 "plan preconditions are not satisfied: " + ", ".join(blockers)
             )
-        plan_consumer: ConsumerObservation | None = None
-        if plan_kind == "activate":
-            plan_consumer = self._proof_consumers(subject, now)[0]
-        elif plan_kind == "rollback":
-            plan_consumer = self._rollback_consumers(subject, now)[0]
         plan_links = self._plan_links(
             subject,
             plan_kind,
@@ -697,7 +705,15 @@ class StackMCPApplication:
             effect_class="prepare_candidate",
             payload={"plan": plan.model_dump(mode="json")},
             now=now,
-            freshness_state=self._effective_freshness(subject, now),
+            freshness_state=self._worst_state(
+                [
+                    self._effective_freshness(subject, now),
+                    *(
+                        self._effective_link_state(link, now)
+                        for link in plan_links
+                    ),
+                ]
+            ),
             freshness_scope=f"{organ_id}/{target_policy_family}",
         )
 
@@ -1228,6 +1244,8 @@ class StackMCPApplication:
     def _subject_links(
         subject: RuntimeSubject,
         plan_kind: PlanKind,
+        *,
+        plan_consumer: ConsumerObservation | None,
     ) -> tuple[LinkEvidence, ...]:
         links = [
             subject.source.evidence,
@@ -1245,9 +1263,13 @@ class StackMCPApplication:
         if plan_kind == "activate":
             links.extend(
                 (
-                    *(consumer.evidence for consumer in subject.consumers),
                     subject.proof.evidence,
                     subject.acceptance.evidence,
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
                     subject.canary.evidence,
                     subject.rollback.evidence,
                 )
@@ -1256,7 +1278,11 @@ class StackMCPApplication:
             links.extend(
                 (
                     subject.registry.evidence,
-                    *(consumer.evidence for consumer in subject.consumers),
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
                     subject.rollback.evidence,
                 )
             )

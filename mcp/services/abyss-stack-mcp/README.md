@@ -73,9 +73,14 @@ planning allows at most 30 seconds of positive clock skew and rejects
 future-dated observations, required links, evidence refs, freshness, or deploy
 timestamps beyond it. Required observations must also fall no later than 30
 seconds after their enclosing observation snapshot, so an older snapshot
-cannot carry causally newer proof. Central proof cannot predate the canary link
-or evidence refs it names. Duplicate evidence identities with conflicting
-`observed_at` values are rejected before expiry deduplication.
+cannot carry causally newer proof. Activation and rollback causality checks use
+only the exact proof-selected or last-known-good consumer; unrelated consumer
+observations cannot veto a candidate and are not copied into it. Candidate
+result freshness is the worst effective state across subject freshness and
+every exact link the plan copies, so a drift-backed plan cannot claim `exact`.
+Central proof cannot predate the canary link or evidence refs it names.
+Duplicate evidence identities with conflicting `observed_at` values are
+rejected before expiry deduplication.
 Catalog and inspection apply the same 30-second future-skew bound to the
 observation envelope, links, freshness, and nested evidence timestamps, using
 the earlier of wall-clock time and the enclosing observation snapshot;

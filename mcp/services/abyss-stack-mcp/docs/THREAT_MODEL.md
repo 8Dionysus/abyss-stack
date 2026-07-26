@@ -65,6 +65,9 @@
   candidate;
 - required evidence timestamps cannot postdate the observation snapshot beyond
   the bounded clock-skew allowance;
+- candidate causality and evidence expansion use only the exact
+  proof-selected or last-known-good consumer, while candidate result freshness
+  folds every copied plan link together with the subject freshness envelope;
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;

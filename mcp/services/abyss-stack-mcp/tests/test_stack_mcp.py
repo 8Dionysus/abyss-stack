@@ -1450,6 +1450,47 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
             )
 
 
+@pytest.mark.parametrize(
+    "link_surface",
+    (
+        "source",
+        "package",
+        "deploy",
+        "process",
+        "endpoint",
+        "registry",
+        "proof",
+        "acceptance",
+        "consumer",
+        "canary",
+        "rollback",
+    ),
+)
+def test_candidate_freshness_folds_required_link_drift(
+    tmp_path: Path,
+    link_surface: str,
+) -> None:
+    payload = observation(subject())
+    subject_payload = payload["subjects"][0]
+    if link_surface == "consumer":
+        link = subject_payload["consumers"][0]["evidence"]
+    else:
+        link = subject_payload[link_surface]["evidence"]
+    link["state"] = "compatible_drift"
+    link["reason_codes"] = ["fixture-compatible-drift"]
+
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+
+    assert result["metadata"]["freshness_state"] == "compatible_drift"
+
+
 @pytest.mark.parametrize("policy_family", ("internal_effect", "external_effect"))
 @pytest.mark.parametrize("plan_kind", ("activate", "restart"))
 def test_runtime_activation_blocks_effect_planes_until_effect_contracts_exist(
@@ -1518,6 +1559,9 @@ def test_activation_targets_only_the_selected_compatible_consumer(
     unselected["consumer_id"] = "a-compatible-unselected"
     unselected["registration_ref"] = "config://codex/compatible-unselected"
     unselected["evidence"] = evidence("consumer-unselected")
+    future = (NOW + timedelta(seconds=31)).isoformat()
+    unselected["evidence"]["observed_at"] = future
+    unselected["evidence"]["evidence_refs"][0]["observed_at"] = future
     payload["subjects"][0]["consumers"] = [unselected, good]
 
     app = application(tmp_path, policy_family="candidate", payload=payload)

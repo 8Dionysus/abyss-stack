@@ -56,6 +56,9 @@ Tracking starts with the community-docs baseline for this repository.
   GitLab token-prefix families, and standalone runtime provisioning verifies
   that user systemd has loaded both expected fragments with the exact
   lock-aware `ExecStart` before it can replace the venv.
+- Candidate result freshness now folds every copied plan link, and activation
+  or rollback causality checks ignore unrelated consumers in favor of the
+  exact proof-selected or last-known-good registration.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.
