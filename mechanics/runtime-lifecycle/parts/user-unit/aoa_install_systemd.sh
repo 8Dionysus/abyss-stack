@@ -194,6 +194,8 @@ mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
 abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
+abyss_stack_mcp_auth_manifest_name="abyss-stack-mcp-auth-manifest.json"
+abyss_stack_mcp_auth_manifest_path="${mcp_http_secret_dir}/${abyss_stack_mcp_auth_manifest_name}"
 abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
 abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
 abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
@@ -286,6 +288,9 @@ aoa_provision_abyss_stack_mcp_auth() {
   local candidate_path="${mcp_http_secret_dir}/${abyss_stack_mcp_candidate_credential_name}"
   local read_token=""
   local candidate_token=""
+  local read_digest=""
+  local candidate_digest=""
+  local manifest_temp=""
 
   aoa_provision_mcp_bearer \
     "$abyss_stack_mcp_read_credential_name" \
@@ -297,6 +302,38 @@ aoa_provision_abyss_stack_mcp_auth() {
   candidate_token="$(<"$candidate_path")"
   [[ "$read_token" != "$candidate_token" ]] || \
     aoa_die "abyss-stack MCP read and candidate bearer credentials must be distinct"
+  read_digest="$(
+    printf '%s' "$read_token" | sha256sum | cut -d' ' -f1
+  )"
+  candidate_digest="$(
+    printf '%s' "$candidate_token" | sha256sum | cut -d' ' -f1
+  )"
+  [[ "$read_digest" =~ ^[0-9a-f]{64}$ && \
+     "$candidate_digest" =~ ^[0-9a-f]{64}$ && \
+     "$read_digest" != "$candidate_digest" ]] || \
+    aoa_die "failed to bind distinct abyss-stack MCP credentials"
+  if [[ -e "$abyss_stack_mcp_auth_manifest_path" || \
+        -L "$abyss_stack_mcp_auth_manifest_path" ]]; then
+    [[ -f "$abyss_stack_mcp_auth_manifest_path" && \
+       ! -L "$abyss_stack_mcp_auth_manifest_path" ]] || \
+      aoa_die "existing abyss-stack MCP auth manifest must be a regular non-symlink file"
+  fi
+  manifest_temp="$(
+    mktemp "${mcp_http_secret_dir}/.${abyss_stack_mcp_auth_manifest_name}.XXXXXX"
+  )"
+  chmod 0600 "$manifest_temp"
+  if ! printf \
+      '{"candidate_sha256":"%s","read_sha256":"%s","schema_version":"abyss_stack_mcp_auth_manifest_v1"}\n' \
+      "$candidate_digest" "$read_digest" > "$manifest_temp"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to stage the abyss-stack MCP auth manifest"
+  fi
+  if ! mv -f -- "$manifest_temp" "$abyss_stack_mcp_auth_manifest_path"; then
+    rm -f -- "$manifest_temp"
+    aoa_die "failed to publish the abyss-stack MCP auth manifest"
+  fi
+  chmod 0600 "$abyss_stack_mcp_auth_manifest_path"
+  aoa_note "refreshed abyss-stack MCP credential separation manifest"
 }
 
 aoa_require_abyss_stack_mcp_units_stopped() {

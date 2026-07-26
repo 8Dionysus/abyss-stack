@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -16,6 +20,9 @@ from .core import ObservationStore, StackMCPApplication
 LOGGER = logging.getLogger(__name__)
 READ_PORT = 5431
 CANDIDATE_PORT = 5433
+AUTH_MANIFEST_CREDENTIAL = "abyss-stack-mcp-auth-manifest.json"
+AUTH_MANIFEST_SCHEMA = "abyss_stack_mcp_auth_manifest_v1"
+_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
 CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
@@ -38,8 +45,79 @@ def _contour(policy_family: PolicyMode) -> tuple[int, str, str, str]:
     )
 
 
+def _credential_text(credential_name: str, label: str) -> str:
+    credential_dir = os.environ.get("CREDENTIALS_DIRECTORY", "").strip()
+    if not credential_dir:
+        raise SystemExit(f"managed startup requires {label}")
+    credential_path = Path(credential_dir) / credential_name
+    if credential_path.is_symlink() or not credential_path.is_file():
+        raise SystemExit(f"managed startup requires a regular {label}")
+    try:
+        return credential_path.read_text(encoding="utf-8").removesuffix("\n")
+    except (OSError, UnicodeError) as exc:
+        raise SystemExit(f"managed startup cannot read {label}") from exc
+
+
+def _require_managed_credential_separation(policy_family: PolicyMode) -> None:
+    required = os.environ.get(
+        "ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST",
+        "",
+    ).strip()
+    if not required:
+        return
+    if required != "1":
+        raise SystemExit(
+            "ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST must be 1 when configured"
+        )
+    _, _, credential_name, _ = _contour(policy_family)
+    token = _credential_text(
+        credential_name,
+        f"{policy_family} bearer credential",
+    )
+    manifest_text = _credential_text(
+        AUTH_MANIFEST_CREDENTIAL,
+        "credential separation manifest",
+    )
+    try:
+        manifest = json.loads(manifest_text)
+    except (json.JSONDecodeError, TypeError):
+        raise SystemExit("managed credential separation manifest is invalid") from None
+    expected_keys = {
+        "schema_version",
+        "read_sha256",
+        "candidate_sha256",
+    }
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != expected_keys
+        or manifest.get("schema_version") != AUTH_MANIFEST_SCHEMA
+        or any(
+            not isinstance(manifest.get(key), str)
+            or _SHA256_PATTERN.fullmatch(manifest[key]) is None
+            for key in ("read_sha256", "candidate_sha256")
+        )
+    ):
+        raise SystemExit("managed credential separation manifest is invalid")
+    read_digest = manifest["read_sha256"]
+    candidate_digest = manifest["candidate_sha256"]
+    if hmac.compare_digest(read_digest, candidate_digest):
+        raise SystemExit(
+            "managed read and candidate bearer credentials must be distinct"
+        )
+    observed_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    if not hmac.compare_digest(
+        observed_digest,
+        manifest[f"{policy_family}_sha256"],
+    ):
+        raise SystemExit(
+            f"managed {policy_family} bearer does not match "
+            "the credential separation manifest"
+        )
+
+
 def _auth_kwargs(policy_family: PolicyMode) -> dict[str, Any]:
     port, env_name, credential_name, scope = _contour(policy_family)
+    _require_managed_credential_separation(policy_family)
     return http_auth_kwargs(
         port,
         token_env_var=env_name,

@@ -30,7 +30,12 @@ The processes use different tools, default ports (`5431`, `5433`), environment
 variables, systemd credential names, scopes, and client identities. A read
 credential cannot authenticate to or enumerate the candidate process.
 Provisioning validates the two existing or newly created bearer values
-together and fails closed if they are identical.
+together and fails closed if they are identical. It also atomically publishes
+a non-secret digest manifest. Each managed startup receives only its own
+bearer plus that manifest, verifies that the two committed digests are
+distinct, and binds its loaded bearer to the matching contour digest before
+the server can listen. Copying or rotating a credential file without
+refreshing a valid separated pair therefore fails closed on the next start.
 
 Every candidate remains `execution_authorized=false`, requires separate human
 approval before any effect, contains no free-form shell command, expires in at

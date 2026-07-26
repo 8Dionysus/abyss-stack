@@ -12,7 +12,10 @@
 
 - a separate credential for each read and candidate process, alongside
   separate ports, tools, scopes, and client identities, with equal bearer
-  values rejected after provisioning;
+  values rejected after provisioning; an atomically published non-secret
+  digest manifest is loaded beside only the selected contour credential, so
+  every managed startup verifies both committed digests remain distinct and
+  its own loaded bearer still matches its contour before binding a listener;
 - loopback-only HTTP with DNS-rebinding protection;
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
 - strict input and output models with unknown fields denied;

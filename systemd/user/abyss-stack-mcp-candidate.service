@@ -15,10 +15,12 @@ Environment=ABYSS_STACK_MCP_OBSERVATION_PATH=/srv/AbyssOS/abyss-stack/Logs/mcp/o
 Environment=AOA_MCP_TRANSPORT=streamable-http
 Environment=AOA_MCP_HOST=127.0.0.1
 Environment=AOA_MCP_PORT=5433
+Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONHOME=
 Environment=PYTHONPATH=
 LoadCredential=abyss-stack-mcp-candidate-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-candidate-bearer-token
+LoadCredential=abyss-stack-mcp-auth-manifest.json:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-auth-manifest.json
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime
 ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -2460,3 +2461,43 @@ def test_policy_contours_use_distinct_ports_credentials_and_scopes(
         encoding="utf-8",
     )
     assert "auth" in _auth_kwargs("candidate")
+
+
+def test_managed_startup_rejects_copied_or_equal_contour_credentials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    read_token = "r" * 64
+    candidate_token = "c" * 64
+    credentials = tmp_path / "credentials"
+    credentials.mkdir()
+    read_path = credentials / "abyss-stack-mcp-read-bearer-token"
+    candidate_path = credentials / "abyss-stack-mcp-candidate-bearer-token"
+    manifest_path = credentials / "abyss-stack-mcp-auth-manifest.json"
+    read_path.write_text(read_token, encoding="utf-8")
+    candidate_path.write_text(candidate_token, encoding="utf-8")
+    manifest = {
+        "candidate_sha256": hashlib.sha256(
+            candidate_token.encode("utf-8")
+        ).hexdigest(),
+        "read_sha256": hashlib.sha256(read_token.encode("utf-8")).hexdigest(),
+        "schema_version": "abyss_stack_mcp_auth_manifest_v1",
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setenv("AOA_MCP_TRANSPORT", "streamable-http")
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY", str(credentials))
+    monkeypatch.setenv("ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST", "1")
+    monkeypatch.delenv("ABYSS_STACK_MCP_READ_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN", raising=False)
+
+    assert "auth" in _auth_kwargs("read")
+    assert "auth" in _auth_kwargs("candidate")
+
+    candidate_path.write_text(read_token, encoding="utf-8")
+    with pytest.raises(SystemExit, match="does not match"):
+        _auth_kwargs("candidate")
+
+    manifest["candidate_sha256"] = manifest["read_sha256"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(SystemExit, match="must be distinct"):
+        _auth_kwargs("read")

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
+import json
 import os
 import shutil
 import socket
@@ -57,6 +59,7 @@ STACK_MCP_CREDENTIAL_NAMES = (
     "abyss-stack-mcp-read-bearer-token",
     "abyss-stack-mcp-candidate-bearer-token",
 )
+STACK_MCP_AUTH_MANIFEST_NAME = "abyss-stack-mcp-auth-manifest.json"
 EXPECTED_STATS_RECEIPT_PATHS = (
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/session-harvest-family.jsonl",
     "/srv/AbyssOS/aoa-skills/.aoa/live_receipts/core-skill-applications.jsonl",
@@ -475,6 +478,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             ]
             self.assertEqual(len(provisioned_without_already), 1)
 
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential provisioning intentionally rejects root",
+    )
     def test_stack_mcp_auth_provisions_distinct_secret_safe_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -514,6 +521,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
                     self.assertEqual(path.stat().st_mode & 0o777, 0o600)
                     self.assertNotIn(token, first.stdout + first.stderr)
+            manifest_path = secret_dir / STACK_MCP_AUTH_MANIFEST_NAME
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest,
+                {
+                    "candidate_sha256": hashlib.sha256(
+                        credentials[
+                            "abyss-stack-mcp-candidate-bearer-token"
+                        ].encode("utf-8")
+                    ).hexdigest(),
+                    "read_sha256": hashlib.sha256(
+                        credentials["abyss-stack-mcp-read-bearer-token"].encode(
+                            "utf-8"
+                        )
+                    ).hexdigest(),
+                    "schema_version": "abyss_stack_mcp_auth_manifest_v1",
+                },
+            )
+            self.assertEqual(manifest_path.stat().st_mode & 0o777, 0o600)
             self.assertIn(
                 "provisioned abyss-stack MCP read bearer credential", first.stdout
             )
@@ -543,7 +569,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     )
                     self.assertNotIn(token, second.stdout + second.stderr)
             self.assertEqual(second.stdout.count("already provisioned"), 2)
+            self.assertIn(
+                "refreshed abyss-stack MCP credential separation manifest",
+                second.stdout,
+            )
 
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP credential provisioning intentionally rejects root",
+    )
     def test_stack_mcp_auth_rejects_matching_contour_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -593,6 +627,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             installer,
         )
 
+    @unittest.skipIf(
+        hasattr(os, "geteuid") and os.geteuid() == 0,
+        "abyss-stack MCP runtime provisioning intentionally rejects root",
+    )
     def test_stack_mcp_runtime_provision_is_explicit_and_source_addressed(
         self,
     ) -> None:
@@ -1706,6 +1744,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertNotIn("read-bearer-token", candidate_unit)
         for unit in (read_unit, candidate_unit):
+            self.assertIn(
+                "Environment=ABYSS_STACK_MCP_REQUIRE_AUTH_MANIFEST=1",
+                unit,
+            )
+            self.assertIn(
+                "LoadCredential=abyss-stack-mcp-auth-manifest.json:"
+                "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
+                "abyss-stack-mcp-auth-manifest.json",
+                unit,
+            )
             self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
             self.assertIn("Environment=PYTHONHOME=", unit)
             self.assertIn("Environment=PYTHONPATH=", unit)
