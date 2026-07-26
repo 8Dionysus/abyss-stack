@@ -80,7 +80,8 @@ Tracking starts with the community-docs baseline for this repository.
 
 - Compact the diagnostic skill's global routing description while retaining
   capture, concrete target, evidence/freshness, bounded repair-handoff, and
-  nearest-route distinctions in the host-visible prefix.
+  stored-packet review plus nearest-route distinctions in the host-visible
+  prefix.
 
 - Thin-host service overlays now preserve service-native budgets and soft
   reclaim reservations while clearing hard cgroup CPU and memory ceilings from

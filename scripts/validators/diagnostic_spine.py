@@ -77,7 +77,7 @@ DIAGNOSTIC_OWNER_SKILL_INTERFACE_PATH = (
     DIAGNOSTIC_OWNER_SKILL_ROOT / "agents" / "openai.yaml"
 )
 SKILL_HOME_MANIFEST_PATH = Path("skills") / "port.manifest.json"
-DIAGNOSTIC_OWNER_SKILL_VERSION = "0.2.6"
+DIAGNOSTIC_OWNER_SKILL_VERSION = "0.2.7"
 DIAGNOSTIC_AUTHORITY_REF = (
     "mechanics/diagnostic-spine/parts/diagnostic-surfaces/docs/DIAGNOSTIC_SPINE.md"
 )
