@@ -59,7 +59,9 @@ planning allows at most 30 seconds of positive clock skew and rejects
 future-dated observations, required links, evidence refs, freshness, or deploy
 timestamps beyond it. Required observations must also fall no later than 30
 seconds after their enclosing observation snapshot, so an older snapshot
-cannot carry causally newer proof.
+cannot carry causally newer proof. Central proof cannot predate the canary link
+or evidence refs it names. Duplicate evidence identities with conflicting
+`observed_at` values are rejected before expiry deduplication.
 `rollback_required` is accepted only while its own link and evidence refs are
 unexpired; a bare or expired rollback signal is a controlled precondition
 failure.

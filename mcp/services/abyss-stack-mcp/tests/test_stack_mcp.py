@@ -293,6 +293,23 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
         RuntimeObservation.model_validate(payload)
 
 
+@pytest.mark.parametrize("canary_time_surface", ("link", "evidence"))
+def test_central_proof_cannot_predate_its_canary(
+    canary_time_surface: str,
+) -> None:
+    payload = observation(subject())
+    canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+    if canary_time_surface == "link":
+        canary_evidence["observed_at"] = (NOW + timedelta(seconds=1)).isoformat()
+    else:
+        canary_evidence["evidence_refs"][0]["observed_at"] = (
+            NOW + timedelta(seconds=1)
+        ).isoformat()
+
+    with pytest.raises(ValidationError, match="cannot precede canary evidence"):
+        RuntimeObservation.model_validate(payload)
+
+
 def test_observation_store_rejects_secrets_symlinks_and_oversize(
     tmp_path: Path,
 ) -> None:
@@ -342,7 +359,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
 
 @pytest.mark.parametrize(
     "reference_surface",
-    ("query", "userinfo", "fragment"),
+    ("query", "relative-query", "userinfo", "fragment", "secret-value"),
 )
 def test_observation_store_rejects_credentials_inside_references(
     tmp_path: Path,
@@ -354,13 +371,21 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
             "evidence_ref"
         ] = f"https://evidence.invalid/report?api_key={secret_value}"
+    elif reference_surface == "relative-query":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"receipt?api_key={secret_value}"
+        )
     elif reference_surface == "userinfo":
         payload["subjects"][0]["deploy"]["manifest_ref"] = (
             f"https://operator:{secret_value}@deploy.invalid/manifest"
         )
-    else:
+    elif reference_surface == "fragment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/receipt#client_secret={secret_value}"
+        )
+    else:
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt?value=sk-{secret_value}"
         )
     path = write_observation(tmp_path / f"{reference_surface}.json", payload)
 
@@ -1167,6 +1192,28 @@ def test_plan_deduplication_retains_earliest_evidence_expiry(
         datetime.fromisoformat(plan["expires_at"].replace("Z", "+00:00"))
         == earliest_expiry
     )
+
+
+def test_plan_rejects_conflicting_duplicate_evidence_timestamps(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    source_ref = payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0]
+    endpoint_refs = payload["subjects"][0]["endpoint"]["evidence"]["evidence_refs"]
+    endpoint_refs[0] = {
+        **source_ref,
+        "observed_at": (NOW + timedelta(seconds=1)).isoformat(),
+    }
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="conflicting timestamps"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "activate",
+            expected_observation_digest=digest,
+        )
 
 
 def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> None:

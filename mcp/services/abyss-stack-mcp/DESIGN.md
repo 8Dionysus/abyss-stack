@@ -38,7 +38,9 @@ does a shadow registry receive an admission action; an already admitted entry
 is verified instead. Candidate expiry is capped by every link and evidence ref
 actually copied into the plan, including freshness, central-proof, and
 acceptance evidence. Required evidence timestamps must also be causally
-consistent with the enclosing observation snapshot.
+consistent with the enclosing observation snapshot; central proof follows its
+canary evidence, and duplicate evidence identities cannot disagree on
+`observed_at`.
 
 ## Progressive surface
 

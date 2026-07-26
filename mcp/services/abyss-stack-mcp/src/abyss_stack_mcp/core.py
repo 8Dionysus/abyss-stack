@@ -86,7 +86,7 @@ def _reject_secret_material(value: Any, path: str = "$") -> None:
         lowered = value.lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
-        if "://" in value:
+        if any(marker in value for marker in ("://", "?", "#")):
             try:
                 parsed = urlsplit(value)
             except ValueError:
@@ -99,11 +99,21 @@ def _reject_secret_material(value: Any, path: str = "$") -> None:
                 ("query", parsed.query),
                 ("fragment", parsed.fragment),
             ):
-                for key, _ in parse_qsl(component, keep_blank_values=True):
+                for key, query_value in parse_qsl(
+                    component,
+                    keep_blank_values=True,
+                ):
                     normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
                     if normalized in _FORBIDDEN_KEY_CANONICAL:
                         raise StackMCPError(
                             "secret-bearing reference key is forbidden at "
+                            f"{path}.{component_name}"
+                        )
+                    if query_value.lower().startswith(
+                        ("bearer ", "sk-", "ghp_", "github_pat_")
+                    ):
+                        raise StackMCPError(
+                            "secret-like reference value is forbidden at "
                             f"{path}.{component_name}"
                         )
 
@@ -819,6 +829,13 @@ class StackMCPApplication:
                 evidence.revision,
             )
             retained = unique.get(key)
+            if (
+                retained is not None
+                and evidence.observed_at != retained.observed_at
+            ):
+                raise StackMCPError(
+                    "conflicting timestamps for duplicate plan evidence"
+                )
             if retained is None or (
                 evidence.expires_at is not None
                 and (

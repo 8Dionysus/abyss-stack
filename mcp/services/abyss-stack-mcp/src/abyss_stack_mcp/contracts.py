@@ -829,6 +829,20 @@ class RuntimeSubject(StrictModel):
             )
         if (
             self.proof.verdict == "passed"
+            and self.canary.succeeded
+            and self.proof.evaluated_at is not None
+            and self.proof.evaluated_at
+            < max(
+                self.canary.evidence.observed_at,
+                *(
+                    evidence.observed_at
+                    for evidence in self.canary.evidence.evidence_refs
+                ),
+            )
+        ):
+            raise ValueError("central proof cannot precede canary evidence")
+        if (
+            self.proof.verdict == "passed"
             and self.acceptance.accepted
             and self.proof.evaluated_at is not None
             and self.acceptance.accepted_at is not None

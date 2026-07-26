@@ -30,6 +30,8 @@
   candidate;
 - required evidence timestamps cannot postdate the observation snapshot beyond
   the bounded clock-skew allowance;
+- central proof cannot predate the canary evidence it names, and conflicting
+  duplicate evidence timestamps are rejected before deduplication;
 - rollback-required links need explicit unexpired evidence and cannot fail late
   through candidate-model validation;
 - server-side read-subject filtering before catalog result construction and
