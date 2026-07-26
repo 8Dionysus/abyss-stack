@@ -1,6 +1,6 @@
 ---
 name: abyss-self-diagnostic-spine
-description: Capture, diagnose, review, or prepare a bounded diagnosis/repair handoff for one concrete Abyss runtime target through the abyss-stack diagnostic spine. Use current owner evidence with last-good, drift, or freshness comparison for a named preset, profile, truth goal, or diagnostic_session_v1. Do not use for generic health, artifact trust/source disputes, actual repair/restart/approval, session mining, or tasks needing no runtime evidence.
+description: Capture, diagnose, review, or prepare a bounded diagnosis/repair handoff for one concrete Abyss runtime target through the abyss-stack diagnostic spine. Use for a named preset, profile, truth goal, or diagnostic_session_v1. Require current owner evidence with last-good, drift, or freshness comparison. Do not use for generic health questions, artifact trust/source disputes, actual repair/restart/approval, session mining, or tasks needing no runtime evidence.
 ---
 
 # Abyss Self-Diagnostic Spine
