@@ -16,6 +16,11 @@ Tracking starts with the community-docs baseline for this repository.
   rollback evidence separate; generated public examples are fictional, and
   source-owned user units remain unstarted until provenance, deployment
   parity, registry, consumer, canary, proof, and acceptance gates are met.
+- The stack MCP candidate contour now avoids PostgreSQL on port `5432`, uses
+  explicit port `5433`, provisions a source-addressed Python runtime before
+  unit activation, and fails activation-plan preparation on unusable
+  freshness, endpoint/process unreadiness, incompatible consumers, ungrounded
+  canaries, or missing rollback proof.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

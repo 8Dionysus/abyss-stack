@@ -473,6 +473,103 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     self.assertNotIn(token, second.stdout + second.stderr)
             self.assertEqual(second.stdout.count("already provisioned"), 2)
 
+    def test_stack_mcp_runtime_provision_is_explicit_and_source_addressed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            service_root = (
+                stack_root / "Configs" / "mcp" / "services" / "abyss-stack-mcp"
+            )
+            service_root.mkdir(parents=True)
+            (service_root / "pyproject.toml").write_text(
+                "[project]\nname = \"abyss-stack-mcp\"\nversion = \"0.1.0\"\n",
+                encoding="utf-8",
+            )
+            source_file = service_root / "service.py"
+            source_file.write_text("VALUE = 1\n", encoding="utf-8")
+            bootstrap = root / "fake-python"
+            bootstrap.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$1\" == \"-m\" && \"$2\" == \"venv\" ]]; then\n"
+                "  mkdir -p \"$3/bin\"\n"
+                "  cp \"$0\" \"$3/bin/python\"\n"
+                "  chmod 0755 \"$3/bin/python\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == \"-c\" ]]; then\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 64\n",
+                encoding="utf-8",
+            )
+            bootstrap.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(stack_root / "Configs"),
+                    "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                }
+            )
+            command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--provision-abyss-stack-mcp-runtime",
+            ]
+
+            first = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
+            marker = venv / ".abyss-stack-mcp-source-digest"
+            first_digest = marker.read_text(encoding="utf-8").strip()
+            self.assertRegex(first_digest, r"\A[0-9a-f]{64}\Z")
+            self.assertTrue((venv / "bin" / "python").is_file())
+            self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
+            self.assertNotIn("unit linked", first.stdout)
+
+            second = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertIn("already provisioned", second.stdout)
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_digest)
+
+            source_file.write_text("VALUE = 2\n", encoding="utf-8")
+            third = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(third.returncode, 0, third.stderr)
+            self.assertIn("provisioned abyss-stack MCP runtime", third.stdout)
+            self.assertNotEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_digest,
+            )
+
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -781,9 +878,18 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             "/srv/AbyssOS/abyss-stack/Logs/mcp/organ-runtime-observation.json"
         )
         deployed_entrypoint = (
-            "ExecStart=/usr/bin/env python3 "
+            "ExecStart=/usr/bin/env /srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/venv/bin/python "
             "/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/"
             "scripts/abyss_stack_mcp_server.py"
+        )
+        runtime_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/venv/bin/python"
+        )
+        runtime_exec_condition = (
+            "ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/venv/bin/python"
         )
 
         self.assertIn("Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", read_unit)
@@ -798,6 +904,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         self.assertIn(observation_path, read_unit)
         self.assertIn(observation_path, candidate_unit)
+        self.assertIn("Environment=AOA_MCP_PORT=5431", read_unit)
+        self.assertNotIn("Environment=AOA_MCP_PORT=5433", read_unit)
+        self.assertIn("Environment=AOA_MCP_PORT=5433", candidate_unit)
+        self.assertNotIn("Environment=AOA_MCP_PORT=5431", candidate_unit)
         self.assertIn(
             "LoadCredential=abyss-stack-mcp-read-bearer-token:"
             "/srv/AbyssOS/abyss-stack/Secrets/Configs/"
@@ -814,6 +924,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         self.assertNotIn("read-bearer-token", candidate_unit)
         for unit in (read_unit, candidate_unit):
             self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
+            self.assertIn(runtime_condition, unit)
+            self.assertIn(runtime_exec_condition, unit)
             self.assertIn(deployed_entrypoint, unit)
             self.assertIn("NoNewPrivileges=yes", unit)
             self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", unit)

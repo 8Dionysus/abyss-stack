@@ -80,7 +80,8 @@ The current allowlist covers the local working surface:
 - the separate `abyss-stack-mcp-read.service` and
   `abyss-stack-mcp-candidate.service` processes; neither belongs to the shared
   owner bundle, and each has a disjoint tool catalog, port, scope, client
-  identity, and systemd credential
+  identity, and systemd credential; their explicit ports are `5431` and `5433`
+  because the storage module owns PostgreSQL on `5432`
 - warm dictation and TTS services, plus the `gemma4.spark` stack endpoint
   bridge
 - TTS keep-warm timer that periodically exercises the protected warm server
@@ -109,6 +110,13 @@ idempotent and never prints or replaces either value. Linking the units still
 does not start them, and the stack MCP services must not be started until the
 typed runtime observation exists and source-to-Configs parity is green. No
 Codex client registration is installed for these two contours by this action.
+Provision their dependency-closed Python environment after sync with
+`scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`. The
+source-addressed environment lives under
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`; both units refuse activation
+through `ConditionPathExists` and an executable `ExecCondition` when it is
+absent or unusable. Runtime provisioning, credential provisioning, unit
+linking, start, and client registration remain separate actions.
 
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.

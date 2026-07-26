@@ -22,6 +22,10 @@ source
 Every link keeps its own state, timestamp, expiry, evidence refs, and reason
 codes. Process activity is not endpoint readiness; endpoint readiness is not
 owner-result freshness; consumer registration is not schema compatibility.
+Plan preparation therefore accepts only `exact` or `compatible_drift`
+freshness. Activation also requires process and endpoint readiness, an exact
+consumer/server schema match, at least one shared protocol version, grounded
+canary evidence, and rollback readiness.
 
 ## Progressive surface
 
@@ -40,3 +44,7 @@ The named acceptance owner accepts durable source or memory changes.
 The MCP stable production line remains `2025-11-25`. These contracts are
 protocol-independent so a future adapter can coexist without changing runtime
 authority.
+
+Managed units execute a stack-owned, source-addressed virtual environment under
+`Services/abyss-stack-mcp`; they never inherit dependencies from ambient
+Python. Provisioning is explicit and does not start or register either plane.

@@ -474,18 +474,19 @@ class StackMCPApplication:
         now: datetime,
     ) -> list[str]:
         blockers: list[str] = []
+        usable_states = {"exact", "compatible_drift"}
+        effective_freshness = self._effective_freshness(subject, now)
         if subject.freshness.expires_at <= now:
             blockers.append("subject_freshness_expired")
+        elif effective_freshness not in usable_states:
+            blockers.append("subject_freshness_not_usable")
         required_links = {
             "source_identity": subject.source.evidence,
             "package_identity": subject.package.evidence,
             "deploy_identity": subject.deploy.evidence,
         }
         for name, link in required_links.items():
-            if self._effective_link_state(link, now) not in {
-                "exact",
-                "compatible_drift",
-            }:
+            if self._effective_link_state(link, now) not in usable_states:
                 blockers.append(f"{name}_not_usable")
         if plan_kind in {"activate", "restart"}:
             if subject.registry.registry_state not in {"shadow", "admitted"}:
@@ -495,24 +496,51 @@ class StackMCPApplication:
                 ("endpoint", subject.endpoint.evidence),
                 ("registry", subject.registry.evidence),
             ):
-                if self._effective_link_state(link, now) not in {
-                    "exact",
-                    "compatible_drift",
-                }:
+                if self._effective_link_state(link, now) not in usable_states:
                     blockers.append(f"{name}_evidence_not_usable")
             if subject.endpoint.server_schema_digest is None:
                 blockers.append("server_schema_unobserved")
-        if plan_kind == "activate" and not any(
-            consumer.registered
-            and self._effective_link_state(consumer.evidence, now)
-            in {"exact", "compatible_drift"}
-            for consumer in subject.consumers
-        ):
-            blockers.append("no_registered_consumer")
+        if plan_kind == "activate":
+            if not subject.process.active:
+                blockers.append("process_not_active")
+            if not subject.endpoint.ready:
+                blockers.append("endpoint_not_ready")
+            usable_consumers = [
+                consumer
+                for consumer in subject.consumers
+                if consumer.registered
+                and self._effective_link_state(consumer.evidence, now)
+                in usable_states
+            ]
+            if not usable_consumers:
+                blockers.append("no_registered_consumer")
+            elif not any(
+                consumer.observed_schema_digest
+                == subject.endpoint.server_schema_digest
+                and bool(
+                    set(consumer.observed_protocol_versions)
+                    & set(subject.endpoint.protocol_versions)
+                )
+                for consumer in usable_consumers
+            ):
+                blockers.append("no_compatible_registered_consumer")
+            if (
+                not subject.canary.succeeded
+                or not subject.canary.result_grounded
+                or self._effective_link_state(subject.canary.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("canary_not_proven")
+            if (
+                not subject.rollback.ready
+                or self._effective_link_state(subject.rollback.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("rollback_not_proven")
         if plan_kind == "rollback":
             if not subject.rollback.ready or self._effective_link_state(
                 subject.rollback.evidence, now
-            ) not in {"exact", "compatible_drift"}:
+            ) not in usable_states:
                 blockers.append("rollback_not_proven")
         return blockers
 

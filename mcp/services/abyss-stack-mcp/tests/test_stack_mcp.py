@@ -181,6 +181,22 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
     with pytest.raises(ValidationError, match="exceed"):
         RuntimeObservation.model_validate(payload)
 
+    payload = observation(subject())
+    payload["subjects"][0]["source"]["evidence"] = evidence(
+        "source",
+        state="compatible_drift",
+    )
+    with pytest.raises(ValidationError, match="usable link requires evidence"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    freshness = payload["subjects"][0]["freshness"]
+    freshness["state"] = "compatible_drift"
+    freshness["evidence_refs"] = []
+    freshness["reason_codes"] = ["watermark-drift"]
+    with pytest.raises(ValidationError, match="usable freshness requires"):
+        RuntimeObservation.model_validate(payload)
+
 
 def test_observation_store_rejects_secrets_symlinks_and_oversize(
     tmp_path: Path,
@@ -357,6 +373,92 @@ def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
         )
 
 
+def test_activation_requires_usable_freshness_and_runtime_readiness(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+    assert result["owner_payload"]["plan"]["plan_kind"] == "activate"
+
+    cases: list[tuple[dict, str]] = []
+
+    payload = observation(subject())
+    payload["subjects"][0]["freshness"]["state"] = "blocked"
+    payload["subjects"][0]["freshness"]["reason_codes"] = ["provider-blocked"]
+    cases.append((payload, "subject_freshness_not_usable"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["process"]["active"] = False
+    cases.append((payload, "process_not_active"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["endpoint"]["ready"] = False
+    cases.append((payload, "endpoint_not_ready"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["canary"]["succeeded"] = False
+    cases.append((payload, "canary_not_proven"))
+
+    payload = observation(subject())
+    rollback = payload["subjects"][0]["rollback"]
+    rollback["ready"] = False
+    rollback["last_known_good_package_digest"] = None
+    rollback["proof_ref"] = None
+    rollback["evidence"] = evidence("rollback", state="unknown")
+    cases.append((payload, "rollback_not_proven"))
+
+    for case_index, (case_payload, blocker) in enumerate(cases):
+        case_root = tmp_path / f"case-{case_index}"
+        case_root.mkdir()
+        app = application(
+            case_root,
+            policy_family="candidate",
+            payload=case_payload,
+        )
+        _, digest = app.store.load()
+        with pytest.raises(StackMCPError, match=blocker):
+            app.prepare_plan(
+                "aoa-kag",
+                "read",
+                "activate",
+                expected_observation_digest=digest,
+            )
+
+
+@pytest.mark.parametrize(
+    ("consumer_schema", "consumer_protocols"),
+    [
+        (DIGEST_A, ["2025-11-25"]),
+        (DIGEST_D, ["2026-07-28"]),
+    ],
+)
+def test_activation_rejects_incompatible_registered_consumer(
+    tmp_path: Path,
+    consumer_schema: str,
+    consumer_protocols: list[str],
+) -> None:
+    payload = observation(subject())
+    consumer = payload["subjects"][0]["consumers"][0]
+    consumer["observed_schema_digest"] = consumer_schema
+    consumer["observed_protocol_versions"] = consumer_protocols
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="no_compatible_registered_consumer"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "activate",
+            expected_observation_digest=digest,
+        )
+
+
 def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> None:
     path = write_observation(tmp_path / "observation.json")
     read = build_server(path, policy_family="read")
@@ -378,7 +480,7 @@ def test_policy_contours_use_distinct_ports_credentials_and_scopes(
         "abyss-stack-mcp:read",
     )
     assert _contour("candidate") == (
-        5432,
+        5433,
         "ABYSS_STACK_MCP_CANDIDATE_BEARER_TOKEN",
         "abyss-stack-mcp-candidate-bearer-token",
         "abyss-stack-mcp:candidate",

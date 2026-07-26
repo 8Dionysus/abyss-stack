@@ -22,13 +22,17 @@ The candidate process exposes only:
 - `stack_prepare_runtime_plan`: a content-addressed `sync`, `deploy`,
   `activate`, `restart`, or `rollback` candidate.
 
-The processes use different tools, default ports (`5431`, `5432`), environment
+The processes use different tools, default ports (`5431`, `5433`), environment
 variables, systemd credential names, scopes, and client identities. A read
 credential cannot authenticate to or enumerate the candidate process.
 
 Every candidate remains `execution_authorized=false`, requires separate human
 approval before any effect, contains no free-form shell command, expires in at
 most ten minutes, and stops on observation drift or precondition mismatch.
+Every plan requires usable subject freshness. Activation additionally requires
+an active process, a ready endpoint, a registered consumer with the exact
+server schema digest and an overlapping MCP protocol version, a grounded
+canary, and usable rollback proof.
 
 ## Observation input
 
@@ -58,6 +62,20 @@ ABYSS_STACK_MCP_POLICY_FAMILY=read abyss-stack-mcp-server
 Stdio is the portable default. Authenticated loopback Streamable HTTP is
 selected through `AOA_MCP_TRANSPORT=streamable-http`; it requires the
 plane-specific credential.
+
+The managed user units do not use ambient Python. After syncing the package to
+`Configs`, provision the source-addressed runtime explicitly:
+
+```bash
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
+```
+
+This creates or refreshes
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies its dependencies,
+and records the exact deployed-package content digest. Repeating the command
+with unchanged source verifies and reuses the environment. The units have a
+`ConditionPathExists` guard plus an executable `ExecCondition`, and remain
+inactive when this runtime is absent or unusable.
 
 ## Validation
 

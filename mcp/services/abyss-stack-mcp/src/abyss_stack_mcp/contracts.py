@@ -98,8 +98,8 @@ class LinkEvidence(StrictModel):
     def validate_link(self) -> LinkEvidence:
         if self.expires_at is not None and self.expires_at <= self.observed_at:
             raise ValueError("link expiry must follow observation")
-        if self.state == "exact" and not self.evidence_refs:
-            raise ValueError("an exact link requires evidence")
+        if self.state in {"exact", "compatible_drift"} and not self.evidence_refs:
+            raise ValueError("a usable link requires evidence")
         if self.state != "exact" and not self.reason_codes:
             raise ValueError("a non-exact link requires reason codes")
         return self
@@ -230,12 +230,12 @@ class FreshnessObservation(StrictModel):
     def validate_freshness(self) -> FreshnessObservation:
         if self.expires_at <= self.observed_at:
             raise ValueError("freshness expiry must follow observation")
-        if self.state == "exact":
+        if self.state in {"exact", "compatible_drift"}:
             if self.provider_watermark is None or not self.evidence_refs:
                 raise ValueError(
-                    "exact freshness requires provider watermark and evidence"
+                    "usable freshness requires provider watermark and evidence"
                 )
-        elif not self.reason_codes:
+        if self.state != "exact" and not self.reason_codes:
             raise ValueError("non-exact freshness requires reason codes")
         return self
 

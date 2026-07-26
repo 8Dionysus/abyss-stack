@@ -57,7 +57,8 @@ access planes even when their read calls work.
 | `tos-corpus` | 5429 |
 | `aoa-stats` | 5430 |
 | `abyss-stack` read | 5431 |
-| `abyss-stack` candidate | 5432 |
+| PostgreSQL storage module (non-MCP; reserved conflict) | 5432 |
+| `abyss-stack` candidate | 5433 |
 
 `abyss-stack-mcp` does not join the transitional shared owner credential. Its
 read and candidate planes select distinct credential names, scopes, client
@@ -65,6 +66,10 @@ identities, ports, and tool catalogs. The candidate plane only prepares
 content-addressed plans and has no dispatch method. Neither plane is included
 in the existing owner bundle until package/deploy provenance, a live
 observation, consumer canary, and rollback evidence are present.
+The managed units use the explicitly provisioned
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` runtime rather than ambient
+Python. `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`
+creates or refreshes it from the deployed package and does not start a unit.
 
 `systemd/user/aoa-mcp-http@.service` owns one process per instance and launches
 the deployed workspace wrapper, not a source checkout. The

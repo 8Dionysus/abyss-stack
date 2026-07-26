@@ -152,6 +152,7 @@ Preview the exact bounded projection before a lifecycle-sensitive rollout:
 ```bash
 scripts/aoa-sync-configs --dry-run --item mcp --item schemas --item systemd
 scripts/aoa-sync-configs --item mcp --item schemas --item systemd
+scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 scripts/aoa-install-systemd --provision-mcp-http-auth
 scripts/aoa-install-systemd --provision-abyss-stack-mcp-auth
 scripts/aoa-install-systemd --install-mcp-http-codex-client
@@ -172,6 +173,11 @@ candidate credentials; neither credential is shared with the owner adapters or
 with the other stack contour. It does not register either service with Codex
 and does not start a unit. Start remains a later canary decision after the
 typed runtime observation, deployed parity, and consumer contract are ready.
+The stack MCP runtime provision action builds a source-addressed virtual
+environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
+already deployed package, verifies its dependency closure and imports, and
+does not link, start, or register a service. Repeating it against the same
+deployed package verifies and reuses the environment.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -402,6 +408,15 @@ credentials under `${AOA_STACK_ROOT}/Secrets/Configs`, keeps each file at mode
 This action grants no runtime-effect authority: the candidate process only
 compiles an expiring content-addressed plan with
 `execution_authorized=false`.
+
+Use `--provision-abyss-stack-mcp-runtime` after syncing the MCP package and
+before canarying either stack-owned plane. It must run as the target user,
+installs the deployed package and its constrained dependencies into
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies `pip check` and
+runtime imports, and records a digest of the exact deployed package content.
+The user units point only at this environment and use
+`ConditionPathExists` plus an executable `ExecCondition`, so a missing or
+unusable runtime leaves them inactive instead of entering a restart loop.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:

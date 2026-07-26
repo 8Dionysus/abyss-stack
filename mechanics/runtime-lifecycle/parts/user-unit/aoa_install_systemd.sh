@@ -13,6 +13,7 @@ link_all_user_units=0
 link_system_units=0
 provision_mcp_http_auth=0
 provision_abyss_stack_mcp_auth=0
+provision_abyss_stack_mcp_runtime=0
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -84,6 +85,9 @@ while (($#)); do
     --provision-abyss-stack-mcp-auth)
       provision_abyss_stack_mcp_auth=1
       ;;
+    --provision-abyss-stack-mcp-runtime)
+      provision_abyss_stack_mcp_runtime=1
+      ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
       ;;
@@ -149,11 +153,18 @@ fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
 fi
+if ((provision_abyss_stack_mcp_runtime && EUID == 0)); then
+  aoa_die "abyss-stack MCP runtime provisioning must run as the target user, not root"
+fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
 mcp_http_secret_dir="${AOA_STACK_ROOT}/Secrets/Configs"
 abyss_stack_mcp_read_credential_name="abyss-stack-mcp-read-bearer-token"
 abyss_stack_mcp_candidate_credential_name="abyss-stack-mcp-candidate-bearer-token"
+abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
+abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
+abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
+abyss_stack_mcp_bootstrap_python="${ABYSS_STACK_MCP_BOOTSTRAP_PYTHON:-/usr/bin/python3}"
 mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
 mcp_http_codex_zshrc="${ZDOTDIR:-${HOME}}/.zshrc"
 mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
@@ -213,6 +224,102 @@ aoa_provision_abyss_stack_mcp_auth() {
   aoa_provision_mcp_bearer \
     "$abyss_stack_mcp_candidate_credential_name" \
     "abyss-stack MCP candidate bearer credential"
+}
+
+aoa_provision_abyss_stack_mcp_runtime() {
+  local source_digest=""
+  local existing_digest=""
+  local marker=".abyss-stack-mcp-source-digest"
+  local temp_venv=""
+  local backup_venv=""
+
+  [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
+    aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
+  [[ -f "$abyss_stack_mcp_bootstrap_python" && \
+     ! -L "$abyss_stack_mcp_bootstrap_python" && \
+     -x "$abyss_stack_mcp_bootstrap_python" ]] || \
+    aoa_die "abyss-stack MCP bootstrap Python is not an executable regular file"
+  [[ -d "$abyss_stack_mcp_service_root" && \
+     ! -L "$abyss_stack_mcp_service_root" ]] || \
+    aoa_die "deployed abyss-stack MCP package root is unavailable"
+  [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
+     ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
+    aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  if [[ -n "$(find "$abyss_stack_mcp_service_root" -type l -print -quit)" ]]; then
+    aoa_die "deployed abyss-stack MCP package must not contain symlinks"
+  fi
+
+  source_digest="$(
+    cd "$abyss_stack_mcp_service_root"
+    find . -type f \
+        ! -path '*/__pycache__/*' \
+        ! -path '*/.pytest_cache/*' \
+        ! -name '*.pyc' \
+        -print0 |
+        LC_ALL=C sort -z |
+        xargs -0 sha256sum |
+        sha256sum |
+        cut -d' ' -f1
+  )"
+  [[ "$source_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to digest the deployed abyss-stack MCP package"
+
+  if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
+    [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
+      aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
+    if [[ -f "${abyss_stack_mcp_venv}/${marker}" ]]; then
+      existing_digest="$(<"${abyss_stack_mcp_venv}/${marker}")"
+    fi
+    if [[ "$existing_digest" == "$source_digest" && \
+          -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
+       "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
+       "${abyss_stack_mcp_venv}/bin/python" -c \
+         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+      aoa_note "abyss-stack MCP runtime already provisioned for deployed package digest ${source_digest}"
+      return 0
+    fi
+  fi
+
+  install -d -m 0750 "$abyss_stack_mcp_runtime_root"
+  temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
+  if ! "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to create the abyss-stack MCP runtime environment"
+  fi
+  if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    "${temp_venv}/bin/python" -m pip install \
+      --no-input \
+      --upgrade \
+      --upgrade-strategy only-if-needed \
+      "$abyss_stack_mcp_service_root"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to install the deployed abyss-stack MCP package"
+  fi
+  if ! "${temp_venv}/bin/python" -m pip check >/dev/null || \
+     ! "${temp_venv}/bin/python" -c \
+       'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+    rm -rf -- "$temp_venv"
+    aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
+  fi
+  printf '%s\n' "$source_digest" > "${temp_venv}/${marker}"
+  chmod 0644 "${temp_venv}/${marker}"
+
+  if [[ -d "$abyss_stack_mcp_venv" ]]; then
+    backup_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.previous.XXXXXX")"
+    rmdir -- "$backup_venv"
+    mv -- "$abyss_stack_mcp_venv" "$backup_venv"
+  fi
+  if ! mv -- "$temp_venv" "$abyss_stack_mcp_venv"; then
+    if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
+      mv -- "$backup_venv" "$abyss_stack_mcp_venv"
+    fi
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to activate the provisioned abyss-stack MCP runtime"
+  fi
+  if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
+    rm -rf -- "$backup_venv"
+  fi
+  aoa_note "provisioned abyss-stack MCP runtime for deployed package digest ${source_digest}"
 }
 
 aoa_validate_mcp_http_codex_zshrc() {
@@ -327,13 +434,16 @@ fi
 if ((provision_abyss_stack_mcp_auth)); then
   aoa_provision_abyss_stack_mcp_auth
 fi
+if ((provision_abyss_stack_mcp_runtime)); then
+  aoa_provision_abyss_stack_mcp_runtime
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

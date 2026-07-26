@@ -15,7 +15,7 @@ from .core import ObservationStore, StackMCPApplication
 
 LOGGER = logging.getLogger(__name__)
 READ_PORT = 5431
-CANDIDATE_PORT = 5432
+CANDIDATE_PORT = 5433
 PolicyMode = Literal["read", "candidate"]
 CatalogLimit = Annotated[int, Field(ge=1, le=64)]
 CatalogBudget = Annotated[int, Field(ge=512, le=131_072)]
