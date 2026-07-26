@@ -59,6 +59,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Candidate result freshness now folds every copied plan link, and activation
   or rollback causality checks ignore unrelated consumers in favor of the
   exact proof-selected or last-known-good registration.
+- Step-relevant deploy, proof, acceptance, canary, and rollback receipt names
+  now have to match evidence identities copied into and expiry-bounded by the
+  candidate.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary
   evidence from the current deployment.

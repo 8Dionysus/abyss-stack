@@ -88,7 +88,7 @@ def observation_example() -> dict[str, Any]:
                 "deploy": {
                     "revision": "deploy-example-revision",
                     "tree_digest": DIGESTS["deploy"],
-                    "manifest_ref": "example://deploy/aoa-kag-read",
+                    "manifest_ref": "example://runtime/deploy",
                     "deployed_at": NOW.isoformat(),
                     "evidence": evidence("deploy"),
                 },
@@ -133,7 +133,7 @@ def observation_example() -> dict[str, Any]:
                 },
                 "proof": {
                     "verdict": "passed",
-                    "proof_ref": "example://central-proof/aoa-kag",
+                    "proof_ref": "example://runtime/central-proof",
                     "evaluated_at": NOW.isoformat(),
                     "proved_source_revision": "source-example-revision",
                     "proved_source_tree_digest": DIGESTS["source"],
@@ -148,12 +148,12 @@ def observation_example() -> dict[str, Any]:
                     "proved_canary_route": (
                         "example://canary-route/aoa-kag"
                     ),
-                    "proved_canary_ref": "example://canary/aoa-kag",
+                    "proved_canary_ref": "example://runtime/canary",
                     "evidence": evidence("central-proof", owner="aoa-evals"),
                 },
                 "acceptance": {
                     "accepted": True,
-                    "acceptance_ref": "example://acceptance/aoa-kag",
+                    "acceptance_ref": "example://runtime/acceptance",
                     "accepted_at": NOW.isoformat(),
                     "accepted_source_revision": "source-example-revision",
                     "accepted_package_digest": DIGESTS["package"],
@@ -163,7 +163,7 @@ def observation_example() -> dict[str, Any]:
                     "succeeded": True,
                     "result_grounded": True,
                     "canary_route": "example://canary-route/aoa-kag",
-                    "canary_ref": "example://canary/aoa-kag",
+                    "canary_ref": "example://runtime/canary",
                     "evidence": evidence("canary"),
                 },
                 "rollback": {
@@ -193,7 +193,7 @@ def observation_example() -> dict[str, Any]:
                     "last_known_good_canary_ref": (
                         "example://canary/aoa-kag/last-known-good"
                     ),
-                    "proof_ref": "example://rollback-proof/aoa-kag",
+                    "proof_ref": "example://runtime/rollback",
                     "proved_target": {
                         "consumer_registration_ref": (
                             "example://consumer/aoa-kag"

@@ -68,6 +68,9 @@
 - candidate causality and evidence expansion use only the exact
   proof-selected or last-known-good consumer, while candidate result freshness
   folds every copied plan link together with the subject freshness envelope;
+- every step-relevant named deploy, proof, acceptance, canary, or rollback
+  receipt must equal a contained evidence identity that the candidate copies
+  and expiry-bounds;
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;

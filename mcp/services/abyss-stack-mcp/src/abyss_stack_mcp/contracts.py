@@ -161,6 +161,16 @@ class LinkEvidence(StrictModel):
         return self
 
 
+def _contains_named_evidence(
+    link: LinkEvidence,
+    named_ref: str | None,
+) -> bool:
+    return named_ref is not None and any(
+        evidence.evidence_ref == named_ref
+        for evidence in link.evidence_refs
+    )
+
+
 class OwnerRoles(StrictModel):
     source_owner: Identifier
     access_owner: Identifier
@@ -197,6 +207,20 @@ class DeployIdentity(StrictModel):
         result = _aware_utc(value)
         assert result is not None
         return result
+
+    @model_validator(mode="after")
+    def validate_manifest_evidence(self) -> DeployIdentity:
+        if (
+            self.evidence.state in {"exact", "compatible_drift"}
+            and not _contains_named_evidence(
+                self.evidence,
+                self.manifest_ref,
+            )
+        ):
+            raise ValueError(
+                "usable deploy manifest_ref must match contained evidence"
+            )
+        return self
 
 
 class ProcessObservation(StrictModel):
@@ -460,6 +484,13 @@ class CanaryObservation(StrictModel):
             raise ValueError(
                 "successful canary requires grounded result and evidence ref"
             )
+        if self.succeeded and not _contains_named_evidence(
+            self.evidence,
+            self.canary_ref,
+        ):
+            raise ValueError(
+                "successful canary_ref must match contained evidence"
+            )
         return self
 
 
@@ -567,6 +598,13 @@ class CentralProofObservation(StrictModel):
                 "passed central proof requires an exact target, timestamp, "
                 "and evidence"
             )
+        if self.verdict == "passed" and not _contains_named_evidence(
+            self.evidence,
+            self.proof_ref,
+        ):
+            raise ValueError(
+                "passed central proof_ref must match contained evidence"
+            )
         if (
             self.verdict == "passed"
             and self.evaluated_at is not None
@@ -648,6 +686,13 @@ class OwnerAcceptanceObservation(StrictModel):
         ):
             raise ValueError(
                 "owner acceptance requires an exact target, timestamp, and evidence"
+            )
+        if self.accepted and not _contains_named_evidence(
+            self.evidence,
+            self.acceptance_ref,
+        ):
+            raise ValueError(
+                "accepted acceptance_ref must match contained evidence"
             )
         if (
             self.accepted
@@ -769,6 +814,13 @@ class RollbackObservation(StrictModel):
             raise ValueError(
                 "rollback readiness requires a complete last-known-good contour "
                 "and proof"
+            )
+        if self.ready and not _contains_named_evidence(
+            self.evidence,
+            self.proof_ref,
+        ):
+            raise ValueError(
+                "ready rollback proof_ref must match contained evidence"
             )
         if self.ready and self.proved_target is not None:
             restoration_target = (

@@ -91,7 +91,7 @@ def subject(
         "deploy": {
             "revision": "deploy-rev-1",
             "tree_digest": DIGEST_C,
-            "manifest_ref": f"receipt://deploy/{organ_id}",
+            "manifest_ref": "receipt://runtime/deploy",
             "deployed_at": NOW.isoformat(),
             "evidence": evidence("deploy"),
         },
@@ -135,7 +135,7 @@ def subject(
         },
         "proof": {
             "verdict": "passed",
-            "proof_ref": f"receipt://central-proof/{organ_id}",
+            "proof_ref": "receipt://runtime/central-proof",
             "evaluated_at": NOW.isoformat(),
             "proved_source_revision": "source-rev-1",
             "proved_source_tree_digest": DIGEST_A,
@@ -146,12 +146,12 @@ def subject(
             "proved_server_schema_digest": DIGEST_D,
             "proved_consumer_registration_ref": f"config://codex/{organ_id}",
             "proved_canary_route": f"runbook://canary/{organ_id}",
-            "proved_canary_ref": f"receipt://canary/{organ_id}",
+            "proved_canary_ref": "receipt://runtime/canary",
             "evidence": evidence("central-proof", owner="aoa-evals"),
         },
         "acceptance": {
             "accepted": True,
-            "acceptance_ref": f"receipt://acceptance/{organ_id}",
+            "acceptance_ref": "receipt://runtime/acceptance",
             "accepted_at": NOW.isoformat(),
             "accepted_source_revision": "source-rev-1",
             "accepted_package_digest": DIGEST_B,
@@ -161,7 +161,7 @@ def subject(
             "succeeded": True,
             "result_grounded": True,
             "canary_route": f"runbook://canary/{organ_id}",
-            "canary_ref": f"receipt://canary/{organ_id}",
+            "canary_ref": "receipt://runtime/canary",
             "evidence": evidence("canary"),
         },
         "rollback": {
@@ -187,7 +187,7 @@ def subject(
             "last_known_good_canary_ref": (
                 f"receipt://canary/{organ_id}/last-known-good"
             ),
-            "proof_ref": f"receipt://rollback/{organ_id}",
+            "proof_ref": "receipt://runtime/rollback",
             "proved_target": {
                 "consumer_registration_ref": f"config://codex/{organ_id}",
                 "package_digest": DIGEST_B,
@@ -353,6 +353,29 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
         owner="unrelated-owner",
     )
     with pytest.raises(ValidationError, match="issued by acceptance_owner"):
+        RuntimeObservation.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("surface", "named_field"),
+    (
+        ("deploy", "manifest_ref"),
+        ("proof", "proof_ref"),
+        ("acceptance", "acceptance_ref"),
+        ("canary", "canary_ref"),
+        ("rollback", "proof_ref"),
+    ),
+)
+def test_usable_named_receipts_must_match_contained_evidence(
+    surface: str,
+    named_field: str,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0][surface][named_field] = (
+        f"receipt://unbound/{surface}"
+    )
+
+    with pytest.raises(ValidationError, match="must match contained evidence"):
         RuntimeObservation.model_validate(payload)
 
 
@@ -696,10 +719,14 @@ def test_observation_store_allows_noncredential_substrings_in_reference_keys(
     tmp_path: Path,
 ) -> None:
     payload = observation(subject())
-    payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+    safe_reference = (
         "https://acceptance.invalid/receipt?"
         "tokenizer=model&passwordless=true&authorizationPolicy=local"
     )
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = safe_reference
+    payload["subjects"][0]["acceptance"]["evidence"]["evidence_refs"][0][
+        "evidence_ref"
+    ] = safe_reference
     path = write_observation(tmp_path / "noncredential-key-substrings.json", payload)
 
     loaded, _ = ObservationStore(path).load()
@@ -942,8 +969,8 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["exact_unit_name"] == "aoa-mcp-http@aoa-kag.service"
     assert [step["order"] for step in plan["steps"]] == [1, 2, 3, 4, 5, 6]
     assert plan["steps"][0]["exact_target"] == "aoa-kag-mcp/0.1.0"
-    assert plan["steps"][1]["exact_target"] == "receipt://central-proof/aoa-kag"
-    assert plan["steps"][2]["exact_target"] == "receipt://acceptance/aoa-kag"
+    assert plan["steps"][1]["exact_target"] == "receipt://runtime/central-proof"
+    assert plan["steps"][2]["exact_target"] == "receipt://runtime/acceptance"
     assert plan["steps"][3]["action"] == "admit-registry-entry"
     assert plan["steps"][3]["exact_target"] == f"abyss-private@{DIGEST_A}"
     assert plan["steps"][4]["exact_target"] == "config://codex/aoa-kag"
@@ -986,8 +1013,8 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
             (
                 ("verify-source-revision", "source-rev-1"),
                 ("verify-source-tree-digest", DIGEST_A),
-                ("preview-config-sync", "receipt://deploy/aoa-kag"),
-                ("apply-exact-config-sync", "receipt://deploy/aoa-kag"),
+                ("preview-config-sync", "receipt://runtime/deploy"),
+                ("apply-exact-config-sync", "receipt://runtime/deploy"),
                 ("compare-deployed-digest", DIGEST_E),
             ),
         ),
@@ -1130,7 +1157,7 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
     ] == [
         ("deny-discovery", f"abyss-private@{DIGEST_A}"),
         ("deny-activation", "aoa-kag/read"),
-        ("verify-rollback-proof", "receipt://rollback/aoa-kag"),
+        ("verify-rollback-proof", "receipt://runtime/rollback"),
         ("restore-exact-package", DIGEST_B),
         ("restore-deployed-tree", DIGEST_C),
         ("restore-deploy-revision", "deploy-rev-0"),

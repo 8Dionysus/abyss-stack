@@ -8,7 +8,7 @@
   "subjects": [
     {
       "acceptance": {
-        "acceptance_ref": "example://acceptance/aoa-kag",
+        "acceptance_ref": "example://runtime/acceptance",
         "accepted": true,
         "accepted_at": "2026-07-25T12:00:00Z",
         "accepted_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -30,7 +30,7 @@
         }
       },
       "canary": {
-        "canary_ref": "example://canary/aoa-kag",
+        "canary_ref": "example://runtime/canary",
         "canary_route": "example://canary-route/aoa-kag",
         "evidence": {
           "evidence_refs": [
@@ -94,7 +94,7 @@
           "reason_codes": [],
           "state": "exact"
         },
-        "manifest_ref": "example://deploy/aoa-kag-read",
+        "manifest_ref": "example://runtime/deploy",
         "revision": "deploy-example-revision",
         "tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
@@ -210,8 +210,8 @@
           "reason_codes": [],
           "state": "exact"
         },
-        "proof_ref": "example://central-proof/aoa-kag",
-        "proved_canary_ref": "example://canary/aoa-kag",
+        "proof_ref": "example://runtime/central-proof",
+        "proved_canary_ref": "example://runtime/canary",
         "proved_canary_route": "example://canary-route/aoa-kag",
         "proved_consumer_registration_ref": "example://consumer/aoa-kag",
         "proved_deploy_revision": "deploy-example-revision",
@@ -269,7 +269,7 @@
         "last_known_good_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "last_known_good_process_identity": "aoa-kag-mcp/0.0.0-example",
         "last_known_good_unit_name": "aoa-mcp-http@aoa-kag.service",
-        "proof_ref": "example://rollback-proof/aoa-kag",
+        "proof_ref": "example://runtime/rollback",
         "proved_target": {
           "canary_ref": "example://canary/aoa-kag/last-known-good",
           "canary_route": "example://canary-route/aoa-kag/last-known-good",

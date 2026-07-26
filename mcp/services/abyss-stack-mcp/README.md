@@ -78,6 +78,10 @@ only the exact proof-selected or last-known-good consumer; unrelated consumer
 observations cannot veto a candidate and are not copied into it. Candidate
 result freshness is the worst effective state across subject freshness and
 every exact link the plan copies, so a drift-backed plan cannot claim `exact`.
+Every usable deploy manifest, passed central proof, accepted owner decision,
+successful canary, and ready rollback proof also binds its named receipt to one
+contained `EvidenceRef`; the candidate copies and expiry-bounds that exact
+identity before any step can name it.
 Central proof cannot predate the canary link or evidence refs it names.
 Duplicate evidence identities with conflicting `observed_at` values are
 rejected before expiry deduplication.
