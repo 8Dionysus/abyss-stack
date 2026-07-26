@@ -56,6 +56,45 @@ _FORBIDDEN_KEYS = frozenset(
 _FORBIDDEN_KEY_CANONICAL = frozenset(
     re.sub(r"[^a-z0-9]", "", key.casefold()) for key in _FORBIDDEN_KEYS
 )
+_CREDENTIAL_NAMESPACE_PREFIXES = frozenset(
+    {
+        "aoa",
+        "aws",
+        "azure",
+        "client",
+        "codex",
+        "database",
+        "db",
+        "gcp",
+        "github",
+        "gitlab",
+        "google",
+        "http",
+        "mcp",
+        "openai",
+        "server",
+        "service",
+        "user",
+    }
+)
+_CREDENTIAL_NAMESPACE_SUFFIXES = frozenset(
+    {
+        "backup",
+        "credential",
+        "credentials",
+        "data",
+        "field",
+        "header",
+        "material",
+        "param",
+        "parameter",
+        "ref",
+        "reference",
+        "string",
+        "text",
+        "value",
+    }
+)
 _SECRET_VALUE_PREFIXES = (
     "basic ",
     "bearer ",
@@ -119,15 +158,25 @@ def _is_forbidden_credential_key(value: Any) -> bool:
     canonical = re.sub(r"[^a-z0-9]", "", text.casefold())
     if canonical in _FORBIDDEN_KEY_CANONICAL:
         return True
-    if any(
-        canonical != forbidden
-        and (
-            canonical.startswith(forbidden)
-            or canonical.endswith(forbidden)
-        )
-        for forbidden in _FORBIDDEN_KEY_CANONICAL
-    ):
-        return True
+
+    def has_recognized_boundary(prefix: str, suffix: str) -> bool:
+        if prefix and suffix:
+            return (
+                prefix in _CREDENTIAL_NAMESPACE_PREFIXES
+                and suffix in _CREDENTIAL_NAMESPACE_SUFFIXES
+            )
+        if prefix:
+            return prefix in _CREDENTIAL_NAMESPACE_PREFIXES
+        return suffix in _CREDENTIAL_NAMESPACE_SUFFIXES
+
+    for forbidden in _FORBIDDEN_KEY_CANONICAL:
+        start = canonical.find(forbidden)
+        while start >= 0:
+            stop = start + len(forbidden)
+            if has_recognized_boundary(canonical[:start], canonical[stop:]):
+                return True
+            start = canonical.find(forbidden, start + 1)
+
     camel_separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
     tokens = tuple(
         token
@@ -137,11 +186,18 @@ def _is_forbidden_credential_key(value: Any) -> bool:
         )
         if token
     )
-    return any(
-        "".join(tokens[start:stop]) in _FORBIDDEN_KEY_CANONICAL
-        for start in range(len(tokens))
-        for stop in range(start + 1, min(len(tokens), start + 3) + 1)
-    )
+    for start in range(len(tokens)):
+        for stop in range(start + 1, min(len(tokens), start + 3) + 1):
+            if "".join(tokens[start:stop]) not in _FORBIDDEN_KEY_CANONICAL:
+                continue
+            if stop - start > 1:
+                return True
+            if has_recognized_boundary(
+                "".join(tokens[:start]),
+                "".join(tokens[stop:]),
+            ):
+                return True
+    return False
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -402,7 +458,11 @@ class StackMCPApplication:
                 "runtime_owner": subject.owners.runtime_owner,
                 "registry_state": subject.registry.registry_state,
                 "link_states": self._link_states(subject, now),
-                "freshness_state": self._effective_freshness(subject, now),
+                "freshness_state": self._observation_freshness(
+                    observation,
+                    subject,
+                    now,
+                ),
                 "views": [
                     "identity",
                     "parity",
@@ -469,7 +529,7 @@ class StackMCPApplication:
         observation, digest = self.store.load()
         now = self._now()
         subject = self._find_subject(observation, organ_id, policy_family)
-        payload = self._view(subject, view, now)
+        payload = self._view(observation, subject, view, now)
         return self._result(
             observation,
             digest,
@@ -482,7 +542,11 @@ class StackMCPApplication:
                 "observation": payload,
             },
             now=now,
-            freshness_state=self._effective_freshness(subject, now),
+            freshness_state=self._observation_freshness(
+                observation,
+                subject,
+                now,
+            ),
             freshness_scope=f"{organ_id}/{policy_family}",
         )
 
@@ -723,8 +787,19 @@ class StackMCPApplication:
             return "stale_readable"
         return subject.freshness.state
 
+    def _observation_freshness(
+        self,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> str:
+        if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
+            return "blocked"
+        return self._effective_freshness(subject, now)
+
     def _view(
         self,
+        observation: RuntimeObservation,
         subject: RuntimeSubject,
         view: ObservationView,
         now: datetime,
@@ -768,7 +843,11 @@ class StackMCPApplication:
             }
         if view == "freshness":
             payload = subject.freshness.model_dump(mode="json")
-            payload["effective_state"] = self._effective_freshness(subject, now)
+            payload["effective_state"] = self._observation_freshness(
+                observation,
+                subject,
+                now,
+            )
             return payload
         if view == "proof":
             return subject.proof.model_dump(mode="json")
@@ -781,7 +860,11 @@ class StackMCPApplication:
         if view == "drift":
             return {
                 "states": self._link_states(subject, now),
-                "freshness_state": self._effective_freshness(subject, now),
+                "freshness_state": self._observation_freshness(
+                    observation,
+                    subject,
+                    now,
+                ),
                 "reason_codes": sorted(
                     {
                         reason
@@ -1346,11 +1429,16 @@ class StackMCPApplication:
         freshness_scope: str,
     ) -> dict[str, Any]:
         stale = observation.expires_at <= now
-        effective_freshness = (
-            self._worst_state([freshness_state, "stale_readable"])
-            if stale
-            else freshness_state
-        )
+        future = observation.generated_at > now + MAX_PLAN_FUTURE_SKEW
+        effective_freshness = freshness_state
+        if stale:
+            effective_freshness = self._worst_state(
+                [effective_freshness, "stale_readable"]
+            )
+        if future:
+            effective_freshness = self._worst_state(
+                [effective_freshness, "blocked"]
+            )
         trace_id = sha256_digest(
             {
                 "observation_digest": digest,
@@ -1375,7 +1463,18 @@ class StackMCPApplication:
                 "effect_class": effect_class,
                 "applied_state": "not_applied",
                 "execution_authorized": False,
-                "warnings": (["runtime-observation-expired"] if stale else []),
+                "warnings": [
+                    *(
+                        ["runtime-observation-expired"]
+                        if stale
+                        else []
+                    ),
+                    *(
+                        ["runtime-observation-future-dated"]
+                        if future
+                        else []
+                    ),
+                ],
                 "trace_id": trace_id,
             },
             "owner_payload": payload,

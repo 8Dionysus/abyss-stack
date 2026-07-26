@@ -36,15 +36,17 @@ Tracking starts with the community-docs baseline for this repository.
   before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
-  and secret screening covers both prefix and suffix forms of concatenated
-  namespaced credential keys, compact
+  and secret screening covers separator/camel credential names plus
+  concatenated keys at recognized namespace or attribute boundaries without
+  blocking ordinary word substrings, compact
   JWT values, and encoded URI path segments as well as
   userinfo/query/fragment surfaces. Rollback proof now binds every
   last-known-good restoration field including its distinct canary, and staged
   runtime entry-point shebangs are rebound before content-addressed
   publication. Managed units clear ambient Python import roots and run the venv
-  in isolated mode, while read catalog/inspection downgrade causally future
-  link, freshness, or nested evidence timestamps to `blocked`. Existing equal
+  in isolated mode, while read catalog/inspection downgrade a causally future
+  observation envelope, link, freshness, or nested evidence timestamp to
+  `blocked`. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the

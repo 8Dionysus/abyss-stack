@@ -72,9 +72,10 @@ seconds after their enclosing observation snapshot, so an older snapshot
 cannot carry causally newer proof. Central proof cannot predate the canary link
 or evidence refs it names. Duplicate evidence identities with conflicting
 `observed_at` values are rejected before expiry deduplication.
-Catalog and inspection apply the same 30-second future-skew bound to link,
-freshness, and nested evidence timestamps; causally future usable evidence is
-reported as `blocked`, never as current, before candidate planning is involved.
+Catalog and inspection apply the same 30-second future-skew bound to the
+observation envelope, links, freshness, and nested evidence timestamps;
+causally future usable evidence is reported as `blocked`, never as current,
+before candidate planning is involved.
 `rollback_required` is accepted only while its own link and evidence refs are
 unexpired; a bare or expired rollback signal is a controlled precondition
 failure.
@@ -101,7 +102,10 @@ HTTP endpoints, credentials embedded in URI userinfo/path/query/fragment referen
 encoded nested credential references, unparseable or excessively nested
 URI-like references, whitespace-only exact targets, and unsupported effect
 classes. Credential-key screening recognizes namespaced separator and
-camel-case token sequences rather than only exact key spellings.
+camel-case token sequences rather than only exact key spellings. Concatenated
+matches require a recognized provider/consumer namespace or credential-value
+attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
+`authorizationPolicy` remain valid.
 Secret-prefix checks ignore leading whitespace. Expired observations
 remain visible as stale read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for

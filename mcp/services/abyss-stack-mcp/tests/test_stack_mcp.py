@@ -691,6 +691,23 @@ def test_observation_store_rejects_credentials_inside_references(
     assert secret_value not in str(caught.value)
 
 
+def test_observation_store_allows_noncredential_substrings_in_reference_keys(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+        "https://acceptance.invalid/receipt?"
+        "tokenizer=model&passwordless=true&authorizationPolicy=local"
+    )
+    path = write_observation(tmp_path / "noncredential-key-substrings.json", payload)
+
+    loaded, _ = ObservationStore(path).load()
+
+    assert loaded.subjects[0].acceptance.acceptance_ref.endswith(
+        "tokenizer=model&passwordless=true&authorizationPolicy=local"
+    )
+
+
 def test_observation_store_redacts_contract_validation_input_values(
     tmp_path: Path,
 ) -> None:
@@ -1453,6 +1470,31 @@ def test_read_paths_block_causally_future_evidence(
         assert freshness["owner_payload"]["observation"]["effective_state"] == (
             "blocked"
         )
+
+
+def test_read_paths_block_future_dated_observation_envelope(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["generated_at"] = (
+        NOW + timedelta(minutes=5, seconds=31)
+    ).isoformat()
+    app = application(tmp_path, payload=payload)
+
+    catalog = app.catalog()
+    assert catalog["metadata"]["freshness_state"] == "blocked"
+    assert catalog["metadata"]["warnings"] == [
+        "runtime-observation-future-dated"
+    ]
+    assert catalog["owner_payload"]["entries"][0]["freshness_state"] == "blocked"
+
+    freshness = app.inspect("aoa-kag", "read", view="freshness")
+    assert freshness["metadata"]["freshness_state"] == "blocked"
+    assert freshness["owner_payload"]["observation"]["effective_state"] == "blocked"
+
+    drift = app.inspect("aoa-kag", "read", view="drift")
+    assert drift["metadata"]["freshness_state"] == "blocked"
+    assert drift["owner_payload"]["observation"]["freshness_state"] == "blocked"
 
 
 @pytest.mark.parametrize(

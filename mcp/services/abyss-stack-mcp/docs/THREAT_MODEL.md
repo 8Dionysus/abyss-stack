@@ -21,8 +21,10 @@
   credential-bearing userinfo and forbidden path/query/fragment keys before
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
-  catches namespaced separator/camel-case forms plus concatenated prefix and
-  suffix boundaries while structurally valid compact JWT, PEM private-key, Basic/Bearer, and
+  catches namespaced separator/camel-case forms plus concatenated recognized
+  provider/consumer and credential-attribute boundaries without treating
+  arbitrary word substrings as credentials; structurally valid compact JWT,
+  PEM private-key, Basic/Bearer, and
   provider-token checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
@@ -58,8 +60,8 @@
   candidate;
 - required evidence timestamps cannot postdate the observation snapshot beyond
   the bounded clock-skew allowance;
-- read catalog and inspection downgrade links or freshness with causally future
-  timestamps, including nested evidence refs, to `blocked`;
+- read catalog and inspection downgrade a causally future observation envelope,
+  link, freshness timestamp, or nested evidence ref to `blocked`;
 - central proof cannot predate the canary evidence it names, and conflicting
   duplicate evidence timestamps are rejected before deduplication;
 - rollback-required links need explicit unexpired evidence and cannot fail late
