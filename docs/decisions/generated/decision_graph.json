@@ -1,36 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-<<<<<<< HEAD
-  "decision_count": 97,
-  "edge_count": 2187,
+  "decision_count": 100,
+  "edge_count": 2249,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 856,
-    "DATED": 97,
-    "GUARDED_BY": 277,
-    "HAS_STATUS": 97,
-    "HAS_SURFACE_CLASS": 250,
-    "IN_STACK_LANE": 211,
-    "NEXT_DECISION": 96,
-    "OWNED_BY_SURFACE": 103,
-    "OWNS_DECISION": 97,
+    "CITES_SOURCE_SURFACE": 870,
+    "DATED": 100,
+    "GUARDED_BY": 289,
+    "HAS_STATUS": 100,
+    "HAS_SURFACE_CLASS": 259,
+    "IN_STACK_LANE": 220,
+    "NEXT_DECISION": 99,
+    "OWNED_BY_SURFACE": 106,
+    "OWNS_DECISION": 100,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 101
-=======
-  "decision_count": 88,
-  "edge_count": 1962,
-  "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 780,
-    "DATED": 88,
-    "GUARDED_BY": 239,
-    "HAS_STATUS": 88,
-    "HAS_SURFACE_CLASS": 222,
-    "IN_STACK_LANE": 184,
-    "NEXT_DECISION": 87,
-    "OWNED_BY_SURFACE": 93,
-    "OWNS_DECISION": 88,
-    "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 91
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+    "UNDER_MECHANIC_PARENT": 104
   },
   "edges": [
     {
@@ -9310,52 +9293,31 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/AGENTS.md",
-=======
-      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/README.md",
-=======
-      "target": "source_surface:mechanics/governed-execution/parts/governed-runner/",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md",
-=======
-      "target": "source_surface:mechanics/governed-execution/parts/runtime-contracts/",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py",
-=======
-      "target": "source_surface:repo%3Aaoa-sdk/docs/decisions/AOA-SDK-D-0080-bind-abyss-stack-through-an-explicit-runtime-transport.md",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_analysis.py",
-=======
-      "target": "source_surface:scripts/aoa-agent-os-runtime",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "CITES_SOURCE_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0088",
-<<<<<<< HEAD
       "target": "source_surface:mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py",
       "type": "CITES_SOURCE_SURFACE"
     },
@@ -9556,13 +9518,10 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-=======
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "target": "date:2026-07-26",
       "type": "DATED"
     },
     {
-<<<<<<< HEAD
       "source": "decision:ABYSS-STACK-D-0089",
       "target": "guard_family:effect%20isolation",
       "type": "GUARDED_BY"
@@ -9579,34 +9538,10 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-=======
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:approval%20boundary",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:durable%20lifecycle",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:explicit%20adapter",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "guard_family:no%20hidden%20execution",
-      "type": "GUARDED_BY"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "target": "status:accepted",
       "type": "HAS_STATUS"
     },
     {
-<<<<<<< HEAD
       "source": "decision:ABYSS-STACK-D-0089",
       "target": "surface_class:MCP%20access%20plane",
       "type": "HAS_SURFACE_CLASS"
@@ -9628,29 +9563,10 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0089",
-=======
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:governed%20execution",
-      "type": "HAS_SURFACE_CLASS"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:integration",
-      "type": "HAS_SURFACE_CLASS"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
-      "target": "surface_class:runtime%20contract",
-      "type": "HAS_SURFACE_CLASS"
-    },
-    {
-      "source": "decision:ABYSS-STACK-D-0088",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "target": "stack_lane:decision%20lane",
       "type": "IN_STACK_LANE"
     },
     {
-<<<<<<< HEAD
       "source": "decision:ABYSS-STACK-D-0089",
       "target": "stack_lane:organ%20access%20fabric",
       "type": "IN_STACK_LANE"
@@ -10542,31 +10458,307 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0097",
+      "target": "decision:ABYSS-STACK-D-0098",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0097",
       "target": "owner_surface:mcp/services/abyss-stack-mcp/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0097",
       "target": "mechanic_parent:runtime-lifecycle",
-=======
-      "source": "decision:ABYSS-STACK-D-0088",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "source_surface:mechanics/governed-execution/parts/governed-runner/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "source_surface:mechanics/governed-execution/parts/runtime-contracts/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "source_surface:repo%3Aaoa-sdk/docs/decisions/AOA-SDK-D-0080-bind-abyss-stack-through-an-explicit-runtime-transport.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "source_surface:scripts/aoa-agent-os-runtime",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "date:2026-07-26",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "guard_family:approval%20boundary",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "guard_family:durable%20lifecycle",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "guard_family:explicit%20adapter",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "guard_family:no%20hidden%20execution",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "surface_class:governed%20execution",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "surface_class:integration",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "surface_class:runtime%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "stack_lane:decision%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
       "target": "stack_lane:federation%20seam",
       "type": "IN_STACK_LANE"
     },
     {
-      "source": "decision:ABYSS-STACK-D-0088",
+      "source": "decision:ABYSS-STACK-D-0098",
       "target": "stack_lane:runtime%20lane",
       "type": "IN_STACK_LANE"
     },
     {
-      "source": "decision:ABYSS-STACK-D-0088",
+      "source": "decision:ABYSS-STACK-D-0098",
+      "target": "decision:ABYSS-STACK-D-0099",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0098",
       "target": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
       "type": "OWNED_BY_SURFACE"
     },
     {
-      "source": "decision:ABYSS-STACK-D-0088",
+      "source": "decision:ABYSS-STACK-D-0098",
       "target": "mechanic_parent:governed-execution",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "source_surface:mechanics/runtime-repair/parts/a2a-return-dry-run/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "source_surface:mechanics/runtime-repair/parts/degradation-receipts/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "source_surface:repo%3Aaoa-playbooks/mechanics/scenario-composition/parts/plan-contours/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "source_surface:repo%3Aaoa-sdk/src/aoa_sdk/runtime_adapters/abyss_stack.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "date:2026-07-26",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "guard_family:durable%20lifecycle",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "guard_family:exact%20admission",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "guard_family:no%20hidden%20execution",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "guard_family:owner%20evidence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "surface_class:governed%20execution",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "surface_class:integration",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "surface_class:runtime%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "stack_lane:decision%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "stack_lane:federation%20seam",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "stack_lane:runtime%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "decision:ABYSS-STACK-D-0100",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0099",
+      "target": "mechanic_parent:governed-execution",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/tests/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "source_surface:repo%3Aaoa-sdk/docs/decisions/AOA-SDK-D-0087-project-runtime-approvals-before-plan-compilation.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "date:2026-07-26",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "guard_family:approval%20integrity",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "guard_family:exact%20admission",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "guard_family:no%20hidden%20execution",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "guard_family:owner%20evidence",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "surface_class:approval%20policy",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "surface_class:integration",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "surface_class:runtime%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "stack_lane:decision%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "stack_lane:federation%20seam",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "stack_lane:runtime%20lane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "owner_surface:mechanics/governed-execution/parts/agent-os-adapter/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0100",
+      "target": "mechanic_parent:governed-execution",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -11008,7 +11200,6 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0088",
       "type": "OWNS_DECISION"
-<<<<<<< HEAD
     },
     {
       "source": "repo:abyss-stack",
@@ -11054,38 +11245,36 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0097",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0098",
+      "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0099",
+      "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0100",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 969,
+  "node_count": 994,
   "node_type_counts": {
     "date": 27,
-    "decision": 97,
-    "guard_family": 135,
+    "decision": 100,
+    "guard_family": 142,
     "mechanic_parent": 10,
-    "owner_surface": 53,
+    "owner_surface": 54,
     "repo": 1,
-    "source_surface": 506,
+    "source_surface": 518,
     "stack_lane": 38,
     "status": 3,
-    "surface_class": 99
-=======
-    }
-  ],
-  "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 870,
-  "node_type_counts": {
-    "date": 27,
-    "decision": 88,
-    "guard_family": 111,
-    "mechanic_parent": 10,
-    "owner_surface": 47,
-    "repo": 1,
-    "source_surface": 467,
-    "stack_lane": 35,
-    "status": 3,
-    "surface_class": 81
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+    "surface_class": 101
   },
   "nodes": [
     {
@@ -12094,7 +12283,6 @@
       "type": "decision"
     },
     {
-<<<<<<< HEAD
       "date": "2026-07-25",
       "id": "decision:ABYSS-STACK-D-0088",
       "label": "ABYSS-STACK-D-0088",
@@ -12192,15 +12380,36 @@
       "posture": "accepted pre-final consumer handoff",
       "status": "accepted",
       "title": "ABYSS-STACK-D-0097 Codex Consumer Handoff Remains Owner-Composed",
-=======
+      "type": "decision"
+    },
+    {
       "date": "2026-07-26",
-      "id": "decision:ABYSS-STACK-D-0088",
-      "label": "ABYSS-STACK-D-0088",
-      "path": "docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md",
+      "id": "decision:ABYSS-STACK-D-0098",
+      "label": "ABYSS-STACK-D-0098",
+      "path": "docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md",
       "posture": "accepted rationale",
       "status": "accepted",
-      "title": "ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+      "title": "ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-26",
+      "id": "decision:ABYSS-STACK-D-0099",
+      "label": "ABYSS-STACK-D-0099",
+      "path": "docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md",
+      "posture": "accepted rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes",
+      "type": "decision"
+    },
+    {
+      "date": "2026-07-26",
+      "id": "decision:ABYSS-STACK-D-0100",
+      "label": "ABYSS-STACK-D-0100",
+      "path": "docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md",
+      "posture": "accepted rationale",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans",
       "type": "decision"
     },
     {
@@ -12231,6 +12440,11 @@
     {
       "id": "guard_family:approval%20boundary",
       "label": "approval boundary",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:approval%20integrity",
+      "label": "approval integrity",
       "type": "guard_family"
     },
     {
@@ -12359,7 +12573,6 @@
       "type": "guard_family"
     },
     {
-<<<<<<< HEAD
       "id": "guard_family:draft%20freeze",
       "label": "draft freeze",
       "type": "guard_family"
@@ -12367,10 +12580,11 @@
     {
       "id": "guard_family:dual%20support",
       "label": "dual support",
-=======
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:durable%20lifecycle",
       "label": "durable lifecycle",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "guard_family"
     },
     {
@@ -12389,13 +12603,18 @@
       "type": "guard_family"
     },
     {
-<<<<<<< HEAD
+      "id": "guard_family:exact%20admission",
+      "label": "exact admission",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:exact%20pin",
       "label": "exact pin",
-=======
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:explicit%20adapter",
       "label": "explicit adapter",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
       "type": "guard_family"
     },
     {
@@ -12534,7 +12753,6 @@
       "type": "guard_family"
     },
     {
-<<<<<<< HEAD
       "id": "guard_family:mutable%20control%20projection",
       "label": "mutable control projection",
       "type": "guard_family"
@@ -12550,12 +12768,13 @@
       "type": "guard_family"
     },
     {
-      "id": "guard_family:no%20semantic%20proxy",
-      "label": "no semantic proxy",
-=======
       "id": "guard_family:no%20hidden%20execution",
       "label": "no hidden execution",
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:no%20semantic%20proxy",
+      "label": "no semantic proxy",
       "type": "guard_family"
     },
     {
@@ -12581,6 +12800,11 @@
     {
       "id": "guard_family:owner%20credential",
       "label": "owner credential",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:owner%20evidence",
+      "label": "owner evidence",
       "type": "guard_family"
     },
     {
@@ -14880,6 +15104,21 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py",
+      "label": "mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json",
+      "label": "mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/governed-execution/parts/agent-os-adapter/tests/",
+      "label": "mechanics/governed-execution/parts/agent-os-adapter/tests/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/governed-execution/parts/autonomy-status/",
       "label": "mechanics/governed-execution/parts/autonomy-status/",
       "type": "source_surface"
@@ -15210,6 +15449,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/runtime-repair/parts/degradation-receipts/",
+      "label": "mechanics/runtime-repair/parts/degradation-receipts/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:memo/AGENTS.md",
       "label": "memo/AGENTS.md",
       "type": "source_surface"
@@ -15240,8 +15484,23 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:repo%3Aaoa-playbooks/mechanics/scenario-composition/parts/plan-contours/",
+      "label": "repo:aoa-playbooks/mechanics/scenario-composition/parts/plan-contours/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:repo%3Aaoa-sdk/docs/decisions/AOA-SDK-D-0080-bind-abyss-stack-through-an-explicit-runtime-transport.md",
       "label": "repo:aoa-sdk/docs/decisions/AOA-SDK-D-0080-bind-abyss-stack-through-an-explicit-runtime-transport.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:repo%3Aaoa-sdk/docs/decisions/AOA-SDK-D-0087-project-runtime-approvals-before-plan-compilation.md",
+      "label": "repo:aoa-sdk/docs/decisions/AOA-SDK-D-0087-project-runtime-approvals-before-plan-compilation.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:repo%3Aaoa-sdk/src/aoa_sdk/runtime_adapters/abyss_stack.py",
+      "label": "repo:aoa-sdk/src/aoa_sdk/runtime_adapters/abyss_stack.py",
       "type": "source_surface"
     },
     {
@@ -16052,6 +16311,11 @@
     {
       "id": "surface_class:agent%20skill%20projection",
       "label": "agent skill projection",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:approval%20policy",
+      "label": "approval policy",
       "type": "surface_class"
     },
     {

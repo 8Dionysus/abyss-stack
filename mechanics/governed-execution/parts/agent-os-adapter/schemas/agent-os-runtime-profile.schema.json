@@ -91,7 +91,8 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "executes_through_governed_runner_only",
+        "repository_mutation_through_governed_runner_only",
+        "read_only_lanes_are_artifact_bound",
         "selects_adapter",
         "authors_playbook_meaning",
         "produces_eval_verdict",
@@ -99,7 +100,10 @@
         "opens_network_listener"
       ],
       "properties": {
-        "executes_through_governed_runner_only": {
+        "repository_mutation_through_governed_runner_only": {
+          "const": true
+        },
+        "read_only_lanes_are_artifact_bound": {
           "const": true
         },
         "selects_adapter": {
@@ -190,11 +194,15 @@
       "required": [
         "scenario_id",
         "playbook_id",
+        "execution_lane",
+        "primary_input_artifact_kind",
+        "required_input_artifact_kinds",
         "owner_contour",
         "accepted_step_sets",
         "phase_step_map",
         "approval_operations",
         "runtime_approval_requirements",
+        "admitted_input_evidence_requirements",
         "runtime_evidence_requirements"
       ],
       "properties": {
@@ -205,6 +213,27 @@
         "playbook_id": {
           "type": "string",
           "pattern": "^AOA-P-[0-9]{4}$"
+        },
+        "execution_lane": {
+          "enum": [
+            "governed_repository_change",
+            "a2a_return_review",
+            "runtime_degradation_recovery"
+          ]
+        },
+        "primary_input_artifact_kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "required_input_artifact_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "owner_contour": {
           "$ref": "#/$defs/ownerContour"
@@ -234,20 +263,9 @@
         },
         "approval_operations": {
           "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "plan_freeze",
-            "landing"
-          ],
-          "properties": {
-            "plan_freeze": {
-              "type": "string",
-              "minLength": 1
-            },
-            "landing": {
-              "type": "string",
-              "minLength": 1
-            }
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "runtime_evidence_requirements": {
@@ -289,9 +307,48 @@
             }
           }
         },
+        "admitted_input_evidence_requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "artifact_kind",
+              "producer_owner",
+              "required_after_step_id",
+              "terminal_required",
+              "artifact_binding"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "artifact_kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "producer_owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required_after_step_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "terminal_required": {
+                "type": "boolean"
+              },
+              "artifact_binding": {
+                "const": "scenario_input"
+              }
+            }
+          }
+        },
         "runtime_approval_requirements": {
           "type": "array",
-          "minItems": 2,
+          "minItems": 0,
           "maxItems": 2,
           "items": {
             "type": "object",

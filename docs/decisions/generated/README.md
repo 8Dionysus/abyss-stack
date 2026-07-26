@@ -10,68 +10,36 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Counts
 
-<<<<<<< HEAD
-- Decisions: 97
-- Nodes: 969
-- Edges: 2187
-=======
-- Decisions: 88
-- Nodes: 870
-- Edges: 1962
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+- Decisions: 100
+- Nodes: 994
+- Edges: 2249
 
 ## Node Types
 
 - `date`: 27
-<<<<<<< HEAD
-- `decision`: 97
-- `guard_family`: 135
+- `decision`: 100
+- `guard_family`: 142
 - `mechanic_parent`: 10
-- `owner_surface`: 53
+- `owner_surface`: 54
 - `repo`: 1
-- `source_surface`: 506
+- `source_surface`: 518
 - `stack_lane`: 38
 - `status`: 3
-- `surface_class`: 99
+- `surface_class`: 101
 
 ## Edge Types
 
-- `CITES_SOURCE_SURFACE`: 856
-- `DATED`: 97
-- `GUARDED_BY`: 277
-- `HAS_STATUS`: 97
-- `HAS_SURFACE_CLASS`: 250
-- `IN_STACK_LANE`: 211
-- `NEXT_DECISION`: 96
-- `OWNED_BY_SURFACE`: 103
-- `OWNS_DECISION`: 97
+- `CITES_SOURCE_SURFACE`: 870
+- `DATED`: 100
+- `GUARDED_BY`: 289
+- `HAS_STATUS`: 100
+- `HAS_SURFACE_CLASS`: 259
+- `IN_STACK_LANE`: 220
+- `NEXT_DECISION`: 99
+- `OWNED_BY_SURFACE`: 106
+- `OWNS_DECISION`: 100
 - `SUPERSEDED_BY`: 2
-- `UNDER_MECHANIC_PARENT`: 101
-=======
-- `decision`: 88
-- `guard_family`: 111
-- `mechanic_parent`: 10
-- `owner_surface`: 47
-- `repo`: 1
-- `source_surface`: 467
-- `stack_lane`: 35
-- `status`: 3
-- `surface_class`: 81
-
-## Edge Types
-
-- `CITES_SOURCE_SURFACE`: 780
-- `DATED`: 88
-- `GUARDED_BY`: 239
-- `HAS_STATUS`: 88
-- `HAS_SURFACE_CLASS`: 222
-- `IN_STACK_LANE`: 184
-- `NEXT_DECISION`: 87
-- `OWNED_BY_SURFACE`: 93
-- `OWNS_DECISION`: 88
-- `SUPERSEDED_BY`: 2
-- `UNDER_MECHANIC_PARENT`: 91
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+- `UNDER_MECHANIC_PARENT`: 104
 
 ## Boundary
 

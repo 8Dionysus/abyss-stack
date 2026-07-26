@@ -246,6 +246,10 @@
 - [ABYSS-STACK-D-0062 Agent Skill Projection Validator Module](../ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0062-agent-skill-projection-validator-module.md`)
 - [ABYSS-STACK-D-0080 Diagnostic Skill Owner Home](../ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md) (`docs/decisions/ABYSS-STACK-D-0080-diagnostic-skill-owner-home.md`)
 
+## approval policy
+
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
 ## artifact consumer admission
 
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
@@ -340,7 +344,8 @@
 ## governed execution
 
 - [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 
 ## governed policy
 
@@ -380,7 +385,9 @@
 
 ## integration
 
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
 ## lifecycle
 
@@ -463,7 +470,9 @@
 ## runtime contract
 
 - [ABYSS-STACK-D-0053 Return Policy Validator Module](../ABYSS-STACK-D-0053-return-policy-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0053-return-policy-validator-module.md`)
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
 ## runtime docs
 

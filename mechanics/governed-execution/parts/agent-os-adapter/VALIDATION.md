@@ -13,13 +13,22 @@ python scripts/validate_nested_agents.py
 ```
 
 The focused suite uses a disposable Git repository, the real governed runner,
-injected safe gate/advisory/proposal providers, and a subprocess restore over
-the public bridge executable. The subprocess proof supplies a deliberately
-spoofed `PYTHONPATH`; the explicit interpreter and `-I` must still select the
-packaged SDK. A release gate must repeat the suite from a clean environment
-against the packaged `aoa-sdk`, not only an SDK source checkout.
+typed A2A and owner degradation artifacts, injected safe
+gate/advisory/proposal providers, and subprocess restores over the public
+bridge executable. The subprocess proof supplies a deliberately spoofed
+`PYTHONPATH`; the explicit interpreter and `-I` must still select the packaged
+SDK. Each golden success path starts with the installed public compiler v3
+chain and reaches the bridge without post-compilation plan mutation. A release
+gate must repeat the suite from a clean environment against the packaged
+`aoa-sdk`, not only an SDK source checkout.
 
 The C5 paired case performs the real governed mutation through both approvals,
 keeps eval and memory refs out of the runtime outcome, composes a complete
 external-owner chain in the installed SDK, and closes the durable runtime with
 only the exact final closeout ref crossing the bridge.
+
+The A2A paired cases prove successful and incomplete reviewed returns without
+calling the governed mutation backend. The degradation case proves partial
+progress, durable pause, restore in a new subprocess/Runner from the exact
+`SessionHandle`, duplicate-safe resume, external eval/memo/checkpoint
+composition, and final closeout.

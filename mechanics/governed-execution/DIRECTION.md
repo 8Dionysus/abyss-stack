@@ -13,7 +13,8 @@ Current posture:
 - keep local-worker context budget and return policy visible before execution
   widens
 - keep Agent OS plan admission exact, runtime-owned, durable, and limited to
-  explicitly mapped governed contours
+  explicitly mapped execution lanes; repository mutation alone delegates to
+  the governed runner
 
 Near direction:
 

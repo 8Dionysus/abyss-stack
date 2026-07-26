@@ -68,7 +68,9 @@
 - [ABYSS-STACK-D-0059 Runtime Route Contracts Validator Module](../ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0059-runtime-route-contracts-validator-module.md`)
 - [ABYSS-STACK-D-0060 Inference Pilot Compatibility Validator Module](../ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0060-inference-pilot-compatibility-validator-module.md`)
 - [ABYSS-STACK-D-0071 AoA Evals Local Port Write-Side MCP](../ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md) (`docs/decisions/ABYSS-STACK-D-0071-aoa-evals-local-port-write-side-mcp.md`)
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
 ## inference-pilots
 

@@ -192,7 +192,11 @@
 
 ## approval boundary
 
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+
+## approval integrity
+
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
 ## archive posture
 
@@ -285,7 +289,6 @@
 
 - [ABYSS-STACK-D-0050 Diagnostic Spine Validator Module](../ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0050-diagnostic-spine-validator-module.md`)
 
-<<<<<<< HEAD
 ## display-position audit
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
@@ -297,11 +300,11 @@
 ## dual support
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
-=======
+
 ## durable lifecycle
 
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
 
 ## effect boundary
 
@@ -320,15 +323,18 @@
 
 - [ABYSS-STACK-D-0055 Root Routes Validator Module](../ABYSS-STACK-D-0055-root-routes-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0055-root-routes-validator-module.md`)
 
-<<<<<<< HEAD
+## exact admission
+
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
 ## exact pin
 
 - [ABYSS-STACK-D-0096 Fail-Closed MCP Protocol Migration Lab](../ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md) (`docs/decisions/ABYSS-STACK-D-0096-fail-closed-mcp-protocol-migration-lab.md`)
-=======
+
 ## explicit adapter
 
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
 
 ## explicit teardown
 
@@ -431,7 +437,6 @@
 
 - [ABYSS-STACK-D-0041 Source Hygiene Validator Module](../ABYSS-STACK-D-0041-source-hygiene-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0041-source-hygiene-validator-module.md`)
 
-<<<<<<< HEAD
 ## mutable control projection
 
 - [ABYSS-STACK-D-0088 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0088-tree-of-sophia-human-review-workbench-boundary.md`)
@@ -444,14 +449,15 @@
 
 - [ABYSS-STACK-D-0093 Connector Read Contour Isolation](../ABYSS-STACK-D-0093-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md`)
 
+## no hidden execution
+
+- [ABYSS-STACK-D-0098 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0098-agent-os-subprocess-runtime-adapter.md`)
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
+
 ## no semantic proxy
 
 - [ABYSS-STACK-D-0095 Cross-Organ Orchestration Host Boundary](../ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md) (`docs/decisions/ABYSS-STACK-D-0095-cross-organ-orchestration-host-boundary.md`)
-=======
-## no hidden execution
-
-- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
->>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
 
 ## overlay skill install
 
@@ -477,6 +483,11 @@
 - [ABYSS-STACK-D-0091 Session Memory and ToS Read Contour Isolation](../ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0091-session-and-tos-read-contour-isolation.md`)
 - [ABYSS-STACK-D-0092 Memo and Evals Candidate Contour Isolation](../ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0092-memo-and-evals-candidate-contour-isolation.md`)
 - [ABYSS-STACK-D-0093 Connector Read Contour Isolation](../ABYSS-STACK-D-0093-connector-read-contour-isolation.md) (`docs/decisions/ABYSS-STACK-D-0093-connector-read-contour-isolation.md`)
+
+## owner evidence
+
+- [ABYSS-STACK-D-0099 Owner-Bound Agent OS Execution Lanes](../ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md) (`docs/decisions/ABYSS-STACK-D-0099-owner-bound-agent-os-execution-lanes.md`)
+- [ABYSS-STACK-D-0100 Project Runtime Approvals into Run Plans](../ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md) (`docs/decisions/ABYSS-STACK-D-0100-project-runtime-approvals-into-run-plans.md`)
 
 ## owner skill package
 

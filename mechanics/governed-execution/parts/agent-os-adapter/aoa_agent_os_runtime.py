@@ -457,12 +457,19 @@ class AgentOSRuntimeBridge:
                 "runtime_binding_mismatch",
                 "runtime binding contract differs from the runtime profile",
             )
-        if request_ref not in plan.scenario_binding.input_refs or not any(
+        admitted_input_refs = {
+            *plan.scenario_binding.input_refs,
+            *(
+                item.artifact_ref
+                for item in plan.scenario_binding.input_artifact_bindings
+            ),
+        }
+        if request_ref not in admitted_input_refs or not any(
             request_ref in step.input_refs for step in plan.steps
         ):
             raise AgentOSBridgeError(
                 "runtime_request_unbound",
-                "governed request is not an admitted plan input",
+                "runtime request is not an admitted plan input",
             )
         source_locations = _location_map(
             binding["source_locations"],
@@ -596,24 +603,46 @@ class AgentOSRuntimeBridge:
             }
             for item in plan.approval_requirements
         ]
+        profile_runtime_approval_requirements = [
+            {
+                "requirement_id": item.requirement_id,
+                "operation": item.operation,
+                "risk_class": item.risk_class,
+                "applies_to_step_ids": list(item.applies_to_step_ids),
+                "required_evidence_refs": [
+                    ref.model_dump(mode="json")
+                    for ref in item.required_evidence_refs
+                ],
+                "expires_after_seconds": item.expires_after_seconds,
+                "renewable": item.renewable,
+            }
+            for item in plan.runtime_profile.runtime_approval_requirements
+        ]
         if (
-            len(plan.approval_requirements) != 2
-            or actual_operations != approval_operations
+            actual_operations != approval_operations
             or any(
                 item.approval_owner != plan.runtime_profile.provenance
                 for item in plan.approval_requirements
             )
             or runtime_approval_requirements
             != compatibility["runtime_approval_requirements"]
+            or profile_runtime_approval_requirements
+            != compatibility["runtime_approval_requirements"]
         ):
             raise AgentOSBridgeError(
                 "approval_mapping_mismatch",
-                "plan must declare the two exact governed approval requirements",
+                (
+                    "plan differs from the exact governed approval requirements "
+                    "for its admitted contour"
+                ),
             )
         runtime_evidence_requirements = [
             item.model_dump(mode="json")
             for item in plan.evidence_requirements
-            if item.producer_owner == "abyss-stack"
+            if (
+                item.producer_owner == "abyss-stack"
+                and item.artifact_binding == "step_output"
+            )
         ]
         if (
             runtime_evidence_requirements
@@ -623,23 +652,184 @@ class AgentOSRuntimeBridge:
                 "runtime_evidence_contract_mismatch",
                 "plan runtime evidence requirements differ from the admitted contour",
             )
+        admitted_input_evidence_requirements = [
+            item.model_dump(mode="json")
+            for item in plan.evidence_requirements
+            if item.artifact_binding == "scenario_input"
+        ]
+        if (
+            admitted_input_evidence_requirements
+            != compatibility["admitted_input_evidence_requirements"]
+        ):
+            raise AgentOSBridgeError(
+                "runtime_input_evidence_contract_mismatch",
+                "plan input evidence requirements differ from the admitted contour",
+            )
+        actual_input_kinds = [
+            item.artifact_kind
+            for item in plan.scenario_binding.input_artifact_bindings
+        ]
+        if actual_input_kinds != compatibility["required_input_artifact_kinds"]:
+            raise AgentOSBridgeError(
+                "runtime_input_contract_mismatch",
+                "typed scenario inputs differ from the admitted contour",
+            )
+        self._assert_runtime_inputs(plan, binding, compatibility)
+
+    def _assert_runtime_inputs(
+        self,
+        plan: RunPlan,
+        binding: dict[str, Any],
+        compatibility: dict[str, Any],
+    ) -> None:
+        lane = str(compatibility["execution_lane"])
         request_path = Path(str(binding["request_path"]))
         try:
             request = json.loads(request_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise AgentOSBridgeError(
                 "runtime_request_unavailable",
-                "cannot load the governed request artifact",
+                "cannot load the runtime request artifact",
             ) from exc
+        if not isinstance(request, dict):
+            raise AgentOSBridgeError(
+                "runtime_request_mismatch",
+                "runtime request must be a JSON object",
+            )
+        if lane == "governed_repository_change":
+            if (
+                request.get("playbook_id") != compatibility["playbook_id"]
+                or not isinstance(request.get("goal"), str)
+                or not request["goal"].strip()
+            ):
+                raise AgentOSBridgeError(
+                    "runtime_request_mismatch",
+                    "governed request does not match the admitted playbook",
+                )
+            return
+
+        inputs = self._load_typed_scenario_inputs(plan, binding)
+        primary_kind = str(compatibility["primary_input_artifact_kind"])
+        primary = next(
+            (
+                item.artifact_ref
+                for item in plan.scenario_binding.input_artifact_bindings
+                if item.artifact_kind == primary_kind
+            ),
+            None,
+        )
         if (
-            not isinstance(request, dict)
-            or request.get("playbook_id") != compatibility["playbook_id"]
-            or not isinstance(request.get("goal"), str)
-            or not request["goal"].strip()
+            primary is None
+            or ProvenanceRef.model_validate(binding["request_ref"]) != primary
+            or inputs.get(primary_kind) != request
         ):
             raise AgentOSBridgeError(
                 "runtime_request_mismatch",
-                "governed request does not match the admitted playbook",
+                "runtime request is not the admitted primary typed input",
+            )
+        if lane == "a2a_return_review":
+            self._assert_a2a_inputs(inputs)
+            return
+        if lane == "runtime_degradation_recovery":
+            self._assert_runtime_degradation_input(inputs)
+            return
+        raise AgentOSBridgeError(
+            "runtime_profile_invalid",
+            f"unsupported execution lane: {lane}",
+        )
+
+    def _load_typed_scenario_inputs(
+        self,
+        plan: RunPlan,
+        binding: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        source_locations = _location_map(
+            binding["source_locations"],
+            id_field="artifact_ref",
+            label="source",
+        )
+        loaded: dict[str, dict[str, Any]] = {}
+        for item in plan.scenario_binding.input_artifact_bindings:
+            key = (item.artifact_ref.owner_repo, item.artifact_ref.artifact_ref)
+            path = Path(source_locations[key])
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise AgentOSBridgeError(
+                    "runtime_request_unavailable",
+                    f"cannot load typed scenario input {item.artifact_kind}",
+                ) from exc
+            if not isinstance(payload, dict):
+                raise AgentOSBridgeError(
+                    "runtime_request_mismatch",
+                    f"typed scenario input {item.artifact_kind} must be an object",
+                )
+            loaded[item.artifact_kind] = payload
+        return loaded
+
+    @staticmethod
+    def _assert_a2a_inputs(inputs: dict[str, dict[str, Any]]) -> None:
+        request = inputs["summon_request"]
+        decision = inputs["summon_decision"]
+        result = inputs["child_task_result"]
+        quest_passport = request.get("quest_passport")
+        summon_request = request.get("summon_request")
+        expected_outputs = request.get("expected_outputs")
+        remote_task = result.get("remote_task")
+        if (
+            not isinstance(quest_passport, dict)
+            or not isinstance(quest_passport.get("route_anchor"), str)
+            or not quest_passport["route_anchor"].strip()
+            or not isinstance(summon_request, dict)
+            or not isinstance(summon_request.get("parent_task_id"), str)
+            or not summon_request["parent_task_id"].strip()
+            or summon_request.get("review_required") is not True
+            or not isinstance(expected_outputs, list)
+            or not expected_outputs
+            or not all(isinstance(item, str) and item for item in expected_outputs)
+            or not isinstance(decision.get("allowed"), bool)
+            or not isinstance(decision.get("expected_outputs"), list)
+            or decision.get("expected_outputs") != expected_outputs
+            or result.get("reviewed") is not True
+            or result.get("review_status") != "reviewed"
+            or not isinstance(remote_task, dict)
+            or not isinstance(remote_task.get("task_id"), str)
+            or not remote_task["task_id"].strip()
+            or remote_task.get("parent_task_id")
+            != summon_request["parent_task_id"]
+            or remote_task.get("state")
+            not in {"completed", "failed", "cancelled"}
+            or not isinstance(remote_task.get("returned_artifacts"), list)
+        ):
+            raise AgentOSBridgeError(
+                "runtime_request_mismatch",
+                "A2A inputs do not form one reviewed parent/decision/return chain",
+            )
+
+    @staticmethod
+    def _assert_runtime_degradation_input(
+        inputs: dict[str, dict[str, Any]],
+    ) -> None:
+        receipt = inputs["owner_runtime_receipt"]
+        containment = receipt.get("containment")
+        if (
+            receipt.get("schema_version") != "service_degradation_receipt_v1"
+            or receipt.get("repo") != "abyss-stack"
+            or receipt.get("degraded") is not True
+            or receipt.get("operator_visible") is not True
+            or not isinstance(receipt.get("receipt_id"), str)
+            or not receipt["receipt_id"].strip()
+            or not isinstance(receipt.get("service"), str)
+            or not receipt["service"].strip()
+            or not isinstance(containment, dict)
+            or not isinstance(containment.get("kind"), str)
+            or not isinstance(containment.get("value"), str)
+            or not isinstance(receipt.get("evidence_refs"), list)
+            or not receipt["evidence_refs"]
+        ):
+            raise AgentOSBridgeError(
+                "runtime_request_mismatch",
+                "runtime degradation input is not an operator-visible owner receipt",
             )
 
     def _observe_snapshot(
@@ -744,6 +934,7 @@ class AgentOSRuntimeBridge:
             "approval_requests": [],
             "approval_decisions": [],
             "outcome": None,
+            "execution_lane": None,
             "governed_run_id": None,
             "last_observation": None,
             "runtime_artifact_refs": [],
@@ -888,6 +1079,8 @@ class AgentOSRuntimeBridge:
                 plan,
                 session,
                 profile,
+                binding,
+                compatibility,
                 command,
             )
         elif isinstance(command, CancelCommand):
@@ -912,7 +1105,7 @@ class AgentOSRuntimeBridge:
                 state,
                 command,
                 profile,
-                "recovery_not_supported_for_bounded_change_v1",
+                "recovery_not_admitted_by_plan",
             )
 
         self._emit(
@@ -1002,6 +1195,28 @@ class AgentOSRuntimeBridge:
         compatibility: dict[str, Any],
         command: StartCommand,
     ) -> str | None:
+        lane = str(compatibility["execution_lane"])
+        state["execution_lane"] = lane
+        if lane == "a2a_return_review":
+            return self._start_a2a_return_review(
+                state,
+                plan,
+                session,
+                profile,
+                binding,
+                command,
+            )
+        if lane == "runtime_degradation_recovery":
+            return self._start_runtime_degradation_recovery(
+                state,
+                plan,
+                session,
+                profile,
+                binding,
+                command,
+            )
+        if lane != "governed_repository_change":
+            return "execution_lane_unsupported"
         policy_path = self._policy_path(plan, binding)
         kwargs: dict[str, Any] = {
             "until": "milestone",
@@ -1054,14 +1269,222 @@ class AgentOSRuntimeBridge:
         self._store_approval_request(state, profile, request)
         return None
 
+    def _start_a2a_return_review(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        profile: RuntimeProfile,
+        binding: dict[str, Any],
+        command: StartCommand,
+    ) -> str | None:
+        self._transition(
+            state,
+            profile,
+            state_after="running",
+            trigger="start",
+            at=command.issued_at,
+        )
+        inputs = self._load_typed_scenario_inputs(plan, binding)
+        self._retain_scenario_input_artifacts(state, plan, session, binding)
+        request = inputs["summon_request"]
+        decision = inputs["summon_decision"]
+        child_result = inputs["child_task_result"]
+        expected_outputs = list(request["expected_outputs"])
+        remote_task = dict(child_result["remote_task"])
+        returned_artifacts = list(remote_task["returned_artifacts"])
+        complete_return = (
+            decision["allowed"] is True
+            and set(expected_outputs).issubset(returned_artifacts)
+        )
+        task_id = str(remote_task["task_id"])
+        parent_task_id = str(remote_task["parent_task_id"])
+        target = {
+            "artifact_kind": "codex_local_target",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "execution_surface": decision.get("execution_surface"),
+            "lane": decision.get("lane"),
+            "capability_execution_claimed": False,
+        }
+        return_plan = {
+            "artifact_kind": "return_plan",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "decision": "return" if complete_return else "safe_stop",
+            "returned_artifacts": returned_artifacts,
+            "missing_artifacts": sorted(set(expected_outputs) - set(returned_artifacts)),
+            "reviewed_child_result": True,
+        }
+        checkpoint_plan = {
+            "artifact_kind": "checkpoint_bridge_plan",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "review_status": "candidate",
+            "anchor_artifacts": returned_artifacts,
+            "checkpoint_acceptance_claimed": False,
+        }
+        eval_packet = {
+            "artifact_kind": "a2a_return_eval_packet",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "candidate_status": "unreviewed",
+            "eval_verdict_claimed": False,
+        }
+        dry_run = {
+            "artifact_kind": "runtime_closeout_dry_run_receipt",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "complete_return": complete_return,
+            "dry_run": True,
+            "live_automation": False,
+            "closeout_grant_claimed": False,
+        }
+        for artifact in (
+            target,
+            return_plan,
+            checkpoint_plan,
+            eval_packet,
+            dry_run,
+        ):
+            self._write_lane_artifact(state, session, artifact)
+        summary = {
+            "status": "pass" if complete_return else "fail",
+            "execution_lane": "a2a_return_review",
+            "parent_task_id": parent_task_id,
+            "child_task_id": task_id,
+            "returned_artifacts": returned_artifacts,
+            "missing_artifacts": return_plan["missing_artifacts"],
+            "updated_at": self.clock().isoformat(),
+        }
+        if complete_return:
+            self._transition(
+                state,
+                profile,
+                state_after="completed",
+                trigger="runtime_completed",
+                at=self.clock(),
+            )
+            self._record_outcome(
+                state,
+                plan,
+                session,
+                profile,
+                execution_status="succeeded",
+                failure_codes=(),
+                governed_summary=summary,
+            )
+            return None
+        failure_code = "a2a_incomplete_return"
+        self._transition(
+            state,
+            profile,
+            state_after="failed",
+            trigger="runtime_failed",
+            at=self.clock(),
+            failure_code=failure_code,
+        )
+        self._record_outcome(
+            state,
+            plan,
+            session,
+            profile,
+            execution_status="failed",
+            failure_codes=(failure_code,),
+            governed_summary=summary,
+        )
+        return None
+
+    def _start_runtime_degradation_recovery(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        profile: RuntimeProfile,
+        binding: dict[str, Any],
+        command: StartCommand,
+    ) -> str | None:
+        self._transition(
+            state,
+            profile,
+            state_after="running",
+            trigger="start",
+            at=command.issued_at,
+        )
+        receipt = self._load_typed_scenario_inputs(
+            plan,
+            binding,
+        )["owner_runtime_receipt"]
+        self._retain_scenario_input_artifacts(state, plan, session, binding)
+        stress_lane = {
+            "artifact_kind": "runtime_stress_lane",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "source_receipt_id": receipt["receipt_id"],
+            "service": receipt["service"],
+            "incident_class": receipt.get("incident_class"),
+            "containment": receipt["containment"],
+            "degraded": True,
+            "mutation_widening_blocked": True,
+        }
+        reentry_gate = {
+            "artifact_kind": "runtime_reentry_gate",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "source_receipt_id": receipt["receipt_id"],
+            "service": receipt["service"],
+            "status": "held_for_resume",
+            "operator_visible": True,
+            "evidence_refs": receipt["evidence_refs"],
+        }
+        self._write_lane_artifact(state, session, stress_lane)
+        self._write_lane_artifact(state, session, reentry_gate)
+        state["degradation_receipt"] = receipt
+        self._transition(
+            state,
+            profile,
+            state_after="paused",
+            trigger="pause",
+            at=self.clock(),
+        )
+        return None
+
     def _resume(
         self,
         state: dict[str, Any],
         plan: RunPlan,
         session: SessionHandle,
         profile: RuntimeProfile,
+        binding: dict[str, Any],
+        compatibility: dict[str, Any],
         command: ResumeCommand,
     ) -> None:
+        lane = str(compatibility["execution_lane"])
+        if lane == "runtime_degradation_recovery":
+            self._resume_runtime_degradation_recovery(
+                state,
+                plan,
+                session,
+                profile,
+                binding,
+                command,
+            )
+            return
+        if lane != "governed_repository_change":
+            raise AgentOSBridgeError(
+                "resume_lane_invalid",
+                f"execution lane {lane} does not admit resume",
+            )
         self._transition(
             state,
             profile,
@@ -1140,6 +1563,83 @@ class AgentOSRuntimeBridge:
             recover_from_event_sequence=RunStatus.model_validate(
                 state["status"]
             ).last_event_sequence,
+        )
+
+    def _resume_runtime_degradation_recovery(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        profile: RuntimeProfile,
+        binding: dict[str, Any],
+        command: ResumeCommand,
+    ) -> None:
+        self._transition(
+            state,
+            profile,
+            state_after="running",
+            trigger="resume",
+            at=command.issued_at,
+        )
+        receipt = self._load_typed_scenario_inputs(
+            plan,
+            binding,
+        )["owner_runtime_receipt"]
+        reentry_gate = {
+            "artifact_kind": "runtime_reentry_gate",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "source_receipt_id": receipt["receipt_id"],
+            "service": receipt["service"],
+            "status": "reentered",
+            "operator_visible": True,
+            "evidence_refs": receipt["evidence_refs"],
+        }
+        proof_handoff = {
+            "artifact_kind": "proof_handoff_candidate",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "source_receipt_id": receipt["receipt_id"],
+            "candidate_status": "unreviewed",
+            "eval_verdict_claimed": False,
+        }
+        closeout = {
+            "artifact_kind": "runtime_closeout_receipt",
+            "schema_version": "abyss_stack_agent_os_lane_artifact_v1",
+            "session_id": session.session_id,
+            "source_receipt_id": receipt["receipt_id"],
+            "service": receipt["service"],
+            "interruption_observed": True,
+            "resume_observed": True,
+            "reentry_status": "reentered",
+            "closeout_grant_claimed": False,
+        }
+        for artifact in (reentry_gate, proof_handoff, closeout):
+            self._write_lane_artifact(state, session, artifact)
+        summary = {
+            "status": "pass",
+            "execution_lane": "runtime_degradation_recovery",
+            "source_receipt_id": receipt["receipt_id"],
+            "service": receipt["service"],
+            "interruption_observed": True,
+            "resume_observed": True,
+            "updated_at": self.clock().isoformat(),
+        }
+        self._transition(
+            state,
+            profile,
+            state_after="completed",
+            trigger="runtime_completed",
+            at=self.clock(),
+        )
+        self._record_outcome(
+            state,
+            plan,
+            session,
+            profile,
+            execution_status="succeeded",
+            failure_codes=(),
+            governed_summary=summary,
         )
 
     def _apply_approval(
@@ -1424,9 +1924,15 @@ class AgentOSRuntimeBridge:
             "schema_version": "abyss_stack_agent_os_runtime_result_v1",
             "session_id": session.session_id,
             "plan_digest": plan.plan_digest,
+            "execution_lane": state.get("execution_lane"),
             "governed_run_id": state.get("governed_run_id"),
             "execution_status": execution_status,
-            "governed_summary": governed_summary,
+            "runtime_summary": governed_summary,
+            "governed_summary": (
+                governed_summary
+                if state.get("execution_lane") == "governed_repository_change"
+                else None
+            ),
         }
         _atomic_write_json(runtime_result_path, result_payload)
         runtime_result_ref = ProvenanceRef(
@@ -1440,7 +1946,7 @@ class AgentOSRuntimeBridge:
             ),
             schema_version="abyss_stack_agent_os_runtime_result_v1",
         )
-        evidence_refs: tuple[EvidenceBundleRef, ...] = ()
+        evidence_refs = self._scenario_input_evidence_refs(plan)
         if governed_summary is not None:
             evidence_ref = self._runtime_evidence_bundle(
                 state,
@@ -1448,7 +1954,7 @@ class AgentOSRuntimeBridge:
                 session,
                 governed_summary,
             )
-            evidence_refs = (evidence_ref,)
+            evidence_refs = (*evidence_refs, evidence_ref)
             self._emit(
                 state,
                 profile,
@@ -1483,6 +1989,42 @@ class AgentOSRuntimeBridge:
         )
         return outcome
 
+    @staticmethod
+    def _scenario_input_evidence_refs(
+        plan: RunPlan,
+    ) -> tuple[EvidenceBundleRef, ...]:
+        inputs = {
+            item.artifact_kind: item.artifact_ref
+            for item in plan.scenario_binding.input_artifact_bindings
+        }
+        refs: list[EvidenceBundleRef] = []
+        for requirement in plan.evidence_requirements:
+            if requirement.artifact_binding != "scenario_input":
+                continue
+            provenance = inputs.get(requirement.artifact_kind)
+            if (
+                provenance is None
+                or provenance.owner_repo != requirement.producer_owner
+            ):
+                raise AgentOSBridgeError(
+                    "runtime_input_evidence_contract_mismatch",
+                    (
+                        "scenario input evidence does not retain the declared "
+                        f"producer for {requirement.requirement_id}"
+                    ),
+                )
+            refs.append(
+                EvidenceBundleRef(
+                    ref_id=(
+                        "scenario-input-evidence:"
+                        f"{requirement.requirement_id}"
+                    ),
+                    provenance=provenance,
+                    satisfies_requirement_ids=(requirement.requirement_id,),
+                )
+            )
+        return tuple(refs)
+
     def _runtime_evidence_bundle(
         self,
         state: dict[str, Any],
@@ -1493,26 +2035,33 @@ class AgentOSRuntimeBridge:
         requirement_ids = [
             item.requirement_id
             for item in plan.evidence_requirements
-            if item.producer_owner == "abyss-stack"
+            if (
+                item.producer_owner == "abyss-stack"
+                and item.artifact_binding == "step_output"
+            )
         ]
-        governed_run_dir = self._governed_root() / self._governed_run_id(state)
-        artifacts = []
-        if governed_run_dir.exists():
-            for path in sorted(governed_run_dir.rglob("*")):
-                if path.is_file():
-                    artifacts.append(
-                        {
-                            "path": str(path.relative_to(governed_run_dir)),
-                            "digest": sha256_file(path),
-                        }
-                    )
+        artifacts = list(state["runtime_artifact_refs"])
+        governed_run_id = state.get("governed_run_id")
+        if isinstance(governed_run_id, str) and governed_run_id:
+            governed_run_dir = self._governed_root() / governed_run_id
+            if governed_run_dir.exists():
+                for path in sorted(governed_run_dir.rglob("*")):
+                    if path.is_file():
+                        artifacts.append(
+                            {
+                                "artifact_kind": "governed_run_artifact",
+                                "path": str(path.relative_to(governed_run_dir)),
+                                "digest": sha256_file(path),
+                            }
+                        )
         payload = {
             "schema_version": "abyss_stack_agent_os_evidence_bundle_v1",
             "session_id": session.session_id,
             "plan_digest": plan.plan_digest,
-            "governed_run_id": state.get("governed_run_id"),
+            "execution_lane": state.get("execution_lane"),
+            "governed_run_id": governed_run_id,
             "satisfies_requirement_ids": requirement_ids,
-            "governed_summary": governed_summary,
+            "runtime_summary": governed_summary,
             "artifacts": artifacts,
             "boundaries": {
                 "runtime_evidence_only": True,
@@ -1538,6 +2087,81 @@ class AgentOSRuntimeBridge:
                 schema_version="abyss_stack_agent_os_evidence_bundle_v1",
             ),
             satisfies_requirement_ids=tuple(requirement_ids),
+        )
+
+    def _write_lane_artifact(
+        self,
+        state: dict[str, Any],
+        session: SessionHandle,
+        payload: dict[str, Any],
+    ) -> None:
+        artifact_kind = payload.get("artifact_kind")
+        if not isinstance(artifact_kind, str) or not artifact_kind:
+            raise AgentOSBridgeError(
+                "runtime_artifact_invalid",
+                "lane artifact must declare artifact_kind",
+            )
+        path = (
+            self.state_root
+            / "lane-artifacts"
+            / _session_token(session.session_id)
+            / f"{artifact_kind}.json"
+        )
+        _atomic_write_json(path, payload)
+        retained = [
+            item
+            for item in state["runtime_artifact_refs"]
+            if item.get("artifact_kind") != artifact_kind
+        ]
+        retained.append(
+            {
+                "artifact_kind": artifact_kind,
+                "path": str(path),
+                "digest": sha256_file(path),
+            }
+        )
+        state["runtime_artifact_refs"] = sorted(
+            retained,
+            key=lambda item: str(item["artifact_kind"]),
+        )
+
+    def _retain_scenario_input_artifacts(
+        self,
+        state: dict[str, Any],
+        plan: RunPlan,
+        session: SessionHandle,
+        binding: dict[str, Any],
+    ) -> None:
+        source_locations = _location_map(
+            binding["source_locations"],
+            id_field="artifact_ref",
+            label="source",
+        )
+        retained = list(state["runtime_artifact_refs"])
+        for item in plan.scenario_binding.input_artifact_bindings:
+            key = (item.artifact_ref.owner_repo, item.artifact_ref.artifact_ref)
+            path = Path(source_locations[key])
+            artifact_kind = f"scenario_input:{item.artifact_kind}"
+            retained = [
+                existing
+                for existing in retained
+                if existing.get("artifact_kind") != artifact_kind
+            ]
+            retained.append(
+                {
+                    "artifact_kind": artifact_kind,
+                    "owner_repo": item.artifact_ref.owner_repo,
+                    "artifact_ref": item.artifact_ref.artifact_ref,
+                    "path": str(path),
+                    "digest": sha256_file(path),
+                    "production_claimed": False,
+                    "observed_by_runtime": True,
+                    "session_id": session.session_id,
+                }
+            )
+        state["runtime_artifact_refs"] = sorted(
+            retained,
+            key=lambda item: str(item["artifact_kind"]),
         )
 
     def _build_approval_request(

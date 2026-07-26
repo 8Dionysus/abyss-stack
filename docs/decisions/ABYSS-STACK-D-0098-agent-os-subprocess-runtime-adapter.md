@@ -1,6 +1,6 @@
 # Agent OS Subprocess Runtime Adapter
 
-- Decision ID: ABYSS-STACK-D-0088
+- Decision ID: ABYSS-STACK-D-0098
 - Status: accepted
 - Date: 2026-07-26
 - Owner surface: `mechanics/governed-execution/parts/agent-os-adapter/`

@@ -206,12 +206,14 @@ The current direction is:
 ## Horizon: Agent OS Governed Execution
 
 - Current posture:
-  one local subprocess adapter admits only the exact
-  `bounded_change_safe` / `AOA-P-0011` contour and delegates effects to the
-  existing governed runner with two explicit approvals and durable replay.
+  one local subprocess adapter admits three exact owner-pinned contours:
+  governed `bounded_change_safe`, reviewed A2A return, and runtime degradation
+  pause/restore/resume. Only repository mutation delegates to the governed
+  runner and its two explicit approvals.
 - Next honest move:
-  compose runtime outcomes with owner-produced eval verdicts and memory
-  receipts outside the runtime adapter before considering another scenario.
+  exercise conflicting and incomplete multi-agent returns plus isolated
+  service-failure restoration, while composing eval verdicts and memory
+  receipts outside the runtime adapter.
 - Guardrail:
   an SDK plan is not runtime permission, runtime evidence is not an eval
   verdict, and runtime completion is not final reviewed closeout.

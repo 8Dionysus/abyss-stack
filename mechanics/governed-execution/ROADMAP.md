@@ -6,16 +6,17 @@
 - keep autonomy status as a runtime readout
 - keep return policy config, examples, and schemas package-local
 - keep candidate exports as handoff artifacts for owner review
-- keep the first Agent OS adapter limited to the exact
-  `bounded_change_safe` / `AOA-P-0011` governed contour
+- keep the Agent OS adapter limited to the three exact proven contours:
+  governed `bounded_change_safe`, read-only reviewed A2A return, and
+  degradation pause/restore/resume
 
 ## Next candidates
 
 - split large governed-runner internals only when the tests can stay tight
 - add a package-level candidate export index if exported families multiply
 - add stronger invariant tests for return policy if recurrence behavior grows
-- widen Agent OS scenarios only after a new owner contour, runtime phase map,
-  failure matrix, and paired SDK/runtime proof exist
+- widen Agent OS scenarios only after a new owner contour, explicit execution
+  lane, runtime phase map, failure matrix, and paired SDK/runtime proof exist
 
 ## Stop-lines
 

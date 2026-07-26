@@ -34,7 +34,7 @@ bridge has no network listener and starts no background service.
 
 ## Exact admission
 
-Before mutation the bridge verifies:
+Before execution the bridge verifies:
 
 - exact runtime profile and adapter contract digest;
 - exact plan, session, and binding;
@@ -42,17 +42,22 @@ Before mutation the bridge verifies:
 - raw file digest for every source and ABI location in the plan snapshot;
 - exact admitted scenario, playbook, contour ABI, active step set, and effect
   classes from `runtime-profile.v1.json`;
-- exact stack-owned evidence requirements; caller-added or altered requirements
-  are rejected rather than claimed by a generic runtime bundle;
-- exactly two declared approval requirements, including owner, risk, step
-  scope, evidence refs, expiry, and renewal posture, mapped to `plan_freeze`
-  and `landing`;
+- exact typed scenario inputs and their original producer provenance;
+- exact scenario-scoped runtime approval projection in `RuntimeProfile`;
+- exact input and stack-owned output evidence requirements; caller-added or
+  altered requirements are rejected rather than claimed by a generic bundle;
+- the exact approval posture for the lane. Repository mutation requires the
+  two governed `plan_freeze` and `landing` approvals; the admitted read-only
+  lanes require none. The descriptor, profile projection, and compiled plan
+  must agree in typed form;
 - governed policy supplied through the profile constraint ref.
 
 The bridge never derives a request from a goal or playbook ID and never
 searches for source paths.
 
-## Lifecycle mapping
+## Lifecycle mappings
+
+### Governed repository change
 
 ```text
 start
@@ -71,16 +76,48 @@ resume
   -> completed or failed
 ```
 
-Rejection cancels the Agent OS session. Exact command replay is effect-free;
-idempotency-key payload drift is rejected. Applied command receipts bind the
-entire emitted event slice and are persisted with the runtime state.
+### Reviewed A2A return
+
+```text
+start
+  -> inspect exact summon request/decision/reviewed child result
+  -> emit runtime-owned target, return, checkpoint, eval-candidate, and
+     dry-run closeout artifacts
+  -> completed or failed(a2a_incomplete_return)
+```
+
+This lane does not summon or execute the child. A reviewed terminal child may
+have failed and still support return when every expected artifact is present.
+Missing output remains a typed runtime failure.
+
+### Runtime degradation recovery
+
+```text
+start
+  -> inspect exact operator-visible owner degradation receipt
+  -> record bounded stress/re-entry artifacts
+  -> paused
+
+restore exact SessionHandle in a new Runner/process
+resume
+  -> revalidate the snapshot and owner receipt
+  -> emit re-entry/proof-candidate/runtime-closeout artifacts
+  -> completed
+```
+
+The contour's retry policy admits no hidden retry, so the lane uses explicit
+durable pause/resume rather than forging a `RecoverCommand`. Rejection cancels
+the Agent OS session. Exact command replay is effect-free; idempotency-key
+payload drift is rejected. Applied command receipts bind the entire emitted
+event slice and are persisted with runtime state.
 
 ## Evidence stop line
 
-The bridge may emit a runtime evidence bundle containing governed-run
-artifacts and a runtime outcome referencing `result.summary.json`. It never
-turns a review-packet candidate into an eval verdict, memory receipt,
-checkpoint acceptance, or final closeout receipt.
+The bridge may emit a runtime evidence bundle containing governed-run or
+lane-local artifacts. Scenario inputs cross the chain as original-owner refs;
+the bridge does not re-sign them. It never turns a review-packet or proof
+candidate into an eval verdict, memory receipt, checkpoint acceptance, or
+final closeout receipt.
 
 For C5 closeout, the SDK must first validate a complete immutable
 `EvidenceChain`. Only its exact `CloseoutBundleRef` crosses this transport
