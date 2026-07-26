@@ -90,17 +90,22 @@ interpreter replacement invalidates reuse. Provisioning is explicit, refuses
 to replace the environment while either plane is active or its state cannot be
 observed, and does not stop, start, or register either plane. After the units
 are linked and reloaded, each
-process holds a shared lock for its lifetime; changed provisioning holds the
-exclusive lock and checks stopped state both before building and immediately
-before swapping the verified environment. It builds only from a private copy
+process holds shared source-projection and runtime locks for its lifetime;
+changed provisioning holds the exclusive runtime lock and checks stopped state
+both before building and immediately before swapping the verified environment.
+It builds only from a private copy
 whose source and lock digests match the initial deployed snapshot, then
 rechecks deployed source immediately before publishing the marker and swapping
 the environment. Unit link/reload and runtime provisioning are separate
 transactions so the loaded units cannot lag behind the locking contract.
 Before every managed launch, a read-only unit condition recomputes the deployed
 source-and-lock identity and the complete runtime-content digest, including
-the resolved interpreter bytes; source drift or runtime tampering therefore
-leaves the unit inactive until explicit reprovisioning succeeds.
+the resolved interpreter bytes. The final launch path then takes the shared
+source-projection and runtime locks, repeats that verification under both
+locks, and `exec`s the server without releasing either lock. Source sync,
+runtime replacement, and process launch are therefore serialized for the full
+service lifetime; source drift or runtime tampering leaves the unit inactive
+until explicit stop, sync, and reprovisioning succeed.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence

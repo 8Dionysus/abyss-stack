@@ -618,6 +618,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             source_file = service_root / "service.py"
             source_file.write_text("VALUE = 1\n", encoding="utf-8")
             pip_log = root / "pip.log"
+            server_log = root / "server.log"
             bootstrap = root / "fake-python"
             bootstrap.write_text(
                 "#!/usr/bin/env bash\n"
@@ -630,6 +631,24 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "  exit 66\n"
                 "fi\n"
                 "shift\n"
+                "if [[ \"$1\" == \"-B\" && \"$2\" == \"-m\" && "
+                "\"$3\" == \"abyss_stack_mcp.server\" ]]; then\n"
+                "  source_lock=\"${AOA_STACK_ROOT}/Services/"
+                "abyss-stack-mcp/.source-projection.lock\"\n"
+                "  runtime_lock=\"${AOA_STACK_ROOT}/Services/"
+                "abyss-stack-mcp/.runtime-provision.lock\"\n"
+                "  if /usr/bin/flock --exclusive --nonblock "
+                "\"$source_lock\" /usr/bin/true; then\n"
+                "    exit 67\n"
+                "  fi\n"
+                "  if /usr/bin/flock --exclusive --nonblock "
+                "\"$runtime_lock\" /usr/bin/true; then\n"
+                "    exit 68\n"
+                "  fi\n"
+                "  printf 'verified-and-locked\\n' > "
+                "\"$ABYSS_STACK_MCP_TEST_SERVER_LOG\"\n"
+                "  exit 0\n"
+                "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"venv\" ]]; then\n"
                 "  mkdir -p \"$3/bin\"\n"
                 "  ln -s \"$0\" \"$3/bin/python\"\n"
@@ -700,9 +719,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "exec_path=/usr/bin/flock\n"
                 "exec_start=\"/usr/bin/flock --shared --no-fork "
                 "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
+                ".source-projection.lock /usr/bin/flock --shared --no-fork "
+                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/"
                 ".runtime-provision.lock /usr/bin/env "
-                "${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv/bin/python "
-                "-I -B -m abyss_stack_mcp.server\"\n"
+                "${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd "
+                "--launch-verified-abyss-stack-mcp\"\n"
                 "if [[ \"${ABYSS_STACK_MCP_TEST_UNLOADED_UNIT:-}\" == "
                 "\"$unit\" ]]; then\n"
                 "  load_state=not-found\n"
@@ -747,6 +768,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "AOA_CONFIGS_ROOT": str(stack_root / "Configs"),
                     "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap_link),
                     "ABYSS_STACK_MCP_TEST_PIP_LOG": str(pip_log),
+                    "ABYSS_STACK_MCP_TEST_SERVER_LOG": str(server_log),
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
                     "PATH": f"{fake_bin}:{env['PATH']}",
@@ -910,6 +932,32 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(verified.returncode, 0, verified.stderr)
             self.assertEqual(verified.stdout, "")
+
+            launched = subprocess.run(
+                [
+                    "/usr/bin/flock",
+                    "--shared",
+                    "--no-fork",
+                    str(source_projection_lock),
+                    "/usr/bin/flock",
+                    "--shared",
+                    "--no-fork",
+                    str(runtime_lock),
+                    "/usr/bin/env",
+                    str(INSTALL_SYSTEMD),
+                    "--launch-verified-abyss-stack-mcp",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(launched.returncode, 0, launched.stderr)
+            self.assertEqual(
+                server_log.read_text(encoding="utf-8"),
+                "verified-and-locked\n",
+            )
 
             second = subprocess.run(
                 command,
@@ -1273,6 +1321,16 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             result.stderr,
         )
 
+        launch_result = self.run_install_systemd(
+            "--launch-verified-abyss-stack-mcp",
+            "--restart-now",
+        )
+        self.assertNotEqual(launch_result.returncode, 0)
+        self.assertIn(
+            "verified abyss-stack MCP launch must be a standalone unit action",
+            launch_result.stderr,
+        )
+
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -1583,13 +1641,23 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         deployed_entrypoint = (
             "ExecStart=/usr/bin/flock --shared --no-fork "
             "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
+            ".source-projection.lock /usr/bin/flock --shared --no-fork "
+            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/"
             ".runtime-provision.lock /usr/bin/env "
-            "/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python "
-            "-I -B -m abyss_stack_mcp.server"
+            "/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd "
+            "--launch-verified-abyss-stack-mcp"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
             "abyss-stack-mcp/venv/bin/python"
+        )
+        source_lock_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/.source-projection.lock"
+        )
+        runtime_lock_condition = (
+            "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
+            "abyss-stack-mcp/.runtime-provision.lock"
         )
         runtime_exec_condition = (
             "ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/"
@@ -1598,6 +1666,13 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         runtime_verifier_condition = (
             "ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/"
             "aoa-install-systemd --verify-abyss-stack-mcp-runtime"
+        )
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        self.assertIn("aoa_launch_verified_abyss_stack_mcp()", installer)
+        self.assertIn(
+            '"$abyss_stack_mcp_venv/bin/python" \\\n'
+            "    -I -B -m abyss_stack_mcp.server",
+            installer,
         )
 
         self.assertIn("Environment=ABYSS_STACK_MCP_POLICY_FAMILY=read", read_unit)
@@ -1634,8 +1709,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn("Environment=AOA_MCP_HOST=127.0.0.1", unit)
             self.assertIn("Environment=PYTHONHOME=", unit)
             self.assertIn("Environment=PYTHONPATH=", unit)
-            self.assertIn("/venv/bin/python -I -B -m abyss_stack_mcp.server", unit)
             self.assertIn(runtime_condition, unit)
+            self.assertIn(source_lock_condition, unit)
+            self.assertIn(runtime_lock_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
             self.assertIn(runtime_verifier_condition, unit)
             self.assertIn(deployed_entrypoint, unit)

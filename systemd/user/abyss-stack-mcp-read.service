@@ -2,6 +2,8 @@
 Description=abyss-stack MCP read observation plane
 Documentation=file:///srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/README.md
 ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock
+ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
@@ -19,7 +21,7 @@ Environment=PYTHONPATH=
 LoadCredential=abyss-stack-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
 ExecCondition=/srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime
-ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -I -B -m abyss_stack_mcp.server
+ExecStart=/usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.source-projection.lock /usr/bin/flock --shared --no-fork /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/.runtime-provision.lock /usr/bin/env /srv/AbyssOS/abyss-stack/Configs/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=20

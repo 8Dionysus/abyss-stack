@@ -627,6 +627,9 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "encoded-bare-assignment",
         "passphrase-query",
         "aws-secret-access-key",
+        "aws-presign-credential",
+        "aws-presign-security-token",
+        "aws-presign-signature",
         "credential-query",
         "credentials-query",
         "unparseable",
@@ -789,6 +792,15 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             "https://acceptance.invalid/receipt?"
             f"aws_secret_access_key={secret_value}"
+        )
+    elif reference_surface.startswith("aws-presign-"):
+        key = {
+            "aws-presign-credential": "X-Amz-Credential",
+            "aws-presign-security-token": "X-Amz-Security-Token",
+            "aws-presign-signature": "X-Amz-Signature",
+        }[reference_surface]
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://bucket.s3.amazonaws.com/object?{key}={secret_value}"
         )
     elif reference_surface in {"credential-query", "credentials-query"}:
         key = reference_surface.removesuffix("-query")

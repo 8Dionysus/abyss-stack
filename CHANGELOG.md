@@ -80,7 +80,10 @@ Tracking starts with the community-docs baseline for this repository.
 - Managed stack MCP units now verify deployed source-and-lock identity and the
   complete measured runtime-content digest before every launch, while secret
   screening rejects unambiguous compound credential keys such as
-  `aws_secret_access_key` and exact `credential`/`credentials` references.
+  `aws_secret_access_key`, exact `credential`/`credentials` references, and
+  AWS presigned credential/signature/session-token query keys. Final launch
+  repeats verification while holding source-projection and runtime locks that
+  remain live across `exec`, closing the sync-to-launch race.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

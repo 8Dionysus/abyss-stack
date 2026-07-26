@@ -132,7 +132,9 @@ spellings. Unambiguous credential components such as `secret_access_key` are
 rejected even without a provider namespace, including AWS-style
 `aws_secret_access_key`. Exact `credential` and `credentials` keys are also
 rejected without treating the typed `credential_class` identity field as
-secret material. Concatenated
+secret material. AWS presigned-query keys `X-Amz-Credential`,
+`X-Amz-Signature`, and `X-Amz-Security-Token` are rejected as bounded
+credential material. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.
@@ -200,16 +202,20 @@ guarded rebuild. A changed identity is never installed
 over a running plane: provisioning fails closed while either the read or
 candidate unit is active or their user-systemd state cannot be observed. Stop
 both units explicitly before reprovisioning, then start or canary them as a
-separate action. The units have a `ConditionPathExists` guard, an executable
-`ExecCondition`, and a second read-only `ExecCondition` that recomputes the
-deployed source-and-lock identity plus measured runtime-content digest before
-every launch. They remain inactive when the runtime is absent, unusable,
-drifted, or no longer matches the deployed package.
-Each unit holds a shared runtime lock for its full process lifetime. Changed
-provisioning holds the exclusive lock, checks both unit states before the
-build and again immediately before the guarded environment swap, and aborts if
-a start races the build. Linking and reloading the committed units before
-provisioning is therefore a required rollout precondition.
+separate action. The units have `ConditionPathExists` guards for the runtime
+and both lock files, an executable `ExecCondition`, and a read-only verifier
+condition. Their final launch path then acquires the shared source-projection
+lock followed by the shared runtime lock, repeats the complete deployed
+source-and-lock plus runtime-content verification under those locks, and only
+then `exec`s the server. They remain inactive when the runtime is absent,
+unusable, drifted, or no longer matches the deployed package. Both shared locks
+remain held for the full process lifetime. Changed provisioning and applying
+MCP Configs sync therefore fail closed while either plane runs; stop both
+planes explicitly before either operation. Provisioning checks both unit
+states before the build and again immediately before the guarded environment
+swap, and aborts if a start races the build. Linking and reloading the
+committed units before provisioning is therefore a required rollout
+precondition.
 The provisioner copies the deployed package into a private staged snapshot,
 requires that snapshot and its lock to match the initial digests, installs only
 from the snapshot, and rechecks the deployed tree before writing the runtime
@@ -227,9 +233,10 @@ isolated mode, and pass `-B` explicitly so service imports cannot add bytecode
 to the measured environment. A user-manager import override therefore cannot
 precede the measured site-packages, and a normal launch cannot invalidate the
 recorded runtime-content digest.
-Consequently, a later Configs sync cannot mix new code with an older dependency
-closure; the synced package becomes eligible for a later start only after this
-explicit reprovision step succeeds.
+Consequently, a later Configs sync cannot cross a running plane or mix new code
+with an older dependency closure; after explicitly stopping both planes, the
+synced package becomes eligible for a later start only after this explicit
+reprovision step succeeds.
 
 Runtime dependencies and the build backend are exact pins in
 `requirements.constraints`; the committed `requirements.lock` carries the

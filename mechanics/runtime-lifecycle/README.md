@@ -72,3 +72,7 @@ route through
 `scripts/aoa-install-systemd --verify-abyss-stack-mcp-runtime`; provisioning
 mutates only while both planes are stopped, while verification only compares
 deployed source-and-lock and measured runtime identities.
+Managed launch acquires shared source-projection and runtime locks, repeats the
+verification under both, and retains them across `exec`; an applying MCP
+Configs sync or runtime replacement therefore requires both stack MCP planes
+to be stopped.

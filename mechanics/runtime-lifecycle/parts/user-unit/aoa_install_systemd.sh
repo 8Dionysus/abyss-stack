@@ -15,6 +15,7 @@ provision_mcp_http_auth=0
 provision_abyss_stack_mcp_auth=0
 provision_abyss_stack_mcp_runtime=0
 verify_abyss_stack_mcp_runtime=0
+launch_verified_abyss_stack_mcp=0
 install_mcp_http_codex_client=0
 remove_mcp_http_codex_client=0
 preset_spec=""
@@ -92,6 +93,9 @@ while (($#)); do
     --verify-abyss-stack-mcp-runtime)
       verify_abyss_stack_mcp_runtime=1
       ;;
+    --launch-verified-abyss-stack-mcp)
+      launch_verified_abyss_stack_mcp=1
+      ;;
     --install-mcp-http-codex-client)
       install_mcp_http_codex_client=1
       ;;
@@ -161,8 +165,17 @@ if ((verify_abyss_stack_mcp_runtime && \
       (provision_mcp_http_auth || provision_abyss_stack_mcp_auth || \
        provision_abyss_stack_mcp_runtime || install_mcp_http_codex_client || \
        remove_mcp_http_codex_client || enable_now || restart_now || \
-       link_all_user_units || link_system_units || selection_set || overlay_set))); then
+       launch_verified_abyss_stack_mcp || link_all_user_units || \
+       link_system_units || selection_set || overlay_set))); then
   aoa_die "abyss-stack MCP runtime verification must be a standalone read-only action"
+fi
+if ((launch_verified_abyss_stack_mcp && \
+      (provision_mcp_http_auth || provision_abyss_stack_mcp_auth || \
+       provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || \
+       install_mcp_http_codex_client || remove_mcp_http_codex_client || \
+       enable_now || restart_now || link_all_user_units || link_system_units || \
+       selection_set || overlay_set))); then
+  aoa_die "verified abyss-stack MCP launch must be a standalone unit action"
 fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
@@ -172,6 +185,9 @@ if ((provision_abyss_stack_mcp_auth && EUID == 0)); then
 fi
 if ((provision_abyss_stack_mcp_runtime && EUID == 0)); then
   aoa_die "abyss-stack MCP runtime provisioning must run as the target user, not root"
+fi
+if ((launch_verified_abyss_stack_mcp && EUID == 0)); then
+  aoa_die "verified abyss-stack MCP launch must run as the target user, not root"
 fi
 
 mcp_http_credential_name="aoa-mcp-http-bearer-token"
@@ -300,7 +316,7 @@ aoa_require_abyss_stack_mcp_units_stopped() {
   for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
     expected_unit_source="${AOA_CONFIGS_ROOT}/systemd/user/${unit}"
     expected_unit_target="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user/${unit}"
-    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${abyss_stack_mcp_venv}/bin/python -I -B -m abyss_stack_mcp.server"
+    expected_exec_start="/usr/bin/flock --shared --no-fork ${abyss_stack_mcp_source_lock} /usr/bin/flock --shared --no-fork ${abyss_stack_mcp_runtime_lock} /usr/bin/env ${AOA_CONFIGS_ROOT}/scripts/aoa-install-systemd --launch-verified-abyss-stack-mcp"
     if [[ ! -f "$expected_unit_source" || -L "$expected_unit_source" ]]; then
       abyss_stack_mcp_units_error="lock-aware source unit is unavailable for ${unit}; link and reload managed user units before provisioning"
       return 1
@@ -544,6 +560,13 @@ aoa_verify_abyss_stack_mcp_runtime() {
     aoa_die "abyss-stack MCP runtime content digest mismatch"
   exec {runtime_lock_fd}>&-
   exec {source_lock_fd}>&-
+}
+
+aoa_launch_verified_abyss_stack_mcp() {
+  aoa_verify_abyss_stack_mcp_runtime
+  exec /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
+    "$abyss_stack_mcp_venv/bin/python" \
+    -I -B -m abyss_stack_mcp.server
 }
 
 aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
@@ -992,13 +1015,16 @@ fi
 if ((verify_abyss_stack_mcp_runtime)); then
   aoa_verify_abyss_stack_mcp_runtime
 fi
+if ((launch_verified_abyss_stack_mcp)); then
+  aoa_launch_verified_abyss_stack_mcp
+fi
 if ((install_mcp_http_codex_client)); then
   aoa_install_mcp_http_codex_client
 fi
 if ((remove_mcp_http_codex_client)); then
   aoa_remove_mcp_http_codex_client
 fi
-if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
+if ((provision_mcp_http_auth || provision_abyss_stack_mcp_auth || provision_abyss_stack_mcp_runtime || verify_abyss_stack_mcp_runtime || launch_verified_abyss_stack_mcp || install_mcp_http_codex_client || remove_mcp_http_codex_client)) && \
   ((!enable_now && !restart_now && !link_all_user_units && !link_system_units && !selection_set && !overlay_set)); then
   exit 0
 fi

@@ -187,9 +187,10 @@ environment and reuses it only when that digest still matches; missing or
 changed runtime bytes force the same guarded rebuild path. A changed
 runtime identity fails closed while either stack MCP unit is active or its
 user-systemd state cannot be observed; stop both planes explicitly before
-reprovisioning. Each plane holds a shared runtime lock for its full lifetime;
-changed provisioning takes the exclusive lock and repeats the stopped-state
-check immediately before swapping the environment. The preceding
+reprovisioning. Each plane holds shared source-projection and runtime locks for
+its full lifetime; changed provisioning takes the exclusive runtime lock and
+repeats the stopped-state check immediately before swapping the environment.
+The preceding
 `--all-user-units` link-and-reload step is required so every later start
 participates in that lock; combining it with runtime provisioning in one
 installer invocation is rejected. Provisioning installs only from a private
@@ -451,10 +452,11 @@ changes while either
 active, or when their user-systemd state cannot be observed, the action refuses
 to mutate the environment; stopping and later starting those units remain
 explicit operator actions. The units hold a shared lock for their whole
-process lifetime. Provisioning takes the exclusive form of that lock and
-rechecks both unit states after the build, immediately before the environment
-swap, so a concurrent start cannot cross the replacement boundary. Do not
-combine this flag with `--all-user-units`; the installer rejects that ordering.
+process lifetime and also retain the shared source-projection lock.
+Provisioning takes the exclusive form of the runtime lock and rechecks both
+unit states after the build, immediately before the environment swap, so a
+concurrent start cannot cross the replacement boundary. Do not combine this
+flag with `--all-user-units`; the installer rejects that ordering.
 The package and hash lock are copied to a private digest-matched snapshot and
 pip reads only that snapshot. The deployed tree is rehashed before the marker
 and swap. Provisioning holds the same source-projection lock that an applying
@@ -468,11 +470,17 @@ launch it recomputes the deployed source-and-lock identity and the measured
 runtime-content digest, including resolved interpreter bytes, so a missing,
 unusable, drifted, or source-mismatched runtime leaves the unit inactive
 instead of entering a restart loop.
+The final `ExecStart` acquires the shared source-projection lock followed by
+the shared runtime lock, repeats the verifier under both, and `exec`s the
+server while retaining both locks for the process lifetime. Applying MCP
+Configs sync and changed provisioning therefore fail closed while either plane
+runs; stop both planes explicitly before sync or reprovisioning, then start
+them only after both operations and their parity checks succeed.
 They clear ambient `PYTHONHOME`/`PYTHONPATH`, invoke that venv in isolated
 Python mode with explicit bytecode writes disabled, and execute its installed
 package rather than importing `Configs/src` or an inherited user-manager
-module. After a later Configs sync, rerun this provision action before starting
-or restarting either plane.
+module. After a later stopped-plane Configs sync, rerun this provision action
+before starting or restarting either plane.
 
 Use `--system-units` only through a privileged route after the Configs mirror is
 synced:
