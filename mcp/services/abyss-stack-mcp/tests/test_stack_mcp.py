@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -224,6 +225,15 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
     )
     with pytest.raises(ValidationError, match="user information"):
         RuntimeObservation.model_validate(payload)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO requires POSIX")
+def test_observation_store_rejects_fifo_without_blocking(tmp_path: Path) -> None:
+    fifo = tmp_path / "observation.fifo"
+    os.mkfifo(fifo)
+
+    with pytest.raises(StackMCPError, match="regular file"):
+        ObservationStore(fifo).load()
 
 
 def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
@@ -596,6 +606,45 @@ def test_plan_expires_with_its_earliest_precondition(
         result["owner_payload"]["plan"]["expires_at"].replace("Z", "+00:00")
     )
     assert plan_expiry == expected_expiry
+
+
+def test_plan_deduplication_retains_earliest_evidence_expiry(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    source_ref = payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0]
+    earliest_expiry = NOW + timedelta(minutes=6)
+    source_ref["expires_at"] = earliest_expiry.isoformat()
+    endpoint_refs = payload["subjects"][0]["endpoint"]["evidence"]["evidence_refs"]
+    endpoint_refs[0] = {
+        **source_ref,
+        "expires_at": (NOW + timedelta(hours=2)).isoformat(),
+    }
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+    plan = result["owner_payload"]["plan"]
+    retained = [
+        item
+        for item in plan["precondition_evidence"]
+        if item["evidence_ref"] == source_ref["evidence_ref"]
+    ]
+
+    assert len(retained) == 1
+    assert (
+        datetime.fromisoformat(retained[0]["expires_at"].replace("Z", "+00:00"))
+        == earliest_expiry
+    )
+    assert (
+        datetime.fromisoformat(plan["expires_at"].replace("Z", "+00:00"))
+        == earliest_expiry
+    )
 
 
 def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> None:

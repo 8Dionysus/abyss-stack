@@ -92,7 +92,10 @@ class ObservationStore:
         try:
             descriptor = os.open(
                 path,
-                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                os.O_RDONLY
+                | os.O_CLOEXEC
+                | os.O_NOFOLLOW
+                | getattr(os, "O_NONBLOCK", 0),
             )
             try:
                 file_stat = os.fstat(descriptor)
@@ -639,23 +642,28 @@ class StackMCPApplication:
         links: tuple[LinkEvidence, ...],
     ) -> tuple[EvidenceRef, ...]:
         unique: dict[tuple[str, str, str], EvidenceRef] = {}
+
+        def retain_earliest_expiry(evidence: EvidenceRef) -> None:
+            key = (
+                evidence.owner,
+                evidence.evidence_ref,
+                evidence.revision,
+            )
+            retained = unique.get(key)
+            if retained is None or (
+                evidence.expires_at is not None
+                and (
+                    retained.expires_at is None
+                    or evidence.expires_at < retained.expires_at
+                )
+            ):
+                unique[key] = evidence
+
         for link in links:
             for evidence in link.evidence_refs:
-                unique[
-                    (
-                        evidence.owner,
-                        evidence.evidence_ref,
-                        evidence.revision,
-                    )
-                ] = evidence
+                retain_earliest_expiry(evidence)
         for evidence in subject.freshness.evidence_refs:
-            unique[
-                (
-                    evidence.owner,
-                    evidence.evidence_ref,
-                    evidence.revision,
-                )
-            ] = evidence
+            retain_earliest_expiry(evidence)
         return tuple(unique[key] for key in sorted(unique))
 
     @staticmethod

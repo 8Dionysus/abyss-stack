@@ -473,6 +473,18 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     self.assertNotIn(token, second.stdout + second.stderr)
             self.assertEqual(second.stdout.count("already provisioned"), 2)
 
+    def test_stack_mcp_credential_provisioning_is_user_scoped(self) -> None:
+        installer = INSTALL_SYSTEMD.read_text(encoding="utf-8")
+        self.assertIn(
+            "if ((provision_abyss_stack_mcp_auth && EUID == 0)); then",
+            installer,
+        )
+        self.assertIn(
+            "abyss-stack MCP credential provisioning must run as the target user, "
+            "not root",
+            installer,
+        )
+
     def test_stack_mcp_runtime_provision_is_explicit_and_source_addressed(
         self,
     ) -> None:

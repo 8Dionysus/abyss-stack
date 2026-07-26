@@ -153,6 +153,9 @@ fi
 if (((install_mcp_http_codex_client || remove_mcp_http_codex_client) && EUID == 0)); then
   aoa_die "MCP HTTP Codex client install and removal must run as the target user, not root"
 fi
+if ((provision_abyss_stack_mcp_auth && EUID == 0)); then
+  aoa_die "abyss-stack MCP credential provisioning must run as the target user, not root"
+fi
 if ((provision_abyss_stack_mcp_runtime && EUID == 0)); then
   aoa_die "abyss-stack MCP runtime provisioning must run as the target user, not root"
 fi
