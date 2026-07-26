@@ -37,10 +37,14 @@ Every plan requires usable subject freshness. Activation additionally requires
 an active process with an observed process identity, a ready endpoint, a
 registered consumer with the exact server schema digest and an overlapping MCP
 protocol version, a passed central-proof verdict issued by `proof_owner` and
-bound to the current source/package/deploy/schema/consumer/canary contour, named
-acceptance-owner evidence bound to the current source revision and package
-digest, a grounded canary, and usable rollback proof. The central-proof and
-acceptance receipts plus the selected compatible consumer's exact
+bound to the current source, package, deployed revision and tree digest, schema,
+consumer, and canary contour, named acceptance-owner evidence bound to the
+current source revision and package digest, a grounded canary, and usable
+rollback proof. Activation or restart of `internal_effect` and
+`external_effect` targets is rejected because this package does not model
+their separately required threat, approval, egress, compensation, or rollback
+contracts. The central-proof and acceptance receipts plus the selected
+compatible consumer's exact
 `registration_ref` are embedded in ordered activation steps, preceded by exact
 process-identity verification. A shadow registry receives an exact admission
 action after those gates; an already admitted registry receives verification.

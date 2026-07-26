@@ -29,8 +29,11 @@
 - active processes require an observed process identity rather than a bare
   boolean;
 - activation requires a passed central-proof verdict issued by `proof_owner`
-  and bound to the current source/package/deploy/schema/consumer/canary
-  contour;
+  and bound to the current source, package, deployed revision and tree digest,
+  schema, consumer, and canary contour;
+- activation and restart reject `internal_effect` and `external_effect`
+  subjects while their distinct threat, approval, egress, compensation, and
+  rollback contracts are absent;
 - activation requires acceptance-owner evidence bound to the exact source
   revision and package digest, and carries that expiring receipt into the
   candidate;

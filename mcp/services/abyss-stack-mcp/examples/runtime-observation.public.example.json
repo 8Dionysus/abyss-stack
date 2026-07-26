@@ -213,6 +213,7 @@
         "proved_canary_ref": "example://canary/aoa-kag",
         "proved_consumer_registration_ref": "example://consumer/aoa-kag",
         "proved_deploy_revision": "deploy-example-revision",
+        "proved_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "proved_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "proved_server_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "proved_source_revision": "source-example-revision",

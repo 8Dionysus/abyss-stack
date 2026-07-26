@@ -684,6 +684,8 @@ class StackMCPApplication:
             if effective_state not in usable_states:
                 blockers.append(f"{name}_not_usable")
         if plan_kind in {"activate", "restart"}:
+            if subject.policy_family in {"internal_effect", "external_effect"}:
+                blockers.append("effect_activation_contracts_absent")
             if subject.registry.registry_state not in {"shadow", "admitted"}:
                 blockers.append("registry_state_blocks_runtime_plan")
             for name, link in (
@@ -713,6 +715,8 @@ class StackMCPApplication:
                 or subject.proof.proved_package_digest
                 != subject.package.artifact_digest
                 or subject.proof.proved_deploy_revision != subject.deploy.revision
+                or subject.proof.proved_deploy_tree_digest
+                != subject.deploy.tree_digest
                 or subject.proof.proved_server_schema_digest
                 != subject.endpoint.server_schema_digest
                 or subject.proof.proved_canary_ref != subject.canary.canary_ref

@@ -136,6 +136,7 @@ def subject(
             "proved_source_revision": "source-rev-1",
             "proved_package_digest": DIGEST_B,
             "proved_deploy_revision": "deploy-rev-1",
+            "proved_deploy_tree_digest": DIGEST_C,
             "proved_server_schema_digest": DIGEST_D,
             "proved_consumer_registration_ref": f"config://codex/{organ_id}",
             "proved_canary_ref": f"receipt://canary/{organ_id}",
@@ -1030,6 +1031,7 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proved_source_revision"] = None
     proof["proved_package_digest"] = None
     proof["proved_deploy_revision"] = None
+    proof["proved_deploy_tree_digest"] = None
     proof["proved_server_schema_digest"] = None
     proof["proved_consumer_registration_ref"] = None
     proof["proved_canary_ref"] = None
@@ -1038,6 +1040,10 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
 
     payload = observation(subject())
     payload["subjects"][0]["proof"]["proved_package_digest"] = DIGEST_A
+    cases.append((payload, "central_proof_target_mismatch"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["proved_deploy_tree_digest"] = DIGEST_A
     cases.append((payload, "central_proof_target_mismatch"))
 
     payload = observation(subject())
@@ -1102,6 +1108,32 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
                 "activate",
                 expected_observation_digest=digest,
             )
+
+
+@pytest.mark.parametrize("policy_family", ("internal_effect", "external_effect"))
+@pytest.mark.parametrize("plan_kind", ("activate", "restart"))
+def test_runtime_activation_blocks_effect_planes_until_effect_contracts_exist(
+    tmp_path: Path,
+    policy_family: str,
+    plan_kind: str,
+) -> None:
+    payload = observation(
+        subject(
+            organ_id=f"{policy_family}-organ",
+            policy_family=policy_family,
+            credential_class=f"{policy_family}-credential",
+        )
+    )
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="effect_activation_contracts_absent"):
+        app.prepare_plan(
+            f"{policy_family}-organ",
+            policy_family,
+            plan_kind,
+            expected_observation_digest=digest,
+        )
 
 
 @pytest.mark.parametrize(

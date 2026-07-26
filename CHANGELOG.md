@@ -25,8 +25,10 @@ Tracking starts with the community-docs baseline for this repository.
   writes publish one atomically selected value without clobbering the winner.
 - Published stack MCP schemas now encode conditional runtime invariants;
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
-  precondition, and activation steps name the exact selected compatible
-  consumer registration.
+  precondition, central proof binds the exact deployed-tree digest, activation
+  steps name the exact selected compatible consumer registration, and effect
+  planes cannot be activated or restarted before their distinct contracts
+  exist.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

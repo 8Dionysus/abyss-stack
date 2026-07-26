@@ -134,6 +134,7 @@ def observation_example() -> dict[str, Any]:
                     "proved_source_revision": "source-example-revision",
                     "proved_package_digest": DIGESTS["package"],
                     "proved_deploy_revision": "deploy-example-revision",
+                    "proved_deploy_tree_digest": DIGESTS["deploy"],
                     "proved_server_schema_digest": DIGESTS["schema"],
                     "proved_consumer_registration_ref": (
                         "example://consumer/aoa-kag"

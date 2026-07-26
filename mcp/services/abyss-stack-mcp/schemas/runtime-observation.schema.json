@@ -127,6 +127,9 @@
               "proved_deploy_revision": {
                 "type": "string"
               },
+              "proved_deploy_tree_digest": {
+                "type": "string"
+              },
               "proved_package_digest": {
                 "type": "string"
               },
@@ -143,6 +146,7 @@
               "proved_source_revision",
               "proved_package_digest",
               "proved_deploy_revision",
+              "proved_deploy_tree_digest",
               "proved_server_schema_digest",
               "proved_consumer_registration_ref",
               "proved_canary_ref",
@@ -227,6 +231,19 @@
           ],
           "default": null,
           "title": "Proved Deploy Revision"
+        },
+        "proved_deploy_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Tree Digest"
         },
         "proved_package_digest": {
           "anyOf": [
