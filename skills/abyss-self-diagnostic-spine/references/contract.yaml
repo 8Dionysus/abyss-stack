@@ -3,7 +3,7 @@ identity:
   name: abyss-self-diagnostic-spine
   owner: abyss-stack
   canonical_source: skills/abyss-self-diagnostic-spine
-  version: 0.2.5
+  version: 0.2.6
   lifecycle: admitted
   health: active
 purpose: Produce or review one owner-typed Abyss runtime diagnosis without acquiring repair authority.
