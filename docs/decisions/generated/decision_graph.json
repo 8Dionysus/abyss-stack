@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 86,
-  "edge_count": 1917,
+  "decision_count": 87,
+  "edge_count": 1941,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 769,
-    "DATED": 86,
-    "GUARDED_BY": 231,
-    "HAS_STATUS": 86,
-    "HAS_SURFACE_CLASS": 215,
-    "IN_STACK_LANE": 178,
-    "NEXT_DECISION": 85,
-    "OWNED_BY_SURFACE": 91,
-    "OWNS_DECISION": 86,
+    "CITES_SOURCE_SURFACE": 775,
+    "DATED": 87,
+    "GUARDED_BY": 235,
+    "HAS_STATUS": 87,
+    "HAS_SURFACE_CLASS": 219,
+    "IN_STACK_LANE": 181,
+    "NEXT_DECISION": 86,
+    "OWNED_BY_SURFACE": 92,
+    "OWNS_DECISION": 87,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 88
+    "UNDER_MECHANIC_PARENT": 90
   },
   "edges": [
     {
@@ -9163,12 +9163,127 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0086",
+      "target": "decision:ABYSS-STACK-D-0087",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
       "target": "owner_surface:mechanics/federation-seams/parts/sync-wrapper/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0086",
       "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:mcp/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:mcp/services/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:mcp/services/_shared/http_auth.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:mechanics/config-projection/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:mechanics/runtime-lifecycle/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "source_surface:systemd/user/",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "date:2026-07-25",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "guard_family:effect%20isolation",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "guard_family:owner%20admission",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "guard_family:provenance%20spine",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "guard_family:rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "surface_class:MCP%20runtime",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "surface_class:lifecycle",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "surface_class:policy%20plane",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "surface_class:provenance",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "stack_lane:MCP%20access%20plane",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "stack_lane:config%20projection",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "stack_lane:runtime%20lifecycle",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "owner_surface:mcp/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "mechanic_parent:config-projection",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0087",
+      "target": "mechanic_parent:runtime-lifecycle",
       "type": "UNDER_MECHANIC_PARENT"
     },
     {
@@ -9600,21 +9715,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0086",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0087",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 847,
+  "node_count": 857,
   "node_type_counts": {
     "date": 26,
-    "decision": 86,
-    "guard_family": 104,
+    "decision": 87,
+    "guard_family": 107,
     "mechanic_parent": 10,
-    "owner_surface": 45,
+    "owner_surface": 46,
     "repo": 1,
-    "source_surface": 460,
+    "source_surface": 462,
     "stack_lane": 35,
     "status": 3,
-    "surface_class": 77
+    "surface_class": 80
   },
   "nodes": [
     {
@@ -10608,6 +10728,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-25",
+      "id": "decision:ABYSS-STACK-D-0087",
+      "label": "ABYSS-STACK-D-0087",
+      "path": "docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md",
+      "posture": "accepted target and transitional runtime law",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -10743,6 +10873,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:effect%20isolation",
+      "label": "effect isolation",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:entry%20contract",
       "label": "entry contract",
       "type": "guard_family"
@@ -10843,6 +10978,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:owner%20admission",
+      "label": "owner admission",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:owner%20skill%20package",
       "label": "owner skill package",
       "type": "guard_family"
@@ -10900,6 +11040,11 @@
     {
       "id": "guard_family:projection-only%20cache",
       "label": "projection-only cache",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:provenance%20spine",
+      "label": "provenance spine",
       "type": "guard_family"
     },
     {
@@ -11195,6 +11340,11 @@
     {
       "id": "owner_surface:docs/validation/",
       "label": "docs/validation/",
+      "type": "owner_surface"
+    },
+    {
+      "id": "owner_surface:mcp/",
+      "label": "mcp/",
       "type": "owner_surface"
     },
     {
@@ -12669,6 +12819,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/config-projection/",
+      "label": "mechanics/config-projection/",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
       "label": "mechanics/config-projection/parts/rendering/docs/RENDER_TRUTH.md",
       "type": "source_surface"
@@ -13096,6 +13251,11 @@
     {
       "id": "source_surface:mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md",
       "label": "mechanics/machine-fit/parts/machine-bridge/docs/MACHINE_BRIDGE.md",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/runtime-lifecycle/",
+      "label": "mechanics/runtime-lifecycle/",
       "type": "source_surface"
     },
     {
@@ -13924,6 +14084,11 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:MCP%20runtime",
+      "label": "MCP runtime",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:MCP%20transport",
       "label": "MCP transport",
       "type": "surface_class"
@@ -14129,8 +14294,18 @@
       "type": "surface_class"
     },
     {
+      "id": "surface_class:policy%20plane",
+      "label": "policy plane",
+      "type": "surface_class"
+    },
+    {
       "id": "surface_class:profile/public-contract",
       "label": "profile/public-contract",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:provenance",
+      "label": "provenance",
       "type": "surface_class"
     },
     {

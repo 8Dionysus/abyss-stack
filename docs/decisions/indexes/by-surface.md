@@ -200,6 +200,10 @@
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
 
+## MCP runtime
+
+- [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+
 ## MCP transport
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
@@ -316,6 +320,7 @@
 ## lifecycle
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
+- [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
 
 ## local overlay
 
@@ -341,10 +346,18 @@
 
 - [ABYSS-STACK-D-0078 Federated Stats MCP Access Plane](../ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0078-federated-stats-mcp-access-plane.md`)
 
+## policy plane
+
+- [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
+
 ## profile/public-contract
 
 - [ABYSS-STACK-D-0065 Observability LogQL Loki Alloy](../ABYSS-STACK-D-0065-observability-logql-loki-alloy.md) (`docs/decisions/ABYSS-STACK-D-0065-observability-logql-loki-alloy.md`)
 - [ABYSS-STACK-D-0070 Observability OTLP Tempo Trace Plane](../ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md) (`docs/decisions/ABYSS-STACK-D-0070-observability-otlp-tempo-trace-plane.md`)
+
+## provenance
+
+- [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
 
 ## public mirror hygiene
 

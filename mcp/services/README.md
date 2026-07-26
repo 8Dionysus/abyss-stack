@@ -33,6 +33,15 @@ wildcard-bind, gateway, proxy, cross-host, and OAuth/federated identity
 topology require a later decision than
 [D-0077](../../docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md).
 
+The shared credential and `mcp:access` scope are transitional. They prove that
+an unauthenticated local caller is rejected, but they do not separate owners
+or effects and therefore cannot admit an effectful capability. The governed
+organ-access target in
+[D-0087](../../docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md)
+uses per-owner, per-policy-plane credentials and process contours. Until that
+implementation and its proof land, current services remain direct shadow
+access planes even when their read calls work.
+
 | Owner instance | Default port |
 |---|---:|
 | `aoa-decisions` | 5420 |

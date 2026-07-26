@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 18479678,
+  "allowed_tracked_bytes": 24846955,
+  "approved_by": "repository-owner",
+  "base_ref": "fac82c75d860dd2433cfc1e391f4b6ba117425d7",
+  "changed_generated_bytes": 18479678,
+  "changed_generated_files": 264,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "334fcc81ceca7cb802ac018aec1775ef2999a338e75d94c23896526b0cd619d4",
+  "reason": "Refresh the portable KAG family for the reviewed R2 owner-bounded MCP runtime decision; this digest-bound receipt authorizes only the measured generated projection delta.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24846955,
+  "tracked_bytes_max": 24117248
+}

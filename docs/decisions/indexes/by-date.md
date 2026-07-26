@@ -165,3 +165,4 @@
 
 - [ABYSS-STACK-D-0085 SDK Routing Canary Intake](../ABYSS-STACK-D-0085-sdk-routing-canary-intake.md) (`docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md`)
 - [ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover](../ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md) (`docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md`)
+- [ABYSS-STACK-D-0087 Owner-Bounded MCP Access Fabric](../ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md) (`docs/decisions/ABYSS-STACK-D-0087-owner-bounded-mcp-access-fabric.md`)
