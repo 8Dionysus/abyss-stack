@@ -208,7 +208,11 @@
 - [ABYSS-STACK-D-0066 AoA Decisions MCP Access Plane](../ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0066-aoa-decisions-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0067 Decision Surface Coverage Registry](../ABYSS-STACK-D-0067-decision-surface-coverage-registry.md) (`docs/decisions/ABYSS-STACK-D-0067-decision-surface-coverage-registry.md`)
 - [ABYSS-STACK-D-0068 Decision Graph Contract And Impact Packets](../ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md) (`docs/decisions/ABYSS-STACK-D-0068-decision-graph-contract-and-impact-packets.md`)
+<<<<<<< HEAD
 - [ABYSS-STACK-D-0089 Decision Cache Effect Isolation](../ABYSS-STACK-D-0089-decision-cache-effect-isolation.md) (`docs/decisions/ABYSS-STACK-D-0089-decision-cache-effect-isolation.md`)
+=======
+- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
+>>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
 
 ## MCP access plane
 
@@ -239,6 +243,7 @@
 
 - [ABYSS-STACK-D-0076 Repo-Self KAG Runtime Projections](../ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md) (`docs/decisions/ABYSS-STACK-D-0076-repo-self-kag-runtime-projections.md`)
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
+- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
 
 ## human review
 
@@ -297,6 +302,7 @@
 ## runtime lane
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
+- [ABYSS-STACK-D-0088 Agent OS Subprocess Runtime Adapter](../ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md) (`docs/decisions/ABYSS-STACK-D-0088-agent-os-subprocess-runtime-adapter.md`)
 
 ## runtime lane/federation lane/MCP lane
 

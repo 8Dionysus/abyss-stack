@@ -51,6 +51,12 @@ jobs:
       - name: Shellcheck scripts
         run: python scripts/ci_gate.py --mode shellcheck
 
+      - name: Compile Agent OS runtime bridge
+        run: >-
+          python -m py_compile
+          scripts/aoa-agent-os-runtime
+          mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py
+
       - name: Rehearse bootstrap flow
         run: |
           export AOA_STACK_ROOT="$RUNNER_TEMP/abyss-stack"

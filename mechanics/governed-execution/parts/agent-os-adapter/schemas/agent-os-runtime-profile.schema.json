@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-profile.schema.json",
+  "title": "abyss-stack Agent OS runtime profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "runtime_owner",
+    "adapter_id",
+    "adapter_protocol_version",
+    "source_ref",
+    "schema_ref",
+    "supported_plan_schema_versions",
+    "supported_event_schema_versions",
+    "supported_effect_classes",
+    "required_constraint_artifacts",
+    "compatibility",
+    "boundaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_agent_os_runtime_profile_v1"
+    },
+    "profile_id": {
+      "const": "runtime-profile:abyss-stack-governed-execution-v1"
+    },
+    "runtime_owner": {
+      "const": "abyss-stack"
+    },
+    "adapter_id": {
+      "const": "abyss_stack_agent_os_adapter_v1"
+    },
+    "adapter_protocol_version": {
+      "const": "aoa_runtime_adapter_v1"
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supported_plan_schema_versions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "supported_event_schema_versions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "supported_effect_classes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "read_only",
+          "repo_mutation"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "required_constraint_artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactKey"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "compatibility": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/compatibility"
+      },
+      "minItems": 1
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executes_through_governed_runner_only",
+        "selects_adapter",
+        "authors_playbook_meaning",
+        "produces_eval_verdict",
+        "retains_durable_memory",
+        "opens_network_listener"
+      ],
+      "properties": {
+        "executes_through_governed_runner_only": {
+          "const": true
+        },
+        "selects_adapter": {
+          "const": false
+        },
+        "authors_playbook_meaning": {
+          "const": false
+        },
+        "produces_eval_verdict": {
+          "const": false
+        },
+        "retains_durable_memory": {
+          "const": false
+        },
+        "opens_network_listener": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "artifactKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_ref",
+        "source_ref",
+        "schema_ref",
+        "schema_version"
+      ],
+      "properties": {
+        "owner_repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ownerContour": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "source_ref",
+        "abi_id",
+        "abi_version",
+        "artifact_digest"
+      ],
+      "properties": {
+        "owner_repo": {
+          "const": "aoa-playbooks"
+        },
+        "source_ref": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "abi_id": {
+          "const": "aoa_playbook_plan_contour_v1"
+        },
+        "abi_version": {
+          "const": "aoa_playbook_plan_contour_v1"
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "playbook_id",
+        "owner_contour",
+        "accepted_step_sets",
+        "phase_step_map",
+        "approval_operations",
+        "runtime_approval_requirements",
+        "runtime_evidence_requirements"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "playbook_id": {
+          "type": "string",
+          "pattern": "^AOA-P-[0-9]{4}$"
+        },
+        "owner_contour": {
+          "$ref": "#/$defs/ownerContour"
+        },
+        "accepted_step_sets": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "minItems": 1
+        },
+        "phase_step_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "approval_operations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "plan_freeze",
+            "landing"
+          ],
+          "properties": {
+            "plan_freeze": {
+              "type": "string",
+              "minLength": 1
+            },
+            "landing": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "runtime_evidence_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "artifact_kind",
+              "producer_owner",
+              "required_after_step_id",
+              "terminal_required",
+              "artifact_binding"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "artifact_kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "producer_owner": {
+                "const": "abyss-stack"
+              },
+              "required_after_step_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "terminal_required": {
+                "type": "boolean"
+              },
+              "artifact_binding": {
+                "const": "step_output"
+              }
+            }
+          }
+        },
+        "runtime_approval_requirements": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "operation",
+              "risk_class",
+              "applies_to_step_ids",
+              "required_evidence_refs",
+              "expires_after_seconds",
+              "renewable"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "risk_class": {
+                "type": "string",
+                "minLength": 1
+              },
+              "applies_to_step_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required_evidence_refs": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "expires_after_seconds": {
+                "type": "null"
+              },
+              "renewable": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

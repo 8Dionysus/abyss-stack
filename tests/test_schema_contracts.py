@@ -84,6 +84,12 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
         "mechanics/federation-seams/parts/rpg-runtime/schemas/reputation_ledger_collection.schema.json"
     ),
     Path(
+        "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-binding.schema.json"
+    ),
+    Path(
+        "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-profile.schema.json"
+    ),
+    Path(
         "mechanics/governed-execution/parts/candidate-exports/schemas/runtime-artifact-hook-candidate.schema.json"
     ),
     Path(
@@ -246,6 +252,11 @@ EXAMPLE_SCHEMA_CASES: tuple[tuple[str, str, str], ...] = (
     (
         "mcp/services/abyss-stack-mcp/examples/runtime-observation.public.example.json",
         "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json",
+        "object",
+    ),
+    (
+        "mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json",
+        "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-profile.schema.json",
         "object",
     ),
     (

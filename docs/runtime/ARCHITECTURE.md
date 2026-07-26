@@ -60,6 +60,11 @@ Model routing and agent-facing runtime APIs:
 
 This layer may also host the runtime return wrapper that rebuilds context from a last valid anchor rather than continuing under drift.
 
+The Agent OS control-plane bridge is a separate local subprocess command, not
+a network API. `aoa-sdk` owns its generic plan and lifecycle contracts;
+`abyss-stack` admits supported plans and owns durable runtime state, approvals,
+governed execution, rollback, runtime evidence, and outcomes.
+
 ### 5. Speech and tool layer
 
 Optional runtime helpers:

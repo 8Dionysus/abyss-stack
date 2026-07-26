@@ -56,6 +56,7 @@ MECHANIC_PACKAGE_PARTS = {
     ),
     "governed-execution": (
         "governed-runner",
+        "agent-os-adapter",
         "autonomy-status",
         "return-policy",
         "runtime-contracts",
@@ -100,6 +101,15 @@ MECHANIC_PACKAGE_PARTS = {
     ),
 }
 MECHANIC_PART_REQUIRED_FILES = {
+    ("governed-execution", "agent-os-adapter"): (
+        "CONTRACT.md",
+        "VALIDATION.md",
+        "aoa_agent_os_runtime.py",
+        "runtime-profile.v1.json",
+        "schemas/agent-os-runtime-binding.schema.json",
+        "schemas/agent-os-runtime-profile.schema.json",
+        "tests/test_agent_os_runtime_bridge.py",
+    ),
     ("agon-runtime", "runtime-kernels"): (
         "docs/RUNTIME_KERNELS.md",
         "definitions/duel-runtime-kernels.json",

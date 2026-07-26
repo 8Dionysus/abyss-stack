@@ -78,6 +78,9 @@ The current direction is:
   not by absorbing machine ownership
 - let federation seams become useful runtime inputs only through explicit,
   bounded consumption decisions
+- admit `aoa-sdk` Agent OS plans only through an explicit runtime-owned
+  compatibility profile, exact snapshot observation, and governed approval
+  boundaries
 - keep diagnostic spine and antifragility repair posture as evidence and packet
   routes before live mutation or authority promotion
 - keep release history in `CHANGELOG.md`; the current `v0.4.0` contour remains
@@ -199,6 +202,19 @@ The current direction is:
 - Guardrail:
   federation consumption does not transfer AoA, ToS, skill, memo, eval,
   playbook, routing, KAG, stats, or agent authority into `abyss-stack`.
+
+## Horizon: Agent OS Governed Execution
+
+- Current posture:
+  one local subprocess adapter admits only the exact
+  `bounded_change_safe` / `AOA-P-0011` contour and delegates effects to the
+  existing governed runner with two explicit approvals and durable replay.
+- Next honest move:
+  compose runtime outcomes with owner-produced eval verdicts and memory
+  receipts outside the runtime adapter before considering another scenario.
+- Guardrail:
+  an SDK plan is not runtime permission, runtime evidence is not an eval
+  verdict, and runtime completion is not final reviewed closeout.
 
 ## Horizon: Diagnostics And Repair
 

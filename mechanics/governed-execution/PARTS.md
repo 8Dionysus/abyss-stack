@@ -3,6 +3,7 @@
 | Part | Route | Current source surfaces |
 |---|---|---|
 | Governed runner | `parts/governed-runner/` | `scripts/aoa-governed-run`, `mechanics/governed-execution/parts/governed-runner/aoa_governed_run.py`, `mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md`, `mechanics/governed-execution/parts/governed-runner/aoa_governed_execution.py` |
+| Agent OS adapter | `parts/agent-os-adapter/` | `scripts/aoa-agent-os-runtime`, exact runtime profile and binding schemas, durable subprocess bridge, paired `aoa-sdk` integration tests |
 | Autonomy status | `parts/autonomy-status/` | `scripts/aoa-status`, `mechanics/governed-execution/parts/autonomy-status/aoa_status_autonomy.py` |
 | Return policy | `parts/return-policy/` | `config-templates/Configs/agent-api/return-policy.yaml`, `mechanics/governed-execution/parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md`, `parts/return-policy/schemas/`, `parts/return-policy/examples/` |
 | Runtime contracts | `parts/runtime-contracts/` | governed execution schemas and focused tests |

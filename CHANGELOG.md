@@ -87,6 +87,12 @@ Tracking starts with the community-docs baseline for this repository.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.
+- A local no-listener `aoa-agent-os-runtime` bridge now lets the `aoa-sdk`
+  `AoARunner` drive one exact `bounded_change_safe` / `AOA-P-0011` governed
+  contour while `abyss-stack` retains durable state, two explicit approvals,
+  isolated preview, landing, rollback discipline, runtime evidence, outcomes,
+  exact replay, and source/ABI drift rejection. Eval verdicts, memory receipts,
+  and final closeout remain with their stronger owners.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

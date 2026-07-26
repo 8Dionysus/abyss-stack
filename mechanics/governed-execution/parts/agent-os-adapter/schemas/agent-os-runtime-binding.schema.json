@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/8Dionysus/abyss-stack/main/mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-binding.schema.json",
+  "title": "abyss-stack Agent OS runtime binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "binding_id",
+    "runtime_owner",
+    "adapter_id",
+    "plan_digest",
+    "scenario_id",
+    "playbook_id",
+    "request_ref",
+    "request_path",
+    "source_locations",
+    "abi_locations",
+    "adapter_contract_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "abyss_stack_agent_os_binding_v1"
+    },
+    "binding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_owner": {
+      "const": "abyss-stack"
+    },
+    "adapter_id": {
+      "const": "abyss_stack_agent_os_adapter_v1"
+    },
+    "plan_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "playbook_id": {
+      "type": "string",
+      "pattern": "^AOA-P-[0-9]{4}$"
+    },
+    "request_ref": {
+      "$ref": "#/$defs/provenanceRef"
+    },
+    "request_path": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "source_locations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceLocation"
+      },
+      "minItems": 1
+    },
+    "abi_locations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/abiLocation"
+      },
+      "minItems": 1
+    },
+    "adapter_contract_ref": {
+      "$ref": "#/$defs/provenanceRef"
+    }
+  },
+  "$defs": {
+    "provenanceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_ref",
+        "source_ref",
+        "artifact_digest",
+        "schema_ref",
+        "schema_version"
+      ],
+      "properties": {
+        "owner_repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "schema_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "artifact_ref",
+        "local_path"
+      ],
+      "properties": {
+        "owner_repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local_path": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      }
+    },
+    "abiLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_repo",
+        "abi_id",
+        "local_path"
+      ],
+      "properties": {
+        "owner_repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "abi_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local_path": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      }
+    }
+  }
+}

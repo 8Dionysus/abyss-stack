@@ -1,0 +1,151 @@
+{
+  "schema_version": "abyss_stack_agent_os_runtime_profile_v1",
+  "profile_id": "runtime-profile:abyss-stack-governed-execution-v1",
+  "runtime_owner": "abyss-stack",
+  "adapter_id": "abyss_stack_agent_os_adapter_v1",
+  "adapter_protocol_version": "aoa_runtime_adapter_v1",
+  "source_ref": "abyss_stack_agent_os_adapter_v1",
+  "schema_ref": "mechanics/governed-execution/parts/agent-os-adapter/schemas/agent-os-runtime-profile.schema.json",
+  "supported_plan_schema_versions": [
+    "aoa_control_plane_v1"
+  ],
+  "supported_event_schema_versions": [
+    "aoa_control_plane_v1"
+  ],
+  "supported_effect_classes": [
+    "read_only",
+    "repo_mutation"
+  ],
+  "required_constraint_artifacts": [
+    {
+      "owner_repo": "abyss-stack",
+      "artifact_ref": "config-templates/Configs/agent-api/governed-execution-policy.yaml",
+      "source_ref": "abyss_stack_governed_execution_policy_v1",
+      "schema_ref": "mechanics/governed-execution/parts/governed-runner/docs/GOVERNED_EXECUTION.md#policy",
+      "schema_version": "v1"
+    }
+  ],
+  "compatibility": [
+    {
+      "scenario_id": "bounded_change_safe",
+      "playbook_id": "AOA-P-0011",
+      "owner_contour": {
+        "owner_repo": "aoa-playbooks",
+        "source_ref": "056cac249a353ae94abedbd4048e6730f70c064d",
+        "abi_id": "aoa_playbook_plan_contour_v1",
+        "abi_version": "aoa_playbook_plan_contour_v1",
+        "artifact_digest": "sha256:1effef6739136e3634f787572526926eb5731b978c03e15d6c21c8a047bdd7eb"
+      },
+      "accepted_step_sets": [
+        [
+          "orient",
+          "preview",
+          "mutate",
+          "verify",
+          "closeout"
+        ],
+        [
+          "orient",
+          "mutate",
+          "verify",
+          "closeout"
+        ]
+      ],
+      "phase_step_map": {
+        "prepare_proposal": [
+          "orient"
+        ],
+        "worktree_preview": [
+          "preview"
+        ],
+        "landing_apply": [
+          "mutate"
+        ],
+        "post_apply_validation": [
+          "verify"
+        ],
+        "review_packet_materialization": [
+          "closeout"
+        ]
+      },
+      "approval_operations": {
+        "plan_freeze": "abyss-stack:governed-execution:plan-freeze",
+        "landing": "abyss-stack:governed-execution:landing"
+      },
+      "runtime_approval_requirements": [
+        {
+          "requirement_id": "approval:abyss-stack:plan-freeze",
+          "operation": "abyss-stack:governed-execution:plan-freeze",
+          "risk_class": "repo_mutation",
+          "applies_to_step_ids": [
+            "mutate"
+          ],
+          "required_evidence_refs": [],
+          "expires_after_seconds": null,
+          "renewable": false
+        },
+        {
+          "requirement_id": "approval:abyss-stack:landing",
+          "operation": "abyss-stack:governed-execution:landing",
+          "risk_class": "repo_mutation",
+          "applies_to_step_ids": [
+            "mutate"
+          ],
+          "required_evidence_refs": [],
+          "expires_after_seconds": null,
+          "renewable": false
+        }
+      ],
+      "runtime_evidence_requirements": [
+        {
+          "requirement_id": "evidence:bounded-change:approval",
+          "artifact_kind": "approval_record",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "orient",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:source-map",
+          "artifact_kind": "source_map",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "orient",
+          "terminal_required": false,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:change-set",
+          "artifact_kind": "scoped_change_set",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "mutate",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:verification",
+          "artifact_kind": "verification_pack",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "verify",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        },
+        {
+          "requirement_id": "evidence:bounded-change:summary",
+          "artifact_kind": "shareable_summary",
+          "producer_owner": "abyss-stack",
+          "required_after_step_id": "closeout",
+          "terminal_required": true,
+          "artifact_binding": "step_output"
+        }
+      ]
+    }
+  ],
+  "boundaries": {
+    "executes_through_governed_runner_only": true,
+    "selects_adapter": false,
+    "authors_playbook_meaning": false,
+    "produces_eval_verdict": false,
+    "retains_durable_memory": false,
+    "opens_network_listener": false
+  }
+}

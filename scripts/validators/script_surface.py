@@ -11,6 +11,7 @@ ExecutableCheck = Callable[[Path], bool]
 GitIndexMode = Callable[[Path], str | None]
 
 REQUIRED_SCRIPTS = {
+    "aoa-agent-os-runtime",
     "aoa-diagnose",
     "aoa-governed-run",
     "aoa-doctor",
@@ -69,6 +70,7 @@ REQUIRED_SCRIPTS = {
 
 OPERATOR_BACKEND_SCRIPTS = {
     "aoa-a2a-return-closeout-dry-run": "mechanics/runtime-repair/parts/a2a-return-dry-run/aoa_a2a_return_closeout_dry_run.py",
+    "aoa-agent-os-runtime": "mechanics/governed-execution/parts/agent-os-adapter/aoa_agent_os_runtime.py",
     "aoa-bootstrap-configs": "mechanics/config-projection/parts/bootstrap/aoa_bootstrap_configs.sh",
     "aoa-bootstrap-wsl.ps1": "mechanics/machine-fit/parts/windows-bridge/aoa_bootstrap_wsl.ps1",
     "aoa-bounded-autonomy-pilot": "mechanics/inference-pilots/parts/quiet-bridge-commands/aoa_bounded_autonomy_pilot.sh",

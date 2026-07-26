@@ -10,13 +10,20 @@ Decision records own rationale; this directory contains generated graph read mod
 
 ## Counts
 
+<<<<<<< HEAD
 - Decisions: 97
 - Nodes: 969
 - Edges: 2187
+=======
+- Decisions: 88
+- Nodes: 870
+- Edges: 1962
+>>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
 
 ## Node Types
 
 - `date`: 27
+<<<<<<< HEAD
 - `decision`: 97
 - `guard_family`: 135
 - `mechanic_parent`: 10
@@ -40,6 +47,31 @@ Decision records own rationale; this directory contains generated graph read mod
 - `OWNS_DECISION`: 97
 - `SUPERSEDED_BY`: 2
 - `UNDER_MECHANIC_PARENT`: 101
+=======
+- `decision`: 88
+- `guard_family`: 111
+- `mechanic_parent`: 10
+- `owner_surface`: 47
+- `repo`: 1
+- `source_surface`: 467
+- `stack_lane`: 35
+- `status`: 3
+- `surface_class`: 81
+
+## Edge Types
+
+- `CITES_SOURCE_SURFACE`: 780
+- `DATED`: 88
+- `GUARDED_BY`: 239
+- `HAS_STATUS`: 88
+- `HAS_SURFACE_CLASS`: 222
+- `IN_STACK_LANE`: 184
+- `NEXT_DECISION`: 87
+- `OWNED_BY_SURFACE`: 93
+- `OWNS_DECISION`: 88
+- `SUPERSEDED_BY`: 2
+- `UNDER_MECHANIC_PARENT`: 91
+>>>>>>> 3d891753 (feat(governed-execution): add Agent OS runtime bridge)
 
 ## Boundary
 

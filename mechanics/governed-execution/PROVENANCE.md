@@ -21,10 +21,14 @@ proof verdicts, playbook meaning, and final acceptance.
 
 ## Current Bridges
 
-- [PARTS.md](PARTS.md) maps governed-runner, autonomy-status, return-policy,
-  runtime-contracts, candidate-exports, and local-worker-path parts.
+- [PARTS.md](PARTS.md) maps governed-runner, agent-os-adapter,
+  autonomy-status, return-policy, runtime-contracts, candidate-exports, and
+  local-worker-path parts.
 - [parts/governed-runner/docs/GOVERNED_EXECUTION.md](parts/governed-runner/docs/GOVERNED_EXECUTION.md)
   owns governed execution posture.
+- [parts/agent-os-adapter/CONTRACT.md](parts/agent-os-adapter/CONTRACT.md)
+  owns the explicit runtime-side binding from `aoa-sdk` lifecycle contracts
+  into the governed runner; the SDK remains the plan and protocol owner.
 - [parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md](parts/return-policy/docs/RECURRENCE_RUNTIME_POLICY.md)
   owns bounded recurrence and return policy.
 - [parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md](parts/local-worker-path/docs/CONTEXT_BUDGET_POLICY.md)
