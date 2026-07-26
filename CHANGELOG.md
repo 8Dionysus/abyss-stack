@@ -48,6 +48,9 @@ Tracking starts with the community-docs baseline for this repository.
   observation envelope, link, freshness, or nested evidence timestamp to
   `blocked`. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
+- Rollback candidate preparation now relies on the usable, typed
+  last-known-good rollback proof and no longer blocks on or copies canary
+  evidence from the current deployment.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

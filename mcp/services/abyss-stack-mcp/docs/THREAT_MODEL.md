@@ -68,8 +68,9 @@
   through candidate-model validation;
 - rollback readiness requires a typed proof target equal to the complete
   last-known-good restoration contour, including its distinct canary route and
-  receipt; the rollback plan runs that proven canary rather than the current
-  deployment's route;
+  receipt; the rollback plan runs that proven canary and carries the usable
+  rollback proof rather than depending on current-deployment canary evidence
+  that may be failed, blocked, or expired;
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior;

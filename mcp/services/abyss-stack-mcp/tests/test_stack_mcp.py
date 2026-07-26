@@ -1071,9 +1071,9 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
         "receipt://runtime/source",
         "receipt://runtime/registry",
         "receipt://runtime/consumer",
-        "receipt://runtime/canary",
         "receipt://runtime/rollback",
     } <= evidence_refs
+    assert "receipt://runtime/canary" not in evidence_refs
 
     payload = observation(subject())
     payload["subjects"][0]["source"]["evidence"] = evidence(
@@ -1117,7 +1117,6 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
             ("consumers", 0, "evidence"),
             "rollback_consumer_evidence_not_usable",
         ),
-        (("canary", "evidence"), "canary_evidence_not_usable"),
     ),
 )
 def test_rollback_plan_requires_fresh_evidence_for_every_step(
@@ -1143,6 +1142,48 @@ def test_rollback_plan_requires_fresh_evidence_for_every_step(
             "rollback",
             expected_observation_digest=digest,
         )
+
+
+@pytest.mark.parametrize("current_canary_failure", ("blocked", "expired"))
+def test_rollback_relies_on_lkg_proof_when_current_canary_is_unusable(
+    tmp_path: Path,
+    current_canary_failure: str,
+) -> None:
+    payload = observation(subject())
+    canary_evidence = payload["subjects"][0]["canary"]["evidence"]
+    if current_canary_failure == "blocked":
+        canary_evidence["state"] = "blocked"
+        canary_evidence["reason_codes"] = ["current-deployment-failed"]
+    else:
+        canary_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+        canary_evidence["evidence_refs"][0]["expires_at"] = (
+            NOW + timedelta(minutes=1)
+        ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "rollback",
+        expected_observation_digest=digest,
+    )
+
+    plan = result["owner_payload"]["plan"]
+    assert plan["steps"][-1] == {
+        "order": 13,
+        "action": "run-grounded-canary",
+        "exact_target": "runbook://canary/aoa-kag/last-known-good",
+        "expected_effect": (
+            "prepare run-grounded-canary for operator review"
+        ),
+        "stop_on": ["unexpected-drift", "precondition-mismatch"],
+    }
+    evidence_refs = {
+        item["evidence_ref"] for item in plan["precondition_evidence"]
+    }
+    assert "receipt://runtime/rollback" in evidence_refs
+    assert "receipt://runtime/canary" not in evidence_refs
 
 
 def test_restart_plan_requires_and_carries_fresh_canary_evidence(

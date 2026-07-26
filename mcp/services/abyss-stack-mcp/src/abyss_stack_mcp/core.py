@@ -575,7 +575,7 @@ class StackMCPApplication:
             organ_id,
             target_policy_family,
         )
-        causal_links = self._subject_links(subject)
+        causal_links = self._subject_links(subject, plan_kind)
         causal_evidence = (
             *subject.freshness.evidence_refs,
             *(
@@ -1012,11 +1012,6 @@ class StackMCPApplication:
                 blockers.append("registry_evidence_not_usable")
             if not self._rollback_consumers(subject, now):
                 blockers.append("rollback_consumer_evidence_not_usable")
-            if (
-                self._effective_link_state(subject.canary.evidence, now)
-                not in usable_states
-            ):
-                blockers.append("canary_evidence_not_usable")
         return blockers
 
     @classmethod
@@ -1086,20 +1081,44 @@ class StackMCPApplication:
         )
 
     @staticmethod
-    def _subject_links(subject: RuntimeSubject) -> tuple[LinkEvidence, ...]:
-        return (
+    def _subject_links(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+    ) -> tuple[LinkEvidence, ...]:
+        links = [
             subject.source.evidence,
             subject.package.evidence,
             subject.deploy.evidence,
-            subject.process.evidence,
-            subject.endpoint.evidence,
-            subject.registry.evidence,
-            *(consumer.evidence for consumer in subject.consumers),
-            subject.proof.evidence,
-            subject.acceptance.evidence,
-            subject.canary.evidence,
-            subject.rollback.evidence,
-        )
+        ]
+        if plan_kind in {"activate", "restart"}:
+            links.extend(
+                (
+                    subject.process.evidence,
+                    subject.endpoint.evidence,
+                    subject.registry.evidence,
+                )
+            )
+        if plan_kind == "activate":
+            links.extend(
+                (
+                    *(consumer.evidence for consumer in subject.consumers),
+                    subject.proof.evidence,
+                    subject.acceptance.evidence,
+                    subject.canary.evidence,
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "rollback":
+            links.extend(
+                (
+                    subject.registry.evidence,
+                    *(consumer.evidence for consumer in subject.consumers),
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "restart":
+            links.append(subject.canary.evidence)
+        return tuple(links)
 
     @staticmethod
     def _plan_links(
@@ -1144,7 +1163,6 @@ class StackMCPApplication:
                 (
                     subject.registry.evidence,
                     plan_consumer.evidence,
-                    subject.canary.evidence,
                     subject.rollback.evidence,
                 )
             )

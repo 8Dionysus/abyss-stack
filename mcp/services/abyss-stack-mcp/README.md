@@ -61,8 +61,11 @@ and receipt. The proof carries a second typed target that must exactly equal
 that full restoration contour before readiness is accepted. Its ordered steps
 first deny discovery and activation, restore that runtime floor, restore the
 consumer registration, and finally run the proven last-known-good canary
-rather than the current deployment's canary. Restart plans
-also require and carry usable canary-route evidence. A plan expires at the
+rather than the current deployment's canary. Rollback planning relies on the
+usable rollback proof that binds that LKG route and receipt; it neither validates
+nor copies the current deployment's canary evidence, which may be failed,
+blocked, or expired in the recovery scenario. Restart plans also require and
+carry usable current-canary evidence. A plan expires at the
 earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
 planning allows at most 30 seconds of positive clock skew and rejects
