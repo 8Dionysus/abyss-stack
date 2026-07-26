@@ -482,6 +482,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "suffixed-query-key",
         "namespaced-path-key",
         "bare-assignment",
+        "embedded-bare-assignment",
         "namespaced-bare-assignment",
         "encoded-bare-assignment",
         "unparseable",
@@ -567,6 +568,10 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "bare-assignment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"api_key={secret_value}"
+        )
+    elif reference_surface == "embedded-bare-assignment":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"review receipt carries api_key={secret_value}"
         )
     elif reference_surface == "namespaced-bare-assignment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

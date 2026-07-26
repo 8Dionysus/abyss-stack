@@ -110,7 +110,7 @@ def _decoded_reference_variants(value: str, path: str) -> tuple[str, ...]:
 
 def _reject_credential_assignments(value: str, path: str) -> None:
     assignment_pattern = re.compile(
-        r"(?:^|[?&#;,/])\s*"
+        r"(?<![A-Za-z0-9_.-])"
         r"(?P<key>[A-Za-z][A-Za-z0-9_.-]*"
         r"(?:\s+[A-Za-z][A-Za-z0-9_.-]*){0,2})"
         r"\s*[=:]"
