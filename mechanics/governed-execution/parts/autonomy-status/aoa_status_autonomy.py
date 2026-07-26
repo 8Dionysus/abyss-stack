@@ -471,8 +471,6 @@ def routing_sdk_canonical_layer_check(
         else provenance
     )
     reasons: list[str] = []
-    if payload.get("ok") is not True:
-        reasons.append("route_api_surface_status_not_ok")
     if not isinstance(switch, dict):
         reasons.append("routing_switch_missing")
     else:

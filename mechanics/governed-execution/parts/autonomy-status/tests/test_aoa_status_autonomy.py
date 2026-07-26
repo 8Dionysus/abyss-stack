@@ -387,6 +387,8 @@ class AutonomyCollectorTests(unittest.TestCase):
             ),
             "stderr": "",
         }
+        surface = sdk_canonical_surface_status()
+        surface["ok"] = False
         with patch.object(self.module, "CONFIGS_ROOT", self.configs_root):
             with patch.object(
                 self.module,
@@ -396,7 +398,7 @@ class AutonomyCollectorTests(unittest.TestCase):
                 with patch.object(
                     self.module,
                     "http_get_json",
-                    return_value=sdk_canonical_surface_status(),
+                    return_value=surface,
                 ):
                     result = self.module.run_federation_layer_check(
                         "aoa-routing"
