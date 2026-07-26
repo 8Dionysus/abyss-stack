@@ -18,3 +18,8 @@ the public bridge executable. The subprocess proof supplies a deliberately
 spoofed `PYTHONPATH`; the explicit interpreter and `-I` must still select the
 packaged SDK. A release gate must repeat the suite from a clean environment
 against the packaged `aoa-sdk`, not only an SDK source checkout.
+
+The C5 paired case performs the real governed mutation through both approvals,
+keeps eval and memory refs out of the runtime outcome, composes a complete
+external-owner chain in the installed SDK, and closes the durable runtime with
+only the exact final closeout ref crossing the bridge.

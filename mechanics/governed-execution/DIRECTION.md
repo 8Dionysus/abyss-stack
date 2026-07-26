@@ -22,5 +22,7 @@ Near direction:
 - keep autonomy status as a readout, not a control-plane verdict
 - route memory, proof, playbook, and skill meaning to stronger owner
   repositories
-- compose final eval and retention closeout outside the runtime adapter
+- compose final eval, retention, checkpoint, and closeout completeness in the
+  SDK C5 projection while the runtime adapter validates only its exact
+  closeout scope
 - keep recurrence and return language bounded, evidence-linked, and reversible

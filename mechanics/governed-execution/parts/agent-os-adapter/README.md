@@ -12,6 +12,10 @@ The Python bridge must be paired with an explicit installed-SDK interpreter
 and isolated mode; the executable shebang is an operator convenience, not the
 package-binding contract.
 
+For C5, cross-owner evidence completeness is validated by the SDK before
+dispatch. This runtime owner accepts only the exact final closeout ref and
+validates its plan, session, outcome, and owner scope.
+
 The active contract is [CONTRACT](CONTRACT.md), the exact supported profile
 and plan-to-runtime mapping is [runtime-profile.v1.json](runtime-profile.v1.json),
 and the focused checks are listed in [VALIDATION](VALIDATION.md).

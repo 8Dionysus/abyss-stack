@@ -15,12 +15,27 @@ import pytest
 
 from aoa_sdk.contracts.control_plane import (
     ApprovalDecision,
+    CandidateExplanation,
+    CloseoutBundleRef,
+    ContentRef,
+    EvalVerdictRef,
+    MemoryReceiptRef,
     PlanSnapshot,
+    ProvenanceRef,
     ResumeCommand,
+    RouteDecision,
+    RouteExplanation,
+    RouteIntent,
     RunPlan,
     RuntimeProfile,
     StartCommand,
+    candidate_explanation_disposition,
     canonical_digest,
+)
+from aoa_sdk.contracts.evidence_chain import CheckpointReceiptRef
+from aoa_sdk.control_plane.evidence_chain import (
+    assemble_evidence_chain,
+    assert_evidence_chain_complete,
 )
 from aoa_sdk.control_plane.runner import AoARunner
 from aoa_sdk.runtime_adapters import (
@@ -46,10 +61,16 @@ PROFILE_PATH = PART_ROOT / "runtime-profile.v1.json"
 BRIDGE_PATH = PART_ROOT / "aoa_agent_os_runtime.py"
 BRIDGE_EXECUTABLE = STACK_ROOT / "scripts" / "aoa-agent-os-runtime"
 SUPPORT_PATH = (
-    PART_ROOT.parent
-    / "governed-runner"
-    / "tests"
-    / "governed_runner_test_support.py"
+    PART_ROOT.parent / "governed-runner" / "tests" / "governed_runner_test_support.py"
+)
+C2_INPUTS_PATH = (
+    Path(os.environ.get("AOA_SDK_SOURCE_ROOT", "."))
+    / "mechanics"
+    / "boundary-bridge"
+    / "parts"
+    / "plan-compilation-control-plane"
+    / "examples"
+    / "installed-wheel-smoke.inputs.json"
 )
 
 
@@ -85,8 +106,7 @@ def _runtime_profile(policy_path: Path) -> RuntimeProfile:
             RuntimeArtifactLocation(
                 owner_repo="abyss-stack",
                 artifact_ref=(
-                    "config-templates/Configs/agent-api/"
-                    "governed-execution-policy.yaml"
+                    "config-templates/Configs/agent-api/governed-execution-policy.yaml"
                 ),
                 local_path=str(policy_path),
             ),
@@ -94,20 +114,126 @@ def _runtime_profile(policy_path: Path) -> RuntimeProfile:
     )
 
 
+def _provenance(owner: str, artifact_ref: str) -> ProvenanceRef:
+    return ProvenanceRef(
+        owner_repo=owner,
+        artifact_ref=artifact_ref,
+        source_ref="abyss-stack-c5-paired-proof",
+        artifact_digest=ZERO_DIGEST,
+        schema_ref="paired-proof",
+        schema_version="v1",
+    )
+
+
+def _c5_route_chain(
+    plan: RunPlan,
+) -> tuple[RouteIntent, RouteDecision, RouteExplanation, RunPlan]:
+    payload = json.loads(C2_INPUTS_PATH.read_text(encoding="utf-8"))
+    base_decision = RouteDecision.model_validate(payload["decision"])
+    selected = next(
+        item
+        for item in base_decision.candidates
+        if item.candidate_id == base_decision.selected_candidate_id
+    ).model_copy(
+        update={
+            "agent": plan.scenario_binding.agent_refs[0],
+            "capability": plan.scenario_binding.capability_refs[0],
+            "scenario": plan.scenario_binding.scenario,
+        }
+    )
+    candidates = tuple(
+        selected if item.candidate_id == selected.candidate_id else item
+        for item in base_decision.candidates
+    )
+    intent = RouteIntent(
+        intent_id=base_decision.intent_ref.object_id,
+        correlation_id=plan.correlation_id,
+        objective="complete one real governed change through the C5 chain",
+        requested_by=plan.scenario_binding.agent_refs[0],
+        scenario=plan.scenario_binding.scenario,
+        requested_capability_kinds=(selected.capability.capability_kind,),
+        context_refs=plan.scenario_binding.input_refs,
+        authored_at=NOW,
+        provenance=_provenance(
+            base_decision.intent_ref.owner_repo,
+            "paired-proof/intent.json",
+        ),
+    )
+    decision = base_decision.model_copy(
+        update={
+            "correlation_id": plan.correlation_id,
+            "intent_ref": ContentRef(
+                object_id=intent.intent_id,
+                owner_repo=intent.provenance.owner_repo,
+                schema_version=intent.schema_version,
+                digest=canonical_digest(intent),
+            ),
+            "candidates": candidates,
+            "approval_requirements": (),
+        }
+    )
+    decision_ref = ContentRef(
+        object_id=decision.decision_id,
+        owner_repo=decision.provenance.owner_repo,
+        schema_version=decision.schema_version,
+        digest=canonical_digest(decision),
+    )
+    explanation = RouteExplanation(
+        explanation_id=f"explanation:{decision.decision_id}",
+        correlation_id=decision.correlation_id,
+        decision_ref=decision_ref,
+        decision_status=decision.status,
+        candidate_explanations=tuple(
+            CandidateExplanation(
+                candidate_id=item.candidate_id,
+                disposition=candidate_explanation_disposition(
+                    item,
+                    selected_candidate_id=decision.selected_candidate_id,
+                ),
+                reason_codes=item.reason_codes,
+                evidence_refs=item.evidence_refs,
+            )
+            for item in decision.candidates
+        ),
+        selected_candidate_id=decision.selected_candidate_id,
+        ambiguity_codes=tuple(
+            item for item in decision.reason_codes if item.startswith("ambiguous_")
+        ),
+        provenance=_provenance(
+            "aoa-sdk",
+            "paired-proof/explanation.json",
+        ),
+    )
+    rebound = plan.model_copy(
+        update={
+            "decision_ref": decision_ref,
+            "scenario_binding": plan.scenario_binding.model_copy(
+                update={"decision_ref": decision_ref}
+            ),
+            "plan_digest": ZERO_DIGEST,
+        }
+    )
+    rebound = rebound.model_copy(
+        update={
+            "plan_digest": canonical_digest(
+                rebound,
+                exclude={"plan_digest"},
+            )
+        }
+    )
+    return intent, decision, explanation, rebound
+
+
 def _rewrite_provenance_digests(
     value: Any,
     digests: dict[tuple[str, str], str],
 ) -> Any:
     if isinstance(value, list):
-        return [
-            _rewrite_provenance_digests(item, digests)
-            for item in value
-        ]
+        return [_rewrite_provenance_digests(item, digests) for item in value]
     if not isinstance(value, dict):
         return value
     rewritten = {
-        key: _rewrite_provenance_digests(item, digests)
-        for key, item in value.items()
+        key: _rewrite_provenance_digests(item, digests) for key, item in value.items()
     }
     owner = rewritten.get("owner_repo")
     artifact = rewritten.get("artifact_ref")
@@ -181,8 +307,7 @@ def _build_plan_and_binding(
     original_profile_key = ("abyss-stack", "runtime/agent-os/profile.json")
     source_refs = [
         profile_ref
-        if (item["owner_repo"], item["artifact_ref"])
-        == original_profile_key
+        if (item["owner_repo"], item["artifact_ref"]) == original_profile_key
         else item
         for item in payload["snapshot"]["source_refs"]
     ]
@@ -353,7 +478,14 @@ class Harness:
     state_root: Path
     backend: CountingBackend
 
-    def adapter(self) -> AbyssStackRuntimeAdapter:
+    def adapter(
+        self,
+        *,
+        plan: RunPlan | None = None,
+        binding: AbyssStackRuntimeBinding | None = None,
+    ) -> AbyssStackRuntimeAdapter:
+        selected_plan = plan or self.plan
+        selected_binding = binding or self.binding
         bridge = BRIDGE.AgentOSRuntimeBridge(
             self.state_root,
             backend=self.backend,
@@ -399,8 +531,8 @@ class Harness:
             },
         )
         return AbyssStackRuntimeAdapter(
-            profile=self.plan.runtime_profile,
-            binding=self.binding,
+            profile=selected_plan.runtime_profile,
+            binding=selected_binding,
             transport=BridgeTransport(bridge),
         )
 
@@ -525,9 +657,9 @@ def test_runner_drives_real_governed_execution_and_restores_exactly(
         resume_after_sequence=paused.last_event_sequence,
     )
     assert runner.resume(session, adapter, resume).state == "completed"
-    assert "gamma" in (
-        harness.repo_root / "docs" / "target.md"
-    ).read_text(encoding="utf-8")
+    assert "gamma" in (harness.repo_root / "docs" / "target.md").read_text(
+        encoding="utf-8"
+    )
     outcome = runner.outcome(session)
     assert outcome is not None
     assert outcome.execution_status == "succeeded"
@@ -546,19 +678,152 @@ def test_runner_drives_real_governed_execution_and_restores_exactly(
         == "completed"
     )
     assert restored_runner.outcome(session) == outcome
-    assert restored_runner.resume(session, restored_adapter, resume).state == "completed"
+    assert (
+        restored_runner.resume(session, restored_adapter, resume).state == "completed"
+    )
     assert harness.backend.prepare_calls == 1
     assert harness.backend.resume_calls == 2
+
+
+def test_complete_c5_chain_closes_real_governed_runtime(
+    harness: Harness,
+) -> None:
+    intent, decision, explanation, plan = _c5_route_chain(harness.plan)
+    binding = harness.binding.model_copy(update={"plan_digest": plan.plan_digest})
+    adapter = harness.adapter(plan=plan, binding=binding)
+    runner = AoARunner(clock=lambda: NOW, id_factory=lambda: "real-c5-chain")
+    session = runner.prepare(plan)
+    start = StartCommand(
+        command_id="command:c5:start",
+        idempotency_key="idempotency:c5:start",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=plan.plan_digest,
+        expected_revision=0,
+        issued_at=NOW + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="begin the paired C5 runtime proof",
+    )
+    assert runner.start(session, adapter, start).state == "awaiting_approval"
+    freeze_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:plan-freeze"
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(freeze_request, decision_id="decision:c5:plan-freeze"),
+        ).state
+        == "paused"
+    )
+    landing_request = next(
+        request
+        for request in runner.approval_requests(session)
+        if request.requirement_id == "approval:abyss-stack:landing"
+    )
+    assert (
+        runner.approve(
+            session,
+            _decision(landing_request, decision_id="decision:c5:landing"),
+        ).state
+        == "paused"
+    )
+    paused = runner.status(session)
+    resume = ResumeCommand(
+        command_id="command:c5:resume",
+        idempotency_key="idempotency:c5:resume",
+        session_id=session.session_id,
+        correlation_id=session.correlation_id,
+        plan_digest=plan.plan_digest,
+        expected_revision=paused.revision,
+        issued_at=paused.updated_at + timedelta(seconds=1),
+        issued_by=session.prepared_by,
+        reason="land after both explicit governed approvals",
+        resume_after_sequence=paused.last_event_sequence,
+    )
+    assert runner.resume(session, adapter, resume).state == "completed"
+    outcome = runner.outcome(session)
+    assert outcome is not None
+    assert outcome.eval_verdict_refs == ()
+    assert outcome.memory_receipt_refs == ()
+
+    eval_refs = tuple(
+        EvalVerdictRef(
+            ref_id=f"eval-verdict:{item.requirement_id}",
+            provenance=_provenance(
+                item.eval_owner_ref.owner_repo,
+                f"paired-proof/eval/{item.requirement_id}.json",
+            ),
+            satisfies_requirement_ids=(item.requirement_id,),
+        )
+        for item in plan.eval_requirements
+    )
+    memory_refs = tuple(
+        MemoryReceiptRef(
+            ref_id=f"memory-receipt:{item.requirement_id}",
+            provenance=_provenance(
+                item.memory_owner_ref.owner_repo,
+                f"paired-proof/memo/{item.requirement_id}.json",
+            ),
+            satisfies_requirement_ids=(item.requirement_id,),
+        )
+        for item in plan.retention_requirements
+    )
+    checkpoint_refs = (
+        CheckpointReceiptRef(
+            ref_id="checkpoint-receipt:real-c5-chain",
+            provenance=_provenance(
+                plan.checkpoint_policy.owner.owner_repo,
+                "paired-proof/checkpoint/reviewed.json",
+            ),
+            review_status="reviewed",
+            covered_step_ids=plan.checkpoint_policy.required_after_step_ids,
+            covers_pause=True,
+        ),
+    )
+    closeout_owners = {item.owner_ref.owner_repo for item in plan.closeout_requirements}
+    assert len(closeout_owners) == 1
+    closeout_ref = CloseoutBundleRef(
+        ref_id="closeout-receipt:real-c5-chain",
+        provenance=_provenance(
+            next(iter(closeout_owners)),
+            "paired-proof/closeout/bundle.json",
+        ),
+        satisfies_requirement_ids=tuple(
+            item.requirement_id for item in plan.closeout_requirements
+        ),
+    )
+    chain = assemble_evidence_chain(
+        intent=intent,
+        decision=decision,
+        explanation=explanation,
+        plan=plan,
+        session=session,
+        events=runner.events(session),
+        runtime_outcome=outcome,
+        eval_verdict_refs=eval_refs,
+        memory_receipt_refs=memory_refs,
+        checkpoint_receipt_refs=checkpoint_refs,
+        closeout_bundle_ref=closeout_ref,
+        assembled_at=NOW + timedelta(seconds=10),
+        assembled_by=_provenance(
+            "aoa-sdk",
+            "src/aoa_sdk/control_plane/evidence_chain.py",
+        ),
+    )
+    assert assert_evidence_chain_complete(chain) == closeout_ref
+    assert runner.closeout(session, outcome, chain).state == "closed"
+    assert adapter.status(session).closeout_ref == closeout_ref
+    assert "gamma" in (harness.repo_root / "docs" / "target.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_snapshot_drift_blocks_before_governed_execution(
     harness: Harness,
 ) -> None:
-    drift_key = next(
-        key
-        for key in harness.source_paths
-        if key[0] == "aoa-agents"
-    )
+    drift_key = next(key for key in harness.source_paths if key[0] == "aoa-agents")
     harness.source_paths[drift_key].write_text(
         '{"drift":true}\n',
         encoding="utf-8",
@@ -642,9 +907,7 @@ def test_runtime_rejects_weakened_approval_requirement(
     harness: Harness,
 ) -> None:
     requirements = list(harness.plan.approval_requirements)
-    requirements[-1] = requirements[-1].model_copy(
-        update={"renewable": True}
-    )
+    requirements[-1] = requirements[-1].model_copy(update={"renewable": True})
     weakened_plan = harness.plan.model_copy(
         update={
             "approval_requirements": tuple(requirements),

@@ -81,3 +81,9 @@ The bridge may emit a runtime evidence bundle containing governed-run
 artifacts and a runtime outcome referencing `result.summary.json`. It never
 turns a review-packet candidate into an eval verdict, memory receipt,
 checkpoint acceptance, or final closeout receipt.
+
+For C5 closeout, the SDK must first validate a complete immutable
+`EvidenceChain`. Only its exact `CloseoutBundleRef` crosses this transport
+boundary. The bridge validates that ref against its durable plan, session,
+runtime outcome, and declared closeout-owner scope; it does not re-read or
+reinterpret eval, memory, or checkpoint owner artifacts.

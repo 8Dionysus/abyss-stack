@@ -46,7 +46,7 @@ from aoa_sdk.contracts.control_plane import (  # type: ignore[import-untyped]
     StartCommand,
     assert_approval_decision_matches_request,
     assert_approvals_satisfied,
-    assert_closeout_ready,
+    assert_closeout_bundle_scope,
     assert_run_plan_digest,
     canonical_digest,
     command_digest,
@@ -60,8 +60,7 @@ BINDING_SCHEMA_VERSION = "abyss_stack_agent_os_binding_v1"
 STATE_SCHEMA_VERSION = "abyss_stack_agent_os_runtime_state_v1"
 RESPONSE_SCHEMA_VERSION = "abyss_stack_agent_os_bridge_response_v1"
 PROFILE_ARTIFACT_REF = (
-    "mechanics/governed-execution/parts/agent-os-adapter/"
-    "runtime-profile.v1.json"
+    "mechanics/governed-execution/parts/agent-os-adapter/runtime-profile.v1.json"
 )
 PART_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PART_ROOT.parents[3]
@@ -96,7 +95,9 @@ class AgentOSBridgeError(RuntimeError):
 
 
 class GovernedBackend(Protocol):
-    def prepare_run(self, request_file: str | Path, **kwargs: Any) -> dict[str, Any]: ...
+    def prepare_run(
+        self, request_file: str | Path, **kwargs: Any
+    ) -> dict[str, Any]: ...
 
     def resume_run(self, run_id: str, **kwargs: Any) -> dict[str, Any]: ...
 
@@ -240,10 +241,7 @@ class AgentOSRuntimeBridge:
             if operation == "approval_decisions":
                 return list(state["approval_decisions"])
             if operation == "command_receipts":
-                return [
-                    entry["receipt"]
-                    for entry in state["commands"]
-                ]
+                return [entry["receipt"] for entry in state["commands"]]
             if operation == "renew_approvals":
                 requested_at = _aware_from_json(
                     payload.get("requested_at"),
@@ -391,10 +389,7 @@ class AgentOSRuntimeBridge:
             ),
             "supported_effect_classes": list(profile.supported_effect_classes),
         }
-        expected = {
-            key: descriptor[key]
-            for key in compared
-        }
+        expected = {key: descriptor[key] for key in compared}
         if compared != expected or profile.provenance != expected_provenance:
             raise AgentOSBridgeError(
                 "runtime_profile_mismatch",
@@ -405,8 +400,7 @@ class AgentOSRuntimeBridge:
             for item in descriptor["required_constraint_artifacts"]
         }
         actual_keys = {
-            (item.owner_repo, item.artifact_ref)
-            for item in profile.constraint_refs
+            (item.owner_repo, item.artifact_ref) for item in profile.constraint_refs
         }
         if actual_keys != required_keys:
             raise AgentOSBridgeError(
@@ -444,8 +438,7 @@ class AgentOSRuntimeBridge:
             or binding["runtime_owner"] != "abyss-stack"
             or binding["adapter_id"] != ADAPTER_VERSION
             or binding["plan_digest"] != plan.plan_digest
-            or binding["scenario_id"]
-            != plan.scenario_binding.scenario.scenario_id
+            or binding["scenario_id"] != plan.scenario_binding.scenario.scenario_id
         ):
             raise AgentOSBridgeError(
                 "runtime_binding_mismatch",
@@ -453,9 +446,7 @@ class AgentOSRuntimeBridge:
             )
         try:
             request_ref = ProvenanceRef.model_validate(binding["request_ref"])
-            contract_ref = ProvenanceRef.model_validate(
-                binding["adapter_contract_ref"]
-            )
+            contract_ref = ProvenanceRef.model_validate(binding["adapter_contract_ref"])
         except Exception as exc:
             raise AgentOSBridgeError(
                 "runtime_binding_invalid",
@@ -467,8 +458,7 @@ class AgentOSRuntimeBridge:
                 "runtime binding contract differs from the runtime profile",
             )
         if request_ref not in plan.scenario_binding.input_refs or not any(
-            request_ref in step.input_refs
-            for step in plan.steps
+            request_ref in step.input_refs for step in plan.steps
         ):
             raise AgentOSBridgeError(
                 "runtime_request_unbound",
@@ -485,12 +475,10 @@ class AgentOSRuntimeBridge:
             label="ABI",
         )
         expected_sources = {
-            (item.owner_repo, item.artifact_ref)
-            for item in plan.snapshot.source_refs
+            (item.owner_repo, item.artifact_ref) for item in plan.snapshot.source_refs
         }
         expected_abis = {
-            (item.owner_repo, item.abi_id)
-            for item in plan.snapshot.abi_refs
+            (item.owner_repo, item.abi_id) for item in plan.snapshot.abi_refs
         }
         if set(source_locations) != expected_sources:
             raise AgentOSBridgeError(
@@ -522,8 +510,7 @@ class AgentOSRuntimeBridge:
         matches = [
             item
             for item in self.profile_descriptor["compatibility"]
-            if item["scenario_id"]
-            == plan.scenario_binding.scenario.scenario_id
+            if item["scenario_id"] == plan.scenario_binding.scenario.scenario_id
             and item["playbook_id"] == binding["playbook_id"]
         ]
         if len(matches) != 1:
@@ -593,12 +580,8 @@ class AgentOSRuntimeBridge:
                 "owner_contour_mismatch",
                 "scenario provenance differs from the admitted owner contour",
             )
-        approval_operations = set(
-            compatibility["approval_operations"].values()
-        )
-        actual_operations = {
-            item.operation for item in plan.approval_requirements
-        }
+        approval_operations = set(compatibility["approval_operations"].values())
+        actual_operations = {item.operation for item in plan.approval_requirements}
         runtime_approval_requirements = [
             {
                 "requirement_id": item.requirement_id,
@@ -606,8 +589,7 @@ class AgentOSRuntimeBridge:
                 "risk_class": item.risk_class,
                 "applies_to_step_ids": list(item.applies_to_step_ids),
                 "required_evidence_refs": [
-                    ref.model_dump(mode="json")
-                    for ref in item.required_evidence_refs
+                    ref.model_dump(mode="json") for ref in item.required_evidence_refs
                 ],
                 "expires_after_seconds": item.expires_after_seconds,
                 "renewable": item.renewable,
@@ -951,9 +933,7 @@ class AgentOSRuntimeBridge:
             command_digest=command_digest(command),
             session_id=session.session_id,
             status="applied",
-            resulting_revision=RunStatus.model_validate(
-                state["status"]
-            ).revision,
+            resulting_revision=RunStatus.model_validate(state["status"]).revision,
             event_refs=tuple(_event_ref(item) for item in new_events),
             produced_by=profile.provenance,
         )
@@ -1189,8 +1169,7 @@ class AgentOSRuntimeBridge:
         }
         request = requests.get(decision.requirement_id)
         requirements = {
-            item.requirement_id: item
-            for item in plan.approval_requirements
+            item.requirement_id: item for item in plan.approval_requirements
         }
         requirement = requirements.get(decision.requirement_id)
         if request is None or requirement is None:
@@ -1214,11 +1193,7 @@ class AgentOSRuntimeBridge:
         self._write_governed_approval(
             state,
             milestone=milestone,
-            status=(
-                "approved"
-                if decision.verdict == "approved"
-                else "rejected"
-            ),
+            status=("approved" if decision.verdict == "approved" else "rejected"),
             notes=decision.reason,
         )
         status = RunStatus.model_validate(state["status"])
@@ -1315,9 +1290,7 @@ class AgentOSRuntimeBridge:
             )
             self._store_approval_request(state, profile, request)
             return RunStatus.model_validate(state["status"])
-        failure_code = str(
-            summary.get("failure_class") or "governed_preview_failed"
-        )
+        failure_code = str(summary.get("failure_class") or "governed_preview_failed")
         self._transition(
             state,
             profile,
@@ -1422,7 +1395,7 @@ class AgentOSRuntimeBridge:
                     "runtime session already closed with another bundle",
                 )
             return status
-        assert_closeout_ready(plan, session, outcome, bundle)
+        assert_closeout_bundle_scope(plan, session, outcome, bundle)
         self._transition(
             state,
             profile,
@@ -1522,9 +1495,7 @@ class AgentOSRuntimeBridge:
             for item in plan.evidence_requirements
             if item.producer_owner == "abyss-stack"
         ]
-        governed_run_dir = (
-            self._governed_root() / self._governed_run_id(state)
-        )
+        governed_run_dir = self._governed_root() / self._governed_run_id(state)
         artifacts = []
         if governed_run_dir.exists():
             for path in sorted(governed_run_dir.rglob("*")):
@@ -1633,9 +1604,7 @@ class AgentOSRuntimeBridge:
     ) -> ApprovalRequirement:
         operation = compatibility["approval_operations"][milestone]
         matches = [
-            item
-            for item in plan.approval_requirements
-            if item.operation == operation
+            item for item in plan.approval_requirements if item.operation == operation
         ]
         if len(matches) != 1:
             raise AgentOSBridgeError(
@@ -1651,9 +1620,7 @@ class AgentOSRuntimeBridge:
     ) -> Literal["plan_freeze", "landing"]:
         matches = [
             milestone
-            for milestone, expected in compatibility[
-                "approval_operations"
-            ].items()
+            for milestone, expected in compatibility["approval_operations"].items()
             if expected == operation
         ]
         if matches == ["plan_freeze"]:
@@ -1741,24 +1708,18 @@ class AgentOSRuntimeBridge:
         outcome_ref: ContentRef | None = None,
     ) -> ExecutionEvent:
         session = SessionHandle.model_validate(state["session"])
-        events = [
-            ExecutionEvent.model_validate(item)
-            for item in state["events"]
-        ]
+        events = [ExecutionEvent.model_validate(item) for item in state["events"]]
         emitted_at = self._event_time(state, at)
         sequence = len(events)
         event = ExecutionEvent(
             event_id=(
-                f"abyss-stack-event:{_session_token(session.session_id)}:"
-                f"{sequence}"
+                f"abyss-stack-event:{_session_token(session.session_id)}:{sequence}"
             ),
             event_stream_id=session.event_stream_id,
             session_id=session.session_id,
             correlation_id=session.correlation_id,
             sequence=sequence,
-            previous_event_digest=(
-                events[-1].event_digest if events else None
-            ),
+            previous_event_digest=(events[-1].event_digest if events else None),
             event_digest=ZERO_DIGEST,
             event_kind=event_kind,
             emitted_at=emitted_at,
@@ -1773,9 +1734,7 @@ class AgentOSRuntimeBridge:
             evidence_refs=evidence_refs,
             outcome_ref=outcome_ref,
         )
-        event = event.model_copy(
-            update={"event_digest": execution_event_digest(event)}
-        )
+        event = event.model_copy(update={"event_digest": execution_event_digest(event)})
         state["events"].append(event.model_dump(mode="json"))
         previous = RunStatus.model_validate(state["status"])
         state["status"] = previous.model_copy(
@@ -1798,9 +1757,7 @@ class AgentOSRuntimeBridge:
             floor = max(
                 floor,
                 _aware(
-                    ExecutionEvent.model_validate(
-                        state["events"][-1]
-                    ).emitted_at,
+                    ExecutionEvent.model_validate(state["events"][-1]).emitted_at,
                     "previous runtime event time",
                 ),
             )
@@ -1876,9 +1833,7 @@ class AgentOSRuntimeBridge:
             command_digest=command_digest(command),
             session_id=command.session_id,
             status="rejected",
-            resulting_revision=RunStatus.model_validate(
-                state["status"]
-            ).revision,
+            resulting_revision=RunStatus.model_validate(state["status"]).revision,
             rejection_code=code,
             produced_by=profile.provenance,
         )
@@ -1901,24 +1856,14 @@ class AgentOSRuntimeBridge:
 
     def _runtime_result_path(self, session_id: str) -> Path:
         return (
-            self.state_root
-            / "runtime-results"
-            / f"{_session_token(session_id)}.json"
+            self.state_root / "runtime-results" / f"{_session_token(session_id)}.json"
         )
 
     def _runtime_evidence_path(self, session_id: str) -> Path:
-        return (
-            self.state_root
-            / "evidence"
-            / f"{_session_token(session_id)}.json"
-        )
+        return self.state_root / "evidence" / f"{_session_token(session_id)}.json"
 
     def _state_path(self, session_id: str) -> Path:
-        return (
-            self.state_root
-            / "sessions"
-            / f"{_session_token(session_id)}.json"
-        )
+        return self.state_root / "sessions" / f"{_session_token(session_id)}.json"
 
     def _load_state(self, session_id: str) -> dict[str, Any] | None:
         path = self._state_path(session_id)
