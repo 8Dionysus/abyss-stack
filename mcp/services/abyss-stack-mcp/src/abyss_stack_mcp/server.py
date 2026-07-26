@@ -178,3 +178,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     mode = configured_policy_family()
     _run_server(build_server(policy_family=mode), mode)
+
+
+if __name__ == "__main__":
+    main()

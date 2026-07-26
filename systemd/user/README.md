@@ -117,6 +117,9 @@ source-addressed environment lives under
 through `ConditionPathExists` and an executable `ExecCondition` when it is
 absent or unusable. Runtime provisioning, credential provisioning, unit
 linking, start, and client registration remain separate actions.
+The units execute the installed venv module, not the mutable `Configs/src`
+tree, so a Configs sync cannot combine new service code with an older
+dependency closure; rerun runtime provisioning before a later restart.
 
 The units intentionally consume host-owned commands such as `abyss-machine`
 instead of copying host-layer implementation into `abyss-stack`.

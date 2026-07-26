@@ -16,7 +16,7 @@ Environment=AOA_MCP_PORT=5431
 Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=abyss-stack-mcp-read-bearer-token:/srv/AbyssOS/abyss-stack/Secrets/Configs/abyss-stack-mcp-read-bearer-token
 ExecCondition=/usr/bin/test -x /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python
-ExecStart=/usr/bin/env /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python /srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/scripts/abyss_stack_mcp_server.py
+ExecStart=/usr/bin/env /srv/AbyssOS/abyss-stack/Services/abyss-stack-mcp/venv/bin/python -m abyss_stack_mcp.server
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=20

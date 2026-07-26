@@ -25,6 +25,9 @@ Tracking starts with the community-docs baseline for this repository.
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
   precondition, and activation steps name the exact selected compatible
   consumer registration.
+- Rollback plans now admit fresh `rollback_required` failed-link evidence
+  without weakening other blockers, while managed units execute only the
+  digest-matched package installed in their provisioned venv.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

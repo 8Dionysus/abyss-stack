@@ -374,6 +374,43 @@ def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
         )
 
 
+def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    source_evidence = payload["subjects"][0]["source"]["evidence"]
+    source_evidence["state"] = "rollback_required"
+    source_evidence["reason_codes"] = ["failed-rollout"]
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "rollback",
+        expected_observation_digest=digest,
+    )
+    plan = result["owner_payload"]["plan"]
+    assert plan["plan_kind"] == "rollback"
+    assert "receipt://runtime/source" in {
+        item["evidence_ref"] for item in plan["precondition_evidence"]
+    }
+
+    payload = observation(subject())
+    payload["subjects"][0]["source"]["evidence"] = evidence(
+        "source",
+        state="blocked",
+    )
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="source_identity_not_usable"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "rollback",
+            expected_observation_digest=digest,
+        )
+
+
 def test_activation_requires_usable_freshness_and_runtime_readiness(
     tmp_path: Path,
 ) -> None:

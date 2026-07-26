@@ -84,6 +84,10 @@ and records the exact deployed-package content digest. Repeating the command
 with unchanged source verifies and reuses the environment. The units have a
 `ConditionPathExists` guard plus an executable `ExecCondition`, and remain
 inactive when this runtime is absent or unusable.
+They execute the package installed inside that venv, not `Configs/src`.
+Consequently, a later Configs sync cannot mix new code with an older dependency
+closure; the synced package becomes eligible for a later start only after this
+explicit reprovision step succeeds.
 
 ## Validation
 

@@ -512,7 +512,13 @@ class StackMCPApplication:
             "deploy_identity": subject.deploy.evidence,
         }
         for name, link in required_links.items():
-            if self._effective_link_state(link, now) not in usable_states:
+            effective_state = self._effective_link_state(link, now)
+            if (
+                plan_kind == "rollback"
+                and effective_state == "rollback_required"
+            ):
+                continue
+            if effective_state not in usable_states:
                 blockers.append(f"{name}_not_usable")
         if plan_kind in {"activate", "restart"}:
             if subject.registry.registry_state not in {"shadow", "admitted"}:

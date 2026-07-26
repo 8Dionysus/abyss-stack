@@ -51,7 +51,12 @@ authority.
 
 Managed units execute a stack-owned, source-addressed virtual environment under
 `Services/abyss-stack-mcp`; they never inherit dependencies from ambient
-Python. Provisioning is explicit and does not start or register either plane.
+Python or import newly synced `Configs/src` over the installed package.
+Provisioning is explicit and does not start or register either plane.
+
+`rollback_required` is admissible only for the failed source/package/deploy
+links of a rollback plan. Other unusable states remain blocked, and usable
+freshness plus exact rollback evidence are still mandatory.
 
 Published JSON Schema carries all structurally expressible conditional model
 invariants. Runtime Pydantic validation additionally owns cross-field time

@@ -879,9 +879,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
         )
         deployed_entrypoint = (
             "ExecStart=/usr/bin/env /srv/AbyssOS/abyss-stack/Services/"
-            "abyss-stack-mcp/venv/bin/python "
-            "/srv/AbyssOS/abyss-stack/Configs/mcp/services/abyss-stack-mcp/"
-            "scripts/abyss_stack_mcp_server.py"
+            "abyss-stack-mcp/venv/bin/python -m abyss_stack_mcp.server"
         )
         runtime_condition = (
             "ConditionPathExists=/srv/AbyssOS/abyss-stack/Services/"
@@ -927,6 +925,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn(runtime_condition, unit)
             self.assertIn(runtime_exec_condition, unit)
             self.assertIn(deployed_entrypoint, unit)
+            self.assertNotIn(
+                "/Configs/mcp/services/abyss-stack-mcp/scripts/"
+                "abyss_stack_mcp_server.py",
+                unit,
+            )
             self.assertIn("NoNewPrivileges=yes", unit)
             self.assertNotIn("Environment=AOA_MCP_HTTP_BEARER_TOKEN", unit)
             self.assertNotIn(str(REPO_ROOT), unit)
