@@ -197,6 +197,7 @@ class StackMCPApplication:
                     "consumer",
                     "schema",
                     "freshness",
+                    "acceptance",
                     "canary",
                     "rollback",
                     "drift",
@@ -429,6 +430,10 @@ class StackMCPApplication:
                     ]
                 )
             ),
+            "acceptance": cls._effective_link_state(
+                subject.acceptance.evidence,
+                now,
+            ),
             "canary": cls._effective_link_state(subject.canary.evidence, now),
             "rollback": cls._effective_link_state(subject.rollback.evidence, now),
         }
@@ -507,6 +512,8 @@ class StackMCPApplication:
             payload = subject.freshness.model_dump(mode="json")
             payload["effective_state"] = self._effective_freshness(subject, now)
             return payload
+        if view == "acceptance":
+            return subject.acceptance.model_dump(mode="json")
         if view == "canary":
             return subject.canary.model_dump(mode="json")
         if view == "rollback":
@@ -526,6 +533,7 @@ class StackMCPApplication:
                             subject.endpoint.evidence,
                             subject.registry.evidence,
                             *(consumer.evidence for consumer in subject.consumers),
+                            subject.acceptance.evidence,
                             subject.canary.evidence,
                             subject.rollback.evidence,
                         )
@@ -579,6 +587,19 @@ class StackMCPApplication:
                 blockers.append("process_not_active")
             if not subject.endpoint.ready:
                 blockers.append("endpoint_not_ready")
+            if (
+                not subject.acceptance.accepted
+                or self._effective_link_state(subject.acceptance.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("owner_acceptance_not_proven")
+            elif (
+                subject.acceptance.accepted_source_revision
+                != subject.source.revision
+                or subject.acceptance.accepted_package_digest
+                != subject.package.artifact_digest
+            ):
+                blockers.append("owner_acceptance_target_mismatch")
             usable_consumers = [
                 consumer
                 for consumer in subject.consumers
@@ -707,6 +728,7 @@ class StackMCPApplication:
                 )
             links.extend(
                 (
+                    subject.acceptance.evidence,
                     plan_consumer.evidence,
                     subject.canary.evidence,
                     subject.rollback.evidence,
@@ -795,6 +817,12 @@ class StackMCPApplication:
             future.add("deploy.deployed_at")
         if subject.freshness.observed_at > latest_allowed:
             future.add("freshness.observed_at")
+        if (
+            any(link is subject.acceptance.evidence for link in links)
+            and subject.acceptance.accepted_at is not None
+            and subject.acceptance.accepted_at > latest_allowed
+        ):
+            future.add("acceptance.accepted_at")
         if any(link.observed_at > latest_allowed for link in links):
             future.add("required_link.observed_at")
         if any(
@@ -827,6 +855,10 @@ class StackMCPApplication:
                 ("compare-deployed-digest", subject.deploy.tree_digest),
             ),
             "activate": (
+                (
+                    "verify-owner-acceptance",
+                    subject.acceptance.acceptance_ref or "missing",
+                ),
                 ("verify-registry-admission", subject.registry.registry_id),
                 (
                     "verify-consumer-registration",

@@ -18,8 +18,10 @@
 - external connector policy;
 - runtime execution approval.
 
-The package may report an owner acceptance ref. It cannot infer or manufacture
-owner acceptance from process state, a model response, or a canary.
+The package may report explicit evidence issued by the named acceptance owner
+and bind it to the accepted source revision and package digest. It cannot infer
+or manufacture owner acceptance from process state, a model response, or a
+canary.
 
 Direct owner adapters remain direct. This service is not a semantic proxy,
 universal bus, workflow engine, or authority merger.

@@ -7,6 +7,28 @@
   "schema_version": "abyss_stack_runtime_observation_v1",
   "subjects": [
     {
+      "acceptance": {
+        "acceptance_ref": "example://acceptance/aoa-kag",
+        "accepted": true,
+        "accepted_at": "2026-07-25T12:00:00Z",
+        "accepted_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "accepted_source_revision": "source-example-revision",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/acceptance",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "aoa-kag",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        }
+      },
       "canary": {
         "canary_ref": "example://canary/aoa-kag",
         "canary_route": "example://canary-route/aoa-kag",

@@ -32,9 +32,9 @@ DIGESTS = {
 }
 
 
-def evidence(name: str) -> dict[str, Any]:
+def evidence(name: str, *, owner: str = "abyss-stack") -> dict[str, Any]:
     ref = {
-        "owner": "abyss-stack",
+        "owner": owner,
         "evidence_ref": f"example://runtime/{name}",
         "revision": "public-example-revision",
         "observed_at": NOW.isoformat(),
@@ -126,6 +126,14 @@ def observation_example() -> dict[str, Any]:
                     "expires_at": (NOW + timedelta(hours=1)).isoformat(),
                     "evidence_refs": evidence("freshness")["evidence_refs"],
                     "reason_codes": [],
+                },
+                "acceptance": {
+                    "accepted": True,
+                    "acceptance_ref": "example://acceptance/aoa-kag",
+                    "accepted_at": NOW.isoformat(),
+                    "accepted_source_revision": "source-example-revision",
+                    "accepted_package_digest": DIGESTS["package"],
+                    "evidence": evidence("acceptance", owner="aoa-kag"),
                 },
                 "canary": {
                     "succeeded": True,

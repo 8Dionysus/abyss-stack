@@ -43,6 +43,7 @@ ObservationView = Literal[
     "consumer",
     "schema",
     "freshness",
+    "acceptance",
     "canary",
     "rollback",
     "drift",
@@ -181,11 +182,37 @@ class DeployIdentity(StrictModel):
 
 
 class ProcessObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"active": {"const": True}},
+                        "required": ["active"],
+                    },
+                    "then": {
+                        "properties": {
+                            "process_identity": {"type": "string"},
+                        },
+                        "required": ["process_identity"],
+                    },
+                }
+            ]
+        },
+    )
     unit_name: UnitName
     executable_ref: NonEmpty
     process_identity: NonEmpty | None = None
     active: bool
     evidence: LinkEvidence
+
+    @model_validator(mode="after")
+    def validate_active_identity(self) -> ProcessObservation:
+        if self.active and self.process_identity is None:
+            raise ValueError("an active process requires an observed process identity")
+        return self
 
 
 class EndpointObservation(StrictModel):
@@ -418,6 +445,75 @@ class CanaryObservation(StrictModel):
         return self
 
 
+class OwnerAcceptanceObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"accepted": {"const": True}},
+                        "required": ["accepted"],
+                    },
+                    "then": {
+                        "properties": {
+                            "acceptance_ref": {"type": "string"},
+                            "accepted_at": {"type": "string", "format": "date-time"},
+                            "accepted_source_revision": {"type": "string"},
+                            "accepted_package_digest": {"type": "string"},
+                            "evidence": {
+                                "properties": {
+                                    "state": {
+                                        "enum": ["exact", "compatible_drift"]
+                                    },
+                                    "evidence_refs": {"minItems": 1},
+                                }
+                            },
+                        },
+                        "required": [
+                            "acceptance_ref",
+                            "accepted_at",
+                            "accepted_source_revision",
+                            "accepted_package_digest",
+                            "evidence",
+                        ],
+                    },
+                }
+            ]
+        },
+    )
+    accepted: bool
+    acceptance_ref: NonEmpty | None = None
+    accepted_at: datetime | None = None
+    accepted_source_revision: NonEmpty | None = None
+    accepted_package_digest: Digest | None = None
+    evidence: LinkEvidence
+
+    @field_validator("accepted_at")
+    @classmethod
+    def require_aware_time(cls, value: datetime | None) -> datetime | None:
+        return _aware_utc(value)
+
+    @model_validator(mode="after")
+    def validate_acceptance(self) -> OwnerAcceptanceObservation:
+        acceptance_contour = (
+            self.acceptance_ref,
+            self.accepted_at,
+            self.accepted_source_revision,
+            self.accepted_package_digest,
+        )
+        if self.accepted and (
+            any(value is None for value in acceptance_contour)
+            or self.evidence.state not in {"exact", "compatible_drift"}
+            or not self.evidence.evidence_refs
+        ):
+            raise ValueError(
+                "owner acceptance requires an exact target, timestamp, and evidence"
+            )
+        return self
+
+
 class RollbackObservation(StrictModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -598,6 +694,7 @@ class RuntimeSubject(StrictModel):
     registry: RegistryObservation
     consumers: tuple[ConsumerObservation, ...]
     freshness: FreshnessObservation
+    acceptance: OwnerAcceptanceObservation
     canary: CanaryObservation
     rollback: RollbackObservation
 
@@ -614,6 +711,13 @@ class RuntimeSubject(StrictModel):
         consumer_ids = [consumer.consumer_id for consumer in self.consumers]
         if len(consumer_ids) != len(set(consumer_ids)):
             raise ValueError("consumer ids must be unique within a runtime subject")
+        if self.acceptance.accepted and not any(
+            evidence.owner == self.owners.acceptance_owner
+            for evidence in self.acceptance.evidence.evidence_refs
+        ):
+            raise ValueError(
+                "owner acceptance evidence must be issued by acceptance_owner"
+            )
         return self
 
 

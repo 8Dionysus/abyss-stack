@@ -134,6 +134,7 @@ def build_server(
                 "consumer",
                 "schema",
                 "freshness",
+                "acceptance",
                 "canary",
                 "rollback",
                 "drift",

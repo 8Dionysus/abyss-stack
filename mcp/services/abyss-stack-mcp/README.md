@@ -34,10 +34,13 @@ Every candidate remains `execution_authorized=false`, requires separate human
 approval before any effect, contains no free-form shell command, expires in at
 most ten minutes, and stops on observation drift or precondition mismatch.
 Every plan requires usable subject freshness. Activation additionally requires
-an active process, a ready endpoint, a registered consumer with the exact
-server schema digest and an overlapping MCP protocol version, a grounded
-canary, and usable rollback proof. The selected compatible consumer's exact
-`registration_ref` is embedded in the activation step. Rollback requires
+an active process with an observed process identity, a ready endpoint, a
+registered consumer with the exact server schema digest and an overlapping MCP
+protocol version, named acceptance-owner evidence bound to the current source
+revision and package digest, a grounded canary, and usable rollback proof. The
+acceptance receipt and selected compatible consumer's exact `registration_ref`
+are embedded in activation steps and copied into the expiring precondition
+evidence. Rollback requires
 usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
 those proofs into the candidate. A ready rollback proof must identify the
@@ -67,10 +70,11 @@ HTTP endpoints, and unsupported effect classes. Expired observations remain
 visible as stale read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
-successful canaries, rollback readiness, and policy/effect pairing. The
-Pydantic loader remains the final authority for loopback endpoint parsing,
-relative clock-skew, relational timestamp, uniqueness, and content-address
-checks that JSON Schema cannot express.
+active-process identity, accepted-target completeness, successful canaries,
+rollback readiness, and policy/effect pairing. The Pydantic loader remains the
+final authority for loopback endpoint parsing, relative clock-skew, relational
+timestamp, acceptance-owner provenance, target matching, uniqueness, and
+content-address checks that JSON Schema cannot express.
 
 The committed example is fictional and public-safe. It is neither a live
 runtime capture nor admission evidence.

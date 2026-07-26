@@ -18,6 +18,11 @@
 - secret-like material rejected before validation or response;
 - exact observation digest and short expiry for candidate plans;
 - structured allowlisted plan actions with no free-form command;
+- active processes require an observed process identity rather than a bare
+  boolean;
+- activation requires acceptance-owner evidence bound to the exact source
+  revision and package digest, and carries that expiring receipt into the
+  candidate;
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior.

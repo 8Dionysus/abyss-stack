@@ -25,9 +25,14 @@ DIGEST_C = "sha256:" + "c" * 64
 DIGEST_D = "sha256:" + "d" * 64
 
 
-def evidence(name: str, *, state: str = "exact") -> dict:
+def evidence(
+    name: str,
+    *,
+    state: str = "exact",
+    owner: str = "abyss-stack",
+) -> dict:
     ref = {
-        "owner": "abyss-stack",
+        "owner": owner,
         "evidence_ref": f"receipt://runtime/{name}",
         "revision": "stack-rev-1",
         "observed_at": NOW.isoformat(),
@@ -121,6 +126,14 @@ def subject(
             "observed_at": NOW.isoformat(),
             "expires_at": (NOW + timedelta(hours=1)).isoformat(),
             "evidence_refs": evidence("freshness")["evidence_refs"],
+        },
+        "acceptance": {
+            "accepted": True,
+            "acceptance_ref": f"receipt://acceptance/{organ_id}",
+            "accepted_at": NOW.isoformat(),
+            "accepted_source_revision": "source-rev-1",
+            "accepted_package_digest": DIGEST_B,
+            "evidence": evidence("acceptance", owner=organ_id),
         },
         "canary": {
             "succeeded": True,
@@ -219,6 +232,24 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
     with pytest.raises(ValidationError, match="complete last-known-good contour"):
         RuntimeObservation.model_validate(payload)
 
+    payload = observation(subject())
+    payload["subjects"][0]["process"]["process_identity"] = None
+    with pytest.raises(ValidationError, match="active process requires"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["acceptance_ref"] = None
+    with pytest.raises(ValidationError, match="owner acceptance requires"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["evidence"] = evidence(
+        "acceptance",
+        owner="unrelated-owner",
+    )
+    with pytest.raises(ValidationError, match="issued by acceptance_owner"):
+        RuntimeObservation.model_validate(payload)
+
 
 def test_observation_store_rejects_secrets_symlinks_and_oversize(
     tmp_path: Path,
@@ -313,6 +344,7 @@ def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
     payload = result["owner_payload"]
     assert payload["schema_bytes_loaded"] == 0
     assert payload["entries"][0]["organ_id"] == "aoa-kag"
+    assert "acceptance" in payload["entries"][0]["views"]
     assert "healthy" not in json.dumps(result).lower()
     assert result["metadata"]["execution_authorized"] is False
     assert result["metadata"]["applied_state"] == "not_applied"
@@ -414,13 +446,15 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["execution_authorized"] is False
     assert plan["approval_required_before_execution"] is True
     assert plan["exact_unit_name"] == "aoa-mcp-http@aoa-kag.service"
-    assert [step["order"] for step in plan["steps"]] == [1, 2, 3]
-    assert plan["steps"][1]["exact_target"] == "config://codex/aoa-kag"
+    assert [step["order"] for step in plan["steps"]] == [1, 2, 3, 4]
+    assert plan["steps"][0]["exact_target"] == "receipt://acceptance/aoa-kag"
+    assert plan["steps"][2]["exact_target"] == "config://codex/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
     assert "receipt://runtime/consumer" in evidence_refs
     assert "receipt://runtime/freshness" in evidence_refs
+    assert "receipt://runtime/acceptance" in evidence_refs
 
 
 def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
@@ -666,6 +700,32 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     cases.append((payload, "endpoint_not_ready"))
 
     payload = observation(subject())
+    acceptance = payload["subjects"][0]["acceptance"]
+    acceptance["accepted"] = False
+    acceptance["acceptance_ref"] = None
+    acceptance["accepted_at"] = None
+    acceptance["accepted_source_revision"] = None
+    acceptance["accepted_package_digest"] = None
+    acceptance["evidence"] = evidence("acceptance", state="unknown")
+    cases.append((payload, "owner_acceptance_not_proven"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["accepted_source_revision"] = (
+        "different-source-revision"
+    )
+    cases.append((payload, "owner_acceptance_target_mismatch"))
+
+    payload = observation(subject())
+    acceptance_evidence = payload["subjects"][0]["acceptance"]["evidence"]
+    acceptance_evidence["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    acceptance_evidence["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    cases.append((payload, "owner_acceptance_not_proven"))
+
+    payload = observation(subject())
     payload["subjects"][0]["canary"]["succeeded"] = False
     cases.append((payload, "canary_not_proven"))
 
@@ -746,7 +806,7 @@ def test_activation_targets_only_the_selected_compatible_consumer(
         expected_observation_digest=digest,
     )
     plan = result["owner_payload"]["plan"]
-    assert plan["steps"][1]["exact_target"] == "config://codex/compatible"
+    assert plan["steps"][2]["exact_target"] == "config://codex/compatible"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
@@ -826,7 +886,7 @@ def test_plan_expires_with_its_earliest_precondition(
 
 @pytest.mark.parametrize(
     "future_surface",
-    ("observation", "deploy", "freshness", "link", "evidence"),
+    ("observation", "deploy", "freshness", "acceptance", "link", "evidence"),
 )
 def test_plan_rejects_timestamps_beyond_bounded_future_skew(
     tmp_path: Path,
@@ -840,6 +900,8 @@ def test_plan_rejects_timestamps_beyond_bounded_future_skew(
         payload["subjects"][0]["deploy"]["deployed_at"] = future
     elif future_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = future
+    elif future_surface == "acceptance":
+        payload["subjects"][0]["acceptance"]["accepted_at"] = future
     elif future_surface == "link":
         payload["subjects"][0]["source"]["evidence"]["observed_at"] = future
     else:
@@ -934,8 +996,12 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     inspect_policy = read_tool_contracts["stack_runtime_inspect"]["properties"][
         "policy_family"
     ]
+    inspect_views = read_tool_contracts["stack_runtime_inspect"]["properties"]["view"][
+        "enum"
+    ]
     assert catalog_policy["anyOf"][0]["const"] == "read"
     assert inspect_policy["const"] == "read"
+    assert "acceptance" in inspect_views
 
 
 def test_policy_contours_use_distinct_ports_credentials_and_scopes(

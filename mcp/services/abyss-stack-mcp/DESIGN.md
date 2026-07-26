@@ -15,6 +15,7 @@ source
   -> endpoint
   -> registry
   -> consumer schema observation
+  -> owner acceptance observation
   -> grounded canary
   -> rollback evidence
 ```
@@ -25,11 +26,13 @@ owner-result freshness; consumer registration is not schema compatibility.
 Plan preparation therefore accepts only `exact` or `compatible_drift`
 freshness. Activation also requires process and endpoint readiness, an exact
 consumer/server schema match, at least one shared protocol version, grounded
-canary evidence, and rollback readiness.
+canary evidence, rollback readiness, and acceptance-owner evidence bound to the
+exact current source revision and package digest.
 The compatible consumer is selected deterministically and its registration
-reference becomes the exact activation-step target. Candidate expiry is capped
-by every link and evidence ref actually copied into the plan, including
-freshness evidence.
+reference becomes the exact activation-step target; owner acceptance is a
+separate preceding verification step. Candidate expiry is capped by every link
+and evidence ref actually copied into the plan, including freshness and
+acceptance evidence.
 
 ## Progressive surface
 

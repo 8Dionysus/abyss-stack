@@ -573,6 +573,129 @@
       "title": "LinkEvidence",
       "type": "object"
     },
+    "OwnerAcceptanceObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "accepted": {
+                "const": true
+              }
+            },
+            "required": [
+              "accepted"
+            ]
+          },
+          "then": {
+            "properties": {
+              "acceptance_ref": {
+                "type": "string"
+              },
+              "accepted_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "accepted_package_digest": {
+                "type": "string"
+              },
+              "accepted_source_revision": {
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  },
+                  "state": {
+                    "enum": [
+                      "exact",
+                      "compatible_drift"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "acceptance_ref",
+              "accepted_at",
+              "accepted_source_revision",
+              "accepted_package_digest",
+              "evidence"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "acceptance_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acceptance Ref"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "accepted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted At"
+        },
+        "accepted_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Package Digest"
+        },
+        "accepted_source_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Source Revision"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        }
+      },
+      "required": [
+        "accepted",
+        "evidence"
+      ],
+      "title": "OwnerAcceptanceObservation",
+      "type": "object"
+    },
     "OwnerRoles": {
       "additionalProperties": false,
       "properties": {
@@ -656,6 +779,30 @@
     },
     "ProcessObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "active": {
+                "const": true
+              }
+            },
+            "required": [
+              "active"
+            ]
+          },
+          "then": {
+            "properties": {
+              "process_identity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "process_identity"
+            ]
+          }
+        }
+      ],
       "properties": {
         "active": {
           "title": "Active",
@@ -1049,6 +1196,9 @@
         }
       ],
       "properties": {
+        "acceptance": {
+          "$ref": "#/$defs/OwnerAcceptanceObservation"
+        },
         "canary": {
           "$ref": "#/$defs/CanaryObservation"
         },
@@ -1143,6 +1293,7 @@
         "registry",
         "consumers",
         "freshness",
+        "acceptance",
         "canary",
         "rollback"
       ],
