@@ -26,7 +26,8 @@
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
   into the managed-environment identity and installed only from a private
-  digest-matched source snapshot;
+  digest-matched source snapshot, with the installed files and symlink targets
+  rehashed against a recorded runtime-content digest before any reuse;
 - fail-closed reprovisioning while either managed stack MCP plane is active,
   with a lifetime shared service lock, exclusive provision lock, and final
   stopped-state check before environment replacement;

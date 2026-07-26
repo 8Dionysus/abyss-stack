@@ -108,6 +108,20 @@ def _decoded_reference_variants(value: str, path: str) -> tuple[str, ...]:
     return tuple(variants)
 
 
+def _reject_credential_assignments(value: str, path: str) -> None:
+    assignment_pattern = re.compile(
+        r"(?:^|[?&#;,/])\s*"
+        r"(?P<key>[A-Za-z][A-Za-z0-9_.-]*"
+        r"(?:\s+[A-Za-z][A-Za-z0-9_.-]*){0,2})"
+        r"\s*[=:]"
+    )
+    for match in assignment_pattern.finditer(value):
+        if _is_forbidden_credential_key(match.group("key")):
+            raise StackMCPError(
+                f"secret-bearing reference assignment is forbidden at {path}"
+            )
+
+
 def _reject_secret_material(
     value: Any,
     path: str = "$",
@@ -134,7 +148,10 @@ def _reject_secret_material(
         lowered = value.lstrip().lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
-        decoded_variants = _decoded_reference_variants(value, path)[1:]
+        all_decoded_variants = _decoded_reference_variants(value, path)
+        for decoded_variant in all_decoded_variants:
+            _reject_credential_assignments(decoded_variant, path)
+        decoded_variants = all_decoded_variants[1:]
         for decoded_variant in decoded_variants:
             decoded_lowered = decoded_variant.lstrip().lower()
             if (

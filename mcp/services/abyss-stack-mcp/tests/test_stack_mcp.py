@@ -481,6 +481,9 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "namespaced-query-key",
         "suffixed-query-key",
         "namespaced-path-key",
+        "bare-assignment",
+        "namespaced-bare-assignment",
+        "encoded-bare-assignment",
         "unparseable",
     ),
 )
@@ -560,6 +563,18 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "namespaced-path-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/report/github_api_key/{secret_value}"
+        )
+    elif reference_surface == "bare-assignment":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"api_key={secret_value}"
+        )
+    elif reference_surface == "namespaced-bare-assignment":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"github_api_key:{secret_value}"
+        )
+    elif reference_surface == "encoded-bare-assignment":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"github_api_key%3D{secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

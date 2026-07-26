@@ -178,8 +178,11 @@ The stack MCP runtime provision action builds a source-addressed virtual
 environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
 already deployed package, installs its exact hash-locked dependency closure,
 verifies dependencies and imports, and records both source and lock digests.
-It does not link, stop, start, or register a service. Repeating it against the
-same deployed package and lock verifies and reuses the environment. A changed
+It also records a deterministic digest of the installed runtime files and
+symlink targets. It does not link, stop, start, or register a service.
+Repeating it against the same deployed package and lock rehashes the installed
+environment and reuses it only when that digest still matches; missing or
+changed runtime bytes force the same guarded rebuild path. A changed
 runtime identity fails closed while either stack MCP unit is active or its
 user-systemd state cannot be observed; stop both planes explicitly before
 reprovisioning. Each plane holds a shared runtime lock for its full lifetime;
@@ -431,7 +434,11 @@ installs the deployed package and the exact `requirements.lock` closure with
 artifact-hash enforcement into
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies `pip check` and
 runtime imports, and records a runtime identity containing both the exact
-deployed-package digest and lock digest. If that identity changes while either
+deployed-package digest and lock digest, plus a deterministic digest over the
+installed runtime files and symlink targets. Reuse requires the observed
+runtime digest to match that recorded value; otherwise provisioning rebuilds
+under the same lock and stopped-plane guards. If the source-and-lock identity
+changes while either
 `abyss-stack-mcp-read.service` or `abyss-stack-mcp-candidate.service` is
 active, or when their user-systemd state cannot be observed, the action refuses
 to mutate the environment; stopping and later starting those units remain

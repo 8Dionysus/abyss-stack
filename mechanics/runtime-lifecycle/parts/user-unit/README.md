@@ -63,16 +63,20 @@ rejected after both files are validated. Their managed Python environment
 is a separate explicit action:
 `aoa-install-systemd --provision-abyss-stack-mcp-runtime`. It installs the
 artifact-hashed dependency lock, binds deployed source and lock digests into
-the runtime identity, and refuses to replace a changed environment while
-either plane is active or its user-systemd state cannot be observed. It never
-stops or starts those units implicitly. Run `--all-user-units` first so the
-loaded unit definitions participate in the runtime lock. Each plane then holds
-a shared lock for its full process lifetime; changed provisioning takes the
-exclusive lock and repeats the stopped-state check immediately before the
-environment swap, closing starts that race the build. Linking and provisioning
-in one invocation is rejected. The environment is installed only from a
-private source-and-lock snapshot that matches the initial deployed digest, and
-deployed source is rehashed before marker publication and swap.
+the runtime identity, and records a deterministic digest of every installed
+runtime file and symlink target. Reuse rehashes the environment and a missing
+or mismatched content digest forces a guarded rebuild. Bytecode writes are
+disabled while provisioning, verifying, and running the managed units so the
+measured closure remains stable. Replacement is refused while either plane is
+active or its user-systemd state cannot be observed. It never stops or starts
+those units implicitly. Run `--all-user-units` first so the loaded unit
+definitions participate in the runtime lock. Each plane then holds a shared
+lock for its full process lifetime; changed provisioning takes the exclusive
+lock and repeats the stopped-state check immediately before the environment
+swap, closing starts that race the build. Linking and provisioning in one
+invocation is rejected. The environment is installed only from a private
+source-and-lock snapshot that matches the initial deployed digest, and deployed
+source is rehashed before marker publication and swap.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned

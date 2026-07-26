@@ -314,6 +314,54 @@ aoa_digest_abyss_stack_mcp_package() {
   printf '%s\n' "$digest"
 }
 
+aoa_digest_abyss_stack_mcp_runtime() {
+  local runtime_root="$1"
+  local digest=""
+
+  [[ -d "$runtime_root" && ! -L "$runtime_root" ]] || return 1
+  if [[ -n "$(
+    find "$runtime_root" \
+      ! -type f \
+      ! -type d \
+      ! -type l \
+      -print \
+      -quit
+  )" ]]; then
+    return 1
+  fi
+  digest="$(
+    cd "$runtime_root"
+    while IFS= read -r -d '' entry; do
+      local entry_type="${entry%% *}"
+      local entry_path="${entry#* }"
+      local entry_digest=""
+
+      if [[ "$entry_type" == "l" ]]; then
+        entry_digest="$(
+          readlink --zero -- "$entry_path" |
+            sha256sum |
+            cut -d' ' -f1
+        )" || exit 1
+      else
+        entry_digest="$(sha256sum -- "$entry_path" | cut -d' ' -f1)" || exit 1
+      fi
+      [[ "$entry_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
+      printf '%s\0%s\0%s\0' "$entry_type" "$entry_path" "$entry_digest"
+    done < <(
+      find . \
+        ! -name '.abyss-stack-mcp-runtime-identity' \
+        ! -name '.abyss-stack-mcp-runtime-content-digest' \
+        \( -type f -o -type l \) \
+        -printf '%y %p\0' |
+        LC_ALL=C sort -z
+    ) |
+      sha256sum |
+      cut -d' ' -f1
+  )" || return 1
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$digest"
+}
+
 aoa_provision_abyss_stack_mcp_runtime() {
   local source_digest=""
   local deployed_digest=""
@@ -322,7 +370,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local snapshot_lock_digest=""
   local runtime_identity=""
   local existing_identity=""
+  local runtime_content_digest=""
+  local existing_content_digest=""
+  local observed_content_digest=""
   local marker=".abyss-stack-mcp-runtime-identity"
+  local content_marker=".abyss-stack-mcp-runtime-content-digest"
   local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
   local snapshot_lock_path=""
   local source_snapshot=""
@@ -397,13 +449,27 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
       aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
-    if [[ -f "${abyss_stack_mcp_venv}/${marker}" ]]; then
+    if [[ -f "${abyss_stack_mcp_venv}/${marker}" && \
+          ! -L "${abyss_stack_mcp_venv}/${marker}" ]]; then
       existing_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
     fi
+    if [[ -f "${abyss_stack_mcp_venv}/${content_marker}" && \
+          ! -L "${abyss_stack_mcp_venv}/${content_marker}" ]]; then
+      existing_content_digest="$(
+        <"${abyss_stack_mcp_venv}/${content_marker}"
+      )"
+    fi
+    if [[ "$existing_content_digest" =~ ^[0-9a-f]{64}$ ]]; then
+      observed_content_digest="$(
+        aoa_digest_abyss_stack_mcp_runtime "$abyss_stack_mcp_venv"
+      )" || observed_content_digest=""
+    fi
     if [[ "$existing_identity" == "$runtime_identity" && \
+          "$observed_content_digest" == "$existing_content_digest" && \
           -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
-       "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
-       "${abyss_stack_mcp_venv}/bin/python" -c \
+       PYTHONDONTWRITEBYTECODE=1 \
+         "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
+       PYTHONDONTWRITEBYTECODE=1 "${abyss_stack_mcp_venv}/bin/python" -c \
          'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
@@ -462,24 +528,29 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "deployed abyss-stack MCP hash lock changed while staging its runtime snapshot"
   fi
   if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     "${temp_venv}/bin/python" -m pip install \
       --no-input \
+      --no-compile \
       --require-hashes \
       -r "$snapshot_lock_path"; then
     rm -rf -- "$temp_venv"
     aoa_die "failed to install the deployed abyss-stack MCP hash-locked dependency closure"
   fi
   if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     "${temp_venv}/bin/python" -m pip install \
       --no-input \
+      --no-compile \
       --no-deps \
       --no-build-isolation \
       "$source_snapshot"; then
     rm -rf -- "$temp_venv"
     aoa_die "failed to install the deployed abyss-stack MCP package"
   fi
-  if ! "${temp_venv}/bin/python" -m pip check >/dev/null || \
-     ! "${temp_venv}/bin/python" -c \
+  if ! PYTHONDONTWRITEBYTECODE=1 \
+       "${temp_venv}/bin/python" -m pip check >/dev/null || \
+     ! PYTHONDONTWRITEBYTECODE=1 "${temp_venv}/bin/python" -c \
        'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
@@ -495,6 +566,14 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "deployed abyss-stack MCP package changed during runtime provisioning"
   fi
   rm -rf -- "$source_snapshot"
+  runtime_content_digest="$(
+    aoa_digest_abyss_stack_mcp_runtime "$temp_venv"
+  )" || {
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to digest the provisioned abyss-stack MCP runtime"
+  }
+  printf '%s\n' "$runtime_content_digest" > "${temp_venv}/${content_marker}"
+  chmod 0644 "${temp_venv}/${content_marker}"
   printf '%s\n' "$runtime_identity" > "${temp_venv}/${marker}"
   chmod 0644 "${temp_venv}/${marker}"
 

@@ -139,8 +139,11 @@ This creates or refreshes
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, installs the exact
 `requirements.lock` closure with `--require-hashes`, verifies its dependencies,
 and records a runtime identity composed from both the deployed-package digest
-and the lock digest. Repeating the command with unchanged source and lock
-verifies and reuses the environment. A changed identity is never installed
+and the lock digest, plus a deterministic content digest of the installed
+runtime files and symlink targets. Repeating the command with unchanged source
+and lock rehashes the installed environment before verification and reuses it
+only when the content digest still matches; missing or changed installed bytes
+force a guarded rebuild. A changed identity is never installed
 over a running plane: provisioning fails closed while either the read or
 candidate unit is active or their user-systemd state cannot be observed. Stop
 both units explicitly before reprovisioning, then start or canary them as a

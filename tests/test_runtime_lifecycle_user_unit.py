@@ -630,6 +630,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
                 "  printf '%s\\n' \"$*\" >> \"$ABYSS_STACK_MCP_TEST_PIP_LOG\"\n"
+                "  if [[ \"$*\" == *\"--require-hashes\"* ]]; then\n"
+                "    package_root=\"$(dirname \"$0\")/../lib/python/site-packages/"
+                "test_package\"\n"
+                "    mkdir -p \"$package_root\"\n"
+                "    printf 'VALUE = 1\\n' > \"$package_root/__init__.py\"\n"
+                "  fi\n"
                 "  if [[ -n \"${ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD:-}\" ]]; then\n"
                 "    printf 'VALUE = 99\\n' > "
                 "\"$ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD\"\n"
@@ -700,6 +706,9 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stderr)
             venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
             marker = venv / ".abyss-stack-mcp-runtime-identity"
+            content_marker = (
+                venv / ".abyss-stack-mcp-runtime-content-digest"
+            )
             runtime_lock = (
                 stack_root
                 / "Services"
@@ -708,6 +717,10 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
+            self.assertRegex(
+                content_marker.read_text(encoding="utf-8").strip(),
+                r"\A[0-9a-f]{64}\Z",
+            )
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertTrue(runtime_lock.is_file())
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
@@ -740,6 +753,43 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertIn("already provisioned", second.stdout)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+
+            installed_dependency = (
+                venv
+                / "lib"
+                / "python"
+                / "site-packages"
+                / "test_package"
+                / "__init__.py"
+            )
+            installed_dependency.write_text(
+                "VALUE = 'tampered'\n",
+                encoding="utf-8",
+            )
+            pip_log_before_tamper = pip_log.read_text(encoding="utf-8")
+            rebuilt = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
+            self.assertIn("provisioned abyss-stack MCP runtime", rebuilt.stdout)
+            self.assertNotIn("already provisioned", rebuilt.stdout)
+            self.assertNotEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_tamper,
+            )
+            self.assertEqual(
+                installed_dependency.read_text(encoding="utf-8"),
+                "VALUE = 1\n",
+            )
             self.assertEqual(
                 marker.read_text(encoding="utf-8").strip(),
                 first_identity,
