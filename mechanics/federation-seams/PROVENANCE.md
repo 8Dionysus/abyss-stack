@@ -18,8 +18,9 @@ The refactor pattern is:
   still false
 - accept canonical SDK routing only through a distinct public-release
   `runtime` verdict and materialized owner-switch receipt; runtime rollback
-  remains possible while source ownership stays singular and archive authority
-  stays false
+  first verifies the exact predecessor manifest, ref, stable ABI, and hashes,
+  then persists a compatibility-rollback marker while source ownership stays
+  singular and archive authority stays false
 - expose only an allowlisted trust summary through health; keep full durable
   registry records and deploy-local evidence refs behind their owner boundary
 

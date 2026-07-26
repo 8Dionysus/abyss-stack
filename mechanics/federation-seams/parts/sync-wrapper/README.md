@@ -80,9 +80,12 @@ The mirror posture is `sdk_canonical`. Route-api permits ordinary closure only
 for `authorized_live_cutover` when the receipt, producer admission,
 public-release record, subject bytes, and mirror hashes agree. An isolated
 rehearsal may be canonical-ready but cannot close the live runtime. Runtime
-rollback restores the predecessor bytes but does not reverse source ownership;
-health then reports compatibility rollback instead of inventing a second
-canonical producer.
+rollback first verifies the predecessor manifest, exact source ref, stable
+ABI, and all configured file hashes. It then persists
+`manifest/routing_g5_compatibility_rollback.json` in the restored tree.
+Route-api consumes that marker after restart and keeps ordinary closure red:
+the runtime serves compatibility bytes while SDK source ownership remains
+canonical.
 The isolated mode rejects the live target shape; only
 `--authorized-live-cutover` may address
 `Knowledge/federation/aoa-routing`.

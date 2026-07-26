@@ -39,6 +39,9 @@ GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 SHA256_DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 ROUTING_SDK_CANARY_POSTURE = "sdk_g5_candidate_canary"
 ROUTING_SDK_CANONICAL_POSTURE = "sdk_canonical"
+ROUTING_COMPATIBILITY_ROLLBACK_SCHEMA = (
+    "abyss_stack_routing_g5_compatibility_rollback_v1"
+)
 ROUTING_G5_AUTHORITY_FLAGS = {
     "archive_authorized",
     "canonical_producer_switch_authorized",
@@ -392,6 +395,10 @@ def load_routing_layer(config_path: Path, config: dict[str, Any], mirror_root: P
         "tiny_model_entrypoints": load_json(mirror_root / "generated/tiny_model_entrypoints.json"),
         "mirror_manifest": load_optional_json(
             mirror_root / "manifest/federation_mirror_manifest.json"
+        ),
+        "compatibility_rollback": load_optional_json(
+            mirror_root
+            / "manifest/routing_g5_compatibility_rollback.json"
         ),
     }
 
@@ -811,6 +818,7 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
         }
     hashes = manifest.get("file_sha256")
     trust_verdict = manifest.get("trust_verdict")
+    compatibility_rollback = layer.payloads.get("compatibility_rollback")
     return {
         "manifest_present": True,
         "manifest_schema": manifest.get("schema"),
@@ -857,6 +865,38 @@ def routing_mirror_provenance_summary(layer: LayerStore) -> dict[str, Any]:
                 ),
             }
             if isinstance(manifest.get("owner_switch_receipt"), dict)
+            else None
+        ),
+        "compatibility_rollback": (
+            {
+                "schema": compatibility_rollback.get("schema"),
+                "state": compatibility_rollback.get("state"),
+                "source_owner_state": compatibility_rollback.get(
+                    "source_owner_state"
+                ),
+                "sdk_source_ref": compatibility_rollback.get(
+                    "sdk_source_ref"
+                ),
+                "predecessor_source_ref": compatibility_rollback.get(
+                    "predecessor_source_ref"
+                ),
+                "artifact_subject_digest": compatibility_rollback.get(
+                    "artifact_subject_digest"
+                ),
+                "rolled_back_at_utc": compatibility_rollback.get(
+                    "rolled_back_at_utc"
+                ),
+                "operator_change_ref_present": bool(
+                    compatibility_rollback.get("operator_change_ref")
+                ),
+                "archive_authorized": compatibility_rollback.get(
+                    "archive_authorized"
+                ),
+                "marker_digest": routing_receipt_digest(
+                    compatibility_rollback
+                ),
+            }
+            if isinstance(compatibility_rollback, dict)
             else None
         ),
         "trust_verdict": routing_trust_verdict_summary(trust_verdict),
@@ -1234,6 +1274,122 @@ def routing_receipt_digest(value: Any) -> str | None:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def routing_has_compatibility_rollback(layer: LayerStore) -> bool:
+    return isinstance(layer.payloads.get("compatibility_rollback"), dict)
+
+
+def routing_compatibility_rollback_reasons(
+    layer: LayerStore,
+) -> list[str]:
+    reasons = routing_manifest_common_reasons(layer)
+    marker = layer.payloads.get("compatibility_rollback")
+    manifest = layer.payloads.get("mirror_manifest")
+    if not isinstance(marker, dict):
+        return [
+            *reasons,
+            "routing compatibility rollback marker is missing",
+        ]
+    if marker.get("schema") != ROUTING_COMPATIBILITY_ROLLBACK_SCHEMA:
+        reasons.append("routing compatibility rollback schema is invalid")
+    if marker.get("state") != "compatibility_rollback_active":
+        reasons.append("routing compatibility rollback state is invalid")
+    if marker.get("source_owner_state") != "sdk_canonical_unchanged":
+        reasons.append(
+            "routing compatibility rollback source-owner state is invalid"
+        )
+    sdk_source_ref = marker.get("sdk_source_ref")
+    predecessor_source_ref = marker.get("predecessor_source_ref")
+    if (
+        not isinstance(sdk_source_ref, str)
+        or not GIT_OBJECT_ID_PATTERN.fullmatch(sdk_source_ref)
+    ):
+        reasons.append(
+            "routing compatibility rollback SDK source ref is invalid"
+        )
+    if (
+        not isinstance(predecessor_source_ref, str)
+        or not GIT_OBJECT_ID_PATTERN.fullmatch(predecessor_source_ref)
+    ):
+        reasons.append(
+            "routing compatibility rollback predecessor ref is invalid"
+        )
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("source_git_commit") != predecessor_source_ref
+    ):
+        reasons.append(
+            "routing compatibility rollback predecessor manifest ref drifted"
+        )
+    subject_digest = marker.get("artifact_subject_digest")
+    if (
+        not isinstance(subject_digest, str)
+        or not SHA256_DIGEST_PATTERN.fullmatch(subject_digest)
+    ):
+        reasons.append(
+            "routing compatibility rollback artifact subject is invalid"
+        )
+    if (
+        not isinstance(marker.get("operator_change_ref"), str)
+        or not marker.get("operator_change_ref")
+    ):
+        reasons.append(
+            "routing compatibility rollback operator change ref is missing"
+        )
+    rolled_back_at = marker.get("rolled_back_at_utc")
+    valid_rolled_back_at = False
+    if isinstance(rolled_back_at, str) and rolled_back_at:
+        try:
+            valid_rolled_back_at = (
+                datetime.fromisoformat(rolled_back_at).tzinfo is not None
+            )
+        except ValueError:
+            valid_rolled_back_at = False
+    if not valid_rolled_back_at:
+        reasons.append(
+            "routing compatibility rollback timestamp is invalid"
+        )
+    if marker.get("archive_authorized") is not False:
+        reasons.append(
+            "routing compatibility rollback must deny archive authority"
+        )
+    if isinstance(manifest, dict):
+        if marker.get(
+            "predecessor_manifest_digest"
+        ) != routing_receipt_digest(manifest):
+            reasons.append(
+                "routing compatibility rollback manifest digest drifted"
+            )
+        file_hashes = manifest.get("file_sha256")
+        if marker.get(
+            "predecessor_file_hashes_digest"
+        ) != routing_receipt_digest(file_hashes):
+            reasons.append(
+                "routing compatibility rollback file-hash digest drifted"
+            )
+    router_identity = layer.payloads["router"].get("artifact_identity")
+    expected_identity = {
+        "owner_repo": "aoa-routing",
+        "artifact_class": "thin_routing_readmodel_bundle",
+        "abi_epoch": "aoa_routing_thin_router_v1",
+    }
+    if (
+        not isinstance(router_identity, dict)
+        or {
+            key: router_identity.get(key)
+            for key in expected_identity
+        }
+        != expected_identity
+    ):
+        reasons.append(
+            "routing compatibility rollback predecessor identity is invalid"
+        )
+    if marker.get("predecessor_artifact_identity") != expected_identity:
+        reasons.append(
+            "routing compatibility rollback identity binding drifted"
+        )
+    return reasons
+
+
 def routing_sdk_canonical_provenance_reasons(
     layer: LayerStore,
 ) -> list[str]:
@@ -1588,6 +1744,12 @@ def routing_sdk_canonical_provenance_reasons(
 
 
 def routing_mirror_provenance_reasons(layer: LayerStore) -> list[str]:
+    if routing_has_compatibility_rollback(layer):
+        return [
+            *routing_compatibility_rollback_reasons(layer),
+            "routing compatibility rollback is degraded runtime posture "
+            "and cannot satisfy ordinary closure",
+        ]
     if routing_is_sdk_canary(layer):
         return [
             *routing_sdk_canary_provenance_reasons(layer),
@@ -1918,7 +2080,23 @@ def layer_closure_status(
         if canonical_posture
         else []
     )
+    compatibility_rollback_posture = (
+        routing_has_compatibility_rollback(layer)
+        if layer.layer == "aoa-routing"
+        else False
+    )
+    compatibility_rollback_reasons = (
+        routing_compatibility_rollback_reasons(layer)
+        if compatibility_rollback_posture
+        else []
+    )
     consumer_ready = len(consumer_reasons) == 0
+    compatibility_rollback_valid = (
+        compatibility_rollback_posture
+        and mirror_ready
+        and consumer_ready
+        and len(compatibility_rollback_reasons) == 0
+    )
     provenance_ready = len(provenance_reasons) == 0
     canary_ready = (
         canary_posture
@@ -1944,6 +2122,13 @@ def layer_closure_status(
         "canonical_posture": canonical_posture,
         "canonical_ready": canonical_ready,
         "canonical_reasons": canonical_reasons,
+        "compatibility_rollback_posture": (
+            compatibility_rollback_posture
+        ),
+        "compatibility_rollback_valid": compatibility_rollback_valid,
+        "compatibility_rollback_reasons": (
+            compatibility_rollback_reasons
+        ),
         "consumer_reasons": consumer_reasons,
         "provenance_reasons": provenance_reasons,
         "reasons": reasons,
@@ -1996,6 +2181,7 @@ def routing_switch_status_summary(
     closure = routing_status["closure_status"]
     provenance = routing_status["surface_metadata"]["mirror_provenance"]
     authority = provenance.get("g5_authority")
+    compatibility_rollback = provenance.get("compatibility_rollback")
     return {
         "posture": provenance.get("routing_producer_posture"),
         "activation_mode": provenance.get("cutover_activation_mode"),
@@ -2007,6 +2193,33 @@ def routing_switch_status_summary(
             provenance.get("cutover_activation_mode")
             == "authorized_live_cutover"
             and closure["closure_ready"]
+        ),
+        "compatibility_rollback_active": (
+            closure["compatibility_rollback_posture"]
+            and closure["compatibility_rollback_valid"]
+            and isinstance(compatibility_rollback, dict)
+            and compatibility_rollback.get("state")
+            == "compatibility_rollback_active"
+        ),
+        "runtime_owner_state": (
+            compatibility_rollback.get("state")
+            if (
+                closure["compatibility_rollback_valid"]
+                and isinstance(compatibility_rollback, dict)
+            )
+            else (
+                "compatibility_rollback_marker_invalid"
+                if closure["compatibility_rollback_posture"]
+                else None
+            )
+        ),
+        "source_owner_state": (
+            compatibility_rollback.get("source_owner_state")
+            if (
+                closure["compatibility_rollback_valid"]
+                and isinstance(compatibility_rollback, dict)
+            )
+            else None
         ),
         "canonical_switch_authorized": (
             closure["canonical_ready"]

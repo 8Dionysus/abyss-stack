@@ -345,7 +345,12 @@ scripts/aoa-routing-cutover rollback \
 
 Runtime rollback restores predecessor bytes as a compatibility posture; it
 does not reverse SDK source ownership and does not authorize repository
-archival. Route-api may report normal closure only for an
+archival. Before the swap, the command verifies the rollback tree's manifest,
+exact predecessor ref, stable ABI identity, and every configured file hash.
+It persists
+`manifest/routing_g5_compatibility_rollback.json` in the restored tree, so
+route-api keeps reporting `compatibility_rollback_active` and non-closing
+posture after restart. Route-api may report normal closure only for an
 `authorized_live_cutover` while the exact `sdk_canonical` receipt,
 public-release record, subject bytes, and mirror hashes agree. An isolated
 rehearsal remains non-closing.

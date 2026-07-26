@@ -273,6 +273,79 @@ def exact_args(fixture: dict[str, str], target: Path) -> list[str]:
     ]
 
 
+def make_predecessor_root(
+    target: Path,
+    fixture: dict[str, str],
+) -> None:
+    payloads: dict[str, object] = {
+        "generated/aoa_router.min.json": {
+            "router_version": 1,
+            "artifact_identity": {
+                "owner_repo": "aoa-routing",
+                "artifact_class": "thin_routing_readmodel_bundle",
+                "abi_epoch": "aoa_routing_thin_router_v1",
+            },
+        },
+        "generated/task_to_surface_hints.json": {
+            "version": "1",
+            "hints": [],
+        },
+    }
+    for relative, payload in payloads.items():
+        write_json(target / relative, payload)
+    required_files = list(payloads)
+    write_json(
+        target / "manifest/federation_mirror_manifest.json",
+        {
+            "schema": "abyss_stack_federation_mirror_manifest_v1",
+            "layer": "aoa-routing",
+            "source_git_commit": PREDECESSOR_REF,
+            "required_file_count": len(required_files),
+            "required_files": required_files,
+            "file_sha256": {
+                relative: hashlib.sha256(
+                    (target / relative).read_bytes()
+                ).hexdigest()
+                for relative in required_files
+            },
+            "mirror_is_authority": False,
+        },
+    )
+    (target / "predecessor.txt").write_text(
+        "rollback\n",
+        encoding="utf-8",
+    )
+
+
+def rollback_args(
+    fixture: dict[str, str],
+    *,
+    target: Path,
+    rollback_root: Path,
+    retain_root: Path,
+) -> list[str]:
+    return [
+        "rollback",
+        "--authorized-live-cutover",
+        "--target-root",
+        str(target),
+        "--rollback-root",
+        str(rollback_root),
+        "--canonical-retain-root",
+        str(retain_root),
+        "--sdk-source-ref",
+        SDK_REF,
+        "--predecessor-source-ref",
+        PREDECESSOR_REF,
+        "--subject-digest",
+        fixture["subject_digest"],
+        "--operator-change-ref",
+        "test-g5-change",
+        "--routing-config",
+        fixture["config"],
+    ]
+
+
 def test_isolated_canonical_materialization_is_receipt_bound(
     tmp_path: Path,
 ) -> None:
@@ -343,8 +416,7 @@ def test_live_cutover_and_runtime_rollback_preserve_source_owner_state(
 ) -> None:
     fixture = make_fixture(tmp_path)
     target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
-    target.mkdir(parents=True)
-    (target / "predecessor.txt").write_text("rollback\n", encoding="utf-8")
+    make_predecessor_root(target, fixture)
     rollback_root = target.parent / "aoa-routing.pre-g5"
     activated = run_cutover(
         [
@@ -358,28 +430,19 @@ def test_live_cutover_and_runtime_rollback_preserve_source_owner_state(
         ]
     )
     assert activated.returncode == 0, activated.stderr + activated.stdout
+    assert json.loads(activated.stdout)["predecessor_validation"][
+        "verified"
+    ] is True
     assert rollback_root.joinpath("predecessor.txt").is_file()
 
     retained = target.parent / "aoa-routing.sdk-canonical-retained"
     restored = run_cutover(
-        [
-            "rollback",
-            "--authorized-live-cutover",
-            "--target-root",
-            str(target),
-            "--rollback-root",
-            str(rollback_root),
-            "--canonical-retain-root",
-            str(retained),
-            "--sdk-source-ref",
-            SDK_REF,
-            "--predecessor-source-ref",
-            PREDECESSOR_REF,
-            "--subject-digest",
-            fixture["subject_digest"],
-            "--operator-change-ref",
-            "test-g5-change",
-        ]
+        rollback_args(
+            fixture,
+            target=target,
+            rollback_root=rollback_root,
+            retain_root=retained,
+        )
     )
     assert restored.returncode == 0, restored.stderr + restored.stdout
     result = json.loads(restored.stdout)
@@ -387,3 +450,56 @@ def test_live_cutover_and_runtime_rollback_preserve_source_owner_state(
     assert result["source_owner_state"] == "sdk_canonical_unchanged"
     assert result["archive_authorized"] is False
     assert target.joinpath("predecessor.txt").is_file()
+    marker = json.loads(
+        target.joinpath(
+            "manifest/routing_g5_compatibility_rollback.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert marker["state"] == "compatibility_rollback_active"
+    assert marker["source_owner_state"] == "sdk_canonical_unchanged"
+    assert marker["archive_authorized"] is False
+
+
+def test_rollback_rejects_corrupt_predecessor_before_restore(
+    tmp_path: Path,
+) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+    make_predecessor_root(target, fixture)
+    rollback_root = target.parent / "aoa-routing.pre-g5"
+    activated = run_cutover(
+        [
+            "materialize",
+            *exact_args(fixture, target),
+            "--authorized-live-cutover",
+            "--rollback-root",
+            str(rollback_root),
+            "--operator-change-ref",
+            "test-g5-change",
+        ]
+    )
+    assert activated.returncode == 0, activated.stderr + activated.stdout
+    write_json(
+        rollback_root / "generated/task_to_surface_hints.json",
+        {"tampered": True},
+    )
+
+    retained = target.parent / "aoa-routing.sdk-canonical-retained"
+    restored = run_cutover(
+        rollback_args(
+            fixture,
+            target=target,
+            rollback_root=rollback_root,
+            retain_root=retained,
+        )
+    )
+
+    assert restored.returncode == 1
+    assert "predecessor rollback file digest drifted" in json.loads(
+        restored.stdout
+    )["error"]
+    assert target.joinpath(
+        "manifest/federation_mirror_manifest.json"
+    ).is_file()
+    assert rollback_root.is_dir()
+    assert not retained.exists()

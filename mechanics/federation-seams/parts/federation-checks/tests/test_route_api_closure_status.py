@@ -226,6 +226,9 @@ datasources:
                         "router_version": 1,
                         "artifact_identity": {
                             "owner_repo": "aoa-routing",
+                            "artifact_class": (
+                                "thin_routing_readmodel_bundle"
+                            ),
                             "abi_epoch": "aoa_routing_thin_router_v1",
                         },
                     },
@@ -707,6 +710,36 @@ datasources:
         )
         return store
 
+    def make_compatibility_rollback_store(self):
+        store = self.make_store()
+        manifest = store.routing.payloads["mirror_manifest"]
+        identity = store.routing.payloads["router"]["artifact_identity"]
+        store.routing.payloads["compatibility_rollback"] = {
+            "schema": "abyss_stack_routing_g5_compatibility_rollback_v1",
+            "state": "compatibility_rollback_active",
+            "source_owner_state": "sdk_canonical_unchanged",
+            "sdk_source_ref": "d" * 40,
+            "predecessor_source_ref": manifest["source_git_commit"],
+            "artifact_subject_digest": "sha256:" + ("e" * 64),
+            "operator_change_ref": "private-test-rollback-change",
+            "rolled_back_at_utc": "2026-07-26T00:00:00+00:00",
+            "predecessor_manifest_digest": (
+                self.module.routing_receipt_digest(manifest)
+            ),
+            "predecessor_file_hashes_digest": (
+                self.module.routing_receipt_digest(
+                    manifest["file_sha256"]
+                )
+            ),
+            "predecessor_artifact_identity": {
+                "owner_repo": identity["owner_repo"],
+                "artifact_class": identity["artifact_class"],
+                "abi_epoch": identity["abi_epoch"],
+            },
+            "archive_authorized": False,
+        }
+        return store
+
     def test_health_reports_closure_summary_when_all_layers_are_ready(self) -> None:
         self.module.STORE = self.make_store()
 
@@ -838,6 +871,59 @@ datasources:
         self.assertIn(
             "routing SDK canonical G5 authority posture is invalid",
             closure["canonical_reasons"],
+        )
+
+    def test_compatibility_rollback_marker_persists_degraded_owner_state(
+        self,
+    ) -> None:
+        store = self.make_compatibility_rollback_store()
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(health["ok"])
+        self.assertTrue(closure["compatibility_rollback_posture"])
+        self.assertTrue(closure["compatibility_rollback_valid"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertTrue(
+            health["routing_switch"]["compatibility_rollback_active"]
+        )
+        self.assertEqual(
+            health["routing_switch"]["runtime_owner_state"],
+            "compatibility_rollback_active",
+        )
+        self.assertEqual(
+            health["routing_switch"]["source_owner_state"],
+            "sdk_canonical_unchanged",
+        )
+        self.assertIn(
+            "routing compatibility rollback is degraded runtime posture "
+            "and cannot satisfy ordinary closure",
+            closure["provenance_reasons"],
+        )
+        self.assertNotIn("private-test-rollback-change", json.dumps(health))
+
+    def test_invalid_compatibility_rollback_marker_stays_non_closing(
+        self,
+    ) -> None:
+        store = self.make_compatibility_rollback_store()
+        store.routing.payloads["compatibility_rollback"][
+            "archive_authorized"
+        ] = True
+        self.module.STORE = store
+
+        health = self.module.health()
+        closure = self.module.layer_status(store.routing)["closure_status"]
+
+        self.assertFalse(closure["compatibility_rollback_valid"])
+        self.assertFalse(closure["closure_ready"])
+        self.assertFalse(
+            health["routing_switch"]["compatibility_rollback_active"]
+        )
+        self.assertIn(
+            "routing compatibility rollback must deny archive authority",
+            closure["compatibility_rollback_reasons"],
         )
 
     def test_sdk_live_canary_requires_named_operator_change(self) -> None:

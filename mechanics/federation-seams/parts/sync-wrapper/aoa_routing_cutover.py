@@ -38,6 +38,7 @@ from aoa_routing_canary import (
     require_sha256_digest,
     resolved_subject_file,
     routing_required_files,
+    safe_relative_path,
     stable_digest,
     validate_subject_store,
     write_json,
@@ -48,6 +49,12 @@ CANONICAL_POSTURE = "sdk_canonical"
 OWNER_SWITCH_RECEIPT_SCHEMA = "aoa_sdk_routing_g5_owner_switch_receipt_v1"
 OWNER_SWITCH_RECEIPT_REL = "succession/routing-g5-owner-switch.json"
 CANONICAL_PROFILE_ID = "aoa-sdk-g5-canonical"
+COMPATIBILITY_ROLLBACK_SCHEMA = (
+    "abyss_stack_routing_g5_compatibility_rollback_v1"
+)
+COMPATIBILITY_ROLLBACK_REL = (
+    "manifest/routing_g5_compatibility_rollback.json"
+)
 CANONICAL_AUTHORITY = {
     "archive_authorized": False,
     "canonical_producer_switch_authorized": True,
@@ -85,6 +92,181 @@ def require_canonical_authority(value: Any, label: str) -> dict[str, bool]:
 
 def owner_switch_receipt_digest(receipt: dict[str, Any]) -> str:
     return stable_digest(receipt)
+
+
+def resolved_tree_file(root: Path, relative: str, label: str) -> Path:
+    normalized = safe_relative_path(relative, label)
+    resolved_root = root.resolve(strict=True)
+    candidate = root / normalized
+    if candidate.is_symlink():
+        raise CutoverError(f"{label} must not be a symlink: {normalized}")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(resolved_root)
+    except (FileNotFoundError, ValueError) as exc:
+        raise CutoverError(
+            f"{label} is missing or escapes its root: {normalized}"
+        ) from exc
+    if not resolved.is_file():
+        raise CutoverError(f"{label} is not a file: {normalized}")
+    return resolved
+
+
+def validate_predecessor_root(
+    root: Path,
+    *,
+    required_files: list[str],
+    predecessor_source_ref: str,
+) -> dict[str, Any]:
+    if (root / COMPATIBILITY_ROLLBACK_REL).exists():
+        raise CutoverError(
+            "predecessor rollback tree already carries a compatibility "
+            "rollback marker"
+        )
+    manifest_path = resolved_tree_file(
+        root,
+        "manifest/federation_mirror_manifest.json",
+        "predecessor rollback manifest",
+    )
+    manifest = read_json(
+        manifest_path,
+        "predecessor rollback manifest",
+    )
+    expected = {
+        "schema": "abyss_stack_federation_mirror_manifest_v1",
+        "layer": "aoa-routing",
+        "source_git_commit": predecessor_source_ref,
+        "required_file_count": len(required_files),
+        "required_files": required_files,
+        "mirror_is_authority": False,
+    }
+    for key, value in expected.items():
+        if manifest.get(key) != value:
+            raise CutoverError(f"predecessor rollback manifest drifted: {key}")
+    if manifest.get("routing_producer_posture") not in {
+        None,
+        "predecessor_canonical",
+    }:
+        raise CutoverError(
+            "predecessor rollback tree claims an incompatible producer posture"
+        )
+    hashes = manifest.get("file_sha256")
+    if not isinstance(hashes, dict) or set(hashes) != set(required_files):
+        raise CutoverError("predecessor rollback manifest hash set drifted")
+    for relative in required_files:
+        source = resolved_tree_file(
+            root,
+            relative,
+            "predecessor rollback file",
+        )
+        if hashes.get(relative) != file_digest_hex(source):
+            raise CutoverError(
+                f"predecessor rollback file digest drifted: {relative}"
+            )
+    router_path = resolved_tree_file(
+        root,
+        "generated/aoa_router.min.json",
+        "predecessor rollback router",
+    )
+    router = read_json(
+        router_path,
+        "predecessor rollback router",
+    )
+    identity = router.get("artifact_identity")
+    if (
+        not isinstance(identity, dict)
+        or identity.get("owner_repo") != "aoa-routing"
+        or identity.get("artifact_class") != ARTIFACT_CLASS
+        or identity.get("abi_epoch") != ABI_EPOCH
+    ):
+        raise CutoverError(
+            "predecessor rollback identity is not the exact stable routing ABI"
+        )
+    compact_identity = {
+        "owner_repo": identity["owner_repo"],
+        "artifact_class": identity["artifact_class"],
+        "abi_epoch": identity["abi_epoch"],
+    }
+    return {
+        "verified": True,
+        "source_ref": predecessor_source_ref,
+        "required_file_count": len(required_files),
+        "manifest_digest": stable_digest(manifest),
+        "file_hashes_digest": stable_digest(hashes),
+        "artifact_identity": compact_identity,
+    }
+
+
+def compatibility_rollback_marker(
+    *,
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+    predecessor_inspection: dict[str, Any],
+    rolled_back_at: str,
+) -> dict[str, Any]:
+    return {
+        "schema": COMPATIBILITY_ROLLBACK_SCHEMA,
+        "state": "compatibility_rollback_active",
+        "source_owner_state": "sdk_canonical_unchanged",
+        "sdk_source_ref": sdk_source_ref,
+        "predecessor_source_ref": predecessor_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "operator_change_ref": operator_change_ref,
+        "rolled_back_at_utc": rolled_back_at,
+        "predecessor_manifest_digest": predecessor_inspection[
+            "manifest_digest"
+        ],
+        "predecessor_file_hashes_digest": predecessor_inspection[
+            "file_hashes_digest"
+        ],
+        "predecessor_artifact_identity": predecessor_inspection[
+            "artifact_identity"
+        ],
+        "archive_authorized": False,
+    }
+
+
+def validate_compatibility_rollback_marker(
+    marker: dict[str, Any],
+    *,
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    operator_change_ref: str,
+    predecessor_inspection: dict[str, Any],
+) -> None:
+    expected = {
+        "schema": COMPATIBILITY_ROLLBACK_SCHEMA,
+        "state": "compatibility_rollback_active",
+        "source_owner_state": "sdk_canonical_unchanged",
+        "sdk_source_ref": sdk_source_ref,
+        "predecessor_source_ref": predecessor_source_ref,
+        "artifact_subject_digest": subject_digest,
+        "operator_change_ref": operator_change_ref,
+        "predecessor_manifest_digest": predecessor_inspection[
+            "manifest_digest"
+        ],
+        "predecessor_file_hashes_digest": predecessor_inspection[
+            "file_hashes_digest"
+        ],
+        "predecessor_artifact_identity": predecessor_inspection[
+            "artifact_identity"
+        ],
+        "archive_authorized": False,
+    }
+    for key, value in expected.items():
+        if marker.get(key) != value:
+            raise CutoverError(
+                f"compatibility rollback marker drifted: {key}"
+            )
+    if not isinstance(marker.get("rolled_back_at_utc"), str) or not marker.get(
+        "rolled_back_at_utc"
+    ):
+        raise CutoverError(
+            "compatibility rollback marker timestamp is missing"
+        )
 
 
 def validate_owner_switch_receipt(
@@ -583,6 +765,15 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         raise CutoverError(
             "authorized live cutover requires an existing target and --rollback-root"
         )
+    predecessor_inspection = (
+        validate_predecessor_root(
+            target,
+            required_files=required,
+            predecessor_source_ref=args.predecessor_source_ref,
+        )
+        if live
+        else None
+    )
     if rollback is not None:
         if rollback.exists():
             raise CutoverError(f"rollback root already exists: {rollback}")
@@ -664,6 +855,7 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             "operation": "materialize",
             "activated": activated,
             "rollback_root": str(rollback) if rollback is not None else None,
+            "predecessor_validation": predecessor_inspection,
         }
     )
     return result
@@ -732,6 +924,8 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
     )
     digest = require_sha256_digest(args.subject_digest, "subject digest")
     operator_change = require_operator_change_ref(args.operator_change_ref)
+    config = absolute_existing_file(args.routing_config, "routing config")
+    required = routing_required_files(config)
     target = absolute_runtime_path(args.target_root, "target root")
     ensure_live_target_shape(target)
     rollback_root = absolute_runtime_path(args.rollback_root, "rollback root")
@@ -761,6 +955,32 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         predecessor_source_ref=predecessor_ref,
         subject_digest=digest,
     )
+    predecessor_inspection = validate_predecessor_root(
+        rollback_root,
+        required_files=required,
+        predecessor_source_ref=predecessor_ref,
+    )
+    marker = compatibility_rollback_marker(
+        sdk_source_ref=sdk_ref,
+        predecessor_source_ref=predecessor_ref,
+        subject_digest=digest,
+        operator_change_ref=operator_change,
+        predecessor_inspection=predecessor_inspection,
+        rolled_back_at=datetime.now(timezone.utc).isoformat(),
+    )
+    write_json(rollback_root / COMPATIBILITY_ROLLBACK_REL, marker)
+    persisted_marker = read_json(
+        rollback_root / COMPATIBILITY_ROLLBACK_REL,
+        "compatibility rollback marker",
+    )
+    validate_compatibility_rollback_marker(
+        persisted_marker,
+        sdk_source_ref=sdk_ref,
+        predecessor_source_ref=predecessor_ref,
+        subject_digest=digest,
+        operator_change_ref=operator_change,
+        predecessor_inspection=predecessor_inspection,
+    )
     os.replace(target, retain_root)
     try:
         os.replace(rollback_root, target)
@@ -779,6 +999,11 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_subject_digest": digest,
         "operator_change_ref": operator_change,
         "canonical_identity_inspection": inspection,
+        "predecessor_identity_inspection": predecessor_inspection,
+        "compatibility_rollback_marker": COMPATIBILITY_ROLLBACK_REL,
+        "compatibility_rollback_marker_digest": stable_digest(
+            persisted_marker
+        ),
         "archive_authorized": False,
     }
 
@@ -828,6 +1053,10 @@ def build_parser() -> argparse.ArgumentParser:
     rollback_parser.add_argument("--predecessor-source-ref", required=True)
     rollback_parser.add_argument("--subject-digest", required=True)
     rollback_parser.add_argument("--operator-change-ref", required=True)
+    rollback_parser.add_argument(
+        "--routing-config",
+        default=str(DEFAULT_ROUTING_CONFIG),
+    )
     rollback_parser.set_defaults(handler=rollback)
     return parser
 

@@ -91,12 +91,17 @@ only compatibility and rollback.
 - Positive: canary and canonical runtime closure remain distinguishable.
 - Positive: the live mutation is owner-routed, exact-input, and atomically
   reversible.
+- Positive: rollback refuses an unverified predecessor tree and persists a
+  compatibility marker that survives route-api restart.
 - Positive: route-api exposes only allowlisted receipt and trust summaries.
 - Tradeoff: G5 requires a new canonical registry record and subject store; the
   earlier candidate record cannot be silently promoted.
 - Tradeoff: runtime rollback may temporarily serve predecessor bytes after
   G5. It does not reverse SDK source ownership, so health must report the
   compatibility rollback rather than claim predecessor canonical authority.
+- Tradeoff: live cutover now requires the predecessor mirror to carry an exact
+  manifest, stable ABI identity, and configured file hashes before it can
+  become the rollback tree.
 
 ## Boundaries
 

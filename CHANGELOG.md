@@ -12,8 +12,9 @@ Tracking starts with the community-docs baseline for this repository.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic
-  predecessor rollback, and route-api closure proof; it neither performs the
-  owner switch when merged nor authorizes predecessor archival.
+  verified predecessor rollback, a durable compatibility-rollback marker, and
+  route-api closure proof; it neither performs the owner switch when merged
+  nor authorizes predecessor archival.
 - A fail-closed `aoa-routing-canary` runtime adapter now verifies exact
   `aoa-sdk` subject-store bytes, latest `abyss-machine` `runtime_canary`
   admission, source/predecessor refs, and all-false G5 authority before
