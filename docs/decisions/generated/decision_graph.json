@@ -1,19 +1,19 @@
 {
   "authority_note": "Decision records own rationale; this graph is a generated navigation read model.",
-  "decision_count": 85,
-  "edge_count": 1895,
+  "decision_count": 86,
+  "edge_count": 1917,
   "edge_type_counts": {
-    "CITES_SOURCE_SURFACE": 763,
-    "DATED": 85,
-    "GUARDED_BY": 227,
-    "HAS_STATUS": 85,
-    "HAS_SURFACE_CLASS": 212,
-    "IN_STACK_LANE": 175,
-    "NEXT_DECISION": 84,
-    "OWNED_BY_SURFACE": 90,
-    "OWNS_DECISION": 85,
+    "CITES_SOURCE_SURFACE": 769,
+    "DATED": 86,
+    "GUARDED_BY": 231,
+    "HAS_STATUS": 86,
+    "HAS_SURFACE_CLASS": 215,
+    "IN_STACK_LANE": 178,
+    "NEXT_DECISION": 85,
+    "OWNED_BY_SURFACE": 91,
+    "OWNS_DECISION": 86,
     "SUPERSEDED_BY": 2,
-    "UNDER_MECHANIC_PARENT": 87
+    "UNDER_MECHANIC_PARENT": 88
   },
   "edges": [
     {
@@ -9058,11 +9058,116 @@
     },
     {
       "source": "decision:ABYSS-STACK-D-0085",
+      "target": "decision:ABYSS-STACK-D-0086",
+      "type": "NEXT_DECISION"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0085",
       "target": "owner_surface:mechanics/federation-seams/parts/sync-wrapper/",
       "type": "OWNED_BY_SURFACE"
     },
     {
       "source": "decision:ABYSS-STACK-D-0085",
+      "target": "mechanic_parent:federation-seams",
+      "type": "UNDER_MECHANIC_PARENT"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:config-templates/Services/route-api/app/main.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:mechanics/federation-seams/parts/federation-checks/tests/test_route_api_closure_status.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:mechanics/federation-seams/parts/sync-wrapper/README.md",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_cutover.py",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "source_surface:scripts/aoa-routing-cutover",
+      "type": "CITES_SOURCE_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "date:2026-07-25",
+      "type": "DATED"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "guard_family:artifact%20trust",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "guard_family:rollback",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "guard_family:routing%20G5",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "guard_family:runtime%20closure",
+      "type": "GUARDED_BY"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "status:accepted",
+      "type": "HAS_STATUS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "surface_class:artifact%20consumer%20admission",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "surface_class:owner%20succession",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "surface_class:runtime%20route%20contract",
+      "type": "HAS_SURFACE_CLASS"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "stack_lane:compatibility%20rollback",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "stack_lane:operator%20cutover",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "stack_lane:runtime%20mirror",
+      "type": "IN_STACK_LANE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
+      "target": "owner_surface:mechanics/federation-seams/parts/sync-wrapper/",
+      "type": "OWNED_BY_SURFACE"
+    },
+    {
+      "source": "decision:ABYSS-STACK-D-0086",
       "target": "mechanic_parent:federation-seams",
       "type": "UNDER_MECHANIC_PARENT"
     },
@@ -9490,21 +9595,26 @@
       "source": "repo:abyss-stack",
       "target": "decision:ABYSS-STACK-D-0085",
       "type": "OWNS_DECISION"
+    },
+    {
+      "source": "repo:abyss-stack",
+      "target": "decision:ABYSS-STACK-D-0086",
+      "type": "OWNS_DECISION"
     }
   ],
   "generated_by": "scripts/generate_decision_indexes.py",
-  "node_count": 838,
+  "node_count": 847,
   "node_type_counts": {
     "date": 26,
-    "decision": 85,
-    "guard_family": 101,
+    "decision": 86,
+    "guard_family": 104,
     "mechanic_parent": 10,
     "owner_surface": 45,
     "repo": 1,
-    "source_surface": 457,
-    "stack_lane": 34,
+    "source_surface": 460,
+    "stack_lane": 35,
     "status": 3,
-    "surface_class": 76
+    "surface_class": 77
   },
   "nodes": [
     {
@@ -10488,6 +10598,16 @@
       "type": "decision"
     },
     {
+      "date": "2026-07-25",
+      "id": "decision:ABYSS-STACK-D-0086",
+      "label": "ABYSS-STACK-D-0086",
+      "path": "docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md",
+      "posture": "accepted inert canonical-intake capability",
+      "status": "accepted",
+      "title": "ABYSS-STACK-D-0086 Receipt-Bound SDK Routing Cutover",
+      "type": "decision"
+    },
+    {
       "id": "guard_family:A/B/C%20freeze",
       "label": "A/B/C freeze",
       "type": "guard_family"
@@ -10833,6 +10953,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:rollback",
+      "label": "rollback",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:root%20route",
       "label": "root route",
       "type": "guard_family"
@@ -10863,6 +10988,11 @@
       "type": "guard_family"
     },
     {
+      "id": "guard_family:routing%20G5",
+      "label": "routing G5",
+      "type": "guard_family"
+    },
+    {
       "id": "guard_family:routing%20canary",
       "label": "routing canary",
       "type": "guard_family"
@@ -10870,6 +11000,11 @@
     {
       "id": "guard_family:runtime%20boundary",
       "label": "runtime boundary",
+      "type": "guard_family"
+    },
+    {
+      "id": "guard_family:runtime%20closure",
+      "label": "runtime closure",
       "type": "guard_family"
     },
     {
@@ -12739,6 +12874,11 @@
       "type": "source_surface"
     },
     {
+      "id": "source_surface:mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py",
+      "label": "mechanics/federation-seams/parts/sync-wrapper/aoa_routing_cutover.py",
+      "type": "source_surface"
+    },
+    {
       "id": "source_surface:mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh",
       "label": "mechanics/federation-seams/parts/sync-wrapper/aoa_sync_federation_surfaces.sh",
       "type": "source_surface"
@@ -12746,6 +12886,11 @@
     {
       "id": "source_surface:mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py",
       "label": "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_canary.py",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_cutover.py",
+      "label": "mechanics/federation-seams/parts/sync-wrapper/tests/test_routing_cutover.py",
       "type": "source_surface"
     },
     {
@@ -13121,6 +13266,11 @@
     {
       "id": "source_surface:scripts/aoa-routing-canary",
       "label": "scripts/aoa-routing-canary",
+      "type": "source_surface"
+    },
+    {
+      "id": "source_surface:scripts/aoa-routing-cutover",
+      "label": "scripts/aoa-routing-cutover",
       "type": "source_surface"
     },
     {
@@ -13579,6 +13729,11 @@
       "type": "stack_lane"
     },
     {
+      "id": "stack_lane:compatibility%20rollback",
+      "label": "compatibility rollback",
+      "type": "stack_lane"
+    },
+    {
       "id": "stack_lane:config%20projection",
       "label": "config projection",
       "type": "stack_lane"
@@ -13961,6 +14116,11 @@
     {
       "id": "surface_class:owner%20skill%20home",
       "label": "owner skill home",
+      "type": "surface_class"
+    },
+    {
+      "id": "surface_class:owner%20succession",
+      "label": "owner succession",
       "type": "surface_class"
     },
     {

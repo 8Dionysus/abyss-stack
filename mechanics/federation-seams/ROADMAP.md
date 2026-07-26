@@ -13,6 +13,8 @@
   `aoa-sdk` successor remains shadow-only
 - keep the exact SDK routing canary reversible and non-canonical even after its
   subject store and `runtime_canary` trust verdict pass
+- keep canonical SDK routing intake inert until one exact owner-switch receipt,
+  public-release `runtime` verdict, rollback root, and operator change agree
 
 ## Next candidates
 
@@ -22,8 +24,8 @@
 - add a seam summary matrix if owner routes become hard to scan from `PARTS.md`
 - split route-api specific federation checks if the service grows more
   independent from sync checks
-- collect isolated and operator-reviewed live canary evidence before proposing
-  any distinct G5 authority-switch contract
+- execute a distinct G5 authority switch only through the receipt-bound
+  cutover route; record live evidence without widening archive authority
 - add stronger contract tests for owner mirror inputs only when a downstream
   runtime consumer requires them
 

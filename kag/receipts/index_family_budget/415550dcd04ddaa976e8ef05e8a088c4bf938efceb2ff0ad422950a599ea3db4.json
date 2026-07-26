@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19356353,
+  "allowed_tracked_bytes": 24815326,
+  "approved_by": "repository-owner",
+  "base_ref": "8d9d4309302d90b79fdc3d68da99bb2ace511446",
+  "changed_generated_bytes": 19356353,
+  "changed_generated_files": 287,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "415550dcd04ddaa976e8ef05e8a088c4bf938efceb2ff0ad422950a599ea3db4",
+  "reason": "Admit reboot-safe receipt-bound SDK routing G5 activation and rollback with durable prepared stages, exact transaction recovery states, and file and directory fsync barriers at every rename boundary.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 24815326,
+  "tracked_bytes_max": 24117248
+}

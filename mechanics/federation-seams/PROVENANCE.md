@@ -16,6 +16,14 @@ The refactor pattern is:
 - accept SDK routing candidates only through the exact `abyss-machine`
   subject-store/trust-verdict route, with rollback and all G5 authority flags
   still false
+- accept canonical SDK routing only through a distinct public-release
+  `runtime` verdict and materialized owner-switch receipt; runtime rollback
+  first verifies the exact predecessor manifest, ref, stable ABI, and hashes,
+  then persists a compatibility-rollback marker while source ownership stays
+  singular and archive authority stays false; exact marker and tree evidence
+  also recovers termination before, between, or after the swap boundaries
+- persist canonical prepared-stage, marker, and tree-rename state through
+  file and directory `fsync` barriers before advancing either transaction
 - expose only an allowlisted trust summary through health; keep full durable
   registry records and deploy-local evidence refs behind their owner boundary
 
@@ -45,3 +53,5 @@ repositories own the meaning of their source surfaces.
 - [ABYSS-STACK-D-0085](../../docs/decisions/ABYSS-STACK-D-0085-sdk-routing-canary-intake.md)
   records why exact SDK canary readiness remains distinct from canonical
   runtime closure.
+- [ABYSS-STACK-D-0086](../../docs/decisions/ABYSS-STACK-D-0086-receipt-bound-sdk-routing-cutover.md)
+  records the separate two-phase canonical cutover and rollback law.

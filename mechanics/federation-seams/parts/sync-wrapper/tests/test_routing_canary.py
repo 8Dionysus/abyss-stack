@@ -255,6 +255,21 @@ def test_isolated_canary_materializes_and_checks_exact_candidate(tmp_path: Path)
     assert "subject-store ledger" in json.loads(rebound.stdout)["error"]
 
 
+def test_isolated_canary_rejects_live_target_shape(tmp_path: Path) -> None:
+    fixture = make_fixture(tmp_path)
+    target = tmp_path / "runtime/Knowledge/federation/aoa-routing"
+
+    result = run_canary(
+        ["materialize", *exact_args(fixture, target), "--isolated"]
+    )
+
+    assert result.returncode == 1
+    assert "requires --authorized-live-canary" in json.loads(result.stdout)[
+        "error"
+    ]
+    assert not target.exists()
+
+
 def test_canary_rejects_any_asserted_g5_authority(tmp_path: Path) -> None:
     fixture = make_fixture(tmp_path)
     trust_path = Path(fixture["trust_verdict"])

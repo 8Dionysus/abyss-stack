@@ -42,8 +42,9 @@ result bound to an artifact subject digest and latest durable record; a bare
 - exact SDK and canonical predecessor Git refs
 - a producer-admission object that keeps every G5 authority flag false
 
-`materialize --isolated` creates a rehearsal mirror. Replacing an existing
-target requires a disjoint sibling `--rollback-root`.
+`materialize --isolated` creates a rehearsal mirror and rejects the live
+target shape. Replacing another existing rehearsal target requires a
+disjoint sibling `--rollback-root`.
 `materialize --authorized-live-canary` additionally requires the live target
 shape `Knowledge/federation/aoa-routing` and a named `--operator-change-ref`;
 it still does not authorize a producer switch.
@@ -59,3 +60,42 @@ The candidate manifest uses
 `closure_ready: false`. A canary is non-canonical by construction; ordinary
 runtime health must not become green until a later, separately reviewed G5
 contract changes authority.
+
+## Canonical SDK routing cutover
+
+`scripts/aoa-routing-cutover` is the distinct G5 execution route. It does not
+reuse canary authority. It requires:
+
+- an exact subject store materialized for `consumer_intent: runtime`;
+- a latest-record `runtime` trust verdict rooted in `public_release`;
+- canonical `aoa-sdk` producer admission with the exact predecessor ref;
+- the owner-switch receipt as a verified artifact subject at
+  `succession/routing-g5-owner-switch.json`;
+- the exact G5 authority posture: switch, SDK canonical, live mutation,
+  predecessor maintenance-only, and compatibility-window start true, while
+  archive authority remains false;
+- an explicit rollback root and operator change record for live activation.
+
+The mirror posture is `sdk_canonical`. Route-api permits ordinary closure only
+for `authorized_live_cutover` when the receipt, producer admission with its
+exact trust controls, public-release record, subject bytes, and mirror hashes
+agree. An isolated rehearsal may be canonical-ready but cannot close the live
+runtime. Runtime rollback first verifies the predecessor manifest, exact
+source ref, stable ABI, and all configured file hashes. It then persists
+`manifest/routing_g5_compatibility_rollback.json` in the restored tree.
+Route-api consumes that marker after restart and keeps ordinary closure red:
+the runtime serves compatibility bytes while SDK source ownership remains
+canonical. If an atomic swap step fails, the exact staged marker is removed
+from the rollback root so that the verified predecessor remains retryable.
+If the process terminates, retry validates the exact pre-swap, between-swap,
+or already-restored state and safely continues or returns idempotent success.
+Trust controls and consumer-intent collections are type-checked before set or
+membership operations, so corrupt JSON stays fail-closed without crashing
+route-api health or the cutover command.
+The isolated mode rejects the live target shape; only
+`--authorized-live-cutover` may address
+`Knowledge/federation/aoa-routing`.
+Live activation fsyncs a validated prepared stage before moving the
+predecessor and fsyncs the common parent after each rename. Retry recognizes
+the durable prepared-before-swap, between-swaps, and already-activated states.
+Rollback applies the same durability law to its marker and tree renames.

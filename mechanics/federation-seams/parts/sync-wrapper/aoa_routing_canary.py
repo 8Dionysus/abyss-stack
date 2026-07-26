@@ -176,6 +176,7 @@ def validate_subject_store(
     *,
     required_files: list[str],
     subject_digest: str,
+    consumer_intent: str = "runtime_canary",
 ) -> dict[str, dict[str, Any]]:
     metadata = read_json(subject_root / "subject-store.json", "subject-store metadata")
     if metadata.get("schema") != "abyss_machine_artifact_subject_store_v1":
@@ -186,8 +187,11 @@ def validate_subject_store(
         raise CanaryError("subject-store owner must be aoa-sdk")
     if metadata.get("aggregate_digest") != subject_digest:
         raise CanaryError("subject-store aggregate digest drifted")
-    if metadata.get("consumer_intent") != "runtime_canary":
-        raise CanaryError("subject-store consumer intent must be runtime_canary")
+    if metadata.get("consumer_intent") != consumer_intent:
+        raise CanaryError(
+            "subject-store consumer intent must be "
+            f"{consumer_intent}"
+        )
 
     raw_files = metadata.get("files")
     if not isinstance(raw_files, list) or not raw_files:
@@ -575,12 +579,16 @@ def validate_candidate_root(
     }
 
 
-def ensure_live_target_shape(target: Path) -> None:
-    if not (
+def is_live_target_shape(target: Path) -> bool:
+    return (
         target.name == "aoa-routing"
         and target.parent.name == "federation"
         and target.parent.parent.name == "Knowledge"
-    ):
+    )
+
+
+def ensure_live_target_shape(target: Path) -> None:
+    if not is_live_target_shape(target):
         raise CanaryError(
             "authorized live target must end in Knowledge/federation/aoa-routing"
         )
@@ -600,6 +608,16 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         args.operator_change_ref = require_operator_change_ref(
             args.operator_change_ref
         )
+    else:
+        if is_live_target_shape(target):
+            raise CanaryError(
+                "a live-shaped routing target requires "
+                "--authorized-live-canary"
+            )
+        if args.operator_change_ref is not None:
+            raise CanaryError(
+                "isolated canary must not accept --operator-change-ref"
+            )
     rollback = (
         absolute_runtime_path(args.rollback_root, "rollback root")
         if args.rollback_root
