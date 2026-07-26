@@ -92,6 +92,8 @@ only compatibility and rollback.
 - Positive: canary and canonical runtime closure remain distinguishable.
 - Positive: the live mutation is owner-routed, exact-input, and atomically
   reversible.
+- Positive: live activation persists and validates a canonical prepared stage;
+  retry recognizes pre-rename, between-rename, and already-activated states.
 - Positive: rollback refuses an unverified predecessor tree and persists a
   compatibility marker that survives route-api restart.
 - Positive: an aborted rollback swap removes only the exact marker it staged,
@@ -101,6 +103,8 @@ only compatibility and rollback.
   and either continues or returns an idempotent success.
 - Positive: malformed trust-control collections degrade canonical readiness
   instead of crashing route-api health.
+- Positive: file and directory `fsync` barriers precede transaction-state
+  advancement and follow every tree rename, preserving recovery after reboot.
 - Positive: route-api exposes only allowlisted receipt and trust summaries.
 - Tradeoff: G5 requires a new canonical registry record and subject store; the
   earlier candidate record cannot be silently promoted.

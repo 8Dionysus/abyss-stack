@@ -22,6 +22,8 @@ The refactor pattern is:
   then persists a compatibility-rollback marker while source ownership stays
   singular and archive authority stays false; exact marker and tree evidence
   also recovers termination before, between, or after the swap boundaries
+- persist canonical prepared-stage, marker, and tree-rename state through
+  file and directory `fsync` barriers before advancing either transaction
 - expose only an allowlisted trust summary through health; keep full durable
   registry records and deploy-local evidence refs behind their owner boundary
 

@@ -55,6 +55,7 @@ COMPATIBILITY_ROLLBACK_SCHEMA = (
 COMPATIBILITY_ROLLBACK_REL = (
     "manifest/routing_g5_compatibility_rollback.json"
 )
+CANONICAL_PREPARED_SUFFIX = ".sdk-canonical-prepared"
 CANONICAL_AUTHORITY = {
     "archive_authorized": False,
     "canonical_producer_switch_authorized": True,
@@ -115,6 +116,45 @@ def require_string_list_contains(
         or expected not in value
     ):
         raise CutoverError(f"{label} lacks {expected}")
+
+
+def fsync_file(path: Path) -> None:
+    with path.open("rb") as handle:
+        os.fsync(handle.fileno())
+
+
+def fsync_directory(path: Path) -> None:
+    if not hasattr(os, "O_DIRECTORY"):
+        raise CutoverError(
+            "routing cutover requires directory fsync support"
+        )
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def fsync_tree(root: Path) -> None:
+    files: list[Path] = []
+    directories: list[Path] = [root]
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise CutoverError(
+                f"routing transaction tree must not contain symlinks: {path}"
+            )
+        if path.is_file():
+            files.append(path)
+        elif path.is_dir():
+            directories.append(path)
+    for path in sorted(files):
+        fsync_file(path)
+    for path in sorted(
+        directories,
+        key=lambda item: len(item.parts),
+        reverse=True,
+    ):
+        fsync_directory(path)
 
 
 def resolved_tree_file(root: Path, relative: str, label: str) -> Path:
@@ -769,6 +809,157 @@ def validate_canonical_root(
     }
 
 
+def validate_live_canonical_root(
+    target_root: Path,
+    *,
+    required_files: list[str],
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    subject_entries: dict[str, dict[str, Any]],
+    receipt: dict[str, Any],
+    operator_change_ref: str,
+) -> dict[str, Any]:
+    result = validate_canonical_root(
+        target_root,
+        required_files=required_files,
+        sdk_source_ref=sdk_source_ref,
+        predecessor_source_ref=predecessor_source_ref,
+        subject_digest=subject_digest,
+        subject_entries=subject_entries,
+        receipt=receipt,
+    )
+    manifest = read_json(
+        target_root / "manifest" / "federation_mirror_manifest.json",
+        "live canonical routing mirror manifest",
+    )
+    if manifest.get("cutover_activation_mode") != "authorized_live_cutover":
+        raise CutoverError(
+            "live canonical routing activation mode drifted"
+        )
+    if manifest.get("operator_change_ref") != operator_change_ref:
+        raise CutoverError(
+            "live canonical routing operator change ref drifted"
+        )
+    return result
+
+
+def prepare_canonical_stage(
+    *,
+    prepared: Path,
+    target: Path,
+    store: Path,
+    required_files: list[str],
+    entries: dict[str, dict[str, Any]],
+    verdict: dict[str, Any],
+    receipt: dict[str, Any],
+    sdk_source_ref: str,
+    predecessor_source_ref: str,
+    subject_digest: str,
+    authority: dict[str, bool],
+    observed_at: str | None,
+    live: bool,
+    operator_change_ref: str | None,
+) -> dict[str, Any]:
+    if prepared.is_symlink():
+        raise CutoverError("canonical prepared stage must not be a symlink")
+    if prepared.exists():
+        if not prepared.is_dir():
+            raise CutoverError(
+                "canonical prepared stage exists but is not a directory"
+            )
+        if live:
+            assert operator_change_ref is not None
+            return validate_live_canonical_root(
+                prepared,
+                required_files=required_files,
+                sdk_source_ref=sdk_source_ref,
+                predecessor_source_ref=predecessor_source_ref,
+                subject_digest=subject_digest,
+                subject_entries=entries,
+                receipt=receipt,
+                operator_change_ref=operator_change_ref,
+            )
+        return validate_canonical_root(
+            prepared,
+            required_files=required_files,
+            sdk_source_ref=sdk_source_ref,
+            predecessor_source_ref=predecessor_source_ref,
+            subject_digest=subject_digest,
+            subject_entries=entries,
+            receipt=receipt,
+        )
+
+    build = Path(
+        tempfile.mkdtemp(
+            prefix=f".{target.name}.sdk-canonical-build-",
+            dir=target.parent,
+        )
+    )
+    try:
+        for relative in required_files:
+            source = resolved_subject_file(store, relative)
+            destination = build / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, destination)
+            if file_digest_hex(destination) != entries[relative].get(
+                "sha256_hex"
+            ):
+                raise CutoverError(
+                    "copied canonical file does not match subject ledger: "
+                    f"{relative}"
+                )
+        generated_at = observed_at or datetime.now(timezone.utc).isoformat()
+        manifest = canonical_manifest(
+            target_root=build,
+            required_files=required_files,
+            trust_verdict=verdict,
+            receipt=receipt,
+            sdk_source_ref=sdk_source_ref,
+            predecessor_source_ref=predecessor_source_ref,
+            subject_digest=subject_digest,
+            authority=authority,
+            observed_at=generated_at,
+            activation_mode=(
+                "authorized_live_cutover" if live else "isolated"
+            ),
+            operator_change_ref=operator_change_ref if live else None,
+        )
+        write_json(
+            build / "manifest" / "federation_mirror_manifest.json",
+            manifest,
+        )
+        if live:
+            assert operator_change_ref is not None
+            result = validate_live_canonical_root(
+                build,
+                required_files=required_files,
+                sdk_source_ref=sdk_source_ref,
+                predecessor_source_ref=predecessor_source_ref,
+                subject_digest=subject_digest,
+                subject_entries=entries,
+                receipt=receipt,
+                operator_change_ref=operator_change_ref,
+            )
+        else:
+            result = validate_canonical_root(
+                build,
+                required_files=required_files,
+                sdk_source_ref=sdk_source_ref,
+                predecessor_source_ref=predecessor_source_ref,
+                subject_digest=subject_digest,
+                subject_entries=entries,
+                receipt=receipt,
+            )
+        fsync_tree(build)
+        os.replace(build, prepared)
+        fsync_directory(prepared.parent)
+        return result
+    finally:
+        if build.exists():
+            shutil.rmtree(build)
+
+
 def materialize(args: argparse.Namespace) -> dict[str, Any]:
     required, authority, entries, receipt, verdict = validate_inputs(args)
     target = absolute_runtime_path(args.target_root, "target root")
@@ -798,24 +989,8 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         if args.rollback_root
         else None
     )
-    if target.exists() and rollback is None:
-        raise CutoverError("replacing an existing target requires --rollback-root")
-    if live and (not target.is_dir() or rollback is None):
-        raise CutoverError(
-            "authorized live cutover requires an existing target and --rollback-root"
-        )
-    predecessor_inspection = (
-        validate_predecessor_root(
-            target,
-            required_files=required,
-            predecessor_source_ref=args.predecessor_source_ref,
-        )
-        if live
-        else None
-    )
+    prepared = target.parent / f".{target.name}{CANONICAL_PREPARED_SUFFIX}"
     if rollback is not None:
-        if rollback.exists():
-            raise CutoverError(f"rollback root already exists: {rollback}")
         if rollback == target or rollback in target.parents or target in rollback.parents:
             raise CutoverError("target and rollback roots must be disjoint")
         if rollback.parent != target.parent:
@@ -823,42 +998,53 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
                 "rollback root must share the target parent for atomic activation"
             )
     target.parent.mkdir(parents=True, exist_ok=True)
-    stage = Path(
-        tempfile.mkdtemp(
-            prefix=f".{target.name}.sdk-canonical-stage-",
-            dir=target.parent,
-        )
-    )
-    activated = False
-    rolled_aside = False
-    try:
-        for relative in required:
-            source = resolved_subject_file(store, relative)
-            destination = stage / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, destination)
-            if file_digest_hex(destination) != entries[relative].get("sha256_hex"):
-                raise CutoverError(
-                    "copied canonical file does not match subject ledger: "
-                    f"{relative}"
-                )
-        observed_at = args.observed_at or datetime.now(timezone.utc).isoformat()
-        manifest = canonical_manifest(
-            target_root=stage,
+
+    if not live:
+        if rollback is not None:
+            raise CutoverError(
+                "isolated canonical materialization must not set rollback root"
+            )
+        if target.exists():
+            result = validate_canonical_root(
+                target,
+                required_files=required,
+                sdk_source_ref=args.sdk_source_ref,
+                predecessor_source_ref=args.predecessor_source_ref,
+                subject_digest=args.subject_digest,
+                subject_entries=entries,
+                receipt=receipt,
+            )
+            result.update(
+                {
+                    "operation": "materialize",
+                    "activated": True,
+                    "idempotent_retry": True,
+                    "retry_state": "already_materialized",
+                    "rollback_root": None,
+                    "predecessor_validation": None,
+                }
+            )
+            return result
+        prepare_canonical_stage(
+            prepared=prepared,
+            target=target,
+            store=store,
             required_files=required,
-            trust_verdict=verdict,
+            entries=entries,
+            verdict=verdict,
             receipt=receipt,
             sdk_source_ref=args.sdk_source_ref,
             predecessor_source_ref=args.predecessor_source_ref,
             subject_digest=args.subject_digest,
             authority=authority,
-            observed_at=observed_at,
-            activation_mode="authorized_live_cutover" if live else "isolated",
-            operator_change_ref=args.operator_change_ref if live else None,
+            observed_at=args.observed_at,
+            live=False,
+            operator_change_ref=None,
         )
-        write_json(stage / "manifest" / "federation_mirror_manifest.json", manifest)
-        validate_canonical_root(
-            stage,
+        os.replace(prepared, target)
+        fsync_directory(target.parent)
+        result = validate_canonical_root(
+            target,
             required_files=required,
             sdk_source_ref=args.sdk_source_ref,
             predecessor_source_ref=args.predecessor_source_ref,
@@ -866,21 +1052,123 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             subject_entries=entries,
             receipt=receipt,
         )
-        if target.exists():
-            assert rollback is not None
-            os.replace(target, rollback)
-            rolled_aside = True
-        try:
-            os.replace(stage, target)
-            activated = True
-        except Exception:
-            if rolled_aside and rollback is not None and not target.exists():
-                os.replace(rollback, target)
-            raise
-    finally:
-        if stage.exists():
-            shutil.rmtree(stage)
-    result = validate_canonical_root(
+        result.update(
+            {
+                "operation": "materialize",
+                "activated": True,
+                "idempotent_retry": False,
+                "retry_state": "fresh_isolated_materialization",
+                "rollback_root": None,
+                "predecessor_validation": None,
+            }
+        )
+        return result
+
+    assert rollback is not None
+    operator_change = args.operator_change_ref
+    assert isinstance(operator_change, str)
+    initial = (
+        target.is_dir()
+        and not rollback.exists()
+        and not prepared.exists()
+    )
+    prepared_before_swap = (
+        target.is_dir()
+        and not rollback.exists()
+        and prepared.is_dir()
+    )
+    interrupted_between_swaps = (
+        not target.exists()
+        and rollback.is_dir()
+        and prepared.is_dir()
+    )
+    already_activated = (
+        target.is_dir()
+        and rollback.is_dir()
+        and not prepared.exists()
+    )
+    if not (
+        initial
+        or prepared_before_swap
+        or interrupted_between_swaps
+        or already_activated
+    ):
+        raise CutoverError(
+            "live cutover roots do not match an initial, prepared, "
+            "interrupted, or already-activated transaction state"
+        )
+
+    if already_activated:
+        predecessor_inspection = validate_predecessor_root(
+            rollback,
+            required_files=required,
+            predecessor_source_ref=args.predecessor_source_ref,
+        )
+        result = validate_live_canonical_root(
+            target,
+            required_files=required,
+            sdk_source_ref=args.sdk_source_ref,
+            predecessor_source_ref=args.predecessor_source_ref,
+            subject_digest=args.subject_digest,
+            subject_entries=entries,
+            receipt=receipt,
+            operator_change_ref=operator_change,
+        )
+        result.update(
+            {
+                "operation": "materialize",
+                "activated": True,
+                "idempotent_retry": True,
+                "retry_state": "already_activated",
+                "rollback_root": str(rollback),
+                "predecessor_validation": predecessor_inspection,
+            }
+        )
+        return result
+
+    predecessor_root = (
+        rollback if interrupted_between_swaps else target
+    )
+    predecessor_inspection = validate_predecessor_root(
+        predecessor_root,
+        required_files=required,
+        predecessor_source_ref=args.predecessor_source_ref,
+    )
+    prepare_canonical_stage(
+        prepared=prepared,
+        target=target,
+        store=store,
+        required_files=required,
+        entries=entries,
+        verdict=verdict,
+        receipt=receipt,
+        sdk_source_ref=args.sdk_source_ref,
+        predecessor_source_ref=args.predecessor_source_ref,
+        subject_digest=args.subject_digest,
+        authority=authority,
+        observed_at=args.observed_at,
+        live=True,
+        operator_change_ref=operator_change,
+    )
+
+    retry_state = "continued_after_predecessor_rename"
+    if not interrupted_between_swaps:
+        os.replace(target, rollback)
+        fsync_directory(target.parent)
+        retry_state = (
+            "continued_prepared_activation"
+            if prepared_before_swap
+            else "fresh_live_activation"
+        )
+    try:
+        os.replace(prepared, target)
+        fsync_directory(target.parent)
+    except Exception:
+        if not target.exists() and rollback.is_dir():
+            os.replace(rollback, target)
+            fsync_directory(target.parent)
+        raise
+    result = validate_live_canonical_root(
         target,
         required_files=required,
         sdk_source_ref=args.sdk_source_ref,
@@ -888,12 +1176,15 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         subject_digest=args.subject_digest,
         subject_entries=entries,
         receipt=receipt,
+        operator_change_ref=operator_change,
     )
     result.update(
         {
             "operation": "materialize",
-            "activated": activated,
-            "rollback_root": str(rollback) if rollback is not None else None,
+            "activated": True,
+            "idempotent_retry": False,
+            "retry_state": retry_state,
+            "rollback_root": str(rollback),
             "predecessor_validation": predecessor_inspection,
         }
     )
@@ -973,6 +1264,7 @@ def remove_exact_compatibility_marker(
             "to remove unverified state"
         )
     marker_path.unlink()
+    fsync_directory(marker_path.parent)
 
 
 def load_staged_compatibility_marker(
@@ -1005,6 +1297,7 @@ def write_compatibility_marker_atomic(
     temporary_path = Path(temporary_name)
     try:
         write_json(temporary_path, marker)
+        fsync_file(temporary_path)
         staged = read_json(
             temporary_path,
             "staged compatibility rollback marker",
@@ -1014,6 +1307,7 @@ def write_compatibility_marker_atomic(
                 "staged compatibility rollback marker digest drifted"
             )
         os.replace(temporary_path, marker_path)
+        fsync_directory(marker_path.parent)
     finally:
         if temporary_path.exists():
             temporary_path.unlink()
@@ -1202,12 +1496,15 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         )
         try:
             os.replace(rollback_root, target)
+            fsync_directory(target.parent)
         except Exception:
-            os.replace(retain_root, target)
-            remove_exact_compatibility_marker(
-                rollback_root,
-                expected_marker=staged_marker,
-            )
+            if not target.exists():
+                os.replace(retain_root, target)
+                fsync_directory(target.parent)
+                remove_exact_compatibility_marker(
+                    rollback_root,
+                    expected_marker=staged_marker,
+                )
             raise
         return rollback_result(
             sdk_source_ref=sdk_ref,
@@ -1274,14 +1571,29 @@ def rollback(args: argparse.Namespace) -> dict[str, Any]:
         operator_change_ref=operator_change,
         predecessor_inspection=predecessor_inspection,
     )
+    canonical_moved = False
     try:
         os.replace(target, retain_root)
+        canonical_moved = True
+        fsync_directory(target.parent)
         try:
             os.replace(rollback_root, target)
+            fsync_directory(target.parent)
         except Exception:
-            os.replace(retain_root, target)
+            if not target.exists():
+                os.replace(retain_root, target)
+                canonical_moved = False
+                fsync_directory(target.parent)
             raise
     except Exception:
+        if (
+            canonical_moved
+            and not target.exists()
+            and retain_root.is_dir()
+        ):
+            os.replace(retain_root, target)
+            canonical_moved = False
+            fsync_directory(target.parent)
         remove_exact_compatibility_marker(
             rollback_root,
             expected_marker=persisted_marker,

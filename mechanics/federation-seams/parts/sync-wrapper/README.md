@@ -95,3 +95,7 @@ route-api health or the cutover command.
 The isolated mode rejects the live target shape; only
 `--authorized-live-cutover` may address
 `Knowledge/federation/aoa-routing`.
+Live activation fsyncs a validated prepared stage before moving the
+predecessor and fsyncs the common parent after each rename. Retry recognizes
+the durable prepared-before-swap, between-swaps, and already-activated states.
+Rollback applies the same durability law to its marker and tree renames.

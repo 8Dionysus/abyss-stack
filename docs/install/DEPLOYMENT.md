@@ -327,7 +327,10 @@ Run `check` with the same exact-input flags. The separately reviewed live
 mutation replaces `--isolated` with `--authorized-live-cutover` and requires
 both a disjoint sibling `--rollback-root` and a named
 `--operator-change-ref`. It is valid only for the deployed target ending in
-`Knowledge/federation/aoa-routing`.
+`Knowledge/federation/aoa-routing`. The command first fsyncs a validated,
+durable prepared stage, then fsyncs the common parent after each tree rename.
+A repeated exact command validates and continues a prepared, between-renames,
+or already-activated state, so interruption never requires a manual rename.
 
 Rollback is explicit:
 
@@ -359,7 +362,9 @@ may report normal closure only for an `authorized_live_cutover` while the
 exact `sdk_canonical` receipt, typed producer-admission trust controls,
 public-release record, subject bytes, and mirror hashes agree. Malformed
 control collections remain non-ready instead of raising a health error. An
-isolated rehearsal remains non-closing.
+isolated rehearsal remains non-closing. The marker file is fsynced before its
+rename, its directory is fsynced afterward, and the common tree parent is
+fsynced after every rollback rename.
 
 ### `scripts/aoa-install-systemd`
 
