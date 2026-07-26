@@ -115,6 +115,10 @@ _AUTH_VALUE_PREFIXES = (
 _PROVIDER_TOKEN_PREFIXES = (
     "sk-",
     "ghp_",
+    "gho_",
+    "ghu_",
+    "ghs_",
+    "ghr_",
     "github_pat_",
     "glpat-",
     "gloas-",
@@ -822,7 +826,11 @@ class StackMCPApplication:
         return {
             "source": state(subject.source.evidence),
             "package": state(subject.package.evidence),
-            "deploy": state(subject.deploy.evidence),
+            "deploy": cls._read_deploy_state(
+                observation,
+                subject,
+                now,
+            ),
             "process": state(subject.process.evidence),
             "endpoint": state(subject.endpoint.evidence),
             "registry": state(subject.registry.evidence),
@@ -851,6 +859,26 @@ class StackMCPApplication:
             now,
             snapshot_at=observation.generated_at,
         )
+
+    @classmethod
+    def _read_deploy_state(
+        cls,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> str:
+        state = cls._read_link_state(
+            observation,
+            subject.deploy.evidence,
+            now,
+        )
+        latest_allowed = min(
+            now + MAX_PLAN_FUTURE_SKEW,
+            observation.generated_at + MAX_PLAN_FUTURE_SKEW,
+        )
+        if subject.deploy.deployed_at > latest_allowed:
+            return cls._worst_state([state, "blocked"])
+        return state
 
     @classmethod
     def _view_link_states(
@@ -943,12 +971,21 @@ class StackMCPApplication:
         view: ObservationView,
         now: datetime,
     ) -> Any:
-        def with_effective_evidence(value: Any, link: LinkEvidence) -> Any:
+        def with_effective_evidence(
+            value: Any,
+            link: LinkEvidence,
+            *,
+            effective_state: str | None = None,
+        ) -> Any:
             payload = value.model_dump(mode="json")
-            payload["effective_evidence_state"] = self._read_link_state(
-                observation,
-                link,
-                now,
+            payload["effective_evidence_state"] = (
+                effective_state
+                if effective_state is not None
+                else self._read_link_state(
+                    observation,
+                    link,
+                    now,
+                )
             )
             return payload
 
@@ -968,6 +1005,11 @@ class StackMCPApplication:
                 "deploy": with_effective_evidence(
                     subject.deploy,
                     subject.deploy.evidence,
+                    effective_state=self._read_deploy_state(
+                        observation,
+                        subject,
+                        now,
+                    ),
                 ),
             }
         if view == "parity":

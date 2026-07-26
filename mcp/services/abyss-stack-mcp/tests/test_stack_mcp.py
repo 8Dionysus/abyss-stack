@@ -878,6 +878,10 @@ def test_observation_store_rejects_gitlab_tokens_as_raw_references(
     (
         "sk-proj-reference-secret-value",
         "ghp_reference-secret-value",
+        "gho_reference-secret-value",
+        "ghu_reference-secret-value",
+        "ghs_reference-secret-value",
+        "ghr_reference-secret-value",
         "github_pat_reference-secret-value",
         "glpat-reference-secret-value",
     ),
@@ -1060,6 +1064,34 @@ def test_inspection_folds_snapshot_future_process_link_into_freshness(
     evidence_payload = observation_payload["evidence"]
     assert evidence_payload["state"] == "exact"
     assert observation_payload["effective_evidence_state"] == "blocked"
+
+
+def test_inspection_blocks_deployment_that_postdates_its_snapshot(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["deploy"]["deployed_at"] = (
+        NOW + timedelta(seconds=31)
+    ).isoformat()
+    payload["subjects"][0]["canary"]["succeeded"] = False
+    payload["subjects"][0]["proof"]["verdict"] = "unknown"
+    payload["subjects"][0]["acceptance"]["accepted"] = False
+    app = application(tmp_path, payload=payload)
+
+    identity = app.inspect("aoa-kag", "read", view="identity")
+    full = app.inspect("aoa-kag", "read", view="full")
+
+    assert identity["metadata"]["freshness_state"] == "blocked"
+    assert identity["owner_payload"]["observation"]["deploy"]["evidence"][
+        "state"
+    ] == "exact"
+    assert identity["owner_payload"]["observation"]["deploy"][
+        "effective_evidence_state"
+    ] == "blocked"
+    assert full["metadata"]["freshness_state"] == "blocked"
+    assert full["owner_payload"]["observation"]["effective_link_states"][
+        "deploy"
+    ] == "blocked"
 
 
 def test_read_process_has_no_plan_capability(tmp_path: Path) -> None:
