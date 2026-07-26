@@ -171,6 +171,10 @@ abyss_stack_mcp_service_root="${AOA_CONFIGS_ROOT}/mcp/services/abyss-stack-mcp"
 abyss_stack_mcp_runtime_root="${AOA_STACK_ROOT}/Services/abyss-stack-mcp"
 abyss_stack_mcp_venv="${abyss_stack_mcp_runtime_root}/venv"
 abyss_stack_mcp_runtime_lock="${abyss_stack_mcp_runtime_root}/.runtime-provision.lock"
+abyss_stack_mcp_source_lock_root="$(
+  dirname -- "${AOA_CONFIGS_ROOT%/}"
+)/Services/abyss-stack-mcp"
+abyss_stack_mcp_source_lock="${abyss_stack_mcp_source_lock_root}/.source-projection.lock"
 abyss_stack_mcp_bootstrap_python="${ABYSS_STACK_MCP_BOOTSTRAP_PYTHON:-/usr/bin/python3}"
 abyss_stack_mcp_units_error=""
 mcp_http_codex_launcher="${AOA_CONFIGS_ROOT}/mcp/services/_shared/codex_http_client.sh"
@@ -382,6 +386,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   local backup_venv=""
   local resolved_bootstrap_python=""
   local runtime_lock_fd=""
+  local source_lock_fd=""
 
   [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
     aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
@@ -394,6 +399,34 @@ aoa_provision_abyss_stack_mcp_runtime() {
      -x "$resolved_bootstrap_python" ]] || \
     aoa_die "abyss-stack MCP bootstrap Python is not an executable regular file"
   abyss_stack_mcp_bootstrap_python="$resolved_bootstrap_python"
+  if [[ -e "$abyss_stack_mcp_source_lock_root" || \
+        -L "$abyss_stack_mcp_source_lock_root" ]]; then
+    [[ -d "$abyss_stack_mcp_source_lock_root" && \
+       ! -L "$abyss_stack_mcp_source_lock_root" ]] || \
+      aoa_die "abyss-stack MCP source projection lock root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_source_lock_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_source_lock" || \
+        -L "$abyss_stack_mcp_source_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_source_lock" && \
+       ! -L "$abyss_stack_mcp_source_lock" ]] || \
+      aoa_die "abyss-stack MCP source projection lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_source_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_source_lock" && \
+       ! -L "$abyss_stack_mcp_source_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP source projection lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_source_lock"
+  exec {source_lock_fd}<> "$abyss_stack_mcp_source_lock"
+  if ! /usr/bin/flock --exclusive --nonblock "$source_lock_fd"; then
+    aoa_die "Configs sync or another provisioner holds the abyss-stack MCP source projection lock"
+  fi
   [[ -d "$abyss_stack_mcp_service_root" && \
      ! -L "$abyss_stack_mcp_service_root" ]] || \
     aoa_die "deployed abyss-stack MCP package root is unavailable"
@@ -478,6 +511,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
       [[ "$deployed_digest" == "$source_digest" ]] || \
         aoa_die "deployed abyss-stack MCP package changed during runtime verification"
       aoa_note "abyss-stack MCP runtime already provisioned for deployed source ${source_digest} and lock ${lock_digest}"
+      exec {source_lock_fd}>&-
       return 0
     fi
   fi
@@ -597,6 +631,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
     rm -rf -- "$backup_venv"
   fi
   exec {runtime_lock_fd}>&-
+  exec {source_lock_fd}>&-
   aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
 

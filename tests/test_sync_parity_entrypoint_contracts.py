@@ -6,6 +6,7 @@ import io
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -32,6 +33,64 @@ def write_text(path: Path, content: str) -> None:
 
 
 class SyncParityEntrypointContractsTests(unittest.TestCase):
+    def test_mcp_sync_fails_closed_while_runtime_provisioning_holds_lock(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            configs = root / "Configs"
+            projection_lock = (
+                root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".source-projection.lock"
+            )
+            write_text(projection_lock, "")
+            env = os.environ.copy()
+            env["AOA_STACK_ROOT"] = str(root)
+            env["AOA_CONFIGS_ROOT"] = str(configs)
+            lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--exclusive",
+                    str(projection_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(lock_holder.stdout)
+            self.assertEqual(lock_holder.stdout.readline().strip(), "locked")
+            try:
+                result = subprocess.run(
+                    ["bash", str(SYNC_CONFIGS), "--item", "mcp"],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "runtime provisioning holds the source projection lock",
+                    result.stderr,
+                )
+                self.assertFalse((configs / "mcp").exists())
+            finally:
+                self.assertIsNotNone(lock_holder.stdin)
+                lock_holder.stdin.close()
+                self.assertEqual(lock_holder.wait(timeout=5), 0)
+                lock_holder.stdout.close()
+                lock_holder.stderr.close()
+
     def test_sync_subset_supports_non_mutating_preview_and_apply(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             configs = Path(tmpdir) / "Configs"
@@ -125,6 +184,15 @@ class SyncParityEntrypointContractsTests(unittest.TestCase):
             self.assertFalse((configs / "mcp" / "owner" / ".mypy_cache").exists())
             self.assertFalse((configs / "mcp" / "owner" / ".ruff_cache").exists())
             self.assertFalse((configs / "mcp" / "owner" / ".coverage").exists())
+            projection_lock = (
+                root
+                / "runtime"
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".source-projection.lock"
+            )
+            self.assertTrue(projection_lock.is_file())
+            self.assertEqual(projection_lock.stat().st_mode & 0o777, 0o600)
 
     def test_validate_deployed_parity_accepts_matching_synced_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

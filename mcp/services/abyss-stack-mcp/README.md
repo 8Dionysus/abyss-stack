@@ -159,8 +159,11 @@ provisioning is therefore a required rollout precondition.
 The provisioner copies the deployed package into a private staged snapshot,
 requires that snapshot and its lock to match the initial digests, installs only
 from the snapshot, and rechecks the deployed tree before writing the runtime
-identity or swapping the environment. A Configs sync racing the build
-therefore aborts instead of publishing mixed or mislabelled runtime bytes.
+identity or swapping the environment. It also holds the same exclusive
+source-projection lock that an applying MCP Configs sync holds for its complete
+rsync transaction. A sync and provision transaction therefore cannot cross
+each other's publication boundary or publish mixed or mislabelled runtime
+bytes.
 They execute the package installed inside that venv, not `Configs/src`.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this

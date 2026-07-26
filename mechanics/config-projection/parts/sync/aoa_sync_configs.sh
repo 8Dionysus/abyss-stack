@@ -34,6 +34,8 @@ managed_items=(
 delete_mode=0
 dry_run=0
 selected_items=()
+syncs_abyss_stack_mcp=0
+abyss_stack_mcp_projection_lock_fd=""
 
 aoa_select_sync_item() {
   local requested="$1"
@@ -75,11 +77,55 @@ items=("${managed_items[@]}")
 if ((${#selected_items[@]})); then
   items=("${selected_items[@]}")
 fi
+for item in "${items[@]}"; do
+  if [[ "$item" == "mcp" ]]; then
+    syncs_abyss_stack_mcp=1
+    break
+  fi
+done
 
 if ((dry_run)); then
   [[ -d "${AOA_CONFIGS_ROOT}" ]] || aoa_die "sync target does not exist for dry-run: ${AOA_CONFIGS_ROOT}"
 else
   mkdir -p "${AOA_CONFIGS_ROOT}"
+fi
+
+if ((!dry_run && syncs_abyss_stack_mcp)); then
+  configs_root_without_trailing_slash="${AOA_CONFIGS_ROOT%/}"
+  abyss_stack_mcp_projection_lock_root="$(
+    dirname -- "$configs_root_without_trailing_slash"
+  )/Services/abyss-stack-mcp"
+  abyss_stack_mcp_projection_lock="${abyss_stack_mcp_projection_lock_root}/.source-projection.lock"
+  if [[ -e "$abyss_stack_mcp_projection_lock_root" || \
+        -L "$abyss_stack_mcp_projection_lock_root" ]]; then
+    [[ -d "$abyss_stack_mcp_projection_lock_root" && \
+       ! -L "$abyss_stack_mcp_projection_lock_root" ]] || \
+      aoa_die "abyss-stack MCP source projection lock root must be a non-symlink directory"
+  else
+    install -d -m 0750 "$abyss_stack_mcp_projection_lock_root"
+  fi
+  if [[ -e "$abyss_stack_mcp_projection_lock" || \
+        -L "$abyss_stack_mcp_projection_lock" ]]; then
+    [[ -f "$abyss_stack_mcp_projection_lock" && \
+       ! -L "$abyss_stack_mcp_projection_lock" ]] || \
+      aoa_die "abyss-stack MCP source projection lock must be a regular non-symlink file"
+  else
+    (
+      umask 077
+      set -o noclobber
+      : > "$abyss_stack_mcp_projection_lock"
+    ) 2>/dev/null || true
+    [[ -f "$abyss_stack_mcp_projection_lock" && \
+       ! -L "$abyss_stack_mcp_projection_lock" ]] || \
+      aoa_die "failed to create the abyss-stack MCP source projection lock"
+  fi
+  chmod 0600 "$abyss_stack_mcp_projection_lock"
+  exec {abyss_stack_mcp_projection_lock_fd}<> \
+    "$abyss_stack_mcp_projection_lock"
+  if ! /usr/bin/flock --exclusive --nonblock \
+    "$abyss_stack_mcp_projection_lock_fd"; then
+    aoa_die "abyss-stack MCP runtime provisioning holds the source projection lock"
+  fi
 fi
 
 rsync_flags=(
@@ -117,4 +163,7 @@ if ((dry_run)); then
   aoa_note "config sync preview complete; no files changed"
 else
   aoa_note "config sync complete"
+fi
+if [[ -n "$abyss_stack_mcp_projection_lock_fd" ]]; then
+  exec {abyss_stack_mcp_projection_lock_fd}>&-
 fi

@@ -33,7 +33,9 @@
   with a lifetime shared service lock, exclusive provision lock, and final
   stopped-state check before environment replacement;
 - unit link/reload and runtime provisioning cannot be combined in one
-  invocation, and deployed source is rehashed before the runtime marker/swap;
+  invocation; MCP Configs sync and runtime provisioning share an exclusive
+  source-projection lock from their first mutation/read through publication,
+  and deployed source is rehashed before the runtime marker/swap;
 - sync plans verify both the observed source revision and source-tree digest
   before mutation; sync/deploy plans bind an expected future deployed-tree
   digest instead of reusing the pre-action observation, and rollback denial

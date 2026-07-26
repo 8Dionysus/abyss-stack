@@ -37,3 +37,11 @@ pytest/mypy/ruff caches, `.coverage`, `*.pyc`) is excluded from both preview and
 apply so the deployed Configs mirror contains source-managed runtime material,
 not checkout residue. Sync remains non-destructive unless `--delete` is
 explicitly selected.
+
+An applying sync that includes `mcp` takes the stack-local
+`Services/abyss-stack-mcp/.source-projection.lock` before the first rsync and
+holds it through the complete projection. The runtime provisioner takes the
+same exclusive lock before reading deployed package bytes and holds it through
+runtime marker publication and environment swap. Either command fails closed
+if the other transaction owns the lock. Dry-run does not take or create the
+lock because it cannot mutate Configs.

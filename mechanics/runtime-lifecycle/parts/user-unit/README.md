@@ -76,7 +76,11 @@ lock and repeats the stopped-state check immediately before the environment
 swap, closing starts that race the build. Linking and provisioning in one
 invocation is rejected. The environment is installed only from a private
 source-and-lock snapshot that matches the initial deployed digest, and deployed
-source is rehashed before marker publication and swap.
+source is rehashed before marker publication and swap. A separate exclusive
+source-projection lock is held from before the first deployed-source read
+through the environment swap; an MCP Configs sync takes the same lock around
+its full rsync transaction, so neither publication can cross the other's
+commit boundary.
 
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned

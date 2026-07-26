@@ -715,6 +715,12 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 / "abyss-stack-mcp"
                 / ".runtime-provision.lock"
             )
+            source_projection_lock = (
+                stack_root
+                / "Services"
+                / "abyss-stack-mcp"
+                / ".source-projection.lock"
+            )
             first_identity = marker.read_text(encoding="utf-8").strip()
             self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             self.assertRegex(
@@ -724,6 +730,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertTrue(runtime_lock.is_file())
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(source_projection_lock.is_file())
+            self.assertEqual(
+                source_projection_lock.stat().st_mode & 0o777,
+                0o600,
+            )
             self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
             self.assertNotIn("unit linked", first.stdout)
             pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
@@ -797,6 +808,52 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
 
             source_file.write_text("VALUE = 2\n", encoding="utf-8")
             pip_log_before_block = pip_log.read_text(encoding="utf-8")
+            source_lock_holder = subprocess.Popen(
+                [
+                    "/usr/bin/flock",
+                    "--exclusive",
+                    str(source_projection_lock),
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        "print('locked', flush=True); "
+                        "sys.stdin.buffer.read()"
+                    ),
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertIsNotNone(source_lock_holder.stdout)
+            self.assertEqual(
+                source_lock_holder.stdout.readline().strip(),
+                "locked",
+            )
+            source_locked = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(source_locked.returncode, 0)
+            self.assertIn(
+                "source projection lock",
+                source_locked.stderr,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+            self.assertIsNotNone(source_lock_holder.stdin)
+            source_lock_holder.stdin.close()
+            self.assertEqual(source_lock_holder.wait(timeout=5), 0)
+            source_lock_holder.stdout.close()
+            source_lock_holder.stderr.close()
+
             lock_holder = subprocess.Popen(
                 [
                     "/usr/bin/flock",

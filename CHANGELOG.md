@@ -22,8 +22,9 @@ Tracking starts with the community-docs baseline for this repository.
   plane's lifetime shared lock against exclusive provisioning, rechecks unit
   state immediately before replacement, installs only from a private
   digest-matched package snapshot, rehashes installed runtime files and
-  symlink targets before reuse, rejects a combined unit-link/provision
-  transaction, and fails activation-plan preparation
+  symlink targets before reuse, serializes MCP Configs sync and runtime
+  publication with a separate source-projection lock, rejects a combined
+  unit-link/provision transaction, and fails activation-plan preparation
   on unusable freshness, endpoint/process unreadiness, incompatible consumers,
   ungrounded canaries, or missing rollback proof. Concurrent first credential
   writes publish one atomically selected value without clobbering the winner.

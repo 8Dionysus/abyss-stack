@@ -193,7 +193,10 @@ participates in that lock; combining it with runtime provisioning in one
 installer invocation is rejected. Provisioning installs only from a private
 snapshot whose package and lock digests match the initial deployed tree, then
 rehashes deployed source before publishing the runtime identity and swapping
-the environment. A concurrent Configs sync therefore fails the transaction.
+the environment. It holds a source-projection lock from before its first
+deployed-source read through the swap; an applying MCP Configs sync holds the
+same exclusive lock for its full rsync transaction. Either command fails
+closed rather than crossing the other's publication boundary.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -449,8 +452,10 @@ swap, so a concurrent start cannot cross the replacement boundary. Do not
 combine this flag with `--all-user-units`; the installer rejects that ordering.
 The package and hash lock are copied to a private digest-matched snapshot and
 pip reads only that snapshot. The deployed tree is rehashed before the marker
-and swap, so a Configs sync racing dependency installation cannot mislabel the
-published runtime.
+and swap. Provisioning holds the same source-projection lock that an applying
+MCP Configs sync holds across its full rsync transaction, so the deployed
+source and published runtime identity cannot pass each other between recheck
+and environment replacement.
 The user units point only at this environment and use
 `ConditionPathExists` plus an executable `ExecCondition`, so a missing or
 unusable runtime leaves them inactive instead of entering a restart loop.
