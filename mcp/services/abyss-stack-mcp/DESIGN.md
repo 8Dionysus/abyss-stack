@@ -34,13 +34,17 @@ package digest and issued no earlier than central proof.
 The compatible consumer is selected deterministically and its registration
 reference becomes the exact activation-step target; central proof and owner
 acceptance are separate preceding verification steps. Only after those gates
-does a shadow registry receive an admission action; an already admitted entry
-is verified instead. Candidate expiry is capped by every link and evidence ref
-actually copied into the plan, including freshness, central-proof, and
-acceptance evidence. Required evidence timestamps must also be causally
+does a shadow registry receive an admission action addressed to its immutable
+ID-and-digest pair; an already admitted entry is verified against the same pair.
+Sync and deploy candidates include the exact transition action between preview
+or staging and their postcondition check, but remain non-executing and require
+separate operator approval. Candidate expiry is capped by every link and
+evidence ref actually copied into the plan, including freshness, central-proof,
+and acceptance evidence. Required evidence timestamps must also be causally
 consistent with the enclosing observation snapshot; central proof follows its
-canary evidence, and duplicate evidence identities cannot disagree on
-`observed_at`.
+canary evidence, proof and acceptance receipts cannot predate their asserted
+event beyond the bounded clock skew, and duplicate evidence identities cannot
+disagree on `observed_at`.
 
 ## Progressive surface
 

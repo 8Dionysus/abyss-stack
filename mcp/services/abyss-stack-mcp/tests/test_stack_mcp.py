@@ -191,6 +191,22 @@ def observation(*subjects: dict) -> dict:
     }
 
 
+def set_proof_event_time(
+    payload: dict,
+    event_surface: str,
+    event_time: str,
+) -> None:
+    event = payload["subjects"][0][event_surface]
+    event[
+        {
+            "proof": "evaluated_at",
+            "acceptance": "accepted_at",
+        }[event_surface]
+    ] = event_time
+    event["evidence"]["observed_at"] = event_time
+    event["evidence"]["evidence_refs"][0]["observed_at"] = event_time
+
+
 def write_observation(path: Path, payload: dict | None = None) -> Path:
     path.write_text(
         json.dumps(payload or observation(subject()), indent=2),
@@ -339,6 +355,31 @@ def test_successful_canary_cannot_predate_deployment(
 
 
 @pytest.mark.parametrize(
+    ("event_surface", "expected_error"),
+    (
+        ("proof", "central proof evidence cannot predate"),
+        ("acceptance", "owner acceptance evidence cannot predate"),
+    ),
+)
+@pytest.mark.parametrize("evidence_time_surface", ("link", "evidence"))
+def test_proof_events_reject_unrelated_old_receipts(
+    event_surface: str,
+    expected_error: str,
+    evidence_time_surface: str,
+) -> None:
+    payload = observation(subject())
+    event_evidence = payload["subjects"][0][event_surface]["evidence"]
+    old_receipt_time = (NOW - timedelta(seconds=31)).isoformat()
+    if evidence_time_surface == "link":
+        event_evidence["observed_at"] = old_receipt_time
+    else:
+        event_evidence["evidence_refs"][0]["observed_at"] = old_receipt_time
+
+    with pytest.raises(ValidationError, match=expected_error):
+        RuntimeObservation.model_validate(payload)
+
+
+@pytest.mark.parametrize(
     "field_path",
     (
         ("deploy", "manifest_ref"),
@@ -419,6 +460,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "secret-value",
         "leading-token",
         "leading-direct",
+        "top-level-encoded",
         "nested-value",
         "double-key",
         "unparseable",
@@ -461,6 +503,11 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "leading-direct":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f" Bearer {secret_value}"
+        )
+    elif reference_surface == "top-level-encoded":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "https%3A%2F%2Facceptance.invalid%2Freceipt"
+            f"%3Fapi_key%3D{secret_value}"
         )
     elif reference_surface == "nested-value":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -638,6 +685,7 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["steps"][1]["exact_target"] == "receipt://central-proof/aoa-kag"
     assert plan["steps"][2]["exact_target"] == "receipt://acceptance/aoa-kag"
     assert plan["steps"][3]["action"] == "admit-registry-entry"
+    assert plan["steps"][3]["exact_target"] == f"abyss-private@{DIGEST_A}"
     assert plan["steps"][4]["exact_target"] == "config://codex/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
@@ -664,6 +712,54 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
     assert result["owner_payload"]["plan"]["steps"][3]["action"] == (
         "verify-registry-admission"
     )
+    assert result["owner_payload"]["plan"]["steps"][3]["exact_target"] == (
+        f"abyss-private@{DIGEST_A}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("plan_kind", "expected_steps"),
+    (
+        (
+            "sync",
+            (
+                ("verify-source-revision", "source-rev-1"),
+                ("preview-config-sync", "receipt://deploy/aoa-kag"),
+                ("apply-exact-config-sync", "receipt://deploy/aoa-kag"),
+                ("compare-deployed-digest", DIGEST_C),
+            ),
+        ),
+        (
+            "deploy",
+            (
+                ("verify-package-digest", DIGEST_B),
+                ("stage-exact-package", f"aoa-kag-mcp@{DIGEST_B}"),
+                ("deploy-staged-package", f"aoa-kag-mcp@{DIGEST_B}"),
+                ("compare-deployed-digest", DIGEST_C),
+            ),
+        ),
+    ),
+)
+def test_sync_and_deploy_plans_include_exact_transition_steps(
+    tmp_path: Path,
+    plan_kind: str,
+    expected_steps: tuple[tuple[str, str], ...],
+) -> None:
+    app = application(tmp_path, policy_family="candidate")
+    _, digest = app.store.load()
+
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        plan_kind,
+        expected_observation_digest=digest,
+    )
+
+    plan = result["owner_payload"]["plan"]
+    assert plan["execution_authorized"] is False
+    assert tuple(
+        (step["action"], step["exact_target"]) for step in plan["steps"]
+    ) == expected_steps
 
 
 def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
@@ -1164,15 +1260,15 @@ def test_plan_rejects_timestamps_beyond_bounded_future_skew(
         canary_evidence = payload["subjects"][0]["canary"]["evidence"]
         canary_evidence["observed_at"] = future
         canary_evidence["evidence_refs"][0]["observed_at"] = future
-        payload["subjects"][0]["proof"]["evaluated_at"] = future
-        payload["subjects"][0]["acceptance"]["accepted_at"] = future
+        set_proof_event_time(payload, "proof", future)
+        set_proof_event_time(payload, "acceptance", future)
     elif future_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = future
     elif future_surface == "proof":
-        payload["subjects"][0]["proof"]["evaluated_at"] = future
-        payload["subjects"][0]["acceptance"]["accepted_at"] = future
+        set_proof_event_time(payload, "proof", future)
+        set_proof_event_time(payload, "acceptance", future)
     elif future_surface == "acceptance":
-        payload["subjects"][0]["acceptance"]["accepted_at"] = future
+        set_proof_event_time(payload, "acceptance", future)
     elif future_surface == "link":
         payload["subjects"][0]["source"]["evidence"]["observed_at"] = future
     else:
@@ -1206,15 +1302,15 @@ def test_plan_rejects_evidence_that_postdates_its_snapshot(
         canary_evidence = payload["subjects"][0]["canary"]["evidence"]
         canary_evidence["observed_at"] = post_snapshot
         canary_evidence["evidence_refs"][0]["observed_at"] = post_snapshot
-        payload["subjects"][0]["proof"]["evaluated_at"] = post_snapshot
-        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
+        set_proof_event_time(payload, "proof", post_snapshot)
+        set_proof_event_time(payload, "acceptance", post_snapshot)
     elif post_snapshot_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = post_snapshot
     elif post_snapshot_surface == "proof":
-        payload["subjects"][0]["proof"]["evaluated_at"] = post_snapshot
-        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
+        set_proof_event_time(payload, "proof", post_snapshot)
+        set_proof_event_time(payload, "acceptance", post_snapshot)
     elif post_snapshot_surface == "acceptance":
-        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
+        set_proof_event_time(payload, "acceptance", post_snapshot)
     elif post_snapshot_surface == "link":
         payload["subjects"][0]["source"]["evidence"]["observed_at"] = post_snapshot
     else:

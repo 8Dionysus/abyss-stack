@@ -114,6 +114,27 @@ def _reject_secret_material(
         lowered = value.lstrip().lower()
         if lowered.startswith(("bearer ", "sk-", "ghp_", "github_pat_")):
             raise StackMCPError(f"secret-like value is forbidden at {path}")
+        decoded_variants = _decoded_reference_variants(value, path)[1:]
+        for decoded_variant in decoded_variants:
+            decoded_lowered = decoded_variant.lstrip().lower()
+            if (
+                decoded_lowered.startswith(
+                    ("bearer ", "sk-", "ghp_", "github_pat_")
+                )
+                or any(
+                    marker in decoded_variant
+                    for marker in ("://", "?", "#")
+                )
+            ):
+                if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
+                    raise StackMCPError(
+                        f"nested reference depth is forbidden at {path}"
+                    )
+                _reject_secret_material(
+                    decoded_variant,
+                    path,
+                    reference_depth=reference_depth + 1,
+                )
         if any(marker in value for marker in ("://", "?", "#")):
             if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
                 raise StackMCPError(
@@ -989,11 +1010,19 @@ class StackMCPApplication:
             "sync": (
                 ("verify-source-revision", subject.source.revision),
                 ("preview-config-sync", subject.deploy.manifest_ref),
+                ("apply-exact-config-sync", subject.deploy.manifest_ref),
                 ("compare-deployed-digest", subject.deploy.tree_digest),
             ),
             "deploy": (
                 ("verify-package-digest", subject.package.artifact_digest),
-                ("stage-exact-package", subject.package.name),
+                (
+                    "stage-exact-package",
+                    f"{subject.package.name}@{subject.package.artifact_digest}",
+                ),
+                (
+                    "deploy-staged-package",
+                    f"{subject.package.name}@{subject.package.artifact_digest}",
+                ),
                 ("compare-deployed-digest", subject.deploy.tree_digest),
             ),
             "activate": (
@@ -1015,7 +1044,10 @@ class StackMCPApplication:
                         if subject.registry.registry_state == "shadow"
                         else "verify-registry-admission"
                     ),
-                    subject.registry.registry_id,
+                    (
+                        f"{subject.registry.registry_id}"
+                        f"@{subject.registry.registry_digest}"
+                    ),
                 ),
                 (
                     "verify-consumer-registration",

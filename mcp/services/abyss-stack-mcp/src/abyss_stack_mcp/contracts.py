@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -54,6 +54,7 @@ ObservationView = Literal[
     "full",
 ]
 PlanKind = Literal["sync", "deploy", "activate", "restart", "rollback"]
+MAX_EVENT_EVIDENCE_SKEW = timedelta(seconds=30)
 
 
 def _aware_utc(value: datetime | None) -> datetime | None:
@@ -548,6 +549,19 @@ class CentralProofObservation(StrictModel):
                 "passed central proof requires an exact target, timestamp, "
                 "and evidence"
             )
+        if (
+            self.verdict == "passed"
+            and self.evaluated_at is not None
+            and min(
+                self.evidence.observed_at,
+                *(
+                    evidence.observed_at
+                    for evidence in self.evidence.evidence_refs
+                ),
+            )
+            < self.evaluated_at - MAX_EVENT_EVIDENCE_SKEW
+        ):
+            raise ValueError("central proof evidence cannot predate its verdict")
         return self
 
 
@@ -616,6 +630,21 @@ class OwnerAcceptanceObservation(StrictModel):
         ):
             raise ValueError(
                 "owner acceptance requires an exact target, timestamp, and evidence"
+            )
+        if (
+            self.accepted
+            and self.accepted_at is not None
+            and min(
+                self.evidence.observed_at,
+                *(
+                    evidence.observed_at
+                    for evidence in self.evidence.evidence_refs
+                ),
+            )
+            < self.accepted_at - MAX_EVENT_EVIDENCE_SKEW
+        ):
+            raise ValueError(
+                "owner acceptance evidence cannot predate its decision"
             )
         return self
 
