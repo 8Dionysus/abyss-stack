@@ -120,7 +120,11 @@ def _is_forbidden_credential_key(value: Any) -> bool:
     if canonical in _FORBIDDEN_KEY_CANONICAL:
         return True
     if any(
-        canonical.endswith(forbidden) and canonical != forbidden
+        canonical != forbidden
+        and (
+            canonical.startswith(forbidden)
+            or canonical.endswith(forbidden)
+        )
         for forbidden in _FORBIDDEN_KEY_CANONICAL
     ):
         return True

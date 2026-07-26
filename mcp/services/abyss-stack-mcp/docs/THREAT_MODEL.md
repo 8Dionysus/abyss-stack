@@ -21,8 +21,8 @@
   credential-bearing userinfo and forbidden path/query/fragment keys before
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
-  catches namespaced separator/camel-case and concatenated suffix forms while
-  structurally valid compact JWT, PEM private-key, Basic/Bearer, and
+  catches namespaced separator/camel-case forms plus concatenated prefix and
+  suffix boundaries while structurally valid compact JWT, PEM private-key, Basic/Bearer, and
   provider-token checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;

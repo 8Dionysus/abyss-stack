@@ -520,11 +520,13 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "path-token",
         "namespaced-query-key",
         "concatenated-namespaced-query-key",
+        "concatenated-suffixed-query-key",
         "suffixed-query-key",
         "namespaced-path-key",
         "bare-assignment",
         "embedded-bare-assignment",
         "namespaced-bare-assignment",
+        "concatenated-suffixed-bare-assignment",
         "encoded-bare-assignment",
         "unparseable",
     ),
@@ -644,6 +646,11 @@ def test_observation_store_rejects_credentials_inside_references(
             f"https://acceptance.invalid/report?githubapikey={secret_value}"
             f"&dbpassword={secret_value}"
         )
+    elif reference_surface == "concatenated-suffixed-query-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report?apikeyvalue={secret_value}"
+            f"&tokenvalue={secret_value}"
+        )
     elif reference_surface == "suffixed-query-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/report?api_key_backup={secret_value}"
@@ -663,6 +670,10 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "namespaced-bare-assignment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"github_api_key:{secret_value}"
+        )
+    elif reference_surface == "concatenated-suffixed-bare-assignment":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"tokenvalue={secret_value}"
         )
     elif reference_surface == "encoded-bare-assignment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (

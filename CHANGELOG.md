@@ -36,7 +36,8 @@ Tracking starts with the community-docs baseline for this repository.
   before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
-  and secret screening covers concatenated namespaced credential keys, compact
+  and secret screening covers both prefix and suffix forms of concatenated
+  namespaced credential keys, compact
   JWT values, and encoded URI path segments as well as
   userinfo/query/fragment surfaces. Rollback proof now binds every
   last-known-good restoration field including its distinct canary, and staged
