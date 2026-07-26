@@ -79,8 +79,8 @@ Tracking starts with the community-docs baseline for this repository.
 ### Changed
 
 - Compact the diagnostic skill's global routing description while retaining
-  concrete target, evidence/freshness, and nearest-route distinctions in the
-  host-visible prefix.
+  capture, concrete target, evidence/freshness, and nearest-route distinctions
+  in the host-visible prefix.
 
 - Thin-host service overlays now preserve service-native budgets and soft
   reclaim reservations while clearing hard cgroup CPU and memory ceilings from
