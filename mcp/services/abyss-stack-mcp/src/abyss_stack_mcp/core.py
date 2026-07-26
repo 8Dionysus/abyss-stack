@@ -197,6 +197,7 @@ class StackMCPApplication:
                     "consumer",
                     "schema",
                     "freshness",
+                    "proof",
                     "acceptance",
                     "canary",
                     "rollback",
@@ -312,6 +313,7 @@ class StackMCPApplication:
         )
         precondition_evidence = self._plan_evidence(subject, plan_links)
         future_evidence = self._future_plan_evidence(
+            observation,
             subject,
             plan_links,
             precondition_evidence,
@@ -430,6 +432,7 @@ class StackMCPApplication:
                     ]
                 )
             ),
+            "proof": cls._effective_link_state(subject.proof.evidence, now),
             "acceptance": cls._effective_link_state(
                 subject.acceptance.evidence,
                 now,
@@ -512,6 +515,8 @@ class StackMCPApplication:
             payload = subject.freshness.model_dump(mode="json")
             payload["effective_state"] = self._effective_freshness(subject, now)
             return payload
+        if view == "proof":
+            return subject.proof.model_dump(mode="json")
         if view == "acceptance":
             return subject.acceptance.model_dump(mode="json")
         if view == "canary":
@@ -533,6 +538,7 @@ class StackMCPApplication:
                             subject.endpoint.evidence,
                             subject.registry.evidence,
                             *(consumer.evidence for consumer in subject.consumers),
+                            subject.proof.evidence,
                             subject.acceptance.evidence,
                             subject.canary.evidence,
                             subject.rollback.evidence,
@@ -583,10 +589,32 @@ class StackMCPApplication:
             if subject.endpoint.server_schema_digest is None:
                 blockers.append("server_schema_unobserved")
         if plan_kind == "activate":
+            compatible_consumers = self._compatible_consumers(subject, now)
             if not subject.process.active:
                 blockers.append("process_not_active")
             if not subject.endpoint.ready:
                 blockers.append("endpoint_not_ready")
+            if (
+                subject.proof.verdict != "passed"
+                or self._effective_link_state(subject.proof.evidence, now)
+                not in usable_states
+            ):
+                blockers.append("central_proof_not_proven")
+            elif (
+                subject.proof.proved_source_revision != subject.source.revision
+                or subject.proof.proved_package_digest
+                != subject.package.artifact_digest
+                or subject.proof.proved_deploy_revision != subject.deploy.revision
+                or subject.proof.proved_server_schema_digest
+                != subject.endpoint.server_schema_digest
+                or subject.proof.proved_canary_ref != subject.canary.canary_ref
+                or (
+                    bool(compatible_consumers)
+                    and subject.proof.proved_consumer_registration_ref
+                    != compatible_consumers[0].registration_ref
+                )
+            ):
+                blockers.append("central_proof_target_mismatch")
             if (
                 not subject.acceptance.accepted
                 or self._effective_link_state(subject.acceptance.evidence, now)
@@ -609,7 +637,7 @@ class StackMCPApplication:
             ]
             if not usable_consumers:
                 blockers.append("no_registered_consumer")
-            elif not self._compatible_consumers(subject, now):
+            elif not compatible_consumers:
                 blockers.append("no_compatible_registered_consumer")
             if (
                 not subject.canary.succeeded
@@ -728,6 +756,7 @@ class StackMCPApplication:
                 )
             links.extend(
                 (
+                    subject.proof.evidence,
                     subject.acceptance.evidence,
                     plan_consumer.evidence,
                     subject.canary.evidence,
@@ -806,17 +835,27 @@ class StackMCPApplication:
 
     @staticmethod
     def _future_plan_evidence(
+        observation: RuntimeObservation,
         subject: RuntimeSubject,
         links: tuple[LinkEvidence, ...],
         precondition_evidence: tuple[EvidenceRef, ...],
         now: datetime,
     ) -> tuple[str, ...]:
-        latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        latest_allowed = min(
+            now + MAX_PLAN_FUTURE_SKEW,
+            observation.generated_at + MAX_PLAN_FUTURE_SKEW,
+        )
         future: set[str] = set()
         if subject.deploy.deployed_at > latest_allowed:
             future.add("deploy.deployed_at")
         if subject.freshness.observed_at > latest_allowed:
             future.add("freshness.observed_at")
+        if (
+            any(link is subject.proof.evidence for link in links)
+            and subject.proof.evaluated_at is not None
+            and subject.proof.evaluated_at > latest_allowed
+        ):
+            future.add("proof.evaluated_at")
         if (
             any(link is subject.acceptance.evidence for link in links)
             and subject.acceptance.accepted_at is not None
@@ -855,6 +894,14 @@ class StackMCPApplication:
                 ("compare-deployed-digest", subject.deploy.tree_digest),
             ),
             "activate": (
+                (
+                    "verify-process-identity",
+                    subject.process.process_identity or "missing",
+                ),
+                (
+                    "verify-central-proof",
+                    subject.proof.proof_ref or "missing",
+                ),
                 (
                     "verify-owner-acceptance",
                     subject.acceptance.acceptance_ref or "missing",

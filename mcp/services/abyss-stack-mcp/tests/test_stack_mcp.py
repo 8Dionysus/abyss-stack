@@ -127,6 +127,18 @@ def subject(
             "expires_at": (NOW + timedelta(hours=1)).isoformat(),
             "evidence_refs": evidence("freshness")["evidence_refs"],
         },
+        "proof": {
+            "verdict": "passed",
+            "proof_ref": f"receipt://central-proof/{organ_id}",
+            "evaluated_at": NOW.isoformat(),
+            "proved_source_revision": "source-rev-1",
+            "proved_package_digest": DIGEST_B,
+            "proved_deploy_revision": "deploy-rev-1",
+            "proved_server_schema_digest": DIGEST_D,
+            "proved_consumer_registration_ref": f"config://codex/{organ_id}",
+            "proved_canary_ref": f"receipt://canary/{organ_id}",
+            "evidence": evidence("central-proof", owner="aoa-evals"),
+        },
         "acceptance": {
             "accepted": True,
             "acceptance_ref": f"receipt://acceptance/{organ_id}",
@@ -238,6 +250,26 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
         RuntimeObservation.model_validate(payload)
 
     payload = observation(subject())
+    payload["subjects"][0]["proof"]["proof_ref"] = None
+    with pytest.raises(ValidationError, match="passed central proof requires"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["evidence"] = evidence(
+        "central-proof",
+        owner="unrelated-owner",
+    )
+    with pytest.raises(ValidationError, match="issued by proof_owner"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    payload["subjects"][0]["acceptance"]["accepted_at"] = (
+        NOW - timedelta(seconds=1)
+    ).isoformat()
+    with pytest.raises(ValidationError, match="cannot precede central proof"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
     payload["subjects"][0]["acceptance"]["acceptance_ref"] = None
     with pytest.raises(ValidationError, match="owner acceptance requires"):
         RuntimeObservation.model_validate(payload)
@@ -344,6 +376,7 @@ def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
     payload = result["owner_payload"]
     assert payload["schema_bytes_loaded"] == 0
     assert payload["entries"][0]["organ_id"] == "aoa-kag"
+    assert "proof" in payload["entries"][0]["views"]
     assert "acceptance" in payload["entries"][0]["views"]
     assert "healthy" not in json.dumps(result).lower()
     assert result["metadata"]["execution_authorized"] is False
@@ -446,14 +479,17 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["execution_authorized"] is False
     assert plan["approval_required_before_execution"] is True
     assert plan["exact_unit_name"] == "aoa-mcp-http@aoa-kag.service"
-    assert [step["order"] for step in plan["steps"]] == [1, 2, 3, 4]
-    assert plan["steps"][0]["exact_target"] == "receipt://acceptance/aoa-kag"
-    assert plan["steps"][2]["exact_target"] == "config://codex/aoa-kag"
+    assert [step["order"] for step in plan["steps"]] == [1, 2, 3, 4, 5, 6]
+    assert plan["steps"][0]["exact_target"] == "aoa-kag-mcp/0.1.0"
+    assert plan["steps"][1]["exact_target"] == "receipt://central-proof/aoa-kag"
+    assert plan["steps"][2]["exact_target"] == "receipt://acceptance/aoa-kag"
+    assert plan["steps"][4]["exact_target"] == "config://codex/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
     assert "receipt://runtime/consumer" in evidence_refs
     assert "receipt://runtime/freshness" in evidence_refs
+    assert "receipt://runtime/central-proof" in evidence_refs
     assert "receipt://runtime/acceptance" in evidence_refs
 
 
@@ -700,6 +736,32 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     cases.append((payload, "endpoint_not_ready"))
 
     payload = observation(subject())
+    proof = payload["subjects"][0]["proof"]
+    proof["verdict"] = "unknown"
+    proof["proof_ref"] = None
+    proof["evaluated_at"] = None
+    proof["proved_source_revision"] = None
+    proof["proved_package_digest"] = None
+    proof["proved_deploy_revision"] = None
+    proof["proved_server_schema_digest"] = None
+    proof["proved_consumer_registration_ref"] = None
+    proof["proved_canary_ref"] = None
+    proof["evidence"] = evidence("central-proof", state="unknown")
+    cases.append((payload, "central_proof_not_proven"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["proved_package_digest"] = DIGEST_A
+    cases.append((payload, "central_proof_target_mismatch"))
+
+    payload = observation(subject())
+    proof_evidence = payload["subjects"][0]["proof"]["evidence"]
+    proof_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    proof_evidence["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    cases.append((payload, "central_proof_not_proven"))
+
+    payload = observation(subject())
     acceptance = payload["subjects"][0]["acceptance"]
     acceptance["accepted"] = False
     acceptance["acceptance_ref"] = None
@@ -790,6 +852,9 @@ def test_activation_targets_only_the_selected_compatible_consumer(
     good["consumer_id"] = "z-compatible"
     good["registration_ref"] = "config://codex/compatible"
     good["evidence"] = evidence("consumer-good")
+    payload["subjects"][0]["proof"]["proved_consumer_registration_ref"] = (
+        "config://codex/compatible"
+    )
     incompatible = json.loads(json.dumps(good))
     incompatible["consumer_id"] = "a-incompatible"
     incompatible["registration_ref"] = "config://codex/incompatible"
@@ -806,7 +871,7 @@ def test_activation_targets_only_the_selected_compatible_consumer(
         expected_observation_digest=digest,
     )
     plan = result["owner_payload"]["plan"]
-    assert plan["steps"][2]["exact_target"] == "config://codex/compatible"
+    assert plan["steps"][4]["exact_target"] == "config://codex/compatible"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
@@ -886,7 +951,15 @@ def test_plan_expires_with_its_earliest_precondition(
 
 @pytest.mark.parametrize(
     "future_surface",
-    ("observation", "deploy", "freshness", "acceptance", "link", "evidence"),
+    (
+        "observation",
+        "deploy",
+        "freshness",
+        "proof",
+        "acceptance",
+        "link",
+        "evidence",
+    ),
 )
 def test_plan_rejects_timestamps_beyond_bounded_future_skew(
     tmp_path: Path,
@@ -900,6 +973,9 @@ def test_plan_rejects_timestamps_beyond_bounded_future_skew(
         payload["subjects"][0]["deploy"]["deployed_at"] = future
     elif future_surface == "freshness":
         payload["subjects"][0]["freshness"]["observed_at"] = future
+    elif future_surface == "proof":
+        payload["subjects"][0]["proof"]["evaluated_at"] = future
+        payload["subjects"][0]["acceptance"]["accepted_at"] = future
     elif future_surface == "acceptance":
         payload["subjects"][0]["acceptance"]["accepted_at"] = future
     elif future_surface == "link":
@@ -908,6 +984,43 @@ def test_plan_rejects_timestamps_beyond_bounded_future_skew(
         payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
             "observed_at"
         ] = future
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="future-dated"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "activate",
+            expected_observation_digest=digest,
+        )
+
+
+@pytest.mark.parametrize(
+    "post_snapshot_surface",
+    ("deploy", "freshness", "proof", "acceptance", "link", "evidence"),
+)
+def test_plan_rejects_evidence_that_postdates_its_snapshot(
+    tmp_path: Path,
+    post_snapshot_surface: str,
+) -> None:
+    payload = observation(subject())
+    post_snapshot = (NOW + timedelta(seconds=31)).isoformat()
+    if post_snapshot_surface == "deploy":
+        payload["subjects"][0]["deploy"]["deployed_at"] = post_snapshot
+    elif post_snapshot_surface == "freshness":
+        payload["subjects"][0]["freshness"]["observed_at"] = post_snapshot
+    elif post_snapshot_surface == "proof":
+        payload["subjects"][0]["proof"]["evaluated_at"] = post_snapshot
+        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
+    elif post_snapshot_surface == "acceptance":
+        payload["subjects"][0]["acceptance"]["accepted_at"] = post_snapshot
+    elif post_snapshot_surface == "link":
+        payload["subjects"][0]["source"]["evidence"]["observed_at"] = post_snapshot
+    else:
+        payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
+            "observed_at"
+        ] = post_snapshot
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
 
@@ -1001,6 +1114,7 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     ]
     assert catalog_policy["anyOf"][0]["const"] == "read"
     assert inspect_policy["const"] == "read"
+    assert "proof" in inspect_views
     assert "acceptance" in inspect_views
 
 

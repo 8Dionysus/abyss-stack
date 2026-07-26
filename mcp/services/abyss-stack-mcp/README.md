@@ -36,10 +36,13 @@ most ten minutes, and stops on observation drift or precondition mismatch.
 Every plan requires usable subject freshness. Activation additionally requires
 an active process with an observed process identity, a ready endpoint, a
 registered consumer with the exact server schema digest and an overlapping MCP
-protocol version, named acceptance-owner evidence bound to the current source
-revision and package digest, a grounded canary, and usable rollback proof. The
-acceptance receipt and selected compatible consumer's exact `registration_ref`
-are embedded in activation steps and copied into the expiring precondition
+protocol version, a passed central-proof verdict issued by `proof_owner` and
+bound to the current source/package/deploy/schema/consumer/canary contour, named
+acceptance-owner evidence bound to the current source revision and package
+digest, a grounded canary, and usable rollback proof. The central-proof and
+acceptance receipts plus the selected compatible consumer's exact
+`registration_ref` are embedded in ordered activation steps, preceded by exact
+process-identity verification, and copied into the expiring precondition
 evidence. Rollback requires
 usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
@@ -53,7 +56,9 @@ earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
 planning allows at most 30 seconds of positive clock skew and rejects
 future-dated observations, required links, evidence refs, freshness, or deploy
-timestamps beyond it.
+timestamps beyond it. Required observations must also fall no later than 30
+seconds after their enclosing observation snapshot, so an older snapshot
+cannot carry causally newer proof.
 
 ## Observation input
 
@@ -71,9 +76,10 @@ visible as stale read evidence but cannot produce a candidate plan.
 The generated Draft 2020-12 schema includes the conditional invariants for
 usable links and freshness, endpoint readiness, consumer registration,
 active-process identity, accepted-target completeness, successful canaries,
-rollback readiness, and policy/effect pairing. The Pydantic loader remains the
-final authority for loopback endpoint parsing, relative clock-skew, relational
-timestamp, acceptance-owner provenance, target matching, uniqueness, and
+central-proof target completeness, rollback readiness, and policy/effect
+pairing. The Pydantic loader remains the final authority for loopback endpoint
+parsing, relative clock-skew, relational timestamp, proof/acceptance-owner
+provenance, target and proof-before-acceptance ordering, uniqueness, and
 content-address checks that JSON Schema cannot express.
 
 The committed example is fictional and public-safe. It is neither a live

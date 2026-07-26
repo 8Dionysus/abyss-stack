@@ -23,5 +23,8 @@ and bind it to the accepted source revision and package digest. It cannot infer
 or manufacture owner acceptance from process state, a model response, or a
 canary.
 
+Likewise, it may report a proof-owner verdict and its exact proved target, but
+cannot compute, reinterpret, or self-issue the `aoa-evals` proof.
+
 Direct owner adapters remain direct. This service is not a semantic proxy,
 universal bus, workflow engine, or authority merger.

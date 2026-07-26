@@ -192,6 +192,32 @@
         "process_identity": "aoa-kag-mcp/0.0.0-example",
         "unit_name": "aoa-mcp-http@aoa-kag.service"
       },
+      "proof": {
+        "evaluated_at": "2026-07-25T12:00:00Z",
+        "evidence": {
+          "evidence_refs": [
+            {
+              "evidence_ref": "example://runtime/central-proof",
+              "expires_at": "2026-07-25T14:00:00Z",
+              "observed_at": "2026-07-25T12:00:00Z",
+              "owner": "aoa-evals",
+              "revision": "public-example-revision"
+            }
+          ],
+          "expires_at": "2026-07-25T14:00:00Z",
+          "observed_at": "2026-07-25T12:00:00Z",
+          "reason_codes": [],
+          "state": "exact"
+        },
+        "proof_ref": "example://central-proof/aoa-kag",
+        "proved_canary_ref": "example://canary/aoa-kag",
+        "proved_consumer_registration_ref": "example://consumer/aoa-kag",
+        "proved_deploy_revision": "deploy-example-revision",
+        "proved_package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "proved_server_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "proved_source_revision": "source-example-revision",
+        "verdict": "passed"
+      },
       "registry": {
         "evidence": {
           "evidence_refs": [

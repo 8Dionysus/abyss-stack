@@ -20,9 +20,14 @@
 - structured allowlisted plan actions with no free-form command;
 - active processes require an observed process identity rather than a bare
   boolean;
+- activation requires a passed central-proof verdict issued by `proof_owner`
+  and bound to the current source/package/deploy/schema/consumer/canary
+  contour;
 - activation requires acceptance-owner evidence bound to the exact source
   revision and package digest, and carries that expiring receipt into the
   candidate;
+- required evidence timestamps cannot postdate the observation snapshot beyond
+  the bounded clock-skew allowance;
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior.

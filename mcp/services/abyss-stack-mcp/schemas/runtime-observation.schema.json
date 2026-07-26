@@ -80,6 +80,205 @@
       "title": "CanaryObservation",
       "type": "object"
     },
+    "CentralProofObservation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evaluated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  },
+                  "state": {
+                    "enum": [
+                      "exact",
+                      "compatible_drift"
+                    ]
+                  }
+                }
+              },
+              "proof_ref": {
+                "type": "string"
+              },
+              "proved_canary_ref": {
+                "type": "string"
+              },
+              "proved_consumer_registration_ref": {
+                "type": "string"
+              },
+              "proved_deploy_revision": {
+                "type": "string"
+              },
+              "proved_package_digest": {
+                "type": "string"
+              },
+              "proved_server_schema_digest": {
+                "type": "string"
+              },
+              "proved_source_revision": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "proof_ref",
+              "evaluated_at",
+              "proved_source_revision",
+              "proved_package_digest",
+              "proved_deploy_revision",
+              "proved_server_schema_digest",
+              "proved_consumer_registration_ref",
+              "proved_canary_ref",
+              "evidence"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "evaluated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluated At"
+        },
+        "evidence": {
+          "$ref": "#/$defs/LinkEvidence"
+        },
+        "proof_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proof Ref"
+        },
+        "proved_canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Canary Ref"
+        },
+        "proved_consumer_registration_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Consumer Registration Ref"
+        },
+        "proved_deploy_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Deploy Revision"
+        },
+        "proved_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Package Digest"
+        },
+        "proved_server_schema_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Server Schema Digest"
+        },
+        "proved_source_revision": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Source Revision"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "failed",
+            "unknown"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verdict",
+        "evidence"
+      ],
+      "title": "CentralProofObservation",
+      "type": "object"
+    },
     "ConsumerObservation": {
       "additionalProperties": false,
       "allOf": [
@@ -1269,6 +1468,9 @@
         "process": {
           "$ref": "#/$defs/ProcessObservation"
         },
+        "proof": {
+          "$ref": "#/$defs/CentralProofObservation"
+        },
         "registry": {
           "$ref": "#/$defs/RegistryObservation"
         },
@@ -1293,6 +1495,7 @@
         "registry",
         "consumers",
         "freshness",
+        "proof",
         "acceptance",
         "canary",
         "rollback"

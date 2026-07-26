@@ -127,6 +127,20 @@ def observation_example() -> dict[str, Any]:
                     "evidence_refs": evidence("freshness")["evidence_refs"],
                     "reason_codes": [],
                 },
+                "proof": {
+                    "verdict": "passed",
+                    "proof_ref": "example://central-proof/aoa-kag",
+                    "evaluated_at": NOW.isoformat(),
+                    "proved_source_revision": "source-example-revision",
+                    "proved_package_digest": DIGESTS["package"],
+                    "proved_deploy_revision": "deploy-example-revision",
+                    "proved_server_schema_digest": DIGESTS["schema"],
+                    "proved_consumer_registration_ref": (
+                        "example://consumer/aoa-kag"
+                    ),
+                    "proved_canary_ref": "example://canary/aoa-kag",
+                    "evidence": evidence("central-proof", owner="aoa-evals"),
+                },
                 "acceptance": {
                     "accepted": True,
                     "acceptance_ref": "example://acceptance/aoa-kag",

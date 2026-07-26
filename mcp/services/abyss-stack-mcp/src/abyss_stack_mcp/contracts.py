@@ -43,6 +43,7 @@ ObservationView = Literal[
     "consumer",
     "schema",
     "freshness",
+    "proof",
     "acceptance",
     "canary",
     "rollback",
@@ -445,6 +446,97 @@ class CanaryObservation(StrictModel):
         return self
 
 
+class CentralProofObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"verdict": {"const": "passed"}},
+                        "required": ["verdict"],
+                    },
+                    "then": {
+                        "properties": {
+                            "proof_ref": {"type": "string"},
+                            "evaluated_at": {
+                                "type": "string",
+                                "format": "date-time",
+                            },
+                            "proved_source_revision": {"type": "string"},
+                            "proved_package_digest": {"type": "string"},
+                            "proved_deploy_revision": {"type": "string"},
+                            "proved_server_schema_digest": {"type": "string"},
+                            "proved_consumer_registration_ref": {
+                                "type": "string"
+                            },
+                            "proved_canary_ref": {"type": "string"},
+                            "evidence": {
+                                "properties": {
+                                    "state": {
+                                        "enum": ["exact", "compatible_drift"]
+                                    },
+                                    "evidence_refs": {"minItems": 1},
+                                }
+                            },
+                        },
+                        "required": [
+                            "proof_ref",
+                            "evaluated_at",
+                            "proved_source_revision",
+                            "proved_package_digest",
+                            "proved_deploy_revision",
+                            "proved_server_schema_digest",
+                            "proved_consumer_registration_ref",
+                            "proved_canary_ref",
+                            "evidence",
+                        ],
+                    },
+                }
+            ]
+        },
+    )
+    verdict: Literal["passed", "failed", "unknown"]
+    proof_ref: NonEmpty | None = None
+    evaluated_at: datetime | None = None
+    proved_source_revision: NonEmpty | None = None
+    proved_package_digest: Digest | None = None
+    proved_deploy_revision: NonEmpty | None = None
+    proved_server_schema_digest: Digest | None = None
+    proved_consumer_registration_ref: NonEmpty | None = None
+    proved_canary_ref: NonEmpty | None = None
+    evidence: LinkEvidence
+
+    @field_validator("evaluated_at")
+    @classmethod
+    def require_aware_time(cls, value: datetime | None) -> datetime | None:
+        return _aware_utc(value)
+
+    @model_validator(mode="after")
+    def validate_proof(self) -> CentralProofObservation:
+        proof_contour = (
+            self.proof_ref,
+            self.evaluated_at,
+            self.proved_source_revision,
+            self.proved_package_digest,
+            self.proved_deploy_revision,
+            self.proved_server_schema_digest,
+            self.proved_consumer_registration_ref,
+            self.proved_canary_ref,
+        )
+        if self.verdict == "passed" and (
+            any(value is None for value in proof_contour)
+            or self.evidence.state not in {"exact", "compatible_drift"}
+            or not self.evidence.evidence_refs
+        ):
+            raise ValueError(
+                "passed central proof requires an exact target, timestamp, "
+                "and evidence"
+            )
+        return self
+
+
 class OwnerAcceptanceObservation(StrictModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -694,6 +786,7 @@ class RuntimeSubject(StrictModel):
     registry: RegistryObservation
     consumers: tuple[ConsumerObservation, ...]
     freshness: FreshnessObservation
+    proof: CentralProofObservation
     acceptance: OwnerAcceptanceObservation
     canary: CanaryObservation
     rollback: RollbackObservation
@@ -711,6 +804,11 @@ class RuntimeSubject(StrictModel):
         consumer_ids = [consumer.consumer_id for consumer in self.consumers]
         if len(consumer_ids) != len(set(consumer_ids)):
             raise ValueError("consumer ids must be unique within a runtime subject")
+        if self.proof.verdict == "passed" and not any(
+            evidence.owner == self.owners.proof_owner
+            for evidence in self.proof.evidence.evidence_refs
+        ):
+            raise ValueError("central proof evidence must be issued by proof_owner")
         if self.acceptance.accepted and not any(
             evidence.owner == self.owners.acceptance_owner
             for evidence in self.acceptance.evidence.evidence_refs
@@ -718,6 +816,14 @@ class RuntimeSubject(StrictModel):
             raise ValueError(
                 "owner acceptance evidence must be issued by acceptance_owner"
             )
+        if (
+            self.proof.verdict == "passed"
+            and self.acceptance.accepted
+            and self.proof.evaluated_at is not None
+            and self.acceptance.accepted_at is not None
+            and self.acceptance.accepted_at < self.proof.evaluated_at
+        ):
+            raise ValueError("owner acceptance cannot precede central proof")
         return self
 
 
