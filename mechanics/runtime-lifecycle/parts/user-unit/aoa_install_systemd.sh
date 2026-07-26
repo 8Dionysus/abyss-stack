@@ -174,13 +174,29 @@ mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
 mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
 mcp_http_codex_block_present=0
 
+aoa_validate_mcp_bearer_file() {
+  local credential_path="$1"
+  local credential_label="$2"
+  local token=""
+  local token_size=0
+  local file_size=0
+
+  [[ -f "$credential_path" && ! -L "$credential_path" ]] || \
+    aoa_die "existing ${credential_label} must be a regular non-symlink file"
+  token="$(<"$credential_path")"
+  token_size="${#token}"
+  file_size="$(stat -c '%s' "$credential_path")"
+  if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
+    ! ((file_size == token_size || file_size == token_size + 1)); then
+    aoa_die "existing ${credential_label} has invalid content"
+  fi
+  chmod 0600 "$credential_path"
+}
+
 aoa_provision_mcp_bearer() {
   local credential_name="$1"
   local credential_label="$2"
   local credential_path="${mcp_http_secret_dir}/${credential_name}"
-  local token=""
-  local token_size=0
-  local file_size=0
   local temp_path=""
 
   if [[ -e "$mcp_http_secret_dir" || -L "$mcp_http_secret_dir" ]]; then
@@ -190,16 +206,7 @@ aoa_provision_mcp_bearer() {
     install -d -m 0700 "$mcp_http_secret_dir"
   fi
   if [[ -e "$credential_path" || -L "$credential_path" ]]; then
-    [[ -f "$credential_path" && ! -L "$credential_path" ]] || \
-      aoa_die "existing ${credential_label} must be a regular non-symlink file"
-    token="$(<"$credential_path")"
-    token_size="${#token}"
-    file_size="$(stat -c '%s' "$credential_path")"
-    if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{43,512}$ ]] || \
-      ! ((file_size == token_size || file_size == token_size + 1)); then
-      aoa_die "existing ${credential_label} has invalid content"
-    fi
-    chmod 0600 "$credential_path"
+    aoa_validate_mcp_bearer_file "$credential_path" "$credential_label"
     aoa_note "${credential_label} already provisioned under the deployed Secrets root"
     return 0
   fi
@@ -210,8 +217,17 @@ aoa_provision_mcp_bearer() {
     aoa_die "failed to generate MCP HTTP bearer credential"
   fi
   chmod 0600 "$temp_path"
-  mv -- "$temp_path" "$credential_path"
-  aoa_note "provisioned ${credential_label} under the deployed Secrets root"
+  if ln -- "$temp_path" "$credential_path" 2>/dev/null; then
+    rm -f -- "$temp_path"
+    aoa_note "provisioned ${credential_label} under the deployed Secrets root"
+    return 0
+  fi
+  rm -f -- "$temp_path"
+  if [[ ! -e "$credential_path" && ! -L "$credential_path" ]]; then
+    aoa_die "failed to atomically provision ${credential_label}"
+  fi
+  aoa_validate_mcp_bearer_file "$credential_path" "$credential_label"
+  aoa_note "${credential_label} already provisioned under the deployed Secrets root"
 }
 
 aoa_provision_mcp_http_auth() {
@@ -231,11 +247,16 @@ aoa_provision_abyss_stack_mcp_auth() {
 
 aoa_provision_abyss_stack_mcp_runtime() {
   local source_digest=""
-  local existing_digest=""
-  local marker=".abyss-stack-mcp-source-digest"
+  local lock_digest=""
+  local runtime_identity=""
+  local existing_identity=""
+  local marker=".abyss-stack-mcp-runtime-identity"
+  local lock_path="${abyss_stack_mcp_service_root}/requirements.lock"
   local temp_venv=""
   local backup_venv=""
   local resolved_bootstrap_python=""
+  local unit=""
+  local unit_state=""
 
   [[ "$abyss_stack_mcp_bootstrap_python" == /* ]] || \
     aoa_die "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON must be an absolute path"
@@ -254,6 +275,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
   [[ -f "${abyss_stack_mcp_service_root}/pyproject.toml" && \
      ! -L "${abyss_stack_mcp_service_root}/pyproject.toml" ]] || \
     aoa_die "deployed abyss-stack MCP package metadata is unavailable"
+  [[ -f "$lock_path" && ! -L "$lock_path" ]] || \
+    aoa_die "deployed abyss-stack MCP hash lock is unavailable"
   if [[ -n "$(find "$abyss_stack_mcp_service_root" -type l -print -quit)" ]]; then
     aoa_die "deployed abyss-stack MCP package must not contain symlinks"
   fi
@@ -272,22 +295,52 @@ aoa_provision_abyss_stack_mcp_runtime() {
   )"
   [[ "$source_digest" =~ ^[0-9a-f]{64}$ ]] || \
     aoa_die "failed to digest the deployed abyss-stack MCP package"
+  lock_digest="$(sha256sum "$lock_path" | cut -d' ' -f1)"
+  [[ "$lock_digest" =~ ^[0-9a-f]{64}$ ]] || \
+    aoa_die "failed to digest the deployed abyss-stack MCP hash lock"
+  runtime_identity="${source_digest}:${lock_digest}"
 
   if [[ -e "$abyss_stack_mcp_venv" || -L "$abyss_stack_mcp_venv" ]]; then
     [[ -d "$abyss_stack_mcp_venv" && ! -L "$abyss_stack_mcp_venv" ]] || \
       aoa_die "existing abyss-stack MCP runtime must be a non-symlink directory"
     if [[ -f "${abyss_stack_mcp_venv}/${marker}" ]]; then
-      existing_digest="$(<"${abyss_stack_mcp_venv}/${marker}")"
+      existing_identity="$(<"${abyss_stack_mcp_venv}/${marker}")"
     fi
-    if [[ "$existing_digest" == "$source_digest" && \
+    if [[ "$existing_identity" == "$runtime_identity" && \
           -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
        "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
        "${abyss_stack_mcp_venv}/bin/python" -c \
          'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
-      aoa_note "abyss-stack MCP runtime already provisioned for deployed package digest ${source_digest}"
+      aoa_note "abyss-stack MCP runtime already provisioned for deployed source ${source_digest} and lock ${lock_digest}"
       return 0
     fi
   fi
+
+  for unit in abyss-stack-mcp-read.service abyss-stack-mcp-candidate.service; do
+    if ! unit_state="$(
+      systemctl --user list-units \
+        --all \
+        --full \
+        --plain \
+        --no-legend \
+        "$unit" |
+        awk -v expected="$unit" '$1 == expected {print $3}'
+    )"; then
+      aoa_die "cannot determine whether ${unit} is active; refusing runtime replacement"
+    fi
+    case "$unit_state" in
+      "")
+        ;;
+      inactive|failed)
+        ;;
+      active|activating|reloading|deactivating)
+        aoa_die "refusing to replace abyss-stack MCP runtime while ${unit} is ${unit_state}"
+        ;;
+      *)
+        aoa_die "unexpected ${unit} active state ${unit_state}; refusing runtime replacement"
+        ;;
+    esac
+  done
 
   install -d -m 0750 "$abyss_stack_mcp_runtime_root"
   temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
@@ -298,8 +351,16 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
     "${temp_venv}/bin/python" -m pip install \
       --no-input \
-      --upgrade \
-      --upgrade-strategy only-if-needed \
+      --require-hashes \
+      -r "$lock_path"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to install the deployed abyss-stack MCP hash-locked dependency closure"
+  fi
+  if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    "${temp_venv}/bin/python" -m pip install \
+      --no-input \
+      --no-deps \
+      --no-build-isolation \
       "$abyss_stack_mcp_service_root"; then
     rm -rf -- "$temp_venv"
     aoa_die "failed to install the deployed abyss-stack MCP package"
@@ -310,7 +371,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi
-  printf '%s\n' "$source_digest" > "${temp_venv}/${marker}"
+  printf '%s\n' "$runtime_identity" > "${temp_venv}/${marker}"
   chmod 0644 "${temp_venv}/${marker}"
 
   if [[ -d "$abyss_stack_mcp_venv" ]]; then
@@ -328,7 +389,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   if [[ -n "$backup_venv" && -d "$backup_venv" ]]; then
     rm -rf -- "$backup_venv"
   fi
-  aoa_note "provisioned abyss-stack MCP runtime for deployed package digest ${source_digest}"
+  aoa_note "provisioned abyss-stack MCP runtime for deployed source ${source_digest} and lock ${lock_digest}"
 }
 
 aoa_validate_mcp_http_codex_zshrc() {

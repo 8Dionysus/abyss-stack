@@ -117,15 +117,34 @@ scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime
 ```
 
 This creates or refreshes
-`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies its dependencies,
-and records the exact deployed-package content digest. Repeating the command
-with unchanged source verifies and reuses the environment. The units have a
+`${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, installs the exact
+`requirements.lock` closure with `--require-hashes`, verifies its dependencies,
+and records a runtime identity composed from both the deployed-package digest
+and the lock digest. Repeating the command with unchanged source and lock
+verifies and reuses the environment. A changed identity is never installed
+over a running plane: provisioning fails closed while either the read or
+candidate unit is active or their user-systemd state cannot be observed. Stop
+both units explicitly before reprovisioning, then start or canary them as a
+separate action. The units have a
 `ConditionPathExists` guard plus an executable `ExecCondition`, and remain
 inactive when this runtime is absent or unusable.
 They execute the package installed inside that venv, not `Configs/src`.
 Consequently, a later Configs sync cannot mix new code with an older dependency
 closure; the synced package becomes eligible for a later start only after this
 explicit reprovision step succeeds.
+
+Runtime dependencies and the build backend are exact pins in
+`requirements.constraints`; the committed `requirements.lock` carries the
+resolved closure and artifact hashes. Regenerate it from the repository root
+with the reviewed `pip-tools` version:
+
+```bash
+pip-compile --generate-hashes --resolver=backtracking --strip-extras \
+  --all-build-deps --allow-unsafe \
+  --constraint mcp/services/abyss-stack-mcp/requirements.constraints \
+  --output-file mcp/services/abyss-stack-mcp/requirements.lock \
+  mcp/services/abyss-stack-mcp/pyproject.toml
+```
 
 ## Validation
 

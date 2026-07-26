@@ -404,6 +404,77 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertNotIn(token, second.stdout + second.stderr)
             self.assertIn("already provisioned", second.stdout)
 
+    def test_mcp_http_auth_concurrent_first_write_keeps_one_valid_winner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stack_root = root / "stack"
+            race_root = root / "race"
+            race_root.mkdir()
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "touch \"$RACE_ROOT/ready.$$\"\n"
+                "while (( $(find \"$RACE_ROOT\" -maxdepth 1 -name 'ready.*' "
+                "-type f | wc -l) < 2 )); do\n"
+                "  sleep 0.01\n"
+                "done\n"
+                "printf 'race-%s-' \"$$\"\n"
+                "printf '%050d\\n' 0\n",
+                encoding="utf-8",
+            )
+            python.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "AOA_STACK_ROOT": str(stack_root),
+                    "AOA_CONFIGS_ROOT": str(root / "Configs"),
+                    "HOME": str(root / "home"),
+                    "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
+                    "RACE_ROOT": str(race_root),
+                }
+            )
+            command = [
+                "bash",
+                str(INSTALL_SYSTEMD),
+                "--provision-mcp-http-auth",
+            ]
+            processes = [
+                subprocess.Popen(
+                    command,
+                    cwd=REPO_ROOT,
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(2)
+            ]
+            results = [process.communicate(timeout=10) for process in processes]
+
+            for process, (stdout, stderr) in zip(processes, results, strict=True):
+                self.assertEqual(process.returncode, 0, stderr)
+                self.assertNotIn("race-", stderr)
+                self.assertNotRegex(stdout, r"race-[0-9]+-")
+            token_path = stack_root / MCP_HTTP_SECRET_RELATIVE
+            token = token_path.read_text(encoding="utf-8").removesuffix("\n")
+            self.assertRegex(token, r"\A[A-Za-z0-9._~-]{43,512}\Z")
+            self.assertEqual(token_path.stat().st_mode & 0o777, 0o600)
+            combined_stdout = "".join(stdout for stdout, _ in results)
+            self.assertEqual(combined_stdout.count("already provisioned"), 1)
+            provisioned_without_already = [
+                line
+                for line in combined_stdout.splitlines()
+                if "provisioned MCP HTTP bearer credential" in line
+                and "already" not in line
+            ]
+            self.assertEqual(len(provisioned_without_already), 1)
+
     def test_stack_mcp_auth_provisions_distinct_secret_safe_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -499,8 +570,17 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "[project]\nname = \"abyss-stack-mcp\"\nversion = \"0.1.0\"\n",
                 encoding="utf-8",
             )
+            lock_path = service_root / "requirements.lock"
+            lock_path.write_text(
+                "test-package==1.0.0 \\\n"
+                "    --hash=sha256:"
+                + ("0" * 64)
+                + "\n",
+                encoding="utf-8",
+            )
             source_file = service_root / "service.py"
             source_file.write_text("VALUE = 1\n", encoding="utf-8")
+            pip_log = root / "pip.log"
             bootstrap = root / "fake-python"
             bootstrap.write_text(
                 "#!/usr/bin/env bash\n"
@@ -512,6 +592,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"pip\" ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$ABYSS_STACK_MCP_TEST_PIP_LOG\"\n"
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == \"-c\" ]]; then\n"
@@ -523,14 +604,35 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             bootstrap.chmod(0o755)
             bootstrap_link = root / "fake-python-link"
             bootstrap_link.symlink_to(bootstrap)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "unit=\"${!#}\"\n"
+                "if [[ \"${ABYSS_STACK_MCP_TEST_SYSTEMCTL_FAIL:-0}\" == 1 ]]; "
+                "then\n"
+                "  exit 1\n"
+                "fi\n"
+                "if [[ \"${ABYSS_STACK_MCP_TEST_ACTIVE_UNIT:-}\" == "
+                "\"$unit\" ]]; then\n"
+                "  printf '%s loaded active running test\\n' \"$unit\"\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
             env = os.environ.copy()
             env.update(
                 {
                     "AOA_STACK_ROOT": str(stack_root),
                     "AOA_CONFIGS_ROOT": str(stack_root / "Configs"),
                     "ABYSS_STACK_MCP_BOOTSTRAP_PYTHON": str(bootstrap_link),
+                    "ABYSS_STACK_MCP_TEST_PIP_LOG": str(pip_log),
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
+                    "PATH": f"{fake_bin}:{env['PATH']}",
                 }
             )
             command = [
@@ -549,12 +651,25 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             venv = stack_root / "Services" / "abyss-stack-mcp" / "venv"
-            marker = venv / ".abyss-stack-mcp-source-digest"
-            first_digest = marker.read_text(encoding="utf-8").strip()
-            self.assertRegex(first_digest, r"\A[0-9a-f]{64}\Z")
+            marker = venv / ".abyss-stack-mcp-runtime-identity"
+            first_identity = marker.read_text(encoding="utf-8").strip()
+            self.assertRegex(first_identity, r"\A[0-9a-f]{64}:[0-9a-f]{64}\Z")
             self.assertTrue((venv / "bin" / "python").is_file())
             self.assertIn("provisioned abyss-stack MCP runtime", first.stdout)
             self.assertNotIn("unit linked", first.stdout)
+            pip_calls = pip_log.read_text(encoding="utf-8").splitlines()
+            self.assertTrue(
+                any(
+                    f"--require-hashes -r {lock_path}" in line
+                    for line in pip_calls
+                )
+            )
+            self.assertTrue(
+                any(
+                    f"--no-deps --no-build-isolation {service_root}" in line
+                    for line in pip_calls
+                )
+            )
 
             second = subprocess.run(
                 command,
@@ -566,9 +681,68 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             )
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertIn("already provisioned", second.stdout)
-            self.assertEqual(marker.read_text(encoding="utf-8").strip(), first_digest)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
 
             source_file.write_text("VALUE = 2\n", encoding="utf-8")
+            pip_log_before_block = pip_log.read_text(encoding="utf-8")
+            for active_unit in (
+                "abyss-stack-mcp-read.service",
+                "abyss-stack-mcp-candidate.service",
+            ):
+                with self.subTest(active_unit=active_unit):
+                    blocked = subprocess.run(
+                        command,
+                        cwd=REPO_ROOT,
+                        env={
+                            **env,
+                            "ABYSS_STACK_MCP_TEST_ACTIVE_UNIT": active_unit,
+                        },
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(blocked.returncode, 0)
+                    self.assertIn(
+                        f"while {active_unit} is active",
+                        blocked.stderr,
+                    )
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8").strip(),
+                        first_identity,
+                    )
+                    self.assertEqual(
+                        pip_log.read_text(encoding="utf-8"),
+                        pip_log_before_block,
+                    )
+
+            unobservable = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env={
+                    **env,
+                    "ABYSS_STACK_MCP_TEST_SYSTEMCTL_FAIL": "1",
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unobservable.returncode, 0)
+            self.assertIn(
+                "cannot determine whether abyss-stack-mcp-read.service is active",
+                unobservable.stderr,
+            )
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").strip(),
+                first_identity,
+            )
+            self.assertEqual(
+                pip_log.read_text(encoding="utf-8"),
+                pip_log_before_block,
+            )
+
             third = subprocess.run(
                 command,
                 cwd=REPO_ROOT,
@@ -581,7 +755,7 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             self.assertIn("provisioned abyss-stack MCP runtime", third.stdout)
             self.assertNotEqual(
                 marker.read_text(encoding="utf-8").strip(),
-                first_digest,
+                first_identity,
             )
 
     def test_mcp_http_auth_provision_creates_a_private_secret_root(self) -> None:

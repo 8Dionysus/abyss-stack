@@ -124,8 +124,10 @@ The current direction is:
   the first `abyss-stack-mcp` source candidate separates compact runtime
   observation from immutable non-executing plan preparation. The two stack
   contours have disjoint tools, ports, scopes, client identities, and
-  credentials, and neither is admitted or live merely because its package and
-  unit files exist.
+  atomically provisioned credentials. Their managed environment binds deployed
+  source to an exact artifact-hashed lock and cannot be replaced while either
+  plane is active. Neither contour is admitted or live merely because its
+  package and unit files exist.
 - Next honest move:
   land and deploy the typed source-to-runtime provenance spine, generate one
   secret-free runtime observation from exact source and deployed identities,

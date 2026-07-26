@@ -112,11 +112,14 @@ typed runtime observation exists and source-to-Configs parity is green. No
 Codex client registration is installed for these two contours by this action.
 Provision their dependency-closed Python environment after sync with
 `scripts/aoa-install-systemd --provision-abyss-stack-mcp-runtime`. The
-source-addressed environment lives under
+source-and-lock-addressed environment lives under
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`; both units refuse activation
 through `ConditionPathExists` and an executable `ExecCondition` when it is
 absent or unusable. Runtime provisioning, credential provisioning, unit
 linking, start, and client registration remain separate actions.
+Provisioning installs the exact artifact-hashed lock and refuses to replace a
+changed environment while either stack MCP unit is active or its state cannot
+be observed; it never stops a plane implicitly.
 The units execute the installed venv module, not the mutable `Configs/src`
 tree, so a Configs sync cannot combine new service code with an older
 dependency closure; rerun runtime provisioning before a later restart.

@@ -175,9 +175,13 @@ and does not start a unit. Start remains a later canary decision after the
 typed runtime observation, deployed parity, and consumer contract are ready.
 The stack MCP runtime provision action builds a source-addressed virtual
 environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
-already deployed package, verifies its dependency closure and imports, and
-does not link, start, or register a service. Repeating it against the same
-deployed package verifies and reuses the environment.
+already deployed package, installs its exact hash-locked dependency closure,
+verifies dependencies and imports, and records both source and lock digests.
+It does not link, stop, start, or register a service. Repeating it against the
+same deployed package and lock verifies and reuses the environment. A changed
+runtime identity fails closed while either stack MCP unit is active or its
+user-systemd state cannot be observed; stop both planes explicitly before
+reprovisioning.
 The Codex client install adds a removable Zsh launch function that delegates
 to the deployed launcher without replacing the managed Codex executable or
 exporting the bearer into the parent shell. It affects only new interactive
@@ -411,9 +415,15 @@ compiles an expiring content-addressed plan with
 
 Use `--provision-abyss-stack-mcp-runtime` after syncing the MCP package and
 before canarying either stack-owned plane. It must run as the target user,
-installs the deployed package and its constrained dependencies into
+installs the deployed package and the exact `requirements.lock` closure with
+artifact-hash enforcement into
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies `pip check` and
-runtime imports, and records a digest of the exact deployed package content.
+runtime imports, and records a runtime identity containing both the exact
+deployed-package digest and lock digest. If that identity changes while either
+`abyss-stack-mcp-read.service` or `abyss-stack-mcp-candidate.service` is
+active, or when their user-systemd state cannot be observed, the action refuses
+to mutate the environment; stopping and later starting those units remain
+explicit operator actions.
 The user units point only at this environment and use
 `ConditionPathExists` plus an executable `ExecCondition`, so a missing or
 unusable runtime leaves them inactive instead of entering a restart loop.

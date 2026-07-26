@@ -54,6 +54,18 @@ client-side launcher. The bearer is inherited only by Codex, the managed Codex
 binary symlink is unchanged, and running shells and sessions are untouched.
 `--remove-mcp-http-codex-client` removes only that managed Zsh block.
 
+The stack-owned read and non-executing candidate planes have separate
+credentials provisioned by
+`aoa-install-systemd --provision-abyss-stack-mcp-auth`. First creation uses an
+atomic no-clobber publication step, so concurrent installers keep and validate
+one winner rather than replacing each other. Their managed Python environment
+is a separate explicit action:
+`aoa-install-systemd --provision-abyss-stack-mcp-runtime`. It installs the
+artifact-hashed dependency lock, binds deployed source and lock digests into
+the runtime identity, and refuses to replace a changed environment while
+either plane is active or its user-systemd state cannot be observed. It never
+stops or starts those units implicitly.
+
 Use `pkexec .../aoa-install-systemd --system-units` for the small privileged
 support-unit allowlist under `systemd/system/`. That mode installs root-owned
 copies into `/etc/systemd/system`, reloads the system daemon, and deliberately

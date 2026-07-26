@@ -17,10 +17,12 @@ Tracking starts with the community-docs baseline for this repository.
   source-owned user units remain unstarted until provenance, deployment
   parity, registry, consumer, canary, proof, and acceptance gates are met.
 - The stack MCP candidate contour now avoids PostgreSQL on port `5432`, uses
-  explicit port `5433`, provisions a source-addressed Python runtime before
-  unit activation, and fails activation-plan preparation on unusable
-  freshness, endpoint/process unreadiness, incompatible consumers, ungrounded
-  canaries, or missing rollback proof.
+  explicit port `5433`, provisions a source-and-lock-addressed Python runtime
+  from exact artifact hashes before unit activation, refuses to replace that
+  runtime while either plane is active, and fails activation-plan preparation
+  on unusable freshness, endpoint/process unreadiness, incompatible consumers,
+  ungrounded canaries, or missing rollback proof. Concurrent first credential
+  writes publish one atomically selected value without clobbering the winner.
 - Published stack MCP schemas now encode conditional runtime invariants;
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
   precondition, and activation steps name the exact selected compatible

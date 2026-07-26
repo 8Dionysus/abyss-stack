@@ -67,7 +67,11 @@ authority.
 Managed units execute a stack-owned, source-addressed virtual environment under
 `Services/abyss-stack-mcp`; they never inherit dependencies from ambient
 Python or import newly synced `Configs/src` over the installed package.
-Provisioning is explicit and does not start or register either plane.
+The environment is reproduced from exact direct and transitive pins with
+artifact hashes, and its identity binds both deployed source content and the
+lock file. Provisioning is explicit, refuses to replace the environment while
+either plane is active or its state cannot be observed, and does not stop,
+start, or register either plane.
 
 `rollback_required` is admissible only for the failed source/package/deploy
 links of a rollback plan, and only while the triggering link and its evidence
