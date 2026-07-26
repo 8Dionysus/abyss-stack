@@ -66,9 +66,11 @@ usable rollback proof that binds that LKG route and receipt; it neither validate
 nor copies the current deployment's canary evidence, which may be failed,
 blocked, or expired in the recovery scenario. Restart plans also require and
 carry usable current-canary and central-proof evidence, verify that the passed
-proof names the exact current canary route and receipt before the restart
-snapshot, and reject inactive processes, which must use the full activation
-contour instead. A plan expires at the
+proof names the exact current source, package, deploy, process, server schema,
+compatible consumer registration, canary route, and canary receipt before the
+restart snapshot, and reject inactive processes, which must use the full
+activation contour instead. The selected consumer registration evidence is
+copied and expiry-bounded by the restart candidate. A plan expires at the
 earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
 planning allows at most 30 seconds of positive clock skew and rejects
@@ -128,7 +130,9 @@ classes. Credential-key screening includes passphrases and recognizes
 namespaced separator and camel-case token sequences rather than only exact key
 spellings. Unambiguous credential components such as `secret_access_key` are
 rejected even without a provider namespace, including AWS-style
-`aws_secret_access_key`. Concatenated
+`aws_secret_access_key`. Exact `credential` and `credentials` keys are also
+rejected without treating the typed `credential_class` identity field as
+secret material. Concatenated
 matches require a recognized provider/consumer namespace or credential-value
 attribute boundary, so ordinary keys such as `tokenizer`, `passwordless`, and
 `authorizationPolicy` remain valid.

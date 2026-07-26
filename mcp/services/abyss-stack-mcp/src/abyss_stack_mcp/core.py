@@ -45,7 +45,9 @@ _FORBIDDEN_KEYS = frozenset(
         "authorization",
         "bearer",
         "client_secret",
+        "credential",
         "credential_material",
+        "credentials",
         "passphrase",
         "password",
         "private_key",
@@ -635,7 +637,7 @@ class StackMCPApplication:
             target_policy_family,
         )
         plan_consumer: ConsumerObservation | None = None
-        if plan_kind == "activate":
+        if plan_kind in {"activate", "restart"}:
             proof_consumers = self._proof_consumers(subject, now)
             if proof_consumers:
                 plan_consumer = proof_consumers[0]
@@ -1127,7 +1129,6 @@ class StackMCPApplication:
                 blockers.append("server_schema_unobserved")
         if plan_kind == "activate":
             compatible_consumers = self._compatible_consumers(subject, now)
-            proof_consumers = self._proof_consumers(subject, now)
             if not subject.endpoint.ready:
                 blockers.append("endpoint_not_ready")
             if (
@@ -1136,24 +1137,7 @@ class StackMCPApplication:
                 not in usable_states
             ):
                 blockers.append("central_proof_not_proven")
-            elif (
-                subject.proof.proved_source_revision != subject.source.revision
-                or subject.proof.proved_source_tree_digest
-                != subject.source.tree_digest
-                or subject.proof.proved_package_digest
-                != subject.package.artifact_digest
-                or subject.proof.proved_deploy_revision != subject.deploy.revision
-                or subject.proof.proved_deploy_tree_digest
-                != subject.deploy.tree_digest
-                or subject.proof.proved_process_identity
-                != subject.process.process_identity
-                or subject.proof.proved_server_schema_digest
-                != subject.endpoint.server_schema_digest
-                or subject.proof.proved_canary_route
-                != subject.canary.canary_route
-                or subject.proof.proved_canary_ref != subject.canary.canary_ref
-                or (bool(compatible_consumers) and not proof_consumers)
-            ):
+            elif not self._central_proof_matches_subject(subject, now):
                 blockers.append("central_proof_target_mismatch")
             if (
                 not subject.acceptance.accepted
@@ -1206,13 +1190,8 @@ class StackMCPApplication:
                 not in usable_states
             ):
                 blockers.append("restart_canary_not_proven")
-            elif (
-                subject.proof.proved_canary_route
-                != subject.canary.canary_route
-                or subject.proof.proved_canary_ref
-                != subject.canary.canary_ref
-            ):
-                blockers.append("restart_canary_target_mismatch")
+            elif not self._central_proof_matches_subject(subject, now):
+                blockers.append("restart_proof_target_mismatch")
         if plan_kind == "rollback":
             if not subject.rollback.ready or self._effective_link_state(
                 subject.rollback.evidence, now
@@ -1267,6 +1246,29 @@ class StackMCPApplication:
             for consumer in cls._compatible_consumers(subject, now)
             if consumer.registration_ref
             == subject.proof.proved_consumer_registration_ref
+        )
+
+    @classmethod
+    def _central_proof_matches_subject(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> bool:
+        return bool(cls._proof_consumers(subject, now)) and (
+            subject.proof.proved_source_revision == subject.source.revision
+            and subject.proof.proved_source_tree_digest
+            == subject.source.tree_digest
+            and subject.proof.proved_package_digest
+            == subject.package.artifact_digest
+            and subject.proof.proved_deploy_revision == subject.deploy.revision
+            and subject.proof.proved_deploy_tree_digest
+            == subject.deploy.tree_digest
+            and subject.proof.proved_process_identity
+            == subject.process.process_identity
+            and subject.proof.proved_server_schema_digest
+            == subject.endpoint.server_schema_digest
+            and subject.proof.proved_canary_route == subject.canary.canary_route
+            and subject.proof.proved_canary_ref == subject.canary.canary_ref
         )
 
     @classmethod
@@ -1347,6 +1349,11 @@ class StackMCPApplication:
             links.extend(
                 (
                     subject.proof.evidence,
+                    *(
+                        (plan_consumer.evidence,)
+                        if plan_consumer is not None
+                        else ()
+                    ),
                     subject.canary.evidence,
                 )
             )
@@ -1399,9 +1406,14 @@ class StackMCPApplication:
                 )
             )
         elif plan_kind == "restart":
+            if plan_consumer is None:
+                raise StackMCPError(
+                    "restart plan requires the proof-selected compatible consumer"
+                )
             links.extend(
                 (
                     subject.proof.evidence,
+                    plan_consumer.evidence,
                     subject.canary.evidence,
                 )
             )
@@ -1532,6 +1544,10 @@ class StackMCPApplication:
     ) -> tuple[PlanStep, ...]:
         if plan_kind == "activate" and plan_consumer is None:
             raise StackMCPError("activation plan requires a compatible consumer")
+        if plan_kind == "restart" and plan_consumer is None:
+            raise StackMCPError(
+                "restart plan requires the proof-selected compatible consumer"
+            )
         if plan_kind == "rollback" and plan_consumer is None:
             raise StackMCPError("rollback plan requires a usable consumer")
         actions = {
@@ -1598,6 +1614,14 @@ class StackMCPApplication:
                 (
                     "verify-central-proof",
                     subject.proof.proof_ref or "missing",
+                ),
+                (
+                    "verify-consumer-registration",
+                    (
+                        plan_consumer.registration_ref
+                        if plan_consumer is not None
+                        else "missing-compatible-consumer"
+                    ),
                 ),
                 ("snapshot-exact-process", subject.process.unit_name),
                 ("restart-exact-unit", subject.process.unit_name),

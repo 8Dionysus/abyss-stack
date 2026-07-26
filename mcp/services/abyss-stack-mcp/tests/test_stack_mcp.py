@@ -562,6 +562,8 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
     (
         "apiKey",
         "clientSecret",
+        "credential",
+        "credentials",
         "private.key",
         "refresh token",
         "github_api_key",
@@ -625,6 +627,8 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "encoded-bare-assignment",
         "passphrase-query",
         "aws-secret-access-key",
+        "credential-query",
+        "credentials-query",
         "unparseable",
     ),
 )
@@ -785,6 +789,11 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             "https://acceptance.invalid/receipt?"
             f"aws_secret_access_key={secret_value}"
+        )
+    elif reference_surface in {"credential-query", "credentials-query"}:
+        key = reference_surface.removesuffix("-query")
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/receipt?{key}={secret_value}"
         )
     else:
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -1451,12 +1460,25 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
         item["evidence_ref"]
         for item in result["owner_payload"]["plan"]["precondition_evidence"]
     }
+    assert "config://codex/aoa-kag" in {
+        item["evidence_ref"]
+        for item in result["owner_payload"]["plan"]["precondition_evidence"]
+    }
     assert result["owner_payload"]["plan"]["steps"][0] == {
         "order": 1,
         "action": "verify-central-proof",
         "exact_target": "receipt://runtime/central-proof",
         "expected_effect": (
             "prepare verify-central-proof for operator review"
+        ),
+        "stop_on": ["unexpected-drift", "precondition-mismatch"],
+    }
+    assert result["owner_payload"]["plan"]["steps"][1] == {
+        "order": 2,
+        "action": "verify-consumer-registration",
+        "exact_target": "config://codex/aoa-kag",
+        "expected_effect": (
+            "prepare verify-consumer-registration for operator review"
         ),
         "stop_on": ["unexpected-drift", "precondition-mismatch"],
     }
@@ -1467,7 +1489,7 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
     )
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
-    with pytest.raises(StackMCPError, match="restart_canary_target_mismatch"):
+    with pytest.raises(StackMCPError, match="restart_proof_target_mismatch"):
         app.prepare_plan(
             "aoa-kag",
             "read",
@@ -1496,6 +1518,38 @@ def test_restart_plan_requires_and_carries_fresh_canary_evidence(
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
     with pytest.raises(StackMCPError, match="process_not_active"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "restart",
+            expected_observation_digest=digest,
+        )
+
+
+@pytest.mark.parametrize(
+    ("proof_field", "stale_value"),
+    (
+        ("proved_source_revision", "source-rev-previous"),
+        ("proved_source_tree_digest", DIGEST_B),
+        ("proved_package_digest", DIGEST_A),
+        ("proved_deploy_revision", "deploy-rev-previous"),
+        ("proved_deploy_tree_digest", DIGEST_A),
+        ("proved_process_identity", "aoa-kag-mcp/previous-process"),
+        ("proved_server_schema_digest", DIGEST_A),
+        ("proved_consumer_registration_ref", "config://codex/previous"),
+    ),
+)
+def test_restart_plan_binds_central_proof_to_current_runtime_contour(
+    tmp_path: Path,
+    proof_field: str,
+    stale_value: str,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["proof"][proof_field] = stale_value
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+
+    with pytest.raises(StackMCPError, match="restart_proof_target_mismatch"):
         app.prepare_plan(
             "aoa-kag",
             "read",

@@ -35,8 +35,10 @@ package digest and issued no earlier than central proof. Effect-policy
 activation remains blocked until the separate
 effect contracts named in the owner decision are modeled; restart cannot serve
 as an activation bypass. Restart also verifies and carries a usable central
-proof whose named canary route and receipt exactly match the current grounded
-canary, so changing the restart canary cannot reuse an older proof.
+proof whose source, package, deploy, process, server schema, compatible
+consumer registration, canary route, and receipt exactly match the current
+subject. The proof-selected consumer evidence is copied into the restart
+candidate, so changing any deployed contour cannot reuse an older proof.
 The compatible consumer is selected deterministically and its registration
 reference becomes the exact activation-step target; central proof and owner
 acceptance are separate preceding verification steps. Only after those gates

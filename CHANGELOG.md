@@ -75,11 +75,12 @@ Tracking starts with the community-docs baseline for this repository.
   evidence from the current deployment.
 - Restart candidates now reject inactive processes instead of allowing the
   restart step to act as an ungated start path. They also carry and verify the
-  central proof that binds their exact current canary route and receipt.
+  central proof that binds their exact current source, package, deploy,
+  process, schema, compatible consumer registration, canary route, and receipt.
 - Managed stack MCP units now verify deployed source-and-lock identity and the
   complete measured runtime-content digest before every launch, while secret
   screening rejects unambiguous compound credential keys such as
-  `aws_secret_access_key`.
+  `aws_secret_access_key` and exact `credential`/`credentials` references.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the
   digest-matched package installed in their provisioned venv.

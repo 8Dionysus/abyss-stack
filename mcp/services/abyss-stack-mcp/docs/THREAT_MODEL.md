@@ -23,7 +23,8 @@
   recursive decoding covers nested parameters, and credential-key tokenization
   catches namespaced separator/camel-case forms plus concatenated recognized
   provider/consumer, passphrase, and credential-attribute boundaries, including
-  unambiguous compound credentials such as `secret_access_key`, without
+  exact `credential`/`credentials` and unambiguous compound credentials such
+  as `secret_access_key`, without
   treating arbitrary word substrings as credentials; structurally valid compact JWT and
   PEM private-key checks cover embedded material, Basic/Bearer checks normalize
   leading whitespace, and bounded provider-token patterns are scanned
@@ -60,7 +61,9 @@
 - restart candidates require an already active process, preventing restart from
   becoming an activation-gate bypass for an inactive unit; they also require
   and carry usable central-proof and current-canary evidence, with the proof
-  bound to the exact canary route and receipt used by the plan;
+  bound to the exact source, package, deploy, process, server schema,
+  compatible consumer registration, canary route, and receipt used by the
+  plan, and the selected consumer evidence copied into the candidate;
 - activation requires a passed central-proof verdict issued by `proof_owner`
   and bound to the current source revision and tree digest, package, deployed
   revision and tree digest, running process identity, schema, consumer, and
