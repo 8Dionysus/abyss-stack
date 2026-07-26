@@ -1,0 +1,17 @@
+{
+  "allowed_bytes": 19794593,
+  "allowed_tracked_bytes": 25314666,
+  "approved_by": "repository-owner",
+  "base_ref": "0c930170c474eaaee1dc71d56ef4e00cc3b7e7e8",
+  "changed_generated_bytes": 19794593,
+  "changed_generated_files": 291,
+  "decision_ref": "aoa-kag:docs/decisions/AOA-KAG-D-0017-portable-content-addressed-repository-family.md",
+  "default_limit_bytes": 1048576,
+  "head_family_digest": "60d38edc8b3dd771b8e0d32a618da48d33b86b87e91af26a3342c10c21c727b6",
+  "reason": "Index the reviewed Tree of Sophia human OCR workbench, v1/v2 evidence boundary, stand-off typography, frozen post-reveal analyzer, owner docs, and tests; the added source records redistribute deterministic anchors across portable shards.",
+  "repo": "abyss-stack",
+  "schema_version": "aoa-repo-local-kag-budget-receipt-v1",
+  "scope": "generated_delta_and_tracked_size",
+  "tracked_bytes": 25314666,
+  "tracked_bytes_max": 24117248
+}

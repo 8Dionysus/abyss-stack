@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://abyss.local/schemas/tos/ocr-candidate-review-manifest.schema.json",
+  "title": "Tree of Sophia OCR candidate review packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "experiment_id",
+    "created_at_utc",
+    "artifact_root",
+    "status",
+    "private_local_only",
+    "publishable",
+    "review_mode",
+    "method_identity_visible",
+    "candidate_text_visible",
+    "recognized_reference_visible",
+    "source_packet",
+    "language_scope",
+    "source_count",
+    "candidate_run_count",
+    "unit_count",
+    "pages",
+    "units",
+    "review_template",
+    "blind_map",
+    "candidate_set_sha256",
+    "receipt_ref",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tos_ocr_candidate_review_manifest_v1"
+    },
+    "packet_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifact_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "awaiting-source-visible-human-review"
+    },
+    "private_local_only": {
+      "const": true
+    },
+    "publishable": {
+      "const": false
+    },
+    "review_mode": {
+      "const": "candidate-review"
+    },
+    "method_identity_visible": {
+      "const": false
+    },
+    "candidate_text_visible": {
+      "const": true
+    },
+    "recognized_reference_visible": {
+      "const": false
+    },
+    "source_packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id",
+        "manifest_ref",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "language_scope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2,3}$"
+      }
+    },
+    "source_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "candidate_run_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/unit"
+      }
+    },
+    "review_template": {
+      "$ref": "#/$defs/artifact"
+    },
+    "blind_map": {
+      "$ref": "#/$defs/artifact"
+    },
+    "candidate_set_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "receipt_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "sourcePages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previous",
+        "current",
+        "next"
+      ],
+      "properties": {
+        "previous": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_unit_id",
+        "source_sample_id",
+        "visual_sample_id",
+        "source_anchor_ref",
+        "group_id",
+        "language",
+        "pdf_page",
+        "difficulty",
+        "strata",
+        "candidate_label",
+        "candidate_position",
+        "candidate_count_for_source",
+        "candidate_ref",
+        "candidate_sha256",
+        "candidate_bytes",
+        "source_pages"
+      ],
+      "properties": {
+        "review_unit_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        },
+        "source_sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visual_sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_anchor_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}$"
+        },
+        "pdf_page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "difficulty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strata": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "candidate_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_position": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_count_for_source": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_pages": {
+          "$ref": "#/$defs/sourcePages"
+        }
+      }
+    }
+  }
+}

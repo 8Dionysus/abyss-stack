@@ -141,7 +141,7 @@
         "reviewed_at_utc": { "$ref": "#/$defs/nullableDate" },
         "layout_role": {
           "type": ["string", "null"],
-          "enum": ["heading", "section-marker", "prose", "quotation", "continuation", "page-furniture", "mixed", null]
+          "enum": ["heading", "section-marker", "prose", "quotation", "continuation", "page-furniture", "mixed", "uncertain", null]
         },
         "begins_on_previous_page": { "$ref": "#/$defs/nullableBoolean" },
         "continues_on_next_page": { "$ref": "#/$defs/nullableBoolean" },

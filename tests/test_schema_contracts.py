@@ -48,6 +48,7 @@ EXPECTED_ACTIVE_SCHEMA_PATHS = {
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-manifest.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/human-gold-review-record.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/manual-review-receipt.schema.json"),
+    Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-render-manifest.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/run-receipt.schema.json"),
     Path("mechanics/inference-pilots/parts/tos-foundation-lab/schemas/runtime-manifest.schema.json"),
