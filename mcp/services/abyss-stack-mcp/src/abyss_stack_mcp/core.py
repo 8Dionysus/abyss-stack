@@ -6,6 +6,7 @@ import errno
 import hashlib
 import json
 import os
+import re
 import stat
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -48,6 +49,9 @@ _FORBIDDEN_KEYS = frozenset(
         "token",
     }
 )
+_FORBIDDEN_KEY_CANONICAL = frozenset(
+    re.sub(r"[^a-z0-9]", "", key.casefold()) for key in _FORBIDDEN_KEYS
+)
 
 
 class StackMCPError(ValueError):
@@ -70,8 +74,8 @@ def sha256_digest(value: Any) -> str:
 def _reject_secret_material(value: Any, path: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            normalized = str(key).lower().replace("-", "_")
-            if normalized in _FORBIDDEN_KEYS:
+            normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+            if normalized in _FORBIDDEN_KEY_CANONICAL:
                 raise StackMCPError(f"secret-bearing key is forbidden at {path}.{key}")
             _reject_secret_material(child, f"{path}.{key}")
     elif isinstance(value, list):
@@ -128,8 +132,14 @@ class ObservationStore:
                     f"runtime observation must be an explicit regular file: {path}"
                 ) from exc
             raise StackMCPError(f"invalid runtime observation {path}: {exc}") from exc
-        except (UnicodeError, json.JSONDecodeError, ValidationError) as exc:
-            raise StackMCPError(f"invalid runtime observation {path}: {exc}") from exc
+        except (UnicodeError, json.JSONDecodeError):
+            raise StackMCPError(
+                f"invalid runtime observation {path}: malformed JSON"
+            ) from None
+        except ValidationError:
+            raise StackMCPError(
+                f"invalid runtime observation {path}: contract validation failed"
+            ) from None
         digest = sha256_digest(observation.model_dump(mode="json"))
         return observation, digest
 

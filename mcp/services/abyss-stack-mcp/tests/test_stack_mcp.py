@@ -227,6 +227,40 @@ def test_observation_store_rejects_secrets_symlinks_and_oversize(
         RuntimeObservation.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    "secret_key",
+    ("apiKey", "clientSecret", "private.key", "refresh token"),
+)
+def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
+    tmp_path: Path,
+    secret_key: str,
+) -> None:
+    secret_value = "unprefixed-sensitive-material"
+    payload = observation(subject())
+    payload["subjects"][0][secret_key] = secret_value
+    path = write_observation(tmp_path / "secret-key.json", payload)
+
+    with pytest.raises(StackMCPError, match="secret-bearing") as caught:
+        ObservationStore(path).load()
+
+    assert secret_value not in str(caught.value)
+
+
+def test_observation_store_redacts_contract_validation_input_values(
+    tmp_path: Path,
+) -> None:
+    sensitive_value = "unclassified-sensitive-material"
+    payload = observation(subject())
+    payload["subjects"][0]["unrecognizedField"] = sensitive_value
+    path = write_observation(tmp_path / "invalid-contract.json", payload)
+
+    with pytest.raises(StackMCPError, match="contract validation failed") as caught:
+        ObservationStore(path).load()
+
+    assert sensitive_value not in str(caught.value)
+    assert caught.value.__suppress_context__ is True
+
+
 @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO requires POSIX")
 def test_observation_store_rejects_fifo_without_blocking(tmp_path: Path) -> None:
     fifo = tmp_path / "observation.fifo"
