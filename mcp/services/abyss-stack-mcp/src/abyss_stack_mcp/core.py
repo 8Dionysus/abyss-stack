@@ -168,6 +168,12 @@ class StackMCPApplication:
         max_results: int = 32,
         byte_budget: int = 32_768,
     ) -> dict[str, Any]:
+        if self.policy_family != "read":
+            raise StackMCPError("runtime discovery is absent from this process")
+        if policy_family not in {None, "read"}:
+            raise StackMCPError(
+                "the read process exposes only read-policy observations"
+            )
         if max_results < 1 or byte_budget < 512:
             raise StackMCPError("catalog bounds must be positive and explicit")
         observation, digest = self.store.load()
@@ -197,6 +203,7 @@ class StackMCPApplication:
                 ],
             }
             for subject in observation.subjects
+            if subject.policy_family == "read"
             if (organ_id is None or subject.organ_id == organ_id)
             and (policy_family is None or subject.policy_family == policy_family)
         ]
@@ -236,6 +243,12 @@ class StackMCPApplication:
         *,
         view: ObservationView = "identity",
     ) -> dict[str, Any]:
+        if self.policy_family != "read":
+            raise StackMCPError("runtime inspection is absent from this process")
+        if policy_family != "read":
+            raise StackMCPError(
+                "the read process exposes only read-policy observations"
+            )
         observation, digest = self.store.load()
         now = self._now()
         subject = self._find_subject(observation, organ_id, policy_family)

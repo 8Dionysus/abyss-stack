@@ -17,6 +17,10 @@ The read process exposes only:
 - `stack_runtime_inspect`: one exact owner/policy target and one selected
   evidence view.
 
+Both read tools are server-filtered to `policy_family=read`; omitting the
+catalog filter cannot enumerate candidate or effect subjects, and inspection
+rejects every higher-policy contour before loading an observation.
+
 The candidate process exposes only:
 
 - `stack_prepare_runtime_plan`: a content-addressed `sync`, `deploy`,

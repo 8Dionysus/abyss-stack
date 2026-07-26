@@ -109,10 +109,7 @@ def build_server(
         @mcp.tool(annotations=read_annotations, structured_output=True)
         def stack_runtime_catalog(
             organ_id: str | None = None,
-            policy_family: Literal[
-                "read", "candidate", "internal_effect", "external_effect"
-            ]
-            | None = None,
+            policy_family: Literal["read"] | None = None,
             max_results: CatalogLimit = 32,
             byte_budget: CatalogBudget = 32_768,
         ) -> dict[str, Any]:
@@ -127,9 +124,7 @@ def build_server(
         @mcp.tool(annotations=read_annotations, structured_output=True)
         def stack_runtime_inspect(
             organ_id: str,
-            policy_family: Literal[
-                "read", "candidate", "internal_effect", "external_effect"
-            ],
+            policy_family: Literal["read"] = "read",
             view: Literal[
                 "identity",
                 "parity",

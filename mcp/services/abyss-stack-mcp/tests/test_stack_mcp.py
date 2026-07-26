@@ -48,6 +48,12 @@ def subject(
     policy_family: str = "read",
     credential_class: str = "aoa-kag-read",
 ) -> dict:
+    effect_classes = {
+        "read": ["observe", "derive"],
+        "candidate": ["prepare_candidate"],
+        "internal_effect": ["apply_runtime"],
+        "external_effect": ["external_emit"],
+    }[policy_family]
     return {
         "organ_id": organ_id,
         "policy_family": policy_family,
@@ -59,11 +65,7 @@ def subject(
             "acceptance_owner": organ_id,
         },
         "credential_class": credential_class,
-        "effect_classes": (
-            ["prepare_candidate"]
-            if policy_family == "candidate"
-            else ["observe", "derive"]
-        ),
+        "effect_classes": effect_classes,
         "source": {
             "revision": "source-rev-1",
             "tree_digest": DIGEST_A,
@@ -316,6 +318,50 @@ def test_catalog_is_compact_and_does_not_flatten_health(tmp_path: Path) -> None:
     assert result["metadata"]["applied_state"] == "not_applied"
 
 
+def test_read_plane_cannot_enumerate_or_inspect_higher_policy_subjects(
+    tmp_path: Path,
+) -> None:
+    payload = observation(
+        subject("read-organ", credential_class="read-organ-read"),
+        subject(
+            "candidate-organ",
+            policy_family="candidate",
+            credential_class="candidate-organ-candidate",
+        ),
+        subject(
+            "internal-organ",
+            policy_family="internal_effect",
+            credential_class="internal-organ-effect",
+        ),
+        subject(
+            "external-organ",
+            policy_family="external_effect",
+            credential_class="external-organ-effect",
+        ),
+    )
+    app = application(tmp_path, payload=payload)
+
+    entries = app.catalog()["owner_payload"]["entries"]
+    assert [(entry["organ_id"], entry["policy_family"]) for entry in entries] == [
+        ("read-organ", "read")
+    ]
+    for policy_family in ("candidate", "internal_effect", "external_effect"):
+        with pytest.raises(StackMCPError, match="only read-policy"):
+            app.catalog(policy_family=policy_family)
+        with pytest.raises(StackMCPError, match="only read-policy"):
+            app.inspect(f"{policy_family}-organ", policy_family)
+
+    candidate_app = application(
+        tmp_path,
+        policy_family="candidate",
+        payload=payload,
+    )
+    with pytest.raises(StackMCPError, match="discovery is absent"):
+        candidate_app.catalog()
+    with pytest.raises(StackMCPError, match="inspection is absent"):
+        candidate_app.inspect("read-organ", "read")
+
+
 def test_inspection_keeps_process_endpoint_freshness_independent(
     tmp_path: Path,
 ) -> None:
@@ -396,14 +442,18 @@ def test_candidate_plan_denies_drift_expiry_and_unproven_rollback(
     source_evidence["evidence_refs"][0]["expires_at"] = (
         NOW + timedelta(minutes=1)
     ).isoformat()
+    read_app = application(
+        tmp_path,
+        payload=payload,
+    )
+    catalog = read_app.catalog()
+    assert catalog["owner_payload"]["entries"][0]["link_states"]["source"] == (
+        "stale_readable"
+    )
     app = application(
         tmp_path,
         policy_family="candidate",
         payload=payload,
-    )
-    catalog = app.catalog()
-    assert catalog["owner_payload"]["entries"][0]["link_states"]["source"] == (
-        "stale_readable"
     )
     _, digest = app.store.load()
     with pytest.raises(StackMCPError, match="source_identity_not_usable"):
@@ -711,11 +761,12 @@ def test_freshness_reference_expiry_is_stale_and_blocks_plans(
     payload["subjects"][0]["freshness"]["evidence_refs"][0]["expires_at"] = (
         NOW + timedelta(minutes=1)
     ).isoformat()
-    app = application(tmp_path, policy_family="candidate", payload=payload)
-    catalog = app.catalog()
+    read_app = application(tmp_path, payload=payload)
+    catalog = read_app.catalog()
     assert catalog["owner_payload"]["entries"][0]["freshness_state"] == (
         "stale_readable"
     )
+    app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
     with pytest.raises(StackMCPError, match="subject_freshness_not_usable"):
         app.prepare_plan(
@@ -732,8 +783,8 @@ def test_freshness_reference_expiry_is_stale_and_blocks_plans(
     freshness["evidence_refs"][0]["expires_at"] = (
         NOW + timedelta(minutes=1)
     ).isoformat()
-    app = application(tmp_path, policy_family="candidate", payload=payload)
-    assert app.catalog()["owner_payload"]["entries"][0]["freshness_state"] == (
+    read_app = application(tmp_path, payload=payload)
+    assert read_app.catalog()["owner_payload"]["entries"][0]["freshness_state"] == (
         "blocked"
     )
 
@@ -874,6 +925,17 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     candidate_tools = {tool.name for tool in asyncio.run(candidate.list_tools())}
     assert read_tools == {"stack_runtime_catalog", "stack_runtime_inspect"}
     assert candidate_tools == {"stack_prepare_runtime_plan"}
+    read_tool_contracts = {
+        tool.name: tool.inputSchema for tool in asyncio.run(read.list_tools())
+    }
+    catalog_policy = read_tool_contracts["stack_runtime_catalog"]["properties"][
+        "policy_family"
+    ]
+    inspect_policy = read_tool_contracts["stack_runtime_inspect"]["properties"][
+        "policy_family"
+    ]
+    assert catalog_policy["anyOf"][0]["const"] == "read"
+    assert inspect_policy["const"] == "read"
 
 
 def test_policy_contours_use_distinct_ports_credentials_and_scopes(

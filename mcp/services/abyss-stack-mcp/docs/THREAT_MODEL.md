@@ -18,6 +18,8 @@
 - secret-like material rejected before validation or response;
 - exact observation digest and short expiry for candidate plans;
 - structured allowlisted plan actions with no free-form command;
+- server-side read-subject filtering before catalog result construction and
+  higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior.
 
 ## Confused deputy
