@@ -43,10 +43,10 @@ Tracking starts with the community-docs baseline for this repository.
   userinfo/query/fragment surfaces. Rollback proof now binds every
   last-known-good restoration field including its distinct canary, and staged
   runtime entry-point shebangs are rebound before content-addressed
-  publication. Managed units clear ambient Python import roots and run the venv
-  in isolated mode, while read catalog/inspection downgrade a causally future
-  observation envelope, link, freshness, or nested evidence timestamp to
-  `blocked`. Existing equal
+  publication. Provisioning and managed units clear ambient Python import roots
+  and use isolated mode, while read catalog/inspection apply the earlier
+  wall-clock/snapshot bound and downgrade a causally future observation
+  envelope, link, freshness, or nested evidence timestamp to `blocked`. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary

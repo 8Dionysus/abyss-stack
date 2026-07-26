@@ -622,6 +622,14 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
             bootstrap.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
+                "if [[ -n \"${PYTHONHOME+x}\" || "
+                "-n \"${PYTHONPATH+x}\" ]]; then\n"
+                "  exit 65\n"
+                "fi\n"
+                "if [[ \"${1:-}\" != \"-I\" ]]; then\n"
+                "  exit 66\n"
+                "fi\n"
+                "shift\n"
                 "if [[ \"$1\" == \"-m\" && \"$2\" == \"venv\" ]]; then\n"
                 "  mkdir -p \"$3/bin\"\n"
                 "  cp \"$0\" \"$3/bin/python\"\n"
@@ -692,6 +700,8 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                     "HOME": str(root / "home"),
                     "XDG_CONFIG_HOME": str(root / "xdg-config"),
                     "PATH": f"{fake_bin}:{env['PATH']}",
+                    "PYTHONHOME": str(root / "hostile-python-home"),
+                    "PYTHONPATH": str(root / "hostile-python-path"),
                 }
             )
             command = [

@@ -457,7 +457,11 @@ class StackMCPApplication:
                 "access_owner": subject.owners.access_owner,
                 "runtime_owner": subject.owners.runtime_owner,
                 "registry_state": subject.registry.registry_state,
-                "link_states": self._link_states(subject, now),
+                "link_states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
                 "freshness_state": self._observation_freshness(
                     observation,
                     subject,
@@ -700,6 +704,8 @@ class StackMCPApplication:
     def _effective_link_state(
         link: LinkEvidence,
         now: datetime,
+        *,
+        snapshot_at: datetime | None = None,
     ) -> str:
         if link.state not in {
             "exact",
@@ -708,6 +714,11 @@ class StackMCPApplication:
         }:
             return link.state
         latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if snapshot_at is not None:
+            latest_allowed = min(
+                latest_allowed,
+                snapshot_at + MAX_PLAN_FUTURE_SKEW,
+            )
         if link.observed_at > latest_allowed or any(
             evidence.observed_at > latest_allowed
             for evidence in link.evidence_refs
@@ -725,33 +736,35 @@ class StackMCPApplication:
     @classmethod
     def _link_states(
         cls,
+        observation: RuntimeObservation,
         subject: RuntimeSubject,
         now: datetime,
     ) -> dict[str, str]:
+        def state(link: LinkEvidence) -> str:
+            return cls._effective_link_state(
+                link,
+                now,
+                snapshot_at=observation.generated_at,
+            )
+
         return {
-            "source": cls._effective_link_state(subject.source.evidence, now),
-            "package": cls._effective_link_state(subject.package.evidence, now),
-            "deploy": cls._effective_link_state(subject.deploy.evidence, now),
-            "process": cls._effective_link_state(subject.process.evidence, now),
-            "endpoint": cls._effective_link_state(subject.endpoint.evidence, now),
-            "registry": cls._effective_link_state(subject.registry.evidence, now),
+            "source": state(subject.source.evidence),
+            "package": state(subject.package.evidence),
+            "deploy": state(subject.deploy.evidence),
+            "process": state(subject.process.evidence),
+            "endpoint": state(subject.endpoint.evidence),
+            "registry": state(subject.registry.evidence),
             "consumer": (
                 "unknown"
                 if not subject.consumers
                 else cls._worst_state(
-                    [
-                        cls._effective_link_state(consumer.evidence, now)
-                        for consumer in subject.consumers
-                    ]
+                    [state(consumer.evidence) for consumer in subject.consumers]
                 )
             ),
-            "proof": cls._effective_link_state(subject.proof.evidence, now),
-            "acceptance": cls._effective_link_state(
-                subject.acceptance.evidence,
-                now,
-            ),
-            "canary": cls._effective_link_state(subject.canary.evidence, now),
-            "rollback": cls._effective_link_state(subject.rollback.evidence, now),
+            "proof": state(subject.proof.evidence),
+            "acceptance": state(subject.acceptance.evidence),
+            "canary": state(subject.canary.evidence),
+            "rollback": state(subject.rollback.evidence),
         }
 
     @staticmethod
@@ -770,10 +783,17 @@ class StackMCPApplication:
     def _effective_freshness(
         subject: RuntimeSubject,
         now: datetime,
+        *,
+        snapshot_at: datetime | None = None,
     ) -> str:
         if subject.freshness.state not in {"exact", "compatible_drift"}:
             return subject.freshness.state
         latest_allowed = now + MAX_PLAN_FUTURE_SKEW
+        if snapshot_at is not None:
+            latest_allowed = min(
+                latest_allowed,
+                snapshot_at + MAX_PLAN_FUTURE_SKEW,
+            )
         if subject.freshness.observed_at > latest_allowed or any(
             evidence.observed_at > latest_allowed
             for evidence in subject.freshness.evidence_refs
@@ -795,7 +815,11 @@ class StackMCPApplication:
     ) -> str:
         if observation.generated_at > now + MAX_PLAN_FUTURE_SKEW:
             return "blocked"
-        return self._effective_freshness(subject, now)
+        return self._effective_freshness(
+            subject,
+            now,
+            snapshot_at=observation.generated_at,
+        )
 
     def _view(
         self,
@@ -819,7 +843,11 @@ class StackMCPApplication:
                 "package_digest": subject.package.artifact_digest,
                 "deployed_revision": subject.deploy.revision,
                 "deployed_digest": subject.deploy.tree_digest,
-                "link_states": self._link_states(subject, now),
+                "link_states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
             }
         if view == "process":
             return subject.process.model_dump(mode="json")
@@ -859,7 +887,11 @@ class StackMCPApplication:
             return subject.rollback.model_dump(mode="json")
         if view == "drift":
             return {
-                "states": self._link_states(subject, now),
+                "states": self._link_states(
+                    observation,
+                    subject,
+                    now,
+                ),
                 "freshness_state": self._observation_freshness(
                     observation,
                     subject,

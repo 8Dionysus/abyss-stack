@@ -1484,7 +1484,7 @@ def test_read_paths_block_causally_future_evidence(
     state_surface: str,
 ) -> None:
     payload = observation(subject())
-    future = (NOW + timedelta(minutes=5, seconds=31)).isoformat()
+    future = (NOW + timedelta(seconds=31)).isoformat()
     subject_payload = payload["subjects"][0]
     if future_surface == "link":
         subject_payload["source"]["evidence"]["observed_at"] = future

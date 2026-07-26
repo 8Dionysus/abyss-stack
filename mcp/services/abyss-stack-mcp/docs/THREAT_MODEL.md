@@ -60,8 +60,9 @@
   candidate;
 - required evidence timestamps cannot postdate the observation snapshot beyond
   the bounded clock-skew allowance;
-- read catalog and inspection downgrade a causally future observation envelope,
-  link, freshness timestamp, or nested evidence ref to `blocked`;
+- read catalog and inspection use the earlier wall-clock/snapshot bound and
+  downgrade a causally future observation envelope, link, freshness timestamp,
+  or nested evidence ref to `blocked`;
 - central proof cannot predate the canary evidence it names, and conflicting
   duplicate evidence timestamps are rejected before deduplication;
 - rollback-required links need explicit unexpired evidence and cannot fail late
@@ -74,9 +75,9 @@
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior;
-- managed units clear ambient Python import roots and use isolated interpreter
-  mode, preventing inherited user-manager `PYTHONPATH`/`PYTHONHOME` from
-  shadowing the measured venv closure.
+- the provisioner and managed units clear ambient Python import roots and use
+  isolated interpreter mode, preventing inherited shell or user-manager
+  `PYTHONPATH`/`PYTHONHOME` from shadowing the measured venv closure.
 
 ## Confused deputy
 

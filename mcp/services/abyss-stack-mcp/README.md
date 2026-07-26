@@ -76,7 +76,8 @@ cannot carry causally newer proof. Central proof cannot predate the canary link
 or evidence refs it names. Duplicate evidence identities with conflicting
 `observed_at` values are rejected before expiry deduplication.
 Catalog and inspection apply the same 30-second future-skew bound to the
-observation envelope, links, freshness, and nested evidence timestamps;
+observation envelope, links, freshness, and nested evidence timestamps, using
+the earlier of wall-clock time and the enclosing observation snapshot;
 causally future usable evidence is reported as `blocked`, never as current,
 before candidate planning is involved.
 `rollback_required` is accepted only while its own link and evidence refs are
@@ -180,6 +181,9 @@ source-projection lock that an applying MCP Configs sync holds for its complete
 rsync transaction. A sync and provision transaction therefore cannot cross
 each other's publication boundary or publish mixed or mislabelled runtime
 bytes.
+Every provisioner Python call clears inherited `PYTHONHOME`/`PYTHONPATH` and
+uses isolated interpreter mode, including venv creation, pip installation,
+dependency checks, and import verification.
 They execute the package installed inside that venv, not `Configs/src`.
 Both units clear ambient `PYTHONHOME`/`PYTHONPATH` and invoke the venv with
 Python isolated mode, so a user-manager import override cannot precede the

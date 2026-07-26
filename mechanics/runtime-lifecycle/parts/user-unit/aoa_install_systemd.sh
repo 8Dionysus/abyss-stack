@@ -183,6 +183,14 @@ mcp_http_codex_block_start="# >>> abyss-stack MCP HTTP Codex client >>>"
 mcp_http_codex_block_end="# <<< abyss-stack MCP HTTP Codex client <<<"
 mcp_http_codex_block_present=0
 
+aoa_run_isolated_python() {
+  local python_executable="$1"
+  shift
+
+  /usr/bin/env -u PYTHONHOME -u PYTHONPATH \
+    "$python_executable" -I "$@"
+}
+
 aoa_validate_mcp_bearer_file() {
   local credential_path="$1"
   local credential_label="$2"
@@ -221,7 +229,8 @@ aoa_provision_mcp_bearer() {
   fi
 
   temp_path="$(mktemp "${mcp_http_secret_dir}/.${credential_name}.XXXXXX")"
-  if ! /usr/bin/env python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
+  if ! aoa_run_isolated_python python3 \
+    -c 'import secrets; print(secrets.token_urlsafe(48))' > "$temp_path"; then
     rm -f -- "$temp_path"
     aoa_die "failed to generate MCP HTTP bearer credential"
   fi
@@ -549,9 +558,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
           "$observed_content_digest" == "$existing_content_digest" && \
           -x "${abyss_stack_mcp_venv}/bin/python" ]] && \
        PYTHONDONTWRITEBYTECODE=1 \
-         "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
-       PYTHONDONTWRITEBYTECODE=1 "${abyss_stack_mcp_venv}/bin/python" -c \
-         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+         aoa_run_isolated_python \
+           "${abyss_stack_mcp_venv}/bin/python" -m pip check >/dev/null && \
+       PYTHONDONTWRITEBYTECODE=1 \
+         aoa_run_isolated_python "${abyss_stack_mcp_venv}/bin/python" -c \
+           'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
       deployed_digest="$(
         aoa_digest_abyss_stack_mcp_package "$abyss_stack_mcp_service_root"
       )" || \
@@ -573,7 +584,8 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
 
   temp_venv="$(mktemp -d "${abyss_stack_mcp_runtime_root}/.venv.XXXXXX")"
-  if ! "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
+  if ! aoa_run_isolated_python \
+    "$abyss_stack_mcp_bootstrap_python" -m venv "$temp_venv"; then
     rm -rf -- "$temp_venv"
     aoa_die "failed to create the abyss-stack MCP runtime environment"
   fi
@@ -611,7 +623,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
   if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    "${temp_venv}/bin/python" -m pip install \
+    aoa_run_isolated_python "${temp_venv}/bin/python" -m pip install \
       --no-input \
       --no-compile \
       --require-hashes \
@@ -621,7 +633,7 @@ aoa_provision_abyss_stack_mcp_runtime() {
   fi
   if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    "${temp_venv}/bin/python" -m pip install \
+    aoa_run_isolated_python "${temp_venv}/bin/python" -m pip install \
       --no-input \
       --no-compile \
       --no-deps \
@@ -631,9 +643,11 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "failed to install the deployed abyss-stack MCP package"
   fi
   if ! PYTHONDONTWRITEBYTECODE=1 \
-       "${temp_venv}/bin/python" -m pip check >/dev/null || \
-     ! PYTHONDONTWRITEBYTECODE=1 "${temp_venv}/bin/python" -c \
-       'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
+       aoa_run_isolated_python \
+         "${temp_venv}/bin/python" -m pip check >/dev/null || \
+     ! PYTHONDONTWRITEBYTECODE=1 \
+       aoa_run_isolated_python "${temp_venv}/bin/python" -c \
+         'import abyss_stack_mcp, mcp, pydantic' >/dev/null; then
     rm -rf -- "$temp_venv"
     aoa_die "provisioned abyss-stack MCP runtime failed dependency verification"
   fi
