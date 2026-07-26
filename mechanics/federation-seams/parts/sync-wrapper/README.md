@@ -15,6 +15,11 @@ between the source checkout `HEAD` and
 The check also validates the manifest schema, layer, authority denial, exact
 required-file list, and SHA-256 of every required mirrored file. A byte change
 behind an unchanged source ref is `status:"invalid_manifest"`, not healthy.
+Stable `aoa-routing` mirror paths are resolved from the owner's current
+source-home topology: core schemas come from `routing/core/`, while
+federation-entry, recurrence, and ToS-KAG boundary surfaces stay in their
+owning mechanic parts. The runtime mirror keeps its compatibility paths; it
+does not require the owner repository to restore retired flat source paths.
 
 Use `--check --sync-if-stale --json --layer <layer>` for explicit maintenance
 automation. The command performs the same check first, refreshes the mirror only

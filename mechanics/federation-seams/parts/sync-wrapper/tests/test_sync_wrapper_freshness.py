@@ -13,6 +13,28 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = REPO_ROOT / "scripts" / "aoa-sync-federation-surfaces"
 ROUTING_CONFIG = REPO_ROOT / "config-templates" / "Configs" / "federation" / "aoa-routing.yaml"
+ROUTING_SOURCE_RELS = {
+    "docs/FEDERATION_ENTRY_ABI.md": (
+        "mechanics/boundary-bridge/parts/federation-entry/docs/"
+        "federation-entry-abi.md"
+    ),
+    "docs/RECURRENCE_NAVIGATION_BOUNDARY.md": (
+        "mechanics/recurrence/parts/return-navigation/docs/"
+        "recurrence-navigation-boundary.md"
+    ),
+    "schemas/kag-source-lift-relation-hints.schema.json": (
+        "mechanics/boundary-bridge/parts/tos-kag-boundary/schemas/"
+        "kag-source-lift-relation-hints.schema.json"
+    ),
+    "schemas/federation-entrypoints.schema.json": (
+        "mechanics/boundary-bridge/parts/federation-entry/schemas/"
+        "federation-entrypoints.schema.json"
+    ),
+    "schemas/return-navigation-hints.schema.json": (
+        "mechanics/recurrence/parts/return-navigation/schemas/"
+        "return-navigation-hints.schema.json"
+    ),
+}
 
 
 def run_sync(args: list[str], *, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -29,7 +51,10 @@ def run_sync(args: list[str], *, env: dict[str, str]) -> subprocess.CompletedPro
 def create_source_repo(root: Path) -> str:
     payload = yaml.safe_load(ROUTING_CONFIG.read_text(encoding="utf-8"))
     for rel_path in payload["required_files"]:
-        path = root / rel_path
+        source_rel = ROUTING_SOURCE_RELS.get(rel_path)
+        if source_rel is None and rel_path.startswith("schemas/"):
+            source_rel = f"routing/core/schemas/{Path(rel_path).name}"
+        path = root / (source_rel or rel_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix == ".json":
             path.write_text("{}\n", encoding="utf-8")
@@ -53,6 +78,45 @@ def create_source_repo(root: Path) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def test_routing_sync_resolves_current_owner_source_homes(tmp_path: Path) -> None:
+    if shutil.which("rsync") is None:
+        pytest.skip("aoa-sync-federation-surfaces sync mode requires rsync")
+
+    source_root = tmp_path / "aoa-routing"
+    stack_root = tmp_path / "abyss-stack"
+    source_commit = create_source_repo(source_root)
+    env = {
+        **os.environ,
+        "AOA_STACK_ROOT": str(stack_root),
+        "AOA_ROUTING_ROOT": str(source_root),
+    }
+
+    result = run_sync(["--layer", "aoa-routing"], env=env)
+    assert result.returncode == 0, result.stderr
+    mirror_root = (
+        stack_root / "Knowledge" / "federation" / "aoa-routing"
+    )
+    assert not (source_root / "docs" / "FEDERATION_ENTRY_ABI.md").exists()
+    assert not (source_root / "schemas" / "aoa-router.schema.json").exists()
+    assert (
+        mirror_root / "docs" / "FEDERATION_ENTRY_ABI.md"
+    ).read_text(encoding="utf-8").startswith("# docs/FEDERATION_ENTRY_ABI.md")
+    assert json.loads(
+        (mirror_root / "schemas" / "aoa-router.schema.json").read_text(
+            encoding="utf-8"
+        )
+    ) == {}
+    manifest = json.loads(
+        (
+            mirror_root / "manifest" / "federation_mirror_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["source_git_commit"] == source_commit
+    assert manifest["required_files"] == yaml.safe_load(
+        ROUTING_CONFIG.read_text(encoding="utf-8")
+    )["required_files"]
 
 
 def test_json_check_detects_stale_manifest_and_sync_if_stale_repairs_it(tmp_path: Path) -> None:

@@ -237,6 +237,34 @@ PY
 resolve_layer_source_rel() {
   local layer="$1"
   local rel_path="$2"
+  if [[ "$layer" == "aoa-routing" ]]; then
+    case "$rel_path" in
+      docs/FEDERATION_ENTRY_ABI.md)
+        printf '%s\n' "mechanics/boundary-bridge/parts/federation-entry/docs/federation-entry-abi.md"
+        return 0
+        ;;
+      docs/RECURRENCE_NAVIGATION_BOUNDARY.md)
+        printf '%s\n' "mechanics/recurrence/parts/return-navigation/docs/recurrence-navigation-boundary.md"
+        return 0
+        ;;
+      schemas/kag-source-lift-relation-hints.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/tos-kag-boundary/schemas/kag-source-lift-relation-hints.schema.json"
+        return 0
+        ;;
+      schemas/federation-entrypoints.schema.json)
+        printf '%s\n' "mechanics/boundary-bridge/parts/federation-entry/schemas/federation-entrypoints.schema.json"
+        return 0
+        ;;
+      schemas/return-navigation-hints.schema.json)
+        printf '%s\n' "mechanics/recurrence/parts/return-navigation/schemas/return-navigation-hints.schema.json"
+        return 0
+        ;;
+      schemas/*.json)
+        printf '%s\n' "routing/core/schemas/${rel_path#schemas/}"
+        return 0
+        ;;
+    esac
+  fi
   if [[ "$layer" == "aoa-evals" ]]; then
     case "$rel_path" in
       docs/TRACE_EVAL_BRIDGE.md)
