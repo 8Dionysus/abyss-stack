@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import errno
 import hashlib
 import json
@@ -61,15 +63,48 @@ _SECRET_VALUE_PREFIXES = (
     "ghp_",
     "github_pat_",
 )
+_JWT_CANDIDATE = re.compile(
+    r"(?<![A-Za-z0-9_-])"
+    r"(?P<header>[A-Za-z0-9_-]{2,})\."
+    r"(?P<payload>[A-Za-z0-9_-]{2,})\."
+    r"(?P<signature>[A-Za-z0-9_-]{2,})"
+    r"(?![A-Za-z0-9_-])"
+)
 
 
 class StackMCPError(ValueError):
     """Fail-closed stack MCP contract or observation error."""
 
 
+def _contains_compact_jwt(value: str) -> bool:
+    for match in _JWT_CANDIDATE.finditer(value):
+        decoded_parts: list[Any] = []
+        for part_name in ("header", "payload"):
+            encoded = match.group(part_name)
+            try:
+                decoded = base64.urlsafe_b64decode(
+                    encoded + ("=" * (-len(encoded) % 4))
+                )
+                decoded_parts.append(json.loads(decoded.decode("utf-8")))
+            except (binascii.Error, UnicodeDecodeError, ValueError):
+                break
+        else:
+            header, payload = decoded_parts
+            if (
+                isinstance(header, dict)
+                and isinstance(payload, dict)
+                and isinstance(header.get("alg"), str)
+                and bool(header["alg"])
+            ):
+                return True
+    return False
+
+
 def _looks_like_secret_value(value: str) -> bool:
     normalized = value.lstrip().lower()
     if normalized.startswith(_SECRET_VALUE_PREFIXES):
+        return True
+    if _contains_compact_jwt(value):
         return True
     return bool(
         re.search(
@@ -83,6 +118,11 @@ def _is_forbidden_credential_key(value: Any) -> bool:
     text = str(value)
     canonical = re.sub(r"[^a-z0-9]", "", text.casefold())
     if canonical in _FORBIDDEN_KEY_CANONICAL:
+        return True
+    if any(
+        canonical.endswith(forbidden) and canonical != forbidden
+        for forbidden in _FORBIDDEN_KEY_CANONICAL
+    ):
         return True
     camel_separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
     tokens = tuple(
@@ -783,6 +823,8 @@ class StackMCPApplication:
                 blockers.append("central_proof_not_proven")
             elif (
                 subject.proof.proved_source_revision != subject.source.revision
+                or subject.proof.proved_source_tree_digest
+                != subject.source.tree_digest
                 or subject.proof.proved_package_digest
                 != subject.package.artifact_digest
                 or subject.proof.proved_deploy_revision != subject.deploy.revision
@@ -1221,7 +1263,10 @@ class StackMCPApplication:
                         or "missing-rollback-consumer"
                     ),
                 ),
-                ("run-grounded-canary", subject.canary.canary_route),
+                (
+                    "run-grounded-canary",
+                    subject.rollback.last_known_good_canary_route or "missing",
+                ),
             ),
         }[plan_kind]
         return tuple(

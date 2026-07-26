@@ -65,7 +65,9 @@ is a separate explicit action:
 artifact-hashed dependency lock, binds deployed source and lock digests into
 the runtime identity, and records a deterministic digest of every installed
 runtime file and symlink target. Reuse rehashes the environment and a missing
-or mismatched content digest forces a guarded rebuild. Bytecode writes are
+or mismatched content digest forces a guarded rebuild. Generated entry-point
+shebangs are rewritten from the private staging root to the stable published
+venv path before this digest is recorded and before the atomic rename. Bytecode writes are
 disabled while provisioning, verifying, and running the managed units so the
 measured closure remains stable. Replacement is refused while either plane is
 active or its user-systemd state cannot be observed. It never stops or starts

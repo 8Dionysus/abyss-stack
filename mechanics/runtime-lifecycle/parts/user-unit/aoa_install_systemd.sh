@@ -366,6 +366,54 @@ aoa_digest_abyss_stack_mcp_runtime() {
   printf '%s\n' "$digest"
 }
 
+aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs() {
+  local staged_root="$1"
+  local published_root="$2"
+  local entry=""
+  local first_line=""
+  local interpreter_suffix=""
+  local rewrite_path=""
+
+  while IFS= read -r -d '' entry; do
+    IFS= read -r first_line < "$entry" || continue
+    [[ "$first_line" == "#!${staged_root}/bin/python"* ]] || continue
+    interpreter_suffix="${first_line#\#!"${staged_root}"}"
+    [[ "$interpreter_suffix" =~ ^/bin/python([0-9]+([.][0-9]+)*)?([[:space:]].*)?$ ]] || \
+      return 1
+    rewrite_path="$(mktemp "${entry}.rewrite.XXXXXX")" || return 1
+    if ! {
+      printf '#!%s%s\n' "$published_root" "$interpreter_suffix"
+      tail -n +2 -- "$entry"
+    } > "$rewrite_path"; then
+      rm -f -- "$rewrite_path"
+      return 1
+    fi
+    chmod --reference="$entry" "$rewrite_path" || {
+      rm -f -- "$rewrite_path"
+      return 1
+    }
+    mv -- "$rewrite_path" "$entry" || {
+      rm -f -- "$rewrite_path"
+      return 1
+    }
+  done < <(
+    find "${staged_root}/bin" \
+      -maxdepth 1 \
+      -type f \
+      -print0
+  )
+
+  while IFS= read -r -d '' entry; do
+    IFS= read -r first_line < "$entry" || continue
+    [[ "$first_line" != "#!${staged_root}/"* ]] || return 1
+  done < <(
+    find "${staged_root}/bin" \
+      -maxdepth 1 \
+      -type f \
+      -print0
+  )
+}
+
 aoa_provision_abyss_stack_mcp_runtime() {
   local source_digest=""
   local deployed_digest=""
@@ -600,6 +648,12 @@ aoa_provision_abyss_stack_mcp_runtime() {
     aoa_die "deployed abyss-stack MCP package changed during runtime provisioning"
   fi
   rm -rf -- "$source_snapshot"
+  if ! aoa_rewrite_abyss_stack_mcp_entrypoint_shebangs \
+    "$temp_venv" \
+    "$abyss_stack_mcp_venv"; then
+    rm -rf -- "$temp_venv"
+    aoa_die "failed to bind abyss-stack MCP entry points to the published runtime"
+  fi
   runtime_content_digest="$(
     aoa_digest_abyss_stack_mcp_runtime "$temp_venv"
   )" || {

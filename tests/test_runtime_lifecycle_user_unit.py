@@ -636,6 +636,11 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 "    mkdir -p \"$package_root\"\n"
                 "    printf 'VALUE = 1\\n' > \"$package_root/__init__.py\"\n"
                 "  fi\n"
+                "  if [[ \"$*\" == *\"--no-deps --no-build-isolation\"* ]]; then\n"
+                "    entrypoint=\"$(dirname \"$0\")/abyss-stack-mcp\"\n"
+                "    printf '#!%s\\nexit 0\\n' \"$0\" > \"$entrypoint\"\n"
+                "    chmod 0755 \"$entrypoint\"\n"
+                "  fi\n"
                 "  if [[ -n \"${ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD:-}\" ]]; then\n"
                 "    printf 'VALUE = 99\\n' > "
                 "\"$ABYSS_STACK_MCP_TEST_MUTATE_SOURCE_DURING_BUILD\"\n"
@@ -728,6 +733,15 @@ class RuntimeLifecycleUserUnitTests(unittest.TestCase):
                 r"\A[0-9a-f]{64}\Z",
             )
             self.assertTrue((venv / "bin" / "python").is_file())
+            entrypoint = venv / "bin" / "abyss-stack-mcp"
+            self.assertEqual(
+                entrypoint.read_text(encoding="utf-8").splitlines()[0],
+                f"#!{venv}/bin/python",
+            )
+            self.assertNotIn(
+                "/.venv.",
+                entrypoint.read_text(encoding="utf-8").splitlines()[0],
+            )
             self.assertTrue(runtime_lock.is_file())
             self.assertEqual(runtime_lock.stat().st_mode & 0o777, 0o600)
             self.assertTrue(source_projection_lock.is_file())

@@ -136,6 +136,7 @@ def observation_example() -> dict[str, Any]:
                     "proof_ref": "example://central-proof/aoa-kag",
                     "evaluated_at": NOW.isoformat(),
                     "proved_source_revision": "source-example-revision",
+                    "proved_source_tree_digest": DIGESTS["source"],
                     "proved_package_digest": DIGESTS["package"],
                     "proved_deploy_revision": "deploy-example-revision",
                     "proved_deploy_tree_digest": DIGESTS["deploy"],
@@ -183,7 +184,33 @@ def observation_example() -> dict[str, Any]:
                     "last_known_good_process_identity": (
                         "aoa-kag-mcp/0.0.0-example"
                     ),
+                    "last_known_good_canary_route": (
+                        "example://canary-route/aoa-kag/last-known-good"
+                    ),
+                    "last_known_good_canary_ref": (
+                        "example://canary/aoa-kag/last-known-good"
+                    ),
                     "proof_ref": "example://rollback-proof/aoa-kag",
+                    "proved_target": {
+                        "consumer_registration_ref": (
+                            "example://consumer/aoa-kag"
+                        ),
+                        "package_digest": DIGESTS["package"],
+                        "deploy_revision": "deploy-example-revision",
+                        "deploy_tree_digest": DIGESTS["deploy"],
+                        "unit_name": "aoa-mcp-http@aoa-kag.service",
+                        "credential_class": "aoa-kag-read-example",
+                        "executable_ref": (
+                            "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py"
+                        ),
+                        "process_identity": "aoa-kag-mcp/0.0.0-example",
+                        "canary_route": (
+                            "example://canary-route/aoa-kag/last-known-good"
+                        ),
+                        "canary_ref": (
+                            "example://canary/aoa-kag/last-known-good"
+                        ),
+                    },
                     "evidence": evidence("rollback"),
                 },
             }

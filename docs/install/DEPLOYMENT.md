@@ -179,7 +179,9 @@ environment under `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv` from the
 already deployed package, installs its exact hash-locked dependency closure,
 verifies dependencies and imports, and records both source and lock digests.
 It also records a deterministic digest of the installed runtime files and
-symlink targets. It does not link, stop, start, or register a service.
+symlink targets after rebinding generated entry-point shebangs from the private
+staging path to the stable published venv path. It does not link, stop, start,
+or register a service.
 Repeating it against the same deployed package and lock rehashes the installed
 environment and reuses it only when that digest still matches; missing or
 changed runtime bytes force the same guarded rebuild path. A changed
@@ -438,7 +440,9 @@ artifact-hash enforcement into
 `${AOA_STACK_ROOT}/Services/abyss-stack-mcp/venv`, verifies `pip check` and
 runtime imports, and records a runtime identity containing both the exact
 deployed-package digest and lock digest, plus a deterministic digest over the
-installed runtime files and symlink targets. Reuse requires the observed
+installed runtime files and symlink targets. Generated console-script
+shebangs are rebound to the stable published venv before that digest and the
+atomic rename, so no launcher retains the removed staging path. Reuse requires the observed
 runtime digest to match that recorded value; otherwise provisioning rebuilds
 under the same lock and stopped-plane guards. If the source-and-lock identity
 changes while either

@@ -138,6 +138,7 @@ def subject(
             "proof_ref": f"receipt://central-proof/{organ_id}",
             "evaluated_at": NOW.isoformat(),
             "proved_source_revision": "source-rev-1",
+            "proved_source_tree_digest": DIGEST_A,
             "proved_package_digest": DIGEST_B,
             "proved_deploy_revision": "deploy-rev-1",
             "proved_deploy_tree_digest": DIGEST_C,
@@ -179,7 +180,31 @@ def subject(
                 f"/srv/AbyssOS/.codex/bin/{organ_id}-mcp-server.py"
             ),
             "last_known_good_process_identity": f"{organ_id}-mcp/0.0.9",
+            "last_known_good_canary_route": (
+                f"runbook://canary/{organ_id}/last-known-good"
+            ),
+            "last_known_good_canary_ref": (
+                f"receipt://canary/{organ_id}/last-known-good"
+            ),
             "proof_ref": f"receipt://rollback/{organ_id}",
+            "proved_target": {
+                "consumer_registration_ref": f"config://codex/{organ_id}",
+                "package_digest": DIGEST_B,
+                "deploy_revision": "deploy-rev-0",
+                "deploy_tree_digest": DIGEST_C,
+                "unit_name": f"aoa-mcp-http@{organ_id}.service",
+                "credential_class": credential_class,
+                "executable_ref": (
+                    f"/srv/AbyssOS/.codex/bin/{organ_id}-mcp-server.py"
+                ),
+                "process_identity": f"{organ_id}-mcp/0.0.9",
+                "canary_route": (
+                    f"runbook://canary/{organ_id}/last-known-good"
+                ),
+                "canary_ref": (
+                    f"receipt://canary/{organ_id}/last-known-good"
+                ),
+            },
             "evidence": evidence("rollback"),
         },
     }
@@ -283,6 +308,12 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
     rollback = payload["subjects"][0]["rollback"]
     rollback["last_known_good_process_identity"] = None
     with pytest.raises(ValidationError, match="complete last-known-good contour"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    rollback = payload["subjects"][0]["rollback"]
+    rollback["proved_target"]["package_digest"] = DIGEST_A
+    with pytest.raises(ValidationError, match="proof target must match"):
         RuntimeObservation.model_validate(payload)
 
     payload = observation(subject())
@@ -476,6 +507,8 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "leading-direct",
         "basic-auth",
         "encoded-basic-auth",
+        "raw-jwt",
+        "encoded-jwt",
         "pem-private-key",
         "embedded-pem-private-key",
         "encoded-pem-private-key",
@@ -486,6 +519,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "encoded-path",
         "path-token",
         "namespaced-query-key",
+        "concatenated-namespaced-query-key",
         "suffixed-query-key",
         "namespaced-path-key",
         "bare-assignment",
@@ -545,6 +579,18 @@ def test_observation_store_rejects_credentials_inside_references(
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"Basic%20{secret_value}"
         )
+    elif reference_surface == "raw-jwt":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+            "eyJzdWIiOiJvcGVyYXRvciIsInNlY3JldCI6InJlZmVyZW5jZSJ9."
+            "c2lnbmF0dXJlLW1hdGVyaWFs"
+        )
+    elif reference_surface == "encoded-jwt":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            "eyJhbGciOiJIUzI1NiJ9%2E"
+            "eyJzdWIiOiJvcGVyYXRvciJ9%2E"
+            "c2lnbmF0dXJlLW1hdGVyaWFs"
+        )
     elif reference_surface == "pem-private-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             "-----BEGIN PRIVATE KEY-----\n"
@@ -592,6 +638,11 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "namespaced-query-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
             f"https://acceptance.invalid/report?github_api_key={secret_value}"
+        )
+    elif reference_surface == "concatenated-namespaced-query-key":
+        payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
+            f"https://acceptance.invalid/report?githubapikey={secret_value}"
+            f"&dbpassword={secret_value}"
         )
     elif reference_surface == "suffixed-query-key":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -980,7 +1031,10 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
         ("restart-restored-process", "aoa-mcp-http@aoa-kag.service"),
         ("verify-process-identity", "aoa-kag-mcp/0.0.9"),
         ("restore-consumer-registration", "config://codex/aoa-kag"),
-        ("run-grounded-canary", "runbook://canary/aoa-kag"),
+        (
+            "run-grounded-canary",
+            "runbook://canary/aoa-kag/last-known-good",
+        ),
     ]
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
@@ -1131,6 +1185,7 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proof_ref"] = None
     proof["evaluated_at"] = None
     proof["proved_source_revision"] = None
+    proof["proved_source_tree_digest"] = None
     proof["proved_package_digest"] = None
     proof["proved_deploy_revision"] = None
     proof["proved_deploy_tree_digest"] = None
@@ -1140,6 +1195,10 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proved_canary_ref"] = None
     proof["evidence"] = evidence("central-proof", state="unknown")
     cases.append((payload, "central_proof_not_proven"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["proof"]["proved_source_tree_digest"] = DIGEST_B
+    cases.append((payload, "central_proof_target_mismatch"))
 
     payload = observation(subject())
     payload["subjects"][0]["proof"]["proved_package_digest"] = DIGEST_A

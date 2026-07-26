@@ -31,13 +31,17 @@ Tracking starts with the community-docs baseline for this repository.
 - Published stack MCP schemas now encode conditional runtime invariants;
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
   precondition, central proof binds the exact deployed-tree digest and running
-  process identity, activation steps name the exact selected compatible
+  process identity as well as the source-tree digest, activation steps name the exact selected compatible
   consumer registration, and effect planes cannot be activated or restarted
   before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
-  and secret screening covers namespaced credential keys and encoded URI path
-  segments as well as userinfo/query/fragment surfaces. Existing equal
+  and secret screening covers concatenated namespaced credential keys, compact
+  JWT values, and encoded URI path segments as well as
+  userinfo/query/fragment surfaces. Rollback proof now binds every
+  last-known-good restoration field including its distinct canary, and staged
+  runtime entry-point shebangs are rebound before content-addressed
+  publication. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
 - Rollback plans now admit fresh `rollback_required` failed-link evidence
   without weakening other blockers, while managed units execute only the

@@ -39,10 +39,10 @@ Every plan requires usable subject freshness. Activation additionally requires
 an active process with an observed process identity, a ready endpoint, a
 registered consumer with the exact server schema digest and an overlapping MCP
 protocol version, a passed central-proof verdict issued by `proof_owner` and
-bound to the current source, package, deployed revision and tree digest, schema,
-running process identity, consumer, and canary contour, named acceptance-owner
-evidence bound to the current source revision and package digest, a grounded
-canary, and usable
+bound to the current source revision and source-tree digest, package, deployed
+revision and tree digest, schema, running process identity, consumer, and
+canary contour, named acceptance-owner evidence bound to the current source
+revision and package digest, a grounded canary, and usable
 rollback proof. Activation or restart of `internal_effect` and
 `external_effect` targets is rejected because this package does not model
 their separately required threat, approval, egress, compensation, or rollback
@@ -56,9 +56,12 @@ usable registry, selected consumer-registration, canary-route, and rollback
 evidence, embeds the selected registration target, and carries every one of
 those proofs into the candidate. A ready rollback proof must identify the
 complete last-known-good consumer registration, package, deploy revision and
-tree, unit, credential class, executable, and process identity. Its ordered
-steps first deny discovery and activation, restore that runtime floor, restore
-the consumer registration, and finally run the grounded canary. Restart plans
+tree, unit, credential class, executable, process identity, and canary route
+and receipt. The proof carries a second typed target that must exactly equal
+that full restoration contour before readiness is accepted. Its ordered steps
+first deny discovery and activation, restore that runtime floor, restore the
+consumer registration, and finally run the proven last-known-good canary
+rather than the current deployment's canary. Restart plans
 also require and carry usable canary-route evidence. A plan expires at the
 earliest of ten minutes, its observation/freshness envelopes, every required
 link, and every copied evidence ref; it cannot outlive its proof. Candidate
@@ -141,7 +144,10 @@ This creates or refreshes
 `requirements.lock` closure with `--require-hashes`, verifies its dependencies,
 and records a runtime identity composed from both the deployed-package digest
 and the lock digest, plus a deterministic content digest of the installed
-runtime files and symlink targets. Repeating the command with unchanged source
+runtime files and symlink targets. Before that digest is recorded, generated
+entry-point shebangs are rebound from the private staging directory to the
+stable published venv path, so atomic publication does not leave launchers
+pointing at a removed directory. Repeating the command with unchanged source
 and lock rehashes the installed environment before verification and reuses it
 only when the content digest still matches; missing or changed installed bytes
 force a guarded rebuild. A changed identity is never installed

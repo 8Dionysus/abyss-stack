@@ -482,6 +482,7 @@ class CentralProofObservation(StrictModel):
                                 "format": "date-time",
                             },
                             "proved_source_revision": {"type": "string"},
+                            "proved_source_tree_digest": {"type": "string"},
                             "proved_package_digest": {"type": "string"},
                             "proved_deploy_revision": {"type": "string"},
                             "proved_deploy_tree_digest": {"type": "string"},
@@ -504,6 +505,7 @@ class CentralProofObservation(StrictModel):
                             "proof_ref",
                             "evaluated_at",
                             "proved_source_revision",
+                            "proved_source_tree_digest",
                             "proved_package_digest",
                             "proved_deploy_revision",
                             "proved_deploy_tree_digest",
@@ -522,6 +524,7 @@ class CentralProofObservation(StrictModel):
     proof_ref: NonEmpty | None = None
     evaluated_at: datetime | None = None
     proved_source_revision: NonEmpty | None = None
+    proved_source_tree_digest: Digest | None = None
     proved_package_digest: Digest | None = None
     proved_deploy_revision: NonEmpty | None = None
     proved_deploy_tree_digest: Digest | None = None
@@ -542,6 +545,7 @@ class CentralProofObservation(StrictModel):
             self.proof_ref,
             self.evaluated_at,
             self.proved_source_revision,
+            self.proved_source_tree_digest,
             self.proved_package_digest,
             self.proved_deploy_revision,
             self.proved_deploy_tree_digest,
@@ -659,6 +663,19 @@ class OwnerAcceptanceObservation(StrictModel):
         return self
 
 
+class RollbackProofTarget(StrictModel):
+    consumer_registration_ref: NonEmpty
+    package_digest: Digest
+    deploy_revision: NonEmpty
+    deploy_tree_digest: Digest
+    unit_name: UnitName
+    credential_class: Identifier
+    executable_ref: NonEmpty
+    process_identity: NonEmpty
+    canary_route: NonEmpty
+    canary_ref: NonEmpty
+
+
 class RollbackObservation(StrictModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -688,7 +705,10 @@ class RollbackObservation(StrictModel):
                             "last_known_good_process_identity": {
                                 "type": "string"
                             },
+                            "last_known_good_canary_route": {"type": "string"},
+                            "last_known_good_canary_ref": {"type": "string"},
                             "proof_ref": {"type": "string"},
+                            "proved_target": {"type": "object"},
                         },
                         "required": [
                             "last_known_good_consumer_registration_ref",
@@ -699,7 +719,10 @@ class RollbackObservation(StrictModel):
                             "last_known_good_credential_class",
                             "last_known_good_executable_ref",
                             "last_known_good_process_identity",
+                            "last_known_good_canary_route",
+                            "last_known_good_canary_ref",
                             "proof_ref",
+                            "proved_target",
                         ],
                     },
                 }
@@ -716,7 +739,10 @@ class RollbackObservation(StrictModel):
     last_known_good_credential_class: Identifier | None = None
     last_known_good_executable_ref: NonEmpty | None = None
     last_known_good_process_identity: NonEmpty | None = None
+    last_known_good_canary_route: NonEmpty | None = None
+    last_known_good_canary_ref: NonEmpty | None = None
     proof_ref: NonEmpty | None = None
+    proved_target: RollbackProofTarget | None = None
     evidence: LinkEvidence
 
     @model_validator(mode="after")
@@ -730,13 +756,46 @@ class RollbackObservation(StrictModel):
             self.last_known_good_credential_class,
             self.last_known_good_executable_ref,
             self.last_known_good_process_identity,
+            self.last_known_good_canary_route,
+            self.last_known_good_canary_ref,
             self.proof_ref,
+            self.proved_target,
         )
         if self.ready and any(value is None for value in last_known_good_contour):
             raise ValueError(
                 "rollback readiness requires a complete last-known-good contour "
                 "and proof"
             )
+        if self.ready and self.proved_target is not None:
+            restoration_target = (
+                self.last_known_good_consumer_registration_ref,
+                self.last_known_good_package_digest,
+                self.last_known_good_deploy_revision,
+                self.last_known_good_deploy_tree_digest,
+                self.last_known_good_unit_name,
+                self.last_known_good_credential_class,
+                self.last_known_good_executable_ref,
+                self.last_known_good_process_identity,
+                self.last_known_good_canary_route,
+                self.last_known_good_canary_ref,
+            )
+            proved_target = (
+                self.proved_target.consumer_registration_ref,
+                self.proved_target.package_digest,
+                self.proved_target.deploy_revision,
+                self.proved_target.deploy_tree_digest,
+                self.proved_target.unit_name,
+                self.proved_target.credential_class,
+                self.proved_target.executable_ref,
+                self.proved_target.process_identity,
+                self.proved_target.canary_route,
+                self.proved_target.canary_ref,
+            )
+            if restoration_target != proved_target:
+                raise ValueError(
+                    "rollback proof target must match the complete "
+                    "last-known-good restoration contour"
+                )
         return self
 
 

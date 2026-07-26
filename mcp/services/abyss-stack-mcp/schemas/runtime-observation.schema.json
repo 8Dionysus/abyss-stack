@@ -141,12 +141,16 @@
               },
               "proved_source_revision": {
                 "type": "string"
+              },
+              "proved_source_tree_digest": {
+                "type": "string"
               }
             },
             "required": [
               "proof_ref",
               "evaluated_at",
               "proved_source_revision",
+              "proved_source_tree_digest",
               "proved_package_digest",
               "proved_deploy_revision",
               "proved_deploy_tree_digest",
@@ -304,6 +308,19 @@
           ],
           "default": null,
           "title": "Proved Source Revision"
+        },
+        "proved_source_tree_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proved Source Tree Digest"
         },
         "verdict": {
           "enum": [
@@ -1187,6 +1204,12 @@
           },
           "then": {
             "properties": {
+              "last_known_good_canary_ref": {
+                "type": "string"
+              },
+              "last_known_good_canary_route": {
+                "type": "string"
+              },
               "last_known_good_consumer_registration_ref": {
                 "type": "string"
               },
@@ -1213,6 +1236,9 @@
               },
               "proof_ref": {
                 "type": "string"
+              },
+              "proved_target": {
+                "type": "object"
               }
             },
             "required": [
@@ -1224,7 +1250,10 @@
               "last_known_good_credential_class",
               "last_known_good_executable_ref",
               "last_known_good_process_identity",
-              "proof_ref"
+              "last_known_good_canary_route",
+              "last_known_good_canary_ref",
+              "proof_ref",
+              "proved_target"
             ]
           }
         }
@@ -1232,6 +1261,36 @@
       "properties": {
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
+        },
+        "last_known_good_canary_ref": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Canary Ref"
+        },
+        "last_known_good_canary_route": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Known Good Canary Route"
         },
         "last_known_good_consumer_registration_ref": {
           "anyOf": [
@@ -1364,6 +1423,17 @@
           "default": null,
           "title": "Proof Ref"
         },
+        "proved_target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollbackProofTarget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "ready": {
           "title": "Ready",
           "type": "boolean"
@@ -1382,6 +1452,91 @@
         "evidence"
       ],
       "title": "RollbackObservation",
+      "type": "object"
+    },
+    "RollbackProofTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "canary_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Ref",
+          "type": "string"
+        },
+        "canary_route": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Canary Route",
+          "type": "string"
+        },
+        "consumer_registration_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Consumer Registration Ref",
+          "type": "string"
+        },
+        "credential_class": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Credential Class",
+          "type": "string"
+        },
+        "deploy_revision": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Deploy Revision",
+          "type": "string"
+        },
+        "deploy_tree_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Deploy Tree Digest",
+          "type": "string"
+        },
+        "executable_ref": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Executable Ref",
+          "type": "string"
+        },
+        "package_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Package Digest",
+          "type": "string"
+        },
+        "process_identity": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Process Identity",
+          "type": "string"
+        },
+        "unit_name": {
+          "maxLength": 256,
+          "minLength": 3,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|socket)$",
+          "title": "Unit Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "consumer_registration_ref",
+        "package_digest",
+        "deploy_revision",
+        "deploy_tree_digest",
+        "unit_name",
+        "credential_class",
+        "executable_ref",
+        "process_identity",
+        "canary_route",
+        "canary_ref"
+      ],
+      "title": "RollbackProofTarget",
       "type": "object"
     },
     "RuntimeSubject": {

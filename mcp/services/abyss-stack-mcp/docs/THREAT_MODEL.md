@@ -21,14 +21,17 @@
   credential-bearing userinfo and forbidden path/query/fragment keys before
   validation or response; unparseable URI-like values fail closed, bounded
   recursive decoding covers nested parameters, and credential-key tokenization
-  catches namespaced separator/camel-case forms while PEM private-key,
-  Basic/Bearer, and provider-token checks normalize leading whitespace;
+  catches namespaced separator/camel-case and concatenated suffix forms while
+  structurally valid compact JWT, PEM private-key, Basic/Bearer, and
+  provider-token checks normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
   into the managed-environment identity and installed only from a private
   digest-matched source snapshot, with the installed files and symlink targets
   rehashed against a recorded runtime-content digest before any reuse;
+  generated entry-point shebangs are rebound to the stable publication path
+  before that digest is recorded and the staged environment is renamed;
 - fail-closed reprovisioning while either managed stack MCP plane is active,
   with a lifetime shared service lock, exclusive provision lock, and final
   stopped-state check before environment replacement;
@@ -44,8 +47,9 @@
 - active processes require an observed process identity rather than a bare
   boolean;
 - activation requires a passed central-proof verdict issued by `proof_owner`
-  and bound to the current source, package, deployed revision and tree digest,
-  running process identity, schema, consumer, and canary contour;
+  and bound to the current source revision and tree digest, package, deployed
+  revision and tree digest, running process identity, schema, consumer, and
+  canary contour;
 - activation and restart reject `internal_effect` and `external_effect`
   subjects while their distinct threat, approval, egress, compensation, and
   rollback contracts are absent;
@@ -58,6 +62,10 @@
   duplicate evidence timestamps are rejected before deduplication;
 - rollback-required links need explicit unexpired evidence and cannot fail late
   through candidate-model validation;
+- rollback readiness requires a typed proof target equal to the complete
+  last-known-good restoration contour, including its distinct canary route and
+  receipt; the rollback plan runs that proven canary rather than the current
+  deployment's route;
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior.

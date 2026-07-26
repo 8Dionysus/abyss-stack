@@ -219,6 +219,7 @@
         "proved_process_identity": "aoa-kag-mcp/0.0.0-example",
         "proved_server_schema_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "proved_source_revision": "source-example-revision",
+        "proved_source_tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "verdict": "passed"
       },
       "registry": {
@@ -257,6 +258,8 @@
           "reason_codes": [],
           "state": "exact"
         },
+        "last_known_good_canary_ref": "example://canary/aoa-kag/last-known-good",
+        "last_known_good_canary_route": "example://canary-route/aoa-kag/last-known-good",
         "last_known_good_consumer_registration_ref": "example://consumer/aoa-kag",
         "last_known_good_credential_class": "aoa-kag-read-example",
         "last_known_good_deploy_revision": "deploy-example-revision",
@@ -266,6 +269,18 @@
         "last_known_good_process_identity": "aoa-kag-mcp/0.0.0-example",
         "last_known_good_unit_name": "aoa-mcp-http@aoa-kag.service",
         "proof_ref": "example://rollback-proof/aoa-kag",
+        "proved_target": {
+          "canary_ref": "example://canary/aoa-kag/last-known-good",
+          "canary_route": "example://canary-route/aoa-kag/last-known-good",
+          "consumer_registration_ref": "example://consumer/aoa-kag",
+          "credential_class": "aoa-kag-read-example",
+          "deploy_revision": "deploy-example-revision",
+          "deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "executable_ref": "/srv/AbyssOS/.codex/bin/aoa-kag-mcp-server.py",
+          "package_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "process_identity": "aoa-kag-mcp/0.0.0-example",
+          "unit_name": "aoa-mcp-http@aoa-kag.service"
+        },
         "ready": true,
         "rollback_route": "example://rollback/aoa-kag"
       },
