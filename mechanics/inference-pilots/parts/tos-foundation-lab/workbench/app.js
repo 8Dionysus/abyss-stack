@@ -25,12 +25,14 @@ const feedbackAttachmentLimits = {
 const elements = {
   app: document.getElementById("app"),
   title: document.getElementById("protocol-title"),
+  blindBadge: document.getElementById("blind-badge"),
   saveStatus: document.getElementById("save-status"),
   reviewerChip: document.getElementById("reviewer-chip"),
   progressLabel: document.getElementById("progress-label"),
   progressBar: document.getElementById("progress-bar"),
   unitList: document.getElementById("unit-list"),
   submitReview: document.getElementById("submit-review"),
+  queueBoundary: document.getElementById("queue-boundary"),
   unitContext: document.getElementById("unit-context"),
   unitHeading: document.getElementById("unit-heading"),
   unitInstruction: document.getElementById("unit-instruction"),
@@ -43,7 +45,12 @@ const elements = {
   pageCanvas: document.getElementById("page-canvas"),
   sourcePage: document.getElementById("source-page"),
   pageLabel: document.getElementById("page-label"),
+  sourceCaptionNote: document.getElementById("source-caption-note"),
   zoomLabel: document.getElementById("zoom-label"),
+  candidateCard: document.getElementById("candidate-card"),
+  candidateLabel: document.getElementById("candidate-label"),
+  candidateText: document.getElementById("candidate-text"),
+  candidateCorrect: document.getElementById("candidate-correct"),
   previousUnit: document.getElementById("previous-unit"),
   nextUnit: document.getElementById("next-unit"),
   unitPosition: document.getElementById("unit-position"),
@@ -86,7 +93,8 @@ async function request(path, options = {}) {
 
 function fieldValue(row, fieldName) {
   const value = row.values[fieldName];
-  return value === null || value === undefined ? "" : String(value);
+  if (value === null || value === undefined) return "";
+  return Array.isArray(value) ? value : String(value);
 }
 
 function selectedDecision(values) {
@@ -102,17 +110,50 @@ function missingFields(row) {
     if ((field.required_for || []).includes(decision)) {
       required = true;
     }
-    if (required && (value === null || String(value).trim() === "")) {
+    if (field.required_unless) {
+      const controlValue = row.values[field.required_unless.field];
+      if (!(field.required_unless.values || []).includes(controlValue)) {
+        required = true;
+      }
+    }
+    if (
+      required &&
+      (
+        value === null ||
+        value === undefined ||
+        (Array.isArray(value) ? value.length === 0 : String(value).trim() === "")
+      )
+    ) {
       missing.add(field.name);
     }
   }
-  if (decision && decision !== "accept") {
+  if (
+    view.protocol.review_mode !== "candidate-review" &&
+    decision &&
+    decision !== "accept"
+  ) {
     let rationale = row.values.notes;
     if (view.protocol.protocol_id.includes("gold-page")) {
       rationale = rationale || row.values.source_damage_or_ambiguity;
     }
     if (!rationale || !String(rationale).trim()) {
       missing.add("notes");
+    }
+  }
+  if (view.protocol.review_mode === "candidate-review") {
+    const scope = row.values.language_review_scope;
+    if (
+      scope === "visual-only" &&
+      decision &&
+      !["language-not-assessed", "uncertain", "reject"].includes(decision)
+    ) {
+      missing.add("decision");
+    }
+    if (
+      ["full", "partial"].includes(scope) &&
+      decision === "language-not-assessed"
+    ) {
+      missing.add("decision");
     }
   }
   return [...missing];
@@ -160,6 +201,7 @@ function setSaveStatus(message, tone = "normal") {
 
 function updateProgress() {
   const completion = localCompletion();
+  const candidateReview = view.protocol.review_mode === "candidate-review";
   elements.progressLabel.textContent =
     `${completion.completedUnits} / ${completion.totalUnits}`;
   elements.progressBar.style.width =
@@ -167,9 +209,13 @@ function updateProgress() {
   elements.reviewerChip.textContent =
     view.state.reviewer_ref || "Рецензент не указан";
   elements.submitReview.textContent = isFrozen()
-    ? "Pass 1 зафиксирован"
+    ? candidateReview
+      ? "Ревью зафиксировано"
+      : "Pass 1 зафиксирован"
     : completion.completedUnits === completion.totalUnits
-      ? "Завершить проход"
+      ? candidateReview
+        ? "Завершить ревью"
+        : "Завершить проход"
       : `Завершить · осталось ${completion.totalUnits - completion.completedUnits}`;
   elements.submitReview.disabled = isFrozen();
 }
@@ -192,9 +238,9 @@ function renderQueue() {
     const copy = document.createElement("span");
     copy.className = "unit-copy";
     const strong = document.createElement("strong");
-    strong.textContent = unit.title || unit.unit_id;
+    strong.textContent = unit.queue_title || unit.title || unit.unit_id;
     const context = document.createElement("span");
-    context.textContent = unit.context;
+    context.textContent = unit.queue_context || unit.context;
     copy.append(strong, context);
 
     const dot = document.createElement("span");
@@ -210,18 +256,114 @@ function renderQueue() {
 
 function isFieldRequired(field, row) {
   if (field.always_required) return true;
-  return (field.required_for || []).includes(selectedDecision(row.values));
+  if ((field.required_for || []).includes(selectedDecision(row.values))) {
+    return true;
+  }
+  if (field.required_unless) {
+    const controlValue = row.values[field.required_unless.field];
+    return !(field.required_unless.values || []).includes(controlValue);
+  }
+  return false;
+}
+
+function isFieldVisible(field, row) {
+  const decision = selectedDecision(row.values);
+  if (field.visible_for && !field.visible_for.includes(decision)) {
+    return false;
+  }
+  if (field.hidden_when) {
+    const controlValue = row.values[field.hidden_when.field];
+    if ((field.hidden_when.values || []).includes(controlValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function candidateDecisionOptions(field, row) {
+  const options = field.options || [];
+  if (
+    view.protocol.review_mode !== "candidate-review" ||
+    field.name !== "decision"
+  ) {
+    return options;
+  }
+  const scope = row.values.language_review_scope;
+  if (scope === "visual-only") {
+    return options.filter(([value]) =>
+      ["language-not-assessed", "uncertain", "reject"].includes(value)
+    );
+  }
+  if (["full", "partial"].includes(scope)) {
+    return options.filter(([value]) => value !== "language-not-assessed");
+  }
+  return options;
 }
 
 function markFieldChanged(fieldName, value) {
-  currentRow().values[fieldName] = value === "" ? null : value;
+  const normalized =
+    value === "" || (Array.isArray(value) && value.length === 0) ? null : value;
+  currentRow().values[fieldName] = normalized;
+  if (
+    view.protocol.review_mode === "candidate-review" &&
+    fieldName === "language_review_scope"
+  ) {
+    const language = currentUnit().language;
+    view.state.rows.forEach((row, index) => {
+      if (view.units[index].language !== language) return;
+      row.values.language_review_scope = normalized;
+      if (normalized === "visual-only") {
+        row.values.text_fidelity = null;
+        row.values.completeness = null;
+        row.values.error_types = null;
+        row.values.corrected_text = null;
+        if (
+          row.values.decision &&
+          !["language-not-assessed", "uncertain", "reject"].includes(
+            row.values.decision,
+          )
+        ) {
+          row.values.decision = null;
+        }
+      } else if (row.values.decision === "language-not-assessed") {
+        row.values.decision = null;
+      }
+    });
+  }
   updateProgress();
   renderQueue();
   scheduleSave();
 }
 
+function appendCharacterTools(wrapper, input, characters) {
+  if (!characters || !characters.length) return;
+  const toolbar = document.createElement("span");
+  toolbar.className = "character-tools";
+  const hint = document.createElement("span");
+  hint.textContent = "Вставить:";
+  toolbar.append(hint);
+  for (const character of characters) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "character-button";
+    button.textContent = character;
+    button.title = `Вставить ${character}`;
+    button.disabled = isFrozen();
+    button.addEventListener("click", () => {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      input.setRangeText(character, start, end, "end");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+    toolbar.append(button);
+  }
+  wrapper.append(toolbar);
+}
+
 function buildField(field, row) {
-  const wrapper = document.createElement("label");
+  const isButtonGroup = field.kind === "choice" || field.kind === "multi-choice";
+  const wrapper = document.createElement(isButtonGroup ? "div" : "label");
   wrapper.className = "field";
   wrapper.dataset.field = field.name;
   if (missingFields(row).includes(field.name)) {
@@ -243,23 +385,48 @@ function buildField(field, row) {
 
   const value = fieldValue(row, field.name);
   const disabled = isFrozen();
-  if (field.kind === "choice") {
+  if (isButtonGroup) {
     const choices = document.createElement("span");
     choices.className = "choice-row";
-    for (const [optionValue, optionLabel] of field.options || []) {
+    choices.setAttribute("role", "group");
+    choices.setAttribute("aria-label", field.label);
+    const selected = new Set(
+      field.kind === "multi-choice" && Array.isArray(value)
+        ? value
+        : value
+          ? [value]
+          : [],
+    );
+    for (const [optionValue, optionLabel] of candidateDecisionOptions(field, row)) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "choice-button";
       button.textContent = optionLabel;
       button.disabled = disabled;
-      if (value === optionValue) button.classList.add("selected");
+      if (selected.has(optionValue)) button.classList.add("selected");
       button.addEventListener("click", () => {
-        for (const sibling of choices.querySelectorAll(".choice-button")) {
-          sibling.classList.remove("selected");
+        if (field.kind === "multi-choice") {
+          if (selected.has(optionValue)) {
+            selected.delete(optionValue);
+            button.classList.remove("selected");
+          } else {
+            selected.add(optionValue);
+            button.classList.add("selected");
+          }
+          markFieldChanged(field.name, [...selected]);
+        } else {
+          for (const sibling of choices.querySelectorAll(".choice-button")) {
+            sibling.classList.remove("selected");
+          }
+          button.classList.add("selected");
+          wrapper.classList.remove("missing");
+          markFieldChanged(field.name, optionValue);
+          if (field.name === "language_review_scope") {
+            renderCandidate();
+            renderForm();
+          }
         }
-        button.classList.add("selected");
         wrapper.classList.remove("missing");
-        markFieldChanged(field.name, optionValue);
       });
       choices.append(button);
     }
@@ -268,7 +435,7 @@ function buildField(field, row) {
   }
 
   let input;
-  if (field.kind === "textarea") {
+  if (field.kind === "textarea" || field.kind === "correction-textarea") {
     input = document.createElement("textarea");
     input.rows = field.rows || 4;
   } else if (field.kind === "select") {
@@ -277,7 +444,7 @@ function buildField(field, row) {
     placeholder.value = "";
     placeholder.textContent = "Выберите после просмотра";
     input.append(placeholder);
-    for (const [optionValue, optionLabel] of field.options || []) {
+    for (const [optionValue, optionLabel] of candidateDecisionOptions(field, row)) {
       const option = document.createElement("option");
       option.value = optionValue;
       option.textContent = optionLabel;
@@ -290,20 +457,23 @@ function buildField(field, row) {
   input.name = field.name;
   input.value = value;
   input.disabled = disabled;
-  input.addEventListener("input", () => {
+  appendCharacterTools(wrapper, input, field.character_tools || []);
+  const handleValueChange = () => {
     wrapper.classList.remove("missing");
+    if (
+      field.name === "decision" &&
+      input.value === "corrected" &&
+      !row.values.corrected_text
+    ) {
+      row.values.corrected_text = currentUnit().candidate_text;
+    }
     markFieldChanged(field.name, input.value);
     if (field.name === "decision") {
+      renderCandidate();
       renderForm();
     }
-  });
-  input.addEventListener("change", () => {
-    wrapper.classList.remove("missing");
-    markFieldChanged(field.name, input.value);
-    if (field.name === "decision") {
-      renderForm();
-    }
-  });
+  };
+  input.addEventListener(field.kind === "select" ? "change" : "input", handleValueChange);
   wrapper.append(input);
   return wrapper;
 }
@@ -312,6 +482,7 @@ function renderForm() {
   const row = currentRow();
   elements.reviewForm.replaceChildren();
   for (const field of view.protocol.fields) {
+    if (!isFieldVisible(field, row)) continue;
     elements.reviewForm.append(buildField(field, row));
   }
 }
@@ -348,6 +519,26 @@ function applyZoom() {
   elements.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
 }
 
+function renderCandidate() {
+  const unit = currentUnit();
+  if (!view.protocol.candidate_visible || !unit.candidate_text) {
+    elements.candidateCard.hidden = true;
+    return;
+  }
+  elements.candidateCard.hidden = false;
+  elements.candidateLabel.textContent =
+    `${unit.candidate_label} · ${unit.candidate_position} из ${unit.candidate_count}`;
+  elements.candidateText.textContent = unit.candidate_text.trimEnd();
+  const scope = currentRow().values.language_review_scope;
+  const correctionActive = currentRow().values.decision === "corrected";
+  elements.candidateCorrect.disabled = isFrozen() || scope === "visual-only";
+  elements.candidateCorrect.textContent = correctionActive
+    ? "Продолжить исправление"
+    : scope === "visual-only"
+      ? "Языковая правка не заявлена"
+      : "Исправить только ошибки";
+}
+
 function renderCurrentUnit() {
   const unit = currentUnit();
   elements.unitContext.textContent = unit.context;
@@ -366,20 +557,40 @@ function renderCurrentUnit() {
   showPage("current");
   applyZoom();
   elements.judgmentPanel.scrollTo({ top: 0, left: 0 });
+  renderCandidate();
   renderForm();
 }
 
 function renderAll() {
   elements.title.textContent = view.protocol.short_title;
+  elements.blindBadge.textContent = view.protocol.badge_label || "Blind";
+  const candidateReview = view.protocol.review_mode === "candidate-review";
+  elements.queueBoundary.textContent = candidateReview
+    ? "Здесь сохраняется ваша оценка кандидатов. Она не превращает текст в эталон и не ранжирует методы автоматически."
+    : "Здесь сохраняется только независимый калибровочный черновик.";
+  elements.sourceCaptionNote.textContent = candidateReview
+    ? "Страница и байты кандидата проверены машиной; качество оценивает человек."
+    : "Источник проверен машиной; содержимое оценивает человек.";
   document.title = `${view.protocol.short_title} · Tree of Sophia`;
   document.body.classList.toggle("submitted", isFrozen());
+  document.body.classList.toggle("candidate-review", candidateReview);
   updateProgress();
   renderQueue();
   renderCurrentUnit();
   elements.app.setAttribute("aria-busy", "false");
   if (isFrozen()) {
-    setSaveStatus("Pass 1 зафиксирован", "saved");
-    showToast("Человеческий черновик зафиксирован. Он ещё не является gold.", 6000);
+    setSaveStatus(
+      view.protocol.review_mode === "candidate-review"
+        ? "Ревью зафиксировано"
+        : "Pass 1 зафиксирован",
+      "saved",
+    );
+    showToast(
+      view.protocol.review_mode === "candidate-review"
+        ? "Review draft зафиксирован. Он не является gold или общим рейтингом методов."
+        : "Человеческий черновик зафиксирован. Он ещё не является gold.",
+      6000,
+    );
   } else if (view.state.status === "in-progress") {
     setSaveStatus("Сохранено", "saved");
   } else {
@@ -469,7 +680,7 @@ async function startReview() {
   const reviewerRef = elements.reviewerInput.value.trim();
   elements.startError.textContent = "";
   if (!reviewerRef) {
-    elements.startError.textContent = "Укажите reviewer reference.";
+    elements.startError.textContent = "Укажите имя или устойчивый псевдоним.";
     elements.reviewerInput.focus();
     return;
   }
@@ -514,7 +725,9 @@ async function openSubmit() {
   const lines = [
     `Рецензент: ${view.state.reviewer_ref}`,
     `Проверено единиц: ${completion.totalUnits}`,
-    "Модельные ответы и признанные переводы не были показаны.",
+    view.protocol.review_mode === "candidate-review"
+      ? "Названия методов были скрыты; их OCR-тексты были показаны для оценки."
+      : "Модельные ответы и признанные переводы не были показаны.",
   ];
   for (const line of lines) {
     const item = document.createElement("span");
@@ -762,6 +975,29 @@ function bindEvents() {
   elements.submitReview.addEventListener("click", openSubmit);
   elements.submitConfirm.addEventListener("click", confirmSubmit);
   elements.feedbackOpen.addEventListener("click", openFeedback);
+  elements.candidateCorrect.addEventListener("click", () => {
+    if (currentRow().values.language_review_scope === "visual-only") {
+      showToast(
+        "Языковая правка отключена в режиме «Язык не читаю». Можно оценить страницу и структуру.",
+        5000,
+      );
+      return;
+    }
+    if (!currentRow().values.corrected_text) {
+      currentRow().values.corrected_text = currentUnit().candidate_text;
+    }
+    currentRow().values.decision = "corrected";
+    updateProgress();
+    renderQueue();
+    renderCandidate();
+    renderForm();
+    scheduleSave();
+    window.requestAnimationFrame(() => {
+      elements.reviewForm
+        .querySelector('[name="corrected_text"]')
+        ?.focus();
+    });
+  });
   elements.feedbackSend.addEventListener("click", sendFeedback);
   elements.feedbackDropzone.addEventListener("click", () => {
     elements.feedbackFileInput.click();

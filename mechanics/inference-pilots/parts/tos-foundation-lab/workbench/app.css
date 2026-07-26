@@ -502,6 +502,55 @@ h2 {
   line-height: 1.55;
 }
 
+.candidate-review .review-main {
+  grid-template-columns: minmax(440px, 1.2fr) minmax(420px, 1fr);
+}
+
+.candidate-card {
+  margin-bottom: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(127, 177, 139, 0.30);
+  border-radius: 13px;
+  background: rgba(127, 177, 139, 0.055);
+}
+
+.candidate-card[hidden] {
+  display: none;
+}
+
+.candidate-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.candidate-card-heading .eyebrow {
+  margin-bottom: 3px;
+  color: var(--green);
+}
+
+.candidate-card-heading h2 {
+  font-size: 1.08rem;
+}
+
+.candidate-text {
+  max-height: 46vh;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  color: #e7e5db;
+  background: rgba(8, 11, 9, 0.42);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.92rem;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  scrollbar-color: rgba(217, 184, 103, 0.30) transparent;
+}
+
 .blind-notice {
   margin-top: 10px !important;
   color: var(--muted);
@@ -544,6 +593,33 @@ textarea {
   outline: none;
   color: var(--text);
   background: #111512;
+}
+
+.character-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 7px;
+  color: #818981;
+  font-size: 0.68rem;
+}
+
+.character-button {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 28px;
+  padding: 3px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  color: var(--gold-bright);
+  background: #111512;
+  cursor: pointer;
+}
+
+.character-button:hover {
+  border-color: rgba(217, 184, 103, 0.58);
+  background: rgba(217, 184, 103, 0.08);
 }
 
 input[type="text"],
@@ -858,6 +934,10 @@ body.submitted #review-form button {
     grid-template-columns: minmax(380px, 1.25fr) minmax(330px, 0.9fr);
   }
 
+  .candidate-review .review-main {
+    grid-template-columns: minmax(380px, 1.05fr) minmax(360px, 1fr);
+  }
+
   .viewer-tools .button {
     padding-inline: 8px;
   }
@@ -934,6 +1014,11 @@ body.submitted #review-form button {
   }
 
   .unit-heading-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .candidate-card-heading {
     align-items: flex-start;
     flex-direction: column;
   }

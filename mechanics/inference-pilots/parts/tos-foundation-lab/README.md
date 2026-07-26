@@ -39,6 +39,7 @@ tos-foundation-lab/
 │   ├── human-gold-review-manifest.schema.json
 │   ├── human-gold-review-record.schema.json
 │   ├── manual-review-receipt.schema.json
+│   ├── ocr-candidate-review-manifest.schema.json
 │   ├── ocr-render-manifest.schema.json
 │   ├── run-receipt.schema.json
 │   ├── runtime-manifest.schema.json
@@ -51,6 +52,7 @@ tos-foundation-lab/
 │   └── translation-source-review-manifest.schema.json
 ├── tests/
 │   ├── test_human_review_workbench.py
+│   ├── test_ocr_candidate_review.py
 │   └── test_tos_foundation_lab.py
 ├── workbench/
 │   ├── app.css
@@ -69,6 +71,7 @@ tos-foundation-lab/
 ├── native_structure.py
 ├── neo4j_bridge.py
 ├── neo4j_graph.py
+├── ocr_candidate_review.py
 ├── ocr_render.py
 ├── oxigraph_bridge.py
 ├── oxigraph_graph.py
@@ -122,12 +125,37 @@ resume, active-time observation, human-readable edition routing, private
 screenshot feedback, and draft freeze so the reviewer handles only
 source-visible judgments. Feedback screenshots can be pasted directly from the
 clipboard and remain content-addressed inside the mutable review session. The
-current bounded slice supports pass 1 for the
-15-page diplomatic Human Gold packet and the 30-unit German source packet.
-Its frozen output is still only one human draft: it does not perform pass 2,
-adjudicate disagreement, accept German source text, create gold, or promote
-Tree of Sophia content. See
+current bounded slice supports method-blind visible OCR candidate review,
+candidate-prefilled correction, the independent first pass of the historical
+15-page Human Gold packet, and the 30-unit language-competent German source
+packet. Its frozen output is still only one human draft: it does not perform
+pass 2, adjudicate disagreement, accept German source text, create gold,
+produce a general method ranking, or promote Tree of Sophia content. See
 [`docs/HUMAN_REVIEW_WORKBENCH.md`](docs/HUMAN_REVIEW_WORKBENCH.md).
+
+The ordinary solo+AI OCR route materializes a separate candidate-visible
+packet. Candidate order is randomized per source page, method identity is
+written only to a restricted map, and every visible text remains bound to its
+original run receipt and digest:
+
+```bash
+scripts/aoa-tos-foundation-lab materialize-ocr-candidate-review \
+  --human-gold-manifest PRIVATE_HUMAN_GOLD_PACKET/human-gold-review-manifest.json \
+  --candidate-run PRIVATE_OCR_RUN_A/variant-A \
+  --candidate-run PRIVATE_OCR_RUN_B/variant-B \
+  --candidate-run PRIVATE_OCR_RUN_C/variant-C \
+  --language ru \
+  --packet-id zarathustra-ocr-candidate-review-v1-YYYYMMDD
+
+scripts/aoa-tos-foundation-lab initialize-ocr-candidate-review-session \
+  --manifest PRIVATE_CANDIDATE_PACKET/ocr-candidate-review-manifest.json \
+  --session-id zarathustra-ocr-candidate-review-pass-1-YYYYMMDD
+```
+
+The reviewer sees the page and candidate, records criteria and quick error
+types, and edits a prefilled copy only when correction is useful. A declared
+`visual-only` language scope removes textual-fidelity requirements and cannot
+be exported as human orthographic, grammatical, or semantic verification.
 
 The first executable bounded lane is deterministic Structure A. Prepare its
 run packet from a fresh preflight, then launch the actual work through the host
@@ -220,9 +248,11 @@ explicit human-presence attestation. Source-visible inspection performed by a
 model goes instead to `model_inspection_refs` under the separate advisory
 schema; it can find candidate defects but can never authorize promotion.
 
-The 15-page diplomatic gold has its own blind source interface. It consumes
-the tracked `gold-status.json`, the frozen visual projection, and the exact
-36-page OCR render manifest. For each of the 15 preselected candidates it
+The historical 15-page Human Gold candidate has its own source-only interface.
+In the Workbench this is treated as a rare independent calibration pass, not
+the ordinary review route. It consumes the tracked `gold-status.json`, the
+frozen visual projection, and the exact 36-page OCR render manifest. For each
+of the 15 preselected candidates it
 re-renders the previous/current/next source pages at 300 DPI and requires the
 center page to remain byte-identical to the frozen OCR contestant input:
 
@@ -237,11 +267,17 @@ scripts/aoa-tos-foundation-lab materialize-human-gold-review \
 
 The two local HTML workbooks export drafts only. Pass 1 independently
 transcribes the center page and records layout, reading order, uncertainty,
-source ambiguity, and human time. Pass 2 re-transcribes from the source with
-pass 1 hidden, requires a distinct human identity, and checks punctuation,
-case, hyphenation, page boundaries, lineation, reading order, furniture, and
-uncertain glyphs. The JSONL template remains blank until actual human work is
-merged and adjudicated.
+source ambiguity, and human time. Physical printed line wrapping is not
+recreated in the text field: the page image retains geometry, while the
+transcription preserves paragraphs and semantically meaningful breaks. The
+strict packet's pass 2 remains a separate source comparison with pass 1 hidden
+and checks punctuation, case, hyphenation, page boundaries, reading order,
+furniture, and uncertain glyphs. The JSONL template remains blank until actual
+human work is merged and adjudicated.
+
+In a solo+AI workflow, one human's separated passes may become a
+`solo-human calibration reference`; they must not be reported as two-human
+gold or independent reviewer agreement.
 
 The gate deliberately exits `2` for the blank template:
 

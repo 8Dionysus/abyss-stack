@@ -41,14 +41,43 @@ The Workbench never edits the immutable packet and never promotes a draft into
 Tree of Sophia. It only improves the route by which real human evidence is
 created.
 
+## Review modes
+
+The interface distinguishes three different kinds of human work instead of
+forcing every task through blank full-page transcription:
+
+1. **Candidate review** is the normal comparison route. The source page and
+   one frozen OCR candidate are visible together. Method identity is hidden,
+   and the reviewer records criteria, error types, a decision, and an optional
+   correction.
+2. **Candidate correction** begins from the exact frozen candidate text. The
+   reviewer edits only detected errors; the untouched candidate digest remains
+   in the draft so correction effort can be measured honestly.
+3. **Independent reference** keeps every candidate hidden and asks for a
+   source-only transcription. It is deliberately rare and small because its
+   purpose is to create an anchoring-independent calibration witness, not to
+   become the default human workload.
+
+Blindness is therefore typed. Independent-reference lanes are content-blind.
+Candidate-review lanes are method-blind but candidate-visible. The packet
+declares the mode, and the Workbench must never infer or switch it.
+
+The existing fifteen-page packet retains its historical Human Gold packet
+identity, but the Workbench presents its first pass as an independent
+calibration draft. One pass is not gold. In a solo+AI workflow it must not be
+reported as multi-human or independently double-checked evidence.
+
 ## Human and machine fields
 
 Human-owned fields include:
 
-- transcription;
+- criteria-based candidate assessment;
+- optional correction of a visible candidate;
+- independent transcription only in the explicit reference lane;
 - layout or reading-order judgment;
 - boundary judgment;
 - legibility and uncertainty;
+- declared competence for each source language;
 - decision and rationale;
 - reviewer identity and final human-presence attestation.
 
@@ -64,6 +93,14 @@ Machine-owned fields include:
 A reviewer is never asked to attest that a digest was checked. The packet
 verifier owns that statement.
 
+Language competence limits the claim. `full` permits textual fidelity review,
+`partial` permits only confident textual judgments, and `visual-only` permits
+page identity, legibility, and visible-structure review without orthographic,
+grammatical, or semantic verification. The interface propagates the choice to
+all units in that language and removes content fields that the reviewer cannot
+honestly answer. Historical spelling is compared to the source, not corrected
+to a modern grammar.
+
 Active time is a browser observation, not a human-authored fact or proof of
 attention. It advances only while the review tab is visible and focused, stops
 after ten minutes without interaction, and resumes on focus or interaction.
@@ -72,11 +109,13 @@ into unbounded human cost. Reports must retain that measurement method.
 
 ## First bounded slice
 
-The first slice supports pass 1 for the two prepared Zarathustra packet
-families:
+The current slice supports three prepared Zarathustra review families:
 
-- fifteen-page diplomatic human gold;
+- fifteen-page independent calibration pass using the historical Human Gold
+  packet;
 - thirty-unit German layout, boundary, and diplomatic source review.
+- method-blind, candidate-visible OCR A/B/C review packets with criteria and
+  candidate-prefilled correction.
 
 It provides:
 
@@ -94,9 +133,11 @@ It provides:
 - explicit final review and human attestation;
 - a frozen draft plus SHA-256 receipt.
 
-Pass 2, cross-pass blindness, adjudication, and accepted JSONL materialization
-remain later stages. The first slice must not imply that a submitted pass-1
-draft is gold or accepted German.
+Candidate review records language scope, candidate digest, criteria,
+correction, error tags, decision, and human time without exposing the method
+map. Pass 2, cross-pass blindness, adjudication, and accepted JSONL
+materialization remain later stages. The first slice must not imply that a
+submitted draft is gold, accepted German, or a general method ranking.
 
 ## Exposure and storage
 
@@ -104,6 +145,8 @@ draft is gold or accepted German.
 - Require a per-launch high-entropy token for API and page requests.
 - Reject unexpected `Host` and cross-origin write requests.
 - Serve only page assets resolved from the verified packet manifest.
+- Return candidate text only for a verified candidate-visible protocol; never
+  return the restricted method-identity map.
 - Write only under the declared mutable human-review session directory.
 - Keep feedback screenshots content-addressed under
   `human-review-workbench.feedback-assets/`, owner-only, and referenced from the

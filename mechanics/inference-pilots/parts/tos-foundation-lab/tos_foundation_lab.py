@@ -46,6 +46,15 @@ from human_gold_review import (
     materialize_human_gold_review,
     verify_human_gold_review_manifest,
 )
+from ocr_candidate_review import (
+    DEFAULT_HUMAN_REVIEW_ROOT as DEFAULT_CANDIDATE_REVIEW_ROOT,
+    DEFAULT_SHARED_ROOT as DEFAULT_OCR_CANDIDATE_REVIEW_ROOT,
+    MANIFEST_SCHEMA_PATH as OCR_CANDIDATE_REVIEW_SCHEMA_PATH,
+    OcrCandidateReviewError,
+    initialize_ocr_candidate_review_session,
+    materialize_ocr_candidate_review,
+    verify_ocr_candidate_review_manifest,
+)
 from human_review_workbench import (
     HumanReviewWorkbenchError,
     serve_human_review_workbench,
@@ -304,6 +313,7 @@ def validate_suite() -> list[str]:
         OCR_RENDER_SCHEMA_PATH,
         HUMAN_GOLD_MANIFEST_SCHEMA_PATH,
         HUMAN_GOLD_RECORD_SCHEMA_PATH,
+        OCR_CANDIDATE_REVIEW_SCHEMA_PATH,
         TRANSLATION_SOURCE_SCHEMA_PATH,
         TRANSLATION_SOURCE_INSPECTION_SCHEMA_PATH,
         TRANSLATION_SOURCE_REVIEW_SCHEMA_PATH,
@@ -1125,6 +1135,57 @@ def main(argv: list[str] | None = None) -> int:
     gate_human_gold_parser.add_argument("--manifest", type=Path, required=True)
     gate_human_gold_parser.add_argument("--human-review-output", type=Path)
 
+    ocr_candidate_review_parser = subparsers.add_parser(
+        "materialize-ocr-candidate-review",
+        help=(
+            "freeze method-blind visible OCR candidates beside verified source "
+            "triplets"
+        ),
+    )
+    ocr_candidate_review_parser.add_argument(
+        "--human-gold-manifest", type=Path, required=True
+    )
+    ocr_candidate_review_parser.add_argument(
+        "--candidate-run",
+        type=Path,
+        action="append",
+        required=True,
+        help="repeat once for each frozen OCR run",
+    )
+    ocr_candidate_review_parser.add_argument(
+        "--language",
+        action="append",
+        help="repeat to select source languages; defaults to ru",
+    )
+    ocr_candidate_review_parser.add_argument("--packet-id", required=True)
+    ocr_candidate_review_parser.add_argument(
+        "--shared-root",
+        type=Path,
+        default=DEFAULT_OCR_CANDIDATE_REVIEW_ROOT,
+    )
+
+    verify_ocr_candidate_review_parser = subparsers.add_parser(
+        "verify-ocr-candidate-review",
+        help="verify candidate bytes, source pages, blindness map, and stop line",
+    )
+    verify_ocr_candidate_review_parser.add_argument("manifest", type=Path)
+
+    initialize_ocr_candidate_session_parser = subparsers.add_parser(
+        "initialize-ocr-candidate-review-session",
+        help="create a private mutable Workbench session for a verified packet",
+    )
+    initialize_ocr_candidate_session_parser.add_argument(
+        "--manifest", type=Path, required=True
+    )
+    initialize_ocr_candidate_session_parser.add_argument(
+        "--session-id", required=True
+    )
+    initialize_ocr_candidate_session_parser.add_argument(
+        "--review-root",
+        type=Path,
+        default=DEFAULT_CANDIDATE_REVIEW_ROOT,
+    )
+
     human_review_workbench_parser = subparsers.add_parser(
         "human-review-workbench",
         help="open one verified private pass-1 session in the loopback human workbench",
@@ -1553,6 +1614,49 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if readiness["decision"] == (
                 "ready-for-manual-metric-adjudication"
             ) else 2
+
+        if args.command == "materialize-ocr-candidate-review":
+            manifest = materialize_ocr_candidate_review(
+                args.human_gold_manifest,
+                args.candidate_run,
+                args.packet_id,
+                languages=tuple(args.language or ("ru",)),
+                shared_root=args.shared_root,
+                invocation=[
+                    sys.argv[0],
+                    *(argv if argv is not None else sys.argv[1:]),
+                ],
+            )
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+            print(
+                "[boundary] visible candidates and packet fixity are not source "
+                "truth, gold, acceptance, or a general method ranking"
+            )
+            return 0
+
+        if args.command == "verify-ocr-candidate-review":
+            manifest = verify_ocr_candidate_review_manifest(args.manifest)
+            print(
+                f"[ok] verified {manifest['unit_count']} method-blind candidate "
+                f"units over {manifest['source_count']} source pages"
+            )
+            print(
+                "[boundary] packet verification does not evaluate candidate "
+                "content or create human review"
+            )
+            return 0
+
+        if args.command == "initialize-ocr-candidate-review-session":
+            session_dir = initialize_ocr_candidate_review_session(
+                args.manifest,
+                args.session_id,
+                review_root=args.review_root,
+            )
+            print(session_dir)
+            print(
+                "[boundary] an initialized session contains no human judgment"
+            )
+            return 0
 
         if args.command == "human-review-workbench":
             serve_human_review_workbench(
@@ -2016,6 +2120,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
     except (
         LaboratoryError,
+        OcrCandidateReviewError,
         NativeStructureError,
         LexicalRetrievalError,
         SemanticRetrievalError,

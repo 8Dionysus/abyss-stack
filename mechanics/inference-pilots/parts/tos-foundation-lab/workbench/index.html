@@ -20,7 +20,7 @@
         </div>
       </div>
       <div class="topbar-status">
-        <span id="blind-badge" class="badge badge-blind">Blind</span>
+        <span id="blind-badge" class="badge badge-blind">Независимый проход</span>
         <span id="save-status" class="save-status" role="status">Загрузка…</span>
         <button id="feedback-open" class="button button-quiet" type="button">
           Сообщить о проблеме
@@ -42,7 +42,7 @@
       <button id="submit-review" class="button button-primary submit-review" type="button">
         Завершить проход
       </button>
-      <p class="queue-boundary">
+      <p id="queue-boundary" class="queue-boundary">
         Завершение фиксирует только первый человеческий черновик.
       </p>
     </aside>
@@ -75,7 +75,7 @@
           </div>
           <div class="page-caption">
             <span id="page-label"></span>
-            <span>Источник проверен машиной; содержимое оценивает человек.</span>
+            <span id="source-caption-note">Источник проверен машиной; содержимое оценивает человек.</span>
           </div>
         </div>
       </section>
@@ -86,6 +86,22 @@
           <p id="unit-instruction"></p>
           <p id="blind-notice" class="blind-notice"></p>
         </div>
+        <article id="candidate-card" class="candidate-card" hidden>
+          <div class="candidate-card-heading">
+            <div>
+              <p class="eyebrow">Результат для проверки</p>
+              <h2 id="candidate-label">Кандидат</h2>
+            </div>
+            <button
+              id="candidate-correct"
+              class="button button-secondary"
+              type="button"
+            >
+              Исправить только ошибки
+            </button>
+          </div>
+          <pre id="candidate-text" class="candidate-text"></pre>
+        </article>
         <form id="review-form" novalidate></form>
       </section>
     </main>
@@ -99,7 +115,7 @@
 
   <div id="start-layer" class="modal-layer" hidden>
     <section class="modal start-modal" role="dialog" aria-modal="true" aria-labelledby="start-title">
-      <p class="eyebrow">Human Review Workbench</p>
+      <p class="eyebrow">Tree of Sophia · человеческое ревью</p>
       <h2 id="start-title">Всё готово к человеческой работе</h2>
       <p id="start-description"></p>
       <ul class="start-promises">
@@ -108,8 +124,8 @@
         <li>Никаких путей, JSON и ручных экспортов</li>
       </ul>
       <label class="field">
-        <span class="field-label">Ваш устойчивый reviewer reference</span>
-        <span class="field-help">Псевдоним или внутренний идентификатор; не вводите секреты.</span>
+        <span class="field-label">Как подписать эту работу?</span>
+        <span class="field-help">Например, Dionysus. Можно использовать устойчивый псевдоним; не вводите секреты.</span>
         <input id="reviewer-ref-input" type="text" maxlength="200" autocomplete="off">
       </label>
       <p id="start-error" class="form-error" role="alert"></p>

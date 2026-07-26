@@ -26,6 +26,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from human_gold_review import verify_human_gold_review_manifest
+from ocr_candidate_review import verify_ocr_candidate_review_manifest
 from translation_source_review import verify_translation_source_review_manifest
 
 
@@ -43,6 +44,11 @@ MAX_FEEDBACK_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024
 AUTHORITY_BOUNDARY = (
     "one real-human pass draft only; workbench submission is not independent "
     "double-check, adjudication, source acceptance, gold, translation, or canon"
+)
+OCR_CANDIDATE_REVIEW_AUTHORITY_BOUNDARY = (
+    "one real-human source-visible OCR candidate-review draft only; submission "
+    "does not create source truth, gold, accepted text, a general method "
+    "ranking, translation, or canon"
 )
 FEEDBACK_CATEGORIES = {
     "unclear-task",
@@ -335,12 +341,14 @@ GOLD_FIELDS: tuple[dict[str, Any], ...] = (
     {
         "name": "diplomatic_transcription",
         "kind": "textarea",
-        "label": "Дипломатическая транскрипция текущей страницы",
+        "label": "Независимая транскрипция текста страницы",
         "help": (
-            "Сохраняйте исходную орфографию, регистр, пунктуацию, переносы и "
-            "значимые разрывы строк."
+            "Сохраняйте исходную орфографию, регистр и пунктуацию. Не "
+            "подгоняйте текст под печатные строки: сохраняйте абзацы и только "
+            "значимые разрывы."
         ),
         "rows": 16,
+        "character_tools": ("«", "»", "—", "…"),
         "required_for": ("accept", "accept-with-limits"),
     },
     {
@@ -438,6 +446,7 @@ GERMAN_FIELDS: tuple[dict[str, Any], ...] = (
         "label": "Дипломатическая немецкая транскрипция",
         "help": "Сохраняйте историческую орфографию, регистр и пунктуацию.",
         "rows": 12,
+        "character_tools": ("„", "“", "—", "…", "ß"),
         "required_for": ("accept", "accept-with-limits"),
     },
     {
@@ -469,6 +478,160 @@ GERMAN_FIELDS: tuple[dict[str, Any], ...] = (
     },
 )
 
+OCR_CANDIDATE_FIELDS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "language_review_scope",
+        "kind": "choice",
+        "label": "Насколько вы знаете язык этой страницы?",
+        "help": (
+            "Ответ автоматически применяется ко всем кандидатам на этом языке. "
+            "Он ограничивает только то, что будет считаться проверенным вами."
+        ),
+        "options": (
+            ("full", "Читаю и могу проверить"),
+            ("partial", "Проверю только уверенное"),
+            ("visual-only", "Язык не читаю"),
+        ),
+        "always_required": True,
+        "propagate_by": "language",
+    },
+    {
+        "name": "page_and_region_resolved",
+        "kind": "choice",
+        "label": "Показана правильная страница целиком?",
+        "help": (
+            "«Да» — если центральная страница совпадает с кандидатом и видна "
+            "полностью."
+        ),
+        "options": (
+            ("yes", "Да"),
+            ("no", "Нет"),
+            ("uncertain", "Не уверен"),
+        ),
+        "always_required": True,
+    },
+    {
+        "name": "source_legibility",
+        "kind": "select",
+        "label": "Читаемость источника",
+        "options": (
+            ("legible", "Читается"),
+            ("partly-legible", "Читается частично"),
+            ("illegible", "Нечитаемо"),
+            ("uncertain", "Не уверен"),
+        ),
+        "always_required": True,
+    },
+    {
+        "name": "text_fidelity",
+        "kind": "select",
+        "label": "Насколько точно передан видимый текст?",
+        "help": "Оценивайте исходную орфографию, а не исправляйте автора или издание.",
+        "options": (
+            ("exact", "Точно"),
+            ("minor-errors", "Есть мелкие ошибки"),
+            ("major-errors", "Есть серьёзные ошибки"),
+            ("unusable", "Текст непригоден"),
+            ("uncertain", "Не уверен"),
+        ),
+        "required_unless": {
+            "field": "language_review_scope",
+            "values": ("visual-only",),
+        },
+        "hidden_when": {
+            "field": "language_review_scope",
+            "values": ("visual-only",),
+        },
+    },
+    {
+        "name": "completeness",
+        "kind": "select",
+        "label": "Полнота текста",
+        "options": (
+            ("complete", "Всё на месте"),
+            ("minor-omissions", "Небольшие пропуски"),
+            ("major-omissions", "Большие пропуски"),
+            ("added-text", "Есть лишний текст"),
+            ("uncertain", "Не уверен"),
+        ),
+        "required_unless": {
+            "field": "language_review_scope",
+            "values": ("visual-only",),
+        },
+        "hidden_when": {
+            "field": "language_review_scope",
+            "values": ("visual-only",),
+        },
+    },
+    {
+        "name": "structure_and_order",
+        "kind": "select",
+        "label": "Структура и порядок чтения",
+        "options": (
+            ("correct", "Верно"),
+            ("minor-errors", "Есть мелкие ошибки"),
+            ("major-errors", "Есть серьёзные ошибки"),
+            ("unusable", "Порядок разрушен"),
+            ("not-assessed", "Не могу оценить"),
+        ),
+        "always_required": True,
+    },
+    {
+        "name": "error_types",
+        "kind": "multi-choice",
+        "label": "Что именно не так?",
+        "help": "Отметьте только заметные типы ошибок; можно выбрать несколько.",
+        "options": (
+            ("omission", "Пропуск"),
+            ("addition", "Лишний текст"),
+            ("substitution", "Подмена"),
+            ("spacing", "Пробелы"),
+            ("punctuation", "Пунктуация"),
+            ("reading-order", "Порядок чтения"),
+            ("layout-furniture", "Номера и служебные элементы"),
+        ),
+        "hidden_when": {
+            "field": "language_review_scope",
+            "values": ("visual-only",),
+        },
+    },
+    {
+        "name": "decision",
+        "kind": "select",
+        "label": "Итог по кандидату",
+        "options": (
+            ("accept", "Подходит без исправлений"),
+            ("accept-with-limits", "Подходит с замечаниями"),
+            ("corrected", "Исправил ошибки"),
+            ("reject", "Отклонить"),
+            ("uncertain", "Не уверен"),
+            ("language-not-assessed", "Текст на этом языке не оценивал"),
+        ),
+        "always_required": True,
+    },
+    {
+        "name": "corrected_text",
+        "kind": "correction-textarea",
+        "label": "Исправленный кандидат",
+        "help": (
+            "Текст уже подставлен. Меняйте только найденные ошибки; это не "
+            "перепечатывание с нуля."
+        ),
+        "rows": 14,
+        "character_tools": ("«", "»", "—", "…", "„", "“", "ß"),
+        "required_for": ("corrected",),
+        "visible_for": ("corrected",),
+    },
+    {
+        "name": "notes",
+        "kind": "textarea",
+        "label": "Короткое замечание",
+        "help": "Можно указать конкретное место или причину неуверенности.",
+        "rows": 3,
+        "required_for": ("accept-with-limits", "reject", "uncertain"),
+    },
+)
+
 
 SELECTION_INSTRUCTIONS = {
     "confirm-visible-complete-prose-unit-without-reusing-v1-text": (
@@ -496,17 +659,25 @@ class ReviewProtocol:
     short_title: str
     unit_id_key: str
     fields: tuple[dict[str, Any], ...]
-    expected_unit_count: int
+    expected_unit_count: int | None
     draft_filename: str
     draft_schema_version: str
     manifest_filename: str
     template_key: str = "review_template"
+    review_mode: str = "independent"
+    candidate_visible: bool = False
+    badge_label: str = "Независимый проход"
+    blind_notice: str = (
+        "Модельные ответы, прежние кандидаты и признанные переводы скрыты. "
+        "Судите только по источнику."
+    )
+    authority_boundary: str = AUTHORITY_BOUNDARY
 
 
 GOLD_PROTOCOL = ReviewProtocol(
     protocol_id="tos.human-review.gold-page-pass-1.v1",
-    title="Human Gold: дипломатическая транскрипция",
-    short_title="Human Gold · Pass 1",
+    title="Независимая калибровочная транскрипция",
+    short_title="Независимая калибровка · проход 1",
     unit_id_key="sample_id",
     fields=GOLD_FIELDS,
     expected_unit_count=15,
@@ -518,13 +689,33 @@ GOLD_PROTOCOL = ReviewProtocol(
 GERMAN_PROTOCOL = ReviewProtocol(
     protocol_id="tos.human-review.german-source-pass-1.v1",
     title="Немецкий источник: границы и транскрипция",
-    short_title="German Source · Pass 1",
+    short_title="Немецкий источник · проход 1",
     unit_id_key="review_unit_id",
     fields=GERMAN_FIELDS,
     expected_unit_count=30,
     draft_filename="source-review-pass-1.draft.json",
     draft_schema_version="tos_translation_source_human_review_draft_v2",
     manifest_filename="translation-source-review-manifest.json",
+)
+
+OCR_CANDIDATE_PROTOCOL = ReviewProtocol(
+    protocol_id="tos.human-review.ocr-candidate-pass-1.v1",
+    title="Сверка OCR: оценка и точечное исправление",
+    short_title="Сверка OCR · A/B/C",
+    unit_id_key="review_unit_id",
+    fields=OCR_CANDIDATE_FIELDS,
+    expected_unit_count=None,
+    draft_filename="ocr-candidate-review-pass-1.draft.json",
+    draft_schema_version="tos_ocr_candidate_human_review_draft_v1",
+    manifest_filename="ocr-candidate-review-manifest.json",
+    review_mode="candidate-review",
+    candidate_visible=True,
+    badge_label="Методы скрыты",
+    blind_notice=(
+        "Название метода скрыто, но сам результат показан: сравните его с "
+        "источником. Не перепечатывайте страницу с нуля."
+    ),
+    authority_boundary=OCR_CANDIDATE_REVIEW_AUTHORITY_BOUNDARY,
 )
 
 
@@ -538,12 +729,30 @@ def _blank_values(protocol: ReviewProtocol) -> dict[str, Any]:
 
 def _sanitize_values(
     protocol: ReviewProtocol, values: dict[str, Any]
-) -> dict[str, str | None]:
-    sanitized: dict[str, str | None] = {}
+) -> dict[str, Any]:
+    sanitized: dict[str, Any] = {}
     for field in protocol.fields:
         name = str(field["name"])
-        value = _sanitize_string(values.get(name), field=name)
         options = field.get("options")
+        if field.get("kind") == "multi-choice":
+            value = values.get(name)
+            if value is None:
+                sanitized[name] = None
+                continue
+            if not isinstance(value, list):
+                raise HumanReviewWorkbenchError(f"{name} must be a list or null")
+            allowed = {str(option[0]) for option in options or ()}
+            if (
+                len(value) > len(allowed)
+                or len(value) != len(set(value))
+                or any(not isinstance(item, str) or item not in allowed for item in value)
+            ):
+                raise HumanReviewWorkbenchError(
+                    f"{name} contains an unknown or duplicate option"
+                )
+            sanitized[name] = list(value) or None
+            continue
+        value = _sanitize_string(values.get(name), field=name)
         if value is not None and options:
             allowed = {str(option[0]) for option in options}
             if value not in allowed:
@@ -576,14 +785,35 @@ def _missing_fields(
         required_for = tuple(field.get("required_for", ()))
         if decision in required_for:
             required = True
+        required_unless = field.get("required_unless")
+        if isinstance(required_unless, dict):
+            control_value = values.get(str(required_unless.get("field", "")))
+            excluded_values = tuple(required_unless.get("values", ()))
+            if control_value not in excluded_values:
+                required = True
         if required and (value is None or (isinstance(value, str) and not value.strip())):
             missing.append(name)
-    if decision and decision != "accept":
+    if (
+        protocol is not OCR_CANDIDATE_PROTOCOL
+        and decision
+        and decision != "accept"
+    ):
         rationale = values.get("notes")
         if protocol is GOLD_PROTOCOL:
             rationale = rationale or values.get("source_damage_or_ambiguity")
         if not isinstance(rationale, str) or not rationale.strip():
             missing.append("notes")
+    if protocol is OCR_CANDIDATE_PROTOCOL:
+        scope = values.get("language_review_scope")
+        if scope == "visual-only" and decision not in {
+            None,
+            "language-not-assessed",
+            "uncertain",
+            "reject",
+        }:
+            missing.append("decision")
+        if scope in {"full", "partial"} and decision == "language-not-assessed":
+            missing.append("decision")
     return sorted(set(missing))
 
 
@@ -621,6 +851,16 @@ class ReviewContext:
             self.protocol = GOLD_PROTOCOL
             self.manifest_path = self.packet_root / GOLD_PROTOCOL.manifest_filename
             self.manifest = verify_human_gold_review_manifest(self.manifest_path)
+        elif (
+            self.packet_root / OCR_CANDIDATE_PROTOCOL.manifest_filename
+        ).is_file():
+            self.protocol = OCR_CANDIDATE_PROTOCOL
+            self.manifest_path = (
+                self.packet_root / OCR_CANDIDATE_PROTOCOL.manifest_filename
+            )
+            self.manifest = verify_ocr_candidate_review_manifest(
+                self.manifest_path
+            )
         elif (self.packet_root / GERMAN_PROTOCOL.manifest_filename).is_file():
             self.protocol = GERMAN_PROTOCOL
             self.manifest_path = self.packet_root / GERMAN_PROTOCOL.manifest_filename
@@ -649,7 +889,14 @@ class ReviewContext:
         if _sha256_file(self.template_path) != template_record.get("sha256"):
             raise HumanReviewWorkbenchError("review template digest drifted")
         self.template_rows = _load_jsonl(self.template_path)
-        if len(self.template_rows) != self.protocol.expected_unit_count:
+        expected_unit_count = self.protocol.expected_unit_count
+        if expected_unit_count is None:
+            expected_unit_count = self.manifest.get("unit_count")
+        if (
+            not isinstance(expected_unit_count, int)
+            or expected_unit_count < 1
+            or len(self.template_rows) != expected_unit_count
+        ):
             raise HumanReviewWorkbenchError("review template unit count drifted")
 
         self.units = self._build_units()
@@ -749,6 +996,85 @@ class ReviewContext:
                         )
                     )
                 context = " · ".join(part for part in context_parts if part)
+                language = str(manifest_unit.get("language", "")).lower() or "ru"
+                extra: dict[str, Any] = {}
+            elif self.protocol is OCR_CANDIDATE_PROTOCOL:
+                source = _source_labels(manifest_unit, pages)
+                pdf_page = manifest_unit.get("pdf_page", "?")
+                title = f"{source['short']} · PDF-страница {pdf_page}"
+                candidate_label = str(
+                    manifest_unit.get("candidate_label", "Кандидат")
+                )
+                queue_title = f"Страница {pdf_page} · {candidate_label}"
+                context_parts = [
+                    source["language"],
+                    candidate_label,
+                    _humanize_known(
+                        manifest_unit.get("difficulty"), DIFFICULTY_LABELS
+                    ),
+                ]
+                strata = manifest_unit.get("strata")
+                if isinstance(strata, list) and strata:
+                    context_parts.append(
+                        " / ".join(
+                            _humanize_known(item, STRATA_LABELS)
+                            for item in strata
+                        )
+                    )
+                context = " · ".join(part for part in context_parts if part)
+                queue_context = " · ".join(
+                    part
+                    for part in (
+                        source["short"],
+                        source["language"],
+                        _humanize_known(
+                            manifest_unit.get("difficulty"), DIFFICULTY_LABELS
+                        ),
+                    )
+                    if part
+                )
+                instruction = (
+                    "Прочитайте страницу и сверяйте с показанным OCR-текстом. "
+                    "Оцените его по критериям; исправляйте только найденные "
+                    "ошибки."
+                )
+                candidate_path = (
+                    self.packet_root
+                    / str(manifest_unit.get("candidate_ref", ""))
+                ).resolve()
+                if (
+                    not _within(candidate_path, self.packet_root)
+                    or not candidate_path.is_file()
+                    or candidate_path.is_symlink()
+                    or _sha256_file(candidate_path)
+                    != manifest_unit.get("candidate_sha256")
+                    or candidate_path.stat().st_size
+                    != manifest_unit.get("candidate_bytes")
+                ):
+                    raise HumanReviewWorkbenchError(
+                        f"{unit_id}: candidate text drifted"
+                    )
+                candidate_text = candidate_path.read_text(encoding="utf-8")
+                if len(candidate_text) > MAX_TEXT_FIELD_CHARS:
+                    raise HumanReviewWorkbenchError(
+                        f"{unit_id}: candidate text is too large"
+                    )
+                language = (
+                    str(manifest_unit.get("language", "")).lower() or "und"
+                )
+                extra = {
+                    "queue_title": queue_title,
+                    "queue_context": queue_context,
+                    "candidate_label": candidate_label,
+                    "candidate_position": int(
+                        manifest_unit.get("candidate_position", 1)
+                    ),
+                    "candidate_count": int(
+                        manifest_unit.get("candidate_count_for_source", 1)
+                    ),
+                    "candidate_text": candidate_text,
+                    "candidate_sha256": manifest_unit["candidate_sha256"],
+                }
             else:
                 source = GOLD_SOURCE_LABELS["ocr-naumann-1893"]
                 plan_unit = plan_by_id.get(unit_id, {})
@@ -769,6 +1095,8 @@ class ReviewContext:
                     "Определите один полный видимый прозаический фрагмент и "
                     "зафиксируйте его точные границы.",
                 )
+                language = "de"
+                extra = {}
             units.append(
                 {
                     "index": index,
@@ -776,10 +1104,12 @@ class ReviewContext:
                     "title": title,
                     "context": context,
                     "instruction": instruction,
+                    "language": language,
                     "page_labels": {
                         role: _human_page_label(source["short"], pages[role])
                         for role in ("previous", "current", "next")
                     },
+                    **extra,
                 }
             )
         return units
@@ -808,7 +1138,7 @@ class ReviewContext:
                 }
                 for unit_id in self.unit_ids
             ],
-            "authority_boundary": AUTHORITY_BOUNDARY,
+            "authority_boundary": self.protocol.authority_boundary,
         }
 
     def _load_or_initialize_state(self) -> dict[str, Any]:
@@ -844,7 +1174,7 @@ class ReviewContext:
             "template_sha256": _sha256_file(self.template_path),
             "session_id": self.session.get("session_id"),
             "pass_number": 1,
-            "authority_boundary": AUTHORITY_BOUNDARY,
+            "authority_boundary": self.protocol.authority_boundary,
         }
         for key, value in expected.items():
             if state.get(key) != value:
@@ -918,7 +1248,7 @@ class ReviewContext:
             "unit_count": len(self.units),
             "draft_ref": self.draft_path.name,
             "draft_sha256": draft_sha,
-            "authority_boundary": AUTHORITY_BOUNDARY,
+            "authority_boundary": self.protocol.authority_boundary,
         }
         for key, value in expected_receipt.items():
             if receipt.get(key) != value:
@@ -934,7 +1264,7 @@ class ReviewContext:
             "reviewer_ref": state["reviewer_ref"],
             "exported_at_utc": submitted_at,
             "rows": self._draft_rows(state),
-            "authority_boundary": AUTHORITY_BOUNDARY,
+            "authority_boundary": self.protocol.authority_boundary,
         }
         if self.protocol is GERMAN_PROTOCOL:
             expected_draft["source_acceptance"] = None
@@ -958,10 +1288,10 @@ class ReviewContext:
                     "pass_number": 1,
                     "fields": list(self.protocol.fields),
                     "blind": True,
-                    "blind_notice": (
-                        "Модельные ответы, прежние кандидаты и признанные "
-                        "переводы скрыты. Судите только по источнику."
-                    ),
+                    "review_mode": self.protocol.review_mode,
+                    "candidate_visible": self.protocol.candidate_visible,
+                    "badge_label": self.protocol.badge_label,
+                    "blind_notice": self.protocol.blind_notice,
                 },
                 "packet": {
                     "packet_id": self.manifest["packet_id"],
@@ -974,7 +1304,7 @@ class ReviewContext:
                     "total_units": len(completed),
                     "per_unit": completed,
                 },
-                "authority_boundary": AUTHORITY_BOUNDARY,
+                "authority_boundary": self.protocol.authority_boundary,
             }
 
     def page_asset(self, index: int, role: str) -> Path:
@@ -1228,6 +1558,11 @@ class ReviewContext:
         self, state: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
+        manifest_units = {
+            str(unit.get(self.protocol.unit_id_key)): unit
+            for unit in self.manifest.get("units", [])
+            if isinstance(unit, dict)
+        }
         for row in (state or self.state)["rows"]:
             values = row["values"]
             if self.protocol is GOLD_PROTOCOL:
@@ -1257,6 +1592,38 @@ class ReviewContext:
                             float(row["active_seconds"]) / 60.0, 1
                         ),
                         "notes": _split_lines(values.get("notes")),
+                    }
+                )
+            elif self.protocol is OCR_CANDIDATE_PROTOCOL:
+                unit = manifest_units[row["unit_id"]]
+                rows.append(
+                    {
+                        "review_unit_id": row["unit_id"],
+                        "source_sample_id": unit["source_sample_id"],
+                        "visual_sample_id": unit["visual_sample_id"],
+                        "source_anchor_ref": unit["source_anchor_ref"],
+                        "language": unit["language"],
+                        "candidate_label": unit["candidate_label"],
+                        "candidate_sha256": unit["candidate_sha256"],
+                        "source_visible": True,
+                        "source_page_digest_verified": True,
+                        "language_review_scope": values[
+                            "language_review_scope"
+                        ],
+                        "page_and_region_resolved": values[
+                            "page_and_region_resolved"
+                        ],
+                        "source_legibility": values["source_legibility"],
+                        "text_fidelity": values["text_fidelity"],
+                        "completeness": values["completeness"],
+                        "structure_and_order": values["structure_and_order"],
+                        "error_types": list(values.get("error_types") or []),
+                        "corrected_text": values["corrected_text"],
+                        "decision": values["decision"],
+                        "notes": values["notes"],
+                        "elapsed_minutes": round(
+                            float(row["active_seconds"]) / 60.0, 1
+                        ),
                     }
                 )
             else:
@@ -1320,7 +1687,7 @@ class ReviewContext:
                 "reviewer_ref": reviewer_ref,
                 "exported_at_utc": submitted_at,
                 "rows": self._draft_rows(),
-                "authority_boundary": AUTHORITY_BOUNDARY,
+                "authority_boundary": self.protocol.authority_boundary,
             }
             if self.protocol is GERMAN_PROTOCOL:
                 draft["source_acceptance"] = None
@@ -1339,7 +1706,7 @@ class ReviewContext:
                 "unit_count": len(self.units),
                 "draft_ref": self.draft_path.name,
                 "draft_sha256": draft_sha,
-                "authority_boundary": AUTHORITY_BOUNDARY,
+                "authority_boundary": self.protocol.authority_boundary,
             }
             _atomic_write_json(self.receipt_path, receipt)
             self.state.update(
@@ -1638,7 +2005,7 @@ def serve_human_review_workbench(
                 "exposure": "127.0.0.1-only",
                 "autosave_ref": context.autosave_path.as_posix(),
                 "draft_ref": context.draft_path.as_posix(),
-                "authority_boundary": AUTHORITY_BOUNDARY,
+                "authority_boundary": context.protocol.authority_boundary,
             },
             ensure_ascii=False,
         ),

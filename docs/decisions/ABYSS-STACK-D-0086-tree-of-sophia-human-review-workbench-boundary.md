@@ -11,7 +11,7 @@
 - Surface classes: inference pilot, human review interface, source/runtime boundary, host storage
 - Stack lanes: inference pilots, Tree of Sophia access, human review
 - Mechanic parents: inference-pilots
-- Guard families: blind review, source-visible human review, loopback exposure, draft freeze
+- Guard families: independent reference, method-blind candidate review, language competence, loopback exposure, draft freeze
 - Posture: accepted human-workbench boundary
 
 ## Context
@@ -24,15 +24,26 @@ artifacts were authoritative. Those tasks add friction without adding
 philosophical or philological judgment, and the friction can itself reduce
 review quality, completion rate, and the honest recording of uncertainty.
 
-The route still cannot hide that this is real human work. A convenient
-interface must not prefill a transcription, reveal model candidates or
-recognized translations in a blind lane, convert one pass into acceptance, or
-let an application validator substitute for source-visible judgment.
+The route still cannot hide that this is real human work. Initial use also
+exposed a second failure mode: applying independent full-page transcription to
+ordinary OCR review makes the human reproduce machine work instead of judging
+it. That cost is justified for a deliberately small anchoring-independent
+reference, but not as the default comparison route.
+
+A convenient interface must keep the kind of blindness explicit. It cannot
+prefill an independent transcription or reveal candidates in an independent
+reference lane. A candidate-review lane must show the candidate being judged
+while hiding method identity and recognized references. Neither lane may
+convert one pass into acceptance or let an application validator substitute
+for source-visible judgment.
 
 ## Options considered
 
 - Keep the generated static workbooks and require the reviewer to manage local
   files, exports, and merge steps manually.
+- Use blank full-page transcription as the universal human-review primitive.
+- Use criteria-only review without retaining a route for exact correction or
+  independent calibration.
 - Put the review application and mutable session state inside Tree of Sophia
   beside its source witnesses and authored meaning.
 - Add a bounded loopback runtime adapter to the existing foundation laboratory,
@@ -47,25 +58,38 @@ Review Workbench adapter. It consumes one already prepared private
 `127.0.0.1`, and uses a high-entropy per-launch token for its browser and API
 route.
 
-The Workbench automates only mechanical responsibilities: admissible packet
-resolution, source-page routing, unit ordering, required-field visibility,
+The Workbench automates mechanical responsibilities: admissible packet
+resolution, source-page and candidate routing, unit ordering, required-field
+visibility, language-scope propagation, candidate-prefilled correction,
 atomic autosave, exact resume, timestamps, browser-observed active time,
 feedback capture, output naming, digest calculation, and draft freeze. The
-reviewer owns transcription, source legibility, layout and reading order,
-fragment boundaries, uncertainty, decisions, rationale, identity, and the
-explicit real-human attestation.
+reviewer owns their language competence, source legibility, layout and reading
+order, fragment boundaries, uncertainty, actual corrections, decisions,
+rationale, identity, and explicit real-human attestation.
 
-Blind payloads expose neither model output, prior-pass content, recognized
-translation material, private filesystem paths, nor comparator data. Writes
-remain inside the selected mutable session. The immutable packet and Tree of
-Sophia source witnesses remain read-only.
+The Workbench supports typed review modes:
 
-The first bounded interface supports pass 1 for the prepared fifteen-page
-Human Gold packet and thirty-unit German source-review packet. Successful
-submission means only `pass-1-draft-frozen`. It does not run the independent
-second pass, adjudicate disagreement, accept German source text, create gold,
-authorize translation, or promote a Tree of Sophia sign, concept, graph edge,
-or canon entry.
+- an independent-reference lane hides model output, prior passes, recognized
+  translations, and comparators and may request a small source-only
+  transcription;
+- a candidate-review lane shows the exact digest-frozen candidate while hiding
+  the restricted method-identity map and recognized references;
+- candidate correction begins from that candidate and records only the
+  reviewer's edits, without converting them into source truth.
+
+Writes remain inside the selected mutable session. Immutable packets and Tree
+of Sophia source witnesses remain read-only. A reviewer who declares
+`visual-only` competence for a language can contribute page, legibility, and
+structure judgments, but cannot produce human orthographic, grammatical, or
+semantic verification for that language.
+
+The bounded interface supports the historical fifteen-page Human Gold packet
+as a rare independent calibration pass, the thirty-unit language-competent
+German source-review packet, and method-blind OCR A/B/C candidate-review
+packets. Successful submission means only `pass-1-draft-frozen`. It does not
+run an independent second pass, adjudicate disagreement, accept source text,
+create gold, establish a general method ranking, authorize translation, or
+promote a Tree of Sophia sign, concept, graph edge, or canon entry.
 
 No persistent service is added for this slice. The stable
 `scripts/aoa-tos-foundation-lab human-review-workbench` command starts the
@@ -81,12 +105,14 @@ creating a rival laboratory. Keeping source meaning in Tree of Sophia and
 storage/exposure policy in `abyss-machine` preserves the existing three-owner
 boundary.
 
-One focused unit, automatic mechanics, and exact resume make the human route
-fast enough to repeat and adapt without deciding content on the reviewer's
-behalf. A separate friction channel turns interface defects into research
+One focused unit, criteria before correction, prefilled repair, automatic
+mechanics, and exact resume make the human route fast enough to repeat and
+adapt without deciding content on the reviewer's behalf. Full transcription
+remains available only where independence itself is the evidence being
+created. A separate friction channel turns interface defects into research
 evidence instead of allowing them to contaminate source decisions silently.
 The explicit draft label and freeze receipt make convenience compatible with
-the two-pass and adjudication gates.
+later calibration and adjudication gates.
 
 ## Consequences
 
@@ -99,6 +125,12 @@ the two-pass and adjudication gates.
   uncertain German layout role where the prior interface and schema differed.
 - Positive: human-facing friction becomes separately recordable and can be
   compared across later interface variants.
+- Positive: ordinary OCR comparison no longer requires full-page retyping;
+  criteria-only and corrected-text records remain distinguishable.
+- Positive: every language claim is bounded by reviewer-declared competence,
+  so visual German review cannot masquerade as German-language verification.
+- Tradeoff: a criteria-only candidate review cannot yield exact character
+  error metrics without a separate independent reference.
 - Tradeoff: the first slice is single-session and local-loopback only; it does
   not yet coordinate concurrent reviewers or remote access.
 - Tradeoff: browser-observed active time is a method measurement, not proof of
@@ -113,11 +145,14 @@ the two-pass and adjudication gates.
 - `mechanics/inference-pilots/parts/tos-foundation-lab/README.md`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/docs/HUMAN_REVIEW_WORKBENCH.md`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/human_review_workbench.py`
+- `mechanics/inference-pilots/parts/tos-foundation-lab/ocr_candidate_review.py`
+- `mechanics/inference-pilots/parts/tos-foundation-lab/schemas/ocr-candidate-review-manifest.schema.json`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/tos_foundation_lab.py`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/workbench/index.html`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.js`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/workbench/app.css`
 - `mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_human_review_workbench.py`
+- `mechanics/inference-pilots/parts/tos-foundation-lab/tests/test_ocr_candidate_review.py`
 - `scripts/aoa-tos-foundation-lab`
 
 ## Follow-up route

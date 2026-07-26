@@ -134,6 +134,57 @@ def _review_fixture(
                 ]
             },
         )
+    elif protocol_name == "candidate":
+        protocol = workbench.OCR_CANDIDATE_PROTOCOL
+        unit_ids = [
+            f"tos-sample-synthetic-{source:02d}-candidate-{candidate}"
+            for source in range(1, 3)
+            for candidate in ("a", "b", "c")
+        ]
+        template_rows = [
+            {
+                "review_unit_id": unit_id,
+                "source_pages": {
+                    role: f"pages/{role}.png"
+                    for role in ("previous", "current", "next")
+                },
+            }
+            for unit_id in unit_ids
+        ]
+        manifest_units = []
+        for index, unit_id in enumerate(unit_ids):
+            source_index = index // 3 + 1
+            candidate_position = index % 3 + 1
+            candidate_path = packet_root / "candidates" / f"{unit_id}.txt"
+            candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            candidate_path.write_text(
+                f"Synthetic OCR candidate {candidate_position} for page {source_index}.",
+                encoding="utf-8",
+            )
+            manifest_units.append(
+                {
+                    "review_unit_id": unit_id,
+                    "source_sample_id": f"tos-sample-synthetic-{source_index:02d}",
+                    "visual_sample_id": f"tos-ocr-sample-synthetic-{source_index:02d}",
+                    "source_anchor_ref": f"tos.anchor.synthetic.{source_index:02d}",
+                    "group_id": "ocr-antonovsky-2007",
+                    "language": "ru",
+                    "pdf_page": source_index,
+                    "difficulty": "ordinary",
+                    "strata": ["synthetic"],
+                    "candidate_label": f"Кандидат {chr(65 + candidate_position - 1)}",
+                    "candidate_position": candidate_position,
+                    "candidate_count_for_source": 3,
+                    "candidate_ref": candidate_path.relative_to(packet_root).as_posix(),
+                    "candidate_sha256": _sha256(candidate_path),
+                    "candidate_bytes": candidate_path.stat().st_size,
+                    "source_pages": {
+                        role: f"pages/{role}.png"
+                        for role in ("previous", "current", "next")
+                    },
+                }
+            )
+        plan_path = None
     else:  # pragma: no cover - fixture misuse
         raise AssertionError(f"unknown protocol fixture: {protocol_name}")
 
@@ -147,6 +198,8 @@ def _review_fixture(
             "sha256": _sha256(template_path),
         },
     }
+    if protocol is workbench.OCR_CANDIDATE_PROTOCOL:
+        manifest["unit_count"] = len(unit_ids)
     if plan_path is not None:
         manifest["review_plan_ref"] = plan_path.as_posix()
 
@@ -174,13 +227,21 @@ def _review_fixture(
             if path == manifest_path
             else pytest.fail(f"unexpected gold manifest: {path}"),
         )
-    else:
+    elif protocol is workbench.GERMAN_PROTOCOL:
         monkeypatch.setattr(
             workbench,
             "verify_translation_source_review_manifest",
             lambda path: manifest
             if path == manifest_path
             else pytest.fail(f"unexpected German manifest: {path}"),
+        )
+    else:
+        monkeypatch.setattr(
+            workbench,
+            "verify_ocr_candidate_review_manifest",
+            lambda path: manifest
+            if path == manifest_path
+            else pytest.fail(f"unexpected candidate manifest: {path}"),
         )
     return allowed_root, session_dir, manifest
 
@@ -202,6 +263,23 @@ def _autosave_payload(
                     "diplomatic_transcription": "Synthetic diplomatic page.",
                     "layout_and_reading_order": "Single body region.",
                     "decision": "accept",
+                }
+            )
+        elif (
+            complete
+            and protocol_id == workbench.OCR_CANDIDATE_PROTOCOL.protocol_id
+        ):
+            values.update(
+                {
+                    "language_review_scope": "full",
+                    "page_and_region_resolved": "yes",
+                    "source_legibility": "legible",
+                    "text_fidelity": "minor-errors",
+                    "completeness": "complete",
+                    "structure_and_order": "correct",
+                    "error_types": ["spacing"],
+                    "decision": "accept-with-limits",
+                    "notes": "One spacing error.",
                 }
             )
         elif complete:
@@ -230,6 +308,7 @@ def _autosave_payload(
     [
         ("gold", workbench.GOLD_PROTOCOL.protocol_id, 15),
         ("german", workbench.GERMAN_PROTOCOL.protocol_id, 30),
+        ("candidate", workbench.OCR_CANDIDATE_PROTOCOL.protocol_id, 6),
     ],
 )
 def test_loads_both_supported_review_protocols(
@@ -268,10 +347,18 @@ def test_loads_both_supported_review_protocols(
         )
         assert page_field["label"] == "Показана правильная страница целиком?"
         assert "центральная страница" in page_field["help"]
-    else:
+    elif protocol_name == "german":
         assert view["units"][0]["title"] == (
             "Naumann, 1893 · PDF-страница 2"
         )
+    else:
+        assert view["units"][0]["title"] == (
+            "Антоновский, 2007 · PDF-страница 1"
+        )
+        assert view["protocol"]["review_mode"] == "candidate-review"
+        assert view["protocol"]["candidate_visible"] is True
+        assert view["units"][0]["candidate_text"].startswith("Synthetic OCR")
+        assert view["units"][0]["candidate_label"] == "Кандидат A"
     public_bytes = json.dumps(view, ensure_ascii=False).encode("utf-8")
     assert b"immutable-packets" not in public_bytes
     assert b"recognized_comparator" not in public_bytes
@@ -616,6 +703,79 @@ def test_autosave_enforces_protocol_identity_and_monotonic_observation(
         context.autosave(backwards)
 
 
+def test_candidate_review_respects_language_scope_and_validates_quick_tags(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "candidate"
+    )
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    view = context.public_session()
+    payload = _autosave_payload(view, complete=False)
+    for row in payload["rows"]:
+        row["values"].update(
+            {
+                "language_review_scope": "visual-only",
+                "page_and_region_resolved": "yes",
+                "source_legibility": "legible",
+                "structure_and_order": "not-assessed",
+                "decision": "language-not-assessed",
+            }
+        )
+    saved = context.autosave(payload)
+
+    assert saved["completion"]["completed_units"] == len(context.units)
+    assert saved["state"]["rows"][0]["values"]["text_fidelity"] is None
+    assert saved["state"]["rows"][0]["values"]["completeness"] is None
+
+    invalid = _autosave_payload(saved, complete=False)
+    invalid["rows"][0]["values"]["error_types"] = ["invented-tag"]
+    with pytest.raises(
+        workbench.HumanReviewWorkbenchError,
+        match="unknown or duplicate option",
+    ):
+        context.autosave(invalid)
+
+
+def test_candidate_correction_is_prefilled_evidence_not_required_retyping(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    allowed_root, session_dir, _manifest = _review_fixture(
+        tmp_path, monkeypatch, "candidate"
+    )
+    context = workbench.ReviewContext(
+        session_dir, allowed_work_root=allowed_root
+    )
+    payload = _autosave_payload(context.public_session(), complete=True)
+    first_values = payload["rows"][0]["values"]
+    first_values.update(
+        {
+            "decision": "corrected",
+            "corrected_text": "Synthetic OCR candidate 1 for page 1, corrected.",
+            "notes": None,
+        }
+    )
+    saved = context.autosave(payload)
+    frozen = context.submit(
+        {
+            "revision": saved["state"]["revision"],
+            "performed_by_real_human": True,
+        }
+    )
+
+    assert frozen["state"]["status"] == "submitted-and-frozen"
+    draft = json.loads(context.draft_path.read_text(encoding="utf-8"))
+    first = draft["rows"][0]
+    assert first["decision"] == "corrected"
+    assert first["corrected_text"].endswith("corrected.")
+    assert first["candidate_sha256"] == context.units[0]["candidate_sha256"]
+    assert "run_id" not in json.dumps(draft)
+
+
 def test_resume_rejects_partial_freeze(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -640,7 +800,7 @@ def test_resume_rejects_partial_freeze(
         )
 
 
-@pytest.mark.parametrize("protocol_name", ["gold", "german"])
+@pytest.mark.parametrize("protocol_name", ["gold", "german", "candidate"])
 def test_complete_submission_freezes_draft_and_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -672,10 +832,10 @@ def test_complete_submission_freezes_draft_and_digest(
     assert receipt["status"] == "pass-1-draft-frozen"
     assert receipt["packet_id"] == manifest["packet_id"]
     assert receipt["draft_sha256"] == _sha256(context.draft_path)
-    assert receipt["unit_count"] == context.protocol.expected_unit_count
+    assert receipt["unit_count"] == len(context.units)
     assert draft["performed_by_real_human"] is True
     assert draft["reviewer_ref"] == "human:synthetic-reviewer"
-    assert len(draft["rows"]) == context.protocol.expected_unit_count
+    assert len(draft["rows"]) == len(context.units)
 
     resumed = workbench.ReviewContext(
         session_dir, allowed_work_root=allowed_root

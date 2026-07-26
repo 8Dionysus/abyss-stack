@@ -28,11 +28,13 @@ Tracking starts with the community-docs baseline for this repository.
   exposes `canary_ready` without turning the non-canonical mirror into ordinary
   runtime closure.
 - The Tree of Sophia foundation laboratory now provides a loopback-only human
-  review workbench for its prepared Human Gold and German source packets, with
-  verified source-page routing, focused pass-1 forms, atomic autosave and
-  resume, human-readable edition/page routing, paste-ready private screenshot
-  feedback, explicit human attestation, and a digest-bound frozen draft that
-  cannot claim gold or source acceptance.
+  review workbench for independent calibration, German source, and
+  method-blind OCR candidate packets, with verified source-page routing,
+  criteria-first review, candidate-prefilled correction, reviewer-declared
+  language scope, atomic autosave and resume, human-readable edition/page
+  routing, paste-ready private screenshot feedback, explicit human
+  attestation, and a digest-bound frozen draft that cannot claim gold, source
+  acceptance, or a general method ranking.
 - Tiered KAG runtime materialization now admits exact-commit owner-family
   releases and 24-owner compositions through the `abyss-machine` trust gate,
   verifies direct or packed objects into a local content-addressed cache,

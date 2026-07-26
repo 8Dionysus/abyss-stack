@@ -67,6 +67,17 @@ it includes inspecting the actual ranked passages; for graph projections it
 includes walking an edge back to its claim and evidence; for translation it
 includes source-language reasoning and post-reveal change tracking.
 
+Human work must match the question being measured. Criteria-based,
+method-blind candidate review is the default for comparative quality and human
+correction cost. Candidate-prefilled correction measures repair effort.
+Source-only transcription is a smaller independent calibration lane used only
+when exact reference metrics justify its cost.
+
+Every human content claim is bounded by declared source-language competence.
+A visual-only review may contribute page, legibility, and structure evidence
+but cannot satisfy orthographic, grammatical, semantic, or translation
+acceptance.
+
 ## Owner handoff
 
 `abyss-stack` may produce a derivative candidate and execution receipt. Tree of

@@ -42,3 +42,19 @@ digest-bound pass-1 draft.
 The first bounded slice supports the prepared 15-page Human Gold and 30-unit
 German source-review protocols. It does not perform the independent second
 pass, adjudicate, accept source text, or promote content into Tree of Sophia.
+
+## 2026-07-25 - Criteria-first OCR review and correction
+
+Separated ordinary method-blind OCR candidate review from the rare
+content-blind independent calibration lane. The Workbench now shows a
+digest-frozen candidate beside its source, collects fast criteria and error
+tags, preloads correction text only on request, propagates declared
+source-language competence, and prevents visual-only review from claiming
+textual verification.
+
+Added a private candidate-review packet materializer and verifier with
+per-source randomized A/B/C display, a restricted unserved method map, exact
+candidate/run provenance, a mutable-session initializer, and focused packet,
+resume, correction, language-boundary, and freeze tests. Existing Human Gold
+autosaves retain their internal protocol identity and are presented as
+independent calibration drafts rather than completed gold.

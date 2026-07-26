@@ -219,10 +219,6 @@
 
 - [ABYSS-STACK-D-0077 Loopback MCP Owner Lifecycle](../ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md) (`docs/decisions/ABYSS-STACK-D-0077-loopback-mcp-owner-lifecycle.md`)
 
-## blind review
-
-- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
-
 ## bounded context
 
 - [ABYSS-STACK-D-0079 KAG Query Application Port](../ABYSS-STACK-D-0079-kag-query-application-port.md) (`docs/decisions/ABYSS-STACK-D-0079-kag-query-application-port.md`)
@@ -325,6 +321,14 @@
 
 - [ABYSS-STACK-D-0082 Observability Bind State and Launcher Cgroup Boundary](../ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md) (`docs/decisions/ABYSS-STACK-D-0082-observability-bind-state-and-launcher-cgroup-boundary.md`)
 
+## independent reference
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+
+## language competence
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
+
 ## legacy boundary
 
 - [ABYSS-STACK-D-0047 Federation Upstream Compatibility Language Split](../ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md) (`docs/decisions/ABYSS-STACK-D-0047-federation-upstream-compatibility-language-split.md`)
@@ -352,6 +356,10 @@
 ## mechanics topology
 
 - [ABYSS-STACK-D-0057 Mechanics Topology Validator Module](../ABYSS-STACK-D-0057-mechanics-topology-validator-module.md) (`docs/decisions/ABYSS-STACK-D-0057-mechanics-topology-validator-module.md`)
+
+## method-blind candidate review
+
+- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## mirror hygiene
 
@@ -545,10 +553,6 @@
 - [ABYSS-STACK-D-0072 AoA 4PDA Connector MCP Access Plane](../ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0072-aoa-4pda-connector-mcp-access-plane.md`)
 - [ABYSS-STACK-D-0073 ToS Philosophy Graph Access Plane](../ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md) (`docs/decisions/ABYSS-STACK-D-0073-tos-philosophy-graph-access-plane.md`)
 - [ABYSS-STACK-D-0074 Telegram and Discord Connector MCP Access Planes](../ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md) (`docs/decisions/ABYSS-STACK-D-0074-telegram-discord-connector-mcp-access-planes.md`)
-
-## source-visible human review
-
-- [ABYSS-STACK-D-0086 Tree of Sophia Human Review Workbench Boundary](../ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md) (`docs/decisions/ABYSS-STACK-D-0086-tree-of-sophia-human-review-workbench-boundary.md`)
 
 ## source/deployed parity
 
