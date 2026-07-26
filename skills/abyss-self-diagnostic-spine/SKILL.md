@@ -1,6 +1,6 @@
 ---
 name: abyss-self-diagnostic-spine
-description: Produce, capture, or review one owner-typed Abyss runtime diagnosis through the abyss-stack diagnostic spine. Use when a concrete Abyss preset, profile, truth goal, existing diagnostic_session_v1, or last-good comparison needs current owner evidence, multi-axis drift and freshness review, or a bounded handoff toward reviewed diagnosis or repair. Do not use for generic health questions, artifact trust, source-authority disputes, immediate repair or restart, live-session mining, or when no Abyss runtime evidence is required.
+description: Diagnose or review one concrete Abyss runtime target through the abyss-stack diagnostic spine, using current owner evidence and last-good, drift, or freshness comparison. Use for a named preset, profile, truth goal, or diagnostic_session_v1. Do not use for generic health questions, artifact trust, source disputes, immediate repair/restart, session mining, or when no runtime evidence is needed.
 ---
 
 # Abyss Self-Diagnostic Spine
@@ -25,7 +25,7 @@ Use the skill directory reported by the host as the bundle root.
 3. Require `schema_version` to be `aoa_skill_source_receipt_v1` or
    `aoa_skill_source_receipt_v2`,
    `name=abyss-self-diagnostic-spine`, `owner_repo=abyss-stack`,
-   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.3`.
+   `source_path=skills/abyss-self-diagnostic-spine`, and `version=0.2.4`.
    For v2 also require non-empty `digest`, `source_fingerprint`,
    `source_fingerprint_scope`, and `prompt_description_sha256`. When
    `capability_graph_hash` is present, require it to be a non-empty string and
