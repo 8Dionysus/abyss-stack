@@ -467,6 +467,7 @@ def test_observation_store_rejects_separator_and_case_secret_keys_without_value(
         "query",
         "relative-query",
         "userinfo",
+        "scheme-relative-userinfo",
         "fragment",
         "fragment-token",
         "secret-value",
@@ -505,6 +506,10 @@ def test_observation_store_rejects_credentials_inside_references(
     elif reference_surface == "userinfo":
         payload["subjects"][0]["deploy"]["manifest_ref"] = (
             f"https://operator:{secret_value}@deploy.invalid/manifest"
+        )
+    elif reference_surface == "scheme-relative-userinfo":
+        payload["subjects"][0]["deploy"]["manifest_ref"] = (
+            f"//operator:{secret_value}@deploy.invalid/manifest"
         )
     elif reference_surface == "fragment":
         payload["subjects"][0]["acceptance"]["acceptance_ref"] = (
@@ -786,6 +791,7 @@ def test_activation_verifies_an_already_admitted_registry(tmp_path: Path) -> Non
             "sync",
             (
                 ("verify-source-revision", "source-rev-1"),
+                ("verify-source-tree-digest", DIGEST_A),
                 ("preview-config-sync", "receipt://deploy/aoa-kag"),
                 ("apply-exact-config-sync", "receipt://deploy/aoa-kag"),
                 ("compare-deployed-digest", DIGEST_E),

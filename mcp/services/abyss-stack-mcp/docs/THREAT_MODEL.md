@@ -17,11 +17,12 @@
 - explicit regular observation file with symlink rejection and a 2 MiB limit;
 - strict input and output models with unknown fields denied;
 - secret-like material rejected before validation or response;
-- URI-like references reject credential-bearing userinfo and forbidden
-  path/query/fragment keys before validation or response; unparseable URI-like
-  values fail closed, bounded recursive decoding covers nested parameters, and
-  credential-key tokenization catches namespaced separator/camel-case forms
-  while secret-prefix checks normalize leading whitespace;
+- URI-like references, including scheme-relative forms, reject
+  credential-bearing userinfo and forbidden path/query/fragment keys before
+  validation or response; unparseable URI-like values fail closed, bounded
+  recursive decoding covers nested parameters, and credential-key tokenization
+  catches namespaced separator/camel-case forms while secret-prefix checks
+  normalize leading whitespace;
 - exact targets require at least one non-whitespace character;
 - exact observation digest and short expiry for candidate plans;
 - exact artifact-hashed runtime dependency closure, bound with deployed source
@@ -33,9 +34,10 @@
   stopped-state check before environment replacement;
 - unit link/reload and runtime provisioning cannot be combined in one
   invocation, and deployed source is rehashed before the runtime marker/swap;
-- sync/deploy plans bind an expected future deployed-tree digest instead of
-  reusing the pre-action observation; rollback denial binds registry ID and
-  digest together;
+- sync plans verify both the observed source revision and source-tree digest
+  before mutation; sync/deploy plans bind an expected future deployed-tree
+  digest instead of reusing the pre-action observation, and rollback denial
+  binds registry ID and digest together;
 - structured allowlisted plan actions with no free-form command;
 - active processes require an observed process identity rather than a bare
   boolean;

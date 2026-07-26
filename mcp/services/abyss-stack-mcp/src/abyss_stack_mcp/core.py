@@ -160,7 +160,7 @@ def _reject_secret_material(
                 )
                 or any(
                     marker in decoded_variant
-                    for marker in ("://", "?", "#")
+                    for marker in ("://", "//", "?", "#")
                 )
             ):
                 if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
@@ -172,7 +172,7 @@ def _reject_secret_material(
                     path,
                     reference_depth=reference_depth + 1,
                 )
-        if any(marker in value for marker in ("://", "?", "#")):
+        if any(marker in value for marker in ("://", "//", "?", "#")):
             if reference_depth >= MAX_REFERENCE_DECODE_DEPTH:
                 raise StackMCPError(
                     f"nested reference depth is forbidden at {path}"
@@ -1089,6 +1089,7 @@ class StackMCPApplication:
         actions = {
             "sync": (
                 ("verify-source-revision", subject.source.revision),
+                ("verify-source-tree-digest", subject.source.tree_digest),
                 ("preview-config-sync", subject.deploy.manifest_ref),
                 ("apply-exact-config-sync", subject.deploy.manifest_ref),
                 (
