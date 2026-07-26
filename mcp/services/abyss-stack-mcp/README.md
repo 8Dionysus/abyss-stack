@@ -41,7 +41,7 @@ registered consumer with the exact server schema digest and an overlapping MCP
 protocol version, a passed central-proof verdict issued by `proof_owner` and
 bound to the current source revision and source-tree digest, package, deployed
 revision and tree digest, schema, running process identity, consumer, and
-canary contour, named acceptance-owner evidence bound to the current source
+exact canary route and receipt, named acceptance-owner evidence bound to the current source
 revision and package digest, a grounded canary, and usable
 rollback proof. Activation or restart of `internal_effect` and
 `external_effect` targets is rejected because this package does not model
@@ -80,6 +80,8 @@ observation envelope, links, freshness, and nested evidence timestamps, using
 the earlier of wall-clock time and the enclosing observation snapshot;
 causally future usable evidence is reported as `blocked`, never as current,
 before candidate planning is involved.
+Inspection also folds the effective state of the selected evidence view into
+result freshness metadata and exposes it beside the immutable raw owner state.
 `rollback_required` is accepted only while its own link and evidence refs are
 unexpired; a bare or expired rollback signal is a controlled precondition
 failure.

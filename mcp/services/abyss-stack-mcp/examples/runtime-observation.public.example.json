@@ -212,6 +212,7 @@
         },
         "proof_ref": "example://central-proof/aoa-kag",
         "proved_canary_ref": "example://canary/aoa-kag",
+        "proved_canary_route": "example://canary-route/aoa-kag",
         "proved_consumer_registration_ref": "example://consumer/aoa-kag",
         "proved_deploy_revision": "deploy-example-revision",
         "proved_deploy_tree_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",

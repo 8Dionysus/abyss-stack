@@ -51,7 +51,7 @@
 - activation requires a passed central-proof verdict issued by `proof_owner`
   and bound to the current source revision and tree digest, package, deployed
   revision and tree digest, running process identity, schema, consumer, and
-  canary contour;
+  exact canary route and receipt;
 - activation and restart reject `internal_effect` and `external_effect`
   subjects while their distinct threat, approval, egress, compensation, and
   rollback contracts are absent;
@@ -63,6 +63,9 @@
 - read catalog and inspection use the earlier wall-clock/snapshot bound and
   downgrade a causally future observation envelope, link, freshness timestamp,
   or nested evidence ref to `blocked`;
+- inspection preserves the raw owner link state while exposing its derived
+  effective state and folding the selected view's link state into result
+  freshness metadata;
 - central proof cannot predate the canary evidence it names, and conflicting
   duplicate evidence timestamps are rejected before deduplication;
 - rollback-required links need explicit unexpired evidence and cannot fail late

@@ -31,8 +31,9 @@ Tracking starts with the community-docs baseline for this repository.
 - Published stack MCP schemas now encode conditional runtime invariants;
   freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
   precondition, central proof binds the exact deployed-tree digest and running
-  process identity as well as the source-tree digest, activation steps name the exact selected compatible
-  consumer registration, and effect planes cannot be activated or restarted
+  process identity as well as the source-tree digest and exact canary route,
+  activation steps name the exact selected compatible consumer registration,
+  and effect planes cannot be activated or restarted
   before their distinct contracts
   exist. Sync and deploy candidates now bind their distinct expected
   post-action tree digests, rollback denial binds the exact registry digest,
@@ -46,7 +47,9 @@ Tracking starts with the community-docs baseline for this repository.
   publication. Provisioning and managed units clear ambient Python import roots
   and use isolated mode, while read catalog/inspection apply the earlier
   wall-clock/snapshot bound and downgrade a causally future observation
-  envelope, link, freshness, or nested evidence timestamp to `blocked`. Existing equal
+  envelope, link, freshness, or nested evidence timestamp to `blocked`;
+  inspection also folds its selected effective link state into response
+  freshness while preserving the raw owner claim. Existing equal
   read/candidate bearer values fail closed instead of collapsing the contours.
 - Rollback candidate preparation now relies on the usable, typed
   last-known-good rollback proof and no longer blocks on or copies canary

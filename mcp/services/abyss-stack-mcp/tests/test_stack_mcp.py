@@ -145,6 +145,7 @@ def subject(
             "proved_process_identity": f"{organ_id}-mcp/0.1.0",
             "proved_server_schema_digest": DIGEST_D,
             "proved_consumer_registration_ref": f"config://codex/{organ_id}",
+            "proved_canary_route": f"runbook://canary/{organ_id}",
             "proved_canary_ref": f"receipt://canary/{organ_id}",
             "evidence": evidence("central-proof", owner="aoa-evals"),
         },
@@ -819,8 +820,57 @@ def test_inspection_keeps_process_endpoint_freshness_independent(
     process = app.inspect("aoa-kag", "read", view="process")
     endpoint = app.inspect("aoa-kag", "read", view="endpoint")
     assert process["owner_payload"]["observation"]["active"] is True
+    assert process["metadata"]["freshness_state"] == "exact"
     assert endpoint["owner_payload"]["observation"]["ready"] is False
     assert endpoint["owner_payload"]["observation"]["evidence"]["state"] == ("blocked")
+    assert endpoint["owner_payload"]["observation"][
+        "effective_evidence_state"
+    ] == ("blocked")
+    assert endpoint["metadata"]["freshness_state"] == "blocked"
+
+
+@pytest.mark.parametrize(
+    "view",
+    ("process", "proof", "acceptance", "canary", "rollback"),
+)
+def test_inspection_folds_selected_expired_link_into_freshness(
+    tmp_path: Path,
+    view: str,
+) -> None:
+    payload = observation(subject())
+    selected_evidence = payload["subjects"][0][view]["evidence"]
+    selected_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    selected_evidence["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    app = application(tmp_path, payload=payload)
+
+    result = app.inspect("aoa-kag", "read", view=view)
+
+    assert result["metadata"]["freshness_state"] == "stale_readable"
+    observation_payload = result["owner_payload"]["observation"]
+    evidence_payload = observation_payload["evidence"]
+    assert evidence_payload["state"] == "exact"
+    assert observation_payload["effective_evidence_state"] == "stale_readable"
+
+
+def test_inspection_folds_snapshot_future_process_link_into_freshness(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    process_evidence = payload["subjects"][0]["process"]["evidence"]
+    snapshot_future = (NOW + timedelta(seconds=31)).isoformat()
+    process_evidence["observed_at"] = snapshot_future
+    process_evidence["evidence_refs"][0]["observed_at"] = snapshot_future
+    app = application(tmp_path, payload=payload)
+
+    result = app.inspect("aoa-kag", "read", view="process")
+
+    assert result["metadata"]["freshness_state"] == "blocked"
+    observation_payload = result["owner_payload"]["observation"]
+    evidence_payload = observation_payload["evidence"]
+    assert evidence_payload["state"] == "exact"
+    assert observation_payload["effective_evidence_state"] == "blocked"
 
 
 def test_read_process_has_no_plan_capability(tmp_path: Path) -> None:
@@ -864,6 +914,7 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["steps"][3]["action"] == "admit-registry-entry"
     assert plan["steps"][3]["exact_target"] == f"abyss-private@{DIGEST_A}"
     assert plan["steps"][4]["exact_target"] == "config://codex/aoa-kag"
+    assert plan["steps"][5]["exact_target"] == "runbook://canary/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
@@ -1261,6 +1312,7 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     proof["proved_process_identity"] = None
     proof["proved_server_schema_digest"] = None
     proof["proved_consumer_registration_ref"] = None
+    proof["proved_canary_route"] = None
     proof["proved_canary_ref"] = None
     proof["evidence"] = evidence("central-proof", state="unknown")
     cases.append((payload, "central_proof_not_proven"))
@@ -1280,6 +1332,12 @@ def test_activation_requires_usable_freshness_and_runtime_readiness(
     payload = observation(subject())
     payload["subjects"][0]["proof"]["proved_process_identity"] = (
         "aoa-kag-mcp/previous-process"
+    )
+    cases.append((payload, "central_proof_target_mismatch"))
+
+    payload = observation(subject())
+    payload["subjects"][0]["canary"]["canary_route"] = (
+        "runbook://canary/aoa-kag/unproved-route"
     )
     cases.append((payload, "central_proof_target_mismatch"))
 

@@ -547,6 +547,10 @@ def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
     invalid_payloads.append(payload)
 
     payload = copy.deepcopy(example)
+    payload["subjects"][0]["proof"]["proved_canary_route"] = None
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
     payload["subjects"][0]["rollback"]["proof_ref"] = None
     invalid_payloads.append(payload)
 

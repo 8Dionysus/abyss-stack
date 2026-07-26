@@ -534,6 +534,15 @@ class StackMCPApplication:
         now = self._now()
         subject = self._find_subject(observation, organ_id, policy_family)
         payload = self._view(observation, subject, view, now)
+        freshness_states = [
+            self._observation_freshness(observation, subject, now),
+            *self._view_link_states(
+                observation,
+                subject,
+                view,
+                now,
+            ),
+        ]
         return self._result(
             observation,
             digest,
@@ -546,11 +555,7 @@ class StackMCPApplication:
                 "observation": payload,
             },
             now=now,
-            freshness_state=self._observation_freshness(
-                observation,
-                subject,
-                now,
-            ),
+            freshness_state=self._worst_state(freshness_states),
             freshness_scope=f"{organ_id}/{policy_family}",
         )
 
@@ -741,11 +746,7 @@ class StackMCPApplication:
         now: datetime,
     ) -> dict[str, str]:
         def state(link: LinkEvidence) -> str:
-            return cls._effective_link_state(
-                link,
-                now,
-                snapshot_at=observation.generated_at,
-            )
+            return cls._read_link_state(observation, link, now)
 
         return {
             "source": state(subject.source.evidence),
@@ -766,6 +767,46 @@ class StackMCPApplication:
             "canary": state(subject.canary.evidence),
             "rollback": state(subject.rollback.evidence),
         }
+
+    @classmethod
+    def _read_link_state(
+        cls,
+        observation: RuntimeObservation,
+        link: LinkEvidence,
+        now: datetime,
+    ) -> str:
+        return cls._effective_link_state(
+            link,
+            now,
+            snapshot_at=observation.generated_at,
+        )
+
+    @classmethod
+    def _view_link_states(
+        cls,
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        view: ObservationView,
+        now: datetime,
+    ) -> tuple[str, ...]:
+        states = cls._link_states(observation, subject, now)
+        selected_names = {
+            "identity": ("source", "package", "deploy"),
+            "parity": ("source", "package", "deploy"),
+            "process": ("process",),
+            "endpoint": ("endpoint",),
+            "registry": ("registry",),
+            "consumer": ("consumer",),
+            "schema": ("endpoint", "consumer"),
+            "freshness": (),
+            "proof": ("proof",),
+            "acceptance": ("acceptance",),
+            "canary": ("canary",),
+            "rollback": ("rollback",),
+            "drift": tuple(states),
+            "full": tuple(states),
+        }[view]
+        return tuple(states[name] for name in selected_names)
 
     @staticmethod
     def _worst_state(states: list[str]) -> str:
@@ -828,14 +869,32 @@ class StackMCPApplication:
         view: ObservationView,
         now: datetime,
     ) -> Any:
+        def with_effective_evidence(value: Any, link: LinkEvidence) -> Any:
+            payload = value.model_dump(mode="json")
+            payload["effective_evidence_state"] = self._read_link_state(
+                observation,
+                link,
+                now,
+            )
+            return payload
+
         if view == "identity":
             return {
                 "owners": subject.owners.model_dump(mode="json"),
                 "credential_class": subject.credential_class,
                 "effect_classes": list(subject.effect_classes),
-                "source": subject.source.model_dump(mode="json"),
-                "package": subject.package.model_dump(mode="json"),
-                "deploy": subject.deploy.model_dump(mode="json"),
+                "source": with_effective_evidence(
+                    subject.source,
+                    subject.source.evidence,
+                ),
+                "package": with_effective_evidence(
+                    subject.package,
+                    subject.package.evidence,
+                ),
+                "deploy": with_effective_evidence(
+                    subject.deploy,
+                    subject.deploy.evidence,
+                ),
             }
         if view == "parity":
             return {
@@ -850,16 +909,33 @@ class StackMCPApplication:
                 ),
             }
         if view == "process":
-            return subject.process.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.process,
+                subject.process.evidence,
+            )
         if view == "endpoint":
-            return subject.endpoint.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.endpoint,
+                subject.endpoint.evidence,
+            )
         if view == "registry":
-            return subject.registry.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.registry,
+                subject.registry.evidence,
+            )
         if view == "consumer":
-            return [consumer.model_dump(mode="json") for consumer in subject.consumers]
+            return [
+                with_effective_evidence(consumer, consumer.evidence)
+                for consumer in subject.consumers
+            ]
         if view == "schema":
+            link_states = self._link_states(observation, subject, now)
             return {
                 "server_schema_digest": subject.endpoint.server_schema_digest,
+                "effective_link_states": {
+                    "endpoint": link_states["endpoint"],
+                    "consumer": link_states["consumer"],
+                },
                 "consumer_observations": [
                     {
                         "consumer_id": consumer.consumer_id,
@@ -878,13 +954,25 @@ class StackMCPApplication:
             )
             return payload
         if view == "proof":
-            return subject.proof.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.proof,
+                subject.proof.evidence,
+            )
         if view == "acceptance":
-            return subject.acceptance.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.acceptance,
+                subject.acceptance.evidence,
+            )
         if view == "canary":
-            return subject.canary.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.canary,
+                subject.canary.evidence,
+            )
         if view == "rollback":
-            return subject.rollback.model_dump(mode="json")
+            return with_effective_evidence(
+                subject.rollback,
+                subject.rollback.evidence,
+            )
         if view == "drift":
             return {
                 "states": self._link_states(
@@ -917,7 +1005,13 @@ class StackMCPApplication:
                     }
                 ),
             }
-        return subject.model_dump(mode="json")
+        payload = subject.model_dump(mode="json")
+        payload["effective_link_states"] = self._link_states(
+            observation,
+            subject,
+            now,
+        )
+        return payload
 
     def _plan_blockers(
         self,
@@ -986,6 +1080,8 @@ class StackMCPApplication:
                 != subject.process.process_identity
                 or subject.proof.proved_server_schema_digest
                 != subject.endpoint.server_schema_digest
+                or subject.proof.proved_canary_route
+                != subject.canary.canary_route
                 or subject.proof.proved_canary_ref != subject.canary.canary_ref
                 or (bool(compatible_consumers) and not proof_consumers)
             ):

@@ -145,6 +145,9 @@ def observation_example() -> dict[str, Any]:
                     "proved_consumer_registration_ref": (
                         "example://consumer/aoa-kag"
                     ),
+                    "proved_canary_route": (
+                        "example://canary-route/aoa-kag"
+                    ),
                     "proved_canary_ref": "example://canary/aoa-kag",
                     "evidence": evidence("central-proof", owner="aoa-evals"),
                 },

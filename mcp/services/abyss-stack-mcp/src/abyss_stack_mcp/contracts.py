@@ -491,6 +491,7 @@ class CentralProofObservation(StrictModel):
                             "proved_consumer_registration_ref": {
                                 "type": "string"
                             },
+                            "proved_canary_route": {"type": "string"},
                             "proved_canary_ref": {"type": "string"},
                             "evidence": {
                                 "properties": {
@@ -512,6 +513,7 @@ class CentralProofObservation(StrictModel):
                             "proved_process_identity",
                             "proved_server_schema_digest",
                             "proved_consumer_registration_ref",
+                            "proved_canary_route",
                             "proved_canary_ref",
                             "evidence",
                         ],
@@ -531,6 +533,7 @@ class CentralProofObservation(StrictModel):
     proved_process_identity: NonEmpty | None = None
     proved_server_schema_digest: Digest | None = None
     proved_consumer_registration_ref: NonEmpty | None = None
+    proved_canary_route: NonEmpty | None = None
     proved_canary_ref: NonEmpty | None = None
     evidence: LinkEvidence
 
@@ -552,6 +555,7 @@ class CentralProofObservation(StrictModel):
             self.proved_process_identity,
             self.proved_server_schema_digest,
             self.proved_consumer_registration_ref,
+            self.proved_canary_route,
             self.proved_canary_ref,
         )
         if self.verdict == "passed" and (
