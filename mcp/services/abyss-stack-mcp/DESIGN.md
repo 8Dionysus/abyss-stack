@@ -62,7 +62,8 @@ Python or import newly synced `Configs/src` over the installed package.
 Provisioning is explicit and does not start or register either plane.
 
 `rollback_required` is admissible only for the failed source/package/deploy
-links of a rollback plan. Other unusable states remain blocked, and usable
+links of a rollback plan, and only while the triggering link and its evidence
+refs remain unexpired. Other unusable states remain blocked, and usable
 freshness plus exact rollback evidence are still mandatory.
 
 Published JSON Schema carries all structurally expressible conditional model

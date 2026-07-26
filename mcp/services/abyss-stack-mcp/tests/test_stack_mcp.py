@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from abyss_stack_mcp.contracts import RuntimeObservation
+from abyss_stack_mcp.cli import main as cli_main
 from abyss_stack_mcp.core import (
     ObservationStore,
     StackMCPApplication,
@@ -228,6 +230,14 @@ def test_contract_is_strict_and_policy_effects_are_bounded() -> None:
         state="compatible_drift",
     )
     with pytest.raises(ValidationError, match="usable link requires evidence"):
+        RuntimeObservation.model_validate(payload)
+
+    payload = observation(subject())
+    payload["subjects"][0]["source"]["evidence"] = evidence(
+        "source",
+        state="rollback_required",
+    )
+    with pytest.raises(ValidationError, match="rollback-required link requires"):
         RuntimeObservation.model_validate(payload)
 
     payload = observation(subject())
@@ -626,6 +636,24 @@ def test_rollback_plan_accepts_fresh_rollback_required_deploy_links(
         "source",
         state="blocked",
     )
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="source_identity_not_usable"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "rollback",
+            expected_observation_digest=digest,
+        )
+
+    payload = observation(subject())
+    source_evidence = payload["subjects"][0]["source"]["evidence"]
+    source_evidence["state"] = "rollback_required"
+    source_evidence["reason_codes"] = ["failed-rollout"]
+    source_evidence["expires_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    source_evidence["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
     app = application(tmp_path, policy_family="candidate", payload=payload)
     _, digest = app.store.load()
     with pytest.raises(StackMCPError, match="source_identity_not_usable"):
@@ -1116,6 +1144,35 @@ def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> Non
     assert inspect_policy["const"] == "read"
     assert "proof" in inspect_views
     assert "acceptance" in inspect_views
+
+
+@pytest.mark.parametrize("view", ("proof", "acceptance"))
+def test_portable_cli_exposes_governed_activation_views(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    view: str,
+) -> None:
+    path = write_observation(tmp_path / "observation.json")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "abyss-stack-mcp",
+            "--observation-path",
+            str(path),
+            "inspect",
+            "aoa-kag",
+            "read",
+            "--view",
+            view,
+        ],
+    )
+
+    cli_main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["owner_payload"]["view"] == view
 
 
 def test_policy_contours_use_distinct_ports_credentials_and_scopes(

@@ -59,6 +59,9 @@ future-dated observations, required links, evidence refs, freshness, or deploy
 timestamps beyond it. Required observations must also fall no later than 30
 seconds after their enclosing observation snapshot, so an older snapshot
 cannot carry causally newer proof.
+`rollback_required` is accepted only while its own link and evidence refs are
+unexpired; a bare or expired rollback signal is a controlled precondition
+failure.
 
 ## Observation input
 
@@ -90,6 +93,8 @@ runtime capture nor admission evidence.
 ```bash
 python -m pip install -e mcp/services/abyss-stack-mcp
 abyss-stack-mcp --observation-path /path/to/observation.json catalog
+abyss-stack-mcp --observation-path /path/to/observation.json \
+  inspect aoa-kag read --view proof
 ABYSS_STACK_MCP_POLICY_FAMILY=read abyss-stack-mcp-server
 ```
 

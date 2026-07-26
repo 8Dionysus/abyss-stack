@@ -28,6 +28,8 @@
   candidate;
 - required evidence timestamps cannot postdate the observation snapshot beyond
   the bounded clock-skew allowance;
+- rollback-required links need explicit unexpired evidence and cannot fail late
+  through candidate-model validation;
 - server-side read-subject filtering before catalog result construction and
   higher-policy inspection rejection before observation loading;
 - server-side policy checks independent of MCP annotations or model behavior.

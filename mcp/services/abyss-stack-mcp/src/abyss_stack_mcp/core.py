@@ -398,7 +398,11 @@ class StackMCPApplication:
         link: LinkEvidence,
         now: datetime,
     ) -> str:
-        if link.state not in {"exact", "compatible_drift"}:
+        if link.state not in {
+            "exact",
+            "compatible_drift",
+            "rollback_required",
+        }:
             return link.state
         link_expired = link.expires_at is not None and link.expires_at <= now
         evidence_expired = any(

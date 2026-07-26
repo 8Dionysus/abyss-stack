@@ -42,6 +42,8 @@ def main() -> None:
             "consumer",
             "schema",
             "freshness",
+            "proof",
+            "acceptance",
             "canary",
             "rollback",
             "drift",

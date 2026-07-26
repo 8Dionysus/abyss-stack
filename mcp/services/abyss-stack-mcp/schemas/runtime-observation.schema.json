@@ -712,6 +712,25 @@
               "reason_codes"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "rollback_required"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
         }
       ],
       "properties": {

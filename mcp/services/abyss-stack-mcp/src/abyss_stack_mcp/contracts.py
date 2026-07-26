@@ -121,6 +121,15 @@ class LinkEvidence(StrictModel):
                         "required": ["reason_codes"],
                     },
                 },
+                {
+                    "if": {
+                        "properties": {"state": {"const": "rollback_required"}},
+                        "required": ["state"],
+                    },
+                    "then": {
+                        "properties": {"evidence_refs": {"minItems": 1}},
+                    },
+                },
             ]
         },
     )
@@ -141,6 +150,8 @@ class LinkEvidence(StrictModel):
             raise ValueError("link expiry must follow observation")
         if self.state in {"exact", "compatible_drift"} and not self.evidence_refs:
             raise ValueError("a usable link requires evidence")
+        if self.state == "rollback_required" and not self.evidence_refs:
+            raise ValueError("a rollback-required link requires evidence")
         if self.state != "exact" and not self.reason_codes:
             raise ValueError("a non-exact link requires reason codes")
         return self
