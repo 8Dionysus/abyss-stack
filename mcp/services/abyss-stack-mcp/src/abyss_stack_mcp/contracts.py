@@ -83,6 +83,45 @@ class EvidenceRef(StrictModel):
 
 
 class LinkEvidence(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "state": {"enum": ["exact", "compatible_drift"]}
+                        },
+                        "required": ["state"],
+                    },
+                    "then": {
+                        "properties": {"evidence_refs": {"minItems": 1}},
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "state": {
+                                "enum": [
+                                    "compatible_drift",
+                                    "stale_readable",
+                                    "blocked",
+                                    "unknown",
+                                    "rollback_required",
+                                ]
+                            }
+                        },
+                        "required": ["state"],
+                    },
+                    "then": {
+                        "properties": {"reason_codes": {"minItems": 1}},
+                        "required": ["reason_codes"],
+                    },
+                },
+            ]
+        },
+    )
     state: LinkState
     observed_at: datetime
     expires_at: datetime | None = None
@@ -150,9 +189,29 @@ class ProcessObservation(StrictModel):
 
 
 class EndpointObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"ready": {"const": True}},
+                        "required": ["ready"],
+                    },
+                    "then": {
+                        "properties": {
+                            "server_schema_digest": {"type": "string"},
+                        },
+                        "required": ["server_schema_digest"],
+                    },
+                }
+            ]
+        },
+    )
     transport: Literal["stdio", "streamable-http"]
     endpoint_ref: NonEmpty
-    protocol_versions: tuple[NonEmpty, ...]
+    protocol_versions: Annotated[tuple[NonEmpty, ...], Field(min_length=1)]
     ready: bool
     server_schema_digest: Digest | None = None
     evidence: LinkEvidence
@@ -193,6 +252,30 @@ class RegistryObservation(StrictModel):
 
 
 class ConsumerObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"registered": {"const": True}},
+                        "required": ["registered"],
+                    },
+                    "then": {
+                        "properties": {
+                            "observed_schema_digest": {"type": "string"},
+                            "observed_protocol_versions": {"minItems": 1},
+                        },
+                        "required": [
+                            "observed_schema_digest",
+                            "observed_protocol_versions",
+                        ],
+                    },
+                }
+            ]
+        },
+    )
     consumer_id: Identifier
     registration_ref: NonEmpty
     registered: bool
@@ -212,6 +295,49 @@ class ConsumerObservation(StrictModel):
 
 
 class FreshnessObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "state": {"enum": ["exact", "compatible_drift"]}
+                        },
+                        "required": ["state"],
+                    },
+                    "then": {
+                        "properties": {
+                            "provider_watermark": {"type": "string"},
+                            "evidence_refs": {"minItems": 1},
+                        },
+                        "required": ["provider_watermark", "evidence_refs"],
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "state": {
+                                "enum": [
+                                    "compatible_drift",
+                                    "stale_readable",
+                                    "blocked",
+                                    "unknown",
+                                    "rollback_required",
+                                ]
+                            }
+                        },
+                        "required": ["state"],
+                    },
+                    "then": {
+                        "properties": {"reason_codes": {"minItems": 1}},
+                        "required": ["reason_codes"],
+                    },
+                },
+            ]
+        },
+    )
     state: LinkState
     provider_watermark: NonEmpty | None = None
     observed_at: datetime
@@ -241,6 +367,32 @@ class FreshnessObservation(StrictModel):
 
 
 class CanaryObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"succeeded": {"const": True}},
+                        "required": ["succeeded"],
+                    },
+                    "then": {
+                        "properties": {
+                            "result_grounded": {"const": True},
+                            "canary_ref": {"type": "string"},
+                            "evidence": {
+                                "properties": {
+                                    "evidence_refs": {"minItems": 1},
+                                }
+                            },
+                        },
+                        "required": ["result_grounded", "canary_ref", "evidence"],
+                    },
+                }
+            ]
+        },
+    )
     succeeded: bool
     result_grounded: bool
     canary_route: NonEmpty
@@ -261,6 +413,30 @@ class CanaryObservation(StrictModel):
 
 
 class RollbackObservation(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"ready": {"const": True}},
+                        "required": ["ready"],
+                    },
+                    "then": {
+                        "properties": {
+                            "last_known_good_package_digest": {"type": "string"},
+                            "proof_ref": {"type": "string"},
+                        },
+                        "required": [
+                            "last_known_good_package_digest",
+                            "proof_ref",
+                        ],
+                    },
+                }
+            ]
+        },
+    )
     ready: bool
     rollback_route: NonEmpty
     last_known_good_package_digest: Digest | None = None
@@ -279,22 +455,95 @@ class RollbackObservation(StrictModel):
 
 
 class RuntimeSubject(StrictModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"policy_family": {"const": "read"}},
+                        "required": ["policy_family"],
+                    },
+                    "then": {
+                        "properties": {
+                            "effect_classes": {
+                                "items": {
+                                    "enum": ["observe", "derive", "validate"]
+                                }
+                            }
+                        }
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {"policy_family": {"const": "candidate"}},
+                        "required": ["policy_family"],
+                    },
+                    "then": {
+                        "properties": {
+                            "effect_classes": {
+                                "items": {"const": "prepare_candidate"}
+                            }
+                        }
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "policy_family": {"const": "internal_effect"}
+                        },
+                        "required": ["policy_family"],
+                    },
+                    "then": {
+                        "properties": {
+                            "effect_classes": {
+                                "items": {
+                                    "enum": ["apply_runtime", "accept_source"]
+                                }
+                            }
+                        }
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "policy_family": {"const": "external_effect"}
+                        },
+                        "required": ["policy_family"],
+                    },
+                    "then": {
+                        "properties": {
+                            "effect_classes": {
+                                "items": {
+                                    "enum": ["external_emit", "external_change"]
+                                }
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+    )
     organ_id: Identifier
     policy_family: PolicyFamily
     owners: OwnerRoles
     credential_class: Identifier
-    effect_classes: tuple[
-        Literal[
-            "observe",
-            "derive",
-            "validate",
-            "prepare_candidate",
-            "apply_runtime",
-            "accept_source",
-            "external_emit",
-            "external_change",
+    effect_classes: Annotated[
+        tuple[
+            Literal[
+                "observe",
+                "derive",
+                "validate",
+                "prepare_candidate",
+                "apply_runtime",
+                "accept_source",
+                "external_emit",
+                "external_change",
+            ],
+            ...,
         ],
-        ...,
+        Field(min_length=1),
     ]
     source: SourceIdentity
     package: PackageIdentity
@@ -380,7 +629,7 @@ class RuntimePlanCandidate(StrictModel):
     deployed_revision: NonEmpty
     exact_unit_name: UnitName
     precondition_evidence: tuple[EvidenceRef, ...]
-    steps: tuple[PlanStep, ...]
+    steps: Annotated[tuple[PlanStep, ...], Field(min_length=1)]
     rollback_route: NonEmpty
     created_at: datetime
     expires_at: datetime

@@ -21,6 +21,10 @@ Tracking starts with the community-docs baseline for this repository.
   unit activation, and fails activation-plan preparation on unusable
   freshness, endpoint/process unreadiness, incompatible consumers, ungrounded
   canaries, or missing rollback proof.
+- Published stack MCP schemas now encode conditional runtime invariants;
+  freshness includes supporting-ref expiry, plan TTL cannot outlive any copied
+  precondition, and activation steps name the exact selected compatible
+  consumer registration.
 - A distinct, inert `aoa-routing-cutover` path now admits only a
   receipt-bound `aoa-sdk` canonical routing release with exact public-release
   runtime trust, verified subject-store bytes, explicit G5 authority, atomic

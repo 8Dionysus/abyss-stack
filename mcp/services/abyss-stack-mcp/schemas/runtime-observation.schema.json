@@ -2,6 +2,42 @@
   "$defs": {
     "CanaryObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "succeeded": {
+                "const": true
+              }
+            },
+            "required": [
+              "succeeded"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canary_ref": {
+                "type": "string"
+              },
+              "evidence": {
+                "properties": {
+                  "evidence_refs": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "result_grounded": {
+                "const": true
+              }
+            },
+            "required": [
+              "result_grounded",
+              "canary_ref",
+              "evidence"
+            ]
+          }
+        }
+      ],
       "properties": {
         "canary_ref": {
           "anyOf": [
@@ -46,6 +82,34 @@
     },
     "ConsumerObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "registered": {
+                "const": true
+              }
+            },
+            "required": [
+              "registered"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observed_protocol_versions": {
+                "minItems": 1
+              },
+              "observed_schema_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "observed_schema_digest",
+              "observed_protocol_versions"
+            ]
+          }
+        }
+      ],
       "properties": {
         "consumer_id": {
           "maxLength": 160,
@@ -141,6 +205,30 @@
     },
     "EndpointObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "then": {
+            "properties": {
+              "server_schema_digest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "server_schema_digest"
+            ]
+          }
+        }
+      ],
       "properties": {
         "endpoint_ref": {
           "maxLength": 2048,
@@ -157,6 +245,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "minItems": 1,
           "title": "Protocol Versions",
           "type": "array"
         },
@@ -248,6 +337,65 @@
     },
     "FreshnessObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "exact",
+                  "compatible_drift"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              },
+              "provider_watermark": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider_watermark",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "compatible_drift",
+                  "stale_readable",
+                  "blocked",
+                  "unknown",
+                  "rollback_required"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "reason_codes"
+            ]
+          }
+        }
+      ],
       "properties": {
         "evidence_refs": {
           "items": {
@@ -315,6 +463,58 @@
     },
     "LinkEvidence": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "exact",
+                  "compatible_drift"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "compatible_drift",
+                  "stale_readable",
+                  "blocked",
+                  "unknown",
+                  "rollback_required"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "reason_codes"
+            ]
+          }
+        }
+      ],
       "properties": {
         "evidence_refs": {
           "items": {
@@ -545,6 +745,34 @@
     },
     "RollbackObservation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ready": {
+                "const": true
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "then": {
+            "properties": {
+              "last_known_good_package_digest": {
+                "type": "string"
+              },
+              "proof_ref": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "last_known_good_package_digest",
+              "proof_ref"
+            ]
+          }
+        }
+      ],
       "properties": {
         "evidence": {
           "$ref": "#/$defs/LinkEvidence"
@@ -597,6 +825,102 @@
     },
     "RuntimeSubject": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "read"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "observe",
+                    "derive",
+                    "validate"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "candidate"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "const": "prepare_candidate"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "internal_effect"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "apply_runtime",
+                    "accept_source"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy_family": {
+                "const": "external_effect"
+              }
+            },
+            "required": [
+              "policy_family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect_classes": {
+                "items": {
+                  "enum": [
+                    "external_emit",
+                    "external_change"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "canary": {
           "$ref": "#/$defs/CanaryObservation"
@@ -632,6 +956,7 @@
             ],
             "type": "string"
           },
+          "minItems": 1,
           "title": "Effect Classes",
           "type": "array"
         },

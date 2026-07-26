@@ -26,6 +26,10 @@ Plan preparation therefore accepts only `exact` or `compatible_drift`
 freshness. Activation also requires process and endpoint readiness, an exact
 consumer/server schema match, at least one shared protocol version, grounded
 canary evidence, and rollback readiness.
+The compatible consumer is selected deterministically and its registration
+reference becomes the exact activation-step target. Candidate expiry is capped
+by every link and evidence ref actually copied into the plan, including
+freshness evidence.
 
 ## Progressive surface
 
@@ -48,3 +52,7 @@ authority.
 Managed units execute a stack-owned, source-addressed virtual environment under
 `Services/abyss-stack-mcp`; they never inherit dependencies from ambient
 Python. Provisioning is explicit and does not start or register either plane.
+
+Published JSON Schema carries all structurally expressible conditional model
+invariants. Runtime Pydantic validation additionally owns cross-field time
+ordering, uniqueness, and content-address verification.

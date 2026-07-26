@@ -15,6 +15,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from .contracts import (
+    ConsumerObservation,
+    EvidenceRef,
     LinkEvidence,
     ObservationView,
     PlanKind,
@@ -266,6 +268,17 @@ class StackMCPApplication:
             raise StackMCPError(
                 "plan preconditions are not satisfied: " + ", ".join(blockers)
             )
+        activation_consumer = (
+            self._compatible_consumers(subject, now)[0]
+            if plan_kind == "activate"
+            else None
+        )
+        plan_links = self._plan_links(
+            subject,
+            plan_kind,
+            activation_consumer=activation_consumer,
+        )
+        precondition_evidence = self._plan_evidence(subject, plan_links)
         unsigned = {
             "schema_version": "abyss_stack_runtime_plan_candidate_v1",
             "plan_kind": plan_kind,
@@ -282,17 +295,24 @@ class StackMCPApplication:
             "exact_unit_name": subject.process.unit_name,
             "precondition_evidence": [
                 evidence.model_dump(mode="json")
-                for evidence in self._plan_evidence(subject)
+                for evidence in precondition_evidence
             ],
             "steps": [
-                step.model_dump(mode="json") for step in self._steps(subject, plan_kind)
+                step.model_dump(mode="json")
+                for step in self._steps(
+                    subject,
+                    plan_kind,
+                    activation_consumer=activation_consumer,
+                )
             ],
             "rollback_route": subject.rollback.rollback_route,
             "created_at": now.isoformat().replace("+00:00", "Z"),
-            "expires_at": min(
-                now + timedelta(minutes=10),
-                observation.expires_at,
-                subject.freshness.expires_at,
+            "expires_at": self._plan_expiry(
+                observation,
+                subject,
+                plan_links,
+                precondition_evidence,
+                now,
             )
             .isoformat()
             .replace("+00:00", "Z"),
@@ -388,7 +408,13 @@ class StackMCPApplication:
         subject: RuntimeSubject,
         now: datetime,
     ) -> str:
-        if subject.freshness.expires_at <= now:
+        if subject.freshness.state not in {"exact", "compatible_drift"}:
+            return subject.freshness.state
+        evidence_expired = any(
+            evidence.expires_at is not None and evidence.expires_at <= now
+            for evidence in subject.freshness.evidence_refs
+        )
+        if subject.freshness.expires_at <= now or evidence_expired:
             return "stale_readable"
         return subject.freshness.state
 
@@ -514,15 +540,7 @@ class StackMCPApplication:
             ]
             if not usable_consumers:
                 blockers.append("no_registered_consumer")
-            elif not any(
-                consumer.observed_schema_digest
-                == subject.endpoint.server_schema_digest
-                and bool(
-                    set(consumer.observed_protocol_versions)
-                    & set(subject.endpoint.protocol_versions)
-                )
-                for consumer in usable_consumers
-            ):
+            elif not self._compatible_consumers(subject, now):
                 blockers.append("no_compatible_registered_consumer")
             if (
                 not subject.canary.succeeded
@@ -544,20 +562,78 @@ class StackMCPApplication:
                 blockers.append("rollback_not_proven")
         return blockers
 
+    @classmethod
+    def _compatible_consumers(
+        cls,
+        subject: RuntimeSubject,
+        now: datetime,
+    ) -> tuple[ConsumerObservation, ...]:
+        compatible = [
+            consumer
+            for consumer in subject.consumers
+            if consumer.registered
+            and cls._effective_link_state(consumer.evidence, now)
+            in {"exact", "compatible_drift"}
+            and consumer.observed_schema_digest
+            == subject.endpoint.server_schema_digest
+            and bool(
+                set(consumer.observed_protocol_versions)
+                & set(subject.endpoint.protocol_versions)
+            )
+        ]
+        return tuple(
+            sorted(
+                compatible,
+                key=lambda consumer: (
+                    consumer.consumer_id,
+                    consumer.registration_ref,
+                ),
+            )
+        )
+
     @staticmethod
-    def _plan_evidence(subject: RuntimeSubject) -> tuple[Any, ...]:
-        unique: dict[tuple[str, str, str], Any] = {}
-        for link in (
+    def _plan_links(
+        subject: RuntimeSubject,
+        plan_kind: PlanKind,
+        *,
+        activation_consumer: ConsumerObservation | None,
+    ) -> tuple[LinkEvidence, ...]:
+        links = [
             subject.source.evidence,
             subject.package.evidence,
             subject.deploy.evidence,
-            subject.process.evidence,
-            subject.endpoint.evidence,
-            subject.registry.evidence,
-            *(consumer.evidence for consumer in subject.consumers),
-            subject.canary.evidence,
-            subject.rollback.evidence,
-        ):
+        ]
+        if plan_kind in {"activate", "restart"}:
+            links.extend(
+                (
+                    subject.process.evidence,
+                    subject.endpoint.evidence,
+                    subject.registry.evidence,
+                )
+            )
+        if plan_kind == "activate":
+            if activation_consumer is None:
+                raise StackMCPError(
+                    "activation plan requires one exact compatible consumer"
+                )
+            links.extend(
+                (
+                    activation_consumer.evidence,
+                    subject.canary.evidence,
+                    subject.rollback.evidence,
+                )
+            )
+        elif plan_kind == "rollback":
+            links.append(subject.rollback.evidence)
+        return tuple(links)
+
+    @staticmethod
+    def _plan_evidence(
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+    ) -> tuple[EvidenceRef, ...]:
+        unique: dict[tuple[str, str, str], EvidenceRef] = {}
+        for link in links:
             for evidence in link.evidence_refs:
                 unique[
                     (
@@ -577,10 +653,37 @@ class StackMCPApplication:
         return tuple(unique[key] for key in sorted(unique))
 
     @staticmethod
+    def _plan_expiry(
+        observation: RuntimeObservation,
+        subject: RuntimeSubject,
+        links: tuple[LinkEvidence, ...],
+        precondition_evidence: tuple[EvidenceRef, ...],
+        now: datetime,
+    ) -> datetime:
+        expiries = [
+            now + timedelta(minutes=10),
+            observation.expires_at,
+            subject.freshness.expires_at,
+        ]
+        expiries.extend(
+            link.expires_at for link in links if link.expires_at is not None
+        )
+        expiries.extend(
+            evidence.expires_at
+            for evidence in precondition_evidence
+            if evidence.expires_at is not None
+        )
+        return min(expiries)
+
+    @staticmethod
     def _steps(
         subject: RuntimeSubject,
         plan_kind: PlanKind,
+        *,
+        activation_consumer: ConsumerObservation | None,
     ) -> tuple[PlanStep, ...]:
+        if plan_kind == "activate" and activation_consumer is None:
+            raise StackMCPError("activation plan requires a compatible consumer")
         actions = {
             "sync": (
                 ("verify-source-revision", subject.source.revision),
@@ -594,7 +697,14 @@ class StackMCPApplication:
             ),
             "activate": (
                 ("verify-registry-admission", subject.registry.registry_id),
-                ("verify-consumer-registration", subject.organ_id),
+                (
+                    "verify-consumer-registration",
+                    (
+                        activation_consumer.registration_ref
+                        if activation_consumer is not None
+                        else "missing-compatible-consumer"
+                    ),
+                ),
                 ("run-grounded-canary", subject.canary.canary_route),
             ),
             "restart": (

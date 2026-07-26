@@ -206,6 +206,7 @@
       "items": {
         "$ref": "#/$defs/PlanStep"
       },
+      "minItems": 1,
       "title": "Steps",
       "type": "array"
     },

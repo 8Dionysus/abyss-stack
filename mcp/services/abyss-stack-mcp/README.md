@@ -32,7 +32,10 @@ most ten minutes, and stops on observation drift or precondition mismatch.
 Every plan requires usable subject freshness. Activation additionally requires
 an active process, a ready endpoint, a registered consumer with the exact
 server schema digest and an overlapping MCP protocol version, a grounded
-canary, and usable rollback proof.
+canary, and usable rollback proof. The selected compatible consumer's exact
+`registration_ref` is embedded in the activation step. A plan expires at the
+earliest of ten minutes, its observation/freshness envelopes, every required
+link, and every copied evidence ref; it cannot outlive its proof.
 
 ## Observation input
 
@@ -47,6 +50,11 @@ The loader rejects symlinks, non-files, payloads above 2 MiB, unknown contract
 fields, secret-like keys or values, shared credential classes, non-loopback
 HTTP endpoints, and unsupported effect classes. Expired observations remain
 visible as stale read evidence but cannot produce a candidate plan.
+The generated Draft 2020-12 schema includes the conditional invariants for
+usable links and freshness, endpoint readiness, consumer registration,
+successful canaries, rollback readiness, and policy/effect pairing. The
+Pydantic loader remains the final authority for relational timestamp,
+uniqueness, and content-address checks that JSON Schema cannot express.
 
 The committed example is fictional and public-safe. It is neither a live
 runtime capture nor admission evidence.

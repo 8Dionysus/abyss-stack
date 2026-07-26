@@ -275,13 +275,13 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     first = app.prepare_plan(
         "aoa-kag",
         "read",
-        "restart",
+        "activate",
         expected_observation_digest=digest,
     )
     second = app.prepare_plan(
         "aoa-kag",
         "read",
-        "restart",
+        "activate",
         expected_observation_digest=digest,
     )
     assert first == second
@@ -290,6 +290,7 @@ def test_candidate_plan_is_content_addressed_and_never_authorized(
     assert plan["approval_required_before_execution"] is True
     assert plan["exact_unit_name"] == "aoa-mcp-http@aoa-kag.service"
     assert [step["order"] for step in plan["steps"]] == [1, 2, 3]
+    assert plan["steps"][1]["exact_target"] == "config://codex/aoa-kag"
     evidence_refs = {
         item["evidence_ref"] for item in plan["precondition_evidence"]
     }
@@ -457,6 +458,107 @@ def test_activation_rejects_incompatible_registered_consumer(
             "activate",
             expected_observation_digest=digest,
         )
+
+
+def test_activation_targets_only_the_selected_compatible_consumer(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    good = payload["subjects"][0]["consumers"][0]
+    good["consumer_id"] = "z-compatible"
+    good["registration_ref"] = "config://codex/compatible"
+    good["evidence"] = evidence("consumer-good")
+    incompatible = json.loads(json.dumps(good))
+    incompatible["consumer_id"] = "a-incompatible"
+    incompatible["registration_ref"] = "config://codex/incompatible"
+    incompatible["observed_schema_digest"] = DIGEST_A
+    incompatible["evidence"] = evidence("consumer-bad")
+    payload["subjects"][0]["consumers"] = [incompatible, good]
+
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+    plan = result["owner_payload"]["plan"]
+    assert plan["steps"][1]["exact_target"] == "config://codex/compatible"
+    evidence_refs = {
+        item["evidence_ref"] for item in plan["precondition_evidence"]
+    }
+    assert "receipt://runtime/consumer-good" in evidence_refs
+    assert "receipt://runtime/consumer-bad" not in evidence_refs
+
+
+def test_freshness_reference_expiry_is_stale_and_blocks_plans(
+    tmp_path: Path,
+) -> None:
+    payload = observation(subject())
+    payload["subjects"][0]["freshness"]["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    catalog = app.catalog()
+    assert catalog["owner_payload"]["entries"][0]["freshness_state"] == (
+        "stale_readable"
+    )
+    _, digest = app.store.load()
+    with pytest.raises(StackMCPError, match="subject_freshness_not_usable"):
+        app.prepare_plan(
+            "aoa-kag",
+            "read",
+            "activate",
+            expected_observation_digest=digest,
+        )
+
+    payload = observation(subject())
+    freshness = payload["subjects"][0]["freshness"]
+    freshness["state"] = "blocked"
+    freshness["reason_codes"] = ["provider-blocked"]
+    freshness["evidence_refs"][0]["expires_at"] = (
+        NOW + timedelta(minutes=1)
+    ).isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    assert app.catalog()["owner_payload"]["entries"][0]["freshness_state"] == (
+        "blocked"
+    )
+
+
+@pytest.mark.parametrize(
+    ("expiry_surface", "expected_expiry"),
+    [
+        ("link", NOW + timedelta(minutes=7)),
+        ("evidence", NOW + timedelta(minutes=8)),
+    ],
+)
+def test_plan_expires_with_its_earliest_precondition(
+    tmp_path: Path,
+    expiry_surface: str,
+    expected_expiry: datetime,
+) -> None:
+    payload = observation(subject())
+    if expiry_surface == "link":
+        payload["subjects"][0]["endpoint"]["evidence"]["expires_at"] = (
+            expected_expiry.isoformat()
+        )
+    else:
+        payload["subjects"][0]["source"]["evidence"]["evidence_refs"][0][
+            "expires_at"
+        ] = expected_expiry.isoformat()
+    app = application(tmp_path, policy_family="candidate", payload=payload)
+    _, digest = app.store.load()
+    result = app.prepare_plan(
+        "aoa-kag",
+        "read",
+        "activate",
+        expected_observation_digest=digest,
+    )
+    plan_expiry = datetime.fromisoformat(
+        result["owner_payload"]["plan"]["expires_at"].replace("Z", "+00:00")
+    )
+    assert plan_expiry == expected_expiry
 
 
 def test_read_and_candidate_servers_expose_disjoint_tools(tmp_path: Path) -> None:

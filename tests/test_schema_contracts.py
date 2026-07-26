@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -502,6 +503,59 @@ def test_schema_example_mapping_covers_active_json_examples() -> None:
 def test_active_examples_validate_against_schema_contracts() -> None:
     for payload_path, schema_path, mode in EXAMPLE_SCHEMA_CASES:
         validate_payload(payload_path, schema_path, mode=mode)
+
+
+def test_stack_mcp_schema_encodes_conditional_runtime_invariants() -> None:
+    schema = load_json(
+        "mcp/services/abyss-stack-mcp/schemas/runtime-observation.schema.json"
+    )
+    example = load_json(
+        "mcp/services/abyss-stack-mcp/examples/"
+        "runtime-observation.public.example.json"
+    )
+    assert isinstance(schema, dict)
+    assert isinstance(example, dict)
+    validator = Draft202012Validator(schema)
+    validator.validate(example)
+
+    invalid_payloads: list[dict] = []
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["source"]["evidence"]["evidence_refs"] = []
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    source_evidence = payload["subjects"][0]["source"]["evidence"]
+    source_evidence["state"] = "compatible_drift"
+    del source_evidence["reason_codes"]
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["endpoint"]["server_schema_digest"] = None
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["consumers"][0]["observed_protocol_versions"] = []
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["freshness"]["evidence_refs"] = []
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["canary"]["result_grounded"] = False
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["rollback"]["proof_ref"] = None
+    invalid_payloads.append(payload)
+
+    payload = copy.deepcopy(example)
+    payload["subjects"][0]["effect_classes"] = ["prepare_candidate"]
+    invalid_payloads.append(payload)
+
+    for payload in invalid_payloads:
+        assert not validator.is_valid(payload)
 
 
 def test_generated_schema_artifacts_validate_against_schema_contracts() -> None:
